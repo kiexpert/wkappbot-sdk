@@ -109,7 +109,7 @@ internal partial class Program
         int bitsPerBand = use8Band ? 4 : 2;
         int maxLevel = (1 << bitsPerBand) - 1; // 15 or 3
 
-        Console.WriteLine($"[WHISPER] Mel-Scale Spectrum Analyzer + Tokenizer ({bandCount}-band × {bitsPerBand}bit = 32bit)");
+        Console.Error.WriteLine($"[WHISPER] Mel-Scale Spectrum Analyzer + Tokenizer ({bandCount}-band × {bitsPerBand}bit = 32bit)");
         Console.WriteLine("[WHISPER] Bands (Mel-scale):");
         for (int i = 0; i < bandCount; i++)
             Console.WriteLine($"  B{i,2}: {bands[i].Lo,5}-{bands[i].Hi,5} Hz  ({bands[i].Name})");
@@ -129,10 +129,10 @@ internal partial class Program
             var cap = WaveInEvent.GetCapabilities(i);
             Console.WriteLine($"  [{i}] {cap.ProductName} ({cap.Channels}ch)");
         }
-        Console.WriteLine($"[WHISPER] Using device [{deviceIndex}]");
+        Console.Error.WriteLine($"[WHISPER] Using device [{deviceIndex}]");
         if (useRing) Console.WriteLine("[WHISPER] Ring HUD overlay enabled (--ring)");
-        if (hardKill) Console.WriteLine($"[WHISPER] DUET hard kill enabled (kill-db={killLevelDb})");
-        Console.WriteLine($"[WHISPER] Noise gate: {noiseGateDb} dBFS");
+        if (hardKill) Console.Error.WriteLine($"[WHISPER] DUET hard kill enabled (kill-db={killLevelDb})");
+        Console.Error.WriteLine($"[WHISPER] Noise gate: {noiseGateDb} dBFS");
         Console.WriteLine("[WHISPER] Press Ctrl+C to stop\n");
 
         // Ring HUD overlay (--ring mode, 8-band only for now)
@@ -144,7 +144,7 @@ internal partial class Program
             int sx = (int)System.Windows.SystemParameters.PrimaryScreenWidth - 200;
             int sy = (int)System.Windows.SystemParameters.PrimaryScreenHeight - 230;
             ringHost.Start(sx, sy);
-            Console.WriteLine($"[WHISPER] Ring overlay started at ({sx},{sy})");
+            Console.Error.WriteLine($"[WHISPER] Ring overlay started at ({sx},{sy})");
         }
 
         // Ring buffer for FFT
@@ -348,7 +348,7 @@ internal partial class Program
                 {
                     // Pipe/redirect: simple line output
                     var bars = string.Join(" ", levels.Select(l => l.ToString("X")));
-                    Console.WriteLine($"[{mode}] 0x{token:X8} [{bars}] f={frameCount}");
+                    Console.Error.WriteLine($"[{mode}] 0x{token:X8} [{bars}] f={frameCount}");
                 }
             }
         }
@@ -366,7 +366,7 @@ internal partial class Program
         }
 
         Console.WriteLine("\n[WHISPER] Stopped.");
-        Console.WriteLine($"[WHISPER] Collected {prevTokens.Count} tokens.");
+        Console.Error.WriteLine($"[WHISPER] Collected {prevTokens.Count} tokens.");
         return 0;
     }
 

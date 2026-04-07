@@ -96,7 +96,7 @@ internal partial class Program
                         if (!isDaemonTarget)
                         {
                             // Pattern only hit command args, not the daemon name — false positive guard.
-                            Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: \"{targetPattern}\" only matched cmd args)\n       cmd: {brief}");
+                            Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: \"{targetPattern}\" only matched cmd args)\n       cmd: {brief}");
                             skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
                             continue;
                         }
@@ -139,7 +139,7 @@ internal partial class Program
                     cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
                 {
                     skipped.Add($"[{p.Id}]{procName} (eye-child)");
-                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (eye-child: {cmdBrief})");
+                    Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (eye-child: {cmdBrief})");
                     continue;
                 }
 
@@ -153,7 +153,7 @@ internal partial class Program
                     if (m.Success)
                     {
                         skipped.Add($"[{p.Id}]{procName} (webbot-cdp:port={m.Groups[1].Value})");
-                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
+                        Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
                         continue;
                     }
                 }
@@ -162,7 +162,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[KILL] pid={p.Id} scan failed: {ex.Message}");
+                Console.Error.WriteLine($"[KILL] pid={p.Id} scan failed: {ex.Message}");
             }
         }
 
@@ -170,14 +170,14 @@ internal partial class Program
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             foreach (var s in skipped)
-                Console.WriteLine($"[GUARD] skipped {s} — use --allow-ancestors to override");
+                Console.Error.WriteLine($"[GUARD] skipped {s} — use --allow-ancestors to override");
             Console.ResetColor();
         }
 
         if (candidates.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[KILL] no matching processes for \"{grap}\"");
+            Console.Error.WriteLine($"[KILL] no matching processes for \"{grap}\"");
             Console.ResetColor();
             return 1;
         }
@@ -186,7 +186,7 @@ internal partial class Program
         if (candidates.Count > 1 && nthRaw == null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[KILL] ambiguous — {candidates.Count} processes match \"{grap}\". Use --nth N to target one:");
+            Console.Error.WriteLine($"[KILL] ambiguous — {candidates.Count} processes match \"{grap}\". Use --nth N to target one:");
             Console.ResetColor();
             for (int i = 0; i < candidates.Count; i++)
             {
@@ -212,7 +212,7 @@ internal partial class Program
                 if (idxList == null)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[KILL] --nth \"{term}\" is invalid or out of range (1~{candidates.Count})");
+                    Console.Error.WriteLine($"[KILL] --nth \"{term}\" is invalid or out of range (1~{candidates.Count})");
                     Console.ResetColor();
                     parseOk = false;
                     break;
@@ -238,7 +238,7 @@ internal partial class Program
 
                 if (dryRun)
                 {
-                    Console.WriteLine($"[KILL:DRY] {c.NodeKey} — {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL:DRY] {c.NodeKey} — {c.CmdBrief}");
                     killed.Add(c.NodeKey);
                     continue;
                 }
@@ -247,41 +247,41 @@ internal partial class Program
                 bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
                 if (hasWindow)
                 {
-                    Console.WriteLine($"[KILL] {c.NodeKey} — window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
                     NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
                     Thread.Sleep(800);
                     try { p.Refresh(); } catch { }
                     if (p.HasExited)
                     {
-                        Console.WriteLine($"[KILL] {c.NodeKey} — exited gracefully");
+                        Console.Error.WriteLine($"[KILL] {c.NodeKey} — exited gracefully");
                         killed.Add(c.NodeKey);
                         continue;
                     }
-                    Console.WriteLine($"[KILL] {c.NodeKey} — still alive, force kill");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — still alive, force kill");
                 }
                 else
                 {
-                    Console.WriteLine($"[KILL] {c.NodeKey} — no window, force kill\n       cmd: {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — no window, force kill\n       cmd: {c.CmdBrief}");
                 }
                 p.Kill(entireProcessTree: false);
                 killed.Add(c.NodeKey);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[KILL] {c.NodeKey} failed: {ex.Message}");
+                Console.Error.WriteLine($"[KILL] {c.NodeKey} failed: {ex.Message}");
             }
         }
 
         if (killed.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[KILL] nothing killed for \"{grap}\"");
+            Console.Error.WriteLine($"[KILL] nothing killed for \"{grap}\"");
             Console.ResetColor();
             return 1;
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
+        Console.Error.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
         Console.ResetColor();
 
         // X-ray cleanup: recover any windows left transparent by killed processes

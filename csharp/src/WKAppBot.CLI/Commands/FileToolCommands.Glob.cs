@@ -38,12 +38,12 @@ internal partial class Program
                 .Distinct().OrderBy(f => f).ToList();
             if (results.Count == 0)
             {
-                Console.WriteLine($"[GLOB] No files matching: {pattern}");
+                Console.Error.WriteLine($"[GLOB] No files matching: {pattern}");
                 return 0;
             }
             foreach (var f in results)
                 Console.WriteLine(f);
-            Console.WriteLine($"[GLOB] {results.Count} file(s)");
+            Console.Error.WriteLine($"[GLOB] {results.Count} file(s)");
             return 0;
         }
         catch (Exception ex) { return Error($"Glob failed: {ex.Message}"); }
@@ -167,7 +167,7 @@ internal partial class Program
                 Directory.CreateDirectory(dryBakDir);
                 File.WriteAllBytes(previewPath, bytes);
                 Console.Error.WriteLine("[DRY-RUN] Your write has been PROPOSED. The original file was NOT modified.");
-                Console.WriteLine($"[file write] backup -> {previewPath}");
+                Console.Error.WriteLine($"[file write] backup -> {previewPath}");
                 return 0;
             }
 
@@ -177,7 +177,7 @@ internal partial class Program
                 File.WriteAllBytes(path, bytes);
 
             var encName = encoding.HasValue ? $"CP{encoding}" : "UTF-8";
-            Console.WriteLine($"[FILE] write OK -> {path} ({bytes.Length} bytes, {encName})");
+            Console.Error.WriteLine($"[FILE] write OK -> {path} ({bytes.Length} bytes, {encName})");
             return 0;
         }
         catch (Exception ex) { return Error($"Write failed: {ex.Message}"); }
@@ -250,7 +250,7 @@ internal partial class Program
             int from = Math.Max(1, pgFrom);
             int to   = Math.Min(totalPages, pgTo == int.MaxValue ? totalPages : pgTo);
 
-            Console.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to}){(deepOcr ? " [+OCR-DEEP]" : useOcr ? " [+OCR]" : "")}");
+            Console.Error.WriteLine($"[PDF] {path} ({totalPages} pages, showing {from}-{to}){(deepOcr ? " [+OCR-DEEP]" : useOcr ? " [+OCR]" : "")}");
 
             // Load Windows.Data.Pdf for rendering (OCR mode)
             Windows.Data.Pdf.PdfDocument? winPdf = null;
@@ -266,7 +266,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[PDF] OCR init failed: {ex.Message} — continuing without OCR");
+                    Console.Error.WriteLine($"[PDF] OCR init failed: {ex.Message} — continuing without OCR");
                     useOcr = false;
                 }
             }
@@ -312,7 +312,7 @@ internal partial class Program
                             var deepText = await DeepScanOcrAsync(bmp, ocr, pageOcr, t =>
                             {
                                 if (deepHits == 0) Console.WriteLine();
-                                Console.WriteLine($"[OCR-DEEP] → {t}");
+                                Console.Error.WriteLine($"[OCR-DEEP] → {t}");
                                 deepHits++;
                             });
                             if (deepHits == 0) Console.WriteLine(" nothing new");
@@ -325,7 +325,7 @@ internal partial class Program
                             (double)pageText.Count(c => c == '?') / pageText.Length > 0.20;
                         if (pdfGarbled)
                         {
-                            Console.WriteLine($"[PDF+OCR] p{p} PdfPig garbled (custom font) — using OCR as primary text");
+                            Console.Error.WriteLine($"[PDF+OCR] p{p} PdfPig garbled (custom font) — using OCR as primary text");
                             pageText = combined.Trim();
                         }
                         else
@@ -333,7 +333,7 @@ internal partial class Program
                             ocrAdditions = ComputePdfOcrAdditions(pageText, combined);
                         }
                     }
-                    catch (Exception ocrEx) { Console.WriteLine($"[PDF+OCR] page {p} error: {ocrEx.GetType().Name}: {ocrEx.Message}"); }
+                    catch (Exception ocrEx) { Console.Error.WriteLine($"[PDF+OCR] page {p} error: {ocrEx.GetType().Name}: {ocrEx.Message}"); }
                 }
 
                 Console.WriteLine($"\n--- Page {p} ---");

@@ -84,7 +84,7 @@ internal partial class Program
                 $"Element: name=\"{name}\" type={type} aid=\"{aid}\" {coords}\n\n" +
                 $"Tried:\n{triedStr}\n\n" +
                 $"Action log: {capturedLogPath ?? "(unavailable)"}\n");
-            Console.WriteLine($"[FOCUSLESS] fail-log → {Path.GetFileName(failLogPath)}");
+            Console.Error.WriteLine($"[FOCUSLESS] fail-log → {Path.GetFileName(failLogPath)}");
 
             // ── 삼두 숙제: suggestions.jsonl에 추가 ───────────────────────────────────────
             // 중복 방지: suggestions.jsonl files 배열에 동일 expDir 경로가 있으면 이미 제출된 것
@@ -135,7 +135,7 @@ internal partial class Program
             {
                 File.AppendAllText(suggPath, suggEntry + "\n");
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[FOCUSLESS] 삼두숙제 등록 → suggestions.jsonl ({procName}/{className} \"{name}\")");
+                Console.Error.WriteLine($"[FOCUSLESS] 삼두숙제 등록 → suggestions.jsonl ({procName}/{className} \"{name}\")");
                 Console.ResetColor();
             }
             catch { }
@@ -189,7 +189,7 @@ internal partial class Program
             // Skip if identical tier already recorded
             if (existing.Contains(tierName, StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[KNOWHOW] already recorded: {tierName} ({procName}/{className})");
+                Console.Error.WriteLine($"[KNOWHOW] already recorded: {tierName} ({procName}/{className})");
                 return;
             }
 
@@ -210,7 +210,7 @@ internal partial class Program
 
             File.WriteAllText(mdPath, existing);
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[KNOWHOW] ✓ recorded: {tierName} ({category}) → {Path.GetFileName(mdPath)} ({procName}/{className})");
+            Console.Error.WriteLine($"[KNOWHOW] ✓ recorded: {tierName} ({category}) → {Path.GetFileName(mdPath)} ({procName}/{className})");
             Console.ResetColor();
         }
         catch { /* best effort */ }
@@ -242,7 +242,7 @@ internal partial class Program
             if (lines.Count > 0)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[KNOWHOW] {action} on {procName}/{className}: known tiers → [{string.Join(", ", lines)}]");
+                Console.Error.WriteLine($"[KNOWHOW] {action} on {procName}/{className}: known tiers → [{string.Join(", ", lines)}]");
                 Console.ResetColor();
             }
             return lines;
@@ -315,7 +315,7 @@ internal partial class Program
         if (File.Exists(srcFile))
         {
             attachFiles.Add(srcFile);
-            Console.WriteLine($"[AUTO-HEAL] source attached → A11yActions.{actionPascal}.cs");
+            Console.Error.WriteLine($"[AUTO-HEAL] source attached → A11yActions.{actionPascal}.cs");
         }
 
         if (rect != null && rect.Value.Width > 0 && rect.Value.Height > 0)
@@ -328,7 +328,7 @@ internal partial class Program
                 var elPath = Path.Combine(tmpDir, $"{sessionTag}_element.png");
                 elBmp.Save(elPath, ImageFormat.Png);
                 attachFiles.Add(elPath);
-                Console.WriteLine($"[AUTO-HEAL] element screenshot → {Path.GetFileName(elPath)}");
+                Console.Error.WriteLine($"[AUTO-HEAL] element screenshot → {Path.GetFileName(elPath)}");
 
                 // OCR on same bitmap (before dispose)
                 using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
@@ -341,11 +341,11 @@ internal partial class Program
                                      name.Contains(ocrText, StringComparison.OrdinalIgnoreCase);
                     ocrLine = $"\nOCR text in element area: \"{ocrText}\" (element.Name=\"{name}\", {(nameMatch ? "✓ match" : "⚠ MISMATCH — possible wrong target!")})";
                     Console.ForegroundColor = nameMatch ? ConsoleColor.Gray : ConsoleColor.Yellow;
-                    Console.WriteLine($"[OCR-VERIFY] \"{ocrText}\" vs element.Name=\"{name}\" → {(nameMatch ? "✓ match" : "⚠ MISMATCH")}");
+                    Console.Error.WriteLine($"[OCR-VERIFY] \"{ocrText}\" vs element.Name=\"{name}\" → {(nameMatch ? "✓ match" : "⚠ MISMATCH")}");
                     Console.ResetColor();
                 }
             }
-            catch (Exception ex) { Console.WriteLine($"[AUTO-HEAL] element screenshot failed: {ex.Message}"); }
+            catch (Exception ex) { Console.Error.WriteLine($"[AUTO-HEAL] element screenshot failed: {ex.Message}"); }
         }
 
         // Window context screenshot (broader view)
@@ -355,7 +355,7 @@ internal partial class Program
             var winPath = Path.Combine(tmpDir, $"{sessionTag}_window.png");
             winBmp.Save(winPath, ImageFormat.Png);
             attachFiles.Add(winPath);
-            Console.WriteLine($"[AUTO-HEAL] window screenshot → {Path.GetFileName(winPath)}");
+            Console.Error.WriteLine($"[AUTO-HEAL] window screenshot → {Path.GetFileName(winPath)}");
         }
         catch { }
 
@@ -377,7 +377,7 @@ internal partial class Program
             """;
 
         Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.WriteLine($"[AUTO-HEAL] {action} — all tiers failed → querying triad ({attachFiles.Count} attachments)...");
+        Console.Error.WriteLine($"[AUTO-HEAL] {action} — all tiers failed → querying triad ({attachFiles.Count} attachments)...");
         Console.ResetColor();
 
         SlackPostToThread($"🔧 *[AUTO-HEAL]* `{action}` 전 티어 실패 (`{name}` on `{windowTitle}`) → 삼두 해결방법 문의 중... ({attachFiles.Count}개 스샷 첨부)");
@@ -400,7 +400,7 @@ internal partial class Program
                 if (logToAttach != null)
                 {
                     capturedFiles.Add(logToAttach);
-                    Console.WriteLine($"[AUTO-HEAL] action log attached → {Path.GetFileName(logToAttach)}");
+                    Console.Error.WriteLine($"[AUTO-HEAL] action log attached → {Path.GetFileName(logToAttach)}");
                 }
             }
 

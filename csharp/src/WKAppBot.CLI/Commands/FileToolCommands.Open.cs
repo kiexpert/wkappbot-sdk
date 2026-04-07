@@ -69,7 +69,7 @@ internal partial class Program
 
             NativeMethods.SmartSetForegroundWindow(target.Hwnd);
             Thread.Sleep(150);
-            Console.WriteLine($"[FILE] open target -> hwnd=0x{target.Hwnd:X} cwd={target.WorkspaceCwd ?? "?"}");
+            Console.Error.WriteLine($"[FILE] open target -> hwnd=0x{target.Hwnd:X} cwd={target.WorkspaceCwd ?? "?"}");
         }
         else
         {
@@ -178,7 +178,7 @@ internal partial class Program
                     CreateNoWindow = true,
                 };
                 using var proc = AppBotPipe.StartTracked(psi, workingDir, "FILE-OPEN");
-                Console.WriteLine($"[FILE] open OK -> {gotoSpec}");
+                Console.Error.WriteLine($"[FILE] open OK -> {gotoSpec}");
                 return 0;
             }
             catch

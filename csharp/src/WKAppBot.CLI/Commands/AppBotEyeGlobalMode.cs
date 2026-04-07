@@ -417,12 +417,12 @@ internal partial class Program
                         Console.Error.WriteLine($"[EYE:WARN] ⚠ PATRICIDE: Parent Eye PID={replacePid} didn't retire in 10min — child PID={Environment.ProcessId} force-killing parent");
                         parent.Kill();
                         EyeColor(ConsoleColor.Yellow);
-                        Console.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) force-retired by child");
+                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) force-retired by child");
                         EyeResetColor();
                     }
                     else
                     {
-                        Console.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) retired gracefully — good succession");
+                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Parent Eye (PID={replacePid}) retired gracefully — good succession");
                     }
                 }
                 catch { /* already exited — happy path, 효도 성공 */ }
@@ -543,7 +543,7 @@ internal partial class Program
         // ── Eye pipe server (always: admin UIA proxy + eye tick IPC) ──
         _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
         EyeDiag("eye-pipe-started");
-        Console.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
+        Console.Error.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
 
         PulseStep.Mark("eye-pipe-server");
         // ── Auto a11y hack on InputReadiness probe success ──
@@ -567,7 +567,7 @@ internal partial class Program
         if (claudeHwnd != IntPtr.Zero)
         {
             EyeColor(ConsoleColor.Cyan);
-            Console.WriteLine($"[EYE] Found Claude Desktop (hwnd=0x{claudeHwnd:X8})");
+            Console.Error.WriteLine($"[EYE] Found Claude Desktop (hwnd=0x{claudeHwnd:X8})");
             EyeResetColor();
         }
         // Getter: re-detects if hwnd gone (Claude Desktop restarted or Electron recreated window).
@@ -580,7 +580,7 @@ internal partial class Program
                 {
                     claudeHwnd = fresh;
                     if (claudeHwnd != IntPtr.Zero)
-                        Console.WriteLine($"[EYE] Claude Desktop re-detected (hwnd=0x{claudeHwnd:X8})");
+                        Console.Error.WriteLine($"[EYE] Claude Desktop re-detected (hwnd=0x{claudeHwnd:X8})");
                 }
             }
             return claudeHwnd;
@@ -642,7 +642,7 @@ internal partial class Program
                     var channelName = json?["channel_name"]?.GetValue<string>() ?? slackChannel;
                     var maskApp = appToken.Length > 12 ? appToken[..8] + "..." + appToken[^4..] : "***";
                     var maskBot = slackBotToken.Length > 12 ? slackBotToken[..8] + "..." + slackBotToken[^4..] : "***";
-                    Console.WriteLine($"[EYE] Slack Socket Mode connected — workspace={workspace} channel={channelName} app={maskApp} bot={maskBot}");
+                    Console.Error.WriteLine($"[EYE] Slack Socket Mode connected — workspace={workspace} channel={channelName} app={maskApp} bot={maskBot}");
                     EyeResetColor();
 
                     // Startup: collect stale status messages (reply_count==0) — do NOT delete yet.
@@ -679,7 +679,7 @@ internal partial class Program
                                                 && !_recoveredStatusByUsername.ContainsKey(username))
                                             {
                                                 _recoveredStatusByUsername[username] = (ts, text);
-                                                Console.WriteLine($"[EYE] Recovered status ts for '{username}': {ts}");
+                                                Console.Error.WriteLine($"[EYE] Recovered status ts for '{username}': {ts}");
                                             }
 
                                             // Stale: collect reply-less messages for sweep
@@ -699,10 +699,10 @@ internal partial class Program
                         }
                         catch { }
                         if (_recoveredStatusByUsername.Count > 0)
-                            Console.WriteLine($"[EYE] Recovered {_recoveredStatusByUsername.Count} status position(s) from Slack");
+                            Console.Error.WriteLine($"[EYE] Recovered {_recoveredStatusByUsername.Count} status position(s) from Slack");
                         if (_staleStatusTsOnStartup.Count > 0)
                         {
-                            Console.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post or 20s timer");
+                            Console.Error.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending — will sweep after first post or 20s timer");
                             // Independent timer: sweep even if first ticks are all idle (no new post fired)
                             _ = SweepStaleOnStartupAsync(slackBotToken!, slackChannel!);
                         }
@@ -722,7 +722,7 @@ internal partial class Program
                     slackClient.OnBlockAction += (action) =>
                     {
                         EyeColor(ConsoleColor.Cyan);
-                        Console.WriteLine($"[EYE][SLACK] Button: {action.ActionId}={action.Value} by {action.UserName}");
+                        Console.Error.WriteLine($"[EYE][SLACK] Button: {action.ActionId}={action.Value} by {action.UserName}");
                         EyeResetColor();
 
                         var thread = action.MessageTs ?? GetAnyPlanApprovalTs();
@@ -795,7 +795,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] Slack init error: {ex.Message} — continuing without Slack");
+            Console.Error.WriteLine($"[EYE] Slack init error: {ex.Message} — continuing without Slack");
         }
 
         // ── Startup: execute overdue schedules (PC reboot recovery) ──
@@ -805,7 +805,7 @@ internal partial class Program
             if (overdueItems.Count > 0)
             {
                 EyeColor(ConsoleColor.Yellow);
-                Console.WriteLine($"[SCHEDULE] {overdueItems.Count} overdue schedule(s) from before restart");
+                Console.Error.WriteLine($"[SCHEDULE] {overdueItems.Count} overdue schedule(s) from before restart");
                 EyeResetColor();
                 Thread.Sleep(5000);
                 foreach (var item in overdueItems)
@@ -817,7 +817,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SCHEDULE] Startup recovery error: {ex.Message}");
+            Console.Error.WriteLine($"[SCHEDULE] Startup recovery error: {ex.Message}");
         }
 
         // ── Hot-reload: track EXE timestamp ──
@@ -864,11 +864,11 @@ internal partial class Program
                 caller: "EYE-WHISPER");
             if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
             PulseStep.Mark("whisper-spawned");
-            Console.WriteLine($"[EYE] Whisper Ring spawned pid={_whisperRingPid}");
+            Console.Error.WriteLine($"[EYE] Whisper Ring spawned pid={_whisperRingPid}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] Whisper Ring spawn failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] Whisper Ring spawn failed: {ex.Message}");
         }
 
         // ── Screen Saver: separate process (WPF isolation → Eye stays lightweight) ──
@@ -885,7 +885,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}");
         }
 
         // ── Context usage monitor (per-card) ──
@@ -906,7 +906,7 @@ internal partial class Program
         while (host.IsAlive && !cts.IsCancellationRequested && !hotReloadTriggered)
         {
             if (frameCount < 3) EyeDiag($"frame-{frameCount}-start");
-            if (frameCount < 3) Console.WriteLine($"[EYE_LOOP] frame={frameCount} start");
+            if (frameCount < 3) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} start");
             // ScreenSaver now runs as separate process — no Tick() needed in Eye
 
             // ── Duplicate Eye check (every 100 frames ≈ 10s) ──
@@ -932,7 +932,7 @@ internal partial class Program
                     if (firstEyeHwnd != IntPtr.Zero && firstEyeHwnd != myEyeHwnd)
                     {
                         EyeColor(ConsoleColor.Yellow);
-                        Console.WriteLine($"[EYE] Not topmost Eye (top=0x{firstEyeHwnd:X} me=0x{myEyeHwnd:X}) — self-closing");
+                        Console.Error.WriteLine($"[EYE] Not topmost Eye (top=0x{firstEyeHwnd:X} me=0x{myEyeHwnd:X}) — self-closing");
                         EyeResetColor();
                         cts.Cancel();
                         break;
@@ -944,14 +944,14 @@ internal partial class Program
             var forceFull = ShouldForceFullLoad();
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
             if (frameCount < 3) EyeDiag($"frame-{frameCount}-before-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
-            if (frameCount < 3) Console.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
+            if (frameCount < 3) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
             if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
                 if (frameCount < 3) EyeDiag($"frame-{frameCount}-tick-timeout");
-                Console.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-timeout");
+                Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-timeout");
                 if (frameCount < 3)
                 {
-                    Console.WriteLine($"[EYE] tick timeout (>3s) on frame {frameCount} — startup grace, continuing");
+                    Console.Error.WriteLine($"[EYE] tick timeout (>3s) on frame {frameCount} — startup grace, continuing");
                 }
                 else
                 {
@@ -963,7 +963,7 @@ internal partial class Program
             else if (frameCount < 3)
             {
                 EyeDiag($"frame-{frameCount}-tick-ok");
-                Console.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-ok");
+                Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-ok");
             }
 
             // ── First frame: announce Eye startup to Slack with card summary ──
@@ -992,7 +992,7 @@ internal partial class Program
                                            && r?["username"]?.GetValue<string>() == "앱봇아이")
                                     .ToList();
                                 var r1 = children.Count > 0 ? children[0]?["ts"]?.GetValue<string>() : null;
-                                if (r1 != null) { _eyeSummaryReplyTs = r1; Console.WriteLine($"[EYE] Restored summary reply ts={r1}"); }
+                                if (r1 != null) { _eyeSummaryReplyTs = r1; Console.Error.WriteLine($"[EYE] Restored summary reply ts={r1}"); }
                                 // r2/r3 (mouse CCA, focus chain) handled by UnifiedMouseFocusLoop on startup
                             }
                         }
@@ -1023,7 +1023,7 @@ internal partial class Program
             if (replacePid > 0 && frameCount == 0)
             {
                 EyeColor(ConsoleColor.Magenta);
-                Console.WriteLine($"[EYE:HOT-SWAP] First render OK — old Eye (PID={replacePid}) exiting on its own");
+                Console.Error.WriteLine($"[EYE:HOT-SWAP] First render OK — old Eye (PID={replacePid}) exiting on its own");
                 EyeResetColor();
                 replacePid = 0;
                 // Old Eye does return 0 right after Process.Start — 1s should be enough
@@ -1066,12 +1066,12 @@ internal partial class Program
                             try { await SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이"); }
                             catch { }
                         });
-                        Console.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — Slack notified");
+                        Console.Error.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — Slack notified");
                     }
                     else if (issues.Count == 0)
-                        Console.WriteLine($"[EYE] Skill audit: all refs OK");
+                        Console.Error.WriteLine($"[EYE] Skill audit: all refs OK");
                 }
-                catch (Exception ex) { Console.WriteLine($"[EYE] Skill audit error: {ex.Message}"); }
+                catch (Exception ex) { Console.Error.WriteLine($"[EYE] Skill audit error: {ex.Message}"); }
             }
 
             // ── Stale zoom overlay cleanup (every 60s, kill zooms older than 60s) ──
@@ -1094,7 +1094,7 @@ internal partial class Program
                         return true;
                     }, IntPtr.Zero);
                     if (cleaned > 0)
-                        Console.WriteLine($"[EYE] Cleaned {cleaned} stale zoom overlay(s)");
+                        Console.Error.WriteLine($"[EYE] Cleaned {cleaned} stale zoom overlay(s)");
                 }
                 catch { }
 
@@ -1125,10 +1125,10 @@ internal partial class Program
                         {
                             // Kill old WhisperRing at stale position
                             try { Process.GetProcessById(_whisperRingPid).Kill(); } catch { }
-                            Console.WriteLine($"[EYE] WhisperRing monitor changed ({_whisperRingX},{_whisperRingY})→({newWrX},{newWrY}) — respawning");
+                            Console.Error.WriteLine($"[EYE] WhisperRing monitor changed ({_whisperRingX},{_whisperRingY})→({newWrX},{newWrY}) — respawning");
                         }
                         else
-                            Console.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
+                            Console.Error.WriteLine($"[EYE] WhisperRing pid={_whisperRingPid} died — respawning");
 
                         _whisperRingX = newWrX;
                         _whisperRingY = newWrY;
@@ -1139,7 +1139,7 @@ internal partial class Program
                             showNoActivate: true,
                             caller: "EYE-WHISPER-RESPAWN");
                         if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
-                        Console.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid} at ({_whisperRingX},{_whisperRingY})");
+                        Console.Error.WriteLine($"[EYE] WhisperRing respawned pid={_whisperRingPid} at ({_whisperRingX},{_whisperRingY})");
                     }
                 }
                 catch { }
@@ -1162,7 +1162,7 @@ internal partial class Program
                                 if (userIdleMs < 3000) // user active → kill
                                 {
                                     p.Kill();
-                                    Console.WriteLine($"[EYE] Killed screensaver (PID={p.Id}) — user active");
+                                    Console.Error.WriteLine($"[EYE] Killed screensaver (PID={p.Id}) — user active");
                                 }
                                 else
                                     ssAlive = true;
@@ -1192,7 +1192,7 @@ internal partial class Program
                 GC.Collect(2, GCCollectionMode.Optimized, blocking: false);
                 // Log only if memory is high
                 if (memBefore > 1024)
-                    Console.WriteLine($"[EYE] GC triggered: {memBefore}MB (non-blocking gen2)");
+                    Console.Error.WriteLine($"[EYE] GC triggered: {memBefore}MB (non-blocking gen2)");
             }
 
             // ── Schedule executor + Route retry (~every 10 seconds) ──
@@ -1206,7 +1206,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SCHEDULE] Error: {ex.Message}");
+                    Console.Error.WriteLine($"[SCHEDULE] Error: {ex.Message}");
                 }
 
                 // Route retry queue: re-dispatch failed route attempts
@@ -1216,14 +1216,14 @@ internal partial class Program
                     foreach (var item in retryItems)
                     {
                         EyeColor(ConsoleColor.Cyan);
-                        Console.WriteLine($"[RETRY] Re-dispatching route: {item[..Math.Min(item.Length, 80)]}...");
+                        Console.Error.WriteLine($"[RETRY] Re-dispatching route: {item[..Math.Min(item.Length, 80)]}...");
                         EyeResetColor();
                         EyeCmdPipeServer.DispatchBg(["slack", "route", item]);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[RETRY] Route retry error: {ex.Message}");
+                    Console.Error.WriteLine($"[RETRY] Route retry error: {ex.Message}");
                 }
             }
 
@@ -1254,7 +1254,7 @@ internal partial class Program
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[EYE][SLACK] Reconnect failed: {ex.Message}");
+                        Console.Error.WriteLine($"[EYE][SLACK] Reconnect failed: {ex.Message}");
                     }
                 }
             }
@@ -1294,7 +1294,7 @@ internal partial class Program
                         ? File.GetLastWriteTimeUtc(exePath).Ticks.ToString() : null;
                     if (currentStamp != null && currentStamp == _lastFailedSwapStamp)
                     {
-                        Console.WriteLine($"[EYE:HOT-SWAP] Previously-failed stamp ({currentStamp}) — waiting for newer binary");
+                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Previously-failed stamp ({currentStamp}) — waiting for newer binary");
                         goto AfterHotSwap;
                     }
 
@@ -1325,7 +1325,7 @@ internal partial class Program
                     {
                         // Record failed stamp — don't retry until a newer binary arrives
                         _lastFailedSwapStamp = currentStamp;
-                        Console.WriteLine($"[EYE:HOT-SWAP] Swap failed — recording stamp {currentStamp}");
+                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Swap failed — recording stamp {currentStamp}");
                     }
                     // Identical: continue main loop (no restart needed)
                 }
@@ -1342,7 +1342,7 @@ internal partial class Program
                     if (!slackClient.IsConnected || connAge >= 10)
                     {
                         EyeColor(ConsoleColor.Yellow);
-                        Console.WriteLine($"[EYE][SLACK] Health check: connected={slackClient.IsConnected} age={connAge:F0}m → force reconnect");
+                        Console.Error.WriteLine($"[EYE][SLACK] Health check: connected={slackClient.IsConnected} age={connAge:F0}m → force reconnect");
                         EyeResetColor();
                         Task.Run(async () =>
                         {
@@ -1353,18 +1353,18 @@ internal partial class Program
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"[EYE][SLACK] Periodic reconnect failed: {ex.Message}");
+                                Console.Error.WriteLine($"[EYE][SLACK] Periodic reconnect failed: {ex.Message}");
                             }
                         }).Wait(10000);
                     }
                     else
                     {
-                        Console.WriteLine($"[EYE][SLACK] Health OK: connected={slackClient.IsConnected} age={connAge:F0}m msgs={slackClient.MessageCount} reconnects={slackClient.ReconnectCount}");
+                        Console.Error.WriteLine($"[EYE][SLACK] Health OK: connected={slackClient.IsConnected} age={connAge:F0}m msgs={slackClient.MessageCount} reconnects={slackClient.ReconnectCount}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[EYE][SLACK] Health check error: {ex.Message}");
+                    Console.Error.WriteLine($"[EYE][SLACK] Health check error: {ex.Message}");
                 }
             }
 
@@ -1388,9 +1388,9 @@ internal partial class Program
                                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
                             var resp = hc.GetStringAsync("https://slack.com/api/auth.test").GetAwaiter().GetResult();
                             slackAlive = resp.Contains("\"ok\":true");
-                            if (!slackAlive) Console.WriteLine($"[EYE] Slack auth.test failed: {resp[..Math.Min(100, resp.Length)]}");
+                            if (!slackAlive) Console.Error.WriteLine($"[EYE] Slack auth.test failed: {resp[..Math.Min(100, resp.Length)]}");
                         }
-                        catch (Exception ex) { slackAlive = false; Console.WriteLine($"[EYE] Slack probe failed: {ex.Message}"); }
+                        catch (Exception ex) { slackAlive = false; Console.Error.WriteLine($"[EYE] Slack probe failed: {ex.Message}"); }
                     }
                 }
                 if (slackClient != null && !slackClient.IsConnected)
@@ -1418,7 +1418,7 @@ internal partial class Program
                             Console.WriteLine("[EYE] Slack reconnected!");
                         }
                     }
-                    catch (Exception ex) { Console.WriteLine($"[EYE] Slack reconnect failed: {ex.Message}"); }
+                    catch (Exception ex) { Console.Error.WriteLine($"[EYE] Slack reconnect failed: {ex.Message}"); }
                 }
             }
 
@@ -1431,7 +1431,7 @@ internal partial class Program
                 GC.Collect(2, GCCollectionMode.Optimized);
                 var afterMB = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
                 EyeColor(ConsoleColor.DarkGray);
-                Console.WriteLine($"[EYE][GC] Gen2 collect: {beforeMB}MB → {afterMB}MB (freed {beforeMB - afterMB}MB)");
+                Console.Error.WriteLine($"[EYE][GC] Gen2 collect: {beforeMB}MB → {afterMB}MB (freed {beforeMB - afterMB}MB)");
                 EyeResetColor();
             }
 
@@ -1441,7 +1441,7 @@ internal partial class Program
                 var slackInfo = slackClient != null
                     ? $", Slack={slackClient.IsConnected}, msgs={slackClient.MessageCount}, reconn={slackClient.ReconnectCount}"
                     : "";
-                Console.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
+                Console.Error.WriteLine($"[EYE] frame #{frameCount} ({(slackClient != null ? "Socket+API" : "API-only")}{slackInfo})");
             }
 
             // ── Eye status edit (change-based: only when card summary differs, throttled 1s) ──
@@ -1537,7 +1537,7 @@ internal partial class Program
                 }
                 return true;
             }, IntPtr.Zero);
-            if (closed > 0) Console.WriteLine($"[EYE] Closed {closed} lingering WPF window(s)");
+            if (closed > 0) Console.Error.WriteLine($"[EYE] Closed {closed} lingering WPF window(s)");
         }
         catch { }
 
@@ -1571,7 +1571,7 @@ internal partial class Program
                     a.Contains(' ') ? $"\"{a}\"" : a));
 
                 EyeColor(ConsoleColor.Magenta);
-                Console.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
+                Console.Error.WriteLine($"[EYE:HOT-SWAP] Launching new Eye: {Path.GetFileName(exePath)} {argsStr}");
                 EyeResetColor();
 
                 PulseStep.Init("HOT-SWAP");
@@ -1591,7 +1591,7 @@ internal partial class Program
                 {
                     // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
                     // Both old+new Eye can listen on the same named pipe (MaxAllowedServerInstances) — no gap.
-                    Console.WriteLine($"[EYE:HOT-SWAP] New Eye PID={newProc.Pid} — waiting for window...");
+                    Console.Error.WriteLine($"[EYE:HOT-SWAP] New Eye PID={newProc.Pid} — waiting for window...");
                     var hsw = System.Diagnostics.Stopwatch.StartNew();
                     var warnAt = 9.0;
                     while (true)
@@ -1599,7 +1599,7 @@ internal partial class Program
                         if (newProc.HasExited || hsw.Elapsed.TotalSeconds >= 30) break;
                         if (hsw.Elapsed.TotalSeconds >= warnAt)
                         {
-                            Console.WriteLine($"[EYE:HOT-SWAP] still waiting for new Eye message loop... ({warnAt:F0}s)");
+                            Console.Error.WriteLine($"[EYE:HOT-SWAP] still waiting for new Eye message loop... ({warnAt:F0}s)");
                             warnAt += 9.0;
                         }
                         Thread.Sleep(200);
@@ -1622,7 +1622,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE:HOT-SWAP] Re-launch failed: {ex.Message}");
+                Console.Error.WriteLine($"[EYE:HOT-SWAP] Re-launch failed: {ex.Message}");
             }
         }
 
@@ -1663,18 +1663,18 @@ internal partial class Program
         // Identical check: same mtime + size = no actual rebuild → delete .new.exe
         if (newInfo.LastWriteTimeUtc == curInfo.LastWriteTimeUtc && newInfo.Length == curInfo.Length)
         {
-            Console.WriteLine($"[{tag}] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) — deleting");
+            Console.Error.WriteLine($"[{tag}] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) — deleting");
             try { File.Delete(newExePath); } catch { }
             return HotSwapResult.Identical;
         }
 
-        Console.WriteLine($"[{tag}] .new.exe detected (new={newInfo.Length}b/{newInfo.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo.Length}b/{curInfo.LastWriteTimeUtc:HH:mm:ss}) — rename-swap");
+        Console.Error.WriteLine($"[{tag}] .new.exe detected (new={newInfo.Length}b/{newInfo.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo.Length}b/{curInfo.LastWriteTimeUtc:HH:mm:ss}) — rename-swap");
 
         // Step 1: running exe → .old (Windows allows renaming running exe)
         var oldExePath = Path.Combine(exeDir, $"{exeName}.old-{DateTime.Now:yyyyMMdd-HHmm}.exe");
         bool step1 = false;
         try { File.Move(exePath, oldExePath); step1 = true; }
-        catch (Exception ex) { Console.WriteLine($"[{tag}] step1 rename→.old failed: {ex.Message}"); }
+        catch (Exception ex) { Console.Error.WriteLine($"[{tag}] step1 rename→.old failed: {ex.Message}"); }
 
         // Step 2: .new.exe → exe (retry up to 4× for deploy file lock)
         bool step2 = false;
@@ -1682,20 +1682,20 @@ internal partial class Program
         {
             for (int r = 0; r < 4 && !step2; r++)
             {
-                if (r > 0) { Console.WriteLine($"[{tag}] step2 retry {r}/3 (file locked — waiting 1s)"); Thread.Sleep(1000); }
+                if (r > 0) { Console.Error.WriteLine($"[{tag}] step2 retry {r}/3 (file locked — waiting 1s)"); Thread.Sleep(1000); }
                 try { File.Move(newExePath, exePath); step2 = true; }
-                catch (Exception ex) { if (r == 3) Console.WriteLine($"[{tag}] step2 .new→.exe failed: {ex.Message}"); }
+                catch (Exception ex) { if (r == 3) Console.Error.WriteLine($"[{tag}] step2 .new→.exe failed: {ex.Message}"); }
             }
             if (!step2)
             {
-                Console.WriteLine($"[{tag}] rollback: .old→.exe");
+                Console.Error.WriteLine($"[{tag}] rollback: .old→.exe");
                 try { File.Move(oldExePath, exePath); } catch { }
             }
         }
 
         if (step1 && step2)
         {
-            Console.WriteLine($"[{tag}] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
+            Console.Error.WriteLine($"[{tag}] swap OK (.exe→{Path.GetFileName(oldExePath)}, .new→.exe)");
             return HotSwapResult.Swapped;
         }
         return HotSwapResult.Failed;

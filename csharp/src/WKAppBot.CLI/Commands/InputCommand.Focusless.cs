@@ -227,7 +227,7 @@ internal partial class Program
                         zoomHost = new InputZoomHost();
                         zoomHost.Start(zX, zY, zW, zH, zoomMode);
                         zoomHost.UpdateHeader($"[ZOOM:{modeName}] input_m10 \"{text}\"");
-                        Console.Write($"[ZOOM:{modeName}@{zX},{zY} {zW}x{zH}] ");
+                        Console.Error.Write($"[ZOOM:{modeName}@{zX},{zY} {zW}x{zH}] ");
 
                         // Initial capture (Magnifier/Relay only — HighlightBox is transparent)
                         if (zoomMode != ZoomMode.HighlightBox)
@@ -248,7 +248,7 @@ internal partial class Program
                     }
                     catch (Exception zex)
                     {
-                        Console.Write($"[ZOOM:ERR {zex.GetType().Name}: {zex.Message}] ");
+                        Console.Error.Write($"[ZOOM:ERR {zex.GetType().Name}: {zex.Message}] ");
                         zoomHost = null;
                     }
                 }
@@ -455,7 +455,7 @@ internal partial class Program
                             using var zShotBmp = ScreenCapture.CaptureScreenRegion(zShotX, zShotY, zShotW, zShotH);
                             var zShotPath = OcrDebugPath("zoom_result");
                             ScreenCapture.SaveToFile(zShotBmp, zShotPath);
-                            Console.Write($"[ZOOM:saved {zShotPath}] ");
+                            Console.Error.Write($"[ZOOM:saved {zShotPath}] ");
 
                             // Also save to ExperienceDB control folder
                             try

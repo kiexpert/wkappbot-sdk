@@ -53,7 +53,7 @@ internal partial class Program
                 {
                     var parent = Process.GetProcessById(parentPid);
                     if (verbose)
-                        Console.WriteLine($"[EYE] Ancestor: {parent.ProcessName} (PID={parentPid})");
+                        Console.Error.WriteLine($"[EYE] Ancestor: {parent.ProcessName} (PID={parentPid})");
                     if (parent.ProcessName.Equals("claude", StringComparison.OrdinalIgnoreCase))
                     {
                         claudePids.Add(parentPid);
@@ -242,7 +242,7 @@ internal partial class Program
             if (exitCode == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[EYE] Plan approved via MCP: {output.TrimEnd()}");
+                Console.Error.WriteLine($"[EYE] Plan approved via MCP: {output.TrimEnd()}");
                 Console.ResetColor();
                 return true;
             }
@@ -250,7 +250,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] ClickApproveButton error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] ClickApproveButton error: {ex.Message}");
             return false;
         }
     }
@@ -279,7 +279,7 @@ internal partial class Program
             if (code2 == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[EYE] Plan feedback submitted via MCP: \"{feedback}\"");
+                Console.Error.WriteLine($"[EYE] Plan feedback submitted via MCP: \"{feedback}\"");
                 Console.ResetColor();
                 return true;
             }
@@ -287,7 +287,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] TypePlanFeedback error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] TypePlanFeedback error: {ex.Message}");
             return false;
         }
     }
@@ -322,7 +322,7 @@ internal partial class Program
             if (exitCode == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[EYE] Permission button clicked via MCP: \"{buttonText}\"");
+                Console.Error.WriteLine($"[EYE] Permission button clicked via MCP: \"{buttonText}\"");
                 Console.ResetColor();
                 return true;
             }
@@ -330,7 +330,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] ClickPermissionButton error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] ClickPermissionButton error: {ex.Message}");
             return false;
         }
     }
@@ -450,7 +450,7 @@ internal partial class Program
                                 name.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
                             {
                                 // Log the trigger text for debugging
-                                Console.WriteLine($"[EYE] Rate limit trigger text: \"{(name.Length > 80 ? name[..80] + "…" : name)}\"");
+                                Console.Error.WriteLine($"[EYE] Rate limit trigger text: \"{(name.Length > 80 ? name[..80] + "…" : name)}\"");
                                 // Try to extract reset time from this element or siblings
                                 var resetTime = ParseResetTime(name);
                                 if (resetTime == null)
@@ -758,7 +758,7 @@ internal partial class Program
                 fullText.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
                 fullText.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[EYE] Rate limit trigger (OCR): \"{(fullText.Length > 120 ? fullText[..120] + "…" : fullText)}\"");
+                Console.Error.WriteLine($"[EYE] Rate limit trigger (OCR): \"{(fullText.Length > 120 ? fullText[..120] + "…" : fullText)}\"");
                 // Extract reset time from OCR text
                 var resetTime = ParseResetTime(fullText);
                 var displayText = resetTime != null

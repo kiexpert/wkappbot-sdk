@@ -31,7 +31,7 @@ internal partial class Program
             if (pkgs.Count == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ADB] No package matching '{grap.Package}'");
+                Console.Error.WriteLine($"[ADB] No package matching '{grap.Package}'");
                 Console.ResetColor();
                 return null;
             }
@@ -45,7 +45,7 @@ internal partial class Program
             if (scoped == null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found in UIA tree — trying OCR fallback...");
+                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found in UIA tree — trying OCR fallback...");
                 Console.ResetColor();
 
                 // Show available targets for debugging
@@ -64,13 +64,13 @@ internal partial class Program
                 if (ocrNode != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[ADB] OCR fallback hit: \"{ocrNode.DisplayName}\" at ({ocrNode.CenterX},{ocrNode.CenterY})");
+                    Console.Error.WriteLine($"[ADB] OCR fallback hit: \"{ocrNode.DisplayName}\" at ({ocrNode.CenterX},{ocrNode.CenterY})");
                     Console.ResetColor();
                     return ocrNode;
                 }
 
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ADB] OCR fallback also failed for '{grap.ScopePath}'");
+                Console.Error.WriteLine($"[ADB] OCR fallback also failed for '{grap.ScopePath}'");
                 Console.ResetColor();
 
                 // Auto bug report
@@ -81,7 +81,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"[ADB] Target: {target.SearchKey}");
+        Console.Error.WriteLine($"[ADB] Target: {target.SearchKey}");
         Console.ResetColor();
         return target;
     }
@@ -183,7 +183,7 @@ internal partial class Program
                 var targetLabel = !string.IsNullOrEmpty(targetNode.ShortResourceId) ? targetNode.ShortResourceId : targetNode.DisplayName;
                 var focusLabel = !string.IsNullOrEmpty(focused.ShortResourceId) ? focused.ShortResourceId : focused.DisplayName;
                 var msg = $"focus mismatch — target: {targetLabel}, focused: {focusLabel}";
-                Console.WriteLine($"[ADB] ⚠ {msg}");
+                Console.Error.WriteLine($"[ADB] ⚠ {msg}");
                 Console.ResetColor();
                 DumpFailureDiagnostics(adb, serial);
 
@@ -288,7 +288,7 @@ internal partial class Program
     static int AdbUnsupported(string action)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ADB] Action '{action}' not supported for Android");
+        Console.Error.WriteLine($"[ADB] Action '{action}' not supported for Android");
         Console.WriteLine("[ADB] Supported: inspect find windows screenshot ocr | close minimize maximize restore | "
             + "click invoke read highlight toggle expand collapse select scroll type set-value set-range focus | "
             + "wait eval | back home recent long-press");
@@ -427,7 +427,7 @@ internal partial class Program
                                     int x2 = int.Parse(nums[2].Value), y2 = int.Parse(nums[3].Value);
                                     int cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
 
-                                    Console.WriteLine($"[ADB-OCR] Found \"{pattern}\" at ({cx},{cy}) via OCR+dump hybrid");
+                                    Console.Error.WriteLine($"[ADB-OCR] Found \"{pattern}\" at ({cx},{cy}) via OCR+dump hybrid");
                                     return new AndroidNode
                                     {
                                         ClassName = "ocr-fallback", Text = pattern,
@@ -441,11 +441,11 @@ internal partial class Program
                     }
                 }
 
-                Console.WriteLine($"[ADB-OCR] OCR matched \"{pattern}\" but couldn't resolve bounds");
+                Console.Error.WriteLine($"[ADB-OCR] OCR matched \"{pattern}\" but couldn't resolve bounds");
                 return null;
             }
 
-            Console.WriteLine($"[ADB-OCR] Text \"{pattern}\" not found in OCR output");
+            Console.Error.WriteLine($"[ADB-OCR] Text \"{pattern}\" not found in OCR output");
             return null;
         }
         catch (Exception ex)

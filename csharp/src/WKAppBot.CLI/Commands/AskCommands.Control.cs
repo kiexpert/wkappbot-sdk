@@ -56,7 +56,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ASK:CTRL] reader stopped: {ex.Message}");
+                    Console.Error.WriteLine($"[ASK:CTRL] reader stopped: {ex.Message}");
                 }
             });
         }
@@ -83,7 +83,7 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ASK:CTRL] pipe stopped: {ex.Message}");
+                Console.Error.WriteLine($"[ASK:CTRL] pipe stopped: {ex.Message}");
                 Thread.Sleep(250);
             }
         }
@@ -95,7 +95,7 @@ internal partial class Program
             return;
 
         _askControlQueue.Enqueue(cmd);
-        Console.WriteLine($"[ASK:CTRL] queued action={cmd.Action} q={cmd.QuestionId ?? "*"} reason={cmd.Reason ?? "USER_STOP"}");
+        Console.Error.WriteLine($"[ASK:CTRL] queued action={cmd.Action} q={cmd.QuestionId ?? "*"} reason={cmd.Reason ?? "USER_STOP"}");
     }
 
     static bool TryParseAskControlCommand(string line, string currentRunId, out AskControlCommand? cmd)
@@ -179,11 +179,11 @@ internal partial class Program
             else if (string.Equals(cmd.Action, "status", StringComparison.OrdinalIgnoreCase))
             {
                 var key = askSession.ResolveQuestionKey(cmd.PageKey, cmd.QuestionId, cmd.RunId);
-                Console.WriteLine($"[ASK:QSTATUS] {askSession.SnapshotQuestion(key).ToJsonString()}");
+                Console.Error.WriteLine($"[ASK:QSTATUS] {askSession.SnapshotQuestion(key).ToJsonString()}");
             }
             else if (string.Equals(cmd.Action, "list", StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[ASK:QLIST] {askSession.SnapshotQuestions().ToJsonString()}");
+                Console.Error.WriteLine($"[ASK:QLIST] {askSession.SnapshotQuestions().ToJsonString()}");
             }
         }
 

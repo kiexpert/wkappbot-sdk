@@ -218,7 +218,7 @@ internal sealed class TriadSharedContext
             try
             {
                 await cdp.AppendContentEditableAsync(editorSel, message, "\n\n");
-                Console.WriteLine($"[MOD:DM] ??{targetAi}: {message[..Math.Min(60, message.Length)]}");
+                Console.Error.WriteLine($"[MOD:DM] ??{targetAi}: {message[..Math.Min(60, message.Length)]}");
             }
             catch { }
         });
@@ -291,7 +291,7 @@ internal sealed class TriadSharedContext
                                 await selfCdp.AppendContentEditableAsync(editorSel, demand, "\n\n");
                                 await Task.Delay(500);
                                 await selfCdp.SendPromptAsync(editorSel); // auto-send!
-                                Console.WriteLine($"[MOD] {ai}: STANCE missing ??reject + re-request SENT");
+                                Console.Error.WriteLine($"[MOD] {ai}: STANCE missing ??reject + re-request SENT");
                                 Program.SlackPostToThread($"[MOD {ai}] STANCE missing. Response rejected and re-requested.", "Moderator");
                             }
                         }
@@ -339,7 +339,7 @@ internal sealed class TriadSharedContext
 
                     var crossText = $"[{ai} says]: {snippet}\nYour brief reaction? (ENGLISH ONLY)";
                     var queued = await _crossPromptPump.AppendAndQueueAsync(peerAi, peerCdp, editorSel, crossText, "\n\n");
-                    Console.WriteLine($"[CROSS] {ai}->{peerAi}: {(queued ? "armed" : "append-failed")} ({snippet.Length} chars)");
+                    Console.Error.WriteLine($"[CROSS] {ai}->{peerAi}: {(queued ? "armed" : "append-failed")} ({snippet.Length} chars)");
 
                     // Post delivery result to Slack
                     Program.SlackPostToThread($"[CROSS {Program.AiDisplayName(ai)}->{peerAi}] {(queued ? "armed" : "append failed")}", Program.AiDisplayName(ai));
@@ -554,7 +554,7 @@ internal partial class Program
         if (result != 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[TRIAD:{ai}] ??Failed ??attempting recovery with shared context");
+            Console.Error.WriteLine($"[TRIAD:{ai}] ??Failed ??attempting recovery with shared context");
             Console.ResetColor();
 
             SlackPostToThread($"🔄 *[Recovery]* `{AiDisplayName(ai)}` failed -- attempting fallback with shared context..", AiDisplayName(ai));

@@ -51,7 +51,7 @@ internal static class RouteRetryQueue
                 File.AppendAllText(QueuePath, line + "\n");
             }
 
-            Console.WriteLine($"[RETRY] Queued retry #{retryCount} at {DateTimeOffset.FromUnixTimeSeconds(retryAt).LocalDateTime:HH:mm:ss}");
+            Console.Error.WriteLine($"[RETRY] Queued retry #{retryCount} at {DateTimeOffset.FromUnixTimeSeconds(retryAt).LocalDateTime:HH:mm:ss}");
 
             // Schedule precise one-shot at soonest retryAt
             ScheduleRetryTask();
@@ -61,7 +61,7 @@ internal static class RouteRetryQueue
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RETRY] Enqueue error: {ex.Message}");
+            Console.Error.WriteLine($"[RETRY] Enqueue error: {ex.Message}");
         }
     }
 
@@ -103,7 +103,7 @@ internal static class RouteRetryQueue
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RETRY] GetDueItems error: {ex.Message}");
+                Console.Error.WriteLine($"[RETRY] GetDueItems error: {ex.Message}");
                 return [];
             }
         }
@@ -153,7 +153,7 @@ Register-ScheduledTask -TaskName '{RetryTaskName}' -Action $action -Trigger $tri
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RETRY] ScheduleRetryTask error: {ex.Message}");
+            Console.Error.WriteLine($"[RETRY] ScheduleRetryTask error: {ex.Message}");
         }
     }
 
@@ -225,7 +225,7 @@ Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RETRY] PowerShell error: {ex.Message}");
+            Console.Error.WriteLine($"[RETRY] PowerShell error: {ex.Message}");
         }
     }
 

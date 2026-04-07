@@ -42,14 +42,14 @@ internal partial class Program
                 if (string.IsNullOrWhiteSpace(text) || !text.Contains('%'))
                     return null; // not logged in or page didn't load
 
-                Console.WriteLine($"[USAGE] Web page loaded ({text.Length} chars)");
+                Console.Error.WriteLine($"[USAGE] Web page loaded ({text.Length} chars)");
                 return ParseUsageFromWebText(text);
             }
             finally { _cdpBrowserLock.Release(); }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[USAGE] Web probe failed: {ex.Message}");
+            Console.Error.WriteLine($"[USAGE] Web probe failed: {ex.Message}");
             return null;
         }
     }

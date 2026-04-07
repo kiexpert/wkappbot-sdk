@@ -81,7 +81,7 @@ internal partial class Program
         if (after.HasValue)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[PROMPT] Waiting {after.Value.TotalSeconds:F0}s before delivering to \"{nameQuery}\"...");
+            Console.Error.WriteLine($"[PROMPT] Waiting {after.Value.TotalSeconds:F0}s before delivering to \"{nameQuery}\"...");
             Console.ResetColor();
             System.Threading.Thread.Sleep(after.Value);
         }
@@ -90,7 +90,7 @@ internal partial class Program
         if (whenIdle.HasValue)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[PROMPT] Waiting for \"{nameQuery}\" to be idle >= {whenIdle.Value.TotalSeconds:F0}s (timeout={timeout.TotalMinutes:F0}m)...");
+            Console.Error.WriteLine($"[PROMPT] Waiting for \"{nameQuery}\" to be idle >= {whenIdle.Value.TotalSeconds:F0}s (timeout={timeout.TotalMinutes:F0}m)...");
             Console.ResetColor();
 
             var deadline = DateTime.UtcNow + timeout;
@@ -115,7 +115,7 @@ internal partial class Program
                     if ((age ?? TimeSpan.MaxValue) >= whenIdle.Value)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"[PROMPT] \"{nameQuery}\" idle {age!.Value.TotalSeconds:F0}s — delivering");
+                        Console.Error.WriteLine($"[PROMPT] \"{nameQuery}\" idle {age!.Value.TotalSeconds:F0}s — delivering");
                         Console.ResetColor();
                         delivered = true;
                         break;
@@ -168,20 +168,20 @@ internal partial class Program
         {
             var prompt   = item.p;
             var dispName = item.info.displayName;
-            Console.WriteLine($"[PROMPT] → {dispName} (0x{prompt.WindowHandle:X})");
+            Console.Error.WriteLine($"[PROMPT] → {dispName} (0x{prompt.WindowHandle:X})");
             try
             {
                 ClaudePromptHelper.AllowFocusSteal = true;
                 ph.TypeAndSubmit(prompt, message);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[PROMPT] ✓ Delivered to {dispName}");
+                Console.Error.WriteLine($"[PROMPT] ✓ Delivered to {dispName}");
                 Console.ResetColor();
                 ok++;
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[PROMPT] ✗ Failed ({dispName}): {ex.Message}");
+                Console.Error.WriteLine($"[PROMPT] ✗ Failed ({dispName}): {ex.Message}");
                 Console.ResetColor();
             }
         }

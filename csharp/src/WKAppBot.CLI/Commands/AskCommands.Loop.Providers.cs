@@ -26,11 +26,11 @@ internal partial class Program
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.WriteLine($"[ASK:LOOP] GPT requested {requested} — clamped to {maxParallel}");
+                Console.Error.WriteLine($"[ASK:LOOP] GPT requested {requested} — clamped to {maxParallel}");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
-            Console.WriteLine($"[ASK:LOOP] GPT step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            Console.Error.WriteLine($"[ASK:LOOP] GPT step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
             onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"ChatGPT:step{step}");
             var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
             // Post ⏳ placeholder per tool — will be updated in-place when result arrives
@@ -41,12 +41,12 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
                 }
-                Console.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
+                Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
                 return ExecuteLoopCommandAsync(tc.Argv!, timeoutSec, retries, "gpt")
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
@@ -80,11 +80,11 @@ internal partial class Program
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.WriteLine($"[ASK:LOOP] Gemini requested {requested} calls — clamped to {maxParallel} (--max-parallel)");
+                Console.Error.WriteLine($"[ASK:LOOP] Gemini requested {requested} calls — clamped to {maxParallel} (--max-parallel)");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
-            Console.WriteLine($"[ASK:LOOP] Gemini step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            Console.Error.WriteLine($"[ASK:LOOP] Gemini step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
             onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Gemini:step{step}");
             var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
             var idToStartTsGemini = onReport != null ? toolCalls.ToDictionary(
@@ -94,12 +94,12 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
                 }
-                Console.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
+                Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
                 return ExecuteLoopCommandAsync(tc.Argv!, timeoutSec, retries, "gemini")
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
@@ -135,11 +135,11 @@ internal partial class Program
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.WriteLine($"[ASK:LOOP] Claude requested {requested} — clamped to {maxParallel}");
+                Console.Error.WriteLine($"[ASK:LOOP] Claude requested {requested} — clamped to {maxParallel}");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
-            Console.WriteLine($"[ASK:LOOP] Claude step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
+            Console.Error.WriteLine($"[ASK:LOOP] Claude step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
             onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Claude:step{step}");
             var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
             var idToStartTsClaude = onReport != null ? toolCalls.ToDictionary(
@@ -149,12 +149,12 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
                 }
-                Console.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
+                Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: {string.Join(" ", tc.Argv!)}");
                 return ExecuteLoopCommandAsync(tc.Argv!, timeoutSec, retries, "claude")
                     .ContinueWith(t => (tc.Id, t.Result));
             }).ToList();
@@ -210,7 +210,7 @@ internal partial class Program
                 {
                     triadCtx.PushDiscovery(provider, toolMsg);
                     triadCtx.UpdateChunk(provider, $"[TOOL] {toolMsg}");
-                    Console.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+                    Console.Error.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
                     SlackPostToThread($"🔧 *[{provider} tool→peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
                 }
                 // Log tool results to MD: edit = full output, others = one line
@@ -296,7 +296,7 @@ internal partial class Program
             else
                 sb.Append("All tool calls complete. Emit next TOOL_CALL block(s) if more actions needed, otherwise give final answer.");
 
-            Console.WriteLine($"[ASK:LOOP] Flushing {collected.Count} result(s) to {provider} (pending={pending.Count})");
+            Console.Error.WriteLine($"[ASK:LOOP] Flushing {collected.Count} result(s) to {provider} (pending={pending.Count})");
 
             // Log tool results to Slack thread — each tool as separate post with AI:toolId:stepN username
             if (onReport != null)
@@ -349,7 +349,7 @@ internal partial class Program
             var (ok, next) = await sendAndWait(sb.ToString());
             if (!ok || string.IsNullOrWhiteSpace(next))
             {
-                Console.WriteLine($"[ASK:LOOP] {provider} follow-up timed out after flush.");
+                Console.Error.WriteLine($"[ASK:LOOP] {provider} follow-up timed out after flush.");
                 onReport?.Invoke($"❌ *timeout* — {provider} didn't respond after tool results flush", $"{LoopProviderLabel(provider)}:error");
                 return (true, answer);
             }

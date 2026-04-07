@@ -117,7 +117,7 @@ internal partial class Program
         if (handler == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[BLOCK] No matching handler for [{classPath}] \"{windowTitle}\".");
+            Console.Error.WriteLine($"[BLOCK] No matching handler for [{classPath}] \"{windowTitle}\".");
             Console.ResetColor();
 
             // Interactive learning: ask user to hover over desired button
@@ -222,7 +222,7 @@ internal partial class Program
         string condDesc = string.Join(" + ", parts);
 
         Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine($"[BLOCK] Patrol wait: {condDesc} (max {totalMs / 1000.0:F1}s)");
+        Console.Error.WriteLine($"[BLOCK] Patrol wait: {condDesc} (max {totalMs / 1000.0:F1}s)");
         Console.ResetColor();
 
         int blockerCount = 0;
@@ -273,7 +273,7 @@ internal partial class Program
                     {
                         Console.WriteLine(); // newline after \r progress
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"[BLOCK] Patrol done: window found \"{found[0].Title}\" ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                        Console.Error.WriteLine($"[BLOCK] Patrol done: window found \"{found[0].Title}\" ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
                         Console.ResetColor();
                         return;
                     }
@@ -290,7 +290,7 @@ internal partial class Program
                 {
                     Console.WriteLine(); // newline after \r progress
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"[BLOCK] Patrol done: dialog gone ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                    Console.Error.WriteLine($"[BLOCK] Patrol done: dialog gone ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
                     Console.ResetColor();
                     return;
                 }
@@ -309,7 +309,7 @@ internal partial class Program
                         {
                             Console.WriteLine(); // newline after \r progress
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[BLOCK] Patrol done: stable ×{consecutiveStable} ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                            Console.Error.WriteLine($"[BLOCK] Patrol done: stable ×{consecutiveStable} ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
                             Console.ResetColor();
                             return;
                         }
@@ -358,7 +358,7 @@ internal partial class Program
                         {
                             Console.WriteLine(); // newline after \r progress
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[BLOCK] Patrol done: responsive ✓ ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                            Console.Error.WriteLine($"[BLOCK] Patrol done: responsive ✓ ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
                             Console.ResetColor();
                             return;
                         }
@@ -377,7 +377,7 @@ internal partial class Program
                 lastFrameHash = null;
                 responsiveConfirmed = false; // app may hang again after popup dismiss
                 Console.ForegroundColor = ConsoleColor.DarkCyan;
-                Console.WriteLine($"[BLOCK] Patrol: handled blocker #{blockerCount} (stable reset)");
+                Console.Error.WriteLine($"[BLOCK] Patrol: handled blocker #{blockerCount} (stable reset)");
                 Console.ResetColor();
             }
         }
@@ -388,7 +388,7 @@ internal partial class Program
         if (hasStableCondition) extras.Add($"stable={consecutiveStable}/{stableTarget}");
         if (hasResponsiveCondition) extras.Add($"responsive={responsiveConfirmed}");
         string extra = extras.Count > 0 ? ", " + string.Join(", ", extras) : "";
-        Console.WriteLine($"[BLOCK] Patrol timeout: {totalMs / 1000.0:F1}s elapsed, {blockerCount} blockers handled{extra}");
+        Console.Error.WriteLine($"[BLOCK] Patrol timeout: {totalMs / 1000.0:F1}s elapsed, {blockerCount} blockers handled{extra}");
         Console.ResetColor();
     }
 

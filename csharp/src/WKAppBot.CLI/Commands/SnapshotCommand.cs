@@ -66,7 +66,7 @@ internal partial class Program
         NativeMethods.GetWindowThreadProcessId(win.Handle, out uint winPid);
         string? winProcessName = null;
         try { winProcessName = System.Diagnostics.Process.GetProcessById((int)winPid).ProcessName; } catch { }
-        Console.WriteLine($"[SNAPSHOT] Window: \"{win.Title}\" (class={win.ClassName}, pid={winPid})");
+        Console.Error.WriteLine($"[SNAPSHOT] Window: \"{win.Title}\" (class={win.ClassName}, pid={winPid})");
 
         // Knowhow broadcast: show existing knowhow for this window/profile
         BroadcastInspectKnowhow(win.Handle, win.ClassName, null, win.Title);
@@ -98,13 +98,13 @@ internal partial class Program
             }
             var uiaPath = Path.Combine(outDir, "uia_tree.txt");
             File.WriteAllText(uiaPath, tree, Encoding.UTF8);
-            Console.WriteLine($"[SNAPSHOT] UIA tree: {uiaPath} ({tree.Length} chars)");
+            Console.Error.WriteLine($"[SNAPSHOT] UIA tree: {uiaPath} ({tree.Length} chars)");
             savedCount++;
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[SNAPSHOT] UIA tree failed: {ex.Message}");
+            Console.Error.WriteLine($"[SNAPSHOT] UIA tree failed: {ex.Message}");
             Console.ResetColor();
         }
 
@@ -118,24 +118,24 @@ internal partial class Program
             {
                 screenshotPath = Path.Combine(outDir, "screenshot.png");
                 bmp.Save(screenshotPath, ImageFormat.Png);
-                Console.WriteLine($"[SNAPSHOT] Screenshot: {screenshotPath} ({bmp.Width}x{bmp.Height})");
+                Console.Error.WriteLine($"[SNAPSHOT] Screenshot: {screenshotPath} ({bmp.Width}x{bmp.Height})");
                 savedCount++;
 
                 // 2-1. Experience DB save (class-path + ring buffer + blend)
                 try
                 {
                     SaveExperienceSnapshot(winProcessName ?? "unknown", win.ClassName, cid, bmp, out var expCurrentPath, out var expBlendPath);
-                    Console.WriteLine($"[SNAPSHOT] 경험 current 저장: {expCurrentPath} (ring 0..9, class={win.ClassName}{(cid.HasValue ? $", cid={cid.Value}" : "")})");
+                    Console.Error.WriteLine($"[SNAPSHOT] 경험 current 저장: {expCurrentPath} (ring 0..9, class={win.ClassName}{(cid.HasValue ? $", cid={cid.Value}" : "")})");
                     if (!string.IsNullOrWhiteSpace(expBlendPath))
                     {
-                        Console.WriteLine($"[SNAPSHOT] 경험블렌드 저장 완료 (50% alpha, prev+curr): {expBlendPath} (AI 참조용)");
+                        Console.Error.WriteLine($"[SNAPSHOT] 경험블렌드 저장 완료 (50% alpha, prev+curr): {expBlendPath} (AI 참조용)");
                     }
                     savedCount++;
                 }
                 catch (Exception ex)
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[SNAPSHOT] 경험DB 저장 실패: {ex.Message}");
+                    Console.Error.WriteLine($"[SNAPSHOT] 경험DB 저장 실패: {ex.Message}");
                     Console.ResetColor();
                 }
             }
@@ -151,7 +151,7 @@ internal partial class Program
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[SNAPSHOT] Screenshot failed: {ex.Message}");
+            Console.Error.WriteLine($"[SNAPSHOT] Screenshot failed: {ex.Message}");
             Console.ResetColor();
         }
 
@@ -175,13 +175,13 @@ internal partial class Program
                 }
 
                 File.WriteAllText(ocrPath, sb.ToString(), Encoding.UTF8);
-                Console.WriteLine($"[SNAPSHOT] OCR: {ocrPath} ({ocrResult.Words.Count} words)");
+                Console.Error.WriteLine($"[SNAPSHOT] OCR: {ocrPath} ({ocrResult.Words.Count} words)");
                 savedCount++;
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[SNAPSHOT] OCR failed: {ex.Message}");
+                Console.Error.WriteLine($"[SNAPSHOT] OCR failed: {ex.Message}");
                 Console.ResetColor();
             }
             finally
@@ -232,7 +232,7 @@ internal partial class Program
                     if (controls > 0)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"[SNAPSHOT] 경험DB 학습: {forms} forms, {controls} controls touched, {screenshots} new screenshots (profile={profileMatch.Value.name})");
+                        Console.Error.WriteLine($"[SNAPSHOT] 경험DB 학습: {forms} forms, {controls} controls touched, {screenshots} new screenshots (profile={profileMatch.Value.name})");
                         Console.ResetColor();
                         savedCount++;
                     }
@@ -247,13 +247,13 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[SNAPSHOT] 경험DB 학습 실패: {ex.Message}");
+                Console.Error.WriteLine($"[SNAPSHOT] 경험DB 학습 실패: {ex.Message}");
                 Console.ResetColor();
             }
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[SNAPSHOT] Done! {savedCount} files saved to {outDir}");
+        Console.Error.WriteLine($"[SNAPSHOT] Done! {savedCount} files saved to {outDir}");
         Console.ResetColor();
         return 0;
     }

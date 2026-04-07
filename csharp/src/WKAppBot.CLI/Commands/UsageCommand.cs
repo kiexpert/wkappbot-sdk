@@ -273,7 +273,7 @@ Data Directory:
         {
             EmitEyeTick("tick", tag, status);
         }
-        Console.WriteLine($"[TICK] tag={tag} status={status}");
+        Console.Error.WriteLine($"[TICK] tag={tag} status={status}");
         return 0;
     }
 
@@ -620,10 +620,10 @@ Data Directory:
         var utf8Bytes = System.Text.Encoding.UTF8.GetBytes(testStr);
         var cp949Bytes = System.Text.Encoding.GetEncoding(949).GetBytes(testStr);
 
-        Console.WriteLine($"[ENC-TEST] text={testStr}");
-        Console.WriteLine($"[ENC-TEST] UTF-8 hex: {string.Join(" ", utf8Bytes.Select(b => b.ToString("X2")))}");
-        Console.WriteLine($"[ENC-TEST] CP949 hex: {string.Join(" ", cp949Bytes.Select(b => b.ToString("X2")))}");
-        Console.WriteLine($"[ENC-TEST] Console.OutputEncoding={Console.OutputEncoding.CodePage} GetConsoleOutputCP={EncTestGetConsoleOutputCP()}");
+        Console.Error.WriteLine($"[ENC-TEST] text={testStr}");
+        Console.Error.WriteLine($"[ENC-TEST] UTF-8 hex: {string.Join(" ", utf8Bytes.Select(b => b.ToString("X2")))}");
+        Console.Error.WriteLine($"[ENC-TEST] CP949 hex: {string.Join(" ", cp949Bytes.Select(b => b.ToString("X2")))}");
+        Console.Error.WriteLine($"[ENC-TEST] Console.OutputEncoding={Console.OutputEncoding.CodePage} GetConsoleOutputCP={EncTestGetConsoleOutputCP()}");
         Console.WriteLine("[ENC-TEST] done");
         return 0;
     }

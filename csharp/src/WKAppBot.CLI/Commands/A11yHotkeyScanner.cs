@@ -16,7 +16,7 @@ internal static class A11yHotkeyScanner
 
     public static void ScanAndMerge(IntPtr hwnd, AutomationElement? el, string processName, string? exeVersion = null)
     {
-        Console.WriteLine($"[HOTKEY-DB] Scanning '{processName}' (fast)...");
+        Console.Error.WriteLine($"[HOTKEY-DB] Scanning '{processName}' (fast)...");
         var newEntries = new List<HotkeyDbEntry>();
 
         // ① Win32 컨트롤 레이블 (빠름)
@@ -56,7 +56,7 @@ internal static class A11yHotkeyScanner
 
         int added = HotkeyExperienceDb.Merge(processName, newEntries, exeVersion);
         HotkeyExperienceDb.MarkSessionScanned(processName);
-        Console.WriteLine($"[HOTKEY-DB] Fast scan done — {newEntries.Count} found, {added} new merged");
+        Console.Error.WriteLine($"[HOTKEY-DB] Fast scan done — {newEntries.Count} found, {added} new merged");
 
         // ④ 백그라운드: 다국어 리소스 스캔 (LoadLibraryExW, 느림)
         // 메인 스레드 차단 없이 추가 언어팩 메뉴 항목 보충
@@ -70,9 +70,9 @@ internal static class A11yHotkeyScanner
                     .ToList();
                 var bgAdded = HotkeyExperienceDb.Merge(bgProc, bgEntries, bgVer);
                 if (bgAdded > 0)
-                    Console.WriteLine($"[HOTKEY-DB] BG multi-lang scan — {bgAdded} additional entries merged");
+                    Console.Error.WriteLine($"[HOTKEY-DB] BG multi-lang scan — {bgAdded} additional entries merged");
             }
-            catch (Exception ex) { Console.WriteLine($"[HOTKEY-DB] BG scan error: {ex.Message}"); }
+            catch (Exception ex) { Console.Error.WriteLine($"[HOTKEY-DB] BG scan error: {ex.Message}"); }
         });
     }
 
@@ -95,7 +95,7 @@ internal static class A11yHotkeyScanner
 
         if (!valid)
         {
-            Console.WriteLine($"[HOTKEY-DB] Stale entry '{entry.Label}' ({entry.Method}) — removing");
+            Console.Error.WriteLine($"[HOTKEY-DB] Stale entry '{entry.Label}' ({entry.Method}) — removing");
             HotkeyExperienceDb.RemoveStale(processName, [entry.Label], exeVersion);
         }
         return valid;

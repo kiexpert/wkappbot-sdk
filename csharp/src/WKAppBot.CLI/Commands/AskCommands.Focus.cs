@@ -47,7 +47,7 @@ internal partial class Program
                     {
                         notifiedOnce = true;
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[FOCUS-WD] Chrome stole focus @ {context} -- restoring...");
+                        Console.Error.WriteLine($"[FOCUS-WD] Chrome stole focus @ {context} -- restoring...");
                         Console.ResetColor();
                         try
                         {
@@ -61,13 +61,13 @@ internal partial class Program
                     NativeMethods.ForceForegroundWindow(prevFg);
                     if (NativeMethods.GetForegroundWindow() == prevFg)
                     {
-                        Console.WriteLine($"[FOCUS-WD] restored @ {context}");
+                        Console.Error.WriteLine($"[FOCUS-WD] restored @ {context}");
                         notifiedOnce = false;
                     }
                 }
             }
             catch (OperationCanceledException) { }
-            catch (Exception ex) { Console.WriteLine($"[FOCUS-WD] error: {ex.Message}"); }
+            catch (Exception ex) { Console.Error.WriteLine($"[FOCUS-WD] error: {ex.Message}"); }
         });
 
         return new ActionDisposable(() => cts.Cancel());
@@ -87,7 +87,7 @@ internal partial class Program
     {
         if (prevFg == IntPtr.Zero) return false;
         var cur = NativeMethods.GetForegroundWindow();
-        if (cur == prevFg) { Console.WriteLine($"[ASK:FOCUS] ok @ {step}"); return false; }
+        if (cur == prevFg) { Console.Error.WriteLine($"[ASK:FOCUS] ok @ {step}"); return false; }
 
         // Only act if Chrome stole it
         if (cdp != null)
@@ -99,7 +99,7 @@ internal partial class Program
                 NativeMethods.GetWindowThreadProcessId(chromeHwnd, out uint chromePid);
                 if (curPid != chromePid)
                 {
-                    Console.WriteLine($"[ASK:FOCUS] user-switch @ {step}: now={cur:X8} (not Chrome)");
+                    Console.Error.WriteLine($"[ASK:FOCUS] user-switch @ {step}: now={cur:X8} (not Chrome)");
                     return false;
                 }
             }
@@ -131,7 +131,7 @@ internal partial class Program
         catch { }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[ASK:FOCUS] STOLEN @ {step}: was={prevFg:X8} now={cur:X8} -- retrying...");
+        Console.Error.WriteLine($"[ASK:FOCUS] STOLEN @ {step}: was={prevFg:X8} now={cur:X8} -- retrying...");
         Console.ResetColor();
 
         // Retry loop until restored or timeout
@@ -145,13 +145,13 @@ internal partial class Program
             await Task.Delay(retryIntervalMs);
             if (NativeMethods.GetForegroundWindow() == prevFg) { restored = true; break; }
             if (attempt % 10 == 0)
-                Console.WriteLine($"[ASK:FOCUS] still retrying @ {step} attempt={attempt} elapsed={sw.ElapsedMilliseconds}ms");
+                Console.Error.WriteLine($"[ASK:FOCUS] still retrying @ {step} attempt={attempt} elapsed={sw.ElapsedMilliseconds}ms");
         }
 
         if (restored)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[ASK:FOCUS] restored @ {step} after {attempt} attempt(s) ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[ASK:FOCUS] restored @ {step} after {attempt} attempt(s) ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
             // Restore IME
             try
@@ -172,7 +172,7 @@ internal partial class Program
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[ASK:FOCUS] RESTORE FAILED @ {step} after {attempt} attempts ({timeoutMs}ms timeout)");
+            Console.Error.WriteLine($"[ASK:FOCUS] RESTORE FAILED @ {step} after {attempt} attempts ({timeoutMs}ms timeout)");
             Console.ResetColor();
             // Unrecoverable: mechanical restore exhausted — report to Slack for human awareness
             AutoBugReport($"focus-steal unrecoverable @ {step}: prevFg=0x{prevFg:X8} stuck on 0x{NativeMethods.GetForegroundWindow():X8} after {attempt} attempts");
@@ -194,7 +194,7 @@ internal partial class Program
             if (KeyboardInput.IsInputLockedByOther())
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"[ASK:FOCUS] ??Another session is typing ??waiting up to 5s before {action}...");
+                Console.Error.WriteLine($"[ASK:FOCUS] ??Another session is typing ??waiting up to 5s before {action}...");
                 Console.ResetColor();
                 var waited = 0;
                 while (waited < 5000 && KeyboardInput.IsInputLockedByOther())
@@ -203,9 +203,9 @@ internal partial class Program
                     waited += 200;
                 }
                 if (KeyboardInput.IsInputLockedByOther())
-                    Console.WriteLine($"[ASK:FOCUS] Still locked after wait ??proceeding anyway");
+                    Console.Error.WriteLine($"[ASK:FOCUS] Still locked after wait ??proceeding anyway");
                 else
-                    Console.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms ??proceeding");
+                    Console.Error.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms ??proceeding");
             }
 
             // ── Mid-input check 2: overlay check for focus steals ──
@@ -223,7 +223,7 @@ internal partial class Program
                 if (focusStealerKnown)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[ASK:FOCUS] FocusStealer-ask prop detected -- yield confirmation required");
+                    Console.Error.WriteLine($"[ASK:FOCUS] FocusStealer-ask prop detected -- yield confirmation required");
                     Console.ResetColor();
                     var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
                     NativeMethods.GetLastInputInfo(ref lii);
@@ -234,18 +234,18 @@ internal partial class Program
                     if (!yieldResult.Approved)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[ASK:FOCUS] yield denied -- {action} aborted");
+                        Console.Error.WriteLine($"[ASK:FOCUS] yield denied -- {action} aborted");
                         Console.ResetColor();
                         return (false, prevFg, null);
                     }
-                    Console.WriteLine($"[ASK:FOCUS] yield approved -- {action} running");
+                    Console.Error.WriteLine($"[ASK:FOCUS] yield approved -- {action} running");
                 }
             }
 
             var chromeHwnd = cdp.GetChromeWindowHandle();
             if (chromeHwnd == IntPtr.Zero)
             {
-                Console.WriteLine($"[AAR:CDP] Chrome window not found for {action}");
+                Console.Error.WriteLine($"[AAR:CDP] Chrome window not found for {action}");
                 return (false, prevFg, null);
             }
 
@@ -303,7 +303,7 @@ internal partial class Program
                 _ = cdp.SetBotTitlePrefixAsync(label ?? "WKBot");
             }
 
-            Console.WriteLine($"[AAR:CDP] Ready: {action}");
+            Console.Error.WriteLine($"[AAR:CDP] Ready: {action}");
             return (true, prevFg, zoom);
         }
         catch (Exception ex)
@@ -357,7 +357,7 @@ internal partial class Program
         var cur = NativeMethods.GetForegroundWindow();
         if (cur == prevFg)
         {
-            Console.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
+            Console.Error.WriteLine($"[ASK:FOCUS] ok @ {step} fg={cur:X8}");
             return false;
         }
         // Fire-and-forget retry restore (handles Chrome-PID check, IME, cursor, overlay, OnFocusStealer)
@@ -410,12 +410,12 @@ internal partial class Program
                 screenRect = new System.Drawing.Rectangle(pt0.X, pt0.Y, cr.Right, cr.Bottom);
             }
 
-            Console.Write($"[ZOOM:CDP {action}] ");
+            Console.Error.Write($"[ZOOM:CDP {action}] ");
             return ClickZoomHelper.BeginFromRect(screenRect, chromeHwnd, $"cdp-{action}", label);
         }
         catch (Exception ex)
         {
-            Console.Write($"[ZOOM:CDP:ERR {ex.GetType().Name}] ");
+            Console.Error.Write($"[ZOOM:CDP:ERR {ex.GetType().Name}] ");
             return null;
         }
     }
@@ -465,7 +465,7 @@ internal partial class Program
             if (title is "열기" or "Open" or "파일 열기" or "Open File")
             {
                 result = hWnd;
-                Console.WriteLine($"[ASK] FindFileOpenDialog: title match '{title}' hwnd={hWnd:X}");
+                Console.Error.WriteLine($"[ASK] FindFileOpenDialog: title match '{title}' hwnd={hWnd:X}");
                 return false; // stop
             }
 
@@ -475,7 +475,7 @@ internal partial class Program
             if (combo != IntPtr.Zero && dui != IntPtr.Zero)
             {
                 result = hWnd;
-                Console.WriteLine($"[ASK] FindFileOpenDialog: structural match '{title}' hwnd={hWnd:X}");
+                Console.Error.WriteLine($"[ASK] FindFileOpenDialog: structural match '{title}' hwnd={hWnd:X}");
                 return false; // stop
             }
 

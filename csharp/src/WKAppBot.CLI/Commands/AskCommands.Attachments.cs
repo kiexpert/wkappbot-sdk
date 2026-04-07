@@ -40,7 +40,7 @@ internal partial class Program
             _ => "image/png"
         };
         var fileName = Path.GetFileName(imagePath);
-        Console.WriteLine($"[ASK] Pasting image: {fileName} ({bytes.Length / 1024}KB, {mimeType})");
+        Console.Error.WriteLine($"[ASK] Pasting image: {fileName} ({bytes.Length / 1024}KB, {mimeType})");
 
         // Tier 1: Synthetic paste event with File blob (focusless ??no real clipboard needed)
         var pasteJs = $$"""
@@ -64,7 +64,7 @@ internal partial class Program
             })()
             """;
         var result = await cdp.EvalAsync(pasteJs);
-        Console.WriteLine($"[ASK] Synthetic paste: {result}");
+        Console.Error.WriteLine($"[ASK] Synthetic paste: {result}");
 
         if (result == "PASTED")
         {
@@ -76,7 +76,7 @@ internal partial class Program
 
                 if (indicator != "NONE")
                 {
-                    Console.WriteLine($"[ASK] Image attached: {indicator} ({(i + 1) * 500}ms)");
+                    Console.Error.WriteLine($"[ASK] Image attached: {indicator} ({(i + 1) * 500}ms)");
                     return true;
                 }
             }
@@ -133,7 +133,7 @@ internal partial class Program
 
             // Check for attachment
             var attached = await cdp.CheckAttachmentAsync();
-            Console.WriteLine($"[ASK] Clipboard paste: {attached}");
+            Console.Error.WriteLine($"[ASK] Clipboard paste: {attached}");
 
             // Restore original clipboard contents
             RestoreClipboard(clipBackup);
@@ -187,7 +187,7 @@ internal partial class Program
             {
                 // Final check for delayed dialogs
                 await DismissDialogIfPresent(cdp);
-                Console.WriteLine($"[ASK] Image upload complete ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[ASK] Image upload complete ({sw.ElapsedMilliseconds}ms)");
                 return;
             }
         }
@@ -205,7 +205,7 @@ internal partial class Program
         {
             var dismissed = await cdp.DismissDialogAsync();
             if (dismissed.StartsWith("DISMISSED"))
-                Console.WriteLine($"[ASK] Auto-dismissed dialog: {dismissed}");
+                Console.Error.WriteLine($"[ASK] Auto-dismissed dialog: {dismissed}");
         }
         catch { /* best effort */ }
     }
@@ -232,14 +232,14 @@ internal partial class Program
                     // Image: clipboard paste (Tier 1 synthetic ??Tier 2 Win32 clipboard + Ctrl+V)
                     var imgOk = await PasteImageViaCdp(cdp, filePath, editorSelector);
                     if (imgOk) await WaitForImageUpload(cdp);
-                    else Console.WriteLine($"[ASK] Image paste failed: {Path.GetFileName(filePath)}");
+                    else Console.Error.WriteLine($"[ASK] Image paste failed: {Path.GetFileName(filePath)}");
                 }
                 else
                 {
                     // Non-image file: use hidden file input element
                     var fileOk = await AttachFileViaFileInput(cdp, filePath, originalUserFg);
                     if (fileOk) await WaitForImageUpload(cdp); // reuse upload wait
-                    else Console.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
+                    else Console.Error.WriteLine($"[ASK] File attach failed: {Path.GetFileName(filePath)}");
                 }
                 await Task.Delay(500); // settle between attachments
                 await DismissDialogIfPresent(cdp); // catch late-appearing dialogs

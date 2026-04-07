@@ -19,7 +19,7 @@ internal partial class Program
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("claude.ai", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} ??navigating back to claude.ai");
+            Console.Error.WriteLine($"[ASK:LOOP] Claude tab drifted to {currentUrl} ??navigating back to claude.ai");
             await cdp.NavigateAsync("https://claude.ai/new");
             await Task.Delay(3000);
         }
@@ -138,7 +138,7 @@ internal partial class Program
         var currentUrl = await cdp.GetUrlAsync() ?? "";
         if (!currentUrl.Contains("gemini.google.com", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} ??navigating back");
+            Console.Error.WriteLine($"[ASK:LOOP] Gemini tab drifted to {currentUrl} ??navigating back");
             await cdp.NavigateAsync("https://gemini.google.com/app");
             await Task.Delay(3000);
         }
@@ -207,7 +207,7 @@ internal partial class Program
         }
         if (sendResult == "PENDING")
             sendResult = "FORCED(5x)";
-        Console.WriteLine($"[ASK:LOOP] Gemini send={sendResult}");
+        Console.Error.WriteLine($"[ASK:LOOP] Gemini send={sendResult}");
         loopLock.Release("sent");
 
         var sw = Stopwatch.StartNew();

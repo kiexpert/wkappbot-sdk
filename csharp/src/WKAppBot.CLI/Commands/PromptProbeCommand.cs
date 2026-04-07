@@ -129,7 +129,7 @@ internal partial class Program
             candidates = candidates.Where(c => c.HostMatch).ToList();
 
         Console.WriteLine();
-        Console.WriteLine($"[PROMPT-PROBE] === Candidate Windows ({candidates.Count}) ===");
+        Console.Error.WriteLine($"[PROMPT-PROBE] === Candidate Windows ({candidates.Count}) ===");
         if (hostTarget != "any" && candidates.Count == 0)
             Console.WriteLine($"  no {hostTarget} prompt candidates matched the current live windows");
         using var automation = new UIA3Automation();
@@ -137,7 +137,7 @@ internal partial class Program
         foreach (var c in candidates)
         {
             idx++;
-            Console.WriteLine($"[{idx}] hwnd=0x{c.Hwnd:X} score={c.Score} proc={c.ProcessName} pid={c.Pid}");
+            Console.Error.WriteLine($"[{idx}] hwnd=0x{c.Hwnd:X} score={c.Score} proc={c.ProcessName} pid={c.Pid}");
             Console.WriteLine($"    title=\"{TrimForLog(c.Title, 120)}\"");
             Console.WriteLine($"    class={c.ClassName} visible={c.Visible} iconic={c.Iconic}");
             Console.WriteLine($"    rect=({c.Rect.X},{c.Rect.Y},{c.Rect.Width},{c.Rect.Height})");
@@ -270,7 +270,7 @@ internal partial class Program
         {
             Console.WriteLine();
             var injectTarget = GetArgValue(args, "--target");
-            Console.WriteLine($"[PROMPT-PROBE] === Inject Test (submit={injectSubmit} target={injectTarget ?? "codex-only"}) ===");
+            Console.Error.WriteLine($"[PROMPT-PROBE] === Inject Test (submit={injectSubmit} target={injectTarget ?? "codex-only"}) ===");
             ClaudePromptHelper.AllowFocusSteal = injectSubmit;
 
             var targets = allPrompts.Where(p =>

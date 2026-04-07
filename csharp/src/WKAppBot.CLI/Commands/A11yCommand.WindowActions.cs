@@ -18,7 +18,7 @@ internal partial class Program
             NativeMethods.ShowWindow(hwnd, 9);
         NativeMethods.SmartSetForegroundWindow(hwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
         NativeMethods.BringWindowToTop(hwnd);
-        Console.WriteLine($"[A11Y] focus {tag} — SetForegroundWindow");
+        Console.Error.WriteLine($"[A11Y] focus {tag} — SetForegroundWindow");
         return true;
     }
 
@@ -53,7 +53,7 @@ internal partial class Program
                     WKAppBot.Win32.Input.KeyboardInput.Hotkey(keys);
             }
 
-            Console.WriteLine($"[A11Y] hotkey {tag} — \"{keyCombo}\"");
+            Console.Error.WriteLine($"[A11Y] hotkey {tag} — \"{keyCombo}\"");
             return true;
         }
         catch (Exception ex)
@@ -74,11 +74,11 @@ internal partial class Program
                 Thread.Sleep(500);
                 if (!NativeMethods.IsWindow(hwnd))
                 {
-                    Console.WriteLine($"[A11Y] close {tag} — UIA WindowPattern");
+                    Console.Error.WriteLine($"[A11Y] close {tag} — UIA WindowPattern");
                     return true;
                 }
                 // Window still alive — save dialog may have appeared (WinUI internal modal)
-                Console.WriteLine($"[A11Y] close {tag} — UIA Close sent but window still alive, checking internal modal...");
+                Console.Error.WriteLine($"[A11Y] close {tag} — UIA Close sent but window still alive, checking internal modal...");
                 if (HasUiaInternalModal(automation, hwnd, out var modalButtonName))
                 {
                     if (force)
@@ -87,23 +87,23 @@ internal partial class Program
                         Thread.Sleep(500);
                         if (!NativeMethods.IsWindow(hwnd))
                         {
-                            Console.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
+                            Console.Error.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
                             return true;
                         }
                     }
                     else
                     {
-                        Console.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
+                        Console.Error.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
                         return false;
                     }
                 }
                 // Fall through to Win32 WM_CLOSE tier
             }
-            Console.WriteLine($"[A11Y] close {tag} — UIA not sufficient, trying Win32");
+            Console.Error.WriteLine($"[A11Y] close {tag} — UIA not sufficient, trying Win32");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] close {tag} — UIA failed ({ex.Message}), trying Win32");
+            Console.Error.WriteLine($"[A11Y] close {tag} — UIA failed ({ex.Message}), trying Win32");
         }
 
         try
@@ -112,18 +112,18 @@ internal partial class Program
             Thread.Sleep(1000);
             if (!NativeMethods.IsWindow(hwnd))
             {
-                Console.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE");
+                Console.Error.WriteLine($"[A11Y] close {tag} — Win32 WM_CLOSE");
                 return true;
             }
             var blocker = readiness.DetectBlocker(hwnd);
             if (blocker != null)
             {
-                Console.WriteLine($"[A11Y] close {tag} — blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                Console.Error.WriteLine($"[A11Y] close {tag} — blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
                 readiness.BlockerHandler?.TryHandle(hwnd, blocker);
                 Thread.Sleep(500);
                 if (!NativeMethods.IsWindow(hwnd))
                 {
-                    Console.WriteLine($"[A11Y] close {tag} — closed after dismiss");
+                    Console.Error.WriteLine($"[A11Y] close {tag} — closed after dismiss");
                     return true;
                 }
             }
@@ -136,7 +136,7 @@ internal partial class Program
                     Thread.Sleep(500);
                     if (!NativeMethods.IsWindow(hwnd))
                     {
-                        Console.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
+                        Console.Error.WriteLine($"[A11Y] close {tag} — closed after UIA modal dismiss");
                         return true;
                     }
                     // Retry WM_CLOSE after dismiss
@@ -144,19 +144,19 @@ internal partial class Program
                     Thread.Sleep(500);
                     if (!NativeMethods.IsWindow(hwnd))
                     {
-                        Console.WriteLine($"[A11Y] close {tag} — closed after retry WM_CLOSE");
+                        Console.Error.WriteLine($"[A11Y] close {tag} — closed after retry WM_CLOSE");
                         return true;
                     }
                 }
                 else
                 {
-                    Console.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
+                    Console.Error.WriteLine($"[A11Y] close {tag} — save dialog detected! use --force to dismiss without saving");
                     return false;
                 }
             }
             if (!force)
             {
-                Console.WriteLine($"[A11Y] close {tag} — still alive (use --force to kill)");
+                Console.Error.WriteLine($"[A11Y] close {tag} — still alive (use --force to kill)");
                 return false;
             }
         }
@@ -171,7 +171,7 @@ internal partial class Program
             if (pid != 0)
             {
                 System.Diagnostics.Process.GetProcessById((int)pid).Kill();
-                Console.WriteLine($"[A11Y] close {tag} — Process.Kill (pid={pid})");
+                Console.Error.WriteLine($"[A11Y] close {tag} — Process.Kill (pid={pid})");
                 return true;
             }
         }
@@ -250,7 +250,7 @@ internal partial class Program
                     var name = btn.Name;
                     if (!string.IsNullOrEmpty(name) && name.Equals(buttonName, StringComparison.OrdinalIgnoreCase))
                     {
-                        Console.WriteLine($"[A11Y] close {tag} — UIA internal modal: clicking \"{name}\" (--force)");
+                        Console.Error.WriteLine($"[A11Y] close {tag} — UIA internal modal: clicking \"{name}\" (--force)");
                         if (btn.Patterns.Invoke.IsSupported)
                             btn.Patterns.Invoke.Pattern.Invoke();
                         else
@@ -276,13 +276,13 @@ internal partial class Program
             if (el.Patterns.Window.IsSupported)
             {
                 el.Patterns.Window.Pattern.SetWindowVisualState(state);
-                Console.WriteLine($"[A11Y] {name} {tag} — UIA WindowPattern");
+                Console.Error.WriteLine($"[A11Y] {name} {tag} — UIA WindowPattern");
                 return true;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[A11Y] {name} {tag} — UIA failed ({ex.Message}), trying Win32");
+            Console.Error.WriteLine($"[A11Y] {name} {tag} — UIA failed ({ex.Message}), trying Win32");
         }
 
         int cmd = state switch
@@ -294,7 +294,7 @@ internal partial class Program
         try
         {
             NativeMethods.ShowWindow(hwnd, cmd);
-            Console.WriteLine($"[A11Y] {name} {tag} — Win32 ShowWindow({cmd})");
+            Console.Error.WriteLine($"[A11Y] {name} {tag} — Win32 ShowWindow({cmd})");
             return true;
         }
         catch (Exception ex)
@@ -312,7 +312,7 @@ internal partial class Program
             if (el.Patterns.Transform.IsSupported && el.Patterns.Transform.Pattern.CanMove)
             {
                 el.Patterns.Transform.Pattern.Move(x, y);
-                Console.WriteLine($"[A11Y] move {tag} -> ({x},{y}) — UIA Transform");
+                Console.Error.WriteLine($"[A11Y] move {tag} -> ({x},{y}) — UIA Transform");
                 return true;
             }
         }
@@ -320,7 +320,7 @@ internal partial class Program
         try
         {
             NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, 0x0015);
-            Console.WriteLine($"[A11Y] move {tag} -> ({x},{y}) — Win32 SetWindowPos");
+            Console.Error.WriteLine($"[A11Y] move {tag} -> ({x},{y}) — Win32 SetWindowPos");
             return true;
         }
         catch (Exception ex)
@@ -338,7 +338,7 @@ internal partial class Program
             if (el.Patterns.Transform.IsSupported && el.Patterns.Transform.Pattern.CanResize)
             {
                 el.Patterns.Transform.Pattern.Resize(w, h);
-                Console.WriteLine($"[A11Y] resize {tag} -> ({w}x{h}) — UIA Transform");
+                Console.Error.WriteLine($"[A11Y] resize {tag} -> ({w}x{h}) — UIA Transform");
                 return true;
             }
         }
@@ -346,7 +346,7 @@ internal partial class Program
         try
         {
             NativeMethods.SetWindowPos(hwnd, IntPtr.Zero, 0, 0, w, h, 0x0016);
-            Console.WriteLine($"[A11Y] resize {tag} -> ({w}x{h}) — Win32 SetWindowPos");
+            Console.Error.WriteLine($"[A11Y] resize {tag} -> ({w}x{h}) — Win32 SetWindowPos");
             return true;
         }
         catch (Exception ex)

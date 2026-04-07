@@ -48,7 +48,7 @@ internal partial class Program
                 return false;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭 -> find 자동 전환. 정확한 타겟을 지정하세요:");
+            Console.Error.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭 -> find 자동 전환. 정확한 타겟을 지정하세요:");
             Console.ResetColor();
 
             // Get focused UIA element info (for the foreground window's process)
@@ -126,7 +126,7 @@ internal partial class Program
                     }
                 }
             }
-            Console.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
             return true;
         }
 
@@ -146,12 +146,12 @@ internal partial class Program
             var popTitle = WindowFinder.GetWindowText(ownedPopup);
             var popJson5 = WindowFinder.BuildTargetJson5(ownedPopup);
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
+            Console.Error.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
             Console.ResetColor();
 
             // Auto-find inside the alert dialog (UIA)
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] ALERT -> find 자동 전환. 알러트 내부 요소:");
+            Console.Error.WriteLine($"[A11Y] ALERT -> find 자동 전환. 알러트 내부 요소:");
             Console.ResetColor();
             try
             {
@@ -235,7 +235,7 @@ internal partial class Program
                     {
                         var focJson5 = WindowFinder.BuildTargetJson5(targetHwnd);
                         Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
+                        Console.Error.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
                         Console.ResetColor();
                     }
                 }
@@ -284,7 +284,7 @@ internal partial class Program
                         {
                             var leafJson5 = WindowFinder.BuildTargetJson5(targetHwnd);
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{leafJson5}#*{label}*\"");
+                            Console.Error.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{leafJson5}#*{label}*\"");
                             Console.ResetColor();
                         }
                     }
@@ -302,7 +302,7 @@ internal partial class Program
             string grap, string action, string? uiaPath, string[] win32Segments, int segIndex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] \"{missingPattern}\" 자식창 없음 -> find 자동 전환. Win32 자식 윈도우:");
+            Console.Error.WriteLine($"[A11Y] \"{missingPattern}\" 자식창 없음 -> find 자동 전환. Win32 자식 윈도우:");
             Console.ResetColor();
             var siblings = WindowFinder.GetChildrenZOrder(parentHwnd);
             int shown = 0;
@@ -349,7 +349,7 @@ internal partial class Program
                 return false;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] #scope 없음 -> find 자동 전환. \"{title}\" 의 UIA 요소:");
+            Console.Error.WriteLine($"[A11Y] #scope 없음 -> find 자동 전환. \"{title}\" 의 UIA 요소:");
             Console.ResetColor();
             try
             {
@@ -405,7 +405,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
             return true;
         }
 
@@ -418,7 +418,7 @@ internal partial class Program
             string uiaPath, string action)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[A11Y] \"{uiaPath}\" 요소 없음 -> find 자동 전환. 사용 가능한 요소:");
+            Console.Error.WriteLine($"[A11Y] \"{uiaPath}\" 요소 없음 -> find 자동 전환. 사용 가능한 요소:");
             Console.ResetColor();
             try
             {
@@ -441,7 +441,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
         }
     }
 }

@@ -59,7 +59,7 @@ internal partial class Program
                         if (!A11yHotkeyScanner.Verify(dbEntry, hwnd, parentHwnd, procName, exeVersion))
                         {
                             // 검증 실패 → 재스캔 후 재조회 (앱 업데이트 등)
-                            Console.WriteLine($"[A11Y] type --hotkey — stale, rescanning '{procName}'...");
+                            Console.Error.WriteLine($"[A11Y] type --hotkey — stale, rescanning '{procName}'...");
                             HotkeyExperienceDb.MarkSessionScanned(procName); // 무한루프 방지
                             A11yHotkeyScanner.ScanAndMerge(hwnd, el, procName, exeVersion);
                             dbEntry = HotkeyExperienceDb.Match(procName, lookupPattern, exeVersion);
@@ -68,10 +68,10 @@ internal partial class Program
 
                     if (dbEntry != null)
                     {
-                        Console.WriteLine($"[A11Y] type --hotkey — DB '{dbEntry.Label}' ({dbEntry.Source}/{dbEntry.Method})");
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — DB '{dbEntry.Label}' ({dbEntry.Source}/{dbEntry.Method})");
                         return A11yHotkeyScanner.Dispatch(dbEntry, hwnd, parentHwnd);
                     }
-                    Console.WriteLine($"[A11Y] type --hotkey — DB miss '{text}', falling to live scan");
+                    Console.Error.WriteLine($"[A11Y] type --hotkey — DB miss '{text}', falling to live scan");
                 }
 
                 List<(string Label, Func<bool> Activate)>? combinedMap = null;
@@ -93,7 +93,7 @@ internal partial class Program
                     var itemId = Win32ShortcutActivator.ResolveMenuPath(hwnd, segments);
                     if (itemId != 0)
                     {
-                        Console.WriteLine($"[A11Y] type --hotkey — menu path '{text}' → WM_COMMAND 0x{itemId:X4}");
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — menu path '{text}' → WM_COMMAND 0x{itemId:X4}");
                         Win32ShortcutActivator.DispatchMenuItem(hwnd, itemId);
                         return true;
                     }
@@ -115,7 +115,7 @@ internal partial class Program
                     if (matches.Count == 0)
                     {
                         // CDP 없는 Electron/WPF 폴백: UIA AccessKey / AcceleratorKey 스캔
-                        Console.WriteLine($"[A11Y] type --hotkey — no Win32 label match, trying UIA AccessKey scan");
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — no Win32 label match, trying UIA AccessKey scan");
                         var uiaMatcher = PatternMatcher.Create(text);
                         try
                         {
@@ -128,7 +128,7 @@ internal partial class Program
                                 var shortcut  = !string.IsNullOrEmpty(accessKey) ? accessKey
                                               : !string.IsNullOrEmpty(accelKey)  ? accelKey : null;
                                 if (shortcut == null) continue;
-                                Console.WriteLine($"[A11Y] type --hotkey — UIA '{name}' → '{shortcut}' → PostMessage");
+                                Console.Error.WriteLine($"[A11Y] type --hotkey — UIA '{name}' → '{shortcut}' → PostMessage");
                                 return Win32ShortcutActivator.DispatchShortcutViaPostMessage(hwnd, shortcut);
                             }
                         }
@@ -138,9 +138,9 @@ internal partial class Program
                     }
                     var (bestLabel, bestActivate) = matches[0];
                     if (matches.Count > 1)
-                        Console.WriteLine($"[A11Y] type --hotkey — {matches.Count} matches, best coverage: '{bestLabel}' ({(double)text.Length / bestLabel.Length:P0})");
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — {matches.Count} matches, best coverage: '{bestLabel}' ({(double)text.Length / bestLabel.Length:P0})");
                     else
-                        Console.WriteLine($"[A11Y] type --hotkey — matched '{bestLabel}'");
+                        Console.Error.WriteLine($"[A11Y] type --hotkey — matched '{bestLabel}'");
                     if (!bestActivate())
                     {
                         Console.Error.WriteLine("[A11Y] type --hotkey — dispatch failed, aborting");
@@ -200,7 +200,7 @@ internal partial class Program
                 rt.SetApartmentState(ApartmentState.STA);
                 rt.Start();
 
-                Console.WriteLine($"[A11Y] type — Electron clipboard Ctrl+V ({text.Length} chars)");
+                Console.Error.WriteLine($"[A11Y] type — Electron clipboard Ctrl+V ({text.Length} chars)");
                 return true;
             }
             catch (Exception ex)
@@ -214,7 +214,7 @@ internal partial class Program
         {
             foreach (char c in text)
                 NativeMethods.PostMessageW(hwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
-            Console.WriteLine($"[A11Y] type — console telepathy WM_CHAR ({text.Length} chars, focusless!)");
+            Console.Error.WriteLine($"[A11Y] type — console telepathy WM_CHAR ({text.Length} chars, focusless!)");
             return true;
         }
 
@@ -235,7 +235,7 @@ internal partial class Program
                 NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP, (IntPtr)0x11, (IntPtr)unchecked((nint)((1u << 30) | (1u << 31))));
                 Thread.Sleep(50);
                 try { if (!string.IsNullOrEmpty(prevClip)) System.Windows.Forms.Clipboard.SetText(prevClip); } catch { }
-                Console.WriteLine($"[A11Y] type — ConPTY clipboard paste ({text.Length} chars, focusless!)");
+                Console.Error.WriteLine($"[A11Y] type — ConPTY clipboard paste ({text.Length} chars, focusless!)");
                 return true;
             }
             catch (Exception ex)
@@ -253,7 +253,7 @@ internal partial class Program
                 if (vp.IsSupported && !vp.Pattern.IsReadOnly.Value)
                 {
                     vp.Pattern.SetValue(text);
-                    Console.WriteLine($"[A11Y] type — UIA Value.SetValue ({text.Length} chars)");
+                    Console.Error.WriteLine($"[A11Y] type — UIA Value.SetValue ({text.Length} chars)");
                     return true;
                 }
             }
@@ -268,7 +268,7 @@ internal partial class Program
                 var imeTarget = elHwnd != IntPtr.Zero ? elHwnd : hwnd;
                 if (WKAppBot.Win32.Input.KeyboardInput.TypeViaIme(imeTarget, text))
                 {
-                    Console.WriteLine($"[A11Y] type — IME injection ({text.Length} chars, focusless)");
+                    Console.Error.WriteLine($"[A11Y] type — IME injection ({text.Length} chars, focusless)");
                     return true;
                 }
             }
@@ -282,7 +282,7 @@ internal partial class Program
                     if (legacy.IsSupported)
                     {
                         legacy.Pattern.SetValue(text);
-                        Console.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars){(isElectron ? " [Electron]" : "")}");
+                        Console.Error.WriteLine($"[A11Y] type — LegacyIA SetValue ({text.Length} chars){(isElectron ? " [Electron]" : "")}");
                         return true;
                     }
                 }
@@ -295,7 +295,7 @@ internal partial class Program
             {
                 foreach (char c in text)
                     NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_CHAR, (IntPtr)c, IntPtr.Zero);
-                Console.WriteLine($"[A11Y] type — Win32 WM_CHAR ({text.Length} chars)");
+                Console.Error.WriteLine($"[A11Y] type — Win32 WM_CHAR ({text.Length} chars)");
                 return true;
             }
         }
@@ -309,7 +309,7 @@ internal partial class Program
             Thread.Sleep(100);
             // Pass hwnd for per-token mid-input focus check+restore
             WKAppBot.Win32.Input.KeyboardInput.SendKeys(text, hwnd);
-            Console.WriteLine($"[A11Y] type — SendKeys keystroke ({text.Length} chars)");
+            Console.Error.WriteLine($"[A11Y] type — SendKeys keystroke ({text.Length} chars)");
             return true;
         }
         catch (Exception ex)
@@ -365,11 +365,11 @@ internal partial class Program
     {
         var info = UiaLocator.GetRangeValueInfo(el);
         if (info != null)
-            Console.WriteLine($"[A11Y] range: {info.Minimum}..{info.Maximum} (current={info.Value}, step={info.SmallChange})");
+            Console.Error.WriteLine($"[A11Y] range: {info.Minimum}..{info.Maximum} (current={info.Value}, step={info.SmallChange})");
 
         if (UiaLocator.TrySetRangeValue(el, value))
         {
-            Console.WriteLine($"[A11Y] set-range — UIA RangeValue = {value}");
+            Console.Error.WriteLine($"[A11Y] set-range — UIA RangeValue = {value}");
             return true;
         }
 

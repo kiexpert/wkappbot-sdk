@@ -380,7 +380,7 @@ internal partial class Program
                     Console.Write("    KB focus: ");
                     Console.ForegroundColor = ConsoleColor.White;
                     var focusTitle = focusBuf.ToString();
-                    Console.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
+                    Console.Error.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
                     Console.ResetColor();
 
                     // UIA focused LEAF element — TreeWalker + HasKeyboardFocus (works for background windows)
@@ -473,7 +473,7 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.Write("    ◇ popup: ");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"[{popup:X8}] \"{(pTitle.Length > 40 ? pTitle[..37] + "..." : pTitle)}\" ({pClassBuf}) {pRect.Right - pRect.Left}x{pRect.Bottom - pRect.Top}");
+                Console.Error.WriteLine($"[{popup:X8}] \"{(pTitle.Length > 40 ? pTitle[..37] + "..." : pTitle)}\" ({pClassBuf}) {pRect.Right - pRect.Left}x{pRect.Bottom - pRect.Top}");
                 Console.ResetColor();
             }
         }

@@ -34,7 +34,7 @@ internal partial class Program
             text = string.Join(" ", textParts);
 
         Console.OutputEncoding = System.Text.Encoding.UTF8;
-        Console.WriteLine($"[PROMPT-TEST] Finding Claude prompt...");
+        Console.Error.WriteLine($"[PROMPT-TEST] Finding Claude prompt...");
 
         using var helper = new ClaudePromptHelper();
         var prompt = helper.FindPrompt();
@@ -45,17 +45,17 @@ internal partial class Program
             return 1;
         }
 
-        Console.WriteLine($"[PROMPT-TEST] Found: {prompt.HostType} \"{prompt.WindowTitle}\"");
-        Console.WriteLine($"[PROMPT-TEST] Rect: ({prompt.PromptRect.X},{prompt.PromptRect.Y} {prompt.PromptRect.Width}x{prompt.PromptRect.Height})");
-        Console.WriteLine($"[PROMPT-TEST] Text: \"{text}\"");
-        Console.WriteLine($"[PROMPT-TEST] Mode: {(staged ? $"STAGED (retry={retry})" : dryRun ? "DRY-RUN (no Enter)" : "SUBMIT (will press Enter)")}");
+        Console.Error.WriteLine($"[PROMPT-TEST] Found: {prompt.HostType} \"{prompt.WindowTitle}\"");
+        Console.Error.WriteLine($"[PROMPT-TEST] Rect: ({prompt.PromptRect.X},{prompt.PromptRect.Y} {prompt.PromptRect.Width}x{prompt.PromptRect.Height})");
+        Console.Error.WriteLine($"[PROMPT-TEST] Text: \"{text}\"");
+        Console.Error.WriteLine($"[PROMPT-TEST] Mode: {(staged ? $"STAGED (retry={retry})" : dryRun ? "DRY-RUN (no Enter)" : "SUBMIT (will press Enter)")}");
         Console.WriteLine();
 
         if (staged)
         {
             for (int attempt = 1; attempt <= retry; attempt++)
             {
-                Console.WriteLine($"[PROMPT-TEST][STAGED] attempt {attempt}/{retry}");
+                Console.Error.WriteLine($"[PROMPT-TEST][STAGED] attempt {attempt}/{retry}");
 
                 var typed = helper.TypeWithoutSubmit(prompt, text);
                 if (!typed)
@@ -65,7 +65,7 @@ internal partial class Program
                 }
 
                 var before = helper.ProbeSubmitState(prompt);
-                Console.WriteLine($"[PROMPT-TEST][STAGED] before turnForm={before.TurnFormFound} submit={before.SubmitFound} enabled={before.SubmitEnabled} name=\"{before.SubmitName}\"");
+                Console.Error.WriteLine($"[PROMPT-TEST][STAGED] before turnForm={before.TurnFormFound} submit={before.SubmitFound} enabled={before.SubmitEnabled} name=\"{before.SubmitName}\"");
                 var isCodexPrompt = string.Equals(prompt.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase);
                 if ((!before.TurnFormFound || !before.SubmitFound || !before.SubmitEnabled) && !isCodexPrompt)
                 {
@@ -83,8 +83,8 @@ internal partial class Program
                     var accepted = submitted && (isCodexPrompt || helper.VerifySubmitAccepted(prompt, 2000));
                     var after = helper.ProbeSubmitState(prompt);
 
-                    Console.WriteLine($"[PROMPT-TEST][STAGED] submit submitted={submitted} accepted={accepted}");
-                    Console.WriteLine($"[PROMPT-TEST][STAGED] after turnForm={after.TurnFormFound} submit={after.SubmitFound} enabled={after.SubmitEnabled} name=\"{after.SubmitName}\"");
+                    Console.Error.WriteLine($"[PROMPT-TEST][STAGED] submit submitted={submitted} accepted={accepted}");
+                    Console.Error.WriteLine($"[PROMPT-TEST][STAGED] after turnForm={after.TurnFormFound} submit={after.SubmitFound} enabled={after.SubmitEnabled} name=\"{after.SubmitName}\"");
 
                     if (accepted)
                     {
@@ -110,14 +110,14 @@ internal partial class Program
             // Type without submitting — test text insertion only
             Console.WriteLine("[PROMPT-TEST] Dry-run: typing text without submit...");
             var result = helper.TypeWithoutSubmit(prompt, text);
-            Console.WriteLine($"[PROMPT-TEST] Result: {(result ? "OK" : "FAILED")}");
+            Console.Error.WriteLine($"[PROMPT-TEST] Result: {(result ? "OK" : "FAILED")}");
         }
         else
         {
             // Full submit
             Console.WriteLine("[PROMPT-TEST] Submitting...");
             var result = helper.TypeAndSubmit(prompt, text);
-            Console.WriteLine($"[PROMPT-TEST] Result: {(result ? "OK" : "FAILED")}");
+            Console.Error.WriteLine($"[PROMPT-TEST] Result: {(result ? "OK" : "FAILED")}");
         }
 
         Console.WriteLine("[PROMPT-TEST] Done!");

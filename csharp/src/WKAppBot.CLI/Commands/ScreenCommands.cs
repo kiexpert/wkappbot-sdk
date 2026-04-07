@@ -143,7 +143,7 @@ internal partial class Program
 
         // Wait for form to appear
         ready.Wait(3000);
-        Console.WriteLine($"[SCREEN] blank ON — all monitors blacked out (auto-off in {durationSec}s, or move mouse/key to restore)");
+        Console.Error.WriteLine($"[SCREEN] blank ON — all monitors blacked out (auto-off in {durationSec}s, or move mouse/key to restore)");
 
         // Wait for form to close (process must stay alive for the overlay thread)
         thread.Join();

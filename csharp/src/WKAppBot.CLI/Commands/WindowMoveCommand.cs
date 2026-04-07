@@ -67,7 +67,7 @@ internal partial class Program
         if (!ok)
             return Error("SetWindowPos failed.");
 
-        Console.WriteLine($"[MOVE] \"{win.Title}\" -> ({tx},{ty})");
+        Console.Error.WriteLine($"[MOVE] \"{win.Title}\" -> ({tx},{ty})");
         return 0;
     }
 }

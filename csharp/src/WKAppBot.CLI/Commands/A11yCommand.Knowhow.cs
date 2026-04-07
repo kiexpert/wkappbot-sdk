@@ -156,7 +156,7 @@ internal partial class Program
                     int cy2 = wrFast.Top  + (int)(lh.ctrl.RelativeY * winH2) + lh.ctrl.Height / 2;
                     var lhLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
                         lh.ctrl.ClassName ?? "Node", lh.ctrl.Role, lh.ctrl.ControlId, isDynamic: true);
-                    Console.WriteLine($"[A11Y] form_uia cache: \"{uiaPath}\" → {lhLabel} ({cx2},{cy2})");
+                    Console.Error.WriteLine($"[A11Y] form_uia cache: \"{uiaPath}\" → {lhLabel} ({cx2},{cy2})");
                     return DispatchFormUiaAction(action, lhLabel, lh.ctrl, cx2, cy2);
                 }
             }
@@ -224,7 +224,7 @@ internal partial class Program
 
             var dyLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
                 best.ClassName ?? "Node", best.Role, best.ControlId, isDynamic: true);
-            Console.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" → {dyLabel} ({cx},{cy})");
+            Console.Error.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" → {dyLabel} ({cx},{cy})");
             return DispatchFormUiaAction(action, dyLabel, best, cx, cy);
         }
         catch { return null; }
@@ -240,10 +240,10 @@ internal partial class Program
         }
         if (action is "find" or "inspect" or "read")
         {
-            Console.WriteLine($"[A11Y] form_uia element: {label} rel=({ctrl.RelativeX:F3},{ctrl.RelativeY:F3}) size={ctrl.Width}x{ctrl.Height} screen=({cx},{cy})");
+            Console.Error.WriteLine($"[A11Y] form_uia element: {label} rel=({ctrl.RelativeX:F3},{ctrl.RelativeY:F3}) size={ctrl.Width}x{ctrl.Height} screen=({cx},{cy})");
             return true;
         }
-        Console.WriteLine($"[A11Y] form_uia: action '{action}' not supported for coordinate-only element");
+        Console.Error.WriteLine($"[A11Y] form_uia: action '{action}' not supported for coordinate-only element");
         return false;
     }
 }

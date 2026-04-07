@@ -44,7 +44,7 @@ internal partial class Program
                 nullMs = GetNullMs(elHwnd); // cached from read/find, or measures now
                 if (nullMs >= 100)
                 {
-                    Console.WriteLine($"[A11Y] invoke — window lagging (WM_NULL={nullMs}ms) → skip UIA Invoke");
+                    Console.Error.WriteLine($"[A11Y] invoke — window lagging (WM_NULL={nullMs}ms) → skip UIA Invoke");
                     goto tier2;
                 }
             }
@@ -62,18 +62,18 @@ internal partial class Program
                 if (curFg != prevFg && prevFg != IntPtr.Zero)
                 {
                     NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg after UIA Invoke
-                    Console.WriteLine($"[A11Y] invoke — UIA Invoke focus restored ({curFg:X8}→{prevFg:X8})");
+                    Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke focus restored ({curFg:X8}→{prevFg:X8})");
                 }
 
                 if (invokeMs > 1000)
                 {
-                    Console.WriteLine($"[A11Y] invoke — UIA Invoke ⚠ BLOCKED ({invokeMs}ms, null={nullMs}ms)");
+                    Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke ⚠ BLOCKED ({invokeMs}ms, null={nullMs}ms)");
                     return true; // best effort
                 }
 
                 // Suspicious if invoke is no faster than a no-op WM_NULL (+2ms margin)
                 bool suspiciousTiming = invokeMs <= nullMs + 2;
-                Console.WriteLine($"[A11Y] invoke — UIA Invoke {invokeMs}ms (null={nullMs}ms){(suspiciousTiming ? " ⚠ suspicious" : "")}");
+                Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke {invokeMs}ms (null={nullMs}ms){(suspiciousTiming ? " ⚠ suspicious" : "")}");
 
                 if (suspiciousTiming)
                 {
@@ -85,12 +85,12 @@ internal partial class Program
                         var clsB = new System.Text.StringBuilder(64);
                         NativeMethods.GetClassNameW(elHwnd, clsB, clsB.Capacity);
                         ActionApi.OnInvokeHollow?.Invoke(elHwnd, clsB.ToString());
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✗ hollow confirmed (no paint) → prop stamped, trying next tier");
+                        Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke ✗ hollow confirmed (no paint) → prop stamped, trying next tier");
                         _autoHealTiers?.Add($"UIA Invoke: hollow stub (invoke {invokeMs}ms ≈ null {nullMs}ms, no paint)");
                     }
                     else
                     {
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✓ real (paint detected)");
+                        Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke ✓ real (paint detected)");
                         RecordTierSuccess(elHwnd, el, "invoke", "UIA Invoke", KnowhowCategory.MinFocus);
                         return true;
                     }
@@ -115,7 +115,7 @@ internal partial class Program
                     if (UiaLocator.TryInvoke(ancestor))
                     {
                         var aName = ancestor.Properties.Name.ValueOrDefault ?? "";
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ancestor[+{lvl + 1}] '{aName}'");
+                        Console.Error.WriteLine($"[A11Y] invoke — UIA Invoke ancestor[+{lvl + 1}] '{aName}'");
                         RecordTierSuccess(elHwnd, el, "invoke", "UIA Invoke (ancestor)", KnowhowCategory.MinFocus);
                         return true;
                     }

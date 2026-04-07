@@ -180,10 +180,10 @@ Options:
         catch
         {
             // Auto-launch Chrome WebBot if not running
-            Console.WriteLine($"[WEB] CDP port {port} not available — launching Chrome...");
+            Console.Error.WriteLine($"[WEB] CDP port {port} not available — launching Chrome...");
             var proc = WKAppBot.WebBot.ChromeLauncher.LaunchAsync(port, navigateUrl).GetAwaiter().GetResult();
             if (proc != null)
-                Console.WriteLine($"[WEB] Chrome launched (pid={proc.Id})");
+                Console.Error.WriteLine($"[WEB] Chrome launched (pid={proc.Id})");
             cdp.ConnectAsync(port, preferredTargetTag: domainHint).GetAwaiter().GetResult();
         }
 
@@ -204,7 +204,7 @@ Options:
                     if (targetId != null && targetId != cdp.TargetId)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"[WEB] Sandboxed tab (key={sandboxKey}, target={targetId[..Math.Min(8,targetId.Length)]})");
+                        Console.Error.WriteLine($"[WEB] Sandboxed tab (key={sandboxKey}, target={targetId[..Math.Min(8,targetId.Length)]})");
                         Console.ResetColor();
                     }
                 }
@@ -217,7 +217,7 @@ Options:
                     if (targetId != null && targetId != cdp.TargetId)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine($"[WEB] Switched to WebBot tab (tag={sessionTag ?? "?"}, target={targetId?[..8]})");
+                        Console.Error.WriteLine($"[WEB] Switched to WebBot tab (tag={sessionTag ?? "?"}, target={targetId?[..8]})");
                         Console.ResetColor();
                     }
                 }
@@ -225,7 +225,7 @@ Options:
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine($"[WEB] Window check skipped: {ex.Message}");
+                Console.Error.WriteLine($"[WEB] Window check skipped: {ex.Message}");
                 Console.ResetColor();
             }
         }
@@ -303,7 +303,7 @@ Options:
             var targetHwnd = renderHwnd != IntPtr.Zero ? renderHwnd : cdp.ChromeWindowHandle;
             var cdpTitle   = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"[WEB] TARGET: {WindowFinder.BuildTargetJson5(targetHwnd, cdpTitle)}");
+            Console.Error.WriteLine($"[WEB] TARGET: {WindowFinder.BuildTargetJson5(targetHwnd, cdpTitle)}");
             Console.ResetColor();
         }
         catch { }
@@ -397,7 +397,7 @@ Options:
         if (!matched)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[WEB] No tab matching \"{tabPattern}\" found. Use 'wkappbot web tabs' to list.");
+            Console.Error.WriteLine($"[WEB] No tab matching \"{tabPattern}\" found. Use 'wkappbot web tabs' to list.");
             Console.ResetColor();
             cdp.Dispose();
             return null;
@@ -419,7 +419,7 @@ Options:
             return 1;
         }
 
-        Console.WriteLine($"[WEB] {tabs.Count} tab(s):");
+        Console.Error.WriteLine($"[WEB] {tabs.Count} tab(s):");
         foreach (var tab in tabs)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -518,9 +518,9 @@ Options:
         cdp.ChromeWindowHandle = (nint)chromeHwnd;
         var tabId = cdp.TargetId ?? "";
 
-        Console.WriteLine($"[WEB] Title: {title}");
-        Console.WriteLine($"[WEB] URL:   {pageUrl}");
-        Console.WriteLine($"[WEB] TabID: {tabId}");
+        Console.Error.WriteLine($"[WEB] Title: {title}");
+        Console.Error.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.Error.WriteLine($"[WEB] TabID: {tabId}");
         PrintWebTarget(cdp, port);
 
         // Verify this is our WebBot window (CDP port-based connection is already sufficient;
@@ -578,9 +578,9 @@ Options:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine("OK");
         Console.ResetColor();
-        Console.WriteLine($"[WEB] Title: {title}");
-        Console.WriteLine($"[WEB] URL:   {pageUrl}");
-        Console.WriteLine($"[WEB] TabID: {tabId}");
+        Console.Error.WriteLine($"[WEB] Title: {title}");
+        Console.Error.WriteLine($"[WEB] URL:   {pageUrl}");
+        Console.Error.WriteLine($"[WEB] TabID: {tabId}");
         PrintWebTarget(cdp, port);
 
         // Show past knowhow for this domain
@@ -633,7 +633,7 @@ Options:
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"Saved ({fileInfo.Length:N0} bytes, {bmp.Width}x{bmp.Height})");
         Console.ResetColor();
-        Console.WriteLine($"[WEB] File: {output}");
+        Console.Error.WriteLine($"[WEB] File: {output}");
         bmp.Dispose();
 
         return 0;
@@ -661,7 +661,7 @@ Options:
         if (output != null)
         {
             File.WriteAllText(output, html);
-            Console.WriteLine($"[WEB] HTML saved to {output} ({html?.Length ?? 0:N0} chars)");
+            Console.Error.WriteLine($"[WEB] HTML saved to {output} ({html?.Length ?? 0:N0} chars)");
         }
         else
         {
@@ -679,7 +679,7 @@ Options:
         using var cdp = ConnectCdp(port);
 
         var url = cdp.GetUrlAsync().GetAwaiter().GetResult();
-        Console.WriteLine($"[WEB] URL: {url}");
+        Console.Error.WriteLine($"[WEB] URL: {url}");
 
         return 0;
     }
@@ -692,7 +692,7 @@ Options:
         using var cdp = ConnectCdp(port);
 
         var title = cdp.GetTitleAsync().GetAwaiter().GetResult();
-        Console.WriteLine($"[WEB] Title: {title}");
+        Console.Error.WriteLine($"[WEB] Title: {title}");
 
         return 0;
     }
@@ -708,13 +708,13 @@ Options:
             using var cdp = ConnectCdp(port);
             cdp.DisconnectAsync().GetAwaiter().GetResult();
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[WEB] Disconnected from port {port}");
+            Console.Error.WriteLine($"[WEB] Disconnected from port {port}");
             Console.ResetColor();
         }
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[WEB] Not connected or already closed: {ex.Message}");
+            Console.Error.WriteLine($"[WEB] Not connected or already closed: {ex.Message}");
             Console.ResetColor();
         }
 
@@ -744,7 +744,7 @@ Options:
                 var targets = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonArray>(json);
                 if (targets != null)
                 {
-                    Console.WriteLine($"[WEB] Tabs: {targets.Count}");
+                    Console.Error.WriteLine($"[WEB] Tabs: {targets.Count}");
                     int idx = 0;
                     foreach (var target in targets)
                     {
@@ -833,7 +833,7 @@ Options:
             .Where(l => !string.IsNullOrWhiteSpace(l) && !l.TrimStart().StartsWith('#'))
             .ToArray();
 
-        Console.WriteLine($"[WEB] Running {lines.Length} steps from {Path.GetFileName(filePath)} (delay={delayMs}ms)");
+        Console.Error.WriteLine($"[WEB] Running {lines.Length} steps from {Path.GetFileName(filePath)} (delay={delayMs}ms)");
         Console.WriteLine();
 
         int passed = 0, failed = 0;
@@ -896,7 +896,7 @@ Options:
         }
 
         Console.WriteLine();
-        Console.WriteLine($"[WEB] Done: {passed} passed, {failed} failed ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[WEB] Done: {passed} passed, {failed} failed ({sw.ElapsedMilliseconds}ms)");
 
         return failed > 0 ? 1 : 0;
     }
@@ -973,7 +973,7 @@ Options:
             var entryCount = content.Split('\n').Count(l => l.StartsWith("## "));
 
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"[KNOWHOW] {domain} — {entryCount} note(s) from past sessions:");
+            Console.Error.WriteLine($"[KNOWHOW] {domain} — {entryCount} note(s) from past sessions:");
             Console.ResetColor();
 
             // Show compact summary: each ## header as bullet

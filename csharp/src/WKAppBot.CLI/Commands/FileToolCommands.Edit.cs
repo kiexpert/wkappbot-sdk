@@ -38,7 +38,7 @@ internal partial class Program
         var baseDir = searchPath ?? FileDefaultDir();
         if (!Directory.Exists(baseDir))
         {
-            Console.WriteLine($"[file undo] directory not found: {baseDir}");
+            Console.Error.WriteLine($"[file undo] directory not found: {baseDir}");
             return 1;
         }
 
@@ -88,11 +88,11 @@ internal partial class Program
 
         if (restorePairs.Count == 0)
         {
-            Console.WriteLine($"[file undo] no backups found matching *{atPrefix}* in {baseDir}");
+            Console.Error.WriteLine($"[file undo] no backups found matching *{atPrefix}* in {baseDir}");
             return 1;
         }
 
-        Console.WriteLine($"[file undo] found {restorePairs.Count} backup(s) matching *{atPrefix}*");
+        Console.Error.WriteLine($"[file undo] found {restorePairs.Count} backup(s) matching *{atPrefix}*");
 
         if (restorePairs.Count == 0)
         {
@@ -114,7 +114,7 @@ internal partial class Program
         if (listOnly) return 0;
         if (dryRun)
         {
-            Console.WriteLine($"[file undo] dry-run: {restorePairs.Count} file(s) would be restored");
+            Console.Error.WriteLine($"[file undo] dry-run: {restorePairs.Count} file(s) would be restored");
             return 0;
         }
 
@@ -144,7 +144,7 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine($"[file undo] restored {restored} file(s)" +
+        Console.Error.WriteLine($"[file undo] restored {restored} file(s)" +
             (errors > 0 ? $", {errors} error(s)" : ""));
         return errors > 0 ? 1 : 0;
     }
@@ -310,14 +310,14 @@ internal partial class Program
                     var undoBakDir = Path.Combine(Path.GetDirectoryName(path)!, ".bak");
                     var undoBak = Path.Combine(undoBakDir, $"{Path.GetFileName(path)}.bak-{undoTs}-undo.txt");
                     try { Directory.CreateDirectory(undoBakDir); File.Copy(path, undoBak); } catch { }
-                    Console.WriteLine($"[file edit --undo] safety backup → {Path.GetFileName(undoBak)}");
+                    Console.Error.WriteLine($"[file edit --undo] safety backup → {Path.GetFileName(undoBak)}");
                 }
 
                 File.Copy(bakFile, path, overwrite: true);
-                Console.WriteLine($"[file edit --undo] restored {Path.GetFileName(path)} from {Path.GetFileName(bakFile)}");
+                Console.Error.WriteLine($"[file edit --undo] restored {Path.GetFileName(path)} from {Path.GetFileName(bakFile)}");
                 restored++;
             }
-            Console.WriteLine($"[file edit --undo] {restored} file(s) restored, now applying edit...");
+            Console.Error.WriteLine($"[file edit --undo] {restored} file(s) restored, now applying edit...");
         }
 
         // All-or-nothing for multi-file edits: validate ALL files first, then write all.
@@ -350,7 +350,7 @@ internal partial class Program
             if (FileEditWrite(plan, backup, context, multi, tabSize, indentContext) == 0) totalEdited++;
         }
 
-        if (multi) Console.WriteLine($"[file edit] {totalEdited}/{paths.Count} file(s) edited");
+        if (multi) Console.Error.WriteLine($"[file edit] {totalEdited}/{paths.Count} file(s) edited");
         return totalEdited == paths.Count ? 0 : 1;
     }
 
@@ -458,13 +458,13 @@ internal partial class Program
             ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} — data loss accepted");
 
         // Print file path first so AI always sees which file is being edited
-        Console.WriteLine($"[file edit] {plan.Path}");
+        Console.Error.WriteLine($"[file edit] {plan.Path}");
 
         // No actual change → skip backup + write, show context only (search mode)
         bool noChange = plan.OldStr == plan.NewStr;
         if (noChange)
         {
-            Console.WriteLine($"[file edit] {plan.Count} match(es), no change — skip backup & write (search only)");
+            Console.Error.WriteLine($"[file edit] {plan.Count} match(es), no change — skip backup & write (search only)");
         }
         else if (backup)
         {
@@ -481,7 +481,7 @@ internal partial class Program
                 File.Copy(plan.Path, bakPath, overwrite: true);
                 File.SetCreationTime(bakPath, File.GetCreationTime(plan.Path));
                 File.SetLastWriteTime(bakPath, File.GetLastWriteTime(plan.Path));
-                Console.WriteLine($"[file edit] backup → {bakPath}");
+                Console.Error.WriteLine($"[file edit] backup → {bakPath}");
 
                 // Auto-migrate legacy sibling .bak-*.txt files into .bak/ subfolder
                 MigrateLegacyBackups(Path.GetDirectoryName(plan.Path)!, bakDir);
@@ -507,12 +507,12 @@ internal partial class Program
                     Directory.CreateDirectory(dryBakDir);
                     File.WriteAllBytes(backupPath, plan.OutBytes);
                     Console.Error.WriteLine("[DRY-RUN] ⚠ Your edit has been PROPOSED. The original file was NOT modified.");
-                    Console.WriteLine($"[file edit] backup → {backupPath}");
+                    Console.Error.WriteLine($"[file edit] backup → {backupPath}");
                 }
                 catch (Exception ex)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"[DRY-RUN] file edit: {plan.Count} replacement(s) — backup failed ({ex.Message})");
+                    Console.Error.WriteLine($"[DRY-RUN] file edit: {plan.Count} replacement(s) — backup failed ({ex.Message})");
                     Console.ResetColor();
                 }
                 return 0;
@@ -555,7 +555,7 @@ internal partial class Program
 
             // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
             File.WriteAllBytes(plan.Path, plan.OutBytes);
-            Console.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}{(hasReplacement ? " ⚠CORRUPTION" : "")}");
+            Console.Error.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}{(hasReplacement ? " ⚠CORRUPTION" : "")}");
         }
 
         // ── Context output: indent-based block expansion + N extra lines ──
@@ -743,7 +743,7 @@ internal partial class Program
         }
 
         if (totalMoved > 0)
-            Console.WriteLine($"[file edit] migrated {totalMoved} legacy backup(s) to current format");
+            Console.Error.WriteLine($"[file edit] migrated {totalMoved} legacy backup(s) to current format");
     }
 
     static int GetLineIndent(string[] lines, int tabSize, int idx)

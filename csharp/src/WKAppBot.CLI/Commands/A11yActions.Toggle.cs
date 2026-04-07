@@ -13,12 +13,12 @@ internal partial class Program
     {
         var before = UiaLocator.GetToggleState(el);
         if (before != null)
-            Console.WriteLine($"[A11Y] toggle state before: {before}");
+            Console.Error.WriteLine($"[A11Y] toggle state before: {before}");
 
         if (UiaLocator.TryToggle(el))
         {
             var after = UiaLocator.GetToggleState(el);
-            Console.WriteLine($"[A11Y] toggle — UIA Toggle (now: {after})");
+            Console.Error.WriteLine($"[A11Y] toggle — UIA Toggle (now: {after})");
             return true;
         }
 

@@ -29,7 +29,7 @@ internal partial class Program
 
         if (UiaLocator.TryScroll(el, hAmount, vAmount))
         {
-            Console.WriteLine($"[A11Y] scroll {direction} ({amount}) — UIA Scroll");
+            Console.Error.WriteLine($"[A11Y] scroll {direction} ({amount}) — UIA Scroll");
             return true;
         }
 
@@ -42,7 +42,7 @@ internal partial class Program
             wParam = (direction == "down" || direction == "right") ? 3 : 2;
 
         NativeMethods.PostMessageW(elHwnd, msg, (IntPtr)wParam, IntPtr.Zero);
-        Console.WriteLine($"[A11Y] scroll {direction} ({amount}) — Win32 WM_{(msg == 0x0114u ? "H" : "V")}SCROLL");
+        Console.Error.WriteLine($"[A11Y] scroll {direction} ({amount}) — Win32 WM_{(msg == 0x0114u ? "H" : "V")}SCROLL");
         return true;
     }
 }

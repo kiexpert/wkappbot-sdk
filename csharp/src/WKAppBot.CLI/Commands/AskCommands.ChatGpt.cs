@@ -61,9 +61,9 @@ internal partial class Program
     {
         using var _ = ApplyOutputPrefix(linePrefix);
         var toolLogGpt = new System.Collections.Generic.List<string>();
-        Console.WriteLine($"[ASK] ChatGPT: {question}");
+        Console.Error.WriteLine($"[ASK] ChatGPT: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
-            Console.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
+            Console.Error.WriteLine($"[ASK] ChatGPT model hint: {modelHint}");
 
         PulseStep.Init("ask-gpt");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gpt");
@@ -73,8 +73,8 @@ internal partial class Program
             var qid = AskTargetRegistry.AssignNextQid(targetTag);
             _currentQid.Value = qid;
             question = $"[Q{qid}] {question}\n[REPLY: A{qid}]";
-            Console.WriteLine($"[ASK] GPT Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
-            Console.WriteLine($"[ASK] 훈수두기: wkappbot ask gpt --intercept \"내용\" --qid {qid}");
+            Console.Error.WriteLine($"[ASK] GPT Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
+            Console.Error.WriteLine($"[ASK] 훈수두기: wkappbot ask gpt --intercept \"내용\" --qid {qid}");
         }
         var cdp = EnsureCdpConnection(preferredHost: "chatgpt.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
@@ -102,7 +102,7 @@ internal partial class Program
             {
                 // ──?Phase 1: Navigate (iconified OK) ──?                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
-                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
+                Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
                 {
                     Console.WriteLine(newSession ? "[ASK] New session ??navigating to fresh ChatGPT..." : "[ASK] Navigating to ChatGPT...");
@@ -120,7 +120,7 @@ internal partial class Program
                 _currentAskHost.Value = "chatgpt";
                 _currentAskEditorSel.Value = editorSel;
                 PulseStep.Mark("editor-found");
-                Console.WriteLine($"[ASK] Editor found: {editorSel}");
+                Console.Error.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
                 // Check if this is a fresh conversation ??try multiple selectors
@@ -143,11 +143,11 @@ internal partial class Program
                 triadCtx?.BindStreamContext("gpt", cdp, editorSel, Environment.GetEnvironmentVariable("WKAPPBOT_RUN_ID"));
                 // Reuse existing session ??only inject persona on fresh (0 turns) conversations
                 if (existingTurns > 0)
-                    Console.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
+                    Console.Error.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
 
                 var hasLoopPersonaState = await HasLoopPersonaStateAsync(cdp, "gpt");
                 var effectiveLoopPersona = !_suppressLoopPersona.Value && (loopMode || hasLoopPersonaState);
-                Console.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
+                Console.Error.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
                 if (!loopMode && hasLoopPersonaState)
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
 
@@ -169,7 +169,7 @@ internal partial class Program
                     else
                     {
                         bool ready = (personaResp ?? "").Contains("READY", StringComparison.OrdinalIgnoreCase);
-                        Console.WriteLine($"[ASK] Persona: {(ready ? "READY" : personaResp?.Substring(0, Math.Min(50, personaResp.Length)))}");
+                        Console.Error.WriteLine($"[ASK] Persona: {(ready ? "READY" : personaResp?.Substring(0, Math.Min(50, personaResp.Length)))}");
                         if (effectiveLoopPersona)
                             await SetLoopPersonaStateAsync(cdp, "gpt");
                     }
@@ -285,7 +285,7 @@ internal partial class Program
                 }
             }
             if (closed > 0)
-                Console.WriteLine($"[ASK] Closed {closed} about:blank tab(s)");
+                Console.Error.WriteLine($"[ASK] Closed {closed} about:blank tab(s)");
         }
         catch { }
     }
@@ -324,13 +324,13 @@ internal partial class Program
                 if (id == keepId || string.IsNullOrEmpty(id)) continue;
                 var url = t?["url"]?.GetValue<string>() ?? "";
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[ASK] Closing stale {host} tab: {url[..Math.Min(60, url.Length)]}");
+                Console.Error.WriteLine($"[ASK] Closing stale {host} tab: {url[..Math.Min(60, url.Length)]}");
                 Console.ResetColor();
                 await http.GetAsync($"http://127.0.0.1:{port}/json/close/{id}");
                 closed++;
             }
             if (closed > 0)
-                Console.WriteLine($"[ASK] Closed {closed} stale {host} tab(s) ??keeping active session");
+                Console.Error.WriteLine($"[ASK] Closed {closed} stale {host} tab(s) ??keeping active session");
         }
         catch { }
     }

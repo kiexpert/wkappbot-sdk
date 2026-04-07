@@ -93,9 +93,9 @@ Examples:
 
         EnsureComProfileDocs(profile);
 
-        Console.WriteLine($"[COM] Selected profile: {profile}");
-        Console.WriteLine($"[COM] Session file: {ComSessionPath}");
-        Console.WriteLine($"[COM] Exp folder: {Path.Combine(ComExpRoot, profile)}");
+        Console.Error.WriteLine($"[COM] Selected profile: {profile}");
+        Console.Error.WriteLine($"[COM] Session file: {ComSessionPath}");
+        Console.Error.WriteLine($"[COM] Exp folder: {Path.Combine(ComExpRoot, profile)}");
         return 0;
     }
 
@@ -103,9 +103,9 @@ Examples:
     {
         var session = LoadComSession();
         EnsureComProfileDocs(session.Profile);
-        Console.WriteLine($"[COM] Current profile: {session.Profile}");
-        Console.WriteLine($"[COM] Session file: {ComSessionPath}");
-        Console.WriteLine($"[COM] Exp folder: {Path.Combine(ComExpRoot, session.Profile)}");
+        Console.Error.WriteLine($"[COM] Current profile: {session.Profile}");
+        Console.Error.WriteLine($"[COM] Session file: {ComSessionPath}");
+        Console.Error.WriteLine($"[COM] Exp folder: {Path.Combine(ComExpRoot, session.Profile)}");
         return 0;
     }
 
@@ -163,7 +163,7 @@ Examples:
 
             EnsureComProfileDocs(session.Profile);
 
-            Console.WriteLine($"[COM:{session.Profile}] Calling {method}({string.Join(", ", paramStrings)})...");
+            Console.Error.WriteLine($"[COM:{session.Profile}] Calling {method}({string.Join(", ", paramStrings)})...");
             var sw = System.Diagnostics.Stopwatch.StartNew();
             var resp = SendPipeRequest(method, paramObjects);
             sw.Stop();
@@ -185,27 +185,27 @@ Examples:
             if (!ok)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[COM:{session.Profile}] FAIL: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[COM:{session.Profile}] FAIL: {resp.Error} ({sw.ElapsedMilliseconds}ms)");
                 Console.ResetColor();
-                Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
-                Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
-                Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+                Console.Error.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+                Console.Error.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
+                Console.Error.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
                 return 1;
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
-            Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
-            Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
-            Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+            Console.Error.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+            Console.Error.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
+            Console.Error.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
             return 0;
         }
 
         if (session.Profile == "sapi")
         {
             EnsureComProfileDocs(session.Profile);
-            Console.WriteLine($"[COM:{session.Profile}] Calling {method}({string.Join(", ", paramStrings)})...");
+            Console.Error.WriteLine($"[COM:{session.Profile}] Calling {method}({string.Join(", ", paramStrings)})...");
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
             string? err = null;
@@ -262,20 +262,20 @@ Examples:
             if (!ok)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[COM:{session.Profile}] FAIL: {err} ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[COM:{session.Profile}] FAIL: {err} ({sw.ElapsedMilliseconds}ms)");
                 Console.ResetColor();
-                Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
-                Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
-                Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+                Console.Error.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+                Console.Error.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=false elapsedMs={sw.ElapsedMilliseconds}");
+                Console.Error.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
                 return 1;
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[COM:{session.Profile}] OK: {resultText} ({sw.ElapsedMilliseconds}ms)");
             Console.ResetColor();
-            Console.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
-            Console.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
-            Console.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
+            Console.Error.WriteLine($"[COM:{session.Profile}] Saved call record: {callLogPath}");
+            Console.Error.WriteLine($"[AI_NOTICE] profile={session.Profile} method={method} ok=true elapsedMs={sw.ElapsedMilliseconds}");
+            Console.Error.WriteLine($"[AI_NOTICE] com_exp_saved={callLogPath}");
             return 0;
         }
 

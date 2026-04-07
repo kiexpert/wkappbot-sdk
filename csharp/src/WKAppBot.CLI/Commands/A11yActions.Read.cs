@@ -34,13 +34,13 @@ internal partial class Program
         if (zoom == null)
         {
             // Fallback: just print position info without overlay
-            Console.WriteLine($"[A11Y] highlight — overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+            Console.Error.WriteLine($"[A11Y] highlight — overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
             return true;
         }
 
         var label = !string.IsNullOrEmpty(name) ? $"\"{name}\"" : (aid != "" ? $"aid={aid}" : "(unnamed)");
         zoom.UpdateStatus($"[{type}] {label}");
-        Console.WriteLine($"[A11Y] highlight — [{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+        Console.Error.WriteLine($"[A11Y] highlight — [{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
 
         // Show for duration then fade out
         zoom.ShowPass($"{type} {label}");
@@ -303,7 +303,7 @@ internal partial class Program
         }
 
         foreach (var line in lines)
-            Console.WriteLine($"[A11Y] {line}");
+            Console.Error.WriteLine($"[A11Y] {line}");
         return true;
     }
 }

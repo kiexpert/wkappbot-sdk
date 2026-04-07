@@ -36,17 +36,17 @@ internal partial class Program
         int absX = rect.Left + relX;
         int absY = rect.Top + relY;
 
-        Console.WriteLine($"[MSAA-PROBE] Window: 0x{hWnd:X} at ({rect.Left},{rect.Top})");
-        Console.WriteLine($"[MSAA-PROBE] Probing: rel=({relX},{relY}) abs=({absX},{absY})");
+        Console.Error.WriteLine($"[MSAA-PROBE] Window: 0x{hWnd:X} at ({rect.Left},{rect.Top})");
+        Console.Error.WriteLine($"[MSAA-PROBE] Probing: rel=({relX},{relY}) abs=({absX},{absY})");
 
         if (writeText != null)
         {
-            Console.WriteLine($"[MSAA-PROBE] Write mode: \"{writeText}\" — will write to L0..L3 and wait 5s");
+            Console.Error.WriteLine($"[MSAA-PROBE] Write mode: \"{writeText}\" — will write to L0..L3 and wait 5s");
             ClaudePromptHelper.ProbeMsaaWrite(absX, absY, writeText);
         }
         else
         {
-            Console.WriteLine($"[MSAA-PROBE] Walk depth: {depth}");
+            Console.Error.WriteLine($"[MSAA-PROBE] Walk depth: {depth}");
             ClaudePromptHelper.ProbeMsaaAtPoint(absX, absY, depth);
         }
         return 0;

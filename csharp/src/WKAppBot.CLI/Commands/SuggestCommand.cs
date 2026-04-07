@@ -105,13 +105,13 @@ internal partial class Program
         var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
         if (string.IsNullOrEmpty(cwdTag)) cwdTag = "unknown";
 
-        Console.WriteLine($"[SUGGEST] from [{cwdTag}]");
+        Console.Error.WriteLine($"[SUGGEST] from [{cwdTag}]");
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine("  ⚠ Tip: write suggestions in ENGLISH — Korean = 2-3x token cost.");
         Console.ResetColor();
-        Console.WriteLine($"[SUGGEST] {text}");
+        Console.Error.WriteLine($"[SUGGEST] {text}");
         if (files.Count > 0)
-            Console.WriteLine($"[SUGGEST] {files.Count} file(s): {string.Join(", ", files.Select(Path.GetFileName))}");
+            Console.Error.WriteLine($"[SUGGEST] {files.Count} file(s): {string.Join(", ", files.Select(Path.GetFileName))}");
 
         // Build Slack message with [file:name] markers for attached files
         var msgLines = new List<string> { $":memo: *[건의]* from `{cwdTag}`" };
@@ -134,11 +134,11 @@ internal partial class Program
             if (ok)
             {
                 messageTs = ts;
-                Console.WriteLine($"[SUGGEST] Slack sent (+{files.Count} file(s))");
-                Console.WriteLine($"[SUGGEST] ID: {messageTs}  (resolve: suggest resolve {messageTs} \"note\")");
+                Console.Error.WriteLine($"[SUGGEST] Slack sent (+{files.Count} file(s))");
+                Console.Error.WriteLine($"[SUGGEST] ID: {messageTs}  (resolve: suggest resolve {messageTs} \"note\")");
                 foreach (var f in files)
                 {
-                    Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
+                    Console.Error.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
                     SlackUploadFileAsync(botToken, channel, f,
                         title: Path.GetFileName(f), threadTs: messageTs).GetAwaiter().GetResult();
                 }
@@ -169,7 +169,7 @@ internal partial class Program
             };
             var json = JsonSerializer.Serialize(entry);
             File.AppendAllText(jsonlPath, json + Environment.NewLine);
-            Console.WriteLine($"[SUGGEST] Saved to {jsonlPath}");
+            Console.Error.WriteLine($"[SUGGEST] Saved to {jsonlPath}");
         }
         catch (Exception ex)
         {
@@ -221,7 +221,7 @@ internal partial class Program
                 // Use HQ file mtime as oldest — only fetch Slack messages since last local update
                 var fileMtime = File.GetLastWriteTimeUtc(jsonlPath);
                 var oldestUnix = ((DateTimeOffset)fileMtime).AddMinutes(-5).ToUnixTimeSeconds(); // -5min buffer
-                Console.WriteLine($"[SUGGEST] Syncing slack_ts from Slack (since {fileMtime.ToLocalTime():MM-dd HH:mm})...");
+                Console.Error.WriteLine($"[SUGGEST] Syncing slack_ts from Slack (since {fileMtime.ToLocalTime():MM-dd HH:mm})...");
                 {
 
                     try
@@ -269,19 +269,19 @@ internal partial class Program
                         if (changed)
                             File.WriteAllLines(jsonlPath, lines);
                         if (synced > 0)
-                            Console.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack ✓");
+                            Console.Error.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack ✓");
                         else
-                            Console.WriteLine($"[SUGGEST] No new matches found in Slack.");
+                            Console.Error.WriteLine($"[SUGGEST] No new matches found in Slack.");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[SUGGEST] Slack sync failed: {ex.Message}");
+                        Console.Error.WriteLine($"[SUGGEST] Slack sync failed: {ex.Message}");
                     }
                 }
             }
         }
 
-        Console.WriteLine($"[SUGGEST] Pending: {lines.Count} suggestion(s)");
+        Console.Error.WriteLine($"[SUGGEST] Pending: {lines.Count} suggestion(s)");
         Console.WriteLine(new string('─', 100));
 
         for (int i = 0; i < lines.Count; i++)
@@ -482,7 +482,7 @@ internal partial class Program
         var slackTs = target["slack_ts"]?.GetValue<string>();
         var title   = target["title"]?.GetValue<string>();
 
-        Console.WriteLine($"[SUGGEST] ts={ts}  from=[{from}]  status={status}");
+        Console.Error.WriteLine($"[SUGGEST] ts={ts}  from=[{from}]  status={status}");
         if (slackTs != null) Console.WriteLine($"          slack_ts={slackTs}");
         if (title != null) { Console.ForegroundColor = ConsoleColor.Cyan; Console.WriteLine($"  {title}"); Console.ResetColor(); }
         Console.WriteLine();
@@ -540,7 +540,7 @@ internal partial class Program
             var from = node["from"]?.GetValue<string>() ?? "unknown";
             var preview = text.Split('\n')[0];
             if (preview.Length > 60) preview = preview[..60] + "…";
-            Console.WriteLine($"[REPOST] {entryTs[..16]} [{from}] {preview}");
+            Console.Error.WriteLine($"[REPOST] {entryTs[..16]} [{from}] {preview}");
 
             var msgLines = new List<string> { $":memo: *[건의]* from `{from}`" };
             foreach (var part in text.Split('\n'))
@@ -563,7 +563,7 @@ internal partial class Program
                     SlackSendViaApi(botToken, channel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
             }
 
-            Console.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
+            Console.Error.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
 
             // Write slack_ts back into the line
             var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(lines[i])!;

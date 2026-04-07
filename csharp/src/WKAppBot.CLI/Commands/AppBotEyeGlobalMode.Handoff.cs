@@ -383,12 +383,12 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
             File.Move(tmpPath, claudeMdPath, overwrite: true);
 
             EyeColor(ConsoleColor.Green);
-            Console.WriteLine($"[EYE] ✅ CLAUDE.md 인수인계 섹션 작성 완료 ({handoffSection.Length} chars)");
+            Console.Error.WriteLine($"[EYE] ✅ CLAUDE.md 인수인계 섹션 작성 완료 ({handoffSection.Length} chars)");
             EyeResetColor();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] CLAUDE.md 인수인계 작성 실패: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] CLAUDE.md 인수인계 작성 실패: {ex.Message}");
         }
     }
 }

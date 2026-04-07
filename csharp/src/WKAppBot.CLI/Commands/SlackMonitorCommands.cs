@@ -173,11 +173,11 @@ internal partial class Program
                     var hwndPrefix = GetSlackPrefixForHostType(hwndPrompt.HostType);
                     var hwndTag = !string.IsNullOrEmpty(hwndCwd) ? AbbreviateCwd(hwndCwd) : null;
                     var r0 = !string.IsNullOrWhiteSpace(hwndTag) ? $"{hwndPrefix}[{hwndTag}]" : hwndPrefix;
-                    Console.WriteLine($"[NAME] step=0(hwnd) → {r0} | cwd={callerCwd}");
+                    Console.Error.WriteLine($"[NAME] step=0(hwnd) → {r0} | cwd={callerCwd}");
                     return r0;
                 }
                 // callerCwd is a real project dir that doesn't match the fg hwnd → ignore hwnd, fall through
-                Console.WriteLine($"[NAME] step=0 skip: hwnd-cwd={hwndCwd} ≠ caller-cwd={callerCwd}");
+                Console.Error.WriteLine($"[NAME] step=0 skip: hwnd-cwd={hwndCwd} ≠ caller-cwd={callerCwd}");
             }
         }
 
@@ -208,7 +208,7 @@ internal partial class Program
                 var matchPrefix = GetSlackPrefixForHostType(matchPrompt.HostType);
                 var matchTag = AbbreviateCwd(callerCwd);
                 var r1b = !string.IsNullOrWhiteSpace(matchTag) ? $"{matchPrefix}[{matchTag}]" : matchPrefix;
-                Console.WriteLine($"[NAME] step=1b(prompt-title) → {r1b} | cwd={callerCwd}");
+                Console.Error.WriteLine($"[NAME] step=1b(prompt-title) → {r1b} | cwd={callerCwd}");
                 return r1b;
             }
             // callerCwd is known but no card/window matched — build directly from callerCwd
@@ -217,7 +217,7 @@ internal partial class Program
             {
                 var directPrefix = InferSlackPrefixForCaller(callerCwd, callerHwnd);
                 var rDirect = $"{directPrefix}[{directTag}]";
-                Console.WriteLine($"[NAME] step=1b(direct-cwd) → {rDirect} | cwd={callerCwd}");
+                Console.Error.WriteLine($"[NAME] step=1b(direct-cwd) → {rDirect} | cwd={callerCwd}");
                 return rDirect;
             }
         }
@@ -228,7 +228,7 @@ internal partial class Program
 
         if (best == null)
         {
-            Console.WriteLine($"[NAME] step=? → null (no card match) | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=? → null (no card match) | cwd={callerCwd}");
             return null;
         }
 
@@ -236,7 +236,7 @@ internal partial class Program
         // Skip cards from wkappbot itself (shouldn't drive username detection)
         if (pname == "wkappbot" || pname.Contains("wkappbot") || pname == "a11y" || pname.Contains("a11y"))
         {
-            Console.WriteLine($"[NAME] step=? → null (wkappbot card skipped) | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=? → null (wkappbot card skipped) | cwd={callerCwd}");
             return null;
         }
         string prefix;
@@ -246,7 +246,7 @@ internal partial class Program
             prefix = SlackCodexPrefix;
         else
         {
-            Console.WriteLine($"[NAME] step=? → null (unknown parent={pname}) | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=? → null (unknown parent={pname}) | cwd={callerCwd}");
             return null; // unknown ParentName — let caller fall through to other detection
         }
 
@@ -254,7 +254,7 @@ internal partial class Program
         // VS Code (Code.exe): CWD tag meaningful, but skip system/install dirs
         if (pname == "claude" || pname == "claude.exe")
         {
-            Console.WriteLine($"[NAME] step=1/2(card) → {prefix} | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=1/2(card) → {prefix} | cwd={callerCwd}");
             return prefix;
         }
 
@@ -264,7 +264,7 @@ internal partial class Program
         if (cwdTag == null)
             cwdTag = GetSlackFolderTag();
         var rCard = $"{prefix}[{cwdTag}]";
-        Console.WriteLine($"[NAME] step=1/2(card) → {rCard} | cwd={callerCwd}");
+        Console.Error.WriteLine($"[NAME] step=1/2(card) → {rCard} | cwd={callerCwd}");
         return rCard;
     }
 
@@ -307,7 +307,7 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(suggestBypass))
         {
             var bypass = GetSuggestBypassUsername(printDecision);
-            if (printDecision) Console.WriteLine($"[NAME] step=suggest-bypass → {bypass}");
+            if (printDecision) Console.Error.WriteLine($"[NAME] step=suggest-bypass → {bypass}");
             return bypass;
         }
 
@@ -316,7 +316,7 @@ internal partial class Program
         var envName = Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_NAME");
         if (!string.IsNullOrEmpty(envName) && EyeCmdPipeServer.CallerCwd.Value == null)
         {
-            if (printDecision) Console.WriteLine($"[NAME] step=env → {envName}");
+            if (printDecision) Console.Error.WriteLine($"[NAME] step=env → {envName}");
             return envName;
         }
 
@@ -339,7 +339,7 @@ internal partial class Program
         }
 
         if (printDecision)
-            Console.WriteLine($"[SLACK] bot-name={username} cwd={callerCwd}");
+            Console.Error.WriteLine($"[SLACK] bot-name={username} cwd={callerCwd}");
 
         return username;
     }
@@ -360,7 +360,7 @@ internal partial class Program
             username = !string.IsNullOrWhiteSpace(cwdTag) ? $"{SlackClaudePrefix}[{cwdTag}]" : SlackClaudePrefix;
 
         if (printDecision)
-            Console.WriteLine($"[SUGGEST-NAME] bypass={username} cwd={callerCwd}");
+            Console.Error.WriteLine($"[SUGGEST-NAME] bypass={username} cwd={callerCwd}");
 
         return username;
     }
@@ -527,7 +527,7 @@ internal partial class Program
                 // Get foreground window info
                 var fgTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgWindow);
                 var fgClass = WKAppBot.Win32.Window.WindowFinder.GetClassName(fgWindow);
-                Console.WriteLine($"[SLACK]    Foreground: \"{fgTitle}\" (class={fgClass})");
+                Console.Error.WriteLine($"[SLACK]    Foreground: \"{fgTitle}\" (class={fgClass})");
 
                 // Capture foreground window screenshot
                 var outputDir = Path.Combine(DataDir, "output", "screenshots");
@@ -540,7 +540,7 @@ internal partial class Program
                 {
                     bmp.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
                     bmp.Dispose();
-                    Console.WriteLine($"[SLACK]    Screenshot: {screenshotPath}");
+                    Console.Error.WriteLine($"[SLACK]    Screenshot: {screenshotPath}");
 
                     // Upload to Slack thread with diagnostic info
                     var comment = $"Claude 프롬프트를 찾을 수 없어요!\n" +
@@ -572,7 +572,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK]    Diagnosis failed: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK]    Diagnosis failed: {ex.Message}");
             // Fallback: text notification
             try
             {
@@ -656,7 +656,7 @@ internal partial class Program
                             statusTs = newTs;
                             lastContent = newContent;
                             Console.ForegroundColor = ConsoleColor.Cyan;
-                            Console.WriteLine($"[SLACK] Streaming relocated -> new ts={newTs}");
+                            Console.Error.WriteLine($"[SLACK] Streaming relocated -> new ts={newTs}");
                             Console.ResetColor();
                         }
                     }
@@ -664,7 +664,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[SLACK] Relocation error: {ex.Message}");
+                    Console.Error.WriteLine($"[SLACK] Relocation error: {ex.Message}");
                 }
             }
         }
@@ -682,7 +682,7 @@ internal partial class Program
         {
             // Transition: idle → active
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[SLACK] Claude: {label} — {statusText}");
+            Console.Error.WriteLine($"[SLACK] Claude: {label} — {statusText}");
             Console.ResetColor();
 
             var displayText = statusText ?? "작업 중...";
@@ -700,7 +700,7 @@ internal partial class Program
                     if (ok && ts != null)
                     {
                         statusTs = ts;
-                        Console.WriteLine($"[SLACK] Status: {displayText} (ts={ts})");
+                        Console.Error.WriteLine($"[SLACK] Status: {displayText} (ts={ts})");
                     }
                 }
             }
@@ -709,7 +709,7 @@ internal partial class Program
                 var localTs = statusTs;
                 var localContent = lastContent; // ref param can't be captured in lambda
                 Task.Run(async () => await SlackUpdateMessageAsync(botToken, channel, localTs, localContent)).Wait(3000);
-                Console.WriteLine($"[SLACK] Status: {displayText}");
+                Console.Error.WriteLine($"[SLACK] Status: {displayText}");
             }
         }
         else if (!nowActive && claudeBusy)
@@ -739,7 +739,7 @@ internal partial class Program
                     var localTs = statusTs;
                     Task.Run(async () => await SlackUpdateMessageAsync(botToken, channel, localTs, newContent)).Wait(3000);
                 }
-                Console.WriteLine($"[SLACK] Status: {statusText}");
+                Console.Error.WriteLine($"[SLACK] Status: {statusText}");
             }
         }
 
@@ -952,7 +952,7 @@ internal partial class Program
             var json = JsonNode.Parse(body);
             if (json?["ok"]?.GetValue<bool>() != true)
             {
-                Console.WriteLine($"[SLACK] IsOwnThread API failed: {json?["error"]}");
+                Console.Error.WriteLine($"[SLACK] IsOwnThread API failed: {json?["error"]}");
                 return false;
             }
 
@@ -964,12 +964,12 @@ internal partial class Program
             var botId = parent?["bot_id"]?.GetValue<string>();
             var result = !string.IsNullOrEmpty(botId);
             if (result)
-                Console.WriteLine($"[SLACK] IsOwnThread: YES (bot_id={botId}, ts={threadTs})");
+                Console.Error.WriteLine($"[SLACK] IsOwnThread: YES (bot_id={botId}, ts={threadTs})");
             return result;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SLACK] IsOwnThread exception: {ex.Message}");
+            Console.Error.WriteLine($"[SLACK] IsOwnThread exception: {ex.Message}");
             return false;
         }
     }
@@ -1077,7 +1077,7 @@ internal partial class Program
         var error = ok ? null : (json?["error"]?.GetValue<string>() ?? "unknown");
 
         if (!ok)
-            Console.WriteLine($"[SLACK] chat.update error: {error}");
+            Console.Error.WriteLine($"[SLACK] chat.update error: {error}");
 
         return (ok, json?["ts"]?.GetValue<string>(), error);
     }
@@ -1103,7 +1103,7 @@ internal partial class Program
                 // If starter ts != our ts, we're a reply — check if starter is tombstone
                 if (starterTs != ts && (starterSubtype == "tombstone" || starter?["text"]?.GetValue<string>() == "This message was deleted."))
                 {
-                    Console.WriteLine($"[SLACK] Orphan reply ts={ts} — thread starter deleted → force delete");
+                    Console.Error.WriteLine($"[SLACK] Orphan reply ts={ts} — thread starter deleted → force delete");
                     await SlackDeleteRawAsync(botToken, channel, ts);
                     return true;
                 }
@@ -1134,14 +1134,14 @@ internal partial class Program
 
                 if (hasUserReply)
                 {
-                    Console.WriteLine($"[SLACK] SKIP delete ts={ts} — thread has user replies");
+                    Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} — thread has user replies");
                     return false;
                 }
 
                 if (botReplies.Count == 0) break; // all clean
 
                 // Delete first bot reply (repeat loop will pick up the rest)
-                Console.WriteLine($"[SLACK] Clearing bot reply {botReplies[0]} (pass {pass + 1}, {botReplies.Count} remaining)");
+                Console.Error.WriteLine($"[SLACK] Clearing bot reply {botReplies[0]} (pass {pass + 1}, {botReplies.Count} remaining)");
                 await SlackDeleteRawAsync(botToken, channel, botReplies[0]);
                 await Task.Delay(300); // rate limit
             }
@@ -1151,7 +1151,7 @@ internal partial class Program
         // skipLastMsgProtection=true bypasses this for explicit gc/cleanup callers
         if (!skipLastMsgProtection && await IsProtectedLastMessageAsync(botToken, channel, ts))
         {
-            Console.WriteLine($"[SLACK] SKIP delete ts={ts} — protected (last 2 per author)");
+            Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} — protected (last 2 per author)");
             return false;
         }
 
@@ -1172,7 +1172,7 @@ internal partial class Program
         var ok = json?["ok"]?.GetValue<bool>() ?? false;
 
         if (!ok)
-            Console.WriteLine($"[SLACK] chat.delete error: {json?["error"]}");
+            Console.Error.WriteLine($"[SLACK] chat.delete error: {json?["error"]}");
 
         return ok;
     }
@@ -1480,7 +1480,7 @@ internal partial class Program
             foreach (var ots in orphanReplies)
             {
                 await SlackDeleteRawAsync(botToken, channel, ots);
-                Console.WriteLine($"[SLACK:GC] Cleaned orphan reply: {ots}");
+                Console.Error.WriteLine($"[SLACK:GC] Cleaned orphan reply: {ots}");
                 await Task.Delay(300);
             }
 
@@ -1508,7 +1508,7 @@ internal partial class Program
                         }
                         if (hasHumanReply)
                         {
-                            Console.WriteLine($"[SLACK:GC] Status {staleTs} has human reply → skip");
+                            Console.Error.WriteLine($"[SLACK:GC] Status {staleTs} has human reply → skip");
                             continue;
                         }
                         foreach (var rTs in botReplyTs)
@@ -1517,11 +1517,11 @@ internal partial class Program
                             await Task.Delay(300);
                         }
                         if (botReplyTs.Count > 0)
-                            Console.WriteLine($"[SLACK:GC] Cleaned {botReplyTs.Count} bot replies from {staleTs}");
+                            Console.Error.WriteLine($"[SLACK:GC] Cleaned {botReplyTs.Count} bot replies from {staleTs}");
                     }
 
                     await SlackDeleteMessageAsync(botToken, channel, staleTs, guardThreadStarter: true);
-                    Console.WriteLine($"[SLACK:GC] Cleaned stale status for '{author}': {staleTs}");
+                    Console.Error.WriteLine($"[SLACK:GC] Cleaned stale status for '{author}': {staleTs}");
                     await Task.Delay(300);
                 }
             }
@@ -1613,7 +1613,7 @@ internal partial class Program
             var deleted = Task.Run(async () =>
                 await SlackDeleteMessageAsync(botToken, entry.Channel, entry.AckTs, guardThreadStarter: false)).GetAwaiter().GetResult();
             if (deleted)
-                Console.WriteLine($"[SLACK] Deleted pending ack in thread {threadTs}");
+                Console.Error.WriteLine($"[SLACK] Deleted pending ack in thread {threadTs}");
             return deleted;
         }
         catch { return false; }

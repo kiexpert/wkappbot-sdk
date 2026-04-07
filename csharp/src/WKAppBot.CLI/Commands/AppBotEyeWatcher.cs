@@ -77,12 +77,12 @@ internal static class AppBotEyeWatcher
                 };
                 _tickWatcher.Changed += (_, _) => _tickDirty = true;
                 _tickWatcher.Created += (_, _) => _tickDirty = true;
-                Console.WriteLine($"[EYE][FSW] Tick watcher: {tickDir}/{tickFile}");
+                Console.Error.WriteLine($"[EYE][FSW] Tick watcher: {tickDir}/{tickFile}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
         }
     }
 
@@ -105,12 +105,12 @@ internal static class AppBotEyeWatcher
                 _sessionWatcher.Changed += (_, e) => { if (e.Name is { } n) OnSessionChanged(n); };
                 _sessionWatcher.Created += (_, e) => { if (e.Name is { } n) OnSessionChanged(n); };
                 _sessionWatcher.Renamed += (_, e) => { if (e.Name is { } n) OnSessionChanged(n); };
-                Console.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
+                Console.Error.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
         }
     }
 
@@ -130,12 +130,12 @@ internal static class AppBotEyeWatcher
                 };
                 _logWatcher.Changed += (_, _) => _logDirty = true;
                 _logWatcher.Created += (_, _) => _logDirty = true;
-                Console.WriteLine($"[EYE][FSW] Logs watcher: {logDir}/*.log");
+                Console.Error.WriteLine($"[EYE][FSW] Logs watcher: {logDir}/*.log");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Logs watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Logs watcher init failed: {ex.Message}");
         }
     }
 

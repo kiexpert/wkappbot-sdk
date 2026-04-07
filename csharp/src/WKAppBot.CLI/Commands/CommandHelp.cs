@@ -118,7 +118,7 @@ internal partial class Program
             if (!autoMode)
             {
                 Console.WriteLine();
-                Console.WriteLine($"[REGRESSION] No test scripts found for: {command}{(sub != null ? " " + sub : "")}");
+                Console.Error.WriteLine($"[REGRESSION] No test scripts found for: {command}{(sub != null ? " " + sub : "")}");
                 Console.WriteLine($"  Expected: {Path.Combine(testsRoot, command, sub ?? "*")}/*.(sh|ps1|cmd)");
             }
             return (0, 0);

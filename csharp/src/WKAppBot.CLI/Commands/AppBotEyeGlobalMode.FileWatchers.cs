@@ -32,12 +32,12 @@ internal partial class Program
                 };
                 _fswTick.Changed += (_, _) => _fswTickDirty = true;
                 _fswTick.Created += (_, _) => _fswTickDirty = true;
-                Console.WriteLine($"[EYE][FSW] Tick watcher: {tickDir}/{tickFile}");
+                Console.Error.WriteLine($"[EYE][FSW] Tick watcher: {tickDir}/{tickFile}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
         }
 
         // ── 2. OpenClaw sessions watcher (*.jsonl) ──
@@ -58,12 +58,12 @@ internal partial class Program
                 _fswPrompt.Changed += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
                 _fswPrompt.Created += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
                 _fswPrompt.Renamed += (_, e) => { _fswPromptChangedFile = e.Name; _fswPromptDirty = true; };
-                Console.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
+                Console.Error.WriteLine($"[EYE][FSW] Prompt watcher: {sessionsDir}/*.jsonl");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
         }
 
         // Claude Code JSONL: 1s polling only — FSW removed (per-instance watermark sufficient)
@@ -102,12 +102,12 @@ internal partial class Program
                     Console.WriteLine("[EYE][FSW] .new.exe already present at startup — triggering hot-swap");
                     _fswExeDirty = true;
                 }
-                Console.WriteLine($"[EYE][FSW] Hot-swap watcher: {exeDir}/{exeFile}");
+                Console.Error.WriteLine($"[EYE][FSW] Hot-swap watcher: {exeDir}/{exeFile}");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Hot-swap watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Hot-swap watcher init failed: {ex.Message}");
         }
 
         // ── 4. 앱봇관리 log file watcher (temp dir) ──
@@ -144,11 +144,11 @@ internal partial class Program
                 if (e.FullPath != null)
                     Task.Run(() => EyeOpenConsoleWtTab(e.FullPath));
             };
-            Console.WriteLine($"[EYE][FSW] Console watcher: {tempDir}wkappbot-*.log");
+            Console.Error.WriteLine($"[EYE][FSW] Console watcher: {tempDir}wkappbot-*.log");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][FSW] Console watcher init failed: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][FSW] Console watcher init failed: {ex.Message}");
         }
     }
 
@@ -210,7 +210,7 @@ internal partial class Program
             // 이미 같은 로그파일을 감시 중인 powershell.exe가 있으면 탭 중복 방지
             if (IsAlreadyWatchingLog(logFilePath))
             {
-                Console.WriteLine($"[EYE][CONSOLE] 이미 탭 열려있음 (PS 감시중): {wtTitle}");
+                Console.Error.WriteLine($"[EYE][CONSOLE] 이미 탭 열려있음 (PS 감시중): {wtTitle}");
                 return;
             }
 
@@ -225,11 +225,11 @@ internal partial class Program
             }, "AppBotEye:wt");
             // 첫 탭 or apbot-mcp 창 없을 때만 위치 고정
             ScheduleWtWindowPosition(900, wtProc?.Id ?? 0);
-            Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈: {wtTitle}");
+            Console.Error.WriteLine($"[EYE][CONSOLE] WT 탭 오픈: {wtTitle}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE][CONSOLE] WT 탭 오픈 실패: {ex.Message}");
+            Console.Error.WriteLine($"[EYE][CONSOLE] WT 탭 오픈 실패: {ex.Message}");
         }
     }
 
@@ -266,7 +266,7 @@ internal partial class Program
                 try
                 {
                     File.Delete(oldExe);
-                    Console.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
+                    Console.Error.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
                 }
                 catch { } // still locked — 10s polling will retry
             }

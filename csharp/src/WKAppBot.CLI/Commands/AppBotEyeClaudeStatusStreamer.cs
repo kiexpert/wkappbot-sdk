@@ -126,7 +126,7 @@ internal partial class Program
                     {
                         state.SlackStatusTs = recovered.ts;
                         state.LastSlackStatusText = recovered.text;
-                        Console.WriteLine($"[EYE] Restored status ts from Slack for '{expectedUser}': {recovered.ts}");
+                        Console.Error.WriteLine($"[EYE] Restored status ts from Slack for '{expectedUser}': {recovered.ts}");
                         _recoveredStatusByUsername.Remove(expectedUser); // consume — one-time recovery
                         break;
                     }
@@ -253,7 +253,7 @@ internal partial class Program
                 // New session detected: jsonlPath changed (ctime-new file selected by mtime) → reset counter
                 if (prevWarned.path != null && prevWarned.path != jsonlPath)
                 {
-                    Console.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL — context warn counter reset (was {prevWarned.mb}MB)");
+                    Console.Error.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL — context warn counter reset (was {prevWarned.mb}MB)");
                     prevWarned = (0, null);
                 }
 
@@ -266,7 +266,7 @@ internal partial class Program
                 {
                     // 9.5MB~10MB: 인수인계 전 스킬 기여 넛지
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — skill 기여 후 인수인계하세요");
+                    Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — skill 기여 후 인수인계하세요");
                     Console.ResetColor();
                     try
                     {
@@ -274,14 +274,14 @@ internal partial class Program
                             "인수인계 전에 이번 세션 노하우 하나를 스킬로 기여하세요:" +
                             "wkappbot skill contribute --app <앱> --title \"<제목>\" --desc \"<설명>\" [--steps \"s1|s2\"] [--tags \"t1,t2\"]";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, skillNudge]);
-                        Console.WriteLine($"[EYE] 💡 [{cwdTag}] Skill nudge sent");
+                        Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Skill nudge sent");
                     }
                     catch { /* best-effort */ }
                 }
                 else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
+                    Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
                     Console.ResetColor();
 
                     // 프창에도 긴급 경고 전송 (MCP subprocess에서 실행)
@@ -289,7 +289,7 @@ internal partial class Program
                     {
                         var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요! wkappbot newchat \"...\"을 실행하세요";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, urgentNudge]);
-                        Console.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
+                        Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
                     }
                     catch { /* best-effort */ }
 
@@ -300,7 +300,7 @@ internal partial class Program
                 else if (!string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — 인수인계 준비하세요");
+                    Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — 인수인계 준비하세요");
                     Console.ResetColor();
 
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
@@ -313,14 +313,14 @@ internal partial class Program
                             wkappbot newchat "{handoff}"
                             """;
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, nudge]);
-                        Console.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent via MCP");
+                        Console.Error.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent via MCP");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                             $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n클롣에게 인수인계 프롬프트를 전달했습니다.",
                             username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[EYE] ⚠️ [{cwdTag}] Nudge delivery failed: {ex.Message}");
+                        Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Nudge delivery failed: {ex.Message}");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                             $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n인수인계 전달 실패! 직접 확인해주세요.",
                             username: SlackBroadcastUsername)).Wait(3000);
@@ -482,12 +482,12 @@ internal partial class Program
                             state.RateLimitAlertMsgTs = null;
                         }
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"[EYE] {label}Rate limit cleared (newState={claudeStatus.Item1}, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
+                        Console.Error.WriteLine($"[EYE] {label}Rate limit cleared (newState={claudeStatus.Item1}, cooldown={cooldownPassed}, resetTime={resetTimePassed})");
                         Console.ResetColor();
 
                         try
                         {
-                            Console.WriteLine($"[SCHEDULE] {label}Rate limit cleared! Checking on_limit_reset schedules...");
+                            Console.Error.WriteLine($"[SCHEDULE] {label}Rate limit cleared! Checking on_limit_reset schedules...");
                             Thread.Sleep(3000);
                             var resetItems = ScheduleManager.GetOnLimitResetItems();
                             foreach (var resetItem in resetItems)
@@ -498,7 +498,7 @@ internal partial class Program
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
+                            Console.Error.WriteLine($"[SCHEDULE] on_limit_reset error: {ex.Message}");
                         }
                     }
 
@@ -509,7 +509,7 @@ internal partial class Program
                     {
                         state.LastRateLimitAlertTime = DateTime.Now;
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"[EYE] ★ {label}Rate limit detected! {claudeStatus.Item2}");
+                        Console.Error.WriteLine($"[EYE] ★ {label}Rate limit detected! {claudeStatus.Item2}");
                         Console.ResetColor();
                         try
                         {
@@ -590,7 +590,7 @@ internal partial class Program
                                     state.IdleStartedAt = DateTime.UtcNow;
                                     state.HomeworkNotified = false;
                                     state.LastExecutingText = null;
-                                    Console.WriteLine($"[EYE] {label}VS Code → idle: {idleMsg}");
+                                    Console.Error.WriteLine($"[EYE] {label}VS Code → idle: {idleMsg}");
                                 }
                                 goto skipStatusStreaming; // Skip — spinner handles idle for claude-desktop
                             }
@@ -604,7 +604,7 @@ internal partial class Program
                                     // Spinner animating again (or VS Code executing) → activity resumed
                                     if (!isVsCode) ResetSpinnerDetection(state);
                                     state.IdleAfterText = null;
-                                    Console.WriteLine($"[EYE] {label}Idle badge cleared — activity detected");
+                                    Console.Error.WriteLine($"[EYE] {label}Idle badge cleared — activity detected");
                                 }
                                 state.IdleMessageSent = false;
                                 state.IdleStartedAt = null;
@@ -652,7 +652,7 @@ internal partial class Program
                                 _ = Task.Run(async () =>
                                 {
                                     try { await PostOrUpdateAiStatusAsync(hwnd, state, slackText, claudeStatus.Item1, slackBotToken!, slackChannel!, instanceUsername, statusTsFile, primaryHwnd, capturedJsonlSize); }
-                                    catch (Exception ex) { Console.WriteLine($"[EYE] PostOrUpdateAiStatus error: {ex.Message}"); }
+                                    catch (Exception ex) { Console.Error.WriteLine($"[EYE] PostOrUpdateAiStatus error: {ex.Message}"); }
                                 });
                             }
                         }
@@ -694,7 +694,7 @@ internal partial class Program
                                     state.IdleMessageSent = true;
                                     state.IdleStartedAt = DateTime.UtcNow;
                                     state.HomeworkNotified = false;
-                                    Console.WriteLine($"[EYE] {label}Spinner idle: {idleMsg}");
+                                    Console.Error.WriteLine($"[EYE] {label}Spinner idle: {idleMsg}");
                                 }
                                 else if (state.IdleMessageSent && !spinnerIdle)
                                 {
@@ -703,7 +703,7 @@ internal partial class Program
                                     state.IdleStartedAt = null;
                                     state.LastSlackStatusText = null;
                                     ResetSpinnerDetection(state);
-                                    Console.WriteLine($"[EYE] {label}Activity resumed — idle cleared");
+                                    Console.Error.WriteLine($"[EYE] {label}Activity resumed — idle cleared");
                                 }
                             }
                             catch { }
@@ -755,7 +755,7 @@ internal partial class Program
                                         state.PendingPlanApprovalSlackTs = sendTs;
                                         state.PlanApprovalSentToSlack = true;
                                         Console.ForegroundColor = ConsoleColor.Cyan;
-                                        Console.WriteLine($"[EYE] {label}Plan sent to Slack via {plan.Value.source} (ts={sendTs})");
+                                        Console.Error.WriteLine($"[EYE] {label}Plan sent to Slack via {plan.Value.source} (ts={sendTs})");
                                         Console.ResetColor();
                                     }
                                 }
@@ -766,7 +766,7 @@ internal partial class Program
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"[EYE] {label}Plan Slack share error: {ex.Message}");
+                                Console.Error.WriteLine($"[EYE] {label}Plan Slack share error: {ex.Message}");
                             }
                         }
                         if (claudeStatus.Item1 != "plan_approval_pending" && state.PlanApprovalSentToSlack)
@@ -799,14 +799,14 @@ internal partial class Program
                                             state.PendingPermissionSlackTs = sendTs;
                                             state.PermissionPromptSentToSlack = true;
                                             Console.ForegroundColor = ConsoleColor.Cyan;
-                                            Console.WriteLine($"[EYE] {label}Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
+                                            Console.Error.WriteLine($"[EYE] {label}Permission buttons sent to Slack: [{btnList}] (ts={sendTs})");
                                             Console.ResetColor();
                                         }
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"[EYE] {label}Permission Slack share error: {ex.Message}");
+                                    Console.Error.WriteLine($"[EYE] {label}Permission Slack share error: {ex.Message}");
                                 }
                             }
                         }
@@ -830,7 +830,7 @@ internal partial class Program
                         state.RateLimitDetectedAt = null;
                         state.RateLimitResetTime = null;
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"[EYE] {label}Rate limit cleared (idle status detected)");
+                        Console.Error.WriteLine($"[EYE] {label}Rate limit cleared (idle status detected)");
                         Console.ResetColor();
 
                         try
@@ -859,7 +859,7 @@ internal partial class Program
                         state.IdleMessageSent = false;
                         state.LastSlackStatusText = null;
                         ResetSpinnerDetection(state);
-                        Console.WriteLine($"[EYE] {label}UIA null but spinner active — idle cleared");
+                        Console.Error.WriteLine($"[EYE] {label}UIA null but spinner active — idle cleared");
                     }
                 }
                 catch { }
@@ -962,7 +962,7 @@ internal partial class Program
         try
         {
             var (ownFound, adoptTs, adoptBotId, isVeryLatest) = await FindRecentBotStatus(slackBotToken, slackChannel, state.SlackStatusTs);
-            Console.WriteLine($"[EYE-DBG] ownFound={ownFound} adoptTs={adoptTs} adoptBotId={adoptBotId} isVeryLatest={isVeryLatest}");
+            Console.Error.WriteLine($"[EYE-DBG] ownFound={ownFound} adoptTs={adoptTs} adoptBotId={adoptBotId} isVeryLatest={isVeryLatest}");
             if (ownFound)
             {
                 latestIsOurs = true; // our ts is still in recent messages → edit in place
@@ -973,7 +973,7 @@ internal partial class Program
                 state.SlackStatusTs = adoptTs;
                 SetWindowStringProp(hwnd, PropSlackTs, adoptTs);
                 latestIsOurs = true;
-                Console.WriteLine($"[EYE] Adopted bot status ts={adoptTs} → edit in place");
+                Console.Error.WriteLine($"[EYE] Adopted bot status ts={adoptTs} → edit in place");
             }
         }
         catch { }
@@ -1004,11 +1004,11 @@ internal partial class Program
                 if (jsonlSize > 0) state.LastPostedJsonlSize = jsonlSize;
                 SetWindowStringProp(hwnd, PropAiOut, slackText);
                 SetWindowStringProp(hwnd, PropStatusType, statusType);
-                Console.WriteLine($"[EYE] Edit [{statusType}]: {statusHeader[..Math.Min(statusHeader.Length, 80)]}");
+                Console.Error.WriteLine($"[EYE] Edit [{statusType}]: {statusHeader[..Math.Min(statusHeader.Length, 80)]}");
             }
             else
             {
-                Console.WriteLine($"[EYE] Edit failed ({editError}) {slackText.Length}B");
+                Console.Error.WriteLine($"[EYE] Edit failed ({editError}) {slackText.Length}B");
             }
             return;
         }
@@ -1022,7 +1022,7 @@ internal partial class Program
             state.SlackStatusTs = null;
             SetWindowStringProp(hwnd, PropSlackTs, null);
             await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
-            Console.WriteLine($"[EYE] Deleted old status (not latest) → posting new");
+            Console.Error.WriteLine($"[EYE] Deleted old status (not latest) → posting new");
         }
         else if (hasReplies)
         {
@@ -1044,7 +1044,7 @@ internal partial class Program
             SetWindowStringProp(hwnd, PropSlackTs, ts);
             SetWindowStringProp(hwnd, PropAiOut, slackText);
             SetWindowStringProp(hwnd, PropStatusType, statusType);
-            Console.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
+            Console.Error.WriteLine($"[EYE] Post [{statusType}]: {slackText[..Math.Min(slackText.Length, 80)]}");
 
             // Sweep same-username stale status messages (duplicates from Eye restart/hot-swap)
             _ = Task.Run(() => SlackCleanStaleStatusAsync(slackBotToken, slackChannel));
@@ -1074,14 +1074,14 @@ internal partial class Program
                     {
                         foreach (var staleTs in stale)
                             await SlackDeleteMessageAsync(slackBotToken, slackChannel, staleTs);
-                        Console.WriteLine($"[EYE] Swept {stale.Count} stale status message(s) after first post");
+                        Console.Error.WriteLine($"[EYE] Swept {stale.Count} stale status message(s) after first post");
                     }
                 });
             }
         }
         else
         {
-            Console.WriteLine($"[EYE] Post FAILED [{statusType}] ({slackText.Length}B)");
+            Console.Error.WriteLine($"[EYE] Post FAILED [{statusType}] ({slackText.Length}B)");
         }
     }
 
@@ -1106,7 +1106,7 @@ internal partial class Program
         {
             foreach (var staleTs in stale)
                 await SlackDeleteMessageAsync(slackBotToken, slackChannel, staleTs);
-            Console.WriteLine($"[EYE] Startup sweep (timer): {stale.Count} stale status(es) deleted");
+            Console.Error.WriteLine($"[EYE] Startup sweep (timer): {stale.Count} stale status(es) deleted");
         }
     }
 
@@ -1213,7 +1213,7 @@ internal partial class Program
             $"Please review and process them when you have a chance.";
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[EYE] {label}Homework injection → {pending.Count} pending suggestions");
+        Console.Error.WriteLine($"[EYE] {label}Homework injection → {pending.Count} pending suggestions");
         Console.ResetColor();
 
         // Deliver via MCP subprocess (prompt send with --when-idle) — keeps UIA out of Eye memory.
@@ -1234,13 +1234,13 @@ internal partial class Program
 
             if (exitCode != 0)
             {
-                Console.WriteLine($"[EYE] {label}Homework: MCP delivery failed (exit={exitCode}) — spawning VS Code");
+                Console.Error.WriteLine($"[EYE] {label}Homework: MCP delivery failed (exit={exitCode}) — spawning VS Code");
                 state.HomeworkNotified = false; // re-arm
                 TrySpawnAppbotVsCode(prompt);
             }
             else
             {
-                Console.WriteLine($"[EYE] {label}Homework delivered via MCP: {output.TrimEnd()}");
+                Console.Error.WriteLine($"[EYE] {label}Homework delivered via MCP: {output.TrimEnd()}");
             }
         }
         catch (Exception ex)

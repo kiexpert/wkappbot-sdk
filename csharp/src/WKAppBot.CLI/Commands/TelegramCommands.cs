@@ -66,7 +66,7 @@ Examples:
         if (string.IsNullOrWhiteSpace(text))
             return Error("text is empty");
 
-        Console.WriteLine($"[TELEGRAM] target window hint: {windowHint}");
+        Console.Error.WriteLine($"[TELEGRAM] target window hint: {windowHint}");
 
         using var automation = new UIA3Automation();
         var desktop = automation.GetDesktop();
@@ -102,7 +102,7 @@ Examples:
             return Error("compose edit not found");
 
         var cbox = compose.BoundingRectangle;
-        Console.WriteLine($"[TELEGRAM] compose rect=({cbox.Left:0},{cbox.Top:0},{cbox.Width:0}x{cbox.Height:0}) name='{compose.Name}'");
+        Console.Error.WriteLine($"[TELEGRAM] compose rect=({cbox.Left:0},{cbox.Top:0},{cbox.Width:0}x{cbox.Height:0}) name='{compose.Name}'");
 
         var before = ReadElementValue(compose);
 
@@ -118,7 +118,7 @@ Examples:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[TELEGRAM] UIA SetValue failed: {ex.Message}");
+            Console.Error.WriteLine($"[TELEGRAM] UIA SetValue failed: {ex.Message}");
         }
 
         if (!typed)
@@ -132,7 +132,7 @@ Examples:
 
         var afterType = ReadElementValue(compose);
         var typedVerified = !string.Equals(Norm(afterType), Norm(before), StringComparison.Ordinal);
-        Console.WriteLine($"[TELEGRAM] typed-verify={(typedVerified ? "ok" : "weak")} before='{TrimForLog(before)}' after='{TrimForLog(afterType)}'");
+        Console.Error.WriteLine($"[TELEGRAM] typed-verify={(typedVerified ? "ok" : "weak")} before='{TrimForLog(before)}' after='{TrimForLog(afterType)}'");
 
         bool sent = false;
 
@@ -168,7 +168,7 @@ Examples:
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[TELEGRAM] UIA send invoke failed: {ex.Message}");
+            Console.Error.WriteLine($"[TELEGRAM] UIA send invoke failed: {ex.Message}");
         }
 
         if (!sent && !typedVerified)
@@ -188,7 +188,7 @@ Examples:
             return Error("send failed (UIA send failed and fallback disabled)");
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"[TELEGRAM] sent: \"{text}\"");
+        Console.Error.WriteLine($"[TELEGRAM] sent: \"{text}\"");
         Console.ResetColor();
         return 0;
     }

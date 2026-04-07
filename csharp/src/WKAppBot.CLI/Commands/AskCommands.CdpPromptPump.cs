@@ -51,7 +51,7 @@ internal sealed class CdpPromptPump : IDisposable
             if (state.Locked)
             {
                 state.QueuedChunks.Add(text);
-                Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: queued-in-lock ({text.Length} chars)");
+                Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: queued-in-lock ({text.Length} chars)");
                 return true;
             }
         }
@@ -65,7 +65,7 @@ internal sealed class CdpPromptPump : IDisposable
         var dumpAt = DateTime.UtcNow;
 
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
-        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
+        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
 
         // CDP_SIGNAL poller: JS pump sets readyToSend when JS KeyboardEvent won't work (ProseMirror).
         // Poll every 300ms for up to 4s; on signal, fire CDP Enter (same as Claude.cs Tier 1).
@@ -77,7 +77,7 @@ internal sealed class CdpPromptPump : IDisposable
                 {
                     await Task.Delay(300);
                     if (!await cdp.CheckPumpReadyAsync(editorSelector)) continue;
-                    Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: CDP_SIGNAL → firing CDP Enter");
+                    Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: CDP_SIGNAL → firing CDP Enter");
                     await cdp.SendPromptAsync(editorSelector);
                     return;
                 }
@@ -121,7 +121,7 @@ internal sealed class CdpPromptPump : IDisposable
         }
 
         var ok = await cdp.SetPromptPumpLockAsync(editorSelector, locked: true);
-        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: {(ok ? "lock-on" : "lock-on-failed")}");
+        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: {(ok ? "lock-on" : "lock-on-failed")}");
         return ok;
     }
 
@@ -143,7 +143,7 @@ internal sealed class CdpPromptPump : IDisposable
             var appended = await cdp.AppendContentEditableAsync(editorSelector, merged, separator);
             if (!appended)
             {
-                Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: append-after-lock failed");
+                Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: append-after-lock failed");
                 return false;
             }
         }
@@ -159,12 +159,12 @@ internal sealed class CdpPromptPump : IDisposable
         if (immediateFlush)
         {
             var flush = await cdp.FlushPromptPumpNowAsync(editorSelector);
-            Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: flush-after-lock={flush}");
+            Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: flush-after-lock={flush}");
             return flush != "NO_EDITOR";
         }
 
         var armed = await cdp.ArmPromptPumpAsync(editorSelector, idleMs: 1000);
-        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: re-armed={armed}");
+        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: re-armed={armed}");
         return armed;
     }
 
@@ -178,7 +178,7 @@ internal sealed class CdpPromptPump : IDisposable
         }
 
         var ok = await cdp.SetPromptPumpLockAsync(editorSelector, locked: false);
-        Console.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: abort-lock={(ok ? "ok" : "failed")}");
+        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{cdp.TargetId ?? "no-target"}]: abort-lock={(ok ? "ok" : "failed")}");
         return ok;
     }
 

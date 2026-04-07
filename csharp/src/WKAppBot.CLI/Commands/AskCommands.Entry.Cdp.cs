@@ -143,7 +143,7 @@ internal partial class Program
                 {
                     // ✓ URL OK — reconnect to this tab
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"[SANDBOX] ✓ Hit: {key} → {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
+                    Console.Error.WriteLine($"[SANDBOX] ✓ Hit: {key} → {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
                     Console.ResetColor();
                     if (cdp.TargetId != entry.TargetId)
                         await cdp.SwitchToTargetAsync(entry.TargetId, port);
@@ -153,10 +153,10 @@ internal partial class Program
                 {
                     // ✗ URL mismatch — fast-fail: invalidate + new tab
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"[SANDBOX] ✗ Mismatch: {key}");
-                    Console.WriteLine($"[SANDBOX]   expected host: {expectedHost}");
-                    Console.WriteLine($"[SANDBOX]   actual url:    {tab.Url[..Math.Min(80, tab.Url.Length)]}");
-                    Console.WriteLine($"[SANDBOX]   → invalidating registry, creating clean tab");
+                    Console.Error.WriteLine($"[SANDBOX] ✗ Mismatch: {key}");
+                    Console.Error.WriteLine($"[SANDBOX]   expected host: {expectedHost}");
+                    Console.Error.WriteLine($"[SANDBOX]   actual url:    {tab.Url[..Math.Min(80, tab.Url.Length)]}");
+                    Console.Error.WriteLine($"[SANDBOX]   → invalidating registry, creating clean tab");
                     Console.ResetColor();
 
                     AskTargetRegistry.RemoveEntry(key);
@@ -174,7 +174,7 @@ internal partial class Program
                             AskTargetRegistry.SetEntry(key, newId, expectedHost);
                             await cdp.TryCloseTabByIdAsync(port, entry.TargetId, "sandbox-mismatch");
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
+                            Console.Error.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
                             Console.ResetColor();
                             return newId;
                         }
@@ -189,7 +189,7 @@ internal partial class Program
             else
             {
                 // Tab gone — remove stale entry, fall through to create
-                Console.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) — removing");
+                Console.Error.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) — removing");
                 AskTargetRegistry.RemoveEntry(key);
             }
         }
@@ -204,7 +204,7 @@ internal partial class Program
             if (hostMatch != null)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"[SANDBOX] Miss but host-match found: {key} -> {hostMatch.Id[..Math.Min(8,hostMatch.Id.Length)]} ({hostMatch.Url[..Math.Min(50,hostMatch.Url.Length)]})");
+                Console.Error.WriteLine($"[SANDBOX] Miss but host-match found: {key} -> {hostMatch.Id[..Math.Min(8,hostMatch.Id.Length)]} ({hostMatch.Url[..Math.Min(50,hostMatch.Url.Length)]})");
                 Console.ResetColor();
                 if (cdp.TargetId != hostMatch.Id)
                     await cdp.SwitchToTargetAsync(hostMatch.Id, port);
@@ -215,7 +215,7 @@ internal partial class Program
 
         // No existing tab — create a fresh isolated tab.
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
+        Console.Error.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
         Console.ResetColor();
         try
         {
@@ -229,7 +229,7 @@ internal partial class Program
                 await cdp.SwitchToTargetAsync(newId, port);
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[SANDBOX] ✓ Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
+                Console.Error.WriteLine($"[SANDBOX] ✓ Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
                 Console.ResetColor();
                 return newId;
             }
@@ -258,7 +258,7 @@ internal partial class Program
                         if (hostPort != port)
                         {
                             Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.WriteLine($"[ASK] Multi-browser: {preferredHost} found on port {hostPort}");
+                            Console.Error.WriteLine($"[ASK] Multi-browser: {preferredHost} found on port {hostPort}");
                             Console.ResetColor();
                         }
                         port = hostPort;
@@ -270,7 +270,7 @@ internal partial class Program
                         if (freePort != port)
                         {
                             Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.WriteLine($"[ASK] Port {port} taken, using port {freePort} for new Chrome");
+                            Console.Error.WriteLine($"[ASK] Port {port} taken, using port {freePort} for new Chrome");
                             Console.ResetColor();
                             port = freePort;
                         }
@@ -281,7 +281,7 @@ internal partial class Program
                 if (!active)
                 {
                     var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
-                    Console.WriteLine($"[ASK] Launching Chrome on port {port}…{launchUrl ?? "about:blank"}...");
+                    Console.Error.WriteLine($"[ASK] Launching Chrome on port {port}…{launchUrl ?? "about:blank"}...");
                     await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
                     await Task.Delay(2500);
                 }
@@ -343,7 +343,7 @@ internal partial class Program
                         {
                             await cdp.SetWindowBoundsAsync(wb.Value.windowId, expX, expY, expW, expH);
                             Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.WriteLine($"[ASK] Window positioned: ({expX},{expY}) {expW}×{expH}");
+                            Console.Error.WriteLine($"[ASK] Window positioned: ({expX},{expY}) {expW}×{expH}");
                             Console.ResetColor();
                         }
                     }
@@ -359,7 +359,7 @@ internal partial class Program
                     {
                         AskTargetRegistry.SetTargetId(targetTag, resolvedId);
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
+                        Console.Error.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
                         Console.ResetColor();
                     }
                 }
@@ -372,12 +372,12 @@ internal partial class Program
                     if (blocker != null)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[AAR:CDP] Blocker: {blocker.Title} (hwnd={blocker.Handle:X})");
+                        Console.Error.WriteLine($"[AAR:CDP] Blocker: {blocker.Title} (hwnd={blocker.Handle:X})");
                         Console.ResetColor();
                     }
                     if (NativeMethods.IsIconic(chromeHwnd))
                     {
-                        Console.WriteLine($"[AAR:CDP] Chrome minimized …focusless restore");
+                        Console.Error.WriteLine($"[AAR:CDP] Chrome minimized …focusless restore");
                         NativeMethods.ShowWindow(chromeHwnd, 4);
                         await Task.Delay(300);
                     }

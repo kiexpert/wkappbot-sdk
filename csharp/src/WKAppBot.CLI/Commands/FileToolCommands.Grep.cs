@@ -49,7 +49,7 @@ internal partial class Program
             int start  = Math.Max(0, offset);
             int end    = Math.Min(total, start + limit);
 
-            Console.WriteLine($"[FILE] {path} ({total} lines, showing {start + 1}-{end})");
+            Console.Error.WriteLine($"[FILE] {path} ({total} lines, showing {start + 1}-{end})");
             for (int i = start; i < end; i++)
             {
                 if (showLineNumbers) Console.WriteLine($"{i + 1,6}\t{lines[i]}");
@@ -169,7 +169,7 @@ internal partial class Program
             }
 
             if (matchCount == 0)
-                Console.WriteLine($"[GREP] No matches for: {pattern}");
+                Console.Error.WriteLine($"[GREP] No matches for: {pattern}");
             else
                 Console.WriteLine($"\n[GREP] {matchCount} match(es) in {fileCount} file(s)");
 
@@ -333,7 +333,7 @@ Examples:
         }
 
         if (matchCount == 0)
-            Console.WriteLine($"[JSON-GREP] No matches for: {pattern}");
+            Console.Error.WriteLine($"[JSON-GREP] No matches for: {pattern}");
         else
             Console.WriteLine($"\n[JSON-GREP] {matchCount} match(es) in {fileCount} file(s)");
 

@@ -314,7 +314,7 @@ internal partial class Program
             if (!allowed)
             {
                 var cmdStr = string.Join(" ", argv.Take(3));
-                Console.WriteLine($"[DRY-RUN] Blocked write command: {cmdStr}");
+                Console.Error.WriteLine($"[DRY-RUN] Blocked write command: {cmdStr}");
                 return new ExecResult(0, $"[DRY-RUN] Command blocked (read-only mode): {cmdStr}\nThis is a debate session — only read/inspect commands are allowed.", "", 0);
             }
         }

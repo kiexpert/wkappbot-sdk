@@ -141,7 +141,7 @@ internal partial class Program
             if (ClaudeModelAliases.ContainsKey(claudeModel))
             {
                 SetActiveFallbackModel("gemini"); // primary is claude → fallback stays gemini
-                Console.WriteLine($"[MODEL] Synced from Claude Code settings: {claudeModel} (fallback=gemini)");
+                Console.Error.WriteLine($"[MODEL] Synced from Claude Code settings: {claudeModel} (fallback=gemini)");
             }
             return 0;
         }
@@ -151,11 +151,11 @@ internal partial class Program
             var fallback = GetActiveFallbackModel();
             var claudeSettings = GetCurrentClaudeModel();
             var sessionModel = GetCurrentSessionModel();
-            Console.WriteLine($"[MODEL] Fallback model    : {fallback}");
+            Console.Error.WriteLine($"[MODEL] Fallback model    : {fallback}");
             if (claudeSettings != null)
-                Console.WriteLine($"[MODEL] Claude Code (cfg) : {claudeSettings}");
+                Console.Error.WriteLine($"[MODEL] Claude Code (cfg) : {claudeSettings}");
             if (sessionModel != null)
-                Console.WriteLine($"[MODEL] Session (last turn): {sessionModel}");
+                Console.Error.WriteLine($"[MODEL] Session (last turn): {sessionModel}");
             return 0;
         }
 
@@ -168,8 +168,8 @@ internal partial class Program
             {
                 // External AI → only update fallback config
                 SetActiveFallbackModel(model);
-                Console.WriteLine($"[MODEL] Fallback model set to: {model}");
-                Console.WriteLine($"[MODEL] Eye will use '{model}' on next Claude error/rate-limit.");
+                Console.Error.WriteLine($"[MODEL] Fallback model set to: {model}");
+                Console.Error.WriteLine($"[MODEL] Eye will use '{model}' on next Claude error/rate-limit.");
                 return 0;
             }
 
@@ -178,9 +178,9 @@ internal partial class Program
                 // Claude model → update fallback config + Claude Code settings.json
                 SetActiveFallbackModel("gemini"); // reset fallback to gemini (claude is primary)
                 var ok = SetClaudeCodeModel(claudeShort);
-                Console.WriteLine($"[MODEL] Claude Code model → {claudeShort}" + (ok ? "" : " (settings write failed)"));
-                Console.WriteLine($"[MODEL] Fallback model reset to: gemini");
-                Console.WriteLine($"[MODEL] Restart Claude Code tab to apply new model.");
+                Console.Error.WriteLine($"[MODEL] Claude Code model → {claudeShort}" + (ok ? "" : " (settings write failed)"));
+                Console.Error.WriteLine($"[MODEL] Fallback model reset to: gemini");
+                Console.Error.WriteLine($"[MODEL] Restart Claude Code tab to apply new model.");
                 return 0;
             }
 

@@ -724,7 +724,7 @@ internal partial class Program
                         var guardCheck = guard.CheckBeforeKeystroke();
                         if (!guardCheck.Ok)
                         {
-                            Console.WriteLine($"[GUARD] Interrupted: {guardCheck.Type} — {guardCheck.Detail}");
+                            Console.Error.WriteLine($"[GUARD] Interrupted: {guardCheck.Type} — {guardCheck.Detail}");
                             interrupted = true;
                             break;
                         }

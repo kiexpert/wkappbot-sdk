@@ -11,7 +11,7 @@ internal partial class Program
     {
         int parentPid = 0;
         int.TryParse(Environment.GetEnvironmentVariable("WKAPPBOT_PARENT_PID"), out parentPid);
-        Console.WriteLine($"[SCREENSAVER] Standalone process (parent PID={parentPid})");
+        Console.Error.WriteLine($"[SCREENSAVER] Standalone process (parent PID={parentPid})");
         try
         {
             var ss = new ScreenSaverOverlay();

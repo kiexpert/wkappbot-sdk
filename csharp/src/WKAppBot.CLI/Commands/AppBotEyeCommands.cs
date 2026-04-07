@@ -176,7 +176,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE] Guardian bootstrap error: {ex.Message}");
+            Console.Error.WriteLine($"[EYE] Guardian bootstrap error: {ex.Message}");
         }
     }
 
@@ -272,7 +272,7 @@ internal partial class Program
             var latest = prevLogs[0];
             var dest = Path.Combine(crashedDir, Path.GetFileName(latest));
             File.Move(latest, dest, overwrite: true);
-            Console.WriteLine($"[EYE] Previous session was not clean ??moved {Path.GetFileName(latest)} ??_crashed/");
+            Console.Error.WriteLine($"[EYE] Previous session was not clean ??moved {Path.GetFileName(latest)} ??_crashed/");
         }
         catch { }
     }
@@ -609,7 +609,7 @@ internal partial class Program
             using var proc2 = AppBotPipe.Spawn(corePath, eyeArgs, callerCwd, caller: "EYE-LAUNCH");
             if (proc2 != null)
             {
-                Console.WriteLine($"[EYE] Launched (PID={proc2.Pid})");
+                Console.Error.WriteLine($"[EYE] Launched (PID={proc2.Pid})");
                 PulseStep.Mark("process-started");
 
                 // Policy broadcast when Eye first spawns (agent reads stdout)
@@ -893,12 +893,12 @@ internal partial class Program
         var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
 
         var curInfo = new FileInfo(selfExe);
-        Console.WriteLine($"[HOTSWAP] exe: {Path.GetFileName(selfExe)}  mtime={curInfo.LastWriteTimeUtc:yyyy-MM-dd HH:mm:ss}UTC  size={curInfo.Length:#,0}");
+        Console.Error.WriteLine($"[HOTSWAP] exe: {Path.GetFileName(selfExe)}  mtime={curInfo.LastWriteTimeUtc:yyyy-MM-dd HH:mm:ss}UTC  size={curInfo.Length:#,0}");
 
         if (File.Exists(newExePath))
         {
             var prev = new FileInfo(newExePath);
-            Console.WriteLine($"[HOTSWAP] existing .new.exe: mtime={prev.LastWriteTimeUtc:HH:mm:ss}UTC size={prev.Length:#,0} — overwriting");
+            Console.Error.WriteLine($"[HOTSWAP] existing .new.exe: mtime={prev.LastWriteTimeUtc:HH:mm:ss}UTC size={prev.Length:#,0} — overwriting");
         }
 
         try
@@ -907,11 +907,11 @@ internal partial class Program
             File.Copy(selfExe, newExePath, overwrite: true);
             File.SetLastWriteTimeUtc(newExePath, DateTime.UtcNow);
             var newInfo = new FileInfo(newExePath);
-            Console.WriteLine($"[HOTSWAP] .new.exe staged  mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}UTC  size={newInfo.Length:#,0}");
+            Console.Error.WriteLine($"[HOTSWAP] .new.exe staged  mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}UTC  size={newInfo.Length:#,0}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HOTSWAP] Failed to stage .new.exe: {ex.Message}");
+            Console.Error.WriteLine($"[HOTSWAP] Failed to stage .new.exe: {ex.Message}");
             return 1;
         }
 
@@ -953,7 +953,7 @@ internal partial class Program
 
         var state = pair.Value;
         var label = state.CwdLabel ?? state.FullCwd ?? "WKAppBot";
-        Console.WriteLine($"[HOMEWORK] Force-triggering for instance: {label}");
+        Console.Error.WriteLine($"[HOMEWORK] Force-triggering for instance: {label}");
 
         // Reset cooldown so CheckAndSendHomework can also set LastHomeworkAt
         state.HomeworkNotified = false;
@@ -967,7 +967,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[HOMEWORK] Error: {ex.Message}");
+            Console.Error.WriteLine($"[HOMEWORK] Error: {ex.Message}");
             return 1;
         }
     }

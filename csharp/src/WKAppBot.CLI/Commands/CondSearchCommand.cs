@@ -1102,7 +1102,7 @@ internal partial class Program
             return Error($"Invalid row label: {rowLabel}. Use A, B, C, ..., Z");
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[del-row] Not yet implemented — owner-drawn X button doesn't respond to PostMessage/SendInput.");
+        Console.Error.WriteLine($"[del-row] Not yet implemented — owner-drawn X button doesn't respond to PostMessage/SendInput.");
         Console.WriteLine($"  See: knowhow.md \"[2026-03-02] 조건 행 삭제 (del-row)\"");
         Console.WriteLine($"  Workaround: use formula text editing (EM_SETSEL + EM_REPLACESEL) or manual deletion.");
         Console.ResetColor();

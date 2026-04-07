@@ -18,9 +18,9 @@ internal partial class Program
     static int AskGemini(string question, bool slackReport = true, int timeoutSec = 30, bool newTab = false, List<string>? attachFiles = null, bool newSession = false, bool loopMode = false, int loopMaxSteps = 3, int loopRetry = 1, int loopMaxParallel = 7, bool triadMode = false, string? modelHint = null, bool noWait = false, string? targetTagOverride = null, string? linePrefix = null, TriadSharedContext? triadCtx = null)
     {
         using var _ = ApplyOutputPrefix(linePrefix);
-        Console.WriteLine($"[ASK] Gemini: {question}");
+        Console.Error.WriteLine($"[ASK] Gemini: {question}");
         if (!string.IsNullOrWhiteSpace(modelHint))
-            Console.WriteLine($"[ASK] Gemini model hint: {modelHint}");
+            Console.Error.WriteLine($"[ASK] Gemini model hint: {modelHint}");
 
         PulseStep.Init("ask-gemini");
         var targetTag = targetTagOverride ?? BuildSandboxKey("ask", "gemini");
@@ -30,8 +30,8 @@ internal partial class Program
             var qid = AskTargetRegistry.AssignNextQid(targetTag);
             _currentQid.Value = qid;
             question = $"[Q{qid}] {question}\n[REPLY: A{qid}]";
-            Console.WriteLine($"[ASK] Gemini Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
-            Console.WriteLine($"[ASK] 훈수두기: wkappbot ask gemini --intercept \"내용\" --qid {qid}");
+            Console.Error.WriteLine($"[ASK] Gemini Q{qid} 할당됨 (tab={targetTag[..Math.Min(16, targetTag.Length)]})");
+            Console.Error.WriteLine($"[ASK] 훈수두기: wkappbot ask gemini --intercept \"내용\" --qid {qid}");
         }
         var cdp = EnsureCdpConnection(preferredHost: "gemini.google.com", newTab: newTab, targetTag: targetTag);
         if (cdp == null) return 1;
@@ -66,7 +66,7 @@ internal partial class Program
                 // ── P1: Navigate ──
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
-                Console.WriteLine($"[ASK] Tab URL: {currentUrl}");
+                Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("gemini.google.com"))
                 {
                     Console.WriteLine(newSession ? "[ASK] New session ??navigating to fresh Gemini..." : "[ASK] Navigating to Gemini...");
@@ -75,7 +75,7 @@ internal partial class Program
                 }
                 else
                 {
-                    Console.WriteLine($"[ASK] Reusing Gemini session");
+                    Console.Error.WriteLine($"[ASK] Reusing Gemini session");
                 }
 
                 // NOTE: BringToFront removed ??steals OS focus.
@@ -83,7 +83,7 @@ internal partial class Program
 
                 // Diagnose tab state before editor search
                 var tabState = await cdp.GetTabStateAsync();
-                Console.WriteLine($"[ASK] Tab state: hidden={tabState.hidden} title={tabState.title} elements={tabState.elementCount}");
+                Console.Error.WriteLine($"[ASK] Tab state: hidden={tabState.hidden} title={tabState.title} elements={tabState.elementCount}");
                 if (tabState.hidden)
                 {
                     Console.WriteLine("[ASK] Tab hidden ??dispatching visibility events (focusless)...");
@@ -103,7 +103,7 @@ internal partial class Program
                             return Array.from(ce).map(e => e.tagName + '.' + (e.className||'').substring(0,40) + '[' + e.getAttribute('contenteditable') + ']').join(' | ');
                         })()
                         """);
-                    Console.WriteLine($"[ASK] contenteditable elements: {ceDebug}");
+                    Console.Error.WriteLine($"[ASK] contenteditable elements: {ceDebug}");
                     Console.WriteLine("[ASK] Editor not found");
                     return (false, (string?)null);
                 }
@@ -121,7 +121,7 @@ internal partial class Program
                 var geminiTurnCount = (await cdp.GetResponseCountAsync()).ToString();
                 var hasLoopPersonaState = await HasLoopPersonaStateAsync(cdp, "gemini");
                 var effectiveLoopPersona = !_suppressLoopPersona.Value && (loopMode || hasLoopPersonaState);
-                Console.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
+                Console.Error.WriteLine($"[ASK] Loop persona state: {(hasLoopPersonaState ? "present" : "missing")}");
                 if (!loopMode && hasLoopPersonaState)
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
                 if (geminiTurnCount == "0" || (effectiveLoopPersona && !hasLoopPersonaState))
@@ -197,11 +197,11 @@ internal partial class Program
                         if (stablePersonaResp != null)
                         {
                             bool ready = stablePersonaResp.Contains("READY", StringComparison.OrdinalIgnoreCase);
-                            Console.WriteLine($"[ASK] Persona stable ({stablePersonaResp.Length}): {(ready ? "READY" : stablePersonaResp.Substring(0, Math.Min(80, stablePersonaResp.Length)).Replace('\n', ' '))}");
+                            Console.Error.WriteLine($"[ASK] Persona stable ({stablePersonaResp.Length}): {(ready ? "READY" : stablePersonaResp.Substring(0, Math.Min(80, stablePersonaResp.Length)).Replace('\n', ' '))}");
                             if (loopMode && effectiveLoopPersona && stablePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(stablePersonaResp).Count > 0)
                             {
-                                Console.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) ??skipping question send");
+                                Console.Error.WriteLine($"[ASK] Persona continuation has tool call ({stablePersonaResp.Length} chars) ??skipping question send");
                                 personaEarlyToolCall = stablePersonaResp;
                             }
                         }
@@ -239,7 +239,7 @@ internal partial class Program
                     // Capture last response ? may contain tool call that Gemini generated post-READY
                     var latePersonaResp = await GetGeminiLastResponseAsync(cdp);
                     if (latePersonaResp.Length > 0)
-                        Console.WriteLine($"[ASK] Post-persona resp ({latePersonaResp.Length}): {latePersonaResp.Replace('\n', ' ').Substring(0, Math.Min(80, latePersonaResp.Length))}");
+                        Console.Error.WriteLine($"[ASK] Post-persona resp ({latePersonaResp.Length}): {latePersonaResp.Replace('\n', ' ').Substring(0, Math.Min(80, latePersonaResp.Length))}");
                     if (loopMode && latePersonaResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                         && ParseAllLoopToolCalls(latePersonaResp).Count > 0)
                     {
@@ -265,7 +265,7 @@ internal partial class Program
                 var prevFgNow = NativeMethods.GetForegroundWindow();
                 if (prevFgNow != IntPtr.Zero && prevFgNow != prevFgGemini)
                 {
-                    Console.WriteLine($"[ASK:FOCUS] prevFg updated after persona phase: 0x{prevFgGemini:X8} -> 0x{prevFgNow:X8}");
+                    Console.Error.WriteLine($"[ASK:FOCUS] prevFg updated after persona phase: 0x{prevFgGemini:X8} -> 0x{prevFgNow:X8}");
                     prevFgGemini = prevFgNow;
                 }
 
@@ -284,14 +284,14 @@ internal partial class Program
                     // Dismiss consent popup that Gemini shows after file attach (e.g. "이미지 및 파일에서 콘텐츠 생성")
                     var dismissResult = await cdp.DismissDialogAsync();
                     if (dismissResult != "NONE")
-                        Console.WriteLine($"[ASK] Post-attach dialog dismissed: {dismissResult}");
+                        Console.Error.WriteLine($"[ASK] Post-attach dialog dismissed: {dismissResult}");
                 }
 
                 // Dismiss any pre-send dialog (consent popup may appear without file attach too)
                 {
                     var dismissResult = await cdp.DismissDialogAsync();
                     if (dismissResult != "NONE")
-                        Console.WriteLine($"[ASK] Pre-send dialog dismissed: {dismissResult}");
+                        Console.Error.WriteLine($"[ASK] Pre-send dialog dismissed: {dismissResult}");
                 }
 
                 // Tier 1: focusless insert (a11y-first)
@@ -329,7 +329,7 @@ internal partial class Program
                         if (loopMode && effectiveLoopPersona && personaEarlyToolCall == null)
                         {
                             var lateResp = await cdp.GetLastResponseTextAsync() ?? "";
-                            Console.WriteLine($"[ASK] Post-wait resp ({lateResp.Length}): {lateResp.Substring(0, Math.Min(80, lateResp.Length)).Replace('\n', ' ')}");
+                            Console.Error.WriteLine($"[ASK] Post-wait resp ({lateResp.Length}): {lateResp.Substring(0, Math.Min(80, lateResp.Length)).Replace('\n', ' ')}");
                             if (lateResp.Contains("[APPBOT_TOOL_CALL_BEGIN]")
                                 && ParseAllLoopToolCalls(lateResp).Count > 0)
                             {
@@ -370,7 +370,7 @@ internal partial class Program
                             break;
                         }
                         // Gemini generating before send ? fast-fail (attempt=0 only, or if editor not cleared)
-                        Console.WriteLine($"[ASK] Gemini still generating at send time (attempt={sendAttempt}) ? fast-fail");
+                        Console.Error.WriteLine($"[ASK] Gemini still generating at send time (attempt={sendAttempt}) ? fast-fail");
                         zoom?.ShowFail("still generating");
                         zoom?.Dispose();
                         questionLock.Release("fast-fail-gen");
@@ -440,7 +440,7 @@ internal partial class Program
                 zoom?.Dispose();
                 LogRestoreFocus(prevFg, "after-send-Gemini", cdp);
 
-                Console.WriteLine($"[SEND-DONE] send={sendResult}");
+                Console.Error.WriteLine($"[SEND-DONE] send={sendResult}");
                 await cdp.MarkPromptDispatchAsync(editorSel, "gemini", sendResult);
                 askSession.MarkQueued(sendResult);
                 questionLock.Release("sent");
@@ -454,7 +454,7 @@ internal partial class Program
                 bool responseAlreadyStarted = sendResult.StartsWith("RESPONSE_", StringComparison.OrdinalIgnoreCase);
                 if (responseAlreadyStarted) askSession.MarkRunning();
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
-                Console.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
+                Console.Error.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
                 // ── P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ──
                 var abPollTask = Task.Run(async () =>
@@ -495,7 +495,7 @@ internal partial class Program
                     if (text == "\x01BLANK" || text == null)
                     {
                         geminiBlankCount++;
-                        Console.WriteLine($"[ASK] Page blank/broken ({geminiBlankCount}/3)");
+                        Console.Error.WriteLine($"[ASK] Page blank/broken ({geminiBlankCount}/3)");
                         if (geminiBlankCount >= 3)
                         {
                             Console.WriteLine("[ASK] Page unresponsive ??aborting poll");
@@ -510,7 +510,7 @@ internal partial class Program
                         // Diagnostic: log if response count changed but text is empty (baseline filter issue)
                         var diagCount = await cdp.GetResponseCountAsync();
                         if (diagCount.ToString() != preResponseCount && sw.Elapsed.TotalSeconds < 10)
-                            Console.WriteLine($"[ASK] Poll: respCount={diagCount} base={baseResponseCount} ? text empty (filter skipping? check baseline)");
+                            Console.Error.WriteLine($"[ASK] Poll: respCount={diagCount} base={baseResponseCount} ? text empty (filter skipping? check baseline)");
                         continue;
                     }
 
@@ -572,7 +572,7 @@ internal partial class Program
                             var gemEarlyImages = await DetectAndDownloadImages(cdp, geminiKnownImages, "gemini");
                             geminiSavedImages.AddRange(gemEarlyImages);
                             if (liveHeaderPrinted) Console.WriteLine();
-                            Console.WriteLine($"[ASK] Flush idle 1s + stop gone -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.Error.WriteLine($"[ASK] Flush idle 1s + stop gone -- early done ({sw.Elapsed.TotalSeconds:F0}s)");
                             askSession.MarkDone(StripGeminiUiPrefix(text));
                             return (true, text!);
                         }
@@ -602,7 +602,7 @@ internal partial class Program
                                 preStop = StripGeminiUiPrefix(preStop);
                                 if (!string.IsNullOrWhiteSpace(preStop) && preStop.Length >= 3)
                                 {
-                                    Console.WriteLine($"[ASK] Stop notice but answer found before it ({preStop.Length} chars) ? accepting");
+                                    Console.Error.WriteLine($"[ASK] Stop notice but answer found before it ({preStop.Length} chars) ? accepting");
                                     return (true, preStop);
                                 }
                                 Console.WriteLine("[ASK] Gemini stopped response notice detected; retrying once...");
@@ -610,7 +610,7 @@ internal partial class Program
                                 var retryResult = await RetryGeminiAfterStopAsync(cdp, editorSel, question);
                                 if (retryResult.ok && !string.IsNullOrWhiteSpace(retryResult.text))
                                 {
-                                    Console.WriteLine($"[ASK] Retry recovered ({retryResult.text.Length} chars)");
+                                    Console.Error.WriteLine($"[ASK] Retry recovered ({retryResult.text.Length} chars)");
                                     return (true, retryResult.text);
                                 }
                                 Console.WriteLine("[ASK] Retry did not recover from Gemini stop notice; fast-fail");
@@ -619,9 +619,9 @@ internal partial class Program
                             }
                             if (hasToolCall && IsGeminiStoppedNotice(text))
                                 Console.WriteLine("[ASK] Stop notice present but tool call found ? ignoring stop notice");
-                            Console.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
+                            Console.Error.WriteLine($"[ASK] Response received ({text.Length} chars, {sw.Elapsed.TotalSeconds:F0}s)");
                             if (geminiSavedImages.Count > 0)
-                                Console.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
+                                Console.Error.WriteLine($"[ASK] Downloaded {geminiSavedImages.Count} generated image(s)");
                             askSession.MarkDone(StripGeminiUiPrefix(text));
                             return (true, StripGeminiUiPrefix(text));
                         }
@@ -640,7 +640,7 @@ internal partial class Program
                 if (abPollTask.IsCompleted)
                 {
                     var (abOk, abText) = await abPollTask;
-                    Console.WriteLine($"[A/B] New poll: ok={abOk} len={abText.Length}");
+                    Console.Error.WriteLine($"[A/B] New poll: ok={abOk} len={abText.Length}");
                 }
 
                 // Timeout ??return whatever we have
@@ -652,7 +652,7 @@ internal partial class Program
                         askSession.MarkFailed("STOP_NOTICE", lastText);
                         return (false, lastText);
                     }
-                    Console.WriteLine($"[ASK] Timeout ??partial response ({lastText.Length} chars)");
+                    Console.Error.WriteLine($"[ASK] Timeout ??partial response ({lastText.Length} chars)");
                     askSession.MarkTimedOut(StripGeminiUiPrefix(lastText));
                     return (true, StripGeminiUiPrefix(lastText));
                 }
@@ -685,7 +685,7 @@ internal partial class Program
                             askSession.MarkFailed("STOP_NOTICE", text);
                             return (false, text);
                         }
-                        Console.WriteLine($"[ASK] Retry: response ({text.Length} chars)");
+                        Console.Error.WriteLine($"[ASK] Retry: response ({text.Length} chars)");
                         askSession.MarkDone(StripGeminiUiPrefix(text));
                         return (true, StripGeminiUiPrefix(text));
                     }
@@ -699,7 +699,7 @@ internal partial class Program
                         askSession.MarkFailed("STOP_NOTICE", retryText);
                         return (false, retryText);
                     }
-                    Console.WriteLine($"[ASK] Retry: partial ({retryText.Length} chars)");
+                    Console.Error.WriteLine($"[ASK] Retry: partial ({retryText.Length} chars)");
                     askSession.MarkTimedOut(retryText);
                     return (true, retryText);
                 }

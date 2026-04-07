@@ -56,7 +56,7 @@ internal partial class Program
         while (sw.ElapsedMilliseconds < maxWaitMs)
         {
             if (!await cdp.IsStopButtonVisibleAsync()) return true;
-            Console.WriteLine($"[ASK] Gemini generating... waiting ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[ASK] Gemini generating... waiting ({sw.ElapsedMilliseconds}ms)");
             await Task.Delay(1000);
         }
         Console.WriteLine("[ASK] Gemini still generating after wait ? proceeding anyway");
@@ -77,7 +77,7 @@ internal partial class Program
             if (stopVisible == "0")
                 return true;
 
-            Console.WriteLine($"[ASK] Gemini stop visible [{stopVisible}]; waiting before send... ({sw.ElapsedMilliseconds}ms)");
+            Console.Error.WriteLine($"[ASK] Gemini stop visible [{stopVisible}]; waiting before send... ({sw.ElapsedMilliseconds}ms)");
             await Task.Delay(700);
         }
 
@@ -86,7 +86,7 @@ internal partial class Program
         await cdp.ClickStopButtonAsync();
         await Task.Delay(1500);
         var stillVisible = await cdp.IsStopButtonVisibleAsync();
-        Console.WriteLine($"[ASK] Gemini stop after click: {(stillVisible ? "still visible" : "cleared")}");
+        Console.Error.WriteLine($"[ASK] Gemini stop after click: {(stillVisible ? "still visible" : "cleared")}");
         return !stillVisible;
     }
 

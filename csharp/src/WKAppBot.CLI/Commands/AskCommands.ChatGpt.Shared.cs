@@ -30,14 +30,14 @@ internal partial class Program
         if (!isIconic && isVisible) return; // already normal-visible
 
         var title = WKAppBot.Win32.Window.WindowFinder.GetWindowText(chromeHwnd);
-        Console.WriteLine($"[ASK] Restoring Chrome window (iconic={isIconic}, visible={isVisible}): \"{title}\"");
+        Console.Error.WriteLine($"[ASK] Restoring Chrome window (iconic={isIconic}, visible={isVisible}): \"{title}\"");
         // SW_RESTORE(9): restores minimized or hidden window, may steal focus (recovery use)
         NativeMethods.ShowWindow(chromeHwnd, 9); // SW_RESTORE
     }
 
     static async Task TryRecoverChatGptTabAsync(CdpClient cdp, string reason)
     {
-        Console.WriteLine($"[ASK] Recovery: {reason} -> SW_SHOWNOACTIVATE (focusless restore)");
+        Console.Error.WriteLine($"[ASK] Recovery: {reason} -> SW_SHOWNOACTIVATE (focusless restore)");
         ShowChromeAnswer(cdp);
         cdp.RestoreChromeNoActivate();
         await cdp.EmulateActiveTabAsync(); // unthrottle renderer
@@ -77,7 +77,7 @@ internal partial class Program
 
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
         // Timed out — click stop to cancel ongoing generation, then wait briefly and proceed
-        Console.WriteLine($"[ASK] {session.Provider.Name} stop still visible — clicking stop to cancel generation...");
+        Console.Error.WriteLine($"[ASK] {session.Provider.Name} stop still visible — clicking stop to cancel generation...");
         await session.ClickStopAsync();
         await Task.Delay(1500);
         return true;
@@ -106,13 +106,13 @@ internal partial class Program
                         !string.IsNullOrWhiteSpace(btn.Name) &&
                         btn.Name.Contains(k, StringComparison.OrdinalIgnoreCase)))
                     {
-                        Console.WriteLine($"[ASK] UIA: skip stop-like button \"{btn.Name}\"");
+                        Console.Error.WriteLine($"[ASK] UIA: skip stop-like button \"{btn.Name}\"");
                         continue;
                     }
                     var invoke = btn.Patterns.Invoke.PatternOrDefault;
                     if (invoke == null) continue;
 
-                    Console.WriteLine($"[ASK] UIA: found \"{btn.Name}\" ({btn.ControlType})");
+                    Console.Error.WriteLine($"[ASK] UIA: found \"{btn.Name}\" ({btn.ControlType})");
                     invoke.Invoke();
                     Console.WriteLine("[ASK] UIA: Invoked!");
                     return true;
@@ -188,7 +188,7 @@ internal partial class Program
         public static ChromeTabLock? Acquire(string aiName, int timeoutMs = 90000)
         {
             var sem = GetTabSemaphore(aiName);
-            Console.WriteLine($"[ASK] Waiting for browser lock ({aiName})...");
+            Console.Error.WriteLine($"[ASK] Waiting for browser lock ({aiName})...");
             var sw = Stopwatch.StartNew();
             const int sliceMs = 1000;
             bool dotLineOpen = false;
@@ -198,9 +198,9 @@ internal partial class Program
                 {
                     if (dotLineOpen) Console.WriteLine();
                     if (sw.ElapsedMilliseconds > 1500)
-                        Console.WriteLine($"[ASK] Browser lock acquired after queue wait ({aiName}, {sw.ElapsedMilliseconds}ms)");
+                        Console.Error.WriteLine($"[ASK] Browser lock acquired after queue wait ({aiName}, {sw.ElapsedMilliseconds}ms)");
                     else
-                        Console.WriteLine($"[ASK] Browser lock acquired ({aiName})");
+                        Console.Error.WriteLine($"[ASK] Browser lock acquired ({aiName})");
                     return new ChromeTabLock(aiName, sem);
                 }
 
@@ -220,7 +220,7 @@ internal partial class Program
             }
 
             if (dotLineOpen) Console.WriteLine();
-            Console.WriteLine($"[ASK] Browser lock timeout ({aiName})");
+            Console.Error.WriteLine($"[ASK] Browser lock timeout ({aiName})");
             return null;
         }
 
@@ -229,7 +229,7 @@ internal partial class Program
             if (Interlocked.CompareExchange(ref _released, 1, 0) != 0) return;
             _autoRelease.Dispose();
             try { _sem.Release(); } catch { }
-            Console.WriteLine($"[ASK] Browser lock released ({_aiName}, {reason})");
+            Console.Error.WriteLine($"[ASK] Browser lock released ({_aiName}, {reason})");
         }
 
         public void Dispose() => Release("dispose");

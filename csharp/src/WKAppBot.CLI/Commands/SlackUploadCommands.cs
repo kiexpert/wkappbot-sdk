@@ -22,7 +22,7 @@ internal partial class Program
     {
         if (!File.Exists(filePath))
         {
-            Console.WriteLine($"[SLACK] File not found: {filePath}");
+            Console.Error.WriteLine($"[SLACK] File not found: {filePath}");
             return false;
         }
 
@@ -45,7 +45,7 @@ internal partial class Program
 
         if (getUrlJson?["ok"]?.GetValue<bool>() != true)
         {
-            Console.WriteLine($"[SLACK] getUploadURLExternal failed: {getUrlJson?["error"]}");
+            Console.Error.WriteLine($"[SLACK] getUploadURLExternal failed: {getUrlJson?["error"]}");
             return false;
         }
 
@@ -57,7 +57,7 @@ internal partial class Program
             return false;
         }
 
-        Console.WriteLine($"[SLACK] Uploading {fileName} ({fileSize:N0} bytes)...");
+        Console.Error.WriteLine($"[SLACK] Uploading {fileName} ({fileSize:N0} bytes)...");
 
         // Step 2: Upload file content via POST to the upload URL
         using var fileContent = new StreamContent(File.OpenRead(filePath));
@@ -65,7 +65,7 @@ internal partial class Program
         var uploadResp = await http.PostAsync(uploadUrl, fileContent);
         if (!uploadResp.IsSuccessStatusCode)
         {
-            Console.WriteLine($"[SLACK] File upload failed: HTTP {uploadResp.StatusCode}");
+            Console.Error.WriteLine($"[SLACK] File upload failed: HTTP {uploadResp.StatusCode}");
             return false;
         }
 
@@ -98,11 +98,11 @@ internal partial class Program
 
         if (completeJson?["ok"]?.GetValue<bool>() != true)
         {
-            Console.WriteLine($"[SLACK] completeUploadExternal failed: {completeJson?["error"]}");
+            Console.Error.WriteLine($"[SLACK] completeUploadExternal failed: {completeJson?["error"]}");
             return false;
         }
 
-        Console.WriteLine($"[SLACK] File uploaded: {fileName}");
+        Console.Error.WriteLine($"[SLACK] File uploaded: {fileName}");
         return true;
     }
 
@@ -206,7 +206,7 @@ internal partial class Program
             var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
             if (windows.Count == 0)
             {
-                Console.WriteLine($"[SLACK] Window not found: {windowTitle}");
+                Console.Error.WriteLine($"[SLACK] Window not found: {windowTitle}");
                 return 1;
             }
 
@@ -221,7 +221,7 @@ internal partial class Program
             }
             bmp.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
             bmp.Dispose();
-            Console.WriteLine($"[SLACK] Captured: {windows[0].Title} -> {screenshotPath}");
+            Console.Error.WriteLine($"[SLACK] Captured: {windows[0].Title} -> {screenshotPath}");
         }
         else
         {
@@ -232,7 +232,7 @@ internal partial class Program
             using var g = System.Drawing.Graphics.FromImage(bmp);
             g.CopyFromScreen(bounds.Location, System.Drawing.Point.Empty, bounds.Size);
             bmp.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
-            Console.WriteLine($"[SLACK] Captured: full screen -> {screenshotPath}");
+            Console.Error.WriteLine($"[SLACK] Captured: full screen -> {screenshotPath}");
         }
 
         // Upload to Slack

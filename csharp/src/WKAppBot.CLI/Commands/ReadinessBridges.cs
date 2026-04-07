@@ -57,7 +57,7 @@ internal partial class Program
         if (NativeMethods.IsIconic(hwnd))
         {
             wasIconic = true;
-            Console.WriteLine($"[A11Y] 0x{hwnd.ToInt64():X} \"{title}\" minimized — restoring (focusless)");
+            Console.Error.WriteLine($"[A11Y] 0x{hwnd.ToInt64():X} \"{title}\" minimized — restoring (focusless)");
             using var iconicZoom = ClickZoomHelper.BeginForIconic(hwnd, actionLabel, $"\"{title}\"");
             var prevFg = NativeMethods.GetForegroundWindow();
             NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
@@ -84,7 +84,7 @@ internal partial class Program
                 var (handled, _) = readiness.BlockerHandler?.TryHandle(hwnd, blocker) ?? (false, false);
                 if (!handled)
                 {
-                    Console.WriteLine($"[A11Y] blocker persists: {blocker.ClassName} \"{blocker.Title}\"");
+                    Console.Error.WriteLine($"[A11Y] blocker persists: {blocker.ClassName} \"{blocker.Title}\"");
                     break;
                 }
                 Thread.Sleep(1000); // 연쇄 다이얼로그 출현 대기

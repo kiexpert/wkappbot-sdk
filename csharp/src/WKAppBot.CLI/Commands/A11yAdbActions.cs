@@ -50,14 +50,14 @@ internal partial class Program
             if (grap.Device == null && devices.Count > 1)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[ADB] Multiple devices connected — specify device in grap:");
+                Console.Error.WriteLine($"[ADB] Multiple devices connected — specify device in grap:");
                 Console.ResetColor();
                 foreach (var d in devices)
                     Console.WriteLine($"  adb://{d.Model ?? d.Serial}/...");
                 return 1;
             }
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[ADB] Device '{grap.Device}' not found");
+            Console.Error.WriteLine($"[ADB] Device '{grap.Device}' not found");
             Console.ResetColor();
             return 1;
         }
@@ -131,7 +131,7 @@ internal partial class Program
     static int AdbWindows(AdbClient adb, AdbDeviceRegistry registry)
     {
         var all = registry.ListAll();
-        Console.WriteLine($"[ADB] {all.Count} device(s):");
+        Console.Error.WriteLine($"[ADB] {all.Count} device(s):");
         foreach (var info in all)
         {
             var alias = info.Alias != null ? $" [{info.Alias}]" : "";
@@ -186,14 +186,14 @@ internal partial class Program
             if (pkgMatches.Count == 0)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[ADB] No package matching '{grap.Package}'");
+                Console.Error.WriteLine($"[ADB] No package matching '{grap.Package}'");
                 Console.ResetColor();
                 // Still dump from root
             }
             else
             {
                 target = pkgMatches[0]; // Use first package match as root
-                Console.WriteLine($"[ADB] Package: {target.Package}");
+                Console.Error.WriteLine($"[ADB] Package: {target.Package}");
             }
         }
 
@@ -204,14 +204,14 @@ internal partial class Program
             if (scoped != null)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"[ADB] Scope: {scoped.SearchKey}");
+                Console.Error.WriteLine($"[ADB] Scope: {scoped.SearchKey}");
                 Console.ResetColor();
                 target = scoped;
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found — showing from package root");
+                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found — showing from package root");
                 Console.ResetColor();
             }
         }
