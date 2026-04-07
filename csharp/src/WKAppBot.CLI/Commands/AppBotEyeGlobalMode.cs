@@ -486,7 +486,8 @@ internal partial class Program
 
         using var host = new AppBotEyeHost();
         EyeDiag("host-start-call");
-        host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero, isElevated: ElevationHelper.IsElevated());
+        bool startElevated = ElevationHelper.IsElevated() || ElevatedEyeClient.IsAvailable();
+        host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero, isElevated: startElevated);
         EyeDiag("host-start-return");
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
         EyeDiag("host-update-info");
