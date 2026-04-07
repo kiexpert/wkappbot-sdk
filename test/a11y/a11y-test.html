@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>WKAppBot A11Y 3-Tier Fallback Test</title>
+<style>
+body { font-family: 'Malgun Gothic', sans-serif; padding: 20px; background: #1a1a2e; color: #e0e0e0; }
+h1 { color: #00d4ff; }
+h2 { color: #ff6b35; margin-top: 30px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+.section { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; border: 1px solid #333; }
+.result { background: #0f3460; padding: 8px; margin: 5px 0; border-radius: 4px; font-size: 12px; color: #aaa; }
+button { padding: 8px 16px; margin: 5px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+input, select { padding: 6px; margin: 5px; border-radius: 4px; border: 1px solid #555; background: #1a1a2e; color: #e0e0e0; }
+label { margin: 5px 10px 5px 0; }
+
+/* Tier 1: Normal HTML — CDP + UIA both work */
+.tier1 button { background: #00d4ff; color: #000; border: none; }
+.tier1 button:hover { background: #00a8cc; }
+
+/* Tier 2: Custom drawn — No standard role, UIA might struggle */
+.tier2 .custom-btn {
+    display: inline-block; padding: 10px 20px; margin: 5px;
+    background: linear-gradient(135deg, #ff6b35, #d63031);
+    color: white; border-radius: 6px; cursor: pointer; user-select: none;
+    font-weight: bold; text-align: center;
+}
+.tier2 .custom-btn:hover { opacity: 0.8; }
+.tier2 .custom-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Tier 3: Canvas drawn — Only Vision can read */
+.tier3 canvas { border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+
+/* Owner-drawn table */
+.owner-table { border-collapse: collapse; }
+.owner-table td { border: 1px solid #444; padding: 8px 12px; min-width: 80px; }
+.owner-table td.header { background: #0f3460; color: #00d4ff; font-weight: bold; }
+.owner-table td.price-up { color: #ff4444; }
+.owner-table td.price-down { color: #4488ff; }
+</style>
+</head>
+<body>
+
+<h1>WKAppBot A11Y 3-Tier Fallback Test</h1>
+<p>CDP → UIA → Vision 폴백 테스트 페이지</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Tier 1: Standard HTML (CDP + UIA)</h2>
+<div class="section tier1">
+    <button id="btn-buy" onclick="log('매수 클릭!')">매수</button>
+    <button id="btn-sell" onclick="log('매도 클릭!')">매도</button>
+    <button id="btn-cancel" disabled>취소 (disabled)</button>
+    <br><br>
+    <label><input type="checkbox" id="chk-auto"> 자동매매</label>
+    <label><input type="checkbox" id="chk-alert" checked> 알림</label>
+    <br><br>
+    <select id="sel-stock">
+        <option>삼성전자</option>
+        <option>SK하이닉스</option>
+        <option>LG에너지솔루션</option>
+    </select>
+    <input type="text" id="txt-price" placeholder="가격 입력" value="80000">
+    <input type="text" id="txt-qty" placeholder="수량" value="10">
+    <div class="result" id="result1">결과: 대기중</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Tier 2: Custom Drawn (UIA fallback needed)</h2>
+<div class="section tier2">
+    <div class="custom-btn" onclick="log('커스텀 매수!')">매수 주문</div>
+    <div class="custom-btn" onclick="log('커스텀 매도!')">매도 주문</div>
+    <div class="custom-btn disabled">정정 (비활성)</div>
+    <br><br>
+    <!-- No ARIA roles — UIA needs to rely on text content -->
+    <div style="display:inline-block; padding:5px 10px; border:1px solid #555; border-radius:4px; margin:5px; cursor:pointer"
+         onclick="log('종목코드 입력 영역')">
+        <span style="color:#888; font-size:12px">종목코드</span><br>
+        <span style="font-size:16px; font-weight:bold">005930</span>
+    </div>
+    <div style="display:inline-block; padding:5px 10px; border:1px solid #555; border-radius:4px; margin:5px">
+        <span style="color:#888; font-size:12px">현재가</span><br>
+        <span style="font-size:16px; font-weight:bold; color:#ff4444">▲ 82,500</span>
+    </div>
+    <div class="result" id="result2">결과: 대기중</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Tier 3: Canvas Drawn (Vision only)</h2>
+<div class="section tier3">
+    <canvas id="canvas-buttons" width="400" height="80"></canvas>
+    <br>
+    <canvas id="canvas-table" width="500" height="200"></canvas>
+    <div class="result" id="result3">결과: 대기중</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>HTS 호가창 시뮬레이션 (Owner-Draw Table)</h2>
+<div class="section">
+    <table class="owner-table">
+        <tr>
+            <td class="header">매도잔량</td>
+            <td class="header">가격</td>
+            <td class="header">매수잔량</td>
+        </tr>
+        <tr><td>15,230</td><td class="price-down">82,400</td><td></td></tr>
+        <tr><td>8,450</td><td class="price-down">82,300</td><td></td></tr>
+        <tr><td>22,100</td><td class="price-down">82,200</td><td></td></tr>
+        <tr><td></td><td class="price-up">82,100</td><td>31,500</td></tr>
+        <tr><td></td><td class="price-up">82,000</td><td>45,200</td></tr>
+        <tr><td></td><td class="price-up">81,900</td><td>18,700</td></tr>
+    </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>팝업 테스트 (Focus Steal Simulation)</h2>
+<div class="section">
+    <button onclick="showPopup()">주문 확인 팝업 띄우기</button>
+    <button onclick="showAlert()">경고 알림 띄우기</button>
+</div>
+
+<div id="popup-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+     background:rgba(0,0,0,0.7); z-index:1000; justify-content:center; align-items:center;">
+    <div style="background:#16213e; padding:30px; border-radius:12px; border:2px solid #00d4ff; text-align:center; min-width:300px;">
+        <h3 style="color:#00d4ff; margin-top:0;">주문 확인</h3>
+        <p>삼성전자 82,500원 10주 매수</p>
+        <p style="color:#ff6b35; font-size:20px; font-weight:bold;">총 825,000원</p>
+        <button onclick="confirmOrder()" style="background:#00d4ff; color:#000; border:none; padding:10px 30px; font-size:16px; border-radius:6px; margin:5px;">확인</button>
+        <button onclick="cancelOrder()" style="background:#d63031; color:#fff; border:none; padding:10px 30px; font-size:16px; border-radius:6px; margin:5px;">취소</button>
+    </div>
+</div>
+
+<script>
+// ── Canvas drawing (Tier 3) ──
+const ctx1 = document.getElementById('canvas-buttons').getContext('2d');
+ctx1.fillStyle = '#16213e'; ctx1.fillRect(0,0,400,80);
+// Draw buttons on canvas (no HTML elements — only pixels)
+function drawCanvasBtn(ctx, x, y, w, h, text, color) {
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Malgun Gothic';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + w/2, y + h/2);
+}
+drawCanvasBtn(ctx1, 10, 15, 100, 50, '매수', '#d63031');
+drawCanvasBtn(ctx1, 120, 15, 100, 50, '매도', '#0984e3');
+drawCanvasBtn(ctx1, 230, 15, 150, 50, '주문취소', '#636e72');
+
+// Canvas click detection
+document.getElementById('canvas-buttons').addEventListener('click', (e) => {
+    const rect = e.target.getBoundingClientRect();
+    const x = e.clientX - rect.left, y = e.clientY - rect.top;
+    if (x >= 10 && x <= 110 && y >= 15 && y <= 65) log('Canvas 매수 클릭!');
+    else if (x >= 120 && x <= 220 && y >= 15 && y <= 65) log('Canvas 매도 클릭!');
+    else if (x >= 230 && x <= 380 && y >= 15 && y <= 65) log('Canvas 주문취소 클릭!');
+});
+
+// Canvas table (like HTS grid)
+const ctx2 = document.getElementById('canvas-table').getContext('2d');
+ctx2.fillStyle = '#16213e'; ctx2.fillRect(0,0,500,200);
+ctx2.strokeStyle = '#444'; ctx2.lineWidth = 1;
+const headers = ['종목명', '현재가', '등락율', '거래량'];
+const rows = [
+    ['삼성전자', '82,500', '+2.3%', '15,230,000'],
+    ['SK하이닉스', '178,500', '-1.2%', '8,450,000'],
+    ['LG에너지', '385,000', '+0.8%', '2,100,000'],
+];
+const colW = [120, 100, 80, 120];
+let cy = 0;
+// Header
+ctx2.fillStyle = '#0f3460';
+ctx2.fillRect(0, 0, 500, 30);
+ctx2.fillStyle = '#00d4ff'; ctx2.font = 'bold 12px Malgun Gothic'; ctx2.textBaseline = 'middle';
+let cx = 5;
+headers.forEach((h, i) => { ctx2.fillText(h, cx, 15); cx += colW[i]; });
+cy = 30;
+// Data rows
+rows.forEach(row => {
+    ctx2.strokeRect(0, cy, 500, 30);
+    cx = 5;
+    row.forEach((cell, i) => {
+        ctx2.fillStyle = i === 2 ? (cell.startsWith('+') ? '#ff4444' : '#4488ff') : '#e0e0e0';
+        ctx2.font = '12px Malgun Gothic';
+        ctx2.fillText(cell, cx, cy + 15);
+        cx += colW[i];
+    });
+    cy += 30;
+});
+// Grid lines
+for (let i = 0; i <= rows.length; i++) { ctx2.beginPath(); ctx2.moveTo(0, 30+i*30); ctx2.lineTo(500, 30+i*30); ctx2.stroke(); }
+let lx = 0; colW.forEach(w => { lx += w; ctx2.beginPath(); ctx2.moveTo(lx, 0); ctx2.lineTo(lx, 200); ctx2.stroke(); });
+
+// ── Log ──
+function log(msg) {
+    const ts = new Date().toLocaleTimeString();
+    document.getElementById('result1').textContent = `[${ts}] ${msg}`;
+    document.getElementById('result2').textContent = `[${ts}] ${msg}`;
+    document.getElementById('result3').textContent = `[${ts}] ${msg}`;
+    console.log(`[TEST] ${msg}`);
+}
+
+// ── Popup ──
+function showPopup() {
+    document.getElementById('popup-overlay').style.display = 'flex';
+    log('팝업 표시됨');
+}
+function confirmOrder() {
+    document.getElementById('popup-overlay').style.display = 'none';
+    log('주문 확인 완료!');
+}
+function cancelOrder() {
+    document.getElementById('popup-overlay').style.display = 'none';
+    log('주문 취소');
+}
+function showAlert() { alert('경고: 증거금이 부족합니다!'); log('Alert 닫힘'); }
+</script>
+</body>
+</html>
