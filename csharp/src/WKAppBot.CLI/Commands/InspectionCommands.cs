@@ -719,16 +719,16 @@ internal partial class Program
                 if (a11yDir != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write("  [A11Y] ");
+                    Console.Error.Write("  [A11Y] ");
                     Console.ResetColor();
                     Console.WriteLine(Path.GetRelativePath(Path.GetDirectoryName(profileStore.ProfileDir)!, a11yDir));
                 }
                 if (osDir != null)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkCyan;
-                    Console.Write("  [OS]   ");
+                    Console.Error.Write("  [OS]   ");
                     Console.ResetColor();
-                    Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
+                    Console.Error.WriteLine(Path.GetRelativePath(DataDir, osDir));
 
                     // Recent captures (latest 3)
                     var captures = Directory.GetFiles(osDir, "capture_*.png")
@@ -736,9 +736,9 @@ internal partial class Program
                     if (captures.Length > 0)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.Write("  [CAP]  ");
+                        Console.Error.Write("  [CAP]  ");
                         Console.ResetColor();
-                        Console.WriteLine(string.Join("  ", captures.Select(Path.GetFileName)));
+                        Console.Error.WriteLine(string.Join("  ", captures.Select(Path.GetFileName)));
                     }
 
                     // Recent info files: non-PNG, latest 5 by mtime (filename only)
@@ -748,9 +748,9 @@ internal partial class Program
                     if (infoFiles.Length > 0)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.Write("  [INFO] ");
+                        Console.Error.Write("  [INFO] ");
                         Console.ResetColor();
-                        Console.WriteLine(string.Join("  ", infoFiles.Select(Path.GetFileName)));
+                        Console.Error.WriteLine(string.Join("  ", infoFiles.Select(Path.GetFileName)));
                     }
                 }
             }

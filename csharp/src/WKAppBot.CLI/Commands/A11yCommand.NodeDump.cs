@@ -60,13 +60,13 @@ internal partial class Program
     {
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.Error.WriteLine($"[NODE:BEFORE] action={action}");
         Console.ResetColor();
         PrintNodeDetail(el, hwnd, "  ");
         PrintAncestorChain(el, "  ");
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.ResetColor();
         return CaptureNodeState(el);
     }
@@ -80,7 +80,7 @@ internal partial class Program
     {
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.Error.WriteLine($"[NODE:AFTER]  action={action}  result={(ok ? "OK ✓" : "FAIL ✗")}  elapsed={ms}ms");
         Console.ResetColor();
 
@@ -100,13 +100,13 @@ internal partial class Program
         if (changes.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            foreach (var c in changes) Console.WriteLine($"  ∆ {c}");
+            foreach (var c in changes) Console.Error.WriteLine($"  ∆ {c}");
             Console.ResetColor();
         }
-        else Console.WriteLine("  ∆ (no state change detected)");
+        else Console.Error.WriteLine("  ∆ (no state change detected)");
 
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.ResetColor();
     }
 
@@ -126,7 +126,7 @@ internal partial class Program
     {
         const string sep = "──────────────────────────────────────────────────────────────────────";
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.Error.WriteLine($"[MID-INPUT:ABORT] reason={reason}  context={context}");
         Console.ResetColor();
 
@@ -140,12 +140,12 @@ internal partial class Program
             string fgProc = "?"; try { fgProc = System.Diagnostics.Process.GetProcessById((int)fgPid).ProcessName; } catch { }
             bool same = intendedHwnd != IntPtr.Zero && fg == intendedHwnd;
 
-            Console.WriteLine($"  foreground : 0x{fg.ToInt64():X8}  \"{NdTrunc(fgTitle,55)}\"");
-            Console.WriteLine($"             class={fgClass}  proc={fgProc}({fgPid})");
+            Console.Error.WriteLine($"  foreground : 0x{fg.ToInt64():X8}  \"{NdTrunc(fgTitle,55)}\"");
+            Console.Error.WriteLine($"             class={fgClass}  proc={fgProc}({fgPid})");
             if (intendedHwnd != IntPtr.Zero)
             {
                 Console.ForegroundColor = same ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine($"  intended   : 0x{intendedHwnd.ToInt64():X8}  {(same ? "✓ 포그라운드 일치" : "✗ 포커스 강탈 감지!")}");
+                Console.Error.WriteLine($"  intended   : 0x{intendedHwnd.ToInt64():X8}  {(same ? "✓ 포그라운드 일치" : "✗ 포커스 강탈 감지!")}");
                 Console.ResetColor();
             }
         }
@@ -160,7 +160,7 @@ internal partial class Program
             {
                 var ctlTitle = WindowFinder.GetWindowText(focusedCtlHwnd);
                 var ctlClass = WindowFinder.GetClassName(focusedCtlHwnd);
-                Console.WriteLine($"  [PROP] focused ctl : 0x{focusedCtlHwnd.ToInt64():X8}  \"{NdTrunc(ctlTitle,50)}\"  class={ctlClass}");
+                Console.Error.WriteLine($"  [PROP] focused ctl : 0x{focusedCtlHwnd.ToInt64():X8}  \"{NdTrunc(ctlTitle,50)}\"  class={ctlClass}");
             }
         }
 
@@ -168,10 +168,10 @@ internal partial class Program
         if (actionTarget != null)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("  [action target node (closure — no UIA rescan)]");
+            Console.Error.WriteLine("  [action target node (closure — no UIA rescan)]");
             Console.ResetColor();
             try { PrintNodeDetail(actionTarget, actionElHwnd, "    "); PrintAncestorChain(actionTarget, "    "); }
-            catch (Exception ex) { Console.WriteLine($"    (target node read error: {ex.Message})"); }
+            catch (Exception ex) { Console.Error.WriteLine($"    (target node read error: {ex.Message})"); }
         }
 
         // UIA 수준: 현재 포커스된 노드 + 조상 체인 (프롭 캐시로 충분하면 스킵 가능)
@@ -181,17 +181,17 @@ internal partial class Program
             if (focused != null)
             {
                 Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.WriteLine("  [currently focused UIA node + ancestor chain]");
+                Console.Error.WriteLine("  [currently focused UIA node + ancestor chain]");
                 Console.ResetColor();
                 PrintNodeDetail(focused, fg, "    ");
                 PrintAncestorChain(focused, "    ");
             }
-            else Console.WriteLine("  focused UIA node: (none)");
+            else Console.Error.WriteLine("  focused UIA node: (none)");
         }
-        catch (Exception ex) { Console.WriteLine($"  UIA focus read error: {ex.Message}"); }
+        catch (Exception ex) { Console.Error.WriteLine($"  UIA focus read error: {ex.Message}"); }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine(sep);
+        Console.Error.WriteLine(sep);
         Console.ResetColor();
     }
 
@@ -245,20 +245,20 @@ internal partial class Program
         // 헤더
         Console.ForegroundColor = ConsoleColor.White;
         var nameDisplay = name.Length > 70 ? name[..67] + "..." : name;
-        Console.WriteLine($"{indent}★ [{ct}]  \"{nameDisplay}\"  {(string.IsNullOrEmpty(aid) ? "" : $"aid=\"{aid}\"")}");
+        Console.Error.WriteLine($"{indent}★ [{ct}]  \"{nameDisplay}\"  {(string.IsNullOrEmpty(aid) ? "" : $"aid=\"{aid}\"")}");
         Console.ResetColor();
 
         // 상세
-        Console.WriteLine($"{indent}   type    : {ct}{(string.IsNullOrEmpty(localCt) || localCt == ct ? "" : $" ({localCt})")}  class={cls}");
-        Console.WriteLine($"{indent}   state   : enabled={NdB(enabled)}  offscreen={NdB(offscreen)}  focused={NdB(focused)}  content={NdB(isContent)}  ctrl={NdB(isCtrl)}{(isPassword == true ? "  ⚠ PASSWORD" : "")}");
+        Console.Error.WriteLine($"{indent}   type    : {ct}{(string.IsNullOrEmpty(localCt) || localCt == ct ? "" : $" ({localCt})")}  class={cls}");
+        Console.Error.WriteLine($"{indent}   state   : enabled={NdB(enabled)}  offscreen={NdB(offscreen)}  focused={NdB(focused)}  content={NdB(isContent)}  ctrl={NdB(isCtrl)}{(isPassword == true ? "  ⚠ PASSWORD" : "")}");
         if (rect.HasValue)
         {
             var r = rect.Value;
-            Console.WriteLine($"{indent}   rect    : ({r.X},{r.Y}) {r.Width}×{r.Height}  center=({r.X + r.Width / 2},{r.Y + r.Height / 2})");
+            Console.Error.WriteLine($"{indent}   rect    : ({r.X},{r.Y}) {r.Width}×{r.Height}  center=({r.X + r.Width / 2},{r.Y + r.Height / 2})");
         }
-        Console.WriteLine($"{indent}   process : pid={pid}  name={procName}  hwnd=0x{hwnd.ToInt64():X8}");
-        if (pats.Count > 0) Console.WriteLine($"{indent}   patterns: {string.Join(" | ", pats)}");
-        if (vals.Count > 0) Console.WriteLine($"{indent}   values  : {string.Join("  ", vals)}");
+        Console.Error.WriteLine($"{indent}   process : pid={pid}  name={procName}  hwnd=0x{hwnd.ToInt64():X8}");
+        if (pats.Count > 0) Console.Error.WriteLine($"{indent}   patterns: {string.Join(" | ", pats)}");
+        if (vals.Count > 0) Console.Error.WriteLine($"{indent}   values  : {string.Join("  ", vals)}");
     }
 
     // ── 조상 체인: 타겟 → 메인창 ─────────────────────────────────────────
@@ -291,7 +291,7 @@ internal partial class Program
             var badState = (pEnabled == false ? "  ⚠disabled" : "") + (pRect.HasValue && pRect.Value.IsEmpty ? "  ⚠empty-rect" : "");
 
             Console.ForegroundColor = pCt == "Window" ? ConsoleColor.Gray : ConsoleColor.DarkGray;
-            Console.WriteLine($"{indent}↑{level} [{pCt}]  \"{nameDisplay}\"{aidInfo}{rectInfo}{hwndInfo}{badState}");
+            Console.Error.WriteLine($"{indent}↑{level} [{pCt}]  \"{nameDisplay}\"{aidInfo}{rectInfo}{hwndInfo}{badState}");
             Console.ResetColor();
 
             // Window에 도달하면 중단 (메인창)

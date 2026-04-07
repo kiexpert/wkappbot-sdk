@@ -726,7 +726,7 @@ public sealed class InputReadiness
 
         // ── 프로파일링 출력 ──
         swProbe.Stop();
-        Console.WriteLine($"  [PROF:PROBE] init={msInit}ms zoom={msZoom}ms uia={msUia}ms win32={msWin32}ms send={msSendInput}ms blocker={msBlocker}ms knowhow={msKnowhow}ms yield={msYield}ms TOTAL={swProbe.ElapsedMilliseconds}ms");
+        Console.Error.WriteLine($"  [PROF:PROBE] init={msInit}ms zoom={msZoom}ms uia={msUia}ms win32={msWin32}ms send={msSendInput}ms blocker={msBlocker}ms knowhow={msKnowhow}ms yield={msYield}ms TOTAL={swProbe.ElapsedMilliseconds}ms");
         Console.Out.Flush();
 
         // ── 돋보기 상태 업데이트 ──
