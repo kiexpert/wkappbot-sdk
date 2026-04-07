@@ -58,13 +58,13 @@ internal partial class Program
     static void ShowKnowhowHint(string path, string hint)
     {
         Console.ForegroundColor = ConsoleColor.DarkYellow;
-        Console.WriteLine($"  [KNOWHOW:OS] 💌 No knowhow yet — {hint}");
+        Console.Error.WriteLine($"  [KNOWHOW:OS] 💌 No knowhow yet — {hint}");
         Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("     → Your expertise here saves future Claudes hours of trial-and-error. 🙏");
-        Console.WriteLine("     → Please write what you just learned about this app/action:");
+        Console.Error.WriteLine("     → Your expertise here saves future Claudes hours of trial-and-error. 🙏");
+        Console.Error.WriteLine("     → Please write what you just learned about this app/action:");
         Console.ResetColor();
         Console.ForegroundColor = ConsoleColor.DarkCyan;
-        Console.WriteLine($"        a11y file-write \"{path}\" --text \"## Knowhow\\n- your note here\"");
+        Console.Error.WriteLine($"        a11y file-write \"{path}\" --text \"## Knowhow\\n- your note here\"");
         Console.ResetColor();
     }
 
@@ -112,7 +112,7 @@ internal partial class Program
             File.AppendAllText(appKnowhowPath, appNote);
 
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.WriteLine($"  [FOCUSSTEALER] Knowhow recorded → {actionKnowhowPath}");
+            Console.Error.WriteLine($"  [FOCUSSTEALER] Knowhow recorded → {actionKnowhowPath}");
             Console.ResetColor();
         }
         catch { /* best effort */ }

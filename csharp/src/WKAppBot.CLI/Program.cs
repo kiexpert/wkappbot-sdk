@@ -1541,7 +1541,7 @@ internal partial class Program
                     ? $"knowhow-{actionName.ToLowerInvariant()}.md"
                     : "knowhow.md";
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine($"  [KNOWHOW] 노하우 발견 시 기록 → {Path.Combine(ctrlDir, suggestedFile)}");
+                Console.Error.WriteLine($"  [KNOWHOW] 노하우 발견 시 기록 → {Path.Combine(ctrlDir, suggestedFile)}");
                 Console.ResetColor();
             }
         }
@@ -1613,13 +1613,13 @@ internal partial class Program
             // 출력: [KNOWHOW] (N sections) [title] paragraph...
             Console.ForegroundColor = ConsoleColor.Magenta;
             var countInfo = sectionCount > 1 ? $" ({sectionCount}§)" : "";
-            Console.Write($"  [{tag}]{countInfo} ");
+            Console.Error.Write($"  [{tag}]{countInfo} ");
             Console.ResetColor();
 
             if (!string.IsNullOrEmpty(title))
             {
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"{title}: ");
+                Console.Error.Write($"{title}: ");
                 Console.ResetColor();
             }
 
@@ -1631,12 +1631,12 @@ internal partial class Program
                     l.TrimStart('-', '*', ' ', '\t', '`')));
                 text = System.Text.RegularExpressions.Regex.Replace(text, @"\s{2,}", " ").Trim();
                 if (text.Length > 200) text = text[..197] + "...";
-                Console.WriteLine(text);
+                Console.Error.WriteLine(text);
                 Console.ResetColor();
             }
             else
             {
-                Console.WriteLine();
+                Console.Error.WriteLine();
             }
         }
         catch { /* best-effort */ }
