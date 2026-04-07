@@ -414,6 +414,15 @@ internal partial class Program
                     _lastFocusTheftStack = null;
                     // Immediately restore user focus (fire-and-forget retry)
                     _ = Task.Run(() => RestoreFocusWithRetryAsync((IntPtr)prevFg, $"cdp-theft:{method}", cdp));
+                    // Self-reporting audit: classify theft and file suggest automatically
+                    // Known guarded methods: pre-minimize dance was applied but raced
+                    // Unknown methods: gap in IsFocusStealingMethod coverage -- new vector found
+                    var knownGuarded = new[] { "Page.bringToFront", "Target.activateTarget", "Browser.setWindowBounds" };
+                    var baseMethod = method.Split('[')[0]; // strip [operationContext] suffix
+                    if (knownGuarded.Any(m => baseMethod.StartsWith(m, StringComparison.OrdinalIgnoreCase)))
+                        AutoBugReport($"focus-theft RACE: guarded method '{baseMethod}' still stole focus -- WaitForWindowStateAsync coverage may be incomplete");
+                    else
+                        AutoBugReport($"focus-theft UNGUARDED: '{baseMethod}' not in IsFocusStealingMethod -- apply focusless pattern (SW_SHOWMINNOACTIVE+WaitForWindowState+RestoreChromeNoActivate)");
                 };
 
                 // JS errors → Slack thread (빠른 버그 추적)
