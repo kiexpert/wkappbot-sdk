@@ -727,14 +727,19 @@ public sealed partial class CdpClient
                 ShowWindowNative(hwnd, 8); // SW_SHOWMINNOACTIVE: minimize without activating next window
                 ScheduleMinimizeDump("bring-to-front-tab-switch", hwnd);
                 didMinimize = true;
-                await Task.Delay(50);
+                // Poll until minimized (replaces fixed 50ms delay — Chrome may not be iconic yet)
+                var preWb = await GetWindowForTargetAsync();
+                if (preWb != null)
+                    await WaitForWindowStateAsync(preWb.Value.windowId, "minimized", timeoutMs: 1000);
             }
             await SendAsync("Page.bringToFront");
-            // Restore after tab switch settles
+            // Restore after tab switch — poll until normal (replaces fixed 200ms delay)
             if (didMinimize)
             {
-                await Task.Delay(200);
                 RestoreChromeNoActivate();
+                var postWb = await GetWindowForTargetAsync();
+                if (postWb != null)
+                    await WaitForWindowStateAsync(postWb.Value.windowId, "normal", timeoutMs: 1000);
             }
         }
     }
