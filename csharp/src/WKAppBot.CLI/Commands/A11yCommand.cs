@@ -767,21 +767,6 @@ internal partial class Program
 
             if (isElementAction)
             {
-                // ── CDP Tab List: browser target + no #scope + read/inspect → show tabs ──
-                if (string.IsNullOrEmpty(uiaPath) && action is "read" or "find" or "inspect")
-                {
-                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint tabPid);
-                    if (WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)tabPid))
-                    {
-                        var tabPort = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)tabPid);
-                        if (tabPort > 0)
-                        {
-                            success = CdpListTabs(tabPort, tag);
-                            if (success) ok++; else fail++;
-                            continue;
-                        }
-                    }
-                }
 
                 // Pre-check: only attempt ANY CDP path if process has --remote-debugging-port open.
                 // Prevents VS Code / non-CDP browsers from eval JS, telepathy, or minimize entirely.

@@ -346,35 +346,6 @@ internal partial class Program
         }
     }
 
-    /// <summary>List all CDP tabs for a browser target (when no #scope specified).</summary>
-    static bool CdpListTabs(int port, string tag)
-    {
-        try
-        {
-            using var cdp = new WKAppBot.WebBot.CdpClient();
-            cdp.ConnectAsync(port).GetAwaiter().GetResult();
-            var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
-
-            Console.WriteLine($"[A11Y] {tag} — {tabs.Count} tab(s):");
-            for (int i = 0; i < tabs.Count; i++)
-            {
-                var t = tabs[i];
-                var active = t.Id == cdp.TargetId ? " ★" : "";
-                Console.WriteLine($"  [{i + 1}] {t.Title[..Math.Min(t.Title.Length, 60)]}{active}");
-                Console.WriteLine($"      {t.Url[..Math.Min(t.Url.Length, 80)]}");
-            }
-            Console.WriteLine();
-            Console.WriteLine("[A11Y] Use #tab-hint to target a specific tab:");
-            Console.WriteLine($"  a11y read \"{tag}#chatgpt.com\" --eval-js \"document.title\"");
-            return tabs.Count > 0;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[A11Y] CDP tab list error: {ex.Message}");
-            return false;
-        }
-    }
-
     /// <summary>Inject shared a11y JS helpers into the page (idempotent).</summary>
     static void InjectA11yJsHelpers(WKAppBot.WebBot.CdpClient cdp)
     {
