@@ -295,6 +295,7 @@ Examples:
   wkappbot agent gemini ""continue"" --agent-id myjob       # resume same named session
   wkappbot agent claude ""plan"" --triad --fresh            # new session + triad hints
 ");
+        PrintRelatedSkills("agent");
         return 1;
     }
 }

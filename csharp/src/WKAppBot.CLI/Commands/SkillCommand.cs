@@ -655,6 +655,53 @@ internal partial class Program
         return issues;
     }
 
+    /// <summary>
+    /// Print skills related to a command at the end of help/usage output.
+    /// Matches by tag == command, id starts with command, or title contains command.
+    /// </summary>
+    internal static void PrintRelatedSkills(string command, int limit = 4)
+    {
+        try
+        {
+            var cmd = command.ToLowerInvariant();
+            var skills = LoadAllSkills()
+                .Select(s => (skill: s, score: SkillRelevanceScore(s, cmd)))
+                .Where(x => x.score >= 5)   // minimum threshold: must have at least tag match or id-prefix
+                .OrderByDescending(x => x.score)
+                .Take(limit)
+                .Select(x => x.skill)
+                .ToList();
+
+            if (skills.Count == 0) return;
+
+            Console.WriteLine();
+            Console.WriteLine($"Skills: (use 'wkappbot skill show <id>' for full detail)");
+            foreach (var s in skills)
+                Console.WriteLine($"  • {s.Title}  [{s.Id}]");
+        }
+        catch { /* never break usage output */ }
+    }
+
+    static int SkillRelevanceScore(SkillRecord s, string cmd)
+    {
+        int score = 0;
+        if (s.Tags?.Any(t => t.Equals(cmd, StringComparison.OrdinalIgnoreCase)) ?? false) score += 10;
+        if (s.Id.StartsWith(cmd + "-", StringComparison.OrdinalIgnoreCase))  score += 6;
+        if (s.Id.Contains(cmd, StringComparison.OrdinalIgnoreCase))           score += 3;
+        if (s.Title.Contains(cmd, StringComparison.OrdinalIgnoreCase))        score += 2;
+        // also match common aliases/related terms
+        score += cmd switch {
+            "a11y"    => (s.Tags?.Any(t => t is "uia" or "win32" or "automation") ?? false) ? 2 : 0,
+            "ask"     => (s.Tags?.Any(t => t is "gpt" or "gemini" or "triad" or "delegation") ?? false) ? 2 : 0,
+            "web"     => (s.Tags?.Any(t => t is "cdp" or "http" or "fetch") ?? false) ? 1 : 0,
+            "eye"     => (s.Tags?.Any(t => t is "mcp" or "daemon" or "hotswap") ?? false) ? 2 : 0,
+            "logcat"  => (s.Tags?.Any(t => t is "log" or "tail") ?? false) ? 1 : 0,
+            "suggest" => (s.Tags?.Any(t => t is "workflow" or "bug" or "resolve") ?? false) ? 1 : 0,
+            _         => 0,
+        };
+        return score;
+    }
+
     static string FormatAge(DateTime dt)
     {
         var age = DateTime.UtcNow - dt.ToUniversalTime();
@@ -710,6 +757,7 @@ internal partial class Program
         Console.WriteLine("    --refs \"csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs::TaskCanceledException\"");
         Console.WriteLine("  wkappbot skill install           # deploy to HQ after publish");
         Console.WriteLine("  wkappbot skill delete test-skill");
+        PrintRelatedSkills("skill");
         return 0;
     }
 }

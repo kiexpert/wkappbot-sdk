@@ -837,6 +837,7 @@ Examples:
   wkappbot file grep ""static int.*Command"" --path W:/GitHub/WKAppBot/csharp --type cs
   wkappbot file glob ""**/*.cs"" --path W:/GitHub/WKAppBot/csharp/src
 ");
+        PrintRelatedSkills("file");
         return 1;
     }
 }

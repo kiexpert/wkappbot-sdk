@@ -137,6 +137,7 @@ Options:
   --timeout N  Timeout in ms for wait commands (default: 5000)
   -o <file>    Output file path (for screenshot/html)
 ");
+        PrintRelatedSkills("web");
         return 0;
     }
 
