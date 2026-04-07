@@ -4,19 +4,13 @@
   "title": "Skill Authoring Rules \u002B Contribute \u0026 Edit Workflow",
   "desc": "[RULE] ALL skill content (title/desc/steps/tags) MUST be in English -- Korean uses 2-3x tokens. Create, update, and partially edit wkappbot skills. contribute = create or full-update. edit = partial update (title/desc/tags/steps only). Auto version-bumped on every save.",
   "steps": [
-    "0. [RULE] Write ALL skill content in English only -- Korean wastes 2-3x tokens and bloats context for every AI reading the skill.",
-    "1. CREATE: wkappbot skill contribute --app X --title \u0022Title\u0022 --desc \u0022Desc\u0022 --steps \u0022s1",
-    "s2\u0022 --tags \u0022t1,t2\u0022",
-    "2. UPDATE (full): wkappbot skill contribute --app X --title \u0022...\u0022 --desc \u0022...\u0022 --id existing-id",
-    "3. EDIT title: wkappbot skill edit \u003Cid\u003E --title \u0022New Title\u0022 (other fields preserved)",
-    "4. EDIT desc: wkappbot skill edit \u003Cid\u003E --desc \u0022New description\u0022",
-    "5. EDIT steps: wkappbot skill edit \u003Cid\u003E --steps \u0022step1",
+    "0. [RULE] Write ALL skill content in English only -- Korean wastes 2-3x tokens and bloats context for every AI reading the skill.\n1. CREATE: wkappbot skill contribute --app X --title \u0022Title\u0022 --desc \u0022Desc\u0022 --steps \u0022s1",
+    "s2\u0022 --tags \u0022t1,t2\u0022\n   NOTE: use ",
+    " as step separator in --steps. Do NOT use ",
+    " inside step text -- it will be split as a new step.\n2. UPDATE (full): wkappbot skill contribute --app X --title \u0022...\u0022 --desc \u0022...\u0022 --id existing-id\n3. EDIT title: wkappbot skill edit \u003Cid\u003E --title \u0022New Title\u0022 (other fields preserved)\n4. EDIT desc: wkappbot skill edit \u003Cid\u003E --desc \u0022New description\u0022\n5. EDIT steps: wkappbot skill edit \u003Cid\u003E --steps \u0022step1",
     "step2",
-    "step3\u0022",
-    "6. RENAME slug: wkappbot skill delete \u003Cold-id\u003E \u0026\u0026 contribute --id \u003Cnew-slug\u003E ...",
-    "7. VERIFY refs: wkappbot skill verify \u003Cid\u003E",
-    "8. AUDIT all: wkappbot skill audit",
-    "9. Auto-install: skills/ -\u003E HQ on every publish (skill install runs in build)"
+    "step3\u0022\n6. RENAME slug: wkappbot skill delete \u003Cold-id\u003E \u0026\u0026 contribute --id \u003Cnew-slug\u003E ...\n7. VERIFY refs: wkappbot skill verify \u003Cid\u003E\n8. AUDIT all: wkappbot skill audit\n9. Auto-install: skills/ -\u003E HQ on every publish (skill install runs in build)\nNEVER: Do NOT edit .skill.json files directly with Edit/Write tools. Reasons: (1) ",
+    " in content splits steps wrongly, (2) unicode escapes corrupt Korean, (3) version bump skipped, (4) source_refs schema differs. ALWAYS use skill contribute or skill edit commands."
   ],
   "tags": [
     "skill",
@@ -30,6 +24,6 @@
   "source_refs": null,
   "author": "claude",
   "created": "2026-04-07T09:12:14.1021825Z",
-  "updated": "2026-04-07T09:12:14.1022085Z",
-  "version": "1.0"
+  "updated": "2026-04-07T17:38:51.8754763Z",
+  "version": "1.2"
 }
