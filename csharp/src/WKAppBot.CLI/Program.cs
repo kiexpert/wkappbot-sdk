@@ -433,6 +433,13 @@ internal partial class Program
                 var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
                 if (exit == -1)
                 {
+                    // Retry once — pipe may have appeared but server wasn't listening yet
+                    Console.Error.WriteLine("[SUDO] Proxy communication failed — retrying in 500ms...");
+                    Thread.Sleep(500);
+                    exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
+                }
+                if (exit == -1)
+                {
                     Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed");
                     return 1;
                 }
