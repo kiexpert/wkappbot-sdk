@@ -821,9 +821,9 @@ internal partial class Program
             // Guard: if stderr was written but exitCode=0, that's a bug — report + override.
             if (_errScope != null)
             {
-                bool hadErrors = _errScope.HasErrors;
+                bool errorDetected = _errScope.ErrorDetected;
                 _errScope.Finalize(exitCode != 0); // restore stderr
-                if (hadErrors && exitCode == 0)
+                if (errorDetected && exitCode == 0)
                 {
                     // Stderr output with successful exit — caller swallowed an error
                     AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr — error suppressed");

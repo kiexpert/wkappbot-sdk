@@ -55,6 +55,8 @@ internal partial class Program
         /// Finalize: restore stderr. Returns timestamped error log if isError, empty if success.
         /// </summary>
         public bool HasErrors => _capture.Entries.Count > 0;
+        /// <summary>True if an error-like message was detected (passthrough mode was triggered).</summary>
+        public bool ErrorDetected => _capture.ErrorDetected;
 
         public string Finalize(bool isError)
         {
@@ -86,6 +88,7 @@ internal partial class Program
             readonly StringBuilder _line = new();
             public readonly List<(long relMs, string msg)> Entries = new();
             bool _passthrough = false;
+            public bool ErrorDetected => _passthrough;
 
             public ErrorCapture(TextWriter inner) => _inner = inner;
             public override Encoding Encoding => _inner.Encoding;
