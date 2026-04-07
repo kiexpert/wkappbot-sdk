@@ -1,7 +1,7 @@
 {
   "id": "wkedit",
   "app": "wkappbot-workflow",
-  "title": "wkedit \u2014 Encoding-Safe Regex Bulk Edit with Backup \u0026 Undo",
+  "title": "wkedit \u2014 Bulk Transaction Edit (Regex, Multi-File, Backup \u0026 Undo)",
   "desc": "wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits \u2014 saves tokens, prevents CP949 corruption.",
   "steps": [
     "[WHEN-TO-USE] Prefer wkedit for: (1) regex bulk substitution across a file, (2) multi-occurrence replace, (3) any edit on CP949/EUC-KR files. Avoid sed/awk \u2014 they ignore encoding and corrupt Korean source. Avoid Python one-liners \u2014 they waste tokens and miss edge cases.",
