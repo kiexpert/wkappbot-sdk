@@ -76,6 +76,15 @@ internal sealed class WhisperRingWindow : Window
     private static readonly SolidColorBrush ModeBrushQuiet = new(Color.FromRgb(0x55, 0x55, 0x66));
     private static readonly SolidColorBrush ModeBrushNoise = new(Color.FromRgb(0xFF, 0x66, 0x44));
 
+    // Cached per-frame mutable brushes — reuse instead of new() every frame to prevent WPF GC pressure
+    private readonly SolidColorBrush[] _arcStrokeBrushes = new SolidColorBrush[BandCount];
+    private readonly SolidColorBrush _pointerStrokeBrush = new(Colors.White);
+    private readonly SolidColorBrush _pointerDotBrush = new(Colors.White);
+    private readonly SolidColorBrush _coreDotBrush = new(Color.FromRgb(0x44, 0xFF, 0x88));
+    private RadialGradientBrush? _coreGlowBrush;
+    private readonly SolidColorBrush _tokenTextBrush = new(Color.FromRgb(0x33, 0xCC, 0xFF));
+    private readonly SolidColorBrush _sttTextBrush = new(Color.FromRgb(0x33, 0xCC, 0xFF));
+
     static WhisperRingWindow()
     {
         ModeBrushVoice.Freeze();
@@ -123,14 +132,19 @@ internal sealed class WhisperRingWindow : Window
         Canvas.SetTop(bgCircle, cy - RingRadius - 4);
         _canvas.Children.Add(bgCircle);
 
+        // Init cached per-frame brushes (one per band arc)
+        for (int i = 0; i < BandCount; i++)
+            _arcStrokeBrushes[i] = new SolidColorBrush(BandColors[i]);
+
         // Core glow (pulsing center dot)
+        _coreGlowBrush = new RadialGradientBrush(
+            Color.FromArgb(0x44, 0x44, 0xFF, 0x88),
+            Color.FromArgb(0x00, 0x44, 0xFF, 0x88));
         _coreGlow = new WpfEllipse
         {
             Width = 28,
             Height = 28,
-            Fill = new RadialGradientBrush(
-                Color.FromArgb(0x44, 0x44, 0xFF, 0x88),
-                Color.FromArgb(0x00, 0x44, 0xFF, 0x88)),
+            Fill = _coreGlowBrush,
         };
         Canvas.SetLeft(_coreGlow, cx - 14);
         Canvas.SetTop(_coreGlow, cy - 14);
@@ -140,7 +154,7 @@ internal sealed class WhisperRingWindow : Window
         {
             Width = 8,
             Height = 8,
-            Fill = new SolidColorBrush(Color.FromRgb(0x44, 0xFF, 0x88)),
+            Fill = _coreDotBrush,
         };
         Canvas.SetLeft(_coreDot, cx - 4);
         Canvas.SetTop(_coreDot, cy - 4);
@@ -173,11 +187,14 @@ internal sealed class WhisperRingWindow : Window
             _ghostAge[g] = 1.0; // start fully aged (invisible)
         }
 
+        _pointerStrokeBrush.Color = Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF);
+        _pointerDotBrush.Color = Color.FromRgb(0xFF, 0xFF, 0xFF);
+
         // Current pointer — all sounds (white, on top of ghosts)
         _pointer = new System.Windows.Shapes.Line
         {
             X1 = cx, Y1 = cy, X2 = cx, Y2 = cy,
-            Stroke = new SolidColorBrush(Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF)),
+            Stroke = _pointerStrokeBrush,
             StrokeThickness = 2,
             StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round,
@@ -188,7 +205,7 @@ internal sealed class WhisperRingWindow : Window
         _pointerDot = new WpfEllipse
         {
             Width = 6, Height = 6,
-            Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)),
+            Fill = _pointerDotBrush,
             Opacity = 0,
         };
         _pointerLayer.Children.Add(_pointerDot);
@@ -233,10 +250,11 @@ internal sealed class WhisperRingWindow : Window
         double arcSpan = (360.0 - BandCount * GapAngle) / BandCount;
         for (int i = 0; i < BandCount; i++)
         {
+            _arcStrokeBrushes[i].Color = Color.FromArgb(0x66, BandColors[i].R, BandColors[i].G, BandColors[i].B);
             var path = new WpfPath
             {
                 StrokeThickness = 3, // minimum visible thickness
-                Stroke = new SolidColorBrush(Color.FromArgb(0x66, BandColors[i].R, BandColors[i].G, BandColors[i].B)),
+                Stroke = _arcStrokeBrushes[i],
                 StrokeStartLineCap = PenLineCap.Round,
                 StrokeEndLineCap = PenLineCap.Round,
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -273,7 +291,7 @@ internal sealed class WhisperRingWindow : Window
         _tokenText = new TextBlock
         {
             Text = "00000000",
-            Foreground = new SolidColorBrush(Color.FromRgb(0x99, 0x99, 0xAA)),
+            Foreground = _tokenTextBrush,
             FontFamily = new FontFamily("Consolas"),
             FontSize = 9,
             TextAlignment = TextAlignment.Center,
@@ -404,7 +422,7 @@ internal sealed class WhisperRingWindow : Window
             // Color intensity: dim when low, bright when high
             byte alpha = (byte)(0x44 + (int)(energy * 0xBB));
             var color = BandColors[i];
-            _arcPaths[i].Stroke = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
+            _arcStrokeBrushes[i].Color = Color.FromArgb(alpha, color.R, color.G, color.B);
 
             // Glow intensity
             if (_arcPaths[i].Effect is System.Windows.Media.Effects.DropShadowEffect glow)
@@ -460,11 +478,11 @@ internal sealed class WhisperRingWindow : Window
             for (int i = 1; i < BandCount && i < levels.Length; i++)
                 if (levels[i] > levels[domBand]) domBand = i;
             var pColor = BandColors[domBand];
-            _pointer.Stroke = new SolidColorBrush(Color.FromArgb(0xCC, pColor.R, pColor.G, pColor.B));
+            _pointerStrokeBrush.Color = Color.FromArgb(0xCC, pColor.R, pColor.G, pColor.B);
 
             Canvas.SetLeft(_pointerDot, tipX - 3);
             Canvas.SetTop(_pointerDot, tipY - 3);
-            _pointerDot.Fill = new SolidColorBrush(pColor);
+            _pointerDotBrush.Color = pColor;
 
             _pointer.Opacity = 0.7 + magnitude * 0.3;
             _pointerDot.Opacity = 1.0;
@@ -559,14 +577,11 @@ internal sealed class WhisperRingWindow : Window
             "LOUD" => Color.FromRgb(0xFF, 0x22, 0x22),  // bright red = too loud for whisper
             _ => Color.FromRgb(0x44, 0x44, 0x55),
         };
-        _coreDot.Fill = new SolidColorBrush(coreColor);
-        (_coreGlow.Fill as RadialGradientBrush)?.GradientStops.Clear();
-        if (_coreGlow.Fill is RadialGradientBrush rg)
+        _coreDotBrush.Color = coreColor;
+        if (_coreGlowBrush != null)
         {
-            rg = new RadialGradientBrush(
-                Color.FromArgb(0x44, coreColor.R, coreColor.G, coreColor.B),
-                Color.FromArgb(0x00, coreColor.R, coreColor.G, coreColor.B));
-            _coreGlow.Fill = rg;
+            _coreGlowBrush.GradientStops[0].Color = Color.FromArgb(0x44, coreColor.R, coreColor.G, coreColor.B);
+            _coreGlowBrush.GradientStops[1].Color = Color.FromArgb(0x00, coreColor.R, coreColor.G, coreColor.B);
         }
 
         // Recent sound codes — RLE trail (stored as "1 176 .. 362", display-normalized to "1-176 362")
@@ -588,14 +603,16 @@ internal sealed class WhisperRingWindow : Window
         {
             var clockTrail = display.Length > 24 ? display[(display.Length - 24)..] : display;
             _tokenText.Text = clockTrail;
-            _tokenText.Foreground = mode == "WHSPR"
-                ? new SolidColorBrush(Color.FromRgb(0x88, 0xFF, 0xBB))
-                : new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+            _tokenTextBrush.Color = mode == "WHSPR"
+                ? Color.FromRgb(0x88, 0xFF, 0xBB)
+                : Color.FromRgb(0x33, 0xCC, 0xFF);
+            _tokenText.Foreground = _tokenTextBrush;
         }
         else
         {
             _tokenText.Text = DateTime.Now.ToString("HH:mm");
-            _tokenText.Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x66));
+            _tokenTextBrush.Color = Color.FromRgb(0x55, 0x55, 0x66);
+            _tokenText.Foreground = _tokenTextBrush;
         }
 
         // Bottom bar: full trail with tween scroll — slow start, accelerate when queued
@@ -656,7 +673,8 @@ internal sealed class WhisperRingWindow : Window
         {
             // No active STT → always show live clock
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
-            _sttText.Foreground = new SolidColorBrush(Color.FromRgb(0x33, 0xCC, 0xFF));
+            _sttTextBrush.Color = Color.FromRgb(0x33, 0xCC, 0xFF);
+            _sttText.Foreground = _sttTextBrush;
             _sttText.Opacity = mode == "QUIET" ? 0.7 : 0.5;
         }
         // else: keep last STT text as-is

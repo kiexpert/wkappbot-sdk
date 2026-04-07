@@ -18,8 +18,11 @@ internal partial class Program
     {
         try
         {
-            // Detect CDP port from the owning process
+            // Detect CDP port from the owning process — browsers only.
+            // Non-browser Electron apps (VS Code…) also expose CDP but must NOT be treated as browsers.
             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            if (!WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)pid))
+                return null; // Not a browser — skip CDP entirely
             var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
             if (port <= 0)
             {
@@ -36,6 +39,9 @@ internal partial class Program
             var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
             bool tabFound = false;
 
+            // Read-only actions don't need focus — skip browser minimize during tab switch.
+            bool readOnly = action is "read" or "find" or "inspect" or "highlight" or "ocr" or "screenshot";
+
             // Priority 1: if scope looks like URL (contains localhost, http, .com, :port) → match by URL
             bool scopeIsUrl = cssSelector.Contains("localhost", StringComparison.OrdinalIgnoreCase)
                 || cssSelector.Contains("http", StringComparison.OrdinalIgnoreCase)
@@ -48,7 +54,7 @@ internal partial class Program
                     {
                         Console.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" → {tab.Url[..Math.Min(60, tab.Url.Length)]}");
                         if (tab.Id != cdp.TargetId)
-                            cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                            cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                         tabFound = true;
                         break;
                     }
@@ -67,7 +73,7 @@ internal partial class Program
                             windowTitle.Contains(tab.Title, StringComparison.OrdinalIgnoreCase))
                         {
                             if (tab.Id != cdp.TargetId)
-                                cdp.SwitchToTargetAsync(tab.Id, port).GetAwaiter().GetResult();
+                                cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                             break;
                         }
                     }
