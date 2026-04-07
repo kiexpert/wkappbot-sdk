@@ -1,21 +1,24 @@
 {
   "id": "autoheal-userinput-protection",
   "app": "wkappbot-core",
-  "title": "AutoHeal - User Input Protection: Focusless-First \u002B Focus Theft Recovery",
+  "title": "AutoHeal - User Input Protection: Focusless-First + Focus Theft Recovery",
   "desc": "[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. PHILOSOPHY: focusless-first is the PRIMARY goal. Recovery is safety net only. SELF-IMPROVING: bugs auto-report via suggest, triad dialectic resolves gaps, skill accumulates knowhow. LIVING DOCUMENT: check suggest list periodically.",
   "steps": [
     "0. [RULE] ALL skill steps/desc/tags must be English only -- token efficiency.",
     "1. [PHILOSOPHY] Focusless-first: every CDP action should never need OS foreground. Recovery = safety net. Priority: (1) focusless design, (2) recovery as backstop.",
-    "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor\u002Bnotify only.",
+    "2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor+notify only.",
     "3. [MANDATORY] ALL restore paths go through InputReadiness.Probe(SkipBlocker/Knowhow/Zoom=true, AutoApproveYield=true).",
-    "4. [FOCUSLESS PATTERN] (a) check visibilityState=visible-\u003Eskip, (b) SW_SHOWMINNOACTIVE(8), (c) WaitForWindowStateAsync(\u0027minimized\u0027), (d) CDP call, (e) RestoreChromeNoActivate SW(4), (f) WaitForWindowStateAsync(\u0027normal\u0027). Ref: SwitchToTargetAsync, BringToFrontAsync.",
+    "4. [FOCUSLESS PATTERN] Preferred: (0) Emulation.setFocusEmulationEnabled(true) -- CDP emulates tab focused WITHOUT OS foreground, no SW minimize needed. Fallback SW pattern: (a) check visibilityState=visible->skip, (b) SW_SHOWMINNOACTIVE(8), (c) WaitForWindowStateAsync('minimized', timeout=1000), (d) CDP call, (e) RestoreChromeNoActivate SW(4), (f) WaitForWindowStateAsync('normal', timeout=1000). DEGRADED: if (c) or (f) times out, skip SW step, proceed CDP-only. Ref: SwitchToTargetAsync, BringToFrontAsync.",
     "5. [DEVICE INSERTION = SELF-REPORTING] Insert AutoBugReport at every theft detection point. OnFocusTheft classifies UNGUARDED vs RACE and files suggest automatically.",
-    "6. [SELF-IMPROVING LOOP] Bug detected -\u003E suggest filed -\u003E wkappbot ask triad (share skill content \u002B ask for analysis) -\u003E triad dialectic (thesis/antithesis/synthesis) -\u003E code fix -\u003E skill update -\u003E suggest resolve with evidence script. Triad learns from skill history; skill accumulates triad insights. Loop repeats.",
-    "7. [OPERATIONAL] Logs: runtime/cdp-focus-risk.jsonl, runtime/cdp-minimize-watchdog.jsonl. Periodic: wkappbot suggest list -\u003E review CDP theft reports -\u003E ask triad if unclear -\u003E fix -\u003E resolve.",
+    "6. [SELF-IMPROVING LOOP] Bug detected -> suggest filed -> wkappbot ask triad (share skill content + ask for analysis) -> triad dialectic (thesis/antithesis/synthesis) -> code fix -> skill update -> suggest resolve with evidence script. Triad learns from skill history; skill accumulates triad insights. Loop repeats.",
+    "7. [OPERATIONAL] Logs: runtime/cdp-focus-risk.jsonl, runtime/cdp-minimize-watchdog.jsonl. Periodic: wkappbot suggest list -> review CDP theft reports -> ask triad if unclear -> fix -> resolve.",
     "8. [INVESTIGATION] When theft: (a) which action, (b) CDP method, (c) IsFocusStealingMethod()?, (d) SW=8?, (e) WaitForWindowState not delay?, (f) OnFocusTheft restores?",
-    "9. [DONE] SW(6)-\u003ESW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground\u002BRestoreRetry\u002BAutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync \uB3D9\uC758.",
-    "10. [TODO] GPT/Claude ask flows: same prevFgHint\u002BStartFocusWatchdog pattern not yet applied",
-    "11. [TODO] Runtime.evaluate JS .focus() bypass: largest residual risk -- IsFocusRiskExpression detects but does not block"
+    "9. [DONE] SW(6)->SW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground+RestoreRetry+AutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync consent.",
+    "10. [TODO] GPT/Claude ask flows: same prevFgHint+StartFocusWatchdog pattern not yet applied (TODO-10).",
+    "11. [TODO -> SOLUTION] Runtime.evaluate JS .focus() bypass (TODO-11): use Page.addScriptToEvaluateOnNewDocument to monkey-patch HTMLElement.prototype.focus with window.__appbot_lock_focus flag. Set true before CDP input, false after. Also patch window.focus(). window.__appbot_lock_focus toggle via Runtime.evaluate.",
+    "12. [GAPS FROM TRIAD v1.16] (A) prevFg must be per-CDP-action scoped, not global -- re-capture before each action in GPT/Claude flows too. (B) WaitForWindowStateAsync timeout -> degraded CDP-only path (implemented in step 4). (C) Emulation.setFocusEmulationEnabled(true) preferred over SW pattern -- added to step 4. (D) Multi-tab concurrent CDP: prevFg collision in triad mode -- needs per-tab/per-run scoping. (E) IsFocusStealingMethod blacklist: Input.dispatchKeyEvent/MouseEvent can steal focus on some Chrome versions -- verify blacklist completeness. (F) Async layout reflow: page may steal focus after RestoreChromeNoActivate if AJAX/render completes post-restore. (G) SPA autofocus/IntersectionObserver: DOM visibility triggers .focus() -- blocked by TODO-11 solution. (H) OS Toast/Permission prompts: CDP window-state management cannot suppress OS-level focus -- accept+log only.",
+    "13. [TODO] Implement Emulation.setFocusEmulationEnabled(true/false) in EnsureCdpReadyAsync and BringToFrontAsync as primary focusless mechanism. Test: Chrome 112+.",
+    "14. [TODO] Scope prevFg per-CDP-run in GPT/Claude ask flows (Gap-D). Use AsyncLocal<IntPtr> or pass as parameter to avoid triad-mode collision."
   ],
   "tags": [
     "focus",
@@ -65,14 +68,14 @@
       "note": null
     },
     {
-      "file": "EnsureCdpReadyAsync",
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
       "line": null,
-      "pattern": null,
+      "pattern": "EnsureCdpReadyAsync",
       "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T08:50:15.2810138Z",
-  "updated": "2026-04-07T09:37:35.8233958Z",
-  "version": "1.15"
+  "updated": "2026-04-07T09:52:00.0000000Z",
+  "version": "1.16"
 }

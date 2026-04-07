@@ -291,7 +291,16 @@ internal partial class Program
             // Restore Chrome (SW_SHOWNOACTIVATE) so renderer is active for input
             // without stealing OS focus from the user's current window.
             if (action is "input-cdp" or "send" or "type")
+            {
                 cdp.RestoreChromeNoActivate();
+                // TODO-13: Emulate tab focused at CDP level (Emulation.setFocusEmulationEnabled).
+                // Chrome accepts input events as if focused without OS foreground --SW(8) dance becomes optional.
+                await cdp.EmulateActiveTabAsync();
+                // TODO-11: Inject JS focus-lock monkey-patch (once per tab) and lock before input.
+                // Prevents JS .focus() / window.focus() from stealing OS foreground during CDP send.
+                await cdp.InjectFocusLockScriptAsync();
+                await cdp.SetFocusLockAsync(true);
+            }
 
             Console.WriteLine($"[AAR:CDP] Ready: {action}");
             return (true, prevFg, zoom);
@@ -328,6 +337,8 @@ internal partial class Program
             // Kick off async retry restore (fire-and-forget from sync context)
             Task.Run(() => RestoreFocusWithRetryAsync(prevFg, $"guard-{action}", cdp));
         }
+        // Unlock JS focus() so page resumes normal keyboard navigation after send
+        _ = cdp.SetFocusLockAsync(false);
     }
 
     /// <summary>

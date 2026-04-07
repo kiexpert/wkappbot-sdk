@@ -113,4 +113,79 @@ public sealed partial class CdpClient
         // Only actual focus-theft events (in SendAsync post-check) are logged now.
         return Task.CompletedTask;
     }
+
+    // ── JS Focus Lock (TODO-11): monkey-patch HTMLElement.focus() to block OS-focus theft ──
+    // Guard: window.__appbot_lock_focus = true → focus() calls use preventScroll only (no OS activation).
+    // Inject once per tab; toggle around CDP input operations.
+
+    private bool _focusLockInjected;
+
+    /// <summary>
+    /// Inject JS focus-lock monkey-patch into this tab.
+    /// Uses Page.addScriptToEvaluateOnNewDocument (future navigations) + Runtime.evaluate (existing context).
+    /// GPT insight: runImmediately flag applies to already-open tabs (sandbox singleton reuse case).
+    /// </summary>
+    public async Task InjectFocusLockScriptAsync()
+    {
+        if (_focusLockInjected) return;
+        _focusLockInjected = true;
+        const string script = """
+            (function() {
+                if (window.__appbot_focus_guard_installed) return;
+                window.__appbot_focus_guard_installed = true;
+                window.__appbot_lock_focus = false;
+                const _origFocus = HTMLElement.prototype.focus;
+                HTMLElement.prototype.focus = function(opts) {
+                    if (window.__appbot_lock_focus) {
+                        // Preserve DOM focus state (scroll/selection) without OS activation
+                        _origFocus.call(this, { preventScroll: true });
+                        return;
+                    }
+                    _origFocus.call(this, opts);
+                };
+                const _origWinFocus = window.focus;
+                window.focus = function() {
+                    if (window.__appbot_lock_focus) return;
+                    _origWinFocus && _origWinFocus.call(window);
+                };
+            })();
+            """;
+        // Future navigations in this frame/iframes
+        try
+        {
+            await SendAsync("Page.addScriptToEvaluateOnNewDocument", new JsonObject
+            {
+                ["source"] = script,
+                ["runImmediately"] = true  // Apply to existing contexts (sandbox tab reuse)
+            });
+        }
+        catch { }
+        // Existing context (already-loaded tab)
+        try
+        {
+            await SendAsync("Runtime.evaluate", new JsonObject
+            {
+                ["expression"] = script,
+                ["silent"] = true
+            });
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Toggle focus lock on/off for the current tab.
+    /// Set true before CDP input operations, false after.
+    /// </summary>
+    public async Task SetFocusLockAsync(bool locked)
+    {
+        try
+        {
+            await SendAsync("Runtime.evaluate", new JsonObject
+            {
+                ["expression"] = locked ? "window.__appbot_lock_focus = true;" : "window.__appbot_lock_focus = false;",
+                ["silent"] = true
+            });
+        }
+        catch { }
+    }
 }
