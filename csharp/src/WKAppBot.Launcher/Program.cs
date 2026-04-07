@@ -45,9 +45,9 @@ partial class Program
     // WKAPPBOT_PROFILE=1 support — static so RunCore() can log too
     static readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
     static readonly bool _prof = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
-    // Prof: always outputs if stderr is redirected (piped to log), or if WKAPPBOT_PROFILE=1
+    // Prof: only outputs when WKAPPBOT_PROFILE=1 (was: also on stderr redirect, but that fires in every bash pipe)
     static readonly bool _stderrRedirected = Console.IsErrorRedirected;
-    static void Prof(string label) { if (_prof || _stderrRedirected) try { Console.Error.WriteLine($"[LAUNCHER] {_sw.ElapsedMilliseconds}ms {label}"); } catch { } }
+    static void Prof(string label) { if (_prof) try { Console.Error.WriteLine($"[LAUNCHER] {_sw.ElapsedMilliseconds}ms {label}"); } catch { } }
 
     [STAThread]
     static int Main(string[] args)
