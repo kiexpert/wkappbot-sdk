@@ -41,7 +41,15 @@ internal partial class Program
     /// </summary>
     static void RunOcrWorker(HackWorkerContext ctx, Func<bool> shouldAbort)
     {
-        using var ocr = new SimpleOcrAnalyzer();
+        SimpleOcrAnalyzer ocr;
+        try { ocr = new SimpleOcrAnalyzer(); }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[OCR] unavailable (skipping): {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
+
+        using var _ = ocr;
 
         // OcrCorrectionDb
         OcrCorrectionDb? correctionDb = null;

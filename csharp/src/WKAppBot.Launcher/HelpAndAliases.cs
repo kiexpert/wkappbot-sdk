@@ -120,7 +120,7 @@ Your testing, coding, and ideas are appreciated. Let's build together.
 Usage:
   wkappbot <command> [options]
 
-═══ Public Commands ═══════════════════════════════════════════
+=== Public Commands ===================================================
 
   a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
       Universal accessibility interface — 20 standard actions for ANY window.

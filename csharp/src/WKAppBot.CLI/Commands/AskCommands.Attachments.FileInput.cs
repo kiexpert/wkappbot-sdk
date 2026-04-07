@@ -46,9 +46,14 @@ internal partial class Program
                 return true;
 
             // Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort)
+            // Temporarily disable focus-theft monitoring: the HWND change here is expected and intentional.
             await cdp.DisableFileChooserInterception();
             Console.WriteLine("[ASK] All focusless tiers failed → falling back to native file dialog (will steal focus)...");
-            var uiaOk = await TryAttachViaFileDialog(cdp, absPath, originalUserFg);
+            var prevFocusMonitor = cdp.EnableFocusTheftMonitoring;
+            cdp.EnableFocusTheftMonitoring = false;
+            bool uiaOk;
+            try { uiaOk = await TryAttachViaFileDialog(cdp, absPath, originalUserFg); }
+            finally { cdp.EnableFocusTheftMonitoring = prevFocusMonitor; }
             if (uiaOk)
             {
                 Console.WriteLine($"[ASK] File attached via UIA dialog: {fileName}");
