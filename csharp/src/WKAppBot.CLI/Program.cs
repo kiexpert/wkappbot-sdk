@@ -823,6 +823,7 @@ internal partial class Program
                 WriteExitFile(exitCode);
 
             if (tee != null) Console.SetOut(tee.OriginalConsole);
+            if (tee != null) tee.ExitCode = exitCode;
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
             if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
