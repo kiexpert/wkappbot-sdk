@@ -256,29 +256,38 @@ internal partial class Program
         if (args.Length == 0 || args[0].StartsWith('-'))
         {
             Console.WriteLine("Usage: wkappbot skill edit <id> [--title X] [--desc X] [--tags t1,t2] [--steps s1|s2]");
+            Console.WriteLine("                           [--step N --content X]   edit single step by 1-based index");
+            Console.WriteLine("                           [--add-step X]           append a new step");
             Console.WriteLine("  Partial update — only specified fields are changed. Version auto-bumped.");
             Console.WriteLine("  Note: to rename the file slug, use delete + contribute --id <new-slug>.");
             return 1;
         }
 
         var id = args[0];
-        string? title = null, desc = null;
+        string? title = null, desc = null, stepContent = null;
         List<string>? steps = null, tags = null;
+        int stepIndex = -1;   // 1-based; -1 = not set
+        bool addStep  = false;
 
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i])
             {
-                case "--title" when i + 1 < args.Length: title = args[++i]; break;
-                case "--desc"  when i + 1 < args.Length: desc  = args[++i]; break;
-                case "--steps" when i + 1 < args.Length: steps = [.. args[++i].Split('|')]; break;
-                case "--tags"  when i + 1 < args.Length: tags  = [.. args[++i].Split(',')]; break;
+                case "--title"     when i + 1 < args.Length: title       = args[++i]; break;
+                case "--desc"      when i + 1 < args.Length: desc        = args[++i]; break;
+                case "--steps"     when i + 1 < args.Length: steps       = [.. args[++i].Split('|')]; break;
+                case "--tags"      when i + 1 < args.Length: tags        = [.. args[++i].Split(',')]; break;
+                case "--step"      when i + 1 < args.Length:
+                    if (int.TryParse(args[++i], out var si)) stepIndex = si; break;
+                case "--content"   when i + 1 < args.Length: stepContent = args[++i]; break;
+                case "--add-step"  when i + 1 < args.Length: stepContent = args[++i]; addStep = true; break;
             }
         }
 
-        if (title == null && desc == null && steps == null && tags == null)
+        bool hasSingleStep = stepIndex > 0 && stepContent != null;
+        if (title == null && desc == null && steps == null && tags == null && !hasSingleStep && !addStep)
         {
-            Console.WriteLine("[SKILL] Nothing to edit — specify at least one of: --title, --desc, --tags, --steps");
+            Console.WriteLine("[SKILL] Nothing to edit — specify at least one of: --title, --desc, --tags, --steps, --step N --content X, --add-step X");
             return 1;
         }
 
@@ -309,6 +318,27 @@ internal partial class Program
         if (desc  != null) skill.Desc  = desc;
         if (steps != null) skill.Steps = steps;
         if (tags  != null) skill.Tags  = tags;
+
+        // --step N --content X : edit single step by 1-based index
+        if (hasSingleStep)
+        {
+            skill.Steps ??= [];
+            int idx = stepIndex - 1;
+            if (idx < 0 || idx >= skill.Steps.Count)
+                return Error($"--step {stepIndex} out of range (skill has {skill.Steps.Count} step(s))");
+            var old = skill.Steps[idx];
+            skill.Steps[idx] = stepContent!;
+            Console.Error.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" → \"{stepContent}\"");
+        }
+
+        // --add-step X : append new step
+        if (addStep && stepContent != null)
+        {
+            skill.Steps ??= [];
+            skill.Steps.Add(stepContent);
+            Console.Error.WriteLine($"[SKILL] added step {skill.Steps.Count}: \"{stepContent}\"");
+        }
+
         skill.Updated = DateTime.UtcNow;
         skill.Version = BumpVersion(skill.Version);
 
