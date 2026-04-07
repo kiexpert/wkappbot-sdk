@@ -1,5 +1,5 @@
 {
-  "id": "wkedit-encoding-safe-regex-bulk-edit-with-backup-undo",
+  "id": "wkedit",
   "app": "wkappbot-workflow",
   "title": "wkedit \u2014 Encoding-Safe Regex Bulk Edit with Backup \u0026 Undo",
   "desc": "wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits \u2014 saves tokens, prevents CP949 corruption.",
