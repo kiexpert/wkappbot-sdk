@@ -1,0 +1,25 @@
+{
+  "id": "a11y-command-cheatsheet",
+  "app": "wkappbot-workflow",
+  "title": "a11y — 24-Action UI Automation Cheatsheet",
+  "desc": "wkappbot a11y is the primary automation command. 3-tier fallback: UIA→Win32→SendInput (native) or CSS→CDP→UIA (web). grap = glob/regex/OR/UIA-scope/JSON5 target syntax.",
+  "steps": [
+    "DISCOVER: a11y windows | a11y inspect \"*App*\" --depth 5 | a11y find \"*pattern*\"",
+    "WINDOW OPS: a11y focus/minimize/maximize/restore/close/move/resize \"*App*\"",
+    "CLICK: a11y click|invoke|toggle|expand|collapse|select|scroll \"*grap*\"",
+    "TYPE text: a11y type \"*edit*\" \"hello\" — UIA Value→WM_CHAR→LegacyIA→SendKeys",
+    "TYPE hotkey: a11y type \"*app*\" \"File/Save\" --hotkey — menu path dispatch",
+    "READ: a11y read \"*element*\" — returns Name/Value/Text",
+    "WAIT: a11y wait \"*element*\" --condition visible --timeout 30",
+    "KILL: a11y kill \"pattern[/ancestor]\" — process kill by grap",
+    "SCOPE: a11y click \"*App*#*Panel*#*Button*\" — # drills into UIA subtree",
+    "WEB: a11y read \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"",
+    "ANDROID: a11y click \"adb://device#*element*\" — ADB bridge",
+    "FLAGS: --nth 2 / --all / --force / --timeout N / --speak"
+  ],
+  "tags": ["a11y", "uia", "win32", "automation", "grap", "reference"],
+  "author": "claude",
+  "created": "2026-04-07T13:00:00.0000000Z",
+  "updated": "2026-04-07T13:00:00.0000000Z",
+  "version": "1.0"
+}

@@ -35,6 +35,7 @@ internal partial class Program
             "list"       => SkillListCommand(args.Skip(1).ToArray()),
             "show"       => SkillShowCommand(args.Skip(1).ToArray()),
             "contribute" => SkillContributeCommand(args.Skip(1).ToArray()),
+            "edit"       => SkillEditCommand(args.Skip(1).ToArray()),
             "delete"     => SkillDeleteCommand(args.Skip(1).ToArray()),
             "search"     => SkillSearchCommand(args.Skip(1).ToArray()),
             "install"    => SkillInstallCommand(args.Skip(1).ToArray()),
@@ -245,6 +246,74 @@ internal partial class Program
         skill.Save(path);
         var action = existing != null ? "Updated" : "Created";
         Console.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
+        return 0;
+    }
+
+    // ── Edit (partial update) ─────────────────────────────────────────────────
+
+    static int SkillEditCommand(string[] args)
+    {
+        if (args.Length == 0 || args[0].StartsWith('-'))
+        {
+            Console.WriteLine("Usage: wkappbot skill edit <id> [--title X] [--desc X] [--tags t1,t2] [--steps s1|s2]");
+            Console.WriteLine("  Partial update — only specified fields are changed. Version auto-bumped.");
+            Console.WriteLine("  Note: to rename the file slug, use delete + contribute --id <new-slug>.");
+            return 1;
+        }
+
+        var id = args[0];
+        string? title = null, desc = null;
+        List<string>? steps = null, tags = null;
+
+        for (int i = 1; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--title" when i + 1 < args.Length: title = args[++i]; break;
+                case "--desc"  when i + 1 < args.Length: desc  = args[++i]; break;
+                case "--steps" when i + 1 < args.Length: steps = [.. args[++i].Split('|')]; break;
+                case "--tags"  when i + 1 < args.Length: tags  = [.. args[++i].Split(',')]; break;
+            }
+        }
+
+        if (title == null && desc == null && steps == null && tags == null)
+        {
+            Console.WriteLine("[SKILL] Nothing to edit — specify at least one of: --title, --desc, --tags, --steps");
+            return 1;
+        }
+
+        if (!Directory.Exists(ProjectSkillsDir))
+        {
+            Console.WriteLine("[SKILL] No project skills directory. Run from project root.");
+            return 1;
+        }
+
+        string? skillPath = null;
+        SkillRecord? skill = null;
+        foreach (var f in Directory.GetFiles(ProjectSkillsDir, "*.skill.json", SearchOption.AllDirectories))
+        {
+            var s = SkillRecord.Load(f);
+            if (s != null && s.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+            { skill = s; skillPath = f; break; }
+        }
+
+        if (skill == null || skillPath == null)
+        {
+            Console.WriteLine($"[SKILL] Not found in project skills: {id}");
+            Console.WriteLine("  Hint: 'skill edit' only works for project skills, not HQ-only.");
+            Console.WriteLine("  To edit an HQ skill, first copy it: wkappbot skill contribute --app X --title ... --id " + id);
+            return 1;
+        }
+
+        if (title != null) skill.Title = title;
+        if (desc  != null) skill.Desc  = desc;
+        if (steps != null) skill.Steps = steps;
+        if (tags  != null) skill.Tags  = tags;
+        skill.Updated = DateTime.UtcNow;
+        skill.Version = BumpVersion(skill.Version);
+
+        skill.Save(skillPath);
+        Console.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
         return 0;
     }
 
@@ -618,6 +687,8 @@ internal partial class Program
         Console.WriteLine("  contribute --app X --title Y --desc Z");
         Console.WriteLine("             [--steps \"s1|s2\"] [--tags \"t1,t2\"] [--id <slug>]");
         Console.WriteLine("                                    Create or update skill in project dir");
+        Console.WriteLine("  edit <id> [--title X] [--desc X] [--tags X] [--steps X]");
+        Console.WriteLine("                                    Partial update — only specified fields changed");
         Console.WriteLine("  delete <id>                       Remove skill from project dir");
         Console.WriteLine("  install [--app X] [--force]       Copy project skills → HQ (on deploy)");
         Console.WriteLine("  export [--app X] [--out f.zip]    Export project skills to zip");
