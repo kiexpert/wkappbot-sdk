@@ -1,0 +1,20 @@
+{
+  "id": "control-ui-without-stealing-focus-3-tier-focusless-strategy",
+  "app": "wkappbot",
+  "title": "Control UI Without Stealing Focus \u2014 3-Tier Focusless Strategy",
+  "desc": "UIA Invoke/Value/Toggle/Select = truly focusless. WM_CHAR = focusless typing via PostMessage. SendInput/Hotkey = must EnsureFocus first. Tier order: UIA pattern \u2192 Win32 PostMessage \u2192 SendInput. MFC CMaskEditEx: WM_CHAR only \u2014 TranslateMessage auto-generates it, never use EM_SETTEXT or you get double input.",
+  "steps": [],
+  "tags": [
+    "focusless",
+    "uia",
+    "win32",
+    "input",
+    "mfc",
+    "focus"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T04:52:43.1677642Z",
+  "updated": "2026-04-07T04:52:43.1677786Z",
+  "version": "1.0"
+}

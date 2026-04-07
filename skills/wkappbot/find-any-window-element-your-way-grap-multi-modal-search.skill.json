@@ -1,0 +1,20 @@
+{
+  "id": "find-any-window-element-your-way-grap-multi-modal-search",
+  "app": "wkappbot",
+  "title": "Find Any Window Element Your Way \u2014 grap Multi-Modal Search",
+  "desc": "grap = glob/regex/OR/UIA-scope/JSON5 multi-field AND. Wildcards: *Button*. OR: *notepad*;*calc*. UIA scope: app#panel. Tab portal: Chrome#ChatGPT#model. JSON5: {title:\u0027Claude\u0027,domain:\u0027claude.ai\u0027}. hwnd: *hwnd=001A0F2C*. adb: adb://device/*screen*#balance. Combine: *order*#account = grap inside UIA scope.",
+  "steps": [],
+  "tags": [
+    "grap",
+    "search",
+    "pattern",
+    "uia",
+    "scope",
+    "json5"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T04:52:43.2106717Z",
+  "updated": "2026-04-07T04:52:43.2106988Z",
+  "version": "1.0"
+}

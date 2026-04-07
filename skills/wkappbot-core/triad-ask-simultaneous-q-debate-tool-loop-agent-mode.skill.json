@@ -1,0 +1,17 @@
+{
+  "id": "triad-ask-simultaneous-q-debate-tool-loop-agent-mode",
+  "app": "wkappbot-core",
+  "title": "Triad Ask: Simultaneous Q, \uC815\uBC18\uD569 Debate, Tool Loop, Agent Mode",
+  "desc": "Usage patterns for the 3-AI triad system: parallel questioning, thesis-antithesis-synthesis debate, AppBot tool-call loop, and full agent mode. Each pattern has different cost/depth tradeoffs.",
+  "steps": [
+    "1. [SIMULTANEOUS Q] wkappbot ask triad \u0022\u003Cquestion\u003E\u0022 -- all 3 AIs (Gemini/GPT/Claude) answer in parallel on the same Slack thread. Best for: broad gap analysis, design review, architectural decisions. Share full context (skill content, code snippets, version info) in the question for best results. TIP: Include \u0027this is a C# project, not Python\u0027 to prevent Gemini tool-call headscratch on .py files."
+  ],
+  "tags": [
+    "triad"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T11:32:52.6409906Z",
+  "updated": "2026-04-07T11:32:52.6410083Z",
+  "version": "1.0"
+}
