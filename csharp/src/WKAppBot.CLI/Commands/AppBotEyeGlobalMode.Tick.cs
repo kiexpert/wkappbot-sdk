@@ -76,7 +76,7 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
-        host.SetElevatedBorder(ElevationHelper.IsElevated() || ElevatedEyeClient.IsAvailable());
+        host.SetElevatedBorder(ElevationHelper.IsElevated());
         PulseStep.Mark("tick-host-info");
         var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
         Console.WriteLine(string.IsNullOrWhiteSpace(eyeSummary)
