@@ -724,7 +724,7 @@ public sealed partial class CdpClient
             if (hwnd != IntPtr.Zero && !IsIconic(hwnd))
             {
                 Console.Error.WriteLine($"[CDP] Chrome minimized for tab switch (hwnd={hwnd:X8})");
-                ShowWindowNative(hwnd, 6); // SW_MINIMIZE
+                ShowWindowNative(hwnd, 8); // SW_SHOWMINNOACTIVE: minimize without activating next window
                 ScheduleMinimizeDump("bring-to-front-tab-switch", hwnd);
                 didMinimize = true;
                 await Task.Delay(50);

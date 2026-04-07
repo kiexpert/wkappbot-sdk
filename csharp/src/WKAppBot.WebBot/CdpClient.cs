@@ -321,7 +321,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
             && !IsIconic((IntPtr)ChromeWindowHandle))
         {
             Console.Error.WriteLine($"[CDP] Pre-minimize for focus-stealing method: {method}");
-            ShowWindowNative((IntPtr)ChromeWindowHandle, 6); // SW_MINIMIZE
+            ShowWindowNative((IntPtr)ChromeWindowHandle, 8); // SW_SHOWMINNOACTIVE: minimize without activating next window
             ScheduleMinimizeDump($"focus-steal-guard:{method}", (IntPtr)ChromeWindowHandle);
         }
 
@@ -369,7 +369,8 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
                     // Chrome process stole focus → report + restore user's window
                     await LogFocusRiskAsync("focus-theft", method, parameters, prevFg, curFg, "chrome-became-foreground");
                     OnFocusTheft(method + (OperationContext != null ? $"[{OperationContext}]" : ""), prevFg, curFg);
-                    SetForegroundWindow((IntPtr)prevFg);
+                    // ForceForegroundWindow: AttachThreadInput trick bypasses Windows foreground lock
+                    ForceForegroundWindow((IntPtr)prevFg);
                 }
                 // else: user switched windows naturally → do nothing
             }
