@@ -1001,6 +1001,14 @@ public static partial class NativeMethods
     }
 
     /// <summary>
+    /// Force foreground window — AttachThreadInput trick, no FocuslessGuard.
+    /// Use ONLY for focus RESTORATION after a detected theft (defensive).
+    /// Do NOT use for offensive focus acquisition.
+    /// </summary>
+    public static bool ForceForegroundWindow(IntPtr hWnd)
+        => SetForegroundWindowCore(hWnd);
+
+    /// <summary>
     /// Public SetForegroundWindow proxy — routes through FocuslessGuard + AttachThreadInput trick.
     /// Use for any focus action (window activation, bring-to-front).
     /// BLOCKED by FocuslessGuard in focusless mode.
