@@ -165,6 +165,7 @@ public sealed partial class CdpClient
     /// </summary>
     public async Task<bool> AppendContentEditableAsync(string selector, string text, string separator = "\n")
     {
+        TickBotOverlay(); // pulse on each CDP append
         var jsText = JsonSerializer.Serialize(text);
         var jsSep = JsonSerializer.Serialize(separator);
         var esc = Esc(selector);
@@ -460,6 +461,7 @@ public sealed partial class CdpClient
     /// </summary>
     public async Task<string> SendPromptAsync(string editorSelector)
     {
+        TickBotOverlay(); // pulse on send
         // Focus editor first
         await FocusAsync(editorSelector);
         await Task.Delay(50);
