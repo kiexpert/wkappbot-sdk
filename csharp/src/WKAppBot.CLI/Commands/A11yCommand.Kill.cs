@@ -15,7 +15,10 @@ internal partial class Program
     //   "**/wkappbot-core"         → wkappbot-core with any ancestor (any depth)
     //   "wkappbot-core#regex:lucy" → '#' splits name#exePathFilter
     // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
-    static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false, string? argFilter = null)
+    // KillCandidate: a process that passed all guards and is eligible to kill.
+    record KillCandidate(System.Diagnostics.Process Proc, string NodeKey, string CmdLine, string CmdBrief);
+
+    static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false, string? argFilter = null, string? nthRaw = null)
     {
         // Global dry-run mode overrides local flag
         if (_dryRunMode.Value) dryRun = true;
@@ -44,9 +47,10 @@ internal partial class Program
             .ToDictionary(g => g.Key, g => g.First().ProcessName);
 
         var selfPids = allowAncestors ? new HashSet<int>() : GetSelfAndAncestorPids();
-        var killed = new List<string>();
+        var candidates = new List<KillCandidate>();
         var skipped = new List<string>();
 
+        // ── Pass 1: collect all eligible kill targets (no actual killing yet) ──
         foreach (var p in allProcs)
         {
             try
@@ -154,39 +158,11 @@ internal partial class Program
                     }
                 }
 
-                if (dryRun)
-                {
-                    Console.WriteLine($"[KILL:DRY] [{p.Id}]{procName} — {cmdBrief}");
-                    killed.Add($"[{p.Id}]{procName}");
-                    continue;
-                }
-
-                var mainHwnd = p.MainWindowHandle;
-                bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
-                if (hasWindow)
-                {
-                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — window found, sending WM_CLOSE\n       cmd: {cmdBrief}");
-                    NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
-                    Thread.Sleep(800);
-                    try { p.Refresh(); } catch { }
-                    if (p.HasExited)
-                    {
-                        Console.WriteLine($"[KILL] [{p.Id}]{procName} — exited gracefully");
-                        killed.Add($"[{p.Id}]{procName}");
-                        continue;
-                    }
-                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — still alive, force kill");
-                }
-                else
-                {
-                    Console.WriteLine($"[KILL] [{p.Id}]{procName} — no window, force kill\n       cmd: {cmdBrief}");
-                }
-                p.Kill(entireProcessTree: false);
-                killed.Add($"[{p.Id}]{procName}");
+                candidates.Add(new KillCandidate(p, nodeKey, cmdLine, cmdBrief));
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[KILL] pid={p.Id} failed: {ex.Message}");
+                Console.WriteLine($"[KILL] pid={p.Id} scan failed: {ex.Message}");
             }
         }
 
@@ -198,10 +174,108 @@ internal partial class Program
             Console.ResetColor();
         }
 
-        if (killed.Count == 0)
+        if (candidates.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"[KILL] no matching processes for \"{grap}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        // ── Ambiguity guard: multiple candidates without --nth → show find-mode list ──
+        if (candidates.Count > 1 && nthRaw == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[KILL] ambiguous — {candidates.Count} processes match \"{grap}\". Use --nth N to target one:");
+            Console.ResetColor();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var c = candidates[i];
+                Console.WriteLine($"  [{i + 1}] {c.NodeKey}");
+                if (!string.IsNullOrEmpty(c.CmdBrief))
+                    Console.WriteLine($"       {c.CmdBrief}");
+            }
+            return 1;
+        }
+
+        // ── Pass 2: resolve --nth selection, then kill ──
+        IEnumerable<KillCandidate> targets;
+        if (nthRaw != null && candidates.Count > 1)
+        {
+            // Parse --nth (supports comma, range, tilde) into 1-based index list
+            var picked = new List<KillCandidate>();
+            var seen = new HashSet<int>();
+            bool parseOk = true;
+            foreach (var term in nthRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var idxList = ParseNthIndexes(term, candidates.Count);
+                if (idxList == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[KILL] --nth \"{term}\" is invalid or out of range (1~{candidates.Count})");
+                    Console.ResetColor();
+                    parseOk = false;
+                    break;
+                }
+                foreach (var idx in idxList)
+                    if (seen.Add(idx)) picked.Add(candidates[idx - 1]);
+            }
+            if (!parseOk) return 1;
+            targets = picked;
+        }
+        else
+        {
+            targets = candidates;
+        }
+
+        var killed = new List<string>();
+        foreach (var c in targets)
+        {
+            try
+            {
+                var p = c.Proc;
+                var procName = p.ProcessName;
+
+                if (dryRun)
+                {
+                    Console.WriteLine($"[KILL:DRY] {c.NodeKey} — {c.CmdBrief}");
+                    killed.Add(c.NodeKey);
+                    continue;
+                }
+
+                var mainHwnd = p.MainWindowHandle;
+                bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
+                if (hasWindow)
+                {
+                    Console.WriteLine($"[KILL] {c.NodeKey} — window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
+                    NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
+                    Thread.Sleep(800);
+                    try { p.Refresh(); } catch { }
+                    if (p.HasExited)
+                    {
+                        Console.WriteLine($"[KILL] {c.NodeKey} — exited gracefully");
+                        killed.Add(c.NodeKey);
+                        continue;
+                    }
+                    Console.WriteLine($"[KILL] {c.NodeKey} — still alive, force kill");
+                }
+                else
+                {
+                    Console.WriteLine($"[KILL] {c.NodeKey} — no window, force kill\n       cmd: {c.CmdBrief}");
+                }
+                p.Kill(entireProcessTree: false);
+                killed.Add(c.NodeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[KILL] {c.NodeKey} failed: {ex.Message}");
+            }
+        }
+
+        if (killed.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"[KILL] nothing killed for \"{grap}\"");
             Console.ResetColor();
             return 1;
         }
