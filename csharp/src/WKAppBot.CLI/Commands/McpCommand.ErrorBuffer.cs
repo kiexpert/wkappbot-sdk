@@ -54,6 +54,8 @@ internal partial class Program
         /// <summary>
         /// Finalize: restore stderr. Returns timestamped error log if isError, empty if success.
         /// </summary>
+        public bool HasErrors => _capture.Entries.Count > 0;
+
         public string Finalize(bool isError)
         {
             Console.SetError(_originalStderr);
@@ -73,22 +75,42 @@ internal partial class Program
             _current = null;
         }
 
-        /// <summary>Buffer-only writer: captures stderr with timestamps, NO passthrough to console.</summary>
+        /// <summary>
+        /// Captures stderr with timestamps. On first error entry, immediately switches to
+        /// passthrough mode: flushes buffered entries + forwards all subsequent writes directly.
+        /// </summary>
         sealed class ErrorCapture : TextWriter
         {
-            readonly TextWriter _inner; // kept for Flush/Encoding only
+            readonly TextWriter _inner;
             readonly long _baseT = Environment.TickCount64;
             readonly StringBuilder _line = new();
             public readonly List<(long relMs, string msg)> Entries = new();
+            bool _passthrough = false;
 
             public ErrorCapture(TextWriter inner) => _inner = inner;
             public override Encoding Encoding => _inner.Encoding;
 
+            void EmitEntry(string msg)
+            {
+                var relMs = Environment.TickCount64 - _baseT;
+                Entries.Add((relMs, msg));
+                if (!_passthrough)
+                {
+                    // First error — switch to passthrough: flush all buffered entries immediately
+                    _passthrough = true;
+                    foreach (var (t, m) in Entries)
+                        _inner.WriteLine($"[+{t / 1000.0:F1}s] {m}");
+                }
+                else
+                {
+                    _inner.WriteLine($"[+{relMs / 1000.0:F1}s] {msg}");
+                }
+                _inner.Flush();
+            }
+
             public override void WriteLine(string? value)
             {
-                // Buffer only — no passthrough (stderr hidden by default)
-                if (!string.IsNullOrEmpty(value))
-                    Entries.Add((Environment.TickCount64 - _baseT, value));
+                if (!string.IsNullOrEmpty(value)) EmitEntry(value);
             }
 
             public override void Write(char value)
@@ -110,7 +132,7 @@ internal partial class Program
             void FlushLine()
             {
                 if (_line.Length == 0) return;
-                Entries.Add((Environment.TickCount64 - _baseT, _line.ToString()));
+                EmitEntry(_line.ToString());
                 _line.Clear();
             }
 

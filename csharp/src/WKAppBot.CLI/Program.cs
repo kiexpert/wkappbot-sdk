@@ -817,6 +817,19 @@ internal partial class Program
             }
             catch { }
 
+            // ErrorScope: passthrough already emitted on first error; Finalize cleans up.
+            // Guard: if stderr was written but exitCode=0, that's a bug — report + override.
+            if (_errScope != null)
+            {
+                bool hadErrors = _errScope.HasErrors;
+                _errScope.Finalize(exitCode != 0); // restore stderr
+                if (hadErrors && exitCode == 0)
+                {
+                    // Stderr output with successful exit — caller swallowed an error
+                    AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr — error suppressed");
+                    exitCode = -9999;
+                }
+            }
             _exitCode = exitCode;
             return exitCode;
         }
