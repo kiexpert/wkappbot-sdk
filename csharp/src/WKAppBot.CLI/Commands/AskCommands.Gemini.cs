@@ -261,7 +261,7 @@ internal partial class Program
                 if (questionLock == null) return (false, (string?)null);
 
                 // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
-                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini");
+                var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini", prevFgHint: prevFgGemini);
 
                 // ── File attachments (before text) ──
                 // Pass prevFgGemini so native file dialog tier can restore original user focus after close

@@ -763,8 +763,8 @@ public sealed partial class CdpClient
     {
         var hwnd = GetChromeWindowHandle();
         if (hwnd == IntPtr.Zero) { Console.WriteLine("[CDP] MinimizeChrome: hwnd=zero (Chrome not found)"); return; }
-        // SW_MINIMIZE=6
-        ShowWindowNative(hwnd, 6);
+        // SW_SHOWMINNOACTIVE=8: minimize without activating next window (no focus steal)
+        ShowWindowNative(hwnd, 8);
         ScheduleMinimizeDump("explicit-minimize", hwnd);
         var stack = new System.Diagnostics.StackTrace(1, true).ToString();
         var caller = stack.Length > 200 ? stack[..200] : stack;
