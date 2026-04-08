@@ -25,7 +25,17 @@ internal partial class Program
         bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
         bool showCmd = args.Contains("--cmd") || args.Contains("--arg") || filterCmd != null; // show process path + command line args
         int limit = int.TryParse(GetArgValue(args, "--limit"), out var lim) ? lim : 0; // 0=unlimited
-        bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null;
+        // --pid: enumerate all top-level windows owned by a specific process (decimal or 0x hex)
+        uint? filterPid = null;
+        var pidStr = GetArgValue(args, "--pid");
+        if (pidStr != null)
+        {
+            if (pidStr.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                filterPid = Convert.ToUInt32(pidStr, 16);
+            else if (uint.TryParse(pidStr, out var parsedPid))
+                filterPid = parsedPid;
+        }
+        bool hasFilter = filterTitle != null || filterProcess != null || filterClass != null || filterPid != null;
         bool allowCmdLineUrlFallback =
             filterCmd != null ||
             (filterTitle != null
@@ -714,6 +724,34 @@ internal partial class Program
             }, IntPtr.Zero);
         }
         var _printedChildPids = new HashSet<uint>();
+
+        // ── --pid fast path: all top-level windows owned by a specific process ──
+        // Uses _pidWindows cache built in pre-scan above (pid → hwnd list).
+        // Shows every window the process created — entry point for hwndRoot grouping.
+        if (filterPid != null)
+        {
+            PulseStep.Mark("pid-filter-start");
+            var procName = GetProcessName(filterPid.Value);
+            Console.Error.WriteLine($"[windows] pid={filterPid} proc={procName} — all owned top-level windows:");
+            if (_pidWindows.TryGetValue(filterPid.Value, out var pidHwnds))
+            {
+                foreach (var (h, _) in pidHwnds)
+                {
+                    var raw = GetRawWindowInfo(h);
+                    if (raw == null) continue;
+                    var v = raw.Value;
+                    if (!showAll && (!v.visible || (v.w < 1 && v.h < 1))) continue;
+                    PrintWindow(h, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, h == fgWnd);
+                    totalCount++;
+                }
+            }
+            if (totalCount == 0)
+                Console.Error.WriteLine($"[windows] no top-level windows found for pid={filterPid} (use --all to include hidden)");
+            Console.WriteLine();
+            Console.WriteLine($"Total: {totalCount} windows for pid={filterPid} proc={procName}");
+            PulseStep.Done("pid-filter-return");
+            return 0;
+        }
 
         // ── JSON5 fast path: {field:value,...} patterns → delegate to WindowFinder which handles JSON5 natively ──
         // ownerCandidateMatcher is a literal matcher that would filter out all results (no window title = "{...}")
