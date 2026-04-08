@@ -831,13 +831,15 @@ public static class WindowFinder
             return "";
         }
 
-        // Tier 0: Chrome Web App — extract URL from --app=<url> command-line argument
-        //         Web Apps have no address bar, so UIA Tier 2-4 always fail.
+        // Tier 0: Chromium cmdline URL extraction (no address bar → UIA Tier 2-4 fail)
+        //   --app=https://...    Chrome Web App (PWA)
+        //   --folder-uri=file:// VS Code / Electron workspace
         if (IsChromiumProcess(proc))
         {
             try
             {
                 var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                // PWA / Web App
                 var mApp = Regex.Match(cmdLine, @"--app=(https?://\S+)", RegexOptions.IgnoreCase);
                 if (mApp.Success)
                 {
@@ -846,6 +848,17 @@ public static class WindowFinder
                     {
                         _uiaOmniboxCache[hWnd] = (appUrl, now);
                         return appUrl;
+                    }
+                }
+                // VS Code / Electron workspace folder
+                var mFolder = Regex.Match(cmdLine, @"--folder-uri=(file://[^\s""']+)", RegexOptions.IgnoreCase);
+                if (mFolder.Success)
+                {
+                    var folderUrl = mFolder.Groups[1].Value.TrimEnd('"', '\'');
+                    if (!string.IsNullOrEmpty(folderUrl))
+                    {
+                        _uiaOmniboxCache[hWnd] = (folderUrl, now);
+                        return folderUrl;
                     }
                 }
             }
