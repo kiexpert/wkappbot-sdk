@@ -160,7 +160,11 @@ public static class WindowFinder
                     {
                         matched = true;
                         matchedVia = "cmd";
-                        matchedSnippet = cmdLine.Length > 80 ? cmdLine[..80] : cmdLine;
+                        // Extract just the matching token, not the full cmdLine
+                        var tokens = cmdLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        var matchToken = tokens.FirstOrDefault(tk => PatternMatcher.TokenMatchAny(titlePattern, tk))
+                                         ?? (cmdLine.Length > 60 ? cmdLine[..60] : cmdLine);
+                        matchedSnippet = matchToken.Trim('"', '\'');
                     }
                 }
                 catch { }
@@ -200,6 +204,63 @@ public static class WindowFinder
 
             return true;
         }, IntPtr.Zero);
+
+        // ── Windowless process cmdLine scan: find processes with no visible window ──
+        // Walk PPID chain to find host window (e.g. wkappbot running in VS Code terminal).
+        {
+            // Build pid→hwnd map from all visible windows
+            var pidToHwnd = new Dictionary<uint, IntPtr>();
+            var alreadyMatchedPids = new HashSet<uint>(results.Select(r => {
+                NativeMethods.GetWindowThreadProcessId(r.Handle, out uint p); return p;
+            }));
+            NativeMethods.EnumWindows((hWnd, _) => {
+                if (NativeMethods.IsWindowVisible(hWnd)) {
+                    NativeMethods.GetWindowThreadProcessId(hWnd, out uint wPid);
+                    if (!pidToHwnd.ContainsKey(wPid)) pidToHwnd[wPid] = hWnd;
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            foreach (var proc in System.Diagnostics.Process.GetProcesses())
+            {
+                try
+                {
+                    var pid = (uint)proc.Id;
+                    if (pid <= 4) continue;
+                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window — already checked
+                    var cmdLine = NativeMethods.GetProcessCommandLine((int)pid);
+                    if (string.IsNullOrEmpty(cmdLine)) continue;
+                    if (!PatternMatcher.TokenMatchAny(titlePattern, cmdLine)) continue;
+
+                    // Extract matching token
+                    var tokens = cmdLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    var matchToken = tokens.FirstOrDefault(tk => PatternMatcher.TokenMatchAny(titlePattern, tk))
+                                     ?? (cmdLine.Length > 60 ? cmdLine[..60] : cmdLine);
+                    matchToken = matchToken.Trim('"', '\'');
+
+                    // Walk PPID chain to find host window
+                    IntPtr hostHwnd = IntPtr.Zero;
+                    int cur = (int)pid;
+                    for (int depth = 0; depth < 8 && hostHwnd == IntPtr.Zero; depth++)
+                    {
+                        int parent = NativeMethods.GetParentProcessId(cur);
+                        if (parent <= 0 || parent == cur) break;
+                        if (pidToHwnd.TryGetValue((uint)parent, out var ph)) { hostHwnd = ph; break; }
+                        cur = parent;
+                    }
+                    if (hostHwnd == IntPtr.Zero) continue;
+                    if (results.Any(r => r.Handle == hostHwnd)) continue;
+
+                    var hostInfo = WindowInfo.FromHwnd(hostHwnd);
+                    hostInfo.MatchedVia = "cmd";
+                    hostInfo.MatchedSnippet = matchToken;
+                    hostInfo.Coverage = 0.5;
+                    results.Add(hostInfo);
+                }
+                catch { }
+                finally { try { proc.Dispose(); } catch { } }
+            }
+        }
 
         // Sort by coverage descending (most specific match first), then focus priority
         if (results.Count > 1)
