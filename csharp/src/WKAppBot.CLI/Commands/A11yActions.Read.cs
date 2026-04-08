@@ -116,20 +116,21 @@ internal partial class Program
         // If ambiguous (multiple matches), append pid to disambiguate
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
+        var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
         try
         {
-            var verifyHits = WindowFinder.FindByTitle(compactGrap, true);
+            verifyHits = WindowFinder.FindByTitle(compactGrap, false); // all matches
             if (verifyHits.Any(v => v.Handle == hwnd))
             {
                 if (verifyHits.Count > 1)
                 {
                     verifyMark = "OK";
                     NativeMethods.GetWindowThreadProcessId(hwnd, out uint pidDisamb);
-                    // Inject pid: bare domain→{domain:'x',pid:N}; JSON5→add ,pid:N before }
-                    if (!fullGrap.StartsWith('{'))
-                        fullGrap = $"{{domain:'{fullGrap}',pid:{pidDisamb}}}";
-                    else
+                    // Inject pid: JSON5→add ,pid:N before }; else wrap
+                    if (fullGrap.StartsWith('{'))
                         fullGrap = fullGrap.TrimEnd('}') + $",pid:{pidDisamb}}}";
+                    else
+                        fullGrap = $"{{domain:'{fullGrap}',pid:{pidDisamb}}}";
                 }
                 else verifyMark = "OK";
             }
@@ -138,11 +139,33 @@ internal partial class Program
         catch { }
         sw.Stop();
 
-        // Window title as meta — truncated to avoid noise
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms"));
+
+        // Window title → stderr (can be noisy/repeated; not needed for copy-paste)
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
-        var titleShort = winTitle.Length > 60 ? winTitle[..57] + "…" : winTitle;
-        var metaSuffix = !string.IsNullOrEmpty(titleShort) ? $"  {titleShort}" : "";
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaSuffix}"));
+        if (!string.IsNullOrEmpty(winTitle))
+        {
+            var titleShort = winTitle.Length > 60 ? winTitle[..57] + "…" : winTitle;
+            Console.Error.WriteLine($"[find] window: {titleShort}");
+        }
+
+        // Multiple matches → list all with disambiguating pid graps (copy-paste ready)
+        if (verifyHits.Count > 1)
+        {
+            Console.WriteLine(Ansi.Dim($"# {verifyHits.Count} windows match — pick one:"));
+            foreach (var hit in verifyHits)
+            {
+                NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
+                var hitGrap = BuildCompactWinGrap(hit.Handle);
+                string pidGrap = hitGrap.StartsWith('{')
+                    ? hitGrap.TrimEnd('}') + $",pid:{hitPid}}}"
+                    : $"{{domain:'{hitGrap}',pid:{hitPid}}}";
+                var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
+                if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "…";
+                var marker = hit.Handle == hwnd ? " ◀" : "";
+                Console.WriteLine($"#   \"{pidGrap}\"  {hitTitle}{marker}");
+            }
+        }
 
         // ── CURSOR (stderr) ──────────────────────────────────────────────────
         Console.Error.WriteLine(Ansi.Header("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
