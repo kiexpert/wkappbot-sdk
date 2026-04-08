@@ -785,7 +785,8 @@ internal partial class Program
 
         // --elevated arg: lightweight proxy mode — skip full Eye (WPF/MCP/Slack/watchdog).
         // Just start the admin pipe server immediately and wait. Pipe available in <50ms.
-        // FSW watches for binary update: when new exe arrives and IsBusy=false, exit so caller re-spawns new version.
+        // FSW watches for binary update: when new exe arrives and IsBusy=false,
+        // admin Eye spawns the new version itself (already elevated — no UAC needed) then exits.
         if (isElevatedArg)
         {
             Console.WriteLine("[EYE:ADMIN] Elevated proxy mode — pipe server starting (no WPF/MCP/Slack)");
@@ -793,10 +794,11 @@ internal partial class Program
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
 
-            // FSW: watch for binary update — exit gracefully when idle so new version can be spawned
+            // FSW: watch for binary update — drain then spawn new version using own admin token
             var exePath = Environment.ProcessPath ?? "";
             var exeStartStamp = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
             var exeDir = Path.GetDirectoryName(exePath) ?? ".";
+            bool spawnedSuccessor = false;
             System.Threading.Timer? fswDebounce = null;
             var fswAdmin = new FileSystemWatcher(exeDir)
             {
@@ -812,16 +814,34 @@ internal partial class Program
                     if (!File.Exists(exePath)) return;
                     var newStamp = File.GetLastWriteTimeUtc(exePath);
                     if (newStamp <= exeStartStamp) return;
-                    Console.Error.WriteLine($"[EYE:ADMIN] Binary updated (stamp={newStamp:HH:mm:ss}) — will exit when idle");
-                    // Poll until not busy, then cancel
+                    Console.Error.WriteLine($"[EYE:ADMIN] Binary updated (stamp={newStamp:HH:mm:ss}) — draining then self-respawning");
                     Task.Run(async () =>
                     {
+                        // Wait for current admin requests to finish (max 60s)
                         for (int i = 0; i < 120 && !proxyCts.IsCancellationRequested; i++)
                         {
-                            if (!ElevatedEyeServer.IsBusy) { proxyCts.Cancel(); break; }
+                            if (!ElevatedEyeServer.IsBusy) break;
                             await Task.Delay(500);
                         }
-                        if (!proxyCts.IsCancellationRequested) proxyCts.Cancel(); // force after 60s
+                        if (proxyCts.IsCancellationRequested) return;
+                        // Spawn new admin Eye directly — already admin, no UAC popup
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = exePath,
+                                Arguments = "eye --elevated",
+                                UseShellExecute = false, // inherit current elevated token — no UAC
+                                CreateNoWindow = true,
+                            });
+                            spawnedSuccessor = true;
+                            Console.Error.WriteLine("[EYE:ADMIN] Successor admin Eye spawned — exiting");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"[EYE:ADMIN] Failed to spawn successor: {ex.Message}");
+                        }
+                        proxyCts.Cancel();
                     });
                 }, null, 500, Timeout.Infinite);
             };
@@ -830,7 +850,9 @@ internal partial class Program
             fswAdmin.EnableRaisingEvents = false;
             fswAdmin.Dispose();
             fswDebounce?.Dispose();
-            Console.WriteLine("[EYE:ADMIN] Elevated proxy exiting — caller should re-spawn new version");
+            Console.WriteLine(spawnedSuccessor
+                ? "[EYE:ADMIN] Elevated proxy exiting — successor already running"
+                : "[EYE:ADMIN] Elevated proxy exiting");
             return 0;
         }
 
