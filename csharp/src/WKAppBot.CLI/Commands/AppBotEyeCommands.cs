@@ -794,37 +794,41 @@ internal partial class Program
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
 
-            // FSW: watch for binary update — drain then spawn new version using own admin token
+            // FSW: watch for .new.exe staging — drain current requests, then spawn new version.
+            // Detecting .new.exe is earlier and more intentional than watching .exe replacement.
+            // By the time drain completes, normal Eye will have already done TryRenameSwap.
             var exePath = Environment.ProcessPath ?? "";
-            var exeStartStamp = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
             var exeDir = Path.GetDirectoryName(exePath) ?? ".";
+            var exeName = Path.GetFileNameWithoutExtension(exePath);
+            var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
             bool spawnedSuccessor = false;
             System.Threading.Timer? fswDebounce = null;
             var fswAdmin = new FileSystemWatcher(exeDir)
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
-                Filter = Path.GetFileName(exePath),
+                Filter = $"{exeName}.new.exe",
                 EnableRaisingEvents = true,
             };
-            fswAdmin.Changed += (_, _) =>
+            Action onNewExeDetected = () =>
             {
                 fswDebounce?.Dispose();
                 fswDebounce = new System.Threading.Timer(_ =>
                 {
-                    if (!File.Exists(exePath)) return;
-                    var newStamp = File.GetLastWriteTimeUtc(exePath);
-                    if (newStamp <= exeStartStamp) return;
-                    Console.Error.WriteLine($"[EYE:ADMIN] Binary updated (stamp={newStamp:HH:mm:ss}) — draining then self-respawning");
+                    if (!File.Exists(newExePath)) return;
+                    Console.Error.WriteLine($"[EYE:ADMIN] .new.exe staged — draining then self-respawning");
                     Task.Run(async () =>
                     {
-                        // Wait for current admin requests to finish (max 60s)
+                        // Drain current admin requests (max 60s), then wait for normal Eye rename-swap
                         for (int i = 0; i < 120 && !proxyCts.IsCancellationRequested; i++)
                         {
                             if (!ElevatedEyeServer.IsBusy) break;
                             await Task.Delay(500);
                         }
                         if (proxyCts.IsCancellationRequested) return;
-                        // Spawn new admin Eye directly — already admin, no UAC popup
+                        // Poll until .new.exe is consumed by normal Eye (rename-swap done), max 30s
+                        for (int i = 0; i < 60 && File.Exists(newExePath); i++)
+                            await Task.Delay(500);
+                        // Spawn successor using own elevated token — no UAC
                         try
                         {
                             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -845,6 +849,10 @@ internal partial class Program
                     });
                 }, null, 500, Timeout.Infinite);
             };
+            fswAdmin.Created += (_, _) => onNewExeDetected();
+            fswAdmin.Changed += (_, _) => onNewExeDetected();
+            // Also handle case where .new.exe already exists at startup
+            if (File.Exists(newExePath)) onNewExeDetected();
 
             ElevatedEyeServer.ListenAsync(proxyCts.Token).GetAwaiter().GetResult();
             fswAdmin.EnableRaisingEvents = false;
