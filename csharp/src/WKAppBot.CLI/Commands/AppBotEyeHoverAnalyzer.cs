@@ -398,8 +398,18 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 var nodeKey = hwnd != IntPtr.Zero ? $"{hwnd:X8}:{pt.X},{pt.Y}" : "";
                 var idleMs = NativeMethods.GetUserIdleMs();
-                // Skip hover analysis for wkappbot-core's own overlay windows (ScreenSaver, WhisperRing, etc.)
+                // Skip own overlay windows (ScreenSaver, WhisperRing) — fall through to window underneath
                 bool isOwnWindow = hwnd != IntPtr.Zero && IsWkappbotCoreWindow(hwnd);
+                if (isOwnWindow)
+                {
+                    var underHwnd = FindWindowUnderPoint(pt, hwnd);
+                    if (underHwnd != IntPtr.Zero)
+                    {
+                        hwnd = underHwnd;
+                        nodeKey = $"{hwnd:X8}:{pt.X},{pt.Y}";
+                        isOwnWindow = IsWkappbotCoreWindow(hwnd);
+                    }
+                }
                 bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && !firstRun && !isOwnWindow;
                 firstRun = false;
 
@@ -556,16 +566,44 @@ internal partial class Program
 
     /// <summary>
     /// Returns true if hwnd belongs to wkappbot-core itself (ScreenSaver, WhisperRing, overlays).
-    /// These windows are transparent/decorative and not useful hover analysis targets.
+    /// Checks both same-process PID and standalone overlay processes by window title.
     /// </summary>
     static bool IsWkappbotCoreWindow(IntPtr hwnd)
     {
         try
         {
             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
-            return pid == (uint)Environment.ProcessId;
+            if (pid == (uint)Environment.ProcessId) return true;
+            // Standalone overlay processes (separate PID): detect by window title
+            var title = NativeMethods.GetWindowTextW(hwnd);
+            if (title.StartsWith("WKAppBot ScreenSaver", StringComparison.Ordinal)) return true;
+            if (title == "WhisperRing") return true;
         }
-        catch { return false; }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Find the topmost visible non-overlay window at a screen point, skipping a given hwnd.
+    /// Used to fall through screensaver/whisperring overlays to the actual window underneath.
+    /// </summary>
+    static IntPtr FindWindowUnderPoint(POINT pt, IntPtr skipHwnd)
+    {
+        IntPtr found = IntPtr.Zero;
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (hWnd == skipHwnd) return true;
+            if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+            if (IsWkappbotCoreWindow(hWnd)) return true;
+            NativeMethods.GetWindowRect(hWnd, out var r);
+            if (pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom)
+            {
+                found = hWnd;
+                return false; // stop — EnumWindows is top-to-bottom z-order
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
     }
 
     /// <summary>
