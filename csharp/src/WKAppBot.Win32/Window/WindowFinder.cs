@@ -831,6 +831,27 @@ public static class WindowFinder
             return "";
         }
 
+        // Tier 0: Chrome Web App — extract URL from --app=<url> command-line argument
+        //         Web Apps have no address bar, so UIA Tier 2-4 always fail.
+        if (IsChromiumProcess(proc))
+        {
+            try
+            {
+                var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                var mApp = Regex.Match(cmdLine, @"--app=(https?://\S+)", RegexOptions.IgnoreCase);
+                if (mApp.Success)
+                {
+                    var appUrl = mApp.Groups[1].Value.TrimEnd('"', '\'');
+                    if (!string.IsNullOrEmpty(appUrl))
+                    {
+                        _uiaOmniboxCache[hWnd] = (appUrl, now);
+                        return appUrl;
+                    }
+                }
+            }
+            catch { }
+        }
+
         // Tier 1: CDP HTTP — Chromium only, requires --remote-debugging-port
         if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
         {
