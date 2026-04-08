@@ -115,7 +115,6 @@ internal partial class Program
     static volatile bool _fswExeDirty; // hot-swap: exe binary changed
     static volatile bool _pendingSwapWhileAdmin; // hot-swap deferred — admin proxy was busy
     static string? _lastFailedSwapStamp; // mtime stamp of a previously-failed swap — skip until newer binary
-    static volatile bool _adminWasAvailable; // tracks last-known admin proxy state for re-spawn detection
     internal static volatile bool _eyeShutdownRequested; // graceful shutdown via CMD pipe (eye shutdown)
     static volatile bool _slackRetiring; // hot-swap retiring: stop DrainSlackQueue, keep EnqueueSlackRoute
 #pragma warning disable CS0169
@@ -1271,17 +1270,6 @@ internal partial class Program
                 WriteEyeCleanExit();
                 break;
             }
-
-            // ── Admin proxy re-spawn: if admin Eye exited (version update), re-launch new version ──
-            // Admin Eye FSW detects new binary, waits for IsBusy=false, then exits.
-            // We detect the disappearance here and re-spawn so the new version takes over.
-            var adminNowAvailable = ElevatedEyeClient.IsAvailable();
-            if (_adminWasAvailable && !adminNowAvailable && !elevated)
-            {
-                Console.Error.WriteLine("[EYE] Admin proxy disappeared — re-spawning new version");
-                _ = Task.Run(() => ElevationHelper.LaunchElevatedEye());
-            }
-            _adminWasAvailable = adminNowAvailable;
 
             // ── Hot-swap: FSW-driven instant detection + blue-green restart ──
             // FSW flag checked every frame (~100ms) — no 5s polling delay
