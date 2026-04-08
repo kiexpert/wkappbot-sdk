@@ -21,21 +21,22 @@ internal partial class Program
         if (args.Any(a => a is "--regression")) { TryRunRegression("a11y", args); return 0; }
 
         // ═══ Focus Hot-Chain (lightweight — Win32 only, no FlaUI/UIA DLL loading) ═══
+        // For "find": # FOCUS is deferred to A11yFind where focused element abs path is available.
+        bool isFindAction = args.Length > 0 && args[0].Equals("find", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var fg = NativeMethods.GetForegroundWindow();
-            var fgTitle = NativeMethods.GetWindowTextW(fg);
             var gti = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
             {
-                var focusGrap = WindowFinder.BuildTargetJson5(gti.hwndFocus);
+                var focusGrap = BuildCompactWinGrap(gti.hwndFocus);
                 var fsw = System.Diagnostics.Stopwatch.StartNew();
                 var hits = WindowFinder.FindByTitle(focusGrap, true);
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
-                Console.Error.WriteLine($"[FOCUS] {focusGrap} // [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
-                Console.WriteLine(Ansi.Dim($"# FOCUS {focusGrap}"));
+                Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
+                if (!isFindAction)
+                    Console.WriteLine(Ansi.Dim($"# FOCUS \"{focusGrap}\""));
             }
         }
         catch { }

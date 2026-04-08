@@ -67,11 +67,31 @@ internal partial class Program
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}"); }
 
-        // Compact grap: no title/url, cls only for non-browser
+        // Compact grap: no hwnd/pid/proc, browser→domain only
         var compactGrap = BuildCompactWinGrap(hwnd);
         // Skip abs path if root is a Window (path would be "?") or resolution failed
         var validAbsPath = (absTagPath.Length > 0 && absTagPath != "?") ? absTagPath : "";
         var fullGrap = string.IsNullOrEmpty(validAbsPath) ? compactGrap : $"{compactGrap}#{validAbsPath}";
+
+        // # FOCUS with focused element abs path (deferred from A11yCommand for find action)
+        if (focInfo != null)
+        {
+            var gti2 = new NativeMethods.GUITHREADINFO
+                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            NativeMethods.GetGUIThreadInfo(0, ref gti2);
+            var focWin = gti2.hwndFocus != IntPtr.Zero ? BuildCompactWinGrap(gti2.hwndFocus) : "?";
+            // Abs path from parent chain: reversed, 3-char type prefix, skip Window nodes
+            static string Abb(string t) => t.Length > 3 ? t[..3] : t;
+            var chain = focInfo.ParentChain
+                .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
+                .Select(p => Abb(p.type))
+                .Reverse()
+                .ToList();
+            if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window")
+                chain.Add(Abb(focInfo.ControlType));
+            var focPath = chain.Count > 0 ? $"#{string.Join("/", chain)}" : "";
+            Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWin}{focPath}\""));
+        }
 
         // Verify the grap resolves to the correct hwnd → [OK] or [?]
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -84,21 +104,22 @@ internal partial class Program
         catch { }
         sw.Stop();
 
-        // Window title as meta — NOT element name (can be full text content)
+        // Window title as meta — truncated to avoid noise
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
-        var metaSuffix = !string.IsNullOrEmpty(winTitle) ? $"  {winTitle}" : "";
+        var titleShort = winTitle.Length > 60 ? winTitle[..57] + "…" : winTitle;
+        var metaSuffix = !string.IsNullOrEmpty(titleShort) ? $"  {titleShort}" : "";
         Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaSuffix}"));
 
-        // ── CURSOR ──────────────────────────────────────────────────
-        Console.WriteLine(Ansi.Header("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+        // ── CURSOR (stderr) ──────────────────────────────────────────────────
+        Console.Error.WriteLine(Ansi.Header("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 
         bool cursorIsBlocking = false;
         if (focInfo != null)  // focInfo computed above alongside absTagPath
         {
             var curTag = GrapHelper.FormatNodeLabel(focInfo.ControlType, focInfo.AutomationId, focInfo.Name);
-            Console.WriteLine($"  {curTag}");
+            Console.Error.WriteLine($"  {curTag}");
 
-            // Run-length encode consecutive identical unnamed types (e.g. <Group> x7)
+            // Run-length encode consecutive identical unnamed types (e.g. Group x7)
             var parents = focInfo.ParentChain.Where(p => !string.IsNullOrEmpty(p.type)).ToList();
             int pi = 0;
             while (pi < parents.Count)
@@ -112,18 +133,18 @@ internal partial class Program
                         count++;
                 var pTag = GrapHelper.FormatNodeLabel(pType, "", pName);
                 var suffix = count > 1 ? $" x{count}" : "";
-                Console.WriteLine($"    ← {pTag}{suffix}");
+                Console.Error.WriteLine($"    ← {pTag}{suffix}");
                 if (pType == "Dialog") cursorIsBlocking = true;
                 pi += count;
             }
         }
         else
         {
-            Console.WriteLine("  (no focused element)");
+            Console.Error.WriteLine("  (no focused element)");
         }
 
-        // ── TARGET ──────────────────────────────────────────────────
-        Console.WriteLine(Ansi.Header("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+        // ── TARGET (stderr) ──────────────────────────────────────────────────
+        Console.Error.WriteLine(Ansi.Header("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
 
         var targetName = root.Properties.Name.ValueOrDefault ?? "";
         var targetAid  = root.Properties.AutomationId.ValueOrDefault ?? "";
@@ -133,8 +154,7 @@ internal partial class Program
         System.Drawing.Rectangle? targetRect = null;
         try { var r = root.Properties.BoundingRectangle.ValueOrDefault; if (r.Width > 0) targetRect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
         var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, rect: targetRect, actions: patterns);
-        // abs path shown above in # TARGET line; just show node tag here
-        Console.WriteLine($"  {targetTag}");
+        Console.Error.WriteLine($"  {targetTag}");
 
         // parent + siblings
         try
@@ -142,7 +162,7 @@ internal partial class Program
             var parent = root.Parent;
             if (parent != null)
             {
-                Console.WriteLine($"  parent: {GrapHelper.FormatNodeLabel(parent)}");
+                Console.Error.WriteLine($"  parent: {GrapHelper.FormatNodeLabel(parent)}");
 
                 var siblings = parent.FindAllChildren()
                     .Where(c => {
@@ -155,23 +175,22 @@ internal partial class Program
                 if (siblings.Count > 0)
                 {
                     var sibTags = siblings.Select(s => GrapHelper.FormatNodeLabel(s));
-                    Console.WriteLine($"  siblings: {string.Join(" · ", sibTags)}");
+                    Console.Error.WriteLine($"  siblings: {string.Join(" · ", sibTags)}");
                 }
             }
         }
         catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] parent/siblings error: {ex.Message}"); }
 
-        // ── VERDICT ─────────────────────────────────────────────────
-        // Only emit when there's something actionable — skip ✓ (noise)
+        // ── VERDICT (stderr) ─────────────────────────────────────────────────
         if (cursorIsBlocking)
         {
-            Console.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-            Console.WriteLine(Ansi.Yellow("  ⚠ cursor in Dialog — verify target is reachable"));
+            Console.Error.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+            Console.Error.WriteLine(Ansi.Yellow("  ⚠ cursor in Dialog — verify target is reachable"));
         }
         else if (focInfo == null)
         {
-            Console.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-            Console.WriteLine(Ansi.Dim("  ? focus unknown"));
+            Console.Error.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
+            Console.Error.WriteLine(Ansi.Dim("  ? focus unknown"));
         }
 
         // Win32 children → stderr only

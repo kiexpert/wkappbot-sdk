@@ -1693,16 +1693,29 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Compact window grap for # TARGET / hack-hover lines — copy-paste ready.
-    /// Rules: hwnd+pid+proc always; browser→domain (no cls); old app→cls; no title/url.
+    /// Compact window grap for # TARGET / hack-hover lines — copy-paste ready, noise-free.
+    /// Rules: no hwnd/pid; browser→domain only; non-browser→{proc,cls}; no title/url.
     /// </summary>
     internal static string BuildCompactWinGrap(IntPtr hwnd)
     {
         var g = WindowFinder.BuildTargetJson5(hwnd);
+        // Strip machine-specific noisy fields
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",?hwnd:0x[0-9A-Fa-f]+,?", ",");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",?pid:\d+,?", ",");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",title:'[^']*'", "");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",url:'[^']*'", "");
         if (g.Contains("domain:"))
-            g = System.Text.RegularExpressions.Regex.Replace(g, @",cls:'[^']*'", "");
+        {
+            // Browser: keep only domain
+            g = System.Text.RegularExpressions.Regex.Replace(g, @",?proc:'[^']*',?", ",");
+            g = System.Text.RegularExpressions.Regex.Replace(g, @",?cls:'[^']*',?", ",");
+            var m = System.Text.RegularExpressions.Regex.Match(g, @"domain:'([^']*)'");
+            if (m.Success) return m.Groups[1].Value;
+        }
+        // Clean up stray commas from removals
+        g = System.Text.RegularExpressions.Regex.Replace(g, @"\{,+", "{");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",+\}", "}");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",{2,}", ",");
         return g;
     }
 
