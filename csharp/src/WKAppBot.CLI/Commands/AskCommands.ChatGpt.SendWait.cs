@@ -344,7 +344,7 @@ internal partial class Program
                 if (!liveHeaderPrinted)
                 {
                     Console.WriteLine();
-                     Console.WriteLine("[ChatGPT] streaming...");
+                    Console.Error.WriteLine("[ChatGPT] streaming...");
                     liveHeaderPrinted = true;
                 }
                 Console.Write(delta);
@@ -373,7 +373,7 @@ internal partial class Program
                 if (!liveHeaderPrinted)
                 {
                     Console.WriteLine();
-                     Console.WriteLine("[ChatGPT] streaming...");
+                    Console.Error.WriteLine("[ChatGPT] streaming...");
                     liveHeaderPrinted = true;
                 }
                 Console.Write(".");
