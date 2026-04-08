@@ -398,7 +398,9 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 var nodeKey = hwnd != IntPtr.Zero ? $"{hwnd:X8}:{pt.X},{pt.Y}" : "";
                 var idleMs = NativeMethods.GetUserIdleMs();
-                bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && !firstRun;
+                // Skip hover analysis for wkappbot-core's own overlay windows (ScreenSaver, WhisperRing, etc.)
+                bool isOwnWindow = hwnd != IntPtr.Zero && IsWkappbotCoreWindow(hwnd);
+                bool doMouse = hwnd != IntPtr.Zero && idleMs >= 1000 && !firstRun && !isOwnWindow;
                 firstRun = false;
 
                 // Ensure server is running
@@ -551,6 +553,20 @@ internal partial class Program
     }
 
     static string _lastFocusChainResult = "";
+
+    /// <summary>
+    /// Returns true if hwnd belongs to wkappbot-core itself (ScreenSaver, WhisperRing, overlays).
+    /// These windows are transparent/decorative and not useful hover analysis targets.
+    /// </summary>
+    static bool IsWkappbotCoreWindow(IntPtr hwnd)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            return pid == (uint)Environment.ProcessId;
+        }
+        catch { return false; }
+    }
 
     /// <summary>
     /// Restore reply ts values from a recovered Eye status thread (Eye restart reuse).
