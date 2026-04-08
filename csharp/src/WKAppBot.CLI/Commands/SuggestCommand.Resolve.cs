@@ -398,6 +398,10 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine($"  Evidence script PASSED (exit=0)");
                 Console.ResetColor();
+                // Suggest registering as skill regression script
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Error.WriteLine($"  [TIP] To link as skill regression: wkappbot skill contribute --id <skill-id> --regression-script \"{Path.GetFullPath(evidenceFile)}\"");
+                Console.ResetColor();
             }
             catch (Exception ex)
             {
