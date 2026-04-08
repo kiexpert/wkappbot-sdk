@@ -157,21 +157,46 @@ internal partial class Program
             Console.Error.WriteLine($"[find] window: {titleShort}");
         }
 
-        // Multiple matches → list all with disambiguating pid graps (copy-paste ready)
+        // Multiple matches → list all with disambiguating pid graps + focus node (copy-paste ready)
         if (verifyHits.Count > 1)
         {
             Console.WriteLine(Ansi.Dim($"# {verifyHits.Count} windows match — pick one:"));
+            // Pre-capture focused hwnd once
+            var gtiMulti = new NativeMethods.GUITHREADINFO
+                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            NativeMethods.GetGUIThreadInfo(0, ref gtiMulti);
             foreach (var hit in verifyHits)
             {
                 NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
-                var hitGrap = BuildCompactWinGrap(hit.Handle);
-                string pidGrap = hitGrap.StartsWith('{')
-                    ? hitGrap.TrimEnd('}') + $",pid:{hitPid}}}"
-                    : $"{{domain:'{hitGrap}',pid:{hitPid}}}";
+                var hitGrap = InjectHwnd(BuildCompactWinGrap(hit.Handle), hit.Handle);
+                // Focus node path: only for the window that has keyboard focus
+                string focusPath = "";
+                if (gtiMulti.hwndFocus != IntPtr.Zero)
+                {
+                    // Check if focused hwnd belongs to this window's process or is a child
+                    NativeMethods.GetWindowThreadProcessId(gtiMulti.hwndFocus, out uint focPid);
+                    if (focPid == hitPid)
+                    {
+                        // Same process — compute abs tag path from focInfo (already computed above)
+                        if (focInfo != null && hit.Handle == hwnd)
+                        {
+                            // Reuse the already-computed focPath from # FOCUS
+                            static string Abb2(string t) => t.Length > 3 ? t[..3] : t;
+                            var fChain = focInfo.ParentChain
+                                .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
+                                .Select(p => string.IsNullOrEmpty(p.aid) ? Abb2(p.type) : $"{Abb2(p.type)}_{p.aid}")
+                                .Reverse().ToList();
+                            var fLeaf = Abb2(focInfo.ControlType);
+                            if (!string.IsNullOrEmpty(focInfo.AutomationId)) fLeaf += $"_{focInfo.AutomationId}";
+                            if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window") fChain.Add(fLeaf);
+                            if (fChain.Count > 0) focusPath = "#" + string.Join("/", fChain);
+                        }
+                    }
+                }
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
                 if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "…";
                 var marker = hit.Handle == hwnd ? " ◀" : "";
-                Console.WriteLine($"#   \"{pidGrap}\"  hwnd=0x{hit.Handle.ToInt64():X8} pid={hitPid}  {hitTitle}{marker}");
+                Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hitGrap}{focusPath}\"{marker}  {hitTitle}"));
             }
         }
 

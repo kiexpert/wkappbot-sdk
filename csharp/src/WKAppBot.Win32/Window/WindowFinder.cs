@@ -141,6 +141,18 @@ public static class WindowFinder
                     matched = PatternMatcher.TokenMatchAny(titlePattern, url);
             }
 
+            // cmd: fallback — match against process command line args
+            if (!matched)
+            {
+                try
+                {
+                    var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                    if (!string.IsNullOrEmpty(cmdLine))
+                        matched = PatternMatcher.TokenMatchAny(titlePattern, cmdLine);
+                }
+                catch { }
+            }
+
             if (matched)
             {
                 var info = WindowInfo.FromHwnd(hWnd);
