@@ -40,7 +40,9 @@ internal partial class Program
                     fsw.Stop();
                     var focusOk = hits.Any(h => h.Handle == focRootHwnd);
                     Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
-                    Console.WriteLine(Ansi.Dim($"# FOCUS \"hwnd:0x{focRootHwnd.ToInt64():X8}\"  {focusGrap}"));
+                    var focInner = focusGrap.TrimStart('{').TrimEnd('}').Trim();
+                    var focPaste = QuoteGrapExpression($"{{hwnd:0x{focRootHwnd.ToInt64():X},{focInner}}}");
+                    PrintFocusBlock(focPaste, focusOk ? "OK" : "MISS", fsw.ElapsedMilliseconds);
                 }
             }
             catch { }
