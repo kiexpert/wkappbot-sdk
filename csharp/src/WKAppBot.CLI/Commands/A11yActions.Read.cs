@@ -89,7 +89,24 @@ internal partial class Program
                 .ToList();
             if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window")
                 chain.Add(Abb(focInfo.ControlType));
-            var focPath = chain.Count > 0 ? $"#{string.Join("/", chain)}" : "";
+            // Compress consecutive identical bare types: Gro/Gro/Gro → Gro// (same as BuildAbsoluteTagPath)
+            string focPath = "";
+            if (chain.Count > 0)
+            {
+                var sb2 = new System.Text.StringBuilder();
+                for (int ci = 0; ci < chain.Count; ci++)
+                {
+                    if (ci > 0) sb2.Append('/');
+                    sb2.Append(chain[ci]);
+                    if (!chain[ci].Contains('_'))
+                    {
+                        int skip = 0;
+                        while (ci + 1 + skip < chain.Count && chain[ci + 1 + skip] == chain[ci]) skip++;
+                        if (skip > 0) { sb2.Append(new string('/', skip)); ci += skip; }
+                    }
+                }
+                focPath = $"#{sb2}";
+            }
             Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWin}{focPath}\""));
         }
 
