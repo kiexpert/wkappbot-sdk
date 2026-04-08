@@ -1731,6 +1731,9 @@ internal partial class Program
             }
             catch { }
         }
+        // Strip generic Chromium window classes — add no disambiguation value
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",?cls:'Chrome_WidgetWin_\d+',?", ",");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",?cls:'Chrome_RenderWidgetHostHWND',?", ",");
         // Clean up stray commas from removals
         g = System.Text.RegularExpressions.Regex.Replace(g, @"\{,+", "{");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",+\}", "}");
