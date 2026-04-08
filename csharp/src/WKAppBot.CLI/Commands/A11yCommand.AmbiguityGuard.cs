@@ -50,7 +50,7 @@ internal partial class Program
                 return false;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] \"{grap}\" -> {allWindows.Count}개 매칭 -> find 자동 전환. 정확한 타겟을 지정하세요:");
+            Console.Error.WriteLine($"[A11Y] \"{grap}\" matched {allWindows.Count} windows — specify target:");
             Console.ResetColor();
 
             // Get focused UIA element info (for the foreground window's process)
@@ -94,17 +94,19 @@ internal partial class Program
                     Console.ResetColor();
                 }
 
-                // Precise grap command (append #focusScope for combined target)
-                var searchGrap = Program.BuildCompactWinGrap(w.Handle);  // portable, for verify
-                var displayGrap = Program.BuildTargetGrap(w.Handle);     // with hwnd, for display
-                var fullTarget = Program.BuildTargetGrapWithFocusPath(w);
+                // Build paste-ready JSON5 grap with mandatory fields
+                var hitCompact = Program.BuildCompactWinGrap(w.Handle);
+                var hitGrapJson = BuildFindGrap(w.Handle, wpid, proc, hitCompact, w);
+                var hitFullGrap = BuildTargetGrapWithFocusPath(w);
+                var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
+                var hitPaste = QuoteGrapExpression($"{hitGrapJson}{hitScope}");
 
                 // Verify: re-search with portable pattern (no hwnd)
-                var verifyHits = WindowFinder.FindWindows(searchGrap, true);
+                var verifyHits = WindowFinder.FindWindows(hitCompact, true);
                 var verified = verifyHits.Any(v => v.Handle == w.Handle);
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write($"     a11y {action} \"{fullTarget}\"");
+                Console.Write($"     a11y {action} {hitPaste}");
                 Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Red;
                 Console.WriteLine(verified ? " [OK]" : " [MISS]");
                 Console.ResetColor();
@@ -124,12 +126,12 @@ internal partial class Program
                     else
                     {
                         AutoRegisterBug(
-                            $"[BUG-AUTO] auto-find grap verify MISS: pattern={searchGrap} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
-                            args: ["a11y", "find", searchGrap]);
+                            $"[BUG-AUTO] auto-find grap verify MISS: pattern={hitCompact} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
+                            args: ["a11y", "find", hitCompact]);
                     }
                 }
             }
-            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"<target>\" 으로 상세 탐색 / --all 또는 --nth 1 으로 강제 실행");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"<target>\" to explore / --all or --nth 1 to force");
             return true;
         }
 
@@ -147,14 +149,19 @@ internal partial class Program
             if (ownedPopup == IntPtr.Zero || ownedPopup == targetHwnd) return;
 
             var popTitle = WindowFinder.GetWindowText(ownedPopup);
-            var popJson5 = Program.BuildTargetGrap(ownedPopup);
+            NativeMethods.GetWindowThreadProcessId(ownedPopup, out uint popPid);
+            string popProc = ""; try { popProc = System.Diagnostics.Process.GetProcessById((int)popPid).ProcessName; } catch { }
+            var popCompact = Program.BuildCompactWinGrap(ownedPopup);
+            var popGrapJson = BuildFindGrap(ownedPopup, popPid, popProc, popCompact, null);
+            var popJson5 = QuoteGrapExpression(popGrapJson);
+
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
+            Console.Error.WriteLine($"[A11Y] ALERT: modal dialog is blocking target → \"{popTitle}\"");
             Console.ResetColor();
 
             // Auto-find inside the alert dialog (UIA)
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] ALERT -> find 자동 전환. 알러트 내부 요소:");
+            Console.Error.WriteLine($"[A11Y] ALERT: auto-switching to find. Alert contents:");
             Console.ResetColor();
             try
             {
@@ -164,7 +171,7 @@ internal partial class Program
                 int shown = 0;
                 foreach (var ac in alertChildren)
                 {
-                    if (shown >= 15) { Console.WriteLine($"     ... (+{alertChildren.Length - shown}개 더)"); break; }
+                    if (shown >= 15) { Console.WriteLine($"     ... (+{alertChildren.Length - shown} more)"); break; }
                     var acType = "?"; try { acType = ac.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                     var acName = ac.Properties.Name.ValueOrDefault ?? "";
                     var acAid = ac.Properties.AutomationId.ValueOrDefault ?? "";
@@ -176,7 +183,7 @@ internal partial class Program
                     Console.Write(actionable ? "  >> " : "     ");
                     Console.Write($"{acType}(\"{acLabel}\")");
                     if (actionable)
-                        Console.Write($" -> a11y invoke \"{popJson5}#*{acLabel}*\"");
+                        Console.Write($" -> a11y invoke {popJson5}#*{acLabel}*\"");
                     Console.WriteLine();
                     Console.ResetColor();
                     shown++;
@@ -192,7 +199,7 @@ internal partial class Program
                 var akTitle = ak.Title;
                 if (akCls != "Button" || string.IsNullOrEmpty(akTitle)) continue;
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"  >> [Button] \"{akTitle}\" -> a11y click \"{popJson5}#*{akTitle}*\"");
+                Console.WriteLine($"  >> [Button] \"{akTitle}\" -> a11y click {popJson5}#*{akTitle}*\"");
                 Console.ResetColor();
             }
         }
@@ -218,6 +225,12 @@ internal partial class Program
                 if (osFocus != null && osFocus.ProcessId == (int)winPid)
                     focLeaf = osFocus;
 
+                // Build paste-ready grap for this window
+                string winProc = ""; try { winProc = System.Diagnostics.Process.GetProcessById((int)winPid).ProcessName; } catch { }
+                var winCompact = Program.BuildCompactWinGrap(targetHwnd);
+                var winGrapJson = BuildFindGrap(targetHwnd, winPid, winProc, winCompact, null);
+                var winPaste = QuoteGrapExpression(winGrapJson);
+
                 if (focLeaf != null)
                 {
                     // OS focus is in our target window — show leaf + parent chain
@@ -236,9 +249,8 @@ internal partial class Program
                     Console.ResetColor();
                     if (!string.IsNullOrEmpty(fLabel))
                     {
-                        var focJson5 = Program.BuildTargetGrapWithFocusPath(targetHwnd);
                         Console.ForegroundColor = ConsoleColor.DarkGreen;
-                        Console.Error.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
+                        Console.Error.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} {winPaste}#*{fLabel}*\"");
                         Console.ResetColor();
                     }
                 }
@@ -285,9 +297,8 @@ internal partial class Program
                         Console.Error.WriteLine($"[A11Y] LEAF: {dType}(\"{label}\"){(patterns.Count > 0 ? $" [{string.Join(",", patterns)}]" : "")}");
                         if (!string.IsNullOrEmpty(label))
                         {
-                            var leafJson5 = Program.BuildTargetGrapWithFocusPath(targetHwnd);
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.Error.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{leafJson5}#*{label}*\"");
+                            Console.Error.WriteLine($"[A11Y] LEAF TARGET: a11y {action} {winPaste}#*{label}*\"");
                             Console.ResetColor();
                         }
                     }
@@ -305,13 +316,13 @@ internal partial class Program
             string grap, string action, string? uiaPath, string[] win32Segments, int segIndex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] \"{missingPattern}\" 자식창 없음 -> find 자동 전환. Win32 자식 윈도우:");
+            Console.Error.WriteLine($"[A11Y] \"{missingPattern}\" child window not found — Win32 children:");
             Console.ResetColor();
             var siblings = WindowFinder.GetChildrenZOrder(parentHwnd);
             int shown = 0;
             foreach (var sib in siblings)
             {
-                if (shown >= 20) { Console.WriteLine($"     ... (+{siblings.Count - shown}개 더)"); break; }
+                if (shown >= 20) { Console.WriteLine($"     ... (+{siblings.Count - shown} more)"); break; }
                 var sibCls = WindowFinder.GetClassName(sib.Handle);
                 var sibTitle = sib.Title;
                 if (sibTitle.Length > 40) sibTitle = sibTitle[..40];
@@ -335,7 +346,7 @@ internal partial class Program
                 shown++;
             }
             if (siblings.Count == 0)
-                Console.WriteLine("     (자식 윈도우 없음 — UIA 탐색 필요)");
+                Console.WriteLine("     (no child windows — UIA traversal required)");
         }
 
         // ── Layer 5: Missing #scope on element action ──
@@ -352,11 +363,15 @@ internal partial class Program
                 return false;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] #scope 없음 -> find 자동 전환. \"{title}\" 의 UIA 요소:");
+            Console.Error.WriteLine($"[A11Y] No #scope — auto-switching to find. UIA elements in \"{title}\":");
             Console.ResetColor();
             try
             {
-                var winJson5 = Program.BuildTargetGrap(hwnd);
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                string proc = ""; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+                var compact = Program.BuildCompactWinGrap(hwnd);
+                var winGrapJson = BuildFindGrap(hwnd, pid, proc, compact, null);
+                var winPaste = QuoteGrapExpression(winGrapJson);
 
                 // Show focused element first (leaf → parent chain)
                 try
@@ -382,7 +397,7 @@ internal partial class Program
                         if (!string.IsNullOrEmpty(fLabel))
                         {
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
-                            Console.WriteLine($"     -> a11y {action} \"{winJson5}#*{fLabel}*\"");
+                            Console.WriteLine($"     -> a11y {action} {winPaste}#*{fLabel}*\"");
                             Console.ResetColor();
                         }
                     }
@@ -394,7 +409,7 @@ internal partial class Program
                 int shown = 0;
                 foreach (var child in children)
                 {
-                    if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown}개 더 — a11y find로 전체 탐색)"); break; }
+                    if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown} more — use a11y find for full tree)"); break; }
                     var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                     var cName = child.Properties.Name.ValueOrDefault ?? "";
                     var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
@@ -402,13 +417,17 @@ internal partial class Program
                     var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
                     if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
+                    Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} {winPaste}#*{cLabel}*\"");
                     Console.ResetColor();
                     shown++;
                 }
             }
             catch { }
-            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{Program.BuildTargetGrap(hwnd)}\" --depth 5 로 전체 탐색");
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint tipPid);
+            string tipProc = ""; try { tipProc = System.Diagnostics.Process.GetProcessById((int)tipPid).ProcessName; } catch { }
+            var tipCompact = Program.BuildCompactWinGrap(hwnd);
+            var tipGrap = QuoteGrapExpression(BuildFindGrap(hwnd, tipPid, tipProc, tipCompact, null));
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find {tipGrap} --depth 5");
             return true;
         }
 
@@ -421,30 +440,34 @@ internal partial class Program
             string uiaPath, string action)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] \"{uiaPath}\" 요소 없음 -> find 자동 전환. 사용 가능한 요소:");
+            Console.Error.WriteLine($"[A11Y] \"{uiaPath}\" not found — available elements:");
             Console.ResetColor();
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+            string proc = ""; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+            var compact = Program.BuildCompactWinGrap(hwnd);
+            var winGrapJson = BuildFindGrap(hwnd, pid, proc, compact, null);
+            var winPaste = QuoteGrapExpression(winGrapJson);
             try
             {
                 var children = root.FindAllChildren();
                 int shown = 0;
                 foreach (var child in children)
                 {
-                    if (shown >= 15) { Console.WriteLine($"     ... (+{children.Length - shown}개)"); break; }
+                    if (shown >= 15) { Console.WriteLine($"     ... (+{children.Length - shown} more)"); break; }
                     var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                     var cName = child.Properties.Name.ValueOrDefault ?? "";
                     var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
                     if (cName.Length > 40) cName = cName[..40];
                     var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
                     if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
-                    var winJson5 = Program.BuildTargetGrap(hwnd);
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
+                    Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} {winPaste}#*{cLabel}*\"");
                     Console.ResetColor();
                     shown++;
                 }
             }
             catch { }
-            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{Program.BuildTargetGrap(hwnd)}\" --depth 5 로 전체 탐색");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find {winPaste} --depth 5");
         }
     }
 }

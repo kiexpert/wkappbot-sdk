@@ -6,10 +6,10 @@
   "steps": [
     "Run a11y find \u003Cpattern\u003E and treat all fields title/proc/domain/cmd/url as matchable",
     "Always print # FOCUS when the focused leaf can affect interaction, even if unrelated to the target (for example modal/error popups)",
-    "Print # TARGET as the resolved target window with hwnd:0x... as the primary paste-ready token, then append compact JSON5 context only when helpful",
+    "Print ## TARGET section (stdout, bold cyan). Format (v5.13\u002B):\n## TARGET\n\u0022{hwnd:0x...,pid:...,proc:\u0027chrome\u0027,domain:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms\nWindowTitle \u2192 stderr (not stdout \u2014 prevents noise from unrelated tab names)\n\nMandatory field order in grap JSON5: hwnd first, pid second (collision safety), proc, then domain/file/cls/matchedField.\nmatchedField auto-injected: if search matched via cmd/title/uia, that field\u002Bsnippet appended (e.g. cmd:\u0027...\u0027 when chatgpt.com search matched VS Code via cmdline).",
     "Grap output must be shell-friendly: a pasted target string should work without manual editing, quoting, or brace escaping",
     "Always verify pasted grap targets by re-running a11y find on the emitted hwnd:0x... form; [OK] means the pasted token resolves back to the same hwnd",
-    "If multiple windows match, emit one # TARGET line per match and keep the primary pick clearly marked"
+    "Multiple windows match \u2192 ## TARGETS N matches header (outer loop in A11yCommand), then one ## TARGET block per window \u2014 each with its own paste grap \u002B command line \u002B [OK] Nms.\nDo NOT use --all or --nth to force: show all blocks, let user pick specific grap.\nEach block\u0027s grap has matchedField injected so the reason for match is explicit."
   ],
   "tags": [
     "grap",
@@ -68,6 +68,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-08T07:01:01.1192756Z",
-  "updated": "2026-04-08T07:53:36.7800691Z",
-  "version": "1.3"
+  "updated": "2026-04-08T10:22:12.1008484Z",
+  "version": "1.7"
 }

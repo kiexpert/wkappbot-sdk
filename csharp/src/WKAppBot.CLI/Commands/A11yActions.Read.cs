@@ -111,7 +111,7 @@ internal partial class Program
         return f.ToString();
     }
 
-    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true)
+    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true, string[]? extraArgs = null)
     {
         FocusedElementInfo? focInfo = null;
         try
@@ -184,37 +184,18 @@ internal partial class Program
         var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, primaryHit);
         var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
-        if (verifyHits.Count <= 1)
-        {
-            Console.WriteLine(Ansi.TargetLine($"## TARGET  [{Ansi.Mark(verifyMark)}] {sw.ElapsedMilliseconds}ms"));
-            Console.WriteLine(Ansi.TargetLine(paste));
-            if (!string.IsNullOrWhiteSpace(title))
-                Console.Error.WriteLine(title);
-        }
-        else
-        {
-            Console.WriteLine(Ansi.Dim($"## TARGETS  {verifyHits.Count} matches"));
-            foreach (var hit in verifyHits)
-            {
-                Console.WriteLine();
-                NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
-                string hitProc = "";
-                try { using var hp = System.Diagnostics.Process.GetProcessById((int)hitPid); hitProc = hp.ProcessName; } catch { }
-                var hitCompact = BuildCompactWinGrap(hit.Handle);
-                var hitFullGrap = BuildTargetGrapWithFocusPath(hit);
-                var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
-                var hitGrapJson = BuildFindGrap(hit.Handle, hitPid, hitProc, hitCompact, hit);
-                var hitPaste = QuoteGrapExpression($"{hitGrapJson}{hitScope}");
-                var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
-                if (hitTitle.Length > 90) hitTitle = hitTitle[..87] + "...";
-                var marker = hit.Handle == hwnd ? " *" : "";
-
-                Console.WriteLine(Ansi.TargetLine($"### TARGET{marker}  [{Ansi.Mark("OK")}]"));
-                Console.WriteLine(Ansi.TargetLine(hitPaste));
-                if (!string.IsNullOrWhiteSpace(hitTitle))
-                    Console.Error.WriteLine(hitTitle);
-            }
-        }
+        Console.WriteLine(Ansi.TargetLine("## TARGET"));
+        Console.WriteLine(Ansi.TargetLine(paste));
+        // Ready-to-run command line
+        var cmdLine = $"wkappbot a11y find {paste}";
+        if (extraArgs != null && extraArgs.Length > 0)
+            cmdLine += " " + string.Join(" ", extraArgs);
+        Console.WriteLine(Ansi.TargetLine(cmdLine));
+        // Verify mark on its own line (after command, for readability)
+        Console.WriteLine(Ansi.TargetLine($"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms"));
+        // Window title → stderr (human-readable label, not captured by pipes)
+        if (!string.IsNullOrWhiteSpace(title))
+            Console.Error.WriteLine(title);
 
         return true;
     }
