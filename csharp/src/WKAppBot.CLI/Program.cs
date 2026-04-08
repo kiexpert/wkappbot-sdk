@@ -1714,15 +1714,32 @@ internal partial class Program
         }
         else
         {
-            // No domain — check for file:// URL (stripped by BuildTargetJson5 but recoverable)
+            // No domain — check for stripped internal Electron/browser URLs
             WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid2);
             try
             {
                 var rawUrl = WindowFinder.GetBrowserUrl(hwnd, pid2);
-                if (!string.IsNullOrEmpty(rawUrl) && rawUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                if (!string.IsNullOrEmpty(rawUrl))
                 {
-                    var fileName = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
-                    if (!string.IsNullOrEmpty(fileName)) return $"file:'{fileName}'";
+                    if (rawUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fileName = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
+                        if (!string.IsNullOrEmpty(fileName)) return $"file:'{fileName}'";
+                    }
+                    else if (rawUrl.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // VS Code (Electron): extract workspace/folder from window title
+                        // Title format: "[● ]<file> - <workspace> - Visual Studio Code"
+                        //           or: "<workspace> - Visual Studio Code"
+                        var title = WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd).TrimStart('●', ' ');
+                        var parts = title.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && parts[^1].Trim().Equals("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var workspace = parts[^2].Trim();
+                            if (!string.IsNullOrEmpty(workspace)) return $"vscode:'{workspace}'";
+                        }
+                        return "vscode:";
+                    }
                 }
             }
             catch { }
