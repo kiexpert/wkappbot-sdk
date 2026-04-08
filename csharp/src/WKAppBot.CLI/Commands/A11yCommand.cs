@@ -29,14 +29,17 @@ internal partial class Program
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
             {
-                var focusGrap = BuildCompactWinGrap(gti.hwndFocus);
+                // Use root ancestor for grap — child focus hwnd is useless for targeting
+                var focRootHwnd = NativeMethods.GetAncestor(gti.hwndFocus, NativeMethods.GA_ROOT);
+                if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti.hwndFocus;
+                var focusGrap = BuildCompactWinGrap(focRootHwnd);
                 var fsw = System.Diagnostics.Stopwatch.StartNew();
                 var hits = WindowFinder.FindWindows(focusGrap, true);
                 fsw.Stop();
-                var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
+                var focusOk = hits.Any(h => h.Handle == focRootHwnd);
                 Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
                 if (!isFindAction)
-                    Console.WriteLine(Ansi.Dim($"# FOCUS \"{focusGrap}\""));
+                    Console.WriteLine(Ansi.Dim($"# FOCUS \"hwnd:0x{focRootHwnd.ToInt64():X8}\"  {focusGrap}"));
             }
         }
         catch { }

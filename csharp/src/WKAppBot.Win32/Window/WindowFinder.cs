@@ -858,15 +858,13 @@ public static class WindowFinder
             return "";
         }
 
-        // Tier 0: Chromium cmdline URL extraction (no address bar → UIA Tier 2-4 fail)
-        //   --app=https://...    Chrome Web App (PWA)
-        //   --folder-uri=file:// VS Code / Electron workspace
-        if (IsChromiumProcess(proc))
+        // Tier 0: cmdline URL extraction — works for Chromium PWAs AND Electron apps (e.g. VS Code)
+        try
         {
-            try
+            var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+            // --app=https://... (Chromium PWA / Web App only)
+            if (IsChromiumProcess(proc))
             {
-                var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
-                // PWA / Web App
                 var mApp = Regex.Match(cmdLine, @"--app=(https?://\S+)", RegexOptions.IgnoreCase);
                 if (mApp.Success)
                 {
@@ -877,20 +875,20 @@ public static class WindowFinder
                         return appUrl;
                     }
                 }
-                // VS Code / Electron workspace folder
-                var mFolder = Regex.Match(cmdLine, @"--folder-uri=(file://[^\s""']+)", RegexOptions.IgnoreCase);
-                if (mFolder.Success)
+            }
+            // --folder-uri=file:// (VS Code / any Electron workspace — not Chromium-specific)
+            var mFolder = Regex.Match(cmdLine, @"--folder-uri=(file://[^\s""']+)", RegexOptions.IgnoreCase);
+            if (mFolder.Success)
+            {
+                var folderUrl = mFolder.Groups[1].Value.TrimEnd('"', '\'');
+                if (!string.IsNullOrEmpty(folderUrl))
                 {
-                    var folderUrl = mFolder.Groups[1].Value.TrimEnd('"', '\'');
-                    if (!string.IsNullOrEmpty(folderUrl))
-                    {
-                        _uiaOmniboxCache[hWnd] = (folderUrl, now);
-                        return folderUrl;
-                    }
+                    _uiaOmniboxCache[hWnd] = (folderUrl, now);
+                    return folderUrl;
                 }
             }
-            catch { }
         }
+        catch { }
 
         // Tier 1: CDP HTTP — Chromium only, requires --remote-debugging-port
         if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
@@ -1369,9 +1367,18 @@ public static class WindowFinder
             var url = GetBrowserUrl(hWnd, pid);
             if (domainMatchers != null)
             {
-                string domain = "";
-                try { domain = string.IsNullOrEmpty(url) ? "" : new Uri(url.Split(' ')[0]).Host; } catch { }
-                if (!domainMatchers.Any(m => m.IsMatch(domain))) return false;
+                // CDP Tier 1 returns space-separated multi-URL (all open tabs) — check ALL, not just first
+                bool domainMatched = false;
+                foreach (var tok in (url ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    try
+                    {
+                        var dom = new Uri(tok).Host;
+                        if (domainMatchers.Any(m => m.IsMatch(dom))) { domainMatched = true; break; }
+                    }
+                    catch { }
+                }
+                if (!domainMatched) return false;
             }
             if (urlMatchers != null && !urlMatchers.Any(m => m.IsMatch(url ?? "")))
                 return false;
