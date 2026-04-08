@@ -346,7 +346,7 @@ internal partial class Program
             // [GRAP] TARGET: print JSON5 pattern when filter is active (reusable in any a11y command)
             if (hasFilter && !isChild)
             {
-                var target = WindowFinder.BuildTargetJson5(hWnd);
+                var target = BuildTargetGrap(hWnd);
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
                 Console.WriteLine($"  [GRAP] TARGET: {target}");
                 Console.ResetColor();

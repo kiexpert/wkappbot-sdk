@@ -549,7 +549,7 @@ internal partial class Program
         Console.ForegroundColor = ConsoleColor.Cyan;
         foreach (var t in targets)
         {
-            var tGrap = WindowFinder.BuildTargetJson5(t.Handle);
+            var tGrap = BuildTargetGrap(t.Handle);
             var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
             Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
             // For "find": # TARGET is printed by A11yFind with full abs tag path

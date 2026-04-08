@@ -93,11 +93,12 @@ internal partial class Program
                 }
 
                 // Precise grap command (append #focusScope for combined target)
-                var json5 = WindowFinder.BuildTargetJson5(w.Handle);
-                var fullTarget = focusScope != null ? $"{json5}#*{focusScope}*" : json5;
+                var searchGrap = Program.BuildCompactWinGrap(w.Handle);  // portable, for verify
+                var displayGrap = Program.BuildTargetGrap(w.Handle);     // with hwnd, for display
+                var fullTarget = focusScope != null ? $"{displayGrap}#*{focusScope}*" : displayGrap;
 
-                // Verify: re-search with the generated pattern
-                var verifyHits = WindowFinder.FindByTitle(json5, true);
+                // Verify: re-search with portable pattern (no hwnd)
+                var verifyHits = WindowFinder.FindByTitle(searchGrap, true);
                 var verified = verifyHits.Any(v => v.Handle == w.Handle);
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
@@ -121,8 +122,8 @@ internal partial class Program
                     else
                     {
                         AutoRegisterBug(
-                            $"[BUG-AUTO] auto-find grap verify MISS: pattern={json5} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
-                            args: ["a11y", "find", json5]);
+                            $"[BUG-AUTO] auto-find grap verify MISS: pattern={searchGrap} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
+                            args: ["a11y", "find", searchGrap]);
                     }
                 }
             }
@@ -144,7 +145,7 @@ internal partial class Program
             if (ownedPopup == IntPtr.Zero || ownedPopup == targetHwnd) return;
 
             var popTitle = WindowFinder.GetWindowText(ownedPopup);
-            var popJson5 = WindowFinder.BuildTargetJson5(ownedPopup);
+            var popJson5 = Program.BuildTargetGrap(ownedPopup);
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Error.WriteLine($"[A11Y] ALERT: 모달 다이얼로그가 타겟을 차단 중 → \"{popTitle}\"");
             Console.ResetColor();
@@ -233,7 +234,7 @@ internal partial class Program
                     Console.ResetColor();
                     if (!string.IsNullOrEmpty(fLabel))
                     {
-                        var focJson5 = WindowFinder.BuildTargetJson5(targetHwnd);
+                        var focJson5 = Program.BuildTargetGrap(targetHwnd);
                         Console.ForegroundColor = ConsoleColor.DarkGreen;
                         Console.Error.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
                         Console.ResetColor();
@@ -282,7 +283,7 @@ internal partial class Program
                         Console.Error.WriteLine($"[A11Y] LEAF: {dType}(\"{label}\"){(patterns.Count > 0 ? $" [{string.Join(",", patterns)}]" : "")}");
                         if (!string.IsNullOrEmpty(label))
                         {
-                            var leafJson5 = WindowFinder.BuildTargetJson5(targetHwnd);
+                            var leafJson5 = Program.BuildTargetGrap(targetHwnd);
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
                             Console.Error.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{leafJson5}#*{label}*\"");
                             Console.ResetColor();
@@ -353,7 +354,7 @@ internal partial class Program
             Console.ResetColor();
             try
             {
-                var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
+                var winJson5 = Program.BuildTargetGrap(hwnd);
 
                 // Show focused element first (leaf → parent chain)
                 try
@@ -405,7 +406,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{Program.BuildTargetGrap(hwnd)}\" --depth 5 로 전체 탐색");
             return true;
         }
 
@@ -433,7 +434,7 @@ internal partial class Program
                     if (cName.Length > 40) cName = cName[..40];
                     var cLabel = !string.IsNullOrEmpty(cAid) ? cAid : cName;
                     if (string.IsNullOrEmpty(cLabel)) { shown++; continue; }
-                    var winJson5 = WindowFinder.BuildTargetJson5(hwnd);
+                    var winJson5 = Program.BuildTargetGrap(hwnd);
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
                     Console.WriteLine($"     {cType}(\"{cLabel}\") -> a11y {action} \"{winJson5}#*{cLabel}*\"");
                     Console.ResetColor();
@@ -441,7 +442,7 @@ internal partial class Program
                 }
             }
             catch { }
-            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{WindowFinder.BuildTargetJson5(hwnd)}\" --depth 5 로 전체 탐색");
+            Console.Error.WriteLine($"[A11Y] Tip: a11y find \"{Program.BuildTargetGrap(hwnd)}\" --depth 5 로 전체 탐색");
         }
     }
 }
