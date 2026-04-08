@@ -92,10 +92,10 @@ internal partial class Program
             var focScope = focGrap.Contains('#') ? focGrap[focGrap.IndexOf('#')..] : "";
             var focTitle = focRootHwnd != IntPtr.Zero ? NativeMethods.GetWindowTextW(focRootHwnd) : "";
 
+            var focPaste = QuoteGrapExpression($"{focHwnd}{focScope}");
             Console.WriteLine(Ansi.Dim("## FOCUS"));
-            Console.WriteLine(Ansi.Dim($"proc={focProc}  {focHwnd}"));
-            if (!string.IsNullOrWhiteSpace(focScope))
-                Console.WriteLine(Ansi.Dim($"scope: {focScope}"));
+            Console.WriteLine(Ansi.Dim(focPaste));
+            Console.WriteLine(Ansi.Dim($"proc={focProc}"));
             if (!string.IsNullOrWhiteSpace(focTitle))
                 Console.Error.WriteLine(focTitle);
             Console.WriteLine();
@@ -123,21 +123,21 @@ internal partial class Program
         var title = NativeMethods.GetWindowTextW(hwnd);
         if (title.Length > 90) title = title[..87] + "...";
 
+        var paste = QuoteGrapExpression($"{hwndHex}{scope}");
+        var matchedInfo = (!string.IsNullOrWhiteSpace(primaryHit?.MatchedVia) && !string.IsNullOrWhiteSpace(primaryHit?.MatchedSnippet))
+            ? $"  matched: {primaryHit.MatchedVia}={primaryHit.MatchedSnippet}"
+            : "";
+
         if (verifyHits.Count <= 1)
         {
-            // Single match — clean paragraph format
             Console.WriteLine(Ansi.TargetLine($"## TARGET  [{Ansi.Mark(verifyMark)}] {sw.ElapsedMilliseconds}ms"));
-            Console.WriteLine(Ansi.TargetLine($"{hwndHex}  proc={procName}"));
-            if (!string.IsNullOrWhiteSpace(primaryHit?.MatchedVia) && !string.IsNullOrWhiteSpace(primaryHit?.MatchedSnippet))
-                Console.WriteLine(Ansi.TargetLine($"matched: {primaryHit.MatchedVia}={primaryHit.MatchedSnippet}"));
-            if (!string.IsNullOrWhiteSpace(scope))
-                Console.WriteLine(Ansi.TargetLine($"scope: {scope}"));
+            Console.WriteLine(Ansi.TargetLine(paste));
+            Console.WriteLine(Ansi.TargetLine($"proc={procName}{matchedInfo}"));
             if (!string.IsNullOrWhiteSpace(title))
                 Console.Error.WriteLine(title);
         }
         else
         {
-            // Multiple matches — subsections
             Console.WriteLine(Ansi.Dim($"## TARGETS  {verifyHits.Count} matches"));
             foreach (var hit in verifyHits)
             {
@@ -148,16 +148,17 @@ internal partial class Program
                 var hitFullGrap = BuildTargetGrapWithFocusPath(hit);
                 var hitHwnd = $"hwnd:0x{hit.Handle.ToInt64():X}";
                 var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
+                var hitPaste = QuoteGrapExpression($"{hitHwnd}{hitScope}");
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
                 if (hitTitle.Length > 90) hitTitle = hitTitle[..87] + "...";
                 var marker = hit.Handle == hwnd ? " *" : "";
+                var hitMatchedInfo = (!string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
+                    ? $"  matched: {hit.MatchedVia}={hit.MatchedSnippet}"
+                    : "";
 
                 Console.WriteLine(Ansi.TargetLine($"### TARGET{marker}  [{Ansi.Mark("OK")}]"));
-                Console.WriteLine(Ansi.TargetLine($"{hitHwnd}  proc={hitProc}"));
-                if (!string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
-                    Console.WriteLine(Ansi.TargetLine($"matched: {hit.MatchedVia}={hit.MatchedSnippet}"));
-                if (!string.IsNullOrWhiteSpace(hitScope))
-                    Console.WriteLine(Ansi.TargetLine($"scope: {hitScope}"));
+                Console.WriteLine(Ansi.TargetLine(hitPaste));
+                Console.WriteLine(Ansi.TargetLine($"proc={hitProc}{hitMatchedInfo}"));
                 if (!string.IsNullOrWhiteSpace(hitTitle))
                     Console.Error.WriteLine(hitTitle);
             }
