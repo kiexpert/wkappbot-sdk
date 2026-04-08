@@ -1725,6 +1725,43 @@ internal partial class Program
     }
 
     /// <summary>
+    /// Build a target grap that includes the currently focused leaf's absolute UIA path when available.
+    /// Falls back to the plain target grap if the focused leaf cannot be resolved.
+    /// </summary>
+    internal static string BuildTargetGrapWithFocusPath(IntPtr hwnd)
+        => AppendFocusPath(BuildTargetGrap(hwnd), hwnd);
+
+    /// <summary>
+    /// Build a target grap from a verified window hit and append the focused leaf path.
+    /// Preserves MatchedVia / MatchedSnippet on the base grap.
+    /// </summary>
+    internal static string BuildTargetGrapWithFocusPath(WKAppBot.Win32.Window.WindowInfo hit)
+        => AppendFocusPath(BuildTargetGrap(hit), hit.Handle);
+
+    private static string AppendFocusPath(string target, IntPtr hwnd)
+    {
+        try
+        {
+            using var uia = new FlaUI.UIA3.UIA3Automation();
+            var root = uia.FromHandle(hwnd);
+            if (root == null) return target;
+
+            var focused = WKAppBot.Win32.Accessibility.GrapHelper.FindFocusedLeaf(uia, root, hwnd);
+            if (focused == null) return target;
+
+            var path = WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(
+                focused, uia.TreeWalkerFactory.GetRawViewWalker(), 15);
+            if (string.IsNullOrWhiteSpace(path) || path == "?") return target;
+
+            return $"{target}#{path}";
+        }
+        catch
+        {
+            return target;
+        }
+    }
+
+    /// <summary>
     /// BuildTargetGrap overload accepting WindowInfo with MatchedVia/MatchedSnippet.
     /// Injects the matched field into the grap when not already visible in compact form,
     /// so the reason for the match is always clear in the output.
@@ -1740,24 +1777,10 @@ internal partial class Program
             try
             {
                 var rawUrl = WKAppBot.Win32.Window.WindowFinder.GetBrowserUrl(hit.Handle, hitPid);
-                if (!string.IsNullOrEmpty(rawUrl))
-                {
-                    string inject;
-                    if (rawUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var fn = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
-                        inject = !string.IsNullOrEmpty(fn) ? $"file:'{fn}'" : "";
-                    }
-                    else
-                    {
-                        var host = new Uri(rawUrl.Split(' ')[0]).Host;
-                        inject = !string.IsNullOrEmpty(host) ? $"domain:'{host}'" : "";
-                    }
-                    if (!string.IsNullOrEmpty(inject))
-                        compact = compact.StartsWith('{')
-                            ? compact.TrimEnd('}') + $",{inject}}}"
-                            : $"{{{inject}}}";
-                }
+                if (TryBuildDisplayBrowserInject(rawUrl, out var inject) && !string.IsNullOrEmpty(inject))
+                    compact = compact.StartsWith('{')
+                        ? compact.TrimEnd('}') + $",{inject}}}"
+                        : $"{{{inject}}}";
             }
             catch { }
         }
@@ -1784,6 +1807,7 @@ internal partial class Program
                 "url"    => compact.Contains("domain:") || compact.Contains("file:"),
                 "proc"   => compact.Contains("proc:"),
                 "cmd"    => compact.Contains("cmd:") || compact.Contains("file:") || compact.Contains("domain:"),
+                "uia"    => compact.Contains("uia:"),
                 _        => true
             };
             if (!alreadyVisible)
@@ -1797,6 +1821,45 @@ internal partial class Program
             }
         }
         return InjectHwnd(compact, hit.Handle);
+    }
+
+    private static bool TryBuildDisplayBrowserInject(string? rawUrl, out string inject)
+    {
+        inject = "";
+        if (string.IsNullOrWhiteSpace(rawUrl)) return false;
+
+        var primary = rawUrl.Split(' ')[0];
+        if (primary.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase) ||
+            primary.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
+            primary.StartsWith("devtools://", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (primary.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+        {
+            var fn = System.IO.Path.GetFileName(Uri.UnescapeDataString(primary));
+            if (string.IsNullOrEmpty(fn)) return false;
+            inject = $"file:'{fn.Replace("'", "\\'")}'";
+            return true;
+        }
+
+        try
+        {
+            var host = new Uri(primary).Host;
+            if (string.IsNullOrEmpty(host) ||
+                host.Equals("vscode-app", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            inject = $"domain:'{host.Replace("'", "\\'")}'";
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string _BuildCompactWinGrapCore(IntPtr hwnd)

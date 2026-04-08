@@ -1,4 +1,4 @@
-using FlaUI.Core.AutomationElements;
+﻿using FlaUI.Core.AutomationElements;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
@@ -14,7 +14,7 @@ internal partial class Program
         var rect = GetBoundingRect(el);
         if (rect == null)
         {
-            Console.Error.WriteLine("[A11Y] highlight — no BoundingRect available");
+            Console.Error.WriteLine("[A11Y] highlight ??no BoundingRect available");
             return false;
         }
 
@@ -34,13 +34,13 @@ internal partial class Program
         if (zoom == null)
         {
             // Fallback: just print position info without overlay
-            Console.Error.WriteLine($"[A11Y] highlight — overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+            Console.Error.WriteLine($"[A11Y] highlight ??overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
             return true;
         }
 
         var label = !string.IsNullOrEmpty(name) ? $"\"{name}\"" : (aid != "" ? $"aid={aid}" : "(unnamed)");
         zoom.UpdateStatus($"[{type}] {label}");
-        Console.Error.WriteLine($"[A11Y] highlight — [{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+        Console.Error.WriteLine($"[A11Y] highlight ??[{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
 
         // Show for duration then fade out
         zoom.ShowPass($"{type} {label}");
@@ -49,44 +49,37 @@ internal partial class Program
         return true;
     }
 
-    // -- Find: CURSOR → TARGET → VERDICT structured output --
+    // -- Find: CURSOR -> TARGET -> VERDICT structured output --
     // stdout: clean result sections only
-    // stderr: diagnostic/processing info ([DIAG:find])
+    // stderr: only hard errors, not the full analysis dump
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
     {
-        // ── # TARGET: window grap + absolute UIA tag path (copy-paste ready) ──
-        // Printed here (not in A11yCommand) so the full scope path can be included.
-        var windowGrap = WindowFinder.BuildTargetJson5(hwnd);
-        string absTagPath = "";
         FocusedElementInfo? focInfo = null;
         try
         {
             using var loc = new UiaLocator();
-            absTagPath = loc.GetAbsoluteTagPath(root);
-            focInfo    = loc.GetFocusedElementInfo();
+            focInfo = loc.GetFocusedElementInfo();
         }
-        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}");
+        }
 
-        // Compact grap: no hwnd/pid/proc, browser→domain only
         var compactGrap = BuildCompactWinGrap(hwnd);
-        // Skip abs path if root is a Window (path would be "?") or resolution failed
-        var validAbsPath = (absTagPath.Length > 0 && absTagPath != "?") ? absTagPath : "";
-        var fullGrap = string.IsNullOrEmpty(validAbsPath) ? compactGrap : $"{compactGrap}#{validAbsPath}";
+        var fullGrap = BuildTargetGrapWithFocusPath(hwnd);
 
-        // # FOCUS with focused element abs path (deferred from A11yCommand for find action)
         if (focInfo != null)
         {
             var gti2 = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             NativeMethods.GetGUIThreadInfo(0, ref gti2);
-            // Use root ancestor for grap — child focus hwnd (GUIThreadInfo) is not pasteable as a target
             var focRootHwnd = gti2.hwndFocus != IntPtr.Zero
                 ? NativeMethods.GetAncestor(gti2.hwndFocus, NativeMethods.GA_ROOT)
                 : IntPtr.Zero;
             if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti2.hwndFocus;
             var focCompact = focRootHwnd != IntPtr.Zero ? BuildCompactWinGrap(focRootHwnd) : "?";
             var focWinHwnd = focRootHwnd != IntPtr.Zero ? $"hwnd:0x{focRootHwnd.ToInt64():X8}" : "?";
-            // Abs path from parent chain: reversed, 3-char type prefix, skip Window nodes
+
             static string Abb(string t) => t.Length > 3 ? t[..3] : t;
             var chain = focInfo.ParentChain
                 .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
@@ -97,7 +90,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(focInfo.AutomationId)) focLeafTag += $"_{focInfo.AutomationId}";
             if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window")
                 chain.Add(focLeafTag);
-            // Compress consecutive identical bare types: Gro/Gro/Gro → Gro// (same as BuildAbsoluteTagPath)
+
             string focPath = "";
             if (chain.Count > 0)
             {
@@ -115,177 +108,42 @@ internal partial class Program
                 }
                 focPath = $"#{sb2}";
             }
+
             Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWinHwnd}{focPath}\"  {focCompact}"));
         }
 
-        // Verify the compact grap resolves to this hwnd → [OK] or [MISS]
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
         try
         {
-            verifyHits = WindowFinder.FindWindows(compactGrap, false); // all matches
+            verifyHits = WindowFinder.FindWindows(compactGrap, false);
             verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
         }
         catch { }
         sw.Stop();
 
-        // bash-safe primary grap: hwnd:0xXXXXXXXX[#scope]  context={...}
         NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
         string procName = "";
         try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
-        var hwndPrimary = $"hwnd:0x{hwnd.ToInt64():X8}";
-        var scopeStr = string.IsNullOrEmpty(validAbsPath) ? "" : $"#{validAbsPath}";
         var contextStr = compactGrap.Length > 2 ? $"  {compactGrap}" : "";
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hwndPrimary}{scopeStr}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms  proc={procName}{contextStr}"));
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms  proc={procName}{contextStr}"));
 
-        // Window title → stderr
-        var winTitle = NativeMethods.GetWindowTextW(hwnd);
-        if (!string.IsNullOrEmpty(winTitle))
-        {
-            var titleShort = winTitle.Length > 60 ? winTitle[..57] + "…" : winTitle;
-            Console.Error.WriteLine($"[find] window: {titleShort}");
-        }
-
-        // Multiple matches → list all with disambiguating pid graps + focus node (copy-paste ready)
         if (verifyHits.Count > 1)
         {
             Console.WriteLine(Ansi.Dim($"# {verifyHits.Count} windows match — pick one:"));
-            // Pre-capture focused hwnd once
             var gtiMulti = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             NativeMethods.GetGUIThreadInfo(0, ref gtiMulti);
+
             foreach (var hit in verifyHits)
             {
                 NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
-                var hitGrap = BuildTargetGrap(hit);
-                // Focus node path: only for the window that has keyboard focus
-                string focusPath = "";
-                if (gtiMulti.hwndFocus != IntPtr.Zero)
-                {
-                    // Check if focused hwnd belongs to this window's process or is a child
-                    NativeMethods.GetWindowThreadProcessId(gtiMulti.hwndFocus, out uint focPid);
-                    if (focPid == hitPid)
-                    {
-                        // Same process — compute abs tag path from focInfo (already computed above)
-                        if (focInfo != null && hit.Handle == hwnd)
-                        {
-                            // Reuse the already-computed focPath from # FOCUS
-                            static string Abb2(string t) => t.Length > 3 ? t[..3] : t;
-                            var fChain = focInfo.ParentChain
-                                .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
-                                .Select(p => string.IsNullOrEmpty(p.aid) ? Abb2(p.type) : $"{Abb2(p.type)}_{p.aid}")
-                                .Reverse().ToList();
-                            var fLeaf = Abb2(focInfo.ControlType);
-                            if (!string.IsNullOrEmpty(focInfo.AutomationId)) fLeaf += $"_{focInfo.AutomationId}";
-                            if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window") fChain.Add(fLeaf);
-                            if (fChain.Count > 0) focusPath = "#" + string.Join("/", fChain);
-                        }
-                    }
-                }
+                var hitFullGrap = BuildTargetGrapWithFocusPath(hit);
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
-                if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "…";
-                var marker = hit.Handle == hwnd ? " ◀" : "";
-                Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hitGrap}{focusPath}\"{marker}  {hitTitle}"));
-            }
-        }
-
-        // ── CURSOR (stderr) ──────────────────────────────────────────────────
-        Console.Error.WriteLine(Ansi.Header("━━━ CURSOR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-
-        bool cursorIsBlocking = false;
-        if (focInfo != null)  // focInfo computed above alongside absTagPath
-        {
-            var curTag = GrapHelper.FormatNodeLabel(focInfo.ControlType, focInfo.AutomationId, focInfo.Name);
-            Console.Error.WriteLine($"  {curTag}");
-
-            // Run-length encode consecutive identical unnamed types (e.g. Group x7)
-            var parents = focInfo.ParentChain.Where(p => !string.IsNullOrEmpty(p.type)).ToList();
-            int pi = 0;
-            while (pi < parents.Count)
-            {
-                var (pType, pName, _) = parents[pi];
-                int count = 1;
-                if (string.IsNullOrEmpty(pName))
-                    while (pi + count < parents.Count
-                           && parents[pi + count].type == pType
-                           && string.IsNullOrEmpty(parents[pi + count].aid)
-                           && string.IsNullOrEmpty(parents[pi + count].name))
-                        count++;
-                var pTag = GrapHelper.FormatNodeLabel(pType, "", pName);
-                var suffix = count > 1 ? $" x{count}" : "";
-                Console.Error.WriteLine($"    ← {pTag}{suffix}");
-                if (pType == "Dialog") cursorIsBlocking = true;
-                pi += count;
-            }
-        }
-        else
-        {
-            Console.Error.WriteLine("  (no focused element)");
-        }
-
-        // ── TARGET (stderr) ──────────────────────────────────────────────────
-        Console.Error.WriteLine(Ansi.Header("━━━ TARGET ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-
-        var targetName = root.Properties.Name.ValueOrDefault ?? "";
-        var targetAid  = root.Properties.AutomationId.ValueOrDefault ?? "";
-        var targetType = "?"; try { targetType = root.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-        var patterns   = GetSupportedPatternNames(root);
-
-        System.Drawing.Rectangle? targetRect = null;
-        try { var r = root.Properties.BoundingRectangle.ValueOrDefault; if (r.Width > 0) targetRect = new((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height); } catch { }
-        var targetTag = GrapHelper.FormatNodeLabel(targetType, targetAid, targetName, rect: targetRect, actions: patterns);
-        Console.Error.WriteLine($"  {targetTag}");
-
-        // parent + siblings
-        try
-        {
-            var parent = root.Parent;
-            if (parent != null)
-            {
-                Console.Error.WriteLine($"  parent: {GrapHelper.FormatNodeLabel(parent)}");
-
-                var siblings = parent.FindAllChildren()
-                    .Where(c => {
-                        try { return !(c.Properties.Name.ValueOrDefault == targetName
-                                    && c.Properties.AutomationId.ValueOrDefault == targetAid); }
-                        catch { return true; }
-                    })
-                    .Take(8).ToList();
-
-                if (siblings.Count > 0)
-                {
-                    var sibTags = siblings.Select(s => GrapHelper.FormatNodeLabel(s));
-                    Console.Error.WriteLine($"  siblings: {string.Join(" · ", sibTags)}");
-                }
-            }
-        }
-        catch (Exception ex) { Console.Error.WriteLine($"[DIAG:find] parent/siblings error: {ex.Message}"); }
-
-        // ── VERDICT (stderr) ─────────────────────────────────────────────────
-        if (cursorIsBlocking)
-        {
-            Console.Error.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-            Console.Error.WriteLine(Ansi.Yellow("  ⚠ cursor in Dialog — verify target is reachable"));
-        }
-        else if (focInfo == null)
-        {
-            Console.Error.WriteLine(Ansi.Header("━━━ VERDICT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
-            Console.Error.WriteLine(Ansi.Dim("  ? focus unknown"));
-        }
-
-        // Win32 children → stderr only
-        var win32Children = WindowFinder.GetChildrenZOrder(hwnd);
-        if (win32Children.Count > 0)
-        {
-            Console.Error.WriteLine($"[DIAG:find] Win32 children ({win32Children.Count}):");
-            foreach (var child in win32Children)
-            {
-                var cr = child.Rect;
-                var cw = cr.Right - cr.Left;
-                var ch = cr.Bottom - cr.Top;
-                var vis = NativeMethods.IsWindowVisible(child.Handle) ? "" : " [hidden]";
-                Console.Error.WriteLine($"[DIAG:find]   [{child.ClassName}] \"{child.Title}\" hwnd={child.Handle:X8} cid={child.ControlId} {cw}x{ch}{vis}");
+                if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "...";
+                var marker = hit.Handle == hwnd ? " *" : "";
+                Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hitFullGrap}\"{marker}  {hitTitle}"));
             }
         }
 
@@ -435,7 +293,7 @@ internal partial class Program
 
         if (lines.Count == 0)
         {
-            Console.Error.WriteLine("[A11Y] read — no accessible information available");
+            Console.Error.WriteLine("[A11Y] read ??no accessible information available");
             return false;
         }
 
@@ -444,3 +302,4 @@ internal partial class Program
         return true;
     }
 }
+

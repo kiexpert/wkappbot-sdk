@@ -1,0 +1,25 @@
+{
+  "id": "ansi-color-output-auto-disable-on-pipe-no-color",
+  "app": "wkappbot-core",
+  "title": "ANSI Color Output: Auto-Disable on Pipe \u002B NO_COLOR",
+  "desc": "CLI tool ANSI color implementation: auto-disable on pipe/redirect \u002B NO_COLOR env var support. Prevents garbage escape codes in logs/scripts.",
+  "steps": [
+    "Create Ansi.cs helper: static readonly bool IsEnabled = !Console.IsOutputRedirected \u0026\u0026 Environment.GetEnvironmentVariable(\u0022NO_COLOR\u0022) == null;",
+    "Apply colors: Ansi.IsEnabled ? $\u0022\\x1b[1;96m{text}\\x1b[0m\u0022 : text (always provide plain fallback)",
+    "Color palette: dim cyan \\x1b[2;36m = headers, bold cyan \\x1b[1;96m = key values, bold green \\x1b[1;32m = OK, bold red \\x1b[1;31m = MISS/error, yellow \\x1b[33m = warnings",
+    "IsEnabled is static readonly \u2014 evaluated once at startup, never changes mid-process",
+    "Test: redirect stdout to file and verify no escape codes appear in output"
+  ],
+  "tags": [
+    "ansi",
+    "color",
+    "cli",
+    "pipe",
+    "no-color"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-07T19:19:23.0785922Z",
+  "updated": "2026-04-07T19:19:23.0786065Z",
+  "version": "1.0"
+}

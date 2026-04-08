@@ -44,6 +44,8 @@ internal partial class Program
         public static bool CheckMultiWindow(string grap, string action,
             List<WindowInfo> allWindows, bool all, string? nthRaw)
         {
+            if (action.Equals("find", StringComparison.OrdinalIgnoreCase))
+                return false;
             if (IsSpecificPattern(grap) || allWindows.Count <= 1 || all || nthRaw != null)
                 return false;
 
@@ -95,7 +97,7 @@ internal partial class Program
                 // Precise grap command (append #focusScope for combined target)
                 var searchGrap = Program.BuildCompactWinGrap(w.Handle);  // portable, for verify
                 var displayGrap = Program.BuildTargetGrap(w.Handle);     // with hwnd, for display
-                var fullTarget = focusScope != null ? $"{displayGrap}#*{focusScope}*" : displayGrap;
+                var fullTarget = Program.BuildTargetGrapWithFocusPath(w);
 
                 // Verify: re-search with portable pattern (no hwnd)
                 var verifyHits = WindowFinder.FindWindows(searchGrap, true);
@@ -234,7 +236,7 @@ internal partial class Program
                     Console.ResetColor();
                     if (!string.IsNullOrEmpty(fLabel))
                     {
-                        var focJson5 = Program.BuildTargetGrap(targetHwnd);
+                        var focJson5 = Program.BuildTargetGrapWithFocusPath(targetHwnd);
                         Console.ForegroundColor = ConsoleColor.DarkGreen;
                         Console.Error.WriteLine($"[A11Y] FOCUSED TARGET: a11y {action} \"{focJson5}#*{fLabel}*\"");
                         Console.ResetColor();
@@ -283,7 +285,7 @@ internal partial class Program
                         Console.Error.WriteLine($"[A11Y] LEAF: {dType}(\"{label}\"){(patterns.Count > 0 ? $" [{string.Join(",", patterns)}]" : "")}");
                         if (!string.IsNullOrEmpty(label))
                         {
-                            var leafJson5 = Program.BuildTargetGrap(targetHwnd);
+                            var leafJson5 = Program.BuildTargetGrapWithFocusPath(targetHwnd);
                             Console.ForegroundColor = ConsoleColor.DarkGreen;
                             Console.Error.WriteLine($"[A11Y] LEAF TARGET: a11y {action} \"{leafJson5}#*{label}*\"");
                             Console.ResetColor();

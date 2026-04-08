@@ -1,15 +1,22 @@
 {
   "id": "elevated-eye-admin-pipe-server",
   "app": "wkappbot-core",
-  "title": "Run Admin Commands Without UAC Prompt — Elevated Eye Pipe Server",
-  "desc": "Named pipe server (wkappbot_elevated) inside Eye for running admin commands. Triad-tested: length-prefixed JSON, MaxAllowedServerInstances for gap-free hot-swap, UIPI-aware ACL (AuthUser+Admin), IsBusy guard defers hot-swap while active, __eye_tick__ returns cached state, 30s drain cap.",
+  "title": "Admin Eye Pipe Server \u2014 Self-Respawn \u002B Hot-Swap Deferral",
+  "desc": "Named pipe server (wkappbot_elevated) inside admin Eye. Handles admin commands, defers hot-swap while busy, and self-respawns on binary update using own elevated token \u2014 no UAC.",
   "steps": [
     "1. NamedPipeServerStreamAcl.Create AuthUser=ReadWrite Admin=FullControl",
-    "2. WaitForConnectionAsync Task.Run HandleClient Interlocked counter",
-    "3. HandleClient ReadAsync EyeProxyRequest ExecuteCommand WriteAsync response",
-    "4. IsBusy guard hot-swap deferral",
-    "5. __eye_tick__ special returns cached state",
-    "6. StopAcceptingAndWaitForDrain 30s cap was 5min"
+    "2. WaitForConnectionAsync \u2192 Task.Run HandleClient \u2192 Interlocked _activeClients counter",
+    "3. HandleClient: ReadAsync EyeProxyRequest \u2192 ExecuteCommand \u2192 WriteAsync response",
+    "4. IsBusy guard: hot-swap deferred while _activeClients \u003E 0",
+    "5. __eye_tick__ special: returns cached Eye loop state without subprocess",
+    "6. StopAcceptingAndWaitForDrain: 30s drain cap",
+    "## Self-respawn on binary update (AppBotEyeCommands.cs)",
+    "Dual FSW \uAC10\uC2DC: .new.exe \uB4F1\uC7A5(\uC870\uAE30 drain) \u002B .exe \uC9C1\uAD50\uCCB4(fast-path) \uB3D9\uC2DC",
+    ".new.exe path: IsBusy drain \u2192 .new.exe \uC18C\uBA78 \uB300\uAE30(swap \uD655\uC778) \u2192 spawn successor",
+    ".exe path: drain \uC911\uC774\uBA74 \uC790\uC5F0 \uC644\uB8CC, \uC544\uB2C8\uBA74 \uC989\uC2DC spawn",
+    "Process.Start(UseShellExecute=false, \u0027eye --elevated\u0027) \u2014 \uBD80\uBAA8 elevated \uD1A0\uD070 \uC0C1\uC18D, UAC \uC5C6\uC74C",
+    "drainTriggered flag: \uB450 FSW \uB3D9\uC2DC \uBC1C\uD654 \uC2DC \uC911\uBCF5 spawn \uBC29\uC9C0",
+    "startup \uC2DC .new.exe \uC774\uBBF8 \uC788\uC73C\uBA74 \uC989\uC2DC drain \uC2DC\uC791"
   ],
   "tags": [
     "eye",
@@ -17,7 +24,9 @@
     "pipe",
     "hot-swap",
     "elevated",
-    "named-pipe"
+    "named-pipe",
+    "self-respawn",
+    "fsw"
   ],
   "source_refs": [
     {
@@ -25,10 +34,16 @@
       "line": null,
       "pattern": "ElevatedEyeServer",
       "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
+      "line": null,
+      "pattern": "isElevatedArg",
+      "note": null
     }
   ],
   "author": "claude",
   "created": "2026-04-07T06:44:24.2717424Z",
-  "updated": "2026-04-07T06:45:17.2858786Z",
-  "version": "1.2"
+  "updated": "2026-04-08T03:58:03.2601271Z",
+  "version": "1.3"
 }
