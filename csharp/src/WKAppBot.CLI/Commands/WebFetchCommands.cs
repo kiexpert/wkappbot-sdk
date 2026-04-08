@@ -250,7 +250,7 @@ internal partial class Program
         try
         {
             // Find Chrome window with WKWebBot tag
-            var wins = WindowFinder.FindByTitle("*WKWebBot*");
+            var wins = WindowFinder.FindWindows("*WKWebBot*");
             if (wins.Count == 0) return results;
 
             using var auto = new UIA3Automation();

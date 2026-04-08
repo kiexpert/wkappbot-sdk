@@ -49,7 +49,7 @@ internal partial class Program
         var (win32Segments, _) = GrapHelper.SplitGrap(args[0]);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var found = WindowFinder.FindByTitle(win32Segments[0]);
+        var found = WindowFinder.FindWindows(win32Segments[0]);
         if (found.Count == 0)
             return Error($"Window not found: \"{win32Segments[0]}\"");
 

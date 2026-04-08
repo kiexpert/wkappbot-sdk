@@ -721,7 +721,7 @@ internal partial class Program
             && filterCmd == null && !deep && !uiaSearch)
         {
             PulseStep.Mark("json5-find-start");
-            var json5Results = WindowFinder.FindByTitle(filterTitle);
+            var json5Results = WindowFinder.FindWindows(filterTitle);
             PulseStep.Mark("json5-find-done");
             foreach (var wi in json5Results)
             {

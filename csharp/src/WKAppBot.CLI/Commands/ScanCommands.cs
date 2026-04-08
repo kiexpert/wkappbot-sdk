@@ -25,7 +25,7 @@ internal partial class Program
         if (depthStr != null) int.TryParse(depthStr, out depth);
 
         // Find target window
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -380,7 +380,7 @@ internal partial class Program
         string targetFormId = args[1];
         int maxDepth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 6;
 
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
         var win = windows[0];
 

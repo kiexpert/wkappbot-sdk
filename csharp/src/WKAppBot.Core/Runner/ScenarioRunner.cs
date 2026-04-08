@@ -373,7 +373,7 @@ public sealed class ScenarioRunner
             // will be IntPtr.Zero. We need to search all top-level windows by title instead.
             if (app.WaitForWindow?.TitleContains != null)
             {
-                var windows = WindowFinder.FindByTitle(app.WaitForWindow.TitleContains);
+                var windows = WindowFinder.FindWindows(app.WaitForWindow.TitleContains);
                 if (windows.Count > 0)
                 {
                     ctx.MainWindowHandle = windows[0].Handle;

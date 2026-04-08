@@ -47,7 +47,7 @@ internal partial class Program
 
             foreach (var pat in firstSegPatterns)
             {
-                var wins = WindowFinder.FindByTitle(pat);
+                var wins = WindowFinder.FindWindows(pat);
                 if (wins.Count == 0) continue;
 
                 var hwnd = wins[0].Handle;

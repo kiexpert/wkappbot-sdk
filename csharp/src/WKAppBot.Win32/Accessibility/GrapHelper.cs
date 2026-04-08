@@ -498,7 +498,7 @@ public static class GrapHelper
             return (IntPtr.Zero, null!, "No window title before '#'");
 
         // First segment = main window title — may match multiple windows
-        var windows = Window.WindowFinder.FindByTitle(win32Segments[0]);
+        var windows = Window.WindowFinder.FindWindows(win32Segments[0]);
         matchCount = windows.Count;
         if (windows.Count == 0)
             return (IntPtr.Zero, null!, $"Window not found: \"{win32Segments[0]}\"");

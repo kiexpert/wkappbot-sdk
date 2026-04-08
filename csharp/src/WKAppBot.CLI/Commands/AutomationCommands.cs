@@ -49,7 +49,7 @@ Examples:
         }
 
         // Find target window
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0)
             return Error($"Window not found: \"{title}\"");
 
@@ -638,7 +638,7 @@ Examples:
 
             // 5. Check if any MessageBox-like popup appeared (same process, any window)
             NativeMethods.GetWindowThreadProcessId(win.Handle, out uint clickTargetPid);
-            var topWindows = WindowFinder.FindByTitle(""); // all visible windows
+            var topWindows = WindowFinder.FindWindows(""); // all visible windows
             foreach (var tw in topWindows)
             {
                 NativeMethods.GetWindowThreadProcessId(tw.Handle, out uint twPid);

@@ -90,7 +90,7 @@ Examples:
 
         // Find target window — try all matches until one has MDIClient
         // (e.g. "투혼" matches both main window and #32770 dialogs)
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
 
         WindowInfo? win = null;

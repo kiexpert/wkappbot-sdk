@@ -98,7 +98,7 @@ internal partial class Program
                 var fullTarget = focusScope != null ? $"{displayGrap}#*{focusScope}*" : displayGrap;
 
                 // Verify: re-search with portable pattern (no hwnd)
-                var verifyHits = WindowFinder.FindByTitle(searchGrap, true);
+                var verifyHits = WindowFinder.FindWindows(searchGrap, true);
                 var verified = verifyHits.Any(v => v.Handle == w.Handle);
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
@@ -109,7 +109,7 @@ internal partial class Program
                 if (!verified)
                 {
                     var healPattern = $"*hwnd={w.Handle:X8}*";
-                    var healHits = WindowFinder.FindByTitle(healPattern, true);
+                    var healHits = WindowFinder.FindWindows(healPattern, true);
                     var healed = healHits.Any(v => v.Handle == w.Handle);
                     if (healed)
                     {

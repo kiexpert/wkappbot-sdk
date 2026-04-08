@@ -26,7 +26,7 @@ internal partial class Program
             else if (a == "--right-top") rightTop = true;
         }
 
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0)
             return Error($"Window not found: \"{title}\"");
 

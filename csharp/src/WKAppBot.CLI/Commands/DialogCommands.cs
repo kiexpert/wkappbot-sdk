@@ -263,7 +263,7 @@ internal partial class Program
             // ── Check condition: window exists? ──
             if (hasWindowCondition)
             {
-                var found = WindowFinder.FindByTitle(condition!.WindowExists!);
+                var found = WindowFinder.FindWindows(condition!.WindowExists!);
                 if (found.Count > 0)
                 {
                     windowFound = true;
@@ -625,7 +625,7 @@ internal partial class Program
         string? clickText = GetArgValue(args, "--click");
         bool save = args.Contains("--save");
 
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
         var win = windows[0];
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
@@ -899,7 +899,7 @@ internal partial class Program
             return Error("No valid keywords provided. Keywords must be at least 2 characters. " +
                 "Empty/whitespace keywords would match all windows — this is a safety check to prevent accidental mass-close.");
 
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
         var win = windows[0];
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
@@ -1114,7 +1114,7 @@ internal partial class Program
         int btnIndex = args.Length >= 2 && int.TryParse(args[1], out var bi) ? bi : 0;
 
         // Find dialog
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Dialog not found: \"{title}\"");
         var dlg = windows[0];
         Console.WriteLine($"Dialog: [{dlg.Handle:X8}] \"{dlg.Title}\" ({dlg.Rect.Width}x{dlg.Rect.Height})");

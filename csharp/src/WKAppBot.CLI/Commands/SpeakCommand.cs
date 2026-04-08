@@ -89,7 +89,7 @@ internal partial class Program
         {
             try
             {
-                var wins = WKAppBot.Win32.Window.WindowFinder.FindByTitle(targetGrap);
+                var wins = WKAppBot.Win32.Window.WindowFinder.FindWindows(targetGrap);
                 if (wins.Count > 0) targetHwnd = wins[0].Handle;
             }
             catch (Exception ex)

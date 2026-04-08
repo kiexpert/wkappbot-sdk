@@ -1,0 +1,134 @@
+﻿# Ask GEMINI
+
+> **Question**: [HOST-HANDSHAKE]
+The WKAppBot host executed a connectivity probe on startup:
+[APPBOT_TOOL_CALL_BEGIN]{"id":"tc_init","argv":["readiness"]}[APPBOT_TOOL_CALL_END]
+TOOL_RESULTS [MCP+APSP executed_by=host flushed=1 still_running=0]
+[{"jsonrpc":"2.0","id":"tc_init","result":{"content":[{"type":"text","text":"Ready: True  host_pid=29060  time=10:12:38  uptime=11178s  mem=1477MB  system_processes=414"}],"isError":false}}]
+Host is live. Your TOOL_CALL blocks will be executed in real time.
+[/HOST-HANDSHAKE]
+
+[file:study_batch_20260406_101227.mp3]
+You are a professional audio transcription and analysis tool.
+I'm building a karaoke system for language learning.
+This audio file contains multiple short speech segments separated by ~1 second silence gaps.
+Segments are PRIMARILY Korean, but may contain English, Japanese, or other languages mixed in.
+Some segments may be NON-SPEECH. Classify each segment's audio_type:
+  "speech" = human voice, "music" = song/BGM, "instrument" = piano/guitar/etc,
+  "noise" = keyboard/click/fan/ambient, "mixed" = speech+music overlap.
+For non-speech: set confidence=0, transcript="(noise)"/"(music)"/"(instrument)".
+Segment timing map (approximate):
+  Segment 1: 0ms ~ 576ms (file: 715-513 327-132-173-756-763-735-732-736-735-732-713-635-635-651-365-376-675-635-625-637-632-621-236-236-236_W.mp3)
+  Segment 2: 1576ms ~ 2152ms (file: 765-576-756-765-713-715-715-765-756-756-752-753-756-102-130-132-132-617-163-531-532 263-710-310-312-312-317-367-316-613-312-312_W.mp3)
+  Segment 3: 3152ms ~ 3728ms (file: 516-135 735-713-751-735-731-371-317-715-175_W.mp3)
+  Segment 4: 4728ms ~ 5304ms (file: 135-135 715-175-513-513-157-137-317-351-316-231-237-251-327-251-527-325-251-163-137-132-310 315-315-315-135_W.mp3)
+  Segment 5: 6304ms ~ 6880ms (file: 751-751-756-567-625-512-157-517-167-235-623-605-610-316-316-126-316-316-312-123-153-135-153-513-501-153-537-520-360-675-607-657-657-356-567-576-576-607-576-567-567-567-576-567-5_W.mp3)
+  Segment 6: 7880ms ~ 8456ms (file: 571-517-513-517-571-517-571-517-157-517-157-517-571_W.mp3)
+For EACH segment, provide a JSON object with:
+1. Full transcript of the speech
+2. Word-level timing (start_ms relative to segment start, duration_ms)
+3. Speaker identification (speaker_1, speaker_2, etc. — different voices get different IDs)
+4. L/R stereo phase analysis if noticeable (phase_lr_deg: estimated degrees, 0=center)
+5. Confidence score (0.0~1.0) — how confident you are in the transcript accuracy
+6. Detected language code (e.g. "en", "ko", "ja", "zh")
+7. silence_before_ms — milliseconds of silence/noise BEFORE the first word starts speaking
+8. audio_type — one of: speech, music, instrument, noise, mixed
+Respond with ONLY a JSON array, no markdown fences, no explanation:
+[
+  {
+    "segment": 1,
+    "transcript": "Hello, how are you today?",
+    "speaker": "speaker_1",
+    "confidence": 0.95,
+    "language": "en",
+    "silence_before_ms": 120,
+    "audio_type": "speech",
+    "words": [
+      {"word": "Hello", "start_ms": 120, "dur_ms": 350, "phase_lr_deg": 0.0},
+      {"word": "how", "start_ms": 520, "dur_ms": 200, "phase_lr_deg": 0.0}
+    ]
+  }
+]
+> **Time**: 2026-04-06 10:13:18
+> **AI**: gemini
+
+---
+
+## Response
+
+AnalysisAnalysis쿼리 성공Gemini의 응답[
+{
+"segment": 1,
+"transcript": "(music)",
+"speaker": "none",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "music",
+"words": []
+},
+{
+"segment": 2,
+"transcript": "(instrument)",
+"speaker": "none",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "instrument",
+"words": []
+},
+{
+"segment": 3,
+"transcript": "(noise)",
+"speaker": "none",
+"confidence": 0.0,
+"language": "ko",
+"silence_before_ms": 0,
+"audio_type": "noise",
+"words": []
+},
+{
+"segment": 4,
+"transcript": "오늘 공부는 여기까지입니다",
+"speaker": "speaker_1",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "오늘", "start_ms": 40, "dur_ms": 110, "phase_lr_deg": 0.0},
+{"word": "공부는", "start_ms": 155, "dur_ms": 125, "phase_lr_deg": 0.0},
+{"word": "여기까지입니다", "start_ms": 290, "dur_ms": 240, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 5,
+"transcript": "See you again tomorrow",
+"speaker": "speaker_2",
+"confidence": 0.97,
+"language": "en",
+"silence_before_ms": 65,
+"audio_type": "speech",
+"words": [
+{"word": "See", "start_ms": 65, "dur_ms": 90, "phase_lr_deg": -5.0},
+{"word": "you", "start_ms": 160, "dur_ms": 60, "phase_lr_deg": -5.0},
+{"word": "again", "start_ms": 225, "dur_ms": 120, "phase_lr_deg": -5.0},
+{"word": "tomorrow", "start_ms": 350, "dur_ms": 180, "phase_lr_deg": -5.0}
+]
+},
+{
+"segment": 6,
+"transcript": "감사합니다",
+"speaker": "speaker_1",
+"confidence": 0.99,
+"language": "ko",
+"silence_before_ms": 30,
+"audio_type": "speech",
+"words": [
+{"word": "감사합니다", "start_ms": 30, "dur_ms": 500, "phase_lr_deg": 0.0}
+]
+}
+]
+
+---
+*Generated by WKAppBot ask gemini — 2026-04-06 10:13:18*

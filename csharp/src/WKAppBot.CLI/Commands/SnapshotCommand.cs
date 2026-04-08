@@ -45,7 +45,7 @@ internal partial class Program
         var (win32Segments, uiaScopePath) = GrapHelper.SplitGrap(args[0]);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var windows = WindowFinder.FindByTitle(win32Segments[0]);
+        var windows = WindowFinder.FindWindows(win32Segments[0]);
         if (windows.Count == 0)
             return Error($"No window found matching: \"{win32Segments[0]}\"");
 
