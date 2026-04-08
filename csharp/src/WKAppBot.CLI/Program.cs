@@ -1694,7 +1694,7 @@ internal partial class Program
 
     /// <summary>
     /// Compact window grap for # TARGET / hack-hover lines — copy-paste ready, noise-free.
-    /// Rules: no hwnd/pid; browser→domain only; non-browser→{proc,cls}; no title/url.
+    /// Rules: no hwnd/pid; browser→domain or file:'name'; non-browser→{proc,cls}; no title/url.
     /// </summary>
     internal static string BuildCompactWinGrap(IntPtr hwnd)
     {
@@ -1706,11 +1706,26 @@ internal partial class Program
         g = System.Text.RegularExpressions.Regex.Replace(g, @",url:'[^']*'", "");
         if (g.Contains("domain:"))
         {
-            // Browser: keep only domain
+            // Browser with web domain: return just the domain
             g = System.Text.RegularExpressions.Regex.Replace(g, @",?proc:'[^']*',?", ",");
             g = System.Text.RegularExpressions.Regex.Replace(g, @",?cls:'[^']*',?", ",");
             var m = System.Text.RegularExpressions.Regex.Match(g, @"domain:'([^']*)'");
             if (m.Success) return m.Groups[1].Value;
+        }
+        else
+        {
+            // No domain — check for file:// URL (stripped by BuildTargetJson5 but recoverable)
+            WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid2);
+            try
+            {
+                var rawUrl = WindowFinder.GetBrowserUrl(hwnd, pid2);
+                if (!string.IsNullOrEmpty(rawUrl) && rawUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                {
+                    var fileName = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
+                    if (!string.IsNullOrEmpty(fileName)) return $"file:'{fileName}'";
+                }
+            }
+            catch { }
         }
         // Clean up stray commas from removals
         g = System.Text.RegularExpressions.Regex.Replace(g, @"\{,+", "{");
