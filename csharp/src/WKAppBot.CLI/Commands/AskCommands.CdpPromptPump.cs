@@ -68,15 +68,22 @@ internal sealed class CdpPromptPump : IDisposable
         Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: {(armed ? "armed" : "arm-failed")}");
 
         // CDP_SIGNAL poller: JS pump sets readyToSend when JS KeyboardEvent won't work (ProseMirror).
-        // Poll every 300ms for up to 4s; on signal, fire CDP Enter (same as Claude.cs Tier 1).
+        // Poll every 300ms for up to 8s (was 4s); timeout/exception → log and continue (not silent).
         _ = Task.Run(async () =>
         {
             try
             {
-                for (int i = 0; i < 13; i++) // 13 × 300ms = ~4s
+                for (int i = 0; i < 26; i++) // 26 × 300ms = ~8s (doubled from 4s to survive Chrome throttle)
                 {
                     await Task.Delay(300);
-                    if (!await cdp.CheckPumpReadyAsync(editorSelector)) continue;
+                    bool ready;
+                    try { ready = await cdp.CheckPumpReadyAsync(editorSelector); }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: CDP_SIGNAL poll timeout ({ex.GetType().Name}) — continuing");
+                        continue; // retry next tick instead of aborting
+                    }
+                    if (!ready) continue;
                     Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: CDP_SIGNAL → firing CDP Enter");
                     await cdp.SendPromptAsync(editorSelector);
                     return;
@@ -85,24 +92,24 @@ internal sealed class CdpPromptPump : IDisposable
             catch { }
         });
 
-        // Submit watchdog: 5s after LAST append, check if editor still has content
-        // Two-phase: check at 3s and 5s — if content decreased between checks, submission is in progress
+        // Submit watchdog: check at 7s and 5s after LAST append.
+        // Delay increased 3→7s to give CDP_SIGNAL poller (now 8s window) room to recover from throttle.
         int myWatchdog;
         lock (state.SyncRoot) { myWatchdog = ++state.WatchdogGen; }
         _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(3000);
+                await Task.Delay(7000); // increased from 3s — pump poller window is now 8s
                 lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
                 var first = await cdp.GetTextLengthAsync(editorSelector);
                 if (first <= 0) return; // already submitted
-                await Task.Delay(2000);
+                await Task.Delay(3000);
                 lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
                 var second = await cdp.GetTextLengthAsync(editorSelector);
                 if (second <= 0) return; // submitted between checks
                 if (second < first) return; // content decreasing = submission in progress
-                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 5s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
+                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 10s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
                 Console.Error.WriteLine(msg);
                 Program.AutoRegisterBug(msg);
             }
