@@ -1792,6 +1792,22 @@ internal partial class Program
     /// </summary>
     internal static string BuildTargetGrap(WKAppBot.Win32.Window.WindowInfo hit)
     {
+        // child-cmd: host window found via child process cmdline match.
+        // proc: must be the child process (it owns the cmdline), hwnd: is the terminal shell window.
+        // MatchedSnippet = "childProcName:matchedToken"
+        if (hit.MatchedVia == "child-cmd" && !string.IsNullOrEmpty(hit.MatchedSnippet))
+        {
+            var sep = hit.MatchedSnippet.IndexOf(':');
+            if (sep > 0)
+            {
+                var childProc = hit.MatchedSnippet[..sep].Replace("'", "\\'");
+                var token     = hit.MatchedSnippet[(sep + 1)..].Replace("'", "\\'");
+                if (token.Length > 60) token = token[..60];
+                var childCompact = $"{{proc:'{childProc}',cmd:'{token}'}}";
+                return InjectHwnd(childCompact, hit.Handle);
+            }
+        }
+
         var compact = BuildCompactWinGrap(hit.Handle);
 
         // For browser/web-app windows: always inject domain: or file: if not already in compact

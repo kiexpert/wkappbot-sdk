@@ -78,6 +78,7 @@ internal partial class Program
                 var matchNote = w.MatchedVia switch
                 {
                     null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
+                    "child-cmd" => "",  // proc/cmd already in grap
                     _ => $"  ← {w.MatchedVia}: {w.MatchedSnippet}"
                 };
 
