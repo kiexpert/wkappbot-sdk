@@ -167,24 +167,27 @@ public static class GrapHelper
         int siblingIndex = 0, System.Drawing.Rectangle? rect = null, List<string>? actions = null, string? text = null)
     {
         var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
-        // name uses single-quote wrapper so it's visually distinct from automationId
-        string id;
-        if (!string.IsNullOrEmpty(automationId)) id = automationId;
-        else if (!string.IsNullOrEmpty(name))    id = $"'{name}'";
-        else                                     id = "";
-        // XML tag: <Type{N}id attrs> — N only when no id
-        var numPart = string.IsNullOrEmpty(id) ? idx : "";
-        var tag = $"{controlType}{numPart}{id}";
-        var attrs = new List<string>(4);
-        if (rect.HasValue) attrs.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
-        if (actions != null && actions.Count > 0) attrs.Add($"actions=\"{string.Join(",", actions)}\"");
+        // "Type name" format — no XML angle brackets; name quoted, aid unquoted, number when nameless
+        string label;
+        if (!string.IsNullOrEmpty(automationId))
+            label = $"{controlType} {automationId}";
+        else if (!string.IsNullOrEmpty(name))
+        {
+            var n = name.Length > 40 ? name[..37] + "…" : name;
+            label = $"{controlType} \"{n}\"";
+        }
+        else
+            label = $"{controlType}{idx}";
+        var parts = new List<string>(4) { label };
+        if (rect.HasValue) parts.Add($"ltwh={rect.Value.X},{rect.Value.Y},{rect.Value.Width},{rect.Value.Height}");
+        if (actions != null && actions.Count > 0) parts.Add($"actions=\"{string.Join(",", actions)}\"");
         if (text != null)
         {
             var escaped = text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
             if (escaped.Length > 50) escaped = escaped[..47] + "...";
-            attrs.Add($"text=\"{escaped}\"");
+            parts.Add($"text=\"{escaped}\"");
         }
-        return attrs.Count > 0 ? $"<{tag} {string.Join(" ", attrs)}>" : $"<{tag}>";
+        return string.Join(" ", parts);
     }
 
     /// <summary>AutomationElement overload — delegates to canonical string overload.</summary>
