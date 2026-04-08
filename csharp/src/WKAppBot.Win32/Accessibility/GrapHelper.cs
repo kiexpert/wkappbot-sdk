@@ -146,7 +146,7 @@ public static class GrapHelper
                 int skip = 0;
                 while (i + 1 + skip < parts.Count && parts[i + 1 + skip] == baseType)
                     skip++;
-                if (skip > 0) { sb.Append("**/"); i += skip; }
+                if (skip > 0) { sb.Append("**"); i += skip; }
             }
         }
         return sb.ToString();
