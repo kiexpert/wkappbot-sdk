@@ -358,7 +358,7 @@ internal partial class Program
                 await Task.Delay(1000, ct);
         }
 
-        // Set up reply #2 and #3: reuse if existing CCABot reply, else create placeholder
+        // Set up reply #2 and #3: reuse if existing 앱봇아이 reply, else create placeholder
         if (_eyeStatusTs != null && !string.IsNullOrEmpty(_eyeBotToken) && !string.IsNullOrEmpty(_eyeChannel))
         {
             try
@@ -369,18 +369,18 @@ internal partial class Program
                     .ToList();
 
                 // Mouse CCA reply: find by username (position-independent)
-                var ccaReply = children?.FirstOrDefault(r => r?["username"]?.GetValue<string>() == "CCABot");
+                var ccaReply = children?.FirstOrDefault(r => r?["username"]?.GetValue<string>() == "앱봇아이");
                 if (ccaReply != null)
                 {
                     _mouseCcaReplyTs = ccaReply["ts"]?.GetValue<string>();
-                    Console.Error.WriteLine($"[ANALYSIS] Reusing existing CCABot reply ts={_mouseCcaReplyTs}");
+                    Console.Error.WriteLine($"[ANALYSIS] Reusing existing 앱봇아이 reply ts={_mouseCcaReplyTs}");
                 }
                 else
                 {
                     var (ok1, ts1) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, "Analyzing...",
-                        threadTs: _eyeStatusTs, username: "CCABot");
+                        threadTs: _eyeStatusTs, username: "앱봇아이");
                     if (ok1 && ts1 != null) _mouseCcaReplyTs = ts1;
-                    Console.Error.WriteLine($"[ANALYSIS] Created new CCABot reply ts={_mouseCcaReplyTs}");
+                    Console.Error.WriteLine($"[ANALYSIS] Created new 앱봇아이 reply ts={_mouseCcaReplyTs}");
                 }
 
                 Console.Error.WriteLine($"[ANALYSIS] Replies ready: mouse={_mouseCcaReplyTs != null}");
@@ -633,7 +633,7 @@ internal partial class Program
             else
             {
                 var (ok, ts) = await SlackSendViaApi(_eyeBotToken, _eyeChannel, text,
-                    threadTs: _eyeStatusTs, username: "CCABot");
+                    threadTs: _eyeStatusTs, username: "앱봇아이");
                 if (ok && ts != null) _mouseCcaReplyTs = ts;
             }
         }

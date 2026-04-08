@@ -994,9 +994,9 @@ internal partial class Program
                                     .ToList();
                                 var r1 = children.Count > 0 ? children[0]?["ts"]?.GetValue<string>() : null;
                                 if (r1 != null) { _eyeSummaryReplyTs = r1; Console.Error.WriteLine($"[EYE] Restored summary reply ts={r1}"); }
-                                // Restore CCABot slot ts directly (not deferred to UnifiedMouseFocusLoop — avoids duplicate creation)
+                                // Restore 앱봇아이 slot ts directly (not deferred to UnifiedMouseFocusLoop — avoids duplicate creation)
                                 var ccaReply = replies.FirstOrDefault(r => r?["ts"]?.GetValue<string>() != adoptTs
-                                    && r?["username"]?.GetValue<string>() == "CCABot");
+                                    && r?["username"]?.GetValue<string>() == "앱봇아이");
                                 var r2 = ccaReply?["ts"]?.GetValue<string>();
                                 RestoreHoverReplyTs(r2, null);
                             }
@@ -1012,7 +1012,7 @@ internal partial class Program
                         {
                             _eyeStatusTs = eyeTs;
                             // Always post card placeholder as first thread reply [0]
-                            // — guarantees CCABot always lands at [1], not [0]
+                            // — guarantees 앱봇아이 always lands at [1], not [0]
                             var cardContent = summary.Length > 0
                                 ? "```\n" + summary + "\n```"
                                 : "_(loading...)_";

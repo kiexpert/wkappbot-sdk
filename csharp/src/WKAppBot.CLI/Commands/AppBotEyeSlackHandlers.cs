@@ -902,7 +902,7 @@ internal partial class Program
 
         // Local helper: send ack "전달했습니다" and track it for later deletion
         // Deleted when slack reply is sent (not auto-deleted — stays visible until response)
-        var AckUsername = BuildSlackBotUsername("앱봇아이"); // e.g. "앱봇아이[WG-WKAppBot]"
+        var AckUsername = "앱봇아이"; // no CWD suffix — 앱봇아이 is global, not per-folder
         void SendAndTrackAck(string ch, string threadKey, int promptCount = 1, int totalAttempted = 0,
             List<DeliveryResult>? results = null)
         {

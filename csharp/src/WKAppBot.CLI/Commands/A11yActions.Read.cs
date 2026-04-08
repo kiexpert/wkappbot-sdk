@@ -113,7 +113,7 @@ internal partial class Program
     }
 
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true, string[]? extraArgs = null,
-        WKAppBot.Win32.Window.WindowInfo? originalHit = null)
+        WKAppBot.Win32.Window.WindowInfo? originalHit = null, string? multiHeader = null)
     {
         FocusedElementInfo? focInfo = null;
         try
@@ -155,12 +155,28 @@ internal partial class Program
             var focCompact = BuildCompactWinGrap(focRootHwnd);
             var focGrapJson = BuildFindGrap(focRootHwnd, focPid, focProc, focCompact, null);
             var focPaste = QuoteGrapExpression($"{focGrapJson}{focScope}");
+            var focSw = System.Diagnostics.Stopwatch.StartNew();
+            string focVerify = "?";
+            try
+            {
+                var focHits = WindowFinder.FindWindows(focCompact, false);
+                focVerify = focHits.Any(v => v.Handle == focRootHwnd) ? "OK" : "MISS";
+            }
+            catch { }
+            focSw.Stop();
             Console.WriteLine(Ansi.Dim("## FOCUS"));
+            Console.WriteLine(Ansi.Dim("```"));
             Console.WriteLine(Ansi.Dim(focPaste));
+            Console.WriteLine(Ansi.Dim($"{Ansi.Mark(focVerify)} {focSw.ElapsedMilliseconds}ms"));
+            Console.WriteLine(Ansi.Dim("```"));
             if (!string.IsNullOrWhiteSpace(focTitle))
                 Console.Error.WriteLine(focTitle);
             Console.WriteLine();
         }
+
+        // Multi-match header: printed once before first TARGET (after FOCUS if present)
+        if (!string.IsNullOrEmpty(multiHeader))
+            Console.WriteLine(Ansi.Dim(multiHeader));
 
         // ── TARGET section ─────────────────────────────────────
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -190,26 +206,30 @@ internal partial class Program
         var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
         var titleHeading = !string.IsNullOrWhiteSpace(title) ? title : "TARGET";
-        Console.WriteLine(Ansi.TargetLine($"## {titleHeading}"));
-        Console.WriteLine(Ansi.TargetLine(paste));
-        // Ready-to-run command line
         var cmdLine = $"wkappbot a11y find {paste}";
         if (extraArgs != null && extraArgs.Length > 0)
             cmdLine += " " + string.Join(" ", extraArgs);
-        Console.WriteLine(Ansi.TargetLine(cmdLine));
-        // Verify mark + match reason annotation
         var matchNote = "";
         if (originalHit != null && !string.IsNullOrEmpty(originalHit.MatchedVia))
         {
             matchNote = originalHit.MatchedVia switch
             {
-                "context" => $"  ← {originalHit.MatchedSnippet}",  // e.g. "foreground host"
+                "context" => $"  ← {originalHit.MatchedSnippet}",
                 "uia"     => $"  ← uia: {originalHit.MatchedSnippet}",
-                "proc" or "domain" or "url" or "file" or "cls" or "title" => "", // shown in grap already
+                "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
                 _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
             };
         }
-        Console.WriteLine(Ansi.TargetLine($"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{Ansi.Dim(matchNote)}"));
+        var verifyLine = $"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{Ansi.Dim(matchNote)}";
+
+        // Code-fence block: renders cleanly in both terminal and markdown preview
+        Console.WriteLine(Ansi.TargetLine($"## {titleHeading}"));
+        Console.WriteLine(Ansi.TargetLine("```"));
+        Console.WriteLine(Ansi.TargetLine(paste));
+        Console.WriteLine(Ansi.TargetLine(cmdLine));
+        Console.WriteLine(Ansi.TargetLine(verifyLine));
+        Console.WriteLine(Ansi.TargetLine("```"));
+        Console.WriteLine(); // blank line between targets
 
         return true;
     }
