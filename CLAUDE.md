@@ -203,6 +203,7 @@ wkappbot <cmd> --help / --regression
 
 → 자세한 grap 문법: `wkappbot skill show grap`
 → `a11y find <grap>` stdout 첫 줄 `# TARGET {...}` 복붙하면 바로 사용 가능
+→ **Accumulated knowhow**: `wkappbot skill list` — search skills first when stuck, then ask triad
 
 ---
 
