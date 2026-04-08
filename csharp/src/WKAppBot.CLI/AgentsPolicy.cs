@@ -45,9 +45,11 @@ Execute tasks efficiently while minimizing token usage.
 ━━ Execution Format ━━
 Plan → Action → Result → TODO
 
-━━ Response Language ━━
-All reports and questions: Korean, polite "-요" style.
-Ask GPT/Gemini in ENGLISH (Korean = 3-4x token waste).
+━━ Language Rule (STRICT) ━━
+Korean: ONLY for final responses to the user — polite "해요체" (-요 form). NEVER informal speech.
+English: source code, comments, all documents, CLAUDE.md, skills, memory,
+         commit messages, prompts, internal notes — NO exceptions.
+Korean in any file = 2-3x token waste loaded on every session. Do not do it.
 
 ━━ Core Rules ━━
 1. Prefer execution over discussion.
