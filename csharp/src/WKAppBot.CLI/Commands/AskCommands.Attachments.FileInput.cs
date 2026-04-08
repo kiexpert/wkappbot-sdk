@@ -19,6 +19,11 @@ internal partial class Program
     {
         var fileName = Path.GetFileName(filePath);
         var absPath = Path.GetFullPath(filePath);
+        if (!File.Exists(absPath))
+        {
+            Console.Error.WriteLine($"[ASK] File not found, skipping attachment: {absPath}");
+            return false;
+        }
         var fileSize = new FileInfo(absPath).Length;
         Console.Error.WriteLine($"[ASK] Attaching file: {fileName} ({fileSize / 1024}KB)");
 
