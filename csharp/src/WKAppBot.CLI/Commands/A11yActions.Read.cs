@@ -52,7 +52,7 @@ internal partial class Program
     // -- Find: CURSOR -> TARGET -> VERDICT structured output --
     // stdout: clean result sections only
     // stderr: only hard errors, not the full analysis dump
-    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth)
+    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true)
     {
         FocusedElementInfo? focInfo = null;
         try
@@ -68,7 +68,8 @@ internal partial class Program
         var compactGrap = BuildCompactWinGrap(hwnd);
         var fullGrap = BuildTargetGrapWithFocusPath(hwnd);
 
-        if (focInfo != null)
+        // ── FOCUS section ──────────────────────────────────────
+        if (printFocus && focInfo != null)
         {
             var gti2 = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
@@ -77,41 +78,30 @@ internal partial class Program
                 ? NativeMethods.GetAncestor(gti2.hwndFocus, NativeMethods.GA_ROOT)
                 : IntPtr.Zero;
             if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti2.hwndFocus;
-            var focCompact = focRootHwnd != IntPtr.Zero ? BuildCompactWinGrap(focRootHwnd) : "?";
-            var focWinHwnd = focRootHwnd != IntPtr.Zero ? $"hwnd:0x{focRootHwnd.ToInt64():X8}" : "?";
 
-            static string Abb(string t) => t.Length > 3 ? t[..3] : t;
-            var chain = focInfo.ParentChain
-                .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
-                .Select(p => string.IsNullOrEmpty(p.aid) ? Abb(p.type) : $"{Abb(p.type)}_{p.aid}")
-                .Reverse()
-                .ToList();
-            var focLeafTag = Abb(focInfo.ControlType);
-            if (!string.IsNullOrEmpty(focInfo.AutomationId)) focLeafTag += $"_{focInfo.AutomationId}";
-            if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window")
-                chain.Add(focLeafTag);
-
-            string focPath = "";
-            if (chain.Count > 0)
+            var focGrap = focRootHwnd != IntPtr.Zero
+                ? BuildTargetGrapWithFocusPath(focRootHwnd)
+                : BuildTargetGrapWithFocusPath(hwnd);
+            var focHwnd = focRootHwnd != IntPtr.Zero ? $"hwnd:0x{focRootHwnd.ToInt64():X}" : "?";
+            string focProc = "";
+            if (focRootHwnd != IntPtr.Zero)
             {
-                var sb2 = new System.Text.StringBuilder();
-                for (int ci = 0; ci < chain.Count; ci++)
-                {
-                    if (ci > 0) sb2.Append('/');
-                    sb2.Append(chain[ci]);
-                    if (!chain[ci].Contains('_'))
-                    {
-                        int skip = 0;
-                        while (ci + 1 + skip < chain.Count && chain[ci + 1 + skip] == chain[ci]) skip++;
-                        if (skip > 0) { sb2.Append(new string('/', skip)); ci += skip; }
-                    }
-                }
-                focPath = $"#{sb2}";
+                NativeMethods.GetWindowThreadProcessId(focRootHwnd, out uint focPid);
+                try { using var fp = System.Diagnostics.Process.GetProcessById((int)focPid); focProc = fp.ProcessName; } catch { }
             }
+            var focScope = focGrap.Contains('#') ? focGrap[focGrap.IndexOf('#')..] : "";
+            var focTitle = focRootHwnd != IntPtr.Zero ? NativeMethods.GetWindowTextW(focRootHwnd) : "";
 
-            Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWinHwnd}{focPath}\"  {focCompact}"));
+            Console.WriteLine(Ansi.Dim("## FOCUS"));
+            Console.WriteLine(Ansi.Dim($"proc={focProc}  {focHwnd}"));
+            if (!string.IsNullOrWhiteSpace(focScope))
+                Console.WriteLine(Ansi.Dim($"scope: {focScope}"));
+            if (!string.IsNullOrWhiteSpace(focTitle))
+                Console.Error.WriteLine(focTitle);
+            Console.WriteLine();
         }
 
+        // ── TARGET section ─────────────────────────────────────
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
@@ -126,24 +116,50 @@ internal partial class Program
         NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
         string procName = "";
         try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
-        var contextStr = compactGrap.Length > 2 ? $"  {compactGrap}" : "";
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms  proc={procName}{contextStr}"));
 
-        if (verifyHits.Count > 1)
+        var primaryHit = verifyHits.FirstOrDefault(v => v.Handle == hwnd);
+        var hwndHex = $"hwnd:0x{hwnd.ToInt64():X}";
+        var scope = fullGrap.Contains('#') ? fullGrap[fullGrap.IndexOf('#')..] : "";
+        var title = NativeMethods.GetWindowTextW(hwnd);
+        if (title.Length > 90) title = title[..87] + "...";
+
+        if (verifyHits.Count <= 1)
         {
-            Console.WriteLine(Ansi.Dim($"# {verifyHits.Count} windows match — pick one:"));
-            var gtiMulti = new NativeMethods.GUITHREADINFO
-                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
-            NativeMethods.GetGUIThreadInfo(0, ref gtiMulti);
-
+            // Single match — clean paragraph format
+            Console.WriteLine(Ansi.TargetLine($"## TARGET  [{Ansi.Mark(verifyMark)}] {sw.ElapsedMilliseconds}ms"));
+            Console.WriteLine(Ansi.TargetLine($"{hwndHex}  proc={procName}"));
+            if (!string.IsNullOrWhiteSpace(primaryHit?.MatchedVia) && !string.IsNullOrWhiteSpace(primaryHit?.MatchedSnippet))
+                Console.WriteLine(Ansi.TargetLine($"matched: {primaryHit.MatchedVia}={primaryHit.MatchedSnippet}"));
+            if (!string.IsNullOrWhiteSpace(scope))
+                Console.WriteLine(Ansi.TargetLine($"scope: {scope}"));
+            if (!string.IsNullOrWhiteSpace(title))
+                Console.Error.WriteLine(title);
+        }
+        else
+        {
+            // Multiple matches — subsections
+            Console.WriteLine(Ansi.Dim($"## TARGETS  {verifyHits.Count} matches"));
             foreach (var hit in verifyHits)
             {
+                Console.WriteLine();
                 NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
+                string hitProc = "";
+                try { using var hp = System.Diagnostics.Process.GetProcessById((int)hitPid); hitProc = hp.ProcessName; } catch { }
                 var hitFullGrap = BuildTargetGrapWithFocusPath(hit);
+                var hitHwnd = $"hwnd:0x{hit.Handle.ToInt64():X}";
+                var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
-                if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "...";
+                if (hitTitle.Length > 90) hitTitle = hitTitle[..87] + "...";
                 var marker = hit.Handle == hwnd ? " *" : "";
-                Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hitFullGrap}\"{marker}  {hitTitle}"));
+
+                Console.WriteLine(Ansi.TargetLine($"### TARGET{marker}  [{Ansi.Mark("OK")}]"));
+                Console.WriteLine(Ansi.TargetLine($"{hitHwnd}  proc={hitProc}"));
+                if (!string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
+                    Console.WriteLine(Ansi.TargetLine($"matched: {hit.MatchedVia}={hit.MatchedSnippet}"));
+                if (!string.IsNullOrWhiteSpace(hitScope))
+                    Console.WriteLine(Ansi.TargetLine($"scope: {hitScope}"));
+                if (!string.IsNullOrWhiteSpace(hitTitle))
+                    Console.Error.WriteLine(hitTitle);
             }
         }
 
