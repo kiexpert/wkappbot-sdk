@@ -139,9 +139,21 @@ internal partial class Program
         catch { }
         sw.Stop();
 
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms"));
+        // Always resolve hwnd + proc for meta suffix
+        NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
+        string procName = "";
+        try
+        {
+            using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid);
+            procName = proc.ProcessName;
+        }
+        catch { }
+        var metaParts = new System.Text.StringBuilder();
+        metaParts.Append($"  hwnd=0x{hwnd.ToInt64():X8} proc={procName}");
+        if (verifyHits.Count > 1) metaParts.Append($" pid={resolvedPid}");
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaParts}"));
 
-        // Window title → stderr (can be noisy/repeated; not needed for copy-paste)
+        // Window title → stderr
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
         if (!string.IsNullOrEmpty(winTitle))
         {
@@ -163,7 +175,7 @@ internal partial class Program
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
                 if (hitTitle.Length > 50) hitTitle = hitTitle[..47] + "…";
                 var marker = hit.Handle == hwnd ? " ◀" : "";
-                Console.WriteLine($"#   \"{pidGrap}\"  {hitTitle}{marker}");
+                Console.WriteLine($"#   \"{pidGrap}\"  hwnd=0x{hit.Handle.ToInt64():X8} pid={hitPid}  {hitTitle}{marker}");
             }
         }
 
