@@ -1732,6 +1732,7 @@ internal partial class Program
         g = System.Text.RegularExpressions.Regex.Replace(g, @",?pid:\d+,?", ",");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",title:'[^']*'", "");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",url:'[^']*'", "");
+        g = System.Text.RegularExpressions.Regex.Replace(g, @",cmd:'[^']*'", "");
         if (g.Contains("domain:"))
         {
             // Browser with web domain: return just the domain

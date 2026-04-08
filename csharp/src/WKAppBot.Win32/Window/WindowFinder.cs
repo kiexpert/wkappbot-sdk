@@ -1036,6 +1036,32 @@ public static class WindowFinder
         }
         catch { }
 
+        // cmd: truncated command line (key args only, not exe path itself)
+        string cmdField = "";
+        try
+        {
+            var rawCmd = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+            if (!string.IsNullOrEmpty(rawCmd))
+            {
+                // Strip leading exe path token (up to first space after closing quote or first space)
+                var stripped = rawCmd.TrimStart();
+                if (stripped.StartsWith('"'))
+                {
+                    var end = stripped.IndexOf('"', 1);
+                    if (end >= 0) stripped = stripped[(end + 1)..].TrimStart();
+                }
+                else
+                {
+                    var sp = stripped.IndexOf(' ');
+                    if (sp >= 0) stripped = stripped[(sp + 1)..].TrimStart();
+                    else stripped = "";
+                }
+                if (stripped.Length > 120) stripped = stripped[..120];
+                cmdField = stripped.Replace("'", "\\'");
+            }
+        }
+        catch { }
+
         var sb = new System.Text.StringBuilder();
         sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid}");
         if (!string.IsNullOrEmpty(proc)) sb.Append($",proc:'{proc}'");
@@ -1044,6 +1070,7 @@ public static class WindowFinder
         if (!string.IsNullOrEmpty(cls)) sb.Append($",cls:'{cls}'");
         if (cid != 0) sb.Append($",cid:{cid}");
         if (!string.IsNullOrEmpty(url)) sb.Append($",url:'{url.Replace("'", "\\'")}'");
+        if (!string.IsNullOrEmpty(cmdField)) sb.Append($",cmd:'{cmdField}'");
         sb.Append('}');
         return sb.ToString();
     }
@@ -1201,6 +1228,7 @@ public static class WindowFinder
         var procMatchers   = fields.TryGetValue("proc",   out var pv) ? pv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
         var domainMatchers = fields.TryGetValue("domain", out var dv) ? dv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
         var urlMatchers    = fields.TryGetValue("url",    out var uv) ? uv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
+        var cmdMatchers    = fields.TryGetValue("cmd",    out var kv) ? kv.Select(v => PatternMatcher.Create(NormalizeFieldPattern(v))).ToList() : null;
 
         var results = new List<WindowInfo>();
         var procNameCache = new Dictionary<uint, string>();
@@ -1211,7 +1239,7 @@ public static class WindowFinder
         {
             if (NativeMethods.IsWindow(hwndFilter) && MatchesMultiField(
                     hwndFilter, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
-                    domainMatchers, urlMatchers, procNameCache))
+                    domainMatchers, urlMatchers, procNameCache, cmdMatchers))
                 results.Add(WindowInfo.FromHwnd(hwndFilter));
             return results;
         }
@@ -1221,7 +1249,7 @@ public static class WindowFinder
         {
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
             if (MatchesMultiField(hWnd, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
-                    domainMatchers, urlMatchers, procNameCache))
+                    domainMatchers, urlMatchers, procNameCache, cmdMatchers))
             {
                 results.Add(WindowInfo.FromHwnd(hWnd));
                 if (stopOnFirstMatch) return false;
@@ -1257,7 +1285,7 @@ public static class WindowFinder
         IntPtr hWnd, uint pidFilter, int? cidFilter,
         List<PatternMatcher>? titleMatchers, List<PatternMatcher>? clsMatchers, List<PatternMatcher>? procMatchers,
         List<PatternMatcher>? domainMatchers, List<PatternMatcher>? urlMatchers,
-        Dictionary<uint, string> procNameCache)
+        Dictionary<uint, string> procNameCache, List<PatternMatcher>? cmdMatchers = null)
     {
         NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
 
@@ -1298,6 +1326,14 @@ public static class WindowFinder
             string cmdLine = "";
             try { cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? ""; } catch { }
             if (!procMatchers.Any(m => m.MatchAny(proc, cmdLine))) return false;
+        }
+
+        // cmd: match against process command line args
+        if (cmdMatchers != null)
+        {
+            string cmdLine = "";
+            try { cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? ""; } catch { }
+            if (!cmdMatchers.Any(m => m.IsMatch(cmdLine))) return false;
         }
 
         // domain / url (lazy fetch)
