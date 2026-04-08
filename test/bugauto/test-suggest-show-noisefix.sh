@@ -21,11 +21,6 @@ echo "=== Live: suggest show --help ==="
 echo "PASS: suggest show --help works"
 
 echo ""
-echo "=== Live: suggest show --help ==="
-"$WKAPPBOT" suggest show --help 2>&1
-echo "PASS: suggest show --help works"
-
-echo ""
 echo "=== Live: suggest get (noise guard — routed to show subcommand) ==="
 "$WKAPPBOT" suggest get --help 2>&1
 echo "PASS: suggest get routes to show"
