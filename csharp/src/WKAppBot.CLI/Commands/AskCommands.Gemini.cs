@@ -519,8 +519,8 @@ internal partial class Program
                     {
                         if (!liveHeaderPrinted)
                         {
-                            Console.WriteLine();
-                            Console.WriteLine("[Gemini] streaming...");
+                            Console.Error.WriteLine();
+                            Console.Error.WriteLine("[Gemini] streaming...");
                             liveHeaderPrinted = true;
                         }
                         Console.Write(text.Substring(lastFlushedLen));
@@ -755,10 +755,9 @@ internal partial class Program
         if (ok && answer != null)
         {
             // Print answer (truncate for console)
-            Console.WriteLine();
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("[Gemini] Answer:");
-            Console.ResetColor();
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("[Gemini] Answer:");
+
             Console.WriteLine(answer.Length > 2000 ? answer[..2000] + "\n... (truncated)" : answer);
 
             // Full answer marker (for programmatic capture by whisper study etc.)

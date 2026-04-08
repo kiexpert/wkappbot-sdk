@@ -184,7 +184,8 @@ internal partial class Program
         var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, primaryHit);
         var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
-        Console.WriteLine(Ansi.TargetLine("## TARGET"));
+        var titleHeading = !string.IsNullOrWhiteSpace(title) ? title : "TARGET";
+        Console.WriteLine(Ansi.TargetLine($"## {titleHeading}"));
         Console.WriteLine(Ansi.TargetLine(paste));
         // Ready-to-run command line
         var cmdLine = $"wkappbot a11y find {paste}";
@@ -193,9 +194,6 @@ internal partial class Program
         Console.WriteLine(Ansi.TargetLine(cmdLine));
         // Verify mark on its own line (after command, for readability)
         Console.WriteLine(Ansi.TargetLine($"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms"));
-        // Window title → stderr (human-readable label, not captured by pipes)
-        if (!string.IsNullOrWhiteSpace(title))
-            Console.Error.WriteLine(title);
 
         return true;
     }
