@@ -131,14 +131,23 @@ public static class WindowFinder
             var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
 
             // Token-AND match: plain multi-word patterns check each token in title+searchKey (order-independent)
+            string matchedVia = "title";
+            string matchedSnippet = title;
             bool matched = PatternMatcher.TokenMatchAny(titlePattern, title, searchKey);
+            if (matched && !PatternMatcher.TokenMatchAny(titlePattern, title) && PatternMatcher.TokenMatchAny(titlePattern, procName))
+            {
+                matchedVia = "proc"; matchedSnippet = procName;
+            }
 
             // URL fallback: any browser exposing URL via UIA a11y tree or CDP
             if (!matched)
             {
                 var url = GetBrowserUrl(hWnd, pid);
-                if (!string.IsNullOrEmpty(url))
-                    matched = PatternMatcher.TokenMatchAny(titlePattern, url);
+                if (!string.IsNullOrEmpty(url) && PatternMatcher.TokenMatchAny(titlePattern, url))
+                {
+                    matched = true;
+                    try { matchedVia = "domain"; matchedSnippet = new Uri(url.Split(' ')[0]).Host; } catch { matchedVia = "url"; matchedSnippet = url.Length > 60 ? url[..60] : url; }
+                }
             }
 
             // cmd: fallback — match against process command line args
@@ -147,8 +156,12 @@ public static class WindowFinder
                 try
                 {
                     var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
-                    if (!string.IsNullOrEmpty(cmdLine))
-                        matched = PatternMatcher.TokenMatchAny(titlePattern, cmdLine);
+                    if (!string.IsNullOrEmpty(cmdLine) && PatternMatcher.TokenMatchAny(titlePattern, cmdLine))
+                    {
+                        matched = true;
+                        matchedVia = "cmd";
+                        matchedSnippet = cmdLine.Length > 80 ? cmdLine[..80] : cmdLine;
+                    }
                 }
                 catch { }
             }
@@ -159,6 +172,8 @@ public static class WindowFinder
                 // Coverage = pattern literal length / matched text length (higher = more specific match)
                 var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
                 info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
+                info.MatchedVia = matchedVia;
+                info.MatchedSnippet = matchedSnippet;
                 results.Add(info);
                 if (stopOnFirstMatch) return false;
             }
@@ -1383,6 +1398,10 @@ public sealed class WindowInfo
     public int ExStyle { get; init; }
     /// <summary>Grap pattern coverage score (0-1). Higher = more specific match.</summary>
     public double Coverage { get; set; }
+    /// <summary>Which field caused this window to match (title/proc/domain/url/cmd/json5).</summary>
+    public string? MatchedVia { get; set; }
+    /// <summary>Snippet of the matched value (truncated), for injecting into display grap.</summary>
+    public string? MatchedSnippet { get; set; }
 
     public static WindowInfo FromHwnd(IntPtr hWnd)
     {

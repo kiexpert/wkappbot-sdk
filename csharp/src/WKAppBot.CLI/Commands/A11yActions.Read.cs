@@ -168,7 +168,7 @@ internal partial class Program
             foreach (var hit in verifyHits)
             {
                 NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
-                var hitGrap = InjectHwnd(BuildCompactWinGrap(hit.Handle), hit.Handle);
+                var hitGrap = BuildTargetGrap(hit);
                 // Focus node path: only for the window that has keyboard focus
                 string focusPath = "";
                 if (gtiMulti.hwndFocus != IntPtr.Zero)

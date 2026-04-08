@@ -1724,6 +1724,81 @@ internal partial class Program
         return InjectHwnd(BuildCompactWinGrap(hwnd), hwnd);
     }
 
+    /// <summary>
+    /// BuildTargetGrap overload accepting WindowInfo with MatchedVia/MatchedSnippet.
+    /// Injects the matched field into the grap when not already visible in compact form,
+    /// so the reason for the match is always clear in the output.
+    /// </summary>
+    internal static string BuildTargetGrap(WKAppBot.Win32.Window.WindowInfo hit)
+    {
+        var compact = BuildCompactWinGrap(hit.Handle);
+
+        // For browser/web-app windows: always inject domain: or file: if not already in compact
+        if (!compact.Contains("domain:") && !compact.Contains("file:"))
+        {
+            WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
+            try
+            {
+                var rawUrl = WKAppBot.Win32.Window.WindowFinder.GetBrowserUrl(hit.Handle, hitPid);
+                if (!string.IsNullOrEmpty(rawUrl))
+                {
+                    string inject;
+                    if (rawUrl.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fn = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
+                        inject = !string.IsNullOrEmpty(fn) ? $"file:'{fn}'" : "";
+                    }
+                    else
+                    {
+                        var host = new Uri(rawUrl.Split(' ')[0]).Host;
+                        inject = !string.IsNullOrEmpty(host) ? $"domain:'{host}'" : "";
+                    }
+                    if (!string.IsNullOrEmpty(inject))
+                        compact = compact.StartsWith('{')
+                            ? compact.TrimEnd('}') + $",{inject}}}"
+                            : $"{{{inject}}}";
+                }
+            }
+            catch { }
+        }
+
+        // For legacy/non-browser apps: ensure cls: is present (needed for Win32 targeting)
+        if (!compact.Contains("domain:") && !compact.Contains("file:") && !compact.Contains("cls:"))
+        {
+            var cls = WKAppBot.Win32.Window.WindowFinder.GetClassName(hit.Handle);
+            if (!string.IsNullOrEmpty(cls))
+            {
+                cls = cls.Replace("'", "\\'");
+                compact = compact.StartsWith('{')
+                    ? compact.TrimEnd('}') + $",cls:'{cls}'}}"
+                    : $"{{cls:'{cls}'}}";
+            }
+        }
+
+        // Inject matched field if not already visible in compact form
+        if (!string.IsNullOrEmpty(hit.MatchedVia) && !string.IsNullOrEmpty(hit.MatchedSnippet))
+        {
+            bool alreadyVisible = hit.MatchedVia switch
+            {
+                "domain" => compact.Contains("domain:"),
+                "url"    => compact.Contains("domain:") || compact.Contains("file:"),
+                "proc"   => compact.Contains("proc:"),
+                "cmd"    => compact.Contains("cmd:") || compact.Contains("file:") || compact.Contains("domain:"),
+                _        => true
+            };
+            if (!alreadyVisible)
+            {
+                var snippet = hit.MatchedSnippet.Replace("'", "\\'");
+                if (snippet.Length > 60) snippet = snippet[..60];
+                var inject = $"{hit.MatchedVia}:'{snippet}'";
+                compact = compact.StartsWith('{')
+                    ? compact.TrimEnd('}') + $",{inject}}}"
+                    : $"{{{inject}}}";
+            }
+        }
+        return InjectHwnd(compact, hit.Handle);
+    }
+
     private static string _BuildCompactWinGrapCore(IntPtr hwnd)
     {
         var g = WindowFinder.BuildTargetJson5(hwnd);
