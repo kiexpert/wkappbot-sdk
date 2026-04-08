@@ -164,14 +164,9 @@ internal partial class Program
             }
             catch { }
             focSw.Stop();
-            Console.WriteLine(Ansi.Dim("## FOCUS"));
-            Console.WriteLine(Ansi.Dim("```"));
-            Console.WriteLine(Ansi.Dim(focPaste));
-            Console.WriteLine(Ansi.Dim($"{Ansi.Mark(focVerify)} {focSw.ElapsedMilliseconds}ms"));
-            Console.WriteLine(Ansi.Dim("```"));
+            PrintFocusBlock(focPaste, focVerify, focSw.ElapsedMilliseconds);
             if (!string.IsNullOrWhiteSpace(focTitle))
                 Console.Error.WriteLine(focTitle);
-            Console.WriteLine();
         }
 
         // Multi-match header: printed once before first TARGET (after FOCUS if present)
@@ -206,30 +201,14 @@ internal partial class Program
         var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
         var titleHeading = !string.IsNullOrWhiteSpace(title) ? title : "TARGET";
-        var cmdLine = $"wkappbot a11y find {paste}";
-        if (extraArgs != null && extraArgs.Length > 0)
-            cmdLine += " " + string.Join(" ", extraArgs);
-        var matchNote = "";
-        if (originalHit != null && !string.IsNullOrEmpty(originalHit.MatchedVia))
+        var matchNote = originalHit?.MatchedVia switch
         {
-            matchNote = originalHit.MatchedVia switch
-            {
-                "context" => $"  ← {originalHit.MatchedSnippet}",
-                "uia"     => $"  ← uia: {originalHit.MatchedSnippet}",
-                "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
-                _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
-            };
-        }
-        var verifyLine = $"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{Ansi.Dim(matchNote)}";
+            null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
+            "uia" => $"  ← uia: {originalHit.MatchedSnippet}",
+            _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
+        } ?? "";
 
-        // Code-fence block: renders cleanly in both terminal and markdown preview
-        Console.WriteLine(Ansi.TargetLine($"## {titleHeading}"));
-        Console.WriteLine(Ansi.TargetLine("```"));
-        Console.WriteLine(Ansi.TargetLine(paste));
-        Console.WriteLine(Ansi.TargetLine(cmdLine));
-        Console.WriteLine(Ansi.TargetLine(verifyLine));
-        Console.WriteLine(Ansi.TargetLine("```"));
-        Console.WriteLine(); // blank line between targets
+        PrintTargetBlock(titleHeading, paste, "find", extraArgs, verifyMark, sw.ElapsedMilliseconds, matchNote);
 
         return true;
     }

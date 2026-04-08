@@ -49,50 +49,17 @@ internal partial class Program
             if (IsSpecificPattern(grap) || allWindows.Count <= 1 || all || nthRaw != null)
                 return false;
 
-            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Error.WriteLine($"[A11Y] \"{grap}\" matched {allWindows.Count} windows — specify target:");
-            Console.ResetColor();
 
-            // Get focused UIA element info (for the foreground window's process)
-            FocusedElementInfo? focusInfo = null;
-            try { using var uiaLoc = new UiaLocator(); focusInfo = uiaLoc.GetFocusedElementInfo(); }
-            catch { }
+            Console.WriteLine(Ansi.Dim($"### TARGETS  {allWindows.Count} matches"));
 
             for (int idx = 0; idx < allWindows.Count; idx++)
             {
                 var w = allWindows[idx];
-                var r = w.Rect;
                 NativeMethods.GetWindowThreadProcessId(w.Handle, out uint wpid);
                 string proc;
                 try { proc = System.Diagnostics.Process.GetProcessById((int)wpid).ProcessName; }
                 catch { proc = "?"; }
-
-                // Truncate title for display (no ellipsis — keeps pattern-matchable)
-                var title = w.Title.Length > 50 ? w.Title[..50] : w.Title;
-
-                // Summary line: index, proc, class, title, size
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"  {idx + 1}. ");
-                Console.ResetColor();
-                Console.Write($"{proc} ");
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[{w.ClassName}] ");
-                Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($"\"{title}\"");
-                Console.ResetColor();
-                Console.WriteLine($" ({r.Right - r.Left}x{r.Bottom - r.Top})");
-
-                // Focused UIA node (only for the window that owns the focus)
-                string? focusScope = null;
-                if (focusInfo != null && focusInfo.ProcessId == (int)wpid)
-                {
-                    var fId = focusInfo.AutomationId != "" ? focusInfo.AutomationId : focusInfo.Name;
-                    if (fId.Length > 40) fId = fId[..40];
-                    focusScope = fId;
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.WriteLine($"     [FOCUS] {focusInfo.ControlType}(\"{fId}\"){(focusInfo.Patterns.Count > 0 ? " " + string.Join(",", focusInfo.Patterns) : "")}");
-                    Console.ResetColor();
-                }
 
                 // Build paste-ready JSON5 grap with mandatory fields
                 var hitCompact = Program.BuildCompactWinGrap(w.Handle);
@@ -101,34 +68,33 @@ internal partial class Program
                 var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
                 var hitPaste = QuoteGrapExpression($"{hitGrapJson}{hitScope}");
 
-                // Verify: re-search with portable pattern (no hwnd)
+                // Verify: re-search with portable pattern (no hwnd) + timing
+                var vsw = System.Diagnostics.Stopwatch.StartNew();
                 var verifyHits = WindowFinder.FindWindows(hitCompact, true);
+                vsw.Stop();
                 var verified = verifyHits.Any(v => v.Handle == w.Handle);
 
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.Write($"     a11y {action} {hitPaste}");
-                Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(verified ? " [OK]" : " [MISS]");
-                Console.ResetColor();
+                // MatchedField annotation (same logic as find output)
+                var matchNote = w.MatchedVia switch
+                {
+                    null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
+                    _ => $"  ← {w.MatchedVia}: {w.MatchedSnippet}"
+                };
+
+                var title = string.IsNullOrWhiteSpace(w.Title) ? "TARGET" : w.Title;
+                PrintTargetBlock(title, hitPaste, action, null, verified ? "OK" : "MISS", vsw.ElapsedMilliseconds, matchNote);
+
                 if (!verified)
                 {
                     var healPattern = $"*hwnd={w.Handle:X8}*";
                     var healHits = WindowFinder.FindWindows(healPattern, true);
                     var healed = healHits.Any(v => v.Handle == w.Handle);
                     if (healed)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"     [HEAL] hwnd fallback: a11y {action} \"{healPattern}\"");
-                        Console.ResetColor();
-                        // Self-healed via hwnd fallback — title changed (e.g. Chrome navigation).
-                        // Not a real bug; skip AutoRegisterBug.
-                    }
+                        Console.Error.WriteLine($"[HEAL] hwnd fallback: a11y {action} \"{healPattern}\"");
                     else
-                    {
                         AutoRegisterBug(
                             $"[BUG-AUTO] auto-find grap verify MISS: pattern={hitCompact} hwnd=0x{w.Handle:X8} title=\"{title}\" healed={healed}",
                             args: ["a11y", "find", hitCompact]);
-                    }
                 }
             }
             Console.Error.WriteLine($"[A11Y] Tip: a11y find \"<target>\" to explore / --all or --nth 1 to force");
