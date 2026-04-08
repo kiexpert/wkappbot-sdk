@@ -177,7 +177,7 @@ internal partial class Program
 
     static int SkillContributeCommand(string[] args)
     {
-        string? app = null, title = null, desc = null, author = null, id = null;
+        string? app = null, title = null, desc = null, author = null, id = null, regressionScript = null;
         var steps = new List<string>();
         var tags = new List<string>();
         var refs = new List<SkillSourceRef>();
@@ -186,13 +186,14 @@ internal partial class Program
         {
             switch (args[i])
             {
-                case "--app"    when i + 1 < args.Length: app    = args[++i]; break;
-                case "--title"  when i + 1 < args.Length: title  = args[++i]; break;
-                case "--desc"   when i + 1 < args.Length: desc   = args[++i]; break;
-                case "--author" when i + 1 < args.Length: author = args[++i]; break;
-                case "--id"     when i + 1 < args.Length: id     = args[++i]; break;
-                case "--steps"  when i + 1 < args.Length: steps.AddRange(args[++i].Split('|')); break;
-                case "--tags"   when i + 1 < args.Length: tags.AddRange(args[++i].Split(',')); break;
+                case "--app"               when i + 1 < args.Length: app              = args[++i]; break;
+                case "--title"             when i + 1 < args.Length: title            = args[++i]; break;
+                case "--desc"              when i + 1 < args.Length: desc             = args[++i]; break;
+                case "--author"            when i + 1 < args.Length: author           = args[++i]; break;
+                case "--id"                when i + 1 < args.Length: id               = args[++i]; break;
+                case "--steps"             when i + 1 < args.Length: steps.AddRange(args[++i].Split('|')); break;
+                case "--tags"              when i + 1 < args.Length: tags.AddRange(args[++i].Split(',')); break;
+                case "--regression-script" when i + 1 < args.Length: regressionScript = args[++i]; break;
                 // --refs "file.cs:42:pattern|file2.cs::pattern2"
                 case "--refs"   when i + 1 < args.Length:
                     foreach (var r in args[++i].Split('|'))
@@ -213,6 +214,7 @@ internal partial class Program
         {
             Console.WriteLine("Usage: wkappbot skill contribute --app <app> --title <title> --desc <desc>");
             Console.WriteLine("  Options: --steps \"s1|s2\"  --tags \"t1,t2\"  --id <slug>  --author <name>");
+            Console.WriteLine("           --regression-script <path>  (registers test script into experience/tests/)");
             return 1;
         }
 
@@ -227,26 +229,72 @@ internal partial class Program
         Directory.CreateDirectory(appDir);
         var path = Path.Combine(appDir, $"{slug}.skill.json");
 
+        // Register regression script into experience/tests/{cmd}/{subcmd}/
+        string? regScriptRef = null;
+        if (!string.IsNullOrEmpty(regressionScript))
+        {
+            regScriptRef = RegisterRegressionScript(regressionScript, slug);
+            if (regScriptRef == null) return 1; // error already printed
+        }
+
         var existing = File.Exists(path) ? SkillRecord.Load(path) : null;
         var skill = new SkillRecord
         {
-            Id         = slug,
-            App        = app,
-            Title      = title,
-            Desc       = desc,
-            Steps      = steps.Count > 0 ? steps : existing?.Steps ?? [],
-            Tags       = tags.Count  > 0 ? tags  : existing?.Tags  ?? [],
-            SourceRefs = refs.Count  > 0 ? refs  : existing?.SourceRefs,
-            Author     = author ?? existing?.Author ?? "claude",
-            Created    = existing?.Created ?? DateTime.UtcNow,
-            Updated    = DateTime.UtcNow,
-            Version    = existing != null ? BumpVersion(existing.Version) : "1.0"
+            Id               = slug,
+            App              = app,
+            Title            = title,
+            Desc             = desc,
+            Steps            = steps.Count > 0 ? steps : existing?.Steps ?? [],
+            Tags             = tags.Count  > 0 ? tags  : existing?.Tags  ?? [],
+            SourceRefs       = refs.Count  > 0 ? refs  : existing?.SourceRefs,
+            RegressionScript = regScriptRef ?? existing?.RegressionScript,
+            Author           = author ?? existing?.Author ?? "claude",
+            Created          = existing?.Created ?? DateTime.UtcNow,
+            Updated          = DateTime.UtcNow,
+            Version          = existing != null ? BumpVersion(existing.Version) : "1.0"
         };
 
         skill.Save(path);
         var action = existing != null ? "Updated" : "Created";
         Console.Error.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
+        if (regScriptRef != null)
+            Console.Error.WriteLine($"[SKILL] Regression script: {regScriptRef} (auto-runs on suggest resolve)");
         return 0;
+    }
+
+    // Copies regression script into experience/tests/{cmd}/{subcmd}/ and returns relative path from DataDir.
+    // Filename convention: test-{cmd}-{subcmd}[-desc].sh  →  cmd + subcmd extracted from filename.
+    static string? RegisterRegressionScript(string scriptPath, string skillSlug)
+    {
+        if (!File.Exists(scriptPath))
+        {
+            Console.Error.WriteLine($"[SKILL] --regression-script not found: {scriptPath}");
+            return null;
+        }
+
+        var fileName = Path.GetFileNameWithoutExtension(scriptPath);
+        var parts    = fileName.Split('-');
+        // "test-{cmd}-{subcmd}" or fallback
+        var cmd    = parts.Length > 1 ? parts[1] : "misc";
+        var subcmd = parts.Length > 2 ? parts[2] : "general";
+
+        var testsDir = Path.Combine(DataDir, "experience", "tests", cmd, subcmd);
+        Directory.CreateDirectory(testsDir);
+        var destName = Path.GetFileName(scriptPath);
+        var destPath = Path.Combine(testsDir, destName);
+        File.Copy(scriptPath, destPath, overwrite: true);
+
+        // Update .manifest (used by RunRegressionTests deleted-test detection)
+        var manifestPath = Path.Combine(testsDir, ".manifest");
+        var manifest = File.Exists(manifestPath)
+            ? new HashSet<string>(File.ReadAllLines(manifestPath).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')))
+            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (manifest.Add(destName))
+            File.WriteAllLines(manifestPath, manifest.OrderBy(x => x));
+
+        var relPath = Path.GetRelativePath(DataDir, destPath).Replace('\\', '/');
+        Console.Error.WriteLine($"[SKILL] Regression → experience/tests/{cmd}/{subcmd}/{destName}");
+        return relPath;
     }
 
     // ── Edit (partial update) ─────────────────────────────────────────────────
@@ -514,7 +562,15 @@ internal partial class Program
         var skill = FindSkill(args[0]);
         if (skill == null) { Console.Error.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
         var (ok, missing, stale) = RunVerify(skill, verbose: true);
-        return (missing + stale > 0) ? 1 : 0;
+        var regResult = RunSkillRegressionScript(skill);
+        if (regResult == -1)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[SKILL] No regression script registered for '{skill.Id}'.");
+            Console.Error.WriteLine($"  → To add one: wkappbot skill contribute --id {skill.Id} --regression-script <test-{skill.App}-*.sh>");
+            Console.ResetColor();
+        }
+        return (missing + stale > 0 || regResult > 0) ? 1 : 0;
     }
 
     // ── Audit ─────────────────────────────────────────────────────────────────
@@ -612,9 +668,82 @@ internal partial class Program
             }
         }
 
+        // Regression script existence check
+        if (!string.IsNullOrEmpty(skill.RegressionScript))
+        {
+            var scriptAbs = Path.IsPathRooted(skill.RegressionScript)
+                ? skill.RegressionScript
+                : Path.Combine(DataDir, skill.RegressionScript);
+            if (!File.Exists(scriptAbs))
+            {
+                if (verbose) Console.WriteLine($"    ❌ REGRESSION SCRIPT MISSING: {skill.RegressionScript}");
+                missing++;
+            }
+            else if (verbose)
+                Console.Error.WriteLine($"[SKILL] {skill.Id}: regression script ✅ {Path.GetFileName(scriptAbs)}");
+        }
+
         if (verbose && missing + stale == 0)
             Console.Error.WriteLine($"[SKILL] {skill.Id}: ✅ all {ok} ref(s) OK");
         return (ok, missing, stale);
+    }
+
+    // Runs the skill's regression script (if any). Returns 0=pass, 1=fail, -1=no script.
+    static int RunSkillRegressionScript(SkillRecord skill)
+    {
+        if (string.IsNullOrEmpty(skill.RegressionScript)) return -1;
+        var scriptAbs = Path.IsPathRooted(skill.RegressionScript)
+            ? skill.RegressionScript
+            : Path.Combine(DataDir, skill.RegressionScript);
+        if (!File.Exists(scriptAbs))
+        {
+            Console.Error.WriteLine($"[SKILL] Regression script missing: {skill.RegressionScript}");
+            return 1;
+        }
+
+        var ext = Path.GetExtension(scriptAbs).ToLowerInvariant();
+        var (runner, runnerArgs) = ext switch
+        {
+            ".sh"  => (File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe")
+                        ? @"C:\Program Files\Git\usr\bin\bash.exe" : "bash",
+                       $"\"{scriptAbs}\""),
+            ".ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptAbs}\""),
+            ".cmd" or ".bat" => ("cmd.exe", $"/c \"{scriptAbs}\""),
+            _ => (null as string, null as string)
+        };
+        if (runner == null)
+        {
+            Console.Error.WriteLine($"[SKILL] Unsupported regression script type: {ext}");
+            return 1;
+        }
+
+        Console.Error.WriteLine($"[SKILL] Running regression: {Path.GetFileName(scriptAbs)}");
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = runner, Arguments = runnerArgs,
+            UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+        };
+        psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
+        var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "SKILL");
+        var rOut = Task.Run(() => { string? l; while ((l = proc?.StandardOutput.ReadLine()) != null) Console.WriteLine($"  {l}"); });
+        var rErr = Task.Run(() => { string? l; while ((l = proc?.StandardError.ReadLine()) != null) Console.Error.WriteLine($"  {l}"); });
+        proc?.WaitForExit(60_000);
+        rOut.Wait(3_000); rErr.Wait(1_000);
+        var exit = proc?.ExitCode ?? 1;
+        if (exit == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Error.WriteLine($"[SKILL] Regression PASS ✅");
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"[SKILL] Regression FAIL ❌ (exit={exit})");
+            Console.ResetColor();
+        }
+        return exit == 0 ? 0 : 1;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -823,16 +952,19 @@ internal sealed class SkillRecord
     [JsonPropertyName("desc")]        public string Desc    { get; set; } = "";
     [JsonPropertyName("steps")]       public List<string> Steps { get; set; } = [];
     [JsonPropertyName("tags")]        public List<string> Tags  { get; set; } = [];
-    [JsonPropertyName("source_refs")] public List<SkillSourceRef>? SourceRefs { get; set; }
-    [JsonPropertyName("author")]      public string? Author  { get; set; }
-    [JsonPropertyName("created")]     public DateTime Created { get; set; } = DateTime.UtcNow;
-    [JsonPropertyName("updated")]     public DateTime? Updated { get; set; }
-    [JsonPropertyName("version")]     public string? Version  { get; set; }
+    [JsonPropertyName("source_refs")]        public List<SkillSourceRef>? SourceRefs      { get; set; }
+    [JsonPropertyName("regression_script")]  public string? RegressionScript              { get; set; }
+    [JsonPropertyName("author")]             public string? Author                        { get; set; }
+    [JsonPropertyName("created")]            public DateTime Created                      { get; set; } = DateTime.UtcNow;
+    [JsonPropertyName("updated")]            public DateTime? Updated                     { get; set; }
+    [JsonPropertyName("version")]            public string? Version                       { get; set; }
 
     /// <summary>Most recent activity date — updated if set, otherwise created.</summary>
     [JsonIgnore] public DateTime LastActivity => Updated ?? Created;
 
-    [JsonIgnore] public SkillSource Source { get; set; } = SkillSource.Project;
+    [JsonIgnore] public SkillSource Source   { get; set; } = SkillSource.Project;
+    /// <summary>Absolute path to the loaded .skill.json file (set by Load).</summary>
+    [JsonIgnore] public string? FilePath     { get; set; }
 
     static readonly JsonSerializerOptions Opts = new() { WriteIndented = true };
 
@@ -841,7 +973,12 @@ internal sealed class SkillRecord
 
     public static SkillRecord? Load(string path)
     {
-        try { return JsonSerializer.Deserialize<SkillRecord>(File.ReadAllText(path)); }
+        try
+        {
+            var s = JsonSerializer.Deserialize<SkillRecord>(File.ReadAllText(path));
+            if (s != null) s.FilePath = path;
+            return s;
+        }
         catch { return null; }
     }
 }
