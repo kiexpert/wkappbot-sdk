@@ -1710,7 +1710,7 @@ internal partial class Program
             g = System.Text.RegularExpressions.Regex.Replace(g, @",?proc:'[^']*',?", ",");
             g = System.Text.RegularExpressions.Regex.Replace(g, @",?cls:'[^']*',?", ",");
             var m = System.Text.RegularExpressions.Regex.Match(g, @"domain:'([^']*)'");
-            if (m.Success) return m.Groups[1].Value;
+            if (m.Success) return $"{{domain:'{m.Groups[1].Value}'}}";
         }
         else
         {
