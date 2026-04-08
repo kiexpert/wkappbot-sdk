@@ -9,7 +9,11 @@
     "Print ## TARGET section (stdout, bold cyan). Format (v5.13\u002B):\n## TARGET\n\u0022{hwnd:0x...,pid:...,proc:\u0027chrome\u0027,domain:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms\nWindowTitle \u2192 stderr (not stdout \u2014 prevents noise from unrelated tab names)\n\nMandatory field order in grap JSON5: hwnd first, pid second (collision safety), proc, then domain/file/cls/matchedField.\nmatchedField auto-injected: if search matched via cmd/title/uia, that field\u002Bsnippet appended (e.g. cmd:\u0027...\u0027 when chatgpt.com search matched VS Code via cmdline).",
     "Grap output must be shell-friendly: a pasted target string should work without manual editing, quoting, or brace escaping",
     "Always verify pasted grap targets by re-running a11y find on the emitted hwnd:0x... form; [OK] means the pasted token resolves back to the same hwnd",
-    "Multiple windows match \u2192 ## TARGETS N matches header (outer loop in A11yCommand), then one ## TARGET block per window \u2014 each with its own paste grap \u002B command line \u002B [OK] Nms.\nDo NOT use --all or --nth to force: show all blocks, let user pick specific grap.\nEach block\u0027s grap has matchedField injected so the reason for match is explicit."
+    "Multiple windows match \u2192 ## TARGETS N matches header (outer loop in A11yCommand), then one ## TARGET block per window \u2014 each with its own paste grap \u002B command line \u002B [OK] Nms.\nDo NOT use --all or --nth to force: show all blocks, let user pick specific grap.\nEach block\u0027s grap has matchedField injected so the reason for match is explicit.",
+    "OUTPUT FORMAT (v5.13\u002B): Each section wrapped in code fence for markdown compatibility. FOCUS section:\n## FOCUS\n\u0060\u0060\u0060\n\u0022{hwnd:...}#absTagPath\u0022\n[OK] Nms\n\u0060\u0060\u0060\nTARGET section:\n## WindowTitle\n\u0060\u0060\u0060\n\u0022{hwnd:...,proc:...,cmd:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms  \u2190 cmd: chatgpt.com\n\u0060\u0060\u0060\nMultiple matches: ### TARGETS N matches header before first block. Blank line between blocks. Window title in ## heading (not in grap). matchedField annotation on [OK] line (e.g. \u2190 cmd: chatgpt.com).",
+    "OUTPUT FORMAT (v5.13\u002B): Each section wrapped in code fence for markdown compatibility. FOCUS section:\n## FOCUS\n\u0060\u0060\u0060\n\u0022{hwnd:...}#absTagPath\u0022\n[OK] Nms\n\u0060\u0060\u0060\nTARGET section:\n## WindowTitle\n\u0060\u0060\u0060\n\u0022{hwnd:...,proc:...,cmd:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms  \u2190 cmd: chatgpt.com\n\u0060\u0060\u0060\nMultiple matches: ### TARGETS N matches header before first block. Blank line between blocks. Window title in ## heading (not in grap). matchedField annotation on [OK] line (e.g. \u2190 cmd: chatgpt.com).",
+    "WINDOWLESS PROCESS SCAN: After EnumWindows, scan all processes for cmdLine matches. Walk PPID chain (NativeMethods.GetParentProcessId via NtQueryInformationProcess.Reserved3) to find host window (e.g. VS Code terminal running chatgpt.com session). MatchedVia=\u0027cmd\u0027, MatchedSnippet=matching token only (not full cmdline). context matches (foreground heuristic) filtered out of find results.",
+    "WINDOWLESS PROCESS SCAN: After EnumWindows, scan all processes for cmdLine matches. Walk PPID chain (NativeMethods.GetParentProcessId via NtQueryInformationProcess.Reserved3) to find host window (e.g. VS Code terminal running chatgpt.com session). MatchedVia=\u0027cmd\u0027, MatchedSnippet=matching token only (not full cmdline). context matches (foreground heuristic) filtered out of find results."
   ],
   "tags": [
     "grap",
@@ -68,6 +72,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-08T07:01:01.1192756Z",
-  "updated": "2026-04-08T10:22:12.1008484Z",
-  "version": "1.7"
+  "updated": "2026-04-08T12:06:08.4549074Z",
+  "version": "1.11"
 }

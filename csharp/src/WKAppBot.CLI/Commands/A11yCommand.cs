@@ -574,8 +574,7 @@ internal partial class Program
             // Exclude foreground-host heuristic entries — they matched no real field
             targets = targets.Where(t => t.MatchedVia != "context").ToList();
             using var findAutomation = new UIA3Automation();
-            if (targets.Count > 1)
-                Console.WriteLine(Ansi.Dim($"## TARGETS  {targets.Count} matches"));
+            string? multiHeader = targets.Count > 1 ? $"### TARGETS  {targets.Count} matches" : null;
             var findExtraArgs = args.Skip(2).Where(a => !a.StartsWith("--deep") && a != "--depth").ToArray();
             for (int idx = 0; idx < targets.Count; idx++)
             {
@@ -584,7 +583,9 @@ internal partial class Program
                 {
                     var findRoot = findAutomation.FromHandle(win.Handle);
                     if (findRoot != null)
-                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs, originalHit: win);
+                        // multiHeader printed once: after FOCUS on first target, or before second target
+                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs,
+                            originalHit: win, multiHeader: idx == 0 ? multiHeader : null);
                 }
                 catch (Exception ex)
                 {
