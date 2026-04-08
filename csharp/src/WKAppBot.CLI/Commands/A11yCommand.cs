@@ -556,7 +556,10 @@ internal partial class Program
         Console.ForegroundColor = ConsoleColor.Cyan;
         foreach (var t in targets)
         {
-            var tGrap = BuildTargetGrap(t.Handle);
+            NativeMethods.GetWindowThreadProcessId(t.Handle, out uint tPid);
+            string tProc = ""; try { tProc = System.Diagnostics.Process.GetProcessById((int)tPid).ProcessName; } catch { }
+            var tCompact = BuildCompactWinGrap(t.Handle);
+            var tGrap = BuildFindGrap(t.Handle, tPid, tProc, tCompact, t);
             var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
             if (action != "find")
             {
