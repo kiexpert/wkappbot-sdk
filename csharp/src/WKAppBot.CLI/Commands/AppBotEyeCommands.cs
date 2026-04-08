@@ -794,70 +794,103 @@ internal partial class Program
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
 
-            // FSW: watch for .new.exe staging — drain current requests, then spawn new version.
-            // Detecting .new.exe is earlier and more intentional than watching .exe replacement.
-            // By the time drain completes, normal Eye will have already done TryRenameSwap.
+            // Dual FSW: .new.exe staging (early drain trigger) + .exe replacement (fast path).
+            // .new.exe → start draining immediately, then poll until swap complete → spawn
+            // .exe replaced directly (e.g. no .new.exe path) → skip poll, spawn right away
             var exePath = Environment.ProcessPath ?? "";
+            var exeStartStamp = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
             var exeDir = Path.GetDirectoryName(exePath) ?? ".";
             var exeName = Path.GetFileNameWithoutExtension(exePath);
             var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
             bool spawnedSuccessor = false;
+            bool drainTriggered = false;
             System.Threading.Timer? fswDebounce = null;
+            System.Threading.Timer? fswExeDebounce = null;
+
+            // Shared spawn logic — called after drain + swap confirmed
+            Func<Task> spawnSuccessor = async () =>
+            {
+                if (proxyCts.IsCancellationRequested) return;
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = exePath,
+                        Arguments = "eye --elevated",
+                        UseShellExecute = false, // inherit elevated token — no UAC
+                        CreateNoWindow = true,
+                    });
+                    spawnedSuccessor = true;
+                    Console.Error.WriteLine("[EYE:ADMIN] Successor admin Eye spawned — exiting");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[EYE:ADMIN] Failed to spawn successor: {ex.Message}");
+                }
+                proxyCts.Cancel();
+                await Task.CompletedTask;
+            };
+
+            // Shared drain + wait-for-swap logic
+            Action triggerDrainAndRespawn = () =>
+            {
+                if (drainTriggered) return;
+                drainTriggered = true;
+                Task.Run(async () =>
+                {
+                    // 1. Drain current admin requests (max 60s)
+                    for (int i = 0; i < 120 && !proxyCts.IsCancellationRequested; i++)
+                    {
+                        if (!ElevatedEyeServer.IsBusy) break;
+                        await Task.Delay(500);
+                    }
+                    // 2. Wait for normal Eye to consume .new.exe (rename-swap), max 30s
+                    for (int i = 0; i < 60 && File.Exists(newExePath); i++)
+                        await Task.Delay(500);
+                    await spawnSuccessor();
+                });
+            };
+
+            // FSW 1: .new.exe created/updated → early drain trigger
             var fswAdmin = new FileSystemWatcher(exeDir)
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
                 Filter = $"{exeName}.new.exe",
                 EnableRaisingEvents = true,
             };
-            Action onNewExeDetected = () =>
+            fswAdmin.Created += (_, _) => { fswDebounce?.Dispose(); fswDebounce = new System.Threading.Timer(_ => { if (File.Exists(newExePath)) { Console.Error.WriteLine("[EYE:ADMIN] .new.exe staged — starting drain"); triggerDrainAndRespawn(); } }, null, 500, Timeout.Infinite); };
+            fswAdmin.Changed += (_, _) => { fswDebounce?.Dispose(); fswDebounce = new System.Threading.Timer(_ => { if (File.Exists(newExePath)) { Console.Error.WriteLine("[EYE:ADMIN] .new.exe updated — starting drain"); triggerDrainAndRespawn(); } }, null, 500, Timeout.Infinite); };
+
+            // FSW 2: .exe replaced directly (no .new.exe path) → fast-path spawn
+            var fswExe = new FileSystemWatcher(exeDir)
             {
-                fswDebounce?.Dispose();
-                fswDebounce = new System.Threading.Timer(_ =>
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime,
+                Filter = Path.GetFileName(exePath),
+                EnableRaisingEvents = true,
+            };
+            fswExe.Changed += (_, _) =>
+            {
+                fswExeDebounce?.Dispose();
+                fswExeDebounce = new System.Threading.Timer(_ =>
                 {
-                    if (!File.Exists(newExePath)) return;
-                    Console.Error.WriteLine($"[EYE:ADMIN] .new.exe staged — draining then self-respawning");
-                    Task.Run(async () =>
-                    {
-                        // Drain current admin requests (max 60s), then wait for normal Eye rename-swap
-                        for (int i = 0; i < 120 && !proxyCts.IsCancellationRequested; i++)
-                        {
-                            if (!ElevatedEyeServer.IsBusy) break;
-                            await Task.Delay(500);
-                        }
-                        if (proxyCts.IsCancellationRequested) return;
-                        // Poll until .new.exe is consumed by normal Eye (rename-swap done), max 30s
-                        for (int i = 0; i < 60 && File.Exists(newExePath); i++)
-                            await Task.Delay(500);
-                        // Spawn successor using own elevated token — no UAC
-                        try
-                        {
-                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                            {
-                                FileName = exePath,
-                                Arguments = "eye --elevated",
-                                UseShellExecute = false, // inherit current elevated token — no UAC
-                                CreateNoWindow = true,
-                            });
-                            spawnedSuccessor = true;
-                            Console.Error.WriteLine("[EYE:ADMIN] Successor admin Eye spawned — exiting");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.Error.WriteLine($"[EYE:ADMIN] Failed to spawn successor: {ex.Message}");
-                        }
-                        proxyCts.Cancel();
-                    });
+                    if (!File.Exists(exePath)) return;
+                    if (File.GetLastWriteTimeUtc(exePath) <= exeStartStamp) return;
+                    Console.Error.WriteLine("[EYE:ADMIN] .exe replaced — fast-path respawn");
+                    if (!drainTriggered) triggerDrainAndRespawn();
+                    // else drain already in progress — swap poll will exit naturally
                 }, null, 500, Timeout.Infinite);
             };
-            fswAdmin.Created += (_, _) => onNewExeDetected();
-            fswAdmin.Changed += (_, _) => onNewExeDetected();
-            // Also handle case where .new.exe already exists at startup
-            if (File.Exists(newExePath)) onNewExeDetected();
+
+            // Handle .new.exe already present at startup
+            if (File.Exists(newExePath)) { Console.Error.WriteLine("[EYE:ADMIN] .new.exe present at startup — starting drain"); triggerDrainAndRespawn(); }
 
             ElevatedEyeServer.ListenAsync(proxyCts.Token).GetAwaiter().GetResult();
             fswAdmin.EnableRaisingEvents = false;
             fswAdmin.Dispose();
+            fswExe.EnableRaisingEvents = false;
+            fswExe.Dispose();
             fswDebounce?.Dispose();
+            fswExeDebounce?.Dispose();
             Console.WriteLine(spawnedSuccessor
                 ? "[EYE:ADMIN] Elevated proxy exiting — successor already running"
                 : "[EYE:ADMIN] Elevated proxy exiting");
