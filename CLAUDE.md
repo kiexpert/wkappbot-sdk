@@ -1,166 +1,167 @@
 # WKAppBot v5.13.0 - Windows + Android App Automation Test Framework
 
-## 클롣 운영 규칙 (필독!)
+## Operating Rules (READ FIRST)
 
 > ⚠️ **LANGUAGE RULE — Korean is ONLY for final responses to the user.**
 > EVERYTHING else MUST be in English: source code, comments, CLAUDE.md, AgentsPolicy,
 > skills, memory files, commit messages, docs, prompts, internal notes — ALL English.
 > Korean uses 2-3x more tokens. One Korean file = wasted budget on every session load.
 
-### 언어/소통
-- **최종 답변만 한국어** (유저에게 보고할 때만) — 나머지 전부 영어
+### Language / Communication
+- **Final responses to user: Korean, polite 해요체 (-요 form). NEVER informal speech.**
 - Source code / comments / CLAUDE.md / skills / memory / commits / docs → **English only, no exceptions**
-- **질문 시**: `wkappbot slack send "질문"` + 프롬프트 동시 발송 (슬랙 단독 발송 금지)
-- **슬랙 수신**: 반드시 슬랙 쓰레드로 답장 (`--msg TS` 있으면 reply, 없으면 send)
+- **Questions**: `wkappbot slack send "question"` + send in prompt simultaneously (Slack-only forbidden)
+- **Slack replies**: always reply in thread (`--msg TS` if TS available, else `send`)
 
 ### AppBotEye
-- **항상 떠있어야 함**: 일반 CLI 명령 실행 시 자동 spawn (`eye`/`slack`/`help`/`validate`/`win-move` 제외)
-- **Eye = Slack 데몬 통합** → 별도 `slack listen` 불필요
-- **eye tick**: one-shot 상태 조회 (ctx=N% 포함) / **eye**: FSW 하이브리드 루프
-- **인수인계**: `wkappbot newchat "프롬프트"` — 새 채팅에 컨텍스트 요약 전달
-- **크로 카드 금지!**: OpenClaw(크로)는 별도 서비스 — 수정 금지. 클롣 카드만 개선 OK
-- **CWD 약식**: `W:\GitHub\WKAppBot` → `WG-WKAppBot` / 노이즈 필터: `NO_REPLY`, `ㄱㄱ`
+- **Must always be running**: auto-spawned on normal CLI commands (except `eye`/`slack`/`help`/`validate`/`win-move`)
+- **Eye = Slack daemon integrated** → no separate `slack listen` needed
+- **eye tick**: one-shot status query (includes ctx=N%) / **eye**: FSW hybrid loop
+- **Handoff**: `wkappbot newchat "prompt"` — passes context summary to new chat
+- **Cro card forbidden!**: OpenClaw(Cro) is a separate service — do not modify. Only Claude cards OK.
+- **CWD shorthand**: `W:\GitHub\WKAppBot` → `WG-WKAppBot` / noise filters: `NO_REPLY`, `ㄱㄱ`
 
-### 빌드 & 배포
+### Build & Deploy
 ```bash
 "W:/SDK/dotnet/dotnet" publish 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal
 ```
-- **Hot-Swap**: publish만 하면 Eye 자동 감지+교체. **Eye kill 절대 금지!**
-- `.cs` 수정 후 별도 지시 없이 자동 publish
+- **Hot-Swap**: publish triggers auto-detect + swap by Eye. **NEVER kill Eye!**
+- Auto-publish after any `.cs` edit without waiting for instructions
 
-### 마이너 버전 bump
-→ [VERSIONING.md](../VERSIONING.md) 참조 — 3개 파일 함께 커밋
+### Minor Version Bump
+→ See [VERSIONING.md](../VERSIONING.md) — commit 3 files together
 
 ### Source File Size
-~400줄/파일 권장. **WKAppBot 코드에만 적용** (고객 코드 리팩터 금지!)
+~400 lines/file recommended. **WKAppBot code only** (do NOT refactor customer code!)
 
-### 스킬 작성 규칙
-- **스킬 생성/수정은 반드시 `wkappbot skill contribute` / `wkappbot skill edit` 사용**
-- `.skill.json` 파일을 Edit/Write/wkedit 도구로 직접 수정 **절대 금지**
-  - 이유: `|`가 step 구분자라 내용이 쪼개짐, 버전 bump 누락, 인코딩 오염
-  - step 내용에 `|` 사용 금지 — 줄바꿈(newline) 대신 사용
-- 스킬 생성 후 반드시 `wkappbot skill show <id>` 로 결과 검증
+### Skill Authoring Rules
+- **Always use `wkappbot skill contribute` / `wkappbot skill edit` to create/modify skills**
+- **NEVER directly edit `.skill.json` files** with Edit/Write/wkedit tools
+  - Reason: `|` is the step separator — direct edits split content, miss version bump, corrupt encoding
+  - Do not use `|` in step content — use newline instead
+- After creating a skill, always verify with `wkappbot skill show <id>`
 
-### 금지사항
-- Eye 직접 spawn / 클롣 전달 차단 옵션 / Eye 안 띄우는 옵션 — 전부 금지
-- 유저에게 프롬프트에서만 질문 금지 (슬랙 동시 발송 필수)
+### Forbidden
+- Directly spawning Eye / options that block Claude delivery / options that skip Eye — all forbidden
+- Asking user questions in prompt only (must send to Slack simultaneously)
 
 ---
 
 ## Overview
-Windows a11y 기반 앱 UI 자동화. UIA→Win32→SendInput 3티어 폴백, 포커스리스 제어.
+Windows a11y-based app UI automation. UIA→Win32→SendInput 3-tier fallback, focusless control.
 `a11y.exe` = busybox symlink → `wkappbot.exe`
 
 ## Architecture
 
-### 5티어 요소 탐색
-UIA → Vision Cache → Simple OCR → Vision API(Claude) → 좌표 기반
+### 5-Tier Element Search
+UIA → Vision Cache → Simple OCR → Vision API(Claude) → Coordinate-based
 
 ### AppBotPipe / File Tools (v5.8)
-모든 프로세스 생성은 `Spawn()` / `StartTracked()` 경유 — CreateProcessW 훅 보장
-- `Spawn(showNoActivate:true)`: WPF 오버레이용 (WhisperRing/ScreenSaver) — 포커스 없이 창 표시
-- `Spawn(default)`: `SW_HIDE` — 백그라운드 프로세스
-- **FocusLaunchTracker**: 포커스 탈취 프로세스 추적 (`runtime/focus_launch.json`)
-- **워치독 VBS**: Eye 2분+ 사망 시 발동 → wkappbot-core 전부 종료 → eye tick 재시작
-- **File Tools**: `file read/write/edit/grep/glob/undo`는 tool-style alias(`--path`, `--content`, `--pattern`, `--dry-run`) 지원
-- **file write**: patch 추적 대신 `.bak/` 백업 기본 생성, `a11y file-write`/MCP도 같은 백업 경로 사용
-- **LG overlay guard**: `LGDisplayExtension` 단일 클래스 고정 탐지 대신 LG Smart Assistant 계열 topmost screen-cover 창을 프로세스+창 크기 기준으로 일반화 탐지
+All process creation goes through `Spawn()` / `StartTracked()` — ensures CreateProcessW hook
+- `Spawn(showNoActivate:true)`: for WPF overlays (WhisperRing/ScreenSaver) — shows window without focus steal
+- `Spawn(default)`: `SW_HIDE` — background processes
+- **FocusLaunchTracker**: tracks focus-stealing processes (`runtime/focus_launch.json`)
+- **Watchdog VBS**: fires when Eye dies 2min+ → kills all wkappbot-core → restarts eye tick
+- **File Tools**: `file read/write/edit/grep/glob/undo` support tool-style aliases (`--path`, `--content`, `--pattern`, `--dry-run`)
+- **file write**: creates `.bak/` backup by default instead of patch tracking; `a11y file-write`/MCP use same backup path
+- **LG overlay guard**: generalized detection of LG Smart Assistant topmost screen-cover windows by process+size instead of fixed `LGDisplayExtension` class
 
 ### Eye MCP Architecture (v4.9+)
-Eye ↔ MCP 워커(Core) JSON-RPC over pipe. a11y/UIA를 별도 프로세스로 격리.
+Eye ↔ MCP worker(Core) JSON-RPC over pipe. a11y/UIA isolated in separate process.
 - `ShouldRouteToMcp()`: a11y/inspect/windows/ask → MCP, slack/eye/schedule → in-process
-- `DETACHED_PROCESS` 플래그로 ConPTY LPC 교착 방지. 자동 재시작 max 5/5min
-- Slack 파일 기반 큐 (`runtime/slack_queue/`), drain worker 직렬 처리
-- **Launcher quiet-swap**: 런처는 `wkappbot-core.exe` 원본 경로 변경만 감시. `.new.exe` staging/rename는 Eye 책임.
-- **Admin-first swap**: admin endpoint가 살아 있으면 normal core swap은 defer, admin 종료 뒤 새 stamp에서만 재시도.
-- **Failed-stamp skip**: 한번 실패한 core `mtime` stamp는 더 새 파일이 올 때까지 재시도하지 않음.
-- **CDP ask prompt pump**: triad/cross-prompt는 페이지별 singleton prompt pump를 사용. 청크는 append 후 1s idle에서 send하며, 페이지 key는 `scope + targetId + editorSelector`.
-- **Attachment transaction lock**: CDP 첨부가 있으면 페이지 lock을 잡고 첨부를 먼저 올린다. lock 중 들어오는 청크는 queue에 쌓고, 업로드 완료 후 queue text를 append + immediate flush 한 뒤 unlock한다.
+- `DETACHED_PROCESS` flag prevents ConPTY LPC deadlock. Auto-restart max 5/5min
+- Slack file-based queue (`runtime/slack_queue/`), drain worker serial processing
+- **Launcher quiet-swap**: launcher watches only original `wkappbot-core.exe` path change. `.new.exe` staging/rename is Eye's responsibility.
+- **Admin-first swap**: if admin endpoint is alive, defer normal core swap; retry only after admin exits with newer stamp.
+- **Failed-stamp skip**: a core `mtime` stamp that failed once is not retried until a newer file arrives.
+- **CDP ask prompt pump**: triad/cross-prompt uses per-page singleton prompt pump. Chunks appended then sent on 1s idle; page key = `scope + targetId + editorSelector`.
+- **Attachment transaction lock**: if CDP attachment present, acquire page lock and upload attachment first. Chunks arriving during lock are queued; after upload completes, append queue text + immediate flush, then unlock.
 
 ### Self-Healing DYN-A11Y
-UIA 없는 MFC owner-drawn → CCA 세그멘테이션 → OCR 3중 교차검증 → Gemini Vision 추론
-→ `dyn_r{row}c{col}` 동적 ID + Experience DB 캐시 + CCA 파라미터 자동 튜닝
+MFC owner-drawn with no UIA → CCA segmentation → OCR triple cross-validation → Gemini Vision inference
+→ `dyn_r{row}c{col}` dynamic ID + Experience DB cache + CCA parameter auto-tuning
 
 ### v5.11.101+ (2026-04-08, Session 7)
-- **# TARGET 출력 완전 재설계** (copy-paste-ready grap):
-  - `# TARGET "{compactGrap}#{absTagPath}" [OK] Nms  WindowTitle`
-  - `BuildAbsoluteTagPath`: UIA type 3자 약칭 (`Document→Doc`, `Group→Gro`, `Edit→Edi`)
-  - `BuildCompactWinGrap`: title/url 제거, 브라우저→domain(no cls), 나머지→cls 유지
-  - `[OK]/[MISS]` 검증 + 타이밍 ms 표시
-  - window title → meta suffix (element Name 아닌 Win32 GetWindowTextW)
-  - hack-hover 동일 포맷 적용 + `BuildCompactWinGrap` 공통 함수
-- **FormatNodeLabel 통일**: AutomationElement 오버로드 → string 오버로드 완전 위임
-  - name에 단따옴표 래핑 `<Button'확인'>`, 17자 truncation 제거
-  - UIA scope 접근 가능 시 TARGET 태그 오른쪽에 `→ #scope` 힌트
-  - rect `ltwh=` attr 포함; VERDICT ✓ 억제 (⚠/? 만 출력)
-- **KNOWHOW/ShowKnowhowBroadcast/ShowKnowhowHint** → 전부 stderr
-- **UiaLocator.GetAbsoluteTagPath()** 추가 (automation tree walker 노출)
+- **# TARGET output redesign** (copy-paste-ready grap):
+  - `# TARGET "hwnd:0xXXXX[#absTagPath]" [OK] Nms  proc=name  {compact-context}`
+  - bash-safe: `hwnd:0x...` as primary paste token, JSON5 as context suffix
+  - `BuildAbsoluteTagPath`: UIA type 3-char abbreviations (`Document→Doc`, `Group→Gro`, `Edit→Edi`)
+  - `BuildCompactWinGrap`: strips title/url, browser→domain(no cls), legacy→cls
+  - `[OK]/[MISS]` verification + timing ms
+  - window title → stderr
+  - hack-hover same format + `BuildCompactWinGrap` shared function
+- **FormatNodeLabel unified**: AutomationElement overload → fully delegates to string overload
+  - name wrapped in single quotes `<Button'OK'>`, removed 17-char truncation
+  - `→ #scope` hint right of TARGET tag when UIA scope accessible
+  - rect `ltwh=` attr included; VERDICT ✓ suppressed (only ⚠/? output)
+- **KNOWHOW/ShowKnowhowBroadcast/ShowKnowhowHint** → all stderr
+- **UiaLocator.GetAbsoluteTagPath()** added (exposes automation tree walker)
 
 ### v5.11.74~100 (2026-04-08, Session 6)
-- **stdout noise elimination**: 124 Commands/*.cs 파일 `Console.WriteLine($"[` → stderr 일괄 치환 (wkedit bulk)
-- **ClickZoomHelper**: `[ZOOM:]` Console.Write → Console.Error.Write (전부 stderr)
-- **a11y find 출력 재구성**:
-  - 첫 줄 `# FOCUS {json5}` + `# TARGET {json5}` stdout (복붙용)
-  - CURSOR 섹션: 연속 동일 unnamed 노드 run-length encode (`<Group> x7`)
-  - TARGET 섹션: 헤더 grap 중복 제거
-- **BuildTargetJson5 필드 순서**: `hwnd,pid,proc,domain,title,...` (proc/domain 앞으로)
-- **ErrorScope**: error-pattern 즉시 passthrough, ErrorDetected 플래그, exit-0+error → -9999
-- **스킬 추가**: `grap` (10-step UI 주소체계 가이드), `wkedit` v1.1 (bulk transaction edit)
-- **스킬 규칙**: `.skill.json` 직접 수정 금지 — `skill contribute/edit` 명령 필수
+- **stdout noise elimination**: 124 Commands/*.cs files bulk-replaced `Console.WriteLine($"["` → stderr (wkedit bulk)
+- **ClickZoomHelper**: `[ZOOM:]` Console.Write → Console.Error.Write (all stderr)
+- **a11y find output restructure**:
+  - first line `# FOCUS {grap}` + `# TARGET {grap}` stdout (copy-paste ready)
+  - CURSOR section: run-length encode consecutive identical unnamed nodes (`<Group> x7`)
+  - TARGET section: deduplicated header grap
+- **BuildTargetJson5 field order**: `hwnd,pid,proc,domain,title,...` (proc/domain moved forward)
+- **ErrorScope**: error-pattern immediate passthrough, ErrorDetected flag, exit-0+error → -9999
+- **Skills added**: `grap` (10-step UI address system guide), `wkedit` v1.1 (bulk transaction edit)
+- **Skill rule**: no direct `.skill.json` edits — must use `skill contribute/edit` commands
 
-### v5.11 신규 (2026-04-05)
-- **TargetAmbiguityGuard 6-Layer**: AI를 위한 타겟 모호성 감지 + 자동 안내 시스템
-  - L1: 모호 패턴 다중 윈도우 매칭 → 목록 + `[OK]` 검증 + hwnd 오토힐
-  - L2: 모달 알러트 차단 → 알러트 내부 auto-find (UIA + Win32 버튼)
-  - L3: FOCUSED/LEAF 말단 노드 → 모든 명령에서 grap 타겟 안내
-  - L4: Win32 자식창 미발견 → 형제 윈도우 리스팅 (MFC/HTS)
-  - L5: #scope 없는 element action → 루트 자식 + 포커스 체인
-  - L6: UIA scope 요소 미발견 → 사용 가능 요소 리스팅
-- **CDP fixed delay → state-based polling**: 삼두 합의 구현
-  - `WaitForWindowStateAsync` 공용 헬퍼 (50ms 간격 windowState 폴링)
-  - SetWindowBoundsAsync, EnsureMinimizedAsync, SwitchToTargetAsync, EnsureCorrectWindowAsync 전부 교체
-  - WebOpenCommand: Thread.Sleep(1-2s) → document.readyState 폴링
-- **BuildTargetJson5 개선**: title 50자 truncate, 말줄임표 제거 (substring 매칭 보장)
+### v5.11 new (2026-04-05)
+- **TargetAmbiguityGuard 6-Layer**: AI target ambiguity detection + auto-guidance system
+  - L1: ambiguous pattern matches multiple windows → list + `[OK]` verify + hwnd auto-heal
+  - L2: modal alert blocking → auto-find inside alert (UIA + Win32 buttons)
+  - L3: FOCUSED/LEAF terminal node → grap target guidance on all commands
+  - L4: Win32 child window not found → sibling window listing (MFC/HTS)
+  - L5: element action without #scope → root children + focus chain
+  - L6: UIA scope element not found → list available elements
+- **CDP fixed delay → state-based polling**: triad consensus implementation
+  - `WaitForWindowStateAsync` shared helper (50ms interval windowState polling)
+  - SetWindowBoundsAsync, EnsureMinimizedAsync, SwitchToTargetAsync, EnsureCorrectWindowAsync all replaced
+  - WebOpenCommand: Thread.Sleep(1-2s) → document.readyState polling
+- **BuildTargetJson5 improvement**: title 50-char truncate, removed ellipsis (ensures substring matching)
 
 ### v5.11.37~73 (2026-04-06, Session 5)
-- **hack-hover 대폭 개선**:
-  - 라이브 오버레이: 루트 창 크기, UIA 전체 descendant 점선 표시
-  - 타겟 부모 체인 2배 두께 네온 점선 강조
-  - blind 윈도우(UIA 없음/경험DB 없음) 즉시 핵 발동 (취소 불가)
-  - 경험DB FSW: 파일 변경 즉시 오버레이 갱신
-  - 핫스왑: TryRenameSwap으로 .new.exe 감지 → Launcher 재spawn
-  - 콘솔: 매 틱 출력, Eye: 변경+분석만 (RunningInEye 자동 판단)
-  - 스크린리더 자동 활성화 (Chromium UIA 트리 보강)
-- **hack-input 워커**: 키보드 포커스 분석 (UIA GetFocusedElementInfo)
-- **TypeViaIme**: IMM32 focusless 텍스트 입력 Tier 2 통합
+- **hack-hover major improvements**:
+  - Live overlay: root window size, full UIA descendant dotted lines
+  - Target parent chain 2x thick neon dotted highlight
+  - Blind window (no UIA / no experience DB) immediately fires hack (non-cancellable)
+  - Experience DB FSW: overlay refreshes immediately on file change
+  - Hot-swap: TryRenameSwap detects .new.exe → re-spawns Launcher
+  - Console: output every tick, Eye: change+analysis only (auto-detects RunningInEye)
+  - Screen reader auto-activation (boosts Chromium UIA tree)
+- **hack-input worker**: keyboard focus analysis (UIA GetFocusedElementInfo)
+- **TypeViaIme**: IMM32 focusless text input Tier 2 integration
   - AttachThreadInput + ImmSetCompositionString + CPS_COMPLETE
-  - 상태 백업/검증/복구 (실패 시 이전 composition 원복)
-- **auto-hack 프로세스 격리**: Eye 내 A11yHackCommand → AppBotPipe.Spawn (메모리 누수 방지)
-- **CDP EvalAsync**: 2회→3회 retry + 500ms/1000ms exponential backoff
-- **pump watchdog**: 3s→5s + 2차 감소 확인 (오탐 방지)
-- **오버레이 개선**: 반투명 필 전면 제거, Known/Cached 알파 10%, atomic swap 렌더
-- **CommandHelpMap**: speak, hack, hack-hover, hack-input help 등록
+  - State backup/verify/restore (restores previous composition on failure)
+- **auto-hack process isolation**: Eye A11yHackCommand → AppBotPipe.Spawn (prevents memory leak)
+- **CDP EvalAsync**: 2→3 retries + 500ms/1000ms exponential backoff
+- **pump watchdog**: 3s→5s + secondary decrease check (prevents false positives)
+- **Overlay improvements**: removed translucent fill entirely, Known/Cached alpha 10%, atomic swap render
+- **CommandHelpMap**: speak, hack, hack-hover, hack-input help registered
 
 ### v5.10 (2026-04-04)
-- **Eye 파이프 100ms 타임아웃**: `firstOutputTimeoutMs` — slack/ask/newchat 제외 대부분 명령에 적용. Eye 느리면 Core로 자동 전환
-- **TryRenameSwap 공용 함수**: Eye 메인루프 + 스타트업 gentle-swap + `wkappbot hotswap` CLI — 동일 로직 공유
-- **OcrCorrectionDb**: pixel-hash → 정답 매핑 자기학습 사전 (WKAppBot.Vision). UIA 검증 자동 학습, OCR 결과 자동 보정
-- **suggest show/get/view**: 번호/ts로 전체 내용 조회. 알 수 없는 서브커맨드 가드 (노이즈 방지)
-- **suggest resolve 안전장치**: 중복가드 backup전환, .manifest 삭제감지+자동복구, 실패시 evidence 보존
-- **CDP Input.* minimize 제거**: CDP 렌더러 직접 전달 → minimize 불필요. IsFocusStealingMethod만 minimize
-- **Runtime.enable 재시도**: EnableRuntimeWithRetry (최대 4회 exponential backoff)
-- **로그 라우팅 수정**: Eye 파이프 명령 → 명령별 `old {cmd}/` 폴더. 오타 → `old unknown/`
-- **auto-hack 로그 노이즈 제거**: WKAPPBOT_WORKER=1로 TeeWriter 억제
-- **인코딩 오염 감시**: file edit 후 U+FFFD 감지 + Slack 자동 알림
-- **a11y hack 우상단 노드명**: UIA AutomationId/Name을 세그먼트 내부 top-right에 표시
+- **Eye pipe 100ms timeout**: `firstOutputTimeoutMs` — applied to most commands except slack/ask/newchat. Auto-fallback to Core if Eye is slow
+- **TryRenameSwap shared function**: Eye main loop + startup gentle-swap + `wkappbot hotswap` CLI — same logic
+- **OcrCorrectionDb**: pixel-hash → correct answer self-learning dictionary (WKAppBot.Vision). UIA verify auto-learns, OCR results auto-corrected
+- **suggest show/get/view**: query full content by number/ts. Unknown subcommand guard (noise prevention)
+- **suggest resolve safety**: duplicate guard backup fallback, .manifest delete detection+auto-restore, evidence preserved on failure
+- **CDP Input.* minimize removed**: CDP renderer direct delivery → minimize unnecessary. Only IsFocusStealingMethod minimizes
+- **Runtime.enable retry**: EnableRuntimeWithRetry (max 4x exponential backoff)
+- **Log routing fix**: Eye pipe commands → per-command `old {cmd}/` folder. Typos → `old unknown/`
+- **auto-hack log noise removed**: TeeWriter suppressed with WKAPPBOT_WORKER=1
+- **Encoding corruption watch**: U+FFFD detection after file edit + auto Slack alert
+- **a11y hack top-right node name**: UIA AutomationId/Name displayed inside segment top-right
 
 ### Sunset Screensaver + WhisperRing
-별도 프로세스 (WPF 메모리 격리, 부모 PID 감시 → Eye 종료 시 자동 종료)
+Separate processes (WPF memory isolation, parent PID watch → auto-exit when Eye exits)
 
-### 프로젝트 구조
+### Project Structure
 ```
 csharp/src/
-├── WKAppBot.CLI/     # CLI 진입점 + Commands/
+├── WKAppBot.CLI/     # CLI entry + Commands/
 ├── WKAppBot.Core/    # ScenarioRunner, ActionExecutor
 ├── WKAppBot.Win32/   # NativeMethods, WindowFinder, UiaLocator, Input/*
 ├── WKAppBot.Vision/  # ChartAnalyzer, SimpleOcrAnalyzer, VisionCache
@@ -171,11 +172,11 @@ handlers/ scenarios/
 
 ---
 
-## CLI 명령어
-> **`<grap>`** = glob/regex/OR(`;`)/`#UIA스코프`/`{JSON5}` 멀티필드 AND
+## CLI Commands
+> **`<grap>`** = glob/regex/OR(`;`)/`#UIA-scope`/`{JSON5}` multi-field AND
 
 ```
-wkappbot a11y <action> <grap>[#scope] [options]   # ★ 표준 통합 (24 actions)
+wkappbot a11y <action> <grap>[#scope] [options]   # ★ unified standard (24 actions)
   inspect / find / windows / screenshot / ocr     # Discovery
   close / minimize / maximize / restore / focus / move / resize
   click / invoke / toggle / expand / collapse / select / scroll
@@ -196,19 +197,19 @@ wkappbot mcp                                     # MCP stdio server
 wkappbot <cmd> --help / --regression
 ```
 
-## grap 패턴
-| 구문 | 예시 |
-|------|------|
-| 와일드카드 | `"*Button*"` |
-| OR | `"*메모장*;*계산기*"` |
-| #UIA스코프 | `"영웅문#실시간계좌"` |
-| 탭포털 | `"Chrome#ChatGPT#모델"` |
+## grap Patterns
+| Syntax | Example |
+|--------|---------|
+| Wildcard | `"*Button*"` |
+| OR | `"*notepad*;*calc*"` |
+| #UIA-scope | `"heroes#realtime-account"` |
+| Tab portal | `"Chrome#ChatGPT#model"` |
 | JSON5 | `{proc:'chrome',domain:'chatgpt.com',title:'Claude'}` |
-| hwnd 직접 | `{hwnd:0x010B084A}` |
-| adb | `"adb://Fold5/*heromts*#해외잔고"` |
+| Direct hwnd | `hwnd:0x010B084A` |
+| adb | `"adb://Fold5/*heromts*#balance"` |
 
-→ 자세한 grap 문법: `wkappbot skill show grap`
-→ `a11y find <grap>` stdout 첫 줄 `# TARGET {...}` 복붙하면 바로 사용 가능
+→ Full grap syntax: `wkappbot skill show grap`
+→ `a11y find <grap>` stdout first line `# TARGET "hwnd:0x..."` — copy-paste ready
 → **Accumulated knowhow**: `wkappbot skill list` — search skills first when stuck, then ask triad
 
 ---
@@ -216,46 +217,46 @@ wkappbot <cmd> --help / --regression
 ## Key Design Decisions
 
 ### Focusless-First
-UIA Invoke/Value/Toggle/Select = Focusless. SendInput/Hotkey = EnsureFocus 필요.
-WPF 오버레이는 `Spawn(showNoActivate:true)` → SW_SHOWNOACTIVATE(4), 포커스 탈취 없음.
+UIA Invoke/Value/Toggle/Select = Focusless. SendInput/Hotkey requires EnsureFocus.
+WPF overlay uses `Spawn(showNoActivate:true)` → SW_SHOWNOACTIVATE(4), no focus steal.
 
 ### PromptDeliveryContext
-프롬프트 주입 전: ① 타겟 포그라운드? ② 최근 30s 입력?
-→ `Focusless` / `FocusSteal` / `Skip` / `Abort` 자동 결정
+Before prompt injection: ① target foreground? ② recent 30s input?
+→ auto-decides `Focusless` / `FocusSteal` / `Skip` / `Abort`
 
-### HTS 자동화
-MFC 컨트롤: UIA 패턴 거의 없음 → Win32 메시지 폴백 필수. 영웅문 owner-drawn → OCR 폴백.
+### HTS Automation
+MFC controls: almost no UIA patterns → Win32 message fallback required. Heroes owner-drawn → OCR fallback.
 
-### 태그 규칙
+### Tag Conventions
 `[WATCH]` `[RUN]` `[FOCUS]` `[VERIFY]` `[BLOCK]` `[GUARD]` `[ZOOM]` `[SLACK]` `[EXP]` `[KNOWHOW]`
 
 ---
 
 ## Session Management (Claude Code Tips)
-- `wkappbot claude-usage` → JSONL 크기 + ctx% 표시
-- **ctx% = JSONL ÷ ~20MB** — 8MB에서 인수인계 준비, 10MB에서 즉시 handoff
-- **목표**: 세션당 ~10MB 이하. 도전적 토큰 최적화!
-- **Handoff**: `wkappbot newchat "프롬프트"` — 새 채팅에 작업 요약 전달
-- **MEMORY.md**: 200줄 상한. 초과 시 세부내용 `memory/` topic 파일로 분리
+- `wkappbot claude-usage` → JSONL size + ctx%
+- **ctx% = JSONL ÷ ~20MB** — prepare handoff at 8MB, immediate handoff at 10MB
+- **Goal**: ~10MB or less per session. Aggressive token optimization!
+- **Handoff**: `wkappbot newchat "prompt"` — passes work summary to new chat
+- **MEMORY.md**: 200-line limit. Overflow → split into `memory/` topic files
 
 ---
 
-## YAML Scenario (요약)
+## YAML Scenario (summary)
 ```yaml
 scenario: { name: "Test" }
-app: { launch: "calc.exe", wait_for_window: { title_contains: "계산기" } }
+app: { launch: "calc.exe", wait_for_window: { title_contains: "Calculator" } }
 steps:
   - { name: "Click", target: { automation_id: "plusButton" }, action: click }
   - { name: "Verify", target: { automation_id: "CalculatorResults" }, action: assert,
       params: { type: text_contains, expected: "42" } }
 ```
-지원 액션: click/double_click/right_click/type_text/press_key/hotkey/wait/assert/scroll/screenshot/toggle/expand/collapse/select/set_range/window_close/minimize/maximize
+Supported actions: click/double_click/right_click/type_text/press_key/hotkey/wait/assert/scroll/screenshot/toggle/expand/collapse/select/set_range/window_close/minimize/maximize
 
-## 배포 구조
+## Deploy Structure
 ```
 W:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ```
 
-## 참고
-- **MEMORY.md** / **memory/**: 빌드 명령, 아키텍처 결정, gotchas 상세
-- .NET 8.0 `net8.0-windows10.0.22621.0`, 한국어 UI 지원
+## References
+- **MEMORY.md** / **memory/**: build commands, architecture decisions, gotchas detail
+- .NET 8.0 `net8.0-windows10.0.22621.0`, Korean UI support
