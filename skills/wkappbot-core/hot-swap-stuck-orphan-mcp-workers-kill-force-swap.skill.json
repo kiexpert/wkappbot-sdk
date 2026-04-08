@@ -1,0 +1,30 @@
+{
+  "id": "hot-swap-stuck-orphan-mcp-workers-kill-force-swap",
+  "app": "wkappbot-core",
+  "title": "Hot-Swap Stuck? Orphan MCP Workers Kill \u0026 Force Swap",
+  "desc": "Eye hot-swap fails when old wkappbot-core processes hold a file lock on wkappbot-core.exe. Diagnosis \u002B kill \u002B restage procedure.",
+  "steps": [
+    "\uC99D\uC0C1: wkappbot hotswap \u2192 \u0027step1 rename\u2192.old failed: \uB2E4\uB978 \uD504\uB85C\uC138\uC2A4\uAC00 \uD30C\uC77C\uC744 \uC0AC\uC6A9 \uC911\u0027 or \u0027Target not found\u0027",
+    "\uC9C4\uB2E8: powershell -Command \u0022Get-Process wkappbot-core ",
+    " Select-Object Id, Path, StartTime\u0022 \u2014 \uC5EC\uB7EC pid\uAC00 wkappbot-core.exe\uB97C \uBB3C\uACE0 \uC788\uC74C",
+    "Eye pid \uC2DD\uBCC4: wkappbot a11y windows \uC5D0\uC11C \u0027WK AppBot Eye\u0027 pid \u002B \u0027WhisperRing\u0027 pid \uBA54\uBAA8 (\uC774 \uB450 \uAC1C\uB294 kill \uAE08\uC9C0!)",
+    "\uACE0\uC544 MCP \uC6CC\uCEE4 \uD310\uBCC4: Eye/WhisperRing pid \uC81C\uC678\uD55C \uB098\uBA38\uC9C0 = \uACE0\uC544. wkappbot a11y find {pid:XXXX} \uB85C \uCC3D/\uC5ED\uD560 \uD655\uC778",
+    "\uACE0\uC544 kill: powershell -Command \u0022Stop-Process -Id PID1,PID2 -Force\u0022",
+    "restage \u002B swap: cp W:/SDK/bin/wkappbot-core.exe W:/SDK/bin/wkappbot-core.new.exe \u0026\u0026 wkappbot hotswap",
+    "\uC131\uACF5 \uD655\uC778: wkappbot a11y windows \uC5D0\uC11C Eye proc \uC774\uB984\uC774 \u0027wkappbot-core.old-...\u0027 \uC544\uB2CC \u0027wkappbot-core\u0027\uC778\uC9C0 \u002B \uBA54\uBAA8\uB9AC \uAE09\uAC10 \uD655\uC778 (2400MB\u2192800MB \uB4F1)",
+    "\uCC38\uACE0: \uACE0\uC544 \uC6CC\uCEE4\uB294 Eye \uC7AC\uC2DC\uC791 \uB8E8\uD504 \uC2DC\uC808 \uC2A4\uD3F0\uB41C \uAC83\uB4E4. StartTime\uC774 Eye \uD604\uC7AC \uAE30\uB3D9 \uC2DC\uAC01\uBCF4\uB2E4 \uC774\uC804\uC774\uBA74 \uACE0\uC544 \uD655\uC815"
+  ],
+  "tags": [
+    "hotswap",
+    "mcp",
+    "orphan",
+    "file-lock",
+    "eye",
+    "swap"
+  ],
+  "source_refs": null,
+  "author": "claude",
+  "created": "2026-04-08T03:41:43.8383238Z",
+  "updated": "2026-04-08T03:41:43.8383492Z",
+  "version": "1.0"
+}

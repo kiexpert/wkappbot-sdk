@@ -166,6 +166,26 @@ public static class WindowFinder
                 catch { }
             }
 
+            if (!matched && (procName.Equals("Code", StringComparison.OrdinalIgnoreCase)
+                             || procName.Equals("claude", StringComparison.OrdinalIgnoreCase)
+                             || procName.Equals("codex", StringComparison.OrdinalIgnoreCase)
+                             || cls.StartsWith("Chrome_WidgetWin_", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    var uiaHits = UiaLocator.QuickSearch(hWnd, titlePattern, maxDepth: 5, maxResults: 3, maxVisited: 250, timeoutMs: 1500);
+                    if (uiaHits.Count > 0)
+                    {
+                        matched = true;
+                        matchedVia = "uia";
+                        matchedSnippet = uiaHits[0].NamePath.Length > 0
+                            ? uiaHits[0].NamePath
+                            : (!string.IsNullOrEmpty(uiaHits[0].AutomationId) ? uiaHits[0].AutomationId : uiaHits[0].Name);
+                    }
+                }
+                catch { }
+            }
+
             if (matched)
             {
                 var info = WindowInfo.FromHwnd(hWnd);
@@ -188,6 +208,28 @@ public static class WindowFinder
                 var covCmp = b.Coverage.CompareTo(a.Coverage);
                 return covCmp != 0 ? covCmp : focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle));
             });
+
+        bool queryLooksLikeDomain = titlePattern.Contains('.') || titlePattern.Contains("://") || titlePattern.StartsWith("www.", StringComparison.OrdinalIgnoreCase);
+        if (queryLooksLikeDomain && focus.ForegroundHwnd != IntPtr.Zero && NativeMethods.IsWindowVisible(focus.ForegroundHwnd))
+        {
+            if (!results.Any(r => r.Handle == focus.ForegroundHwnd))
+            {
+                NativeMethods.GetWindowThreadProcessId(focus.ForegroundHwnd, out uint fgPid);
+                var fgProc = NativeMethods.TryGetProcessNameFast(fgPid) ?? $"pid={fgPid}";
+                var fgCls = GetClassName(focus.ForegroundHwnd);
+                if (fgProc.Equals("Code", StringComparison.OrdinalIgnoreCase)
+                    || fgProc.Equals("claude", StringComparison.OrdinalIgnoreCase)
+                    || fgProc.Equals("codex", StringComparison.OrdinalIgnoreCase)
+                    || fgCls.StartsWith("Chrome_WidgetWin_", StringComparison.OrdinalIgnoreCase))
+                {
+                    var host = WindowInfo.FromHwnd(focus.ForegroundHwnd);
+                    host.Coverage = 0.01;
+                    host.MatchedVia = "context";
+                    host.MatchedSnippet = "foreground host";
+                    results.Add(host);
+                }
+            }
+        }
 
         // ── Fallback: owner window chain for hidden child processes ──
         // When grap matches only hidden/tiny windows (e.g. wsl PseudoConsoleWindow),
@@ -1057,7 +1099,12 @@ public static class WindowFinder
                 url = "";
             }
             if (!string.IsNullOrEmpty(url))
-                domain = new Uri(url).Host;
+            {
+                var host = new Uri(url).Host;
+                // Internal Electron hosts like vscode-app are not useful as a display domain.
+                if (!string.IsNullOrEmpty(host) && !host.Equals("vscode-app", StringComparison.OrdinalIgnoreCase))
+                    domain = host;
+            }
         }
         catch { }
 

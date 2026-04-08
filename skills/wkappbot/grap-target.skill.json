@@ -1,0 +1,73 @@
+{
+  "id": "grap-target",
+  "app": "wkappbot",
+  "title": "grap-target",
+  "desc": "How to construct a verified, bash-safe grap target string using a11y find. Output must include # FOCUS for the current focused leaf path, and # TARGET as the primary paste-ready hwnd:0x... token plus JSON5 context. Grap output must be shell-friendly, and copy-paste verification is part of the default contract. Covers why {a,b} brace expansion breaks in bash and how hwnd-first format avoids it.",
+  "steps": [
+    "Run a11y find \u003Cpattern\u003E and treat all fields title/proc/domain/cmd/url as matchable",
+    "Always print # FOCUS when the focused leaf can affect interaction, even if unrelated to the target (for example modal/error popups)",
+    "Print # TARGET as the resolved target window with hwnd:0x... as the primary paste-ready token, then append compact JSON5 context only when helpful",
+    "Grap output must be shell-friendly: a pasted target string should work without manual editing, quoting, or brace escaping",
+    "Always verify pasted grap targets by re-running a11y find on the emitted hwnd:0x... form; [OK] means the pasted token resolves back to the same hwnd",
+    "If multiple windows match, emit one # TARGET line per match and keep the primary pick clearly marked"
+  ],
+  "tags": [
+    "grap",
+    "find",
+    "target",
+    "window",
+    "bash",
+    "focus",
+    "shell-safe",
+    "verify"
+  ],
+  "source_refs": [
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "55:# FOCUS",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "92:# TARGET",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "1731:BuildTargetGrapWithFocusPath",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "176:UiaLocator.QuickSearch",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "228:foreground host",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "1104:vscode-app",
+      "note": null
+    },
+    {
+      "file": "w",
+      "line": null,
+      "pattern": "23:Focus Hot-Chain",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T07:01:01.1192756Z",
+  "updated": "2026-04-08T07:53:36.7800691Z",
+  "version": "1.3"
+}

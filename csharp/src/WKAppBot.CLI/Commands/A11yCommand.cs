@@ -23,26 +23,28 @@ internal partial class Program
         // ═══ Focus Hot-Chain (lightweight — Win32 only, no FlaUI/UIA DLL loading) ═══
         // For "find": # FOCUS is deferred to A11yFind where focused element abs path is available.
         bool isFindAction = args.Length > 0 && args[0].Equals("find", StringComparison.OrdinalIgnoreCase);
-        try
+        if (!isFindAction)
         {
-            var gti = new NativeMethods.GUITHREADINFO
-                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
-            if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
+            try
             {
-                // Use root ancestor for grap — child focus hwnd is useless for targeting
-                var focRootHwnd = NativeMethods.GetAncestor(gti.hwndFocus, NativeMethods.GA_ROOT);
-                if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti.hwndFocus;
-                var focusGrap = BuildCompactWinGrap(focRootHwnd);
-                var fsw = System.Diagnostics.Stopwatch.StartNew();
-                var hits = WindowFinder.FindWindows(focusGrap, true);
-                fsw.Stop();
-                var focusOk = hits.Any(h => h.Handle == focRootHwnd);
-                Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
-                if (!isFindAction)
+                var gti = new NativeMethods.GUITHREADINFO
+                    { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+                if (NativeMethods.GetGUIThreadInfo(0, ref gti) && gti.hwndFocus != IntPtr.Zero)
+                {
+                    // Use root ancestor for grap — child focus hwnd is useless for targeting
+                    var focRootHwnd = NativeMethods.GetAncestor(gti.hwndFocus, NativeMethods.GA_ROOT);
+                    if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti.hwndFocus;
+                    var focusGrap = BuildCompactWinGrap(focRootHwnd);
+                    var fsw = System.Diagnostics.Stopwatch.StartNew();
+                    var hits = WindowFinder.FindWindows(focusGrap, true);
+                    fsw.Stop();
+                    var focusOk = hits.Any(h => h.Handle == focRootHwnd);
+                    Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
                     Console.WriteLine(Ansi.Dim($"# FOCUS \"hwnd:0x{focRootHwnd.ToInt64():X8}\"  {focusGrap}"));
+                }
             }
+            catch { }
         }
-        catch { }
 
         // ═══ ADB early dispatch: adb:// prefix → Android pipeline ═══
         if (args.Length >= 2 && Android.AdbGrapRouter.IsAdbGrap(args[1]))
@@ -502,7 +504,9 @@ internal partial class Program
 
         // ═══ STEP 3: Select targets ═══
         List<WindowInfo> targets;
-        if (all)
+        if (action == "find" && !all && nthRaw == null)
+            targets = allWindows;
+        else if (all)
             targets = allWindows;
         else if (nthRaw != null)
         {
@@ -534,7 +538,7 @@ internal partial class Program
             return $"[{wi.ClassName}] {wi.Title} ({proc} hwnd={wi.Handle:X8} {r.Right - r.Left}x{r.Bottom - r.Top})";
         }
 
-        if (allWindows.Count > 1)
+        if (action != "find" && allWindows.Count > 1)
         {
             for (int idx = 0; idx < allWindows.Count; idx++)
             {
@@ -543,7 +547,7 @@ internal partial class Program
                 Console.Error.WriteLine($"[A11Y] {marker} #{idx + 1} {SearchKey(w)}");
             }
         }
-        else
+        else if (action != "find")
         {
             Console.Error.WriteLine($"[A11Y] matched: {SearchKey(targets[0])}");
         }
@@ -554,16 +558,39 @@ internal partial class Program
         {
             var tGrap = BuildTargetGrap(t.Handle);
             var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
-            Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
-            // For "find": # TARGET is printed by A11yFind with full abs tag path
             if (action != "find")
+            {
+                Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
                 Console.WriteLine(Ansi.TargetLine($"# TARGET {tGrap}{uiaSuffix}"));
+            }
         }
         Console.ResetColor();
 
+        if (action == "find")
+        {
+            using var findAutomation = new UIA3Automation();
+            foreach (var win in targets)
+            {
+                try
+                {
+                    var findRoot = findAutomation.FromHandle(win.Handle);
+                    if (findRoot != null)
+                        A11yFind(findRoot, win.Handle, findDepth);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[A11Y] find fast-path failed for 0x{win.Handle:X}: {ex.Message}");
+                }
+            }
+            return 0;
+        }
+
         // ═══ STEP 4.5: Guard Layer 2+3 — modal alert + focused leaf ═══
-        TargetAmbiguityGuard.CheckModalAlert(targets[0].Handle, action);
-        TargetAmbiguityGuard.ShowFocusedLeaf(targets[0].Handle, action);
+        if (action != "find")
+        {
+            TargetAmbiguityGuard.CheckModalAlert(targets[0].Handle, action);
+            TargetAmbiguityGuard.ShowFocusedLeaf(targets[0].Handle, action);
+        }
 
         // ═══ STEP 4.9: Elevation auto-detect → Elevated Eye Proxy delegation ═══
         // Pre-check: if target is elevated AND we have #scope, delegate BEFORE UIA traversal
@@ -579,7 +606,7 @@ internal partial class Program
         if (delegated) return delegateExit;
         // If elevation was needed but delegation failed (MCP/Eye mode), and we have UIA scope,
         // skip UIA traversal entirely (would hang 60s on UIPI block)
-        if (_targetElevated == true && !NativeMethods.IsCurrentProcessElevated() && !string.IsNullOrEmpty(uiaPath))
+        if (action != "find" && _targetElevated == true && !NativeMethods.IsCurrentProcessElevated() && !string.IsNullOrEmpty(uiaPath))
         {
             Console.Error.WriteLine($"[A11Y] UIPI block: cannot traverse UIA on elevated target without admin rights");
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -592,7 +619,7 @@ internal partial class Program
         // Rule: browser windows (CDP port detected) REQUIRE a #tabHint to close a tab.
         //       Without #tabHint → error (prevents accidental whole-browser close).
         //       Use --force to override and close the whole window anyway.
-        if (action == "close" && string.IsNullOrEmpty(uiaPath) && !force)
+        if (action != "find" && action == "close" && string.IsNullOrEmpty(uiaPath) && !force)
         {
             // Check if any matched window is a browser (has CDP port) → show tab list
             var portsChecked2 = new HashSet<int>();
@@ -1335,6 +1362,8 @@ internal partial class Program
                         "focus" => A11yFocusElement(root, hwnd),
                         _ => A11yNotYet(action)
                     };
+                    if (action == "find")
+                        continue;
                     swIter.Stop();
                     if (countN > 1)
                         Console.Error.WriteLine($"[A11Y] [{ci+1}/{countN}] {(success?"ok":"FAIL")} {swIter.ElapsedMilliseconds}ms");
@@ -1342,6 +1371,9 @@ internal partial class Program
                 swTotal.Stop();
                 if (countN > 1)
                     Console.Error.WriteLine($"[A11Y] stress: {countN} iters, total={swTotal.ElapsedMilliseconds}ms, avg={swTotal.ElapsedMilliseconds/countN}ms, rate={countN*1000.0/swTotal.ElapsedMilliseconds:F1}/s");
+
+                if (action == "find")
+                    return 0;
 
                 // ── 입력위치확보 해제: 상태 diff 출력 (AFTER) + callback 해제 ──
                 Win32.Input.KeyboardInput.OnMidInputAbort = null;
