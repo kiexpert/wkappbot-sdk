@@ -727,6 +727,13 @@ internal partial class Program
             try { Console.InputEncoding = System.Text.Encoding.UTF8; } catch { }
             try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
             try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
+            // Ensure stderr is unbuffered — prevents log loss when piped to parent process or log relay.
+            try
+            {
+                var errWriter = new StreamWriter(Console.OpenStandardError(), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
+                Console.SetError(errWriter);
+            }
+            catch { }
             TryHideConsoleWindow();
             InstallEyeCtrlHandler();
             PulseStep.Mark("console-hidden");

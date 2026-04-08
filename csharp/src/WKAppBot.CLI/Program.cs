@@ -38,6 +38,7 @@ internal partial class Program
     /// <summary>True when stdout is redirected (pipe/file). Suppresses diagnostic output ([ACT], cmd echo)
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
+    internal static bool QuietFindOutput = Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") == "1";
     private static readonly HashSet<string> _autoBugDedup = new();
 
     /// <summary>
@@ -229,7 +230,8 @@ internal partial class Program
             Console.SetError(new DebugStringWriter(Console.Error, dbgCmd, dbgSub));
             // [CMD] marker: emitted immediately so DbgViewListener can verify real command execution.
             // grep-only test scripts produce no wkappbot process → no [CMD] in captured debug output.
-            Console.Error.WriteLine($"[CMD] {string.Join(" ", args)}");
+            if (!QuietFindOutput)
+                Console.Error.WriteLine($"[CMD] {string.Join(" ", args)}");
         }
 
         // --args-file <path>: UTF-8 file fallback for Korean args garbled via bash→PowerShell CP949
@@ -485,14 +487,15 @@ internal partial class Program
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
         // Print log path early — so if the caller times out, they know where to tail the live log.
-        if (tee != null && !GrepModeActive)
+        if (tee != null && !GrepModeActive && !QuietFindOutput)
             Console.Error.WriteLine($"[LOG] {logFile}");
         // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
         {
             var launchCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
             var launchHwnd = EyeCmdPipeServer.CallerHwnd.Value;
             var launchCmd = string.Join(" ", args);
-            Console.Error.WriteLine($"[LAUNCH:CORE] cwd={launchCwd} hwnd=0x{launchHwnd:X} cmd={launchCmd}");
+            if (!QuietFindOutput)
+                Console.Error.WriteLine($"[LAUNCH:CORE] cwd={launchCwd} hwnd=0x{launchHwnd:X} cmd={launchCmd}");
         }
         // For grap/grep fast-exit: Launcher writes output path to WKAPPBOT_RELAY_FILE.
         // Core redirects Console.Out to that file. FastExit signals WKAPPBOT_RELAY_EVENT (EventWaitHandle)
@@ -625,7 +628,7 @@ internal partial class Program
             // Skip tick for fast-exit aliases (grap/grep) and Eye pipe commands.
             bool isFileCommand = command == "file" || command.StartsWith("file-", StringComparison.Ordinal);
             _skipTick = _fastExitAfterCommand || RunningInEye || isFileCommand;
-            if (!_skipTick)
+            if (!_skipTick && !QuietFindOutput)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
                 if (!GrepModeActive && !IsPipeMode) Console.Error.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
@@ -667,7 +670,7 @@ internal partial class Program
             if (TryRunRegression(command, restArgs)) { exitCode = 0; return 0; }
 
             if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!QuietFindOutput && !GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
             // ErrorScope: stderr auto-captured with timestamps (default: hidden from console).
@@ -1150,6 +1153,7 @@ internal partial class Program
     {
         try
         {
+            if (QuietFindOutput) return;
             var runtimeDir = Path.Combine(DataDir, "runtime");
             Directory.CreateDirectory(runtimeDir);
 
@@ -1738,6 +1742,10 @@ internal partial class Program
     internal static string BuildTargetGrapWithFocusPath(WKAppBot.Win32.Window.WindowInfo hit)
         => AppendFocusPath(BuildTargetGrap(hit), hit.Handle);
 
+    /// <summary>Quote a grap expression so the whole token can be pasted into a shell as one argument.</summary>
+    internal static string QuoteGrapExpression(string grap)
+        => "\"" + grap.Replace("\"", "\\\"") + "\"";
+
     private static string AppendFocusPath(string target, IntPtr hwnd)
     {
         try
@@ -1759,6 +1767,22 @@ internal partial class Program
         {
             return target;
         }
+    }
+
+    // Get the focused leaf element's XML tag for TARGET block display.
+    // Returns empty string if leaf not found or UIA unavailable.
+    internal static string GetFocusedLeafTag(IntPtr hwnd)
+    {
+        try
+        {
+            using var uia = new FlaUI.UIA3.UIA3Automation();
+            var root = uia.FromHandle(hwnd);
+            if (root == null) return "";
+            var focused = WKAppBot.Win32.Accessibility.GrapHelper.FindFocusedLeaf(uia, root, hwnd);
+            if (focused == null) return "";
+            return FormatLeafTag(focused);
+        }
+        catch { return ""; }
     }
 
     /// <summary>
