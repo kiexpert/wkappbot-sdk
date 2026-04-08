@@ -224,7 +224,7 @@ internal partial class Program
                     Console.Write($"[A11Y] FOCUSED: {focLeaf.ControlType}(\"{fLabel}\")");
                     if (focLeaf.Patterns.Count > 0) Console.Write($" [{string.Join(",", focLeaf.Patterns)}]");
                     Console.WriteLine();
-                    foreach (var (pType, pName) in focLeaf.ParentChain)
+                    foreach (var (pType, pName, _) in focLeaf.ParentChain)
                     {
                         if (string.IsNullOrEmpty(pName)) continue;
                         Console.Write($"         <- {pType}(\"{pName}\")");
@@ -369,7 +369,7 @@ internal partial class Program
                         Console.Write($"  >> [FOCUS] {focInfo.ControlType}(\"{fLabel}\")");
                         if (focInfo.Patterns.Count > 0) Console.Write($" {string.Join(",", focInfo.Patterns)}");
                         Console.WriteLine();
-                        foreach (var (pType, pName) in focInfo.ParentChain)
+                        foreach (var (pType, pName, _) in focInfo.ParentChain)
                         {
                             if (string.IsNullOrEmpty(pName)) continue;
                             Console.Write($"       <- {pType}(\"{pName}\")");

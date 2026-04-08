@@ -335,7 +335,7 @@ public sealed partial class UiaLocator
             try { if (focused.Patterns.Text.IsSupported) patterns.Add("Text"); } catch { }
 
             // Parent chain → root
-            var chain = new List<(string type, string name)>();
+            var chain = new List<(string type, string name, string aid)>();
             string? winTitle = null;
             int pid = 0;
             var cur = focused;
@@ -345,11 +345,12 @@ public sealed partial class UiaLocator
             {
                 try { cur = walker.GetParent(cur); } catch { break; }
                 if (cur == null) break;
-                string pName, pCt;
+                string pName, pCt, pAid;
                 try { pName = cur.Name ?? ""; } catch { pName = ""; }
                 try { pCt = cur.ControlType.ToString(); } catch { pCt = "?"; }
+                try { pAid = cur.AutomationId ?? ""; } catch { pAid = ""; }
                 if (pName.Length > 40) pName = pName[..40] + "…";
-                chain.Add((pCt, pName));
+                chain.Add((pCt, pName, pAid));
                 // Capture window title and pid from first Window-type parent
                 if (winTitle == null && pCt == "Window" && !string.IsNullOrEmpty(pName))
                 {
@@ -381,7 +382,7 @@ public sealed class FocusedElementInfo
     public string ControlType { get; init; } = "";
     public string Value { get; init; } = "";
     public List<string> Patterns { get; init; } = new();
-    public List<(string type, string name)> ParentChain { get; init; } = new();
+    public List<(string type, string name, string aid)> ParentChain { get; init; } = new();
     public string? WindowTitle { get; init; }
     public int ProcessId { get; init; }
     public System.Drawing.Rectangle Bounds { get; init; } = System.Drawing.Rectangle.Empty;

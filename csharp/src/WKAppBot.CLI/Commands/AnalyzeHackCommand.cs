@@ -408,7 +408,7 @@ internal partial class Program
 
             var chain = new JsonArray();
             if (focused.ParentChain != null)
-                foreach (var (type, name) in focused.ParentChain)
+                foreach (var (type, name, _) in focused.ParentChain)
                     chain.Add(new JsonObject { ["type"] = type, ["name"] = name });
             result["chain"] = chain;
 

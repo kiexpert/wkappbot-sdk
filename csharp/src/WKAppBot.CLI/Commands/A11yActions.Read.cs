@@ -84,11 +84,13 @@ internal partial class Program
             static string Abb(string t) => t.Length > 3 ? t[..3] : t;
             var chain = focInfo.ParentChain
                 .Where(p => !string.IsNullOrEmpty(p.type) && p.type != "Window")
-                .Select(p => Abb(p.type))
+                .Select(p => string.IsNullOrEmpty(p.aid) ? Abb(p.type) : $"{Abb(p.type)}_{p.aid}")
                 .Reverse()
                 .ToList();
+            var focLeafTag = Abb(focInfo.ControlType);
+            if (!string.IsNullOrEmpty(focInfo.AutomationId)) focLeafTag += $"_{focInfo.AutomationId}";
             if (!string.IsNullOrEmpty(focInfo.ControlType) && focInfo.ControlType != "Window")
-                chain.Add(Abb(focInfo.ControlType));
+                chain.Add(focLeafTag);
             // Compress consecutive identical bare types: Gro/Gro/Gro → Gro// (same as BuildAbsoluteTagPath)
             string focPath = "";
             if (chain.Count > 0)
@@ -141,11 +143,12 @@ internal partial class Program
             int pi = 0;
             while (pi < parents.Count)
             {
-                var (pType, pName) = parents[pi];
+                var (pType, pName, _) = parents[pi];
                 int count = 1;
                 if (string.IsNullOrEmpty(pName))
                     while (pi + count < parents.Count
                            && parents[pi + count].type == pType
+                           && string.IsNullOrEmpty(parents[pi + count].aid)
                            && string.IsNullOrEmpty(parents[pi + count].name))
                         count++;
                 var pTag = GrapHelper.FormatNodeLabel(pType, "", pName);
