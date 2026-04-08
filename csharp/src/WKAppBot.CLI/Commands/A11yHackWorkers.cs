@@ -206,8 +206,9 @@ internal partial class Program
                 var fullGrap = !string.IsNullOrEmpty(elLabel) ? $"{winGrap}#*{elLabel}*" : winGrap;
 
                 // Verify: bestHwnd first, fallback root
-                var json5 = WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(bestHwnd);
-                var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(json5, true);
+                var json5 = Program.BuildTargetGrap(bestHwnd);  // display form (with hwnd)
+                var searchGrap = Program.BuildCompactWinGrap(bestHwnd); // portable form for verify
+                var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(searchGrap, true);
                 bool verified = verifyHits.Any(v => v.Handle == bestHwnd || v.Handle == rootHwndEarly);
                 var mark = verified ? "OK" : "MISS";
 

@@ -1711,6 +1711,19 @@ internal partial class Program
         return $"{{{grap},{hwndStr}}}";
     }
 
+    /// <summary>
+    /// Build a fully-resolved target grap string for display output.
+    /// Takes hwnd (+ optional pid to avoid extra lookup) and produces:
+    ///   compact portable form (domain/proc/file) + hwnd injected.
+    /// Use instead of BuildTargetJson5 wherever target window info is displayed.
+    /// For search/verify, use BuildCompactWinGrap (no hwnd).
+    /// </summary>
+    internal static string BuildTargetGrap(IntPtr hwnd, uint pid = 0)
+    {
+        if (pid == 0) WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out pid);
+        return InjectHwnd(BuildCompactWinGrap(hwnd), hwnd);
+    }
+
     private static string _BuildCompactWinGrapCore(IntPtr hwnd)
     {
         var g = WindowFinder.BuildTargetJson5(hwnd);

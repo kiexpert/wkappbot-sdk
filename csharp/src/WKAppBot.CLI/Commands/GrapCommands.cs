@@ -60,7 +60,7 @@ internal partial class Program
             {
                 Console.Error.WriteLine($"[GRAP-ALIAS] Multiple matches for '{pattern}':");
                 foreach (var h in hits.Take(8))
-                    Console.Error.WriteLine($"  {WKAppBot.Win32.Window.WindowFinder.BuildTargetJson5(h.Handle)}");
+                    Console.Error.WriteLine($"  {BuildTargetGrap(h.Handle)}");
                 return Error("Ambiguous match — narrow the pattern.");
             }
             grap = BuildCompactWinGrap(hits[0].Handle);
