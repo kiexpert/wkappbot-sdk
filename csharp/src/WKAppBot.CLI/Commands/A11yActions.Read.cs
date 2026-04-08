@@ -208,7 +208,8 @@ internal partial class Program
             _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
         } ?? "";
 
-        PrintTargetBlock(titleHeading, paste, "find", extraArgs, verifyMark, sw.ElapsedMilliseconds, matchNote);
+        var leafTag = GetFocusedLeafTag(hwnd);
+        PrintTargetBlock(titleHeading, paste, "find", extraArgs, verifyMark, sw.ElapsedMilliseconds, matchNote, leafTag);
 
         return true;
     }
