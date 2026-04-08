@@ -1726,20 +1726,7 @@ internal partial class Program
                         var fileName = System.IO.Path.GetFileName(Uri.UnescapeDataString(rawUrl));
                         if (!string.IsNullOrEmpty(fileName)) return $"file:'{fileName}'";
                     }
-                    else if (rawUrl.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // VS Code (Electron): extract workspace/folder from window title
-                        // Title format: "[● ]<file> - <workspace> - Visual Studio Code"
-                        //           or: "<workspace> - Visual Studio Code"
-                        var title = WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd).TrimStart('●', ' ');
-                        var parts = title.Split(" - ", StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 2 && parts[^1].Trim().Equals("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var workspace = parts[^2].Trim();
-                            if (!string.IsNullOrEmpty(workspace)) return $"vscode:'{workspace}'";
-                        }
-                        return "vscode:";
-                    }
+                    // vscode-file:// and other Electron internal URLs → fall through to {proc,cls}
                 }
             }
             catch { }
