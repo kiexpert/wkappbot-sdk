@@ -53,7 +53,7 @@ internal partial class Program
             if (string.IsNullOrEmpty(pattern))
                 return Error("--find requires a pattern argument.");
 
-            var hits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(pattern, false);
+            var hits = WKAppBot.Win32.Window.WindowFinder.FindWindows(pattern, false);
             if (hits.Count == 0)
                 return Error($"--find: no windows matched '{pattern}'");
             if (hits.Count > 1)
@@ -152,7 +152,7 @@ internal partial class Program
             if (note != null) { healed++; Console.Error.WriteLine(note); }
 
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var hits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(expanded, true);
+            var hits = WKAppBot.Win32.Window.WindowFinder.FindWindows(expanded, true);
             sw.Stop();
 
             if (hits.Count > 0)

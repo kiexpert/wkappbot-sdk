@@ -44,7 +44,7 @@ Examples:
         int probeStep = int.TryParse(GetArgValue(args, "--probe-step"), out var ps) ? ps : 2;
 
         // Find target window
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0)
             return Error($"Window not found: \"{title}\"");
 

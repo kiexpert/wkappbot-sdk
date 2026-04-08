@@ -1357,7 +1357,7 @@ internal partial class Program
     {
         try
         {
-            var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
+            var windows = WKAppBot.Win32.Window.WindowFinder.FindWindows(windowTitle);
             if (windows.Count == 0) return;
             var win = windows[0];
 
@@ -1656,7 +1656,7 @@ internal partial class Program
     {
         try
         {
-            var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
+            var windows = WKAppBot.Win32.Window.WindowFinder.FindWindows(windowTitle);
             if (windows.Count == 0) return;
             var win = windows[0];
 

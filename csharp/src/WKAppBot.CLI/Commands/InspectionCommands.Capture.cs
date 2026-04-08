@@ -23,7 +23,7 @@ internal partial class Program
         string? formId = GetArgValue(args, "--form");
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0)
         {
             Console.WriteLine($"No window found matching: \"{title}\"");
@@ -145,7 +145,7 @@ internal partial class Program
         else
         {
             // Treat as window title
-            var windows = WindowFinder.FindByTitle(target);
+            var windows = WindowFinder.FindWindows(target);
             if (windows.Count == 0)
                 return Error($"Window not found: \"{target}\"");
 

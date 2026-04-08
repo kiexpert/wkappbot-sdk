@@ -208,7 +208,7 @@ internal partial class Program
                 // Verify: bestHwnd first, fallback root
                 var json5 = Program.BuildTargetGrap(bestHwnd);  // display form (with hwnd)
                 var searchGrap = Program.BuildCompactWinGrap(bestHwnd); // portable form for verify
-                var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindByTitle(searchGrap, true);
+                var verifyHits = WKAppBot.Win32.Window.WindowFinder.FindWindows(searchGrap, true);
                 bool verified = verifyHits.Any(v => v.Handle == bestHwnd || v.Handle == rootHwndEarly);
                 var mark = verified ? "OK" : "MISS";
 

@@ -203,7 +203,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(windowTitle))
         {
             // Capture specific window
-            var windows = WKAppBot.Win32.Window.WindowFinder.FindByTitle(windowTitle);
+            var windows = WKAppBot.Win32.Window.WindowFinder.FindWindows(windowTitle);
             if (windows.Count == 0)
             {
                 Console.Error.WriteLine($"[SLACK] Window not found: {windowTitle}");

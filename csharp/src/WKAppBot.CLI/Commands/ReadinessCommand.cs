@@ -52,7 +52,7 @@ Options:
 
         if (!string.IsNullOrEmpty(grap))
         {
-            var matches = WindowFinder.FindByTitle(grap);
+            var matches = WindowFinder.FindWindows(grap);
             if (matches.Count == 0)
                 return Error($"Window not found: \"{grap}\"");
             targetHwnd = matches[0].Handle;

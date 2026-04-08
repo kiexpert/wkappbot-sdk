@@ -19,7 +19,7 @@ public static class WindowFinder
     static readonly Dictionary<string, (List<IntPtr> hwnds, DateTime cachedAt)> _grapCache = new();
     static readonly TimeSpan _grapCacheTtl = TimeSpan.FromSeconds(5);
 
-    // ── Chrome URL caches (shared across FindByTitle calls) ──
+    // ── Chrome URL caches (shared across FindWindows calls) ──
     // PID → CDP tab URLs string (all tabs joined by space), 5s TTL
     static readonly Dictionary<uint, (string urls, DateTime cachedAt)> _cdpPidUrlCache = new();
     // HWND → UIA omnibox URL (active tab), 5s TTL
@@ -50,7 +50,7 @@ public static class WindowFinder
     ///             "영웅문" → finds [_NKHeroMainClass] 영웅문4
     ///             "hwnd:0054188E" → direct handle lookup
     /// </summary>
-    public static List<WindowInfo> FindByTitle(string titlePattern, bool stopOnFirstMatch = false)
+    public static List<WindowInfo> FindWindows(string titlePattern, bool stopOnFirstMatch = false)
     {
         // ── Cache check: return cached if all hwnds still alive and within TTL ──
         if (_grapCache.TryGetValue(titlePattern, out var cached)
@@ -329,7 +329,7 @@ public static class WindowFinder
     /// <summary>
     /// Build the standard enriched search key for a window.
     /// Format: "[ClassName] Title (processName hwnd=XXXXXXXX WxH ★flags)"
-    /// Used by FindByTitle, WindowsCommand, and any grap-based search.
+    /// Used by FindWindows, WindowsCommand, and any grap-based search.
     /// </summary>
     public static string BuildSearchKey(IntPtr hWnd, string cls, string title,
         string procName, int w, int h, FocusSnapshot? focus = null)

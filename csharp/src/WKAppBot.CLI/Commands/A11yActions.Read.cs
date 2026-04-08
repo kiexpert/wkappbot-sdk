@@ -121,7 +121,7 @@ internal partial class Program
         var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
         try
         {
-            verifyHits = WindowFinder.FindByTitle(compactGrap, false); // all matches
+            verifyHits = WindowFinder.FindWindows(compactGrap, false); // all matches
             if (verifyHits.Any(v => v.Handle == hwnd))
             {
                 if (verifyHits.Count > 1)

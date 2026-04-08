@@ -1,0 +1,583 @@
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+
+namespace WKAppBot.CLI;
+
+// partial class: wkappbot suggest "건의 내용" [file.png] — slack send to current channel
+internal partial class Program
+{
+
+    static int SuggestCommand(string[] args)
+    {
+        Environment.SetEnvironmentVariable("WKAPPBOT_SUGGEST_BYPASS", "1");
+
+        if (args.Length > 0 && args[0] is "resolve")
+            return SuggestResolveCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "list" or "ls")
+            return SuggestListCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "repost")
+            return SuggestRepostCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "merge")
+            return SuggestMergeCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "show" or "get" or "view")
+            return SuggestShowCommand(args[1..]);
+
+        // Guard: single lowercase word that looks like an unrecognized subcommand → error instead of saving as text.
+        // Prevents accidental "suggest show 19" → garbage JSONL entry.
+        if (args.Length > 0 && args[0].All(ch => char.IsLower(ch) || ch == '-') && args[0].Length <= 12
+            && !args[0].StartsWith('-'))
+        {
+            Console.Error.WriteLine($"[SUGGEST] Unknown subcommand: '{args[0]}'");
+            Console.Error.WriteLine($"  Known subcommands: list, show, merge, resolve, repost");
+            Console.Error.WriteLine($"  To suggest text starting with '{args[0]}', quote it: wkappbot suggest \"{string.Join(" ", args)}\"");
+            return 1;
+        }
+
+        if (args.Length == 0 || args[0] is "-h" or "--help" or "help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest \"text\" [file.png] [\"more text\"]");
+            Console.WriteLine("  Send a suggestion/feature request to #클봇-전체 via webhook.");
+            Console.WriteLine("  Args = lines (like ask/slack send). Files auto-detected & attached.");
+            Console.WriteLine("  Automatically tags sender's workspace (CWD shortname).");
+            Console.WriteLine("  Also saves to wkappbot.hq/suggestions.jsonl for local record.");
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  ⚠ Write in ENGLISH to save tokens (Korean = 2-3x token cost).");
+            Console.WriteLine("     Short & precise wins. Senior Claudes will thank you. 🙏");
+            Console.ResetColor();
+            Console.WriteLine();
+            Console.WriteLine("Subcommands:");
+            Console.WriteLine("  list / ls              Show pending suggestions");
+            Console.WriteLine("  show <n|ts>            Show full text of suggestion #n or by ts prefix");
+            Console.WriteLine("  merge <ts1> [ts2..] --title \"...\"  Merge related suggestions into one self-healing record");
+            Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
+            Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
+            Console.WriteLine();
+            Console.WriteLine("Examples:");
+            Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
+            Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
+            Console.WriteLine("  wkappbot suggest list");
+            Console.WriteLine("  wkappbot suggest resolve 2026-03-17T05:00:00 \"Fixed in v4.4.5\"");
+            Console.WriteLine();
+            Console.WriteLine("Merge (combine duplicates into one self-healing record):");
+            Console.WriteLine("  wkappbot suggest merge --all-matching \"pattern\" --title \"...\" \\");
+            Console.WriteLine("    --root-cause \"...\" --error-pattern \"regex\" --components \"...\" \\");
+            Console.WriteLine("    --priority N --work \"estimated fix\" --affected-cmds \"cmd1,cmd2\"");
+            Console.WriteLine("  Options: --keep-originals  --force  --auto-heal-script <path>");
+            Console.WriteLine("  Example:");
+            Console.WriteLine("    wkappbot suggest merge --all-matching \"Runtime.evaluate.*timeout\" \\");
+            Console.WriteLine("      --title \"CDP timeout on Ghost tabs\" --root-cause \"Chrome hang\" \\");
+            Console.WriteLine("      --work \"Ghost detection + retry\" --affected-cmds ask --priority 2 --force");
+            Console.WriteLine();
+            // Show experience DB test scripts summary
+            var testsRoot = Path.Combine(DataDir, "experience", "tests");
+            if (Directory.Exists(testsRoot))
+            {
+                var allTests = Directory.GetFiles(testsRoot, "*", SearchOption.AllDirectories);
+                if (allTests.Length > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine($"📚 Experience DB: {allTests.Length} test script(s) from previous resolves");
+                    Console.WriteLine($"   Path: {testsRoot}");
+                    foreach (var catDir in Directory.GetDirectories(testsRoot).OrderBy(d => d))
+                    {
+                        var cat = Path.GetFileName(catDir);
+                        foreach (var subDir in Directory.GetDirectories(catDir).OrderBy(d => d))
+                        {
+                            var sub = Path.GetFileName(subDir);
+                            var subFiles = Directory.GetFiles(subDir).Select(Path.GetFileName).ToArray();
+                            if (subFiles.Length > 0)
+                                Console.WriteLine($"   {cat}/{sub}: {string.Join(", ", subFiles)}");
+                        }
+                    }
+                    Console.WriteLine($"   Tip: reference these when writing your own resolve evidence!");
+                    Console.ResetColor();
+                }
+            }
+            return 0;
+        }
+
+        // Separate text vs files (shared ParseTextAndFiles)
+        var (textParts, files) = ParseTextAndFiles(args);
+        var text = string.Join("\n", textParts);
+        var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
+        if (string.IsNullOrEmpty(cwdTag)) cwdTag = "unknown";
+
+        Console.WriteLine($"[SUGGEST] from [{cwdTag}]");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine("  ⚠ Tip: write suggestions in ENGLISH — Korean = 2-3x token cost.");
+        Console.ResetColor();
+        Console.WriteLine($"[SUGGEST] {text}");
+        if (files.Count > 0)
+            Console.WriteLine($"[SUGGEST] {files.Count} file(s): {string.Join(", ", files.Select(Path.GetFileName))}");
+
+        // Build Slack message with [file:name] markers for attached files
+        var msgLines = new List<string> { $":memo: *[건의]* from `{cwdTag}`" };
+        foreach (var part in textParts)
+            msgLines.Add(part);
+        foreach (var f in files)
+            msgLines.Add($"[file:{Path.GetFileName(f)}]");
+        var slackMsg = string.Join("\n", msgLines);
+
+        string? messageTs = null;
+
+        // Send via normal slack send channel (LoadSlackConfig — same as 'wkappbot slack send')
+        var config = LoadSlackConfig();
+        var botToken = config?["bot_token"]?.GetValue<string>();
+        var channel  = config?["channel"]?.GetValue<string>();
+        if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
+        {
+            var senderName = GetSuggestBypassUsername();
+            var (ok, ts) = PostWithOverflow(botToken, channel, slackMsg, username: senderName);
+            if (ok)
+            {
+                messageTs = ts;
+                Console.WriteLine($"[SUGGEST] Slack sent (+{files.Count} file(s))");
+                Console.WriteLine($"[SUGGEST] ID: {messageTs}  (resolve: suggest resolve {messageTs} \"note\")");
+                foreach (var f in files)
+                {
+                    Console.WriteLine($"[SUGGEST] Uploading {Path.GetFileName(f)}...");
+                    SlackUploadFileAsync(botToken, channel, f,
+                        title: Path.GetFileName(f), threadTs: messageTs).GetAwaiter().GetResult();
+                }
+                if (files.Count > 0) Console.WriteLine("[SUGGEST] File(s) uploaded OK");
+            }
+            else
+                Console.Error.WriteLine("[SUGGEST] Slack send failed");
+        }
+        else
+        {
+            Console.Error.WriteLine("[SUGGEST] No Slack config found — saved locally only (run 'wkappbot slack setup' to configure)");
+        }
+
+        // Save to HQ suggestions.jsonl
+        try
+        {
+            var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+            Directory.CreateDirectory(hqDir);
+            var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+            var entry = new
+            {
+                ts = DateTime.UtcNow.ToString("o"),
+                from = cwdTag,
+                cwd = Environment.CurrentDirectory,
+                text = text,
+                files = files.Select(Path.GetFileName).ToArray(),
+                slack_ts = messageTs  // Slack message ts for thread reply in resolve
+            };
+            var json = JsonSerializer.Serialize(entry);
+            File.AppendAllText(jsonlPath, json + Environment.NewLine);
+            Console.WriteLine($"[SUGGEST] Saved to {jsonlPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SUGGEST] Failed to save locally: {ex.Message}");
+        }
+
+        return 0;
+    }
+
+    /// <summary>suggest list — show pending suggestions in a pretty format. Auto-syncs slack_ts from Slack.</summary>
+    static int SuggestListCommand(string[] args)
+    {
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+
+        if (!File.Exists(jsonlPath))
+        {
+            Console.WriteLine("[SUGGEST] No suggestions.jsonl found.");
+            return 0;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        if (lines.Count == 0)
+        {
+            Console.WriteLine("[SUGGEST] No pending suggestions. 🎉");
+            return 0;
+        }
+
+        // ── Auto-sync slack_ts: fetch Slack messages since latest HQ entry ──
+        var entries = lines
+            .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
+            .Where(e => e["review_status"]?.GetValue<string>() != "done"   // skip resolved
+                     && e["status"]?.GetValue<string>() != "done") // skip done
+            .ToList();
+        if (entries.Count == 0)
+        {
+            Console.WriteLine("[SUGGEST] No pending suggestions. 🎉");
+            return 0;
+        }
+        var unsynced = entries.Where(e => e["slack_ts"] == null || e["slack_ts"]?.GetValue<string>() == null).ToList();
+
+        if (unsynced.Count > 0)
+        {
+            var syncCfg = LoadSlackConfig();
+            var botToken = syncCfg?["bot_token"]?.GetValue<string>();
+            var syncChannel = syncCfg?["channel"]?.GetValue<string>();
+            if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(syncChannel))
+            {
+                // Use HQ file mtime as oldest — only fetch Slack messages since last local update
+                var fileMtime = File.GetLastWriteTimeUtc(jsonlPath);
+                var oldestUnix = ((DateTimeOffset)fileMtime).AddMinutes(-5).ToUnixTimeSeconds(); // -5min buffer
+                Console.WriteLine($"[SUGGEST] Syncing slack_ts from Slack (since {fileMtime.ToLocalTime():MM-dd HH:mm})...");
+                {
+
+                    try
+                    {
+                        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                        http.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", botToken);
+                        var url = $"https://slack.com/api/conversations.history?channel={syncChannel}&limit=200&oldest={oldestUnix}";
+                        var resp = http.GetAsync(url).GetAwaiter().GetResult();
+                        var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                        var json = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(body);
+                        var msgs = json?["messages"]?.AsArray() ?? new System.Text.Json.Nodes.JsonArray();
+
+                        // Filter 건의 messages only
+                        var suggestMsgs = msgs
+                            .Where(m => (m?["text"]?.GetValue<string>() ?? "").Contains(":memo: *[건의]*"))
+                            .Select(m => (ts: m!["ts"]!.GetValue<string>(), body: string.Join("\n", (m["text"]?.GetValue<string>() ?? "").Split('\n').Skip(1))))
+                            .ToList();
+
+                        int synced = 0;
+                        bool changed = false;
+                        for (int i = 0; i < entries.Count; i++)
+                        {
+                            if (entries[i]["slack_ts"] != null) continue;
+                            var eText = (entries[i]["text"]?.GetValue<string>() ?? "").Trim();
+                            var eKey = eText[..Math.Min(40, eText.Length)].ToLower();
+
+                            var best = suggestMsgs
+                                .Select(sm => (sm.ts, score: Enumerable.Zip(eKey, sm.body.Trim().ToLower()).Count(p => p.First == p.Second)))
+                                .Where(x => x.score >= 20)
+                                .OrderByDescending(x => x.score)
+                                .FirstOrDefault();
+
+                            if (best.ts != null)
+                            {
+                                var obj = System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<string, object?>>(lines[i])!;
+                                obj["slack_ts"] = best.ts;
+                                lines[i] = System.Text.Json.JsonSerializer.Serialize(obj);
+                                entries[i] = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lines[i])!;
+                                synced++;
+                                changed = true;
+                            }
+                        }
+
+                        if (changed)
+                            File.WriteAllLines(jsonlPath, lines);
+                        if (synced > 0)
+                            Console.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack ✓");
+                        else
+                            Console.WriteLine($"[SUGGEST] No new matches found in Slack.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[SUGGEST] Slack sync failed: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        Console.WriteLine($"[SUGGEST] Pending: {lines.Count} suggestion(s)");
+        Console.WriteLine(new string('─', 100));
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            try
+            {
+                var d = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(lines[i]);
+                var ts       = d?["ts"]?.GetValue<string>()       ?? "";
+                var from     = d?["from"]?.GetValue<string>()     ?? "?";
+                var slackTs  = d?["slack_ts"]?.GetValue<string>();
+                var entryType = d?["type"]?.GetValue<string>()    ?? "";
+                var slackMark = slackTs != null ? " 🔗" : "   ";
+
+                // Date: ISO → MM-dd HH:mm
+                string dateStr = ts;
+                if (DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                    dateStr = dt.ToLocalTime().ToString("MM-dd HH:mm");
+
+                var tsPrefix = ts.Length >= 16 ? ts[..16] : ts;
+
+                if (entryType == "merge")
+                {
+                    // ── Merge record display ──────────────────────────────────────────
+                    var mergeTitle   = d?["title"]?.GetValue<string>()       ?? "?";
+                    var rootCause    = d?["rootCause"]?.GetValue<string>();
+                    var count        = d?["count"]?.GetValue<int>()           ?? 0;
+                    var freq         = d?["frequencyPerHour"]?.GetValue<double>() ?? 0;
+                    var risk         = d?["recurrenceRisk"]?.GetValue<string>() ?? "";
+                    var prio         = d?["priority"]?.GetValue<int>()        ?? 0;
+                    var work         = d?["estimatedWork"]?.GetValue<string>();
+                    var components   = d?["components"]?.AsArray().Select(x => x?.GetValue<string>()).Where(x => x != null).ToArray() ?? [];
+                    var affCmds      = d?["affectedCommands"]?.AsArray().Select(x => x?.GetValue<string>()).Where(x => x != null).ToArray() ?? [];
+                    var errPat       = d?["errorPattern"]?.GetValue<string>();
+                    var healScript   = d?["autoHealScript"]?.GetValue<string>();
+                    var healResult   = d?["autoHealResult"]?.GetValue<string>();
+                    var prioStars    = new string('★', prio) + new string('☆', Math.Max(0, 5 - prio));
+                    var riskColor    = risk switch { "critical" => ConsoleColor.Red, "high" => ConsoleColor.Yellow, "medium" => ConsoleColor.DarkYellow, _ => ConsoleColor.DarkGray };
+
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write($"  {i + 1,2}.");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" {dateStr}");
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write($" [MERGE×{count}]");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($" [{from}]");
+                    Console.Write(slackMark);
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"      {(mergeTitle.Length > 72 ? mergeTitle[..72] + "…" : mergeTitle)}");
+                    Console.ResetColor();
+
+                    // Priority + risk + freq row
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.Write($"      {prioStars}({prio}/5)");
+                    Console.ForegroundColor = riskColor;
+                    Console.Write($"  risk={risk}");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"  freq={freq}/hr");
+                    if (work != null) Console.Write($"  est={work}");
+                    Console.WriteLine();
+                    Console.ResetColor();
+
+                    if (rootCause != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      root: {(rootCause.Length > 90 ? rootCause[..90] + "…" : rootCause)}");
+                        Console.ResetColor();
+                    }
+                    if (errPat != null)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      pattern: {errPat}");
+                        Console.ResetColor();
+                    }
+                    if (components.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      components: {string.Join(", ", components)}");
+                        Console.ResetColor();
+                    }
+                    if (affCmds.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      affected: {string.Join(", ", affCmds)}");
+                        Console.ResetColor();
+                    }
+                    if (healScript != null)
+                    {
+                        Console.ForegroundColor = healResult != null ? ConsoleColor.Green : ConsoleColor.DarkYellow;
+                        Console.WriteLine($"      heal: {healScript}{(healResult != null ? $" → {healResult}" : " (pending)")}");
+                        Console.ResetColor();
+                    }
+                }
+                else
+                {
+                    // ── Regular suggestion display ────────────────────────────────────
+                    var text  = d?["text"]?.GetValue<string>()  ?? "";
+                    var files = d?["files"]?.AsArray();
+
+                    var textLines = text.Split('\n');
+                    var title = textLines[0];
+                    var body  = textLines.Length > 1 ? string.Join(" ", textLines[1..].Where(l => l.Trim().Length > 0)) : "";
+                    if (title.Length > 70) title = title[..70] + "…";
+                    if (body.Length > 80)  body  = body[..80]  + "…";
+
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($"  {i + 1,2}.");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($" {dateStr}");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($" [{from}]");
+                    Console.Write(slackMark);
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"      {title}");
+                    Console.ResetColor();
+
+                    if (body.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      {body}");
+                        Console.ResetColor();
+                    }
+
+                    if (files != null && files.Count > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"      📎 {string.Join(", ", files.Select(f => f?.GetValue<string>()))}");
+                        Console.ResetColor();
+                    }
+                }
+
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.WriteLine($"      ts={tsPrefix}");
+                Console.ResetColor();
+            }
+            catch { Console.WriteLine($"  {i + 1}. [parse error]"); }
+        }
+
+        Console.WriteLine(new string('─', 100));
+        Console.WriteLine($"  resolve: wkappbot suggest resolve <ts> \"note\" --i-completed-... <test.sh>");
+        Console.WriteLine($"  merge:   wkappbot suggest merge --all-matching \"pattern\" --title \"title\" --work \"1h\"");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($"  >> 쉬운 것 / 긴급한 것부터 즉시 작업 시작! 중복은 merge로 정리하세요.");
+        Console.ResetColor();
+        return 0;
+    }
+
+    /// <summary>suggest show &lt;n|ts&gt; — show full content of suggestion by list number or ts prefix.</summary>
+    static int SuggestShowCommand(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest show <n|ts>");
+            Console.WriteLine("  n  : list number (1-based, from 'suggest list')");
+            Console.WriteLine("  ts : timestamp prefix (e.g. 2026-04-02T01)");
+            return 0;
+        }
+
+        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
+        if (!File.Exists(jsonlPath)) { Console.Error.WriteLine("[SUGGEST] No suggestions.jsonl"); return 1; }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        var entries = lines
+            .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
+            .Where(e => e["review_status"]?.GetValue<string>() != "done"
+                     && e["status"]?.GetValue<string>() != "done")
+            .ToList();
+
+        System.Text.Json.Nodes.JsonNode? target = null;
+        var query = args[0];
+
+        if (int.TryParse(query, out var n) && n >= 1 && n <= entries.Count)
+        {
+            target = entries[n - 1];
+        }
+        else
+        {
+            target = entries.FirstOrDefault(e => (e["ts"]?.GetValue<string>() ?? "").StartsWith(query));
+        }
+
+        if (target == null)
+        {
+            Console.Error.WriteLine($"[SUGGEST] Not found: {query}");
+            Console.Error.WriteLine($"  Run 'suggest list' to see numbers. Total: {entries.Count}");
+            return 1;
+        }
+
+        var ts      = target["ts"]?.GetValue<string>() ?? "";
+        var from    = target["from"]?.GetValue<string>() ?? "";
+        var text    = target["text"]?.GetValue<string>() ?? "";
+        var status  = target["status"]?.GetValue<string>() ?? "pending";
+        var slackTs = target["slack_ts"]?.GetValue<string>();
+        var title   = target["title"]?.GetValue<string>();
+
+        Console.WriteLine($"[SUGGEST] ts={ts}  from=[{from}]  status={status}");
+        if (slackTs != null) Console.WriteLine($"          slack_ts={slackTs}");
+        if (title != null) { Console.ForegroundColor = ConsoleColor.Cyan; Console.WriteLine($"  {title}"); Console.ResetColor(); }
+        Console.WriteLine();
+        Console.WriteLine(text);
+        Console.WriteLine();
+        Console.WriteLine($"  resolve: wkappbot suggest resolve {ts} \"note\" --i-completed-... <evidence.sh>");
+        return 0;
+    }
+
+    /// <summary>suggest repost [ts] — re-post entries missing slack_ts and write the new ID back.</summary>
+    static int SuggestRepostCommand(string[] args)
+    {
+        var tsPrefix = args.Length > 0 ? args[0] : null;
+
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+        var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+
+        if (!File.Exists(jsonlPath))
+        {
+            Console.Error.WriteLine("[REPOST] suggestions.jsonl not found");
+            return 1;
+        }
+
+        var repostCfg = LoadSlackConfig();
+        var botToken = repostCfg?["bot_token"]?.GetValue<string>();
+        var channel  = repostCfg?["channel"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
+        {
+            Console.Error.WriteLine("[REPOST] No Slack config — cannot send to Slack");
+            return 1;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        bool changed = false;
+        int reposted = 0;
+
+        for (int i = 0; i < lines.Count; i++)
+        {
+            JsonNode? node;
+            try { node = JsonSerializer.Deserialize<JsonNode>(lines[i]); } catch { continue; }
+            if (node == null) continue;
+
+            var entryTs = node["ts"]?.GetValue<string>() ?? "";
+            var reviewStatus = node["review_status"]?.GetValue<string>() ?? "";
+            var existingSlackTs = node["slack_ts"]?.GetValue<string>();
+
+            // Skip resolved entries
+            if (reviewStatus == "done") continue;
+            // If ts filter given, skip non-matching
+            if (tsPrefix != null && !entryTs.StartsWith(tsPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+            // Skip if already has slack_ts (unless explicit ts filter)
+            if (tsPrefix == null && existingSlackTs != null) continue;
+
+            var text = node["text"]?.GetValue<string>() ?? "";
+            var from = node["from"]?.GetValue<string>() ?? "unknown";
+            var preview = text.Split('\n')[0];
+            if (preview.Length > 60) preview = preview[..60] + "…";
+            Console.WriteLine($"[REPOST] {entryTs[..16]} [{from}] {preview}");
+
+            var msgLines = new List<string> { $":memo: *[건의]* from `{from}`" };
+            foreach (var part in text.Split('\n'))
+                msgLines.Add(part);
+            var slackMsg = string.Join("\n", msgLines);
+            var (header, overflow) = SplitMessageForChannel(slackMsg);
+            var senderName = GetSuggestBypassUsername();
+
+            var (ok, newTs) = SlackSendViaApi(botToken, channel, header, username: senderName).GetAwaiter().GetResult();
+            if (!ok || string.IsNullOrEmpty(newTs))
+            {
+                Console.Error.WriteLine($"[REPOST] Slack send failed for {entryTs}");
+                continue;
+            }
+
+            // Post overflow
+            if (overflow != null)
+            {
+                foreach (var chunk in ChunkText(overflow, 3900))
+                    SlackSendViaApi(botToken, channel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
+            }
+
+            Console.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
+
+            // Write slack_ts back into the line
+            var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(lines[i])!;
+            obj["slack_ts"] = (object?)newTs;
+            lines[i] = JsonSerializer.Serialize(obj);
+            changed = true;
+            reposted++;
+        }
+
+        if (changed)
+            File.WriteAllLines(jsonlPath, lines);
+
+        Console.WriteLine(reposted > 0 ? $"[REPOST] Done: {reposted} reposted, slack_ts saved." : "[REPOST] Nothing to repost.");
+        return 0;
+    }
+
+}

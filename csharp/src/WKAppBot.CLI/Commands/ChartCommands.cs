@@ -79,7 +79,7 @@ internal partial class Program
         else
         {
             // Live window capture
-            var windows = WindowFinder.FindByTitle(input);
+            var windows = WindowFinder.FindWindows(input);
             if (windows.Count == 0) return Error($"Window not found: \"{input}\"");
             var win = windows[0];
 

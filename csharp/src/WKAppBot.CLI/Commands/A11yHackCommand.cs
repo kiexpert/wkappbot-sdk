@@ -69,7 +69,7 @@ internal partial class Program
         bool focusDrillRequested = grapFull.TrimEnd().EndsWith('/')
             || (hashIdx >= 0 && string.IsNullOrWhiteSpace(uiaScope));
 
-        var targets = WindowFinder.FindByTitle(grap);
+        var targets = WindowFinder.FindWindows(grap);
         if (!targets.Any())
         {
             hackLog.WriteLine($"[HACK] No window found: \"{grap}\"");

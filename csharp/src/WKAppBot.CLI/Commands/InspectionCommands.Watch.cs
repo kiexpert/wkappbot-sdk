@@ -24,7 +24,7 @@ internal partial class Program
         if (titleFilter != null)
         {
             // Direct title search — no delay needed
-            var windows = WindowFinder.FindByTitle(titleFilter);
+            var windows = WindowFinder.FindWindows(titleFilter);
             if (windows.Count == 0)
                 return Error($"No window found matching: \"{titleFilter}\"");
             hWnd = windows[0].Handle;

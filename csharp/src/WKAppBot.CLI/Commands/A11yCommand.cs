@@ -31,7 +31,7 @@ internal partial class Program
             {
                 var focusGrap = BuildCompactWinGrap(gti.hwndFocus);
                 var fsw = System.Diagnostics.Stopwatch.StartNew();
-                var hits = WindowFinder.FindByTitle(focusGrap, true);
+                var hits = WindowFinder.FindWindows(focusGrap, true);
                 fsw.Stop();
                 var focusOk = hits.Any(h => h.Handle == gti.hwndFocus);
                 Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
@@ -455,7 +455,7 @@ internal partial class Program
         bool stopOnFirstWindowMatch = isSpecificPattern && isInteractiveAction && !all && nthRaw == null;
         foreach (var pat in firstSegPatterns)
         {
-            foreach (var w in WindowFinder.FindByTitle(pat, stopOnFirstWindowMatch))
+            foreach (var w in WindowFinder.FindWindows(pat, stopOnFirstWindowMatch))
                 if (seen.Add(w.Handle))
                     allWindows.Add(w);
             if (stopOnFirstWindowMatch && allWindows.Count > 0)

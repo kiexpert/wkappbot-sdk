@@ -42,7 +42,7 @@ Examples:
         }
 
         // Find window
-        var windows = WindowFinder.FindByTitle(title);
+        var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
         var win = windows[0];
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");

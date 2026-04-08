@@ -71,7 +71,7 @@ internal partial class Program
         if (win32Segments.Length == 0)
             return Error("find requires window title: find \"window/child\" or find \"window#scope\"");
 
-        var windows = WindowFinder.FindByTitle(win32Segments[0]);
+        var windows = WindowFinder.FindWindows(win32Segments[0]);
         if (windows.Count == 0) return Error($"Window not found: \"{win32Segments[0]}\"");
         var mainWin = windows[0];
         Console.WriteLine($"Window: [{mainWin.Handle:X8}] \"{mainWin.Title}\"");
@@ -193,7 +193,7 @@ internal partial class Program
         var (win32Segments, uiaScopePath) = GrapHelper.SplitGrap(rawTitle);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var windows = WindowFinder.FindByTitle(win32Segments[0]);
+        var windows = WindowFinder.FindWindows(win32Segments[0]);
         if (windows.Count == 0)
         {
             Console.WriteLine($"No window found matching: \"{win32Segments[0]}\"");
