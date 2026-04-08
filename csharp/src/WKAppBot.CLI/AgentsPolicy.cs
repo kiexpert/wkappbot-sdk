@@ -145,6 +145,12 @@ DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
 ⚠ --eval-js needs #tab-hint — bare "*Chrome*" = active tab only (eval is deprecated)
 ⚠ close "*Chrome*" without #hint → shows tab list (safety guard)
 ⚠ wkappbot_cli = MCP tool name only — not a CLI command
+
+━━ Eye Alive Status Message ━━
+Eye posts ":large_green_circle: Eye alive (PID=..., uptime=...)" to Slack on start and updates it in-place.
+This message is a single Slack post that Eye continuously EDITS — it is NOT a new message each time.
+⚠ Do NOT reply to the Eye alive message for conversation — Eye edits will overwrite the thread starter.
+  Use a separate new Slack message when you need a stable conversation thread.
 """;
 
     public const string EmbeddedReminderPrompt = """
@@ -233,6 +239,8 @@ agent-policy.txt
 
     static void Broadcast(string type, string message)
     {
+        if (Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") == "1")
+            return;
         Console.WriteLine($"[POLICY_BEGIN:{type}]");
         Console.WriteLine(message);
         Console.WriteLine($"[POLICY_END:{type}]");
