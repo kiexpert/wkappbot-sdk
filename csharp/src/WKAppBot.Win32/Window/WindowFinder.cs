@@ -252,8 +252,11 @@ public static class WindowFinder
                     if (results.Any(r => r.Handle == hostHwnd)) continue;
 
                     var hostInfo = WindowInfo.FromHwnd(hostHwnd);
-                    hostInfo.MatchedVia = "cmd";
-                    hostInfo.MatchedSnippet = matchToken;
+                    // "child-cmd": host window found via child process cmdline match.
+                    // NOT injected as cmd: field in grap (host proc != matched proc).
+                    // MatchedSnippet = "childProc:token" → annotation "← wkappbot: chatgpt.com"
+                    hostInfo.MatchedVia = "child-cmd";
+                    hostInfo.MatchedSnippet = $"{proc.ProcessName}:{matchToken}";
                     hostInfo.Coverage = 0.5;
                     results.Add(hostInfo);
                 }

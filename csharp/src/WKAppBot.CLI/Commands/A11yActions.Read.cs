@@ -204,7 +204,8 @@ internal partial class Program
         var matchNote = originalHit?.MatchedVia switch
         {
             null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
-            "uia" => $"  ← uia: {originalHit.MatchedSnippet}",
+            "uia"       => $"  ← uia: {originalHit.MatchedSnippet}",
+            "child-cmd" => "",  // proc/cmd already in grap — no extra annotation needed
             _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
         } ?? "";
 

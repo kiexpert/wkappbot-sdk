@@ -34,14 +34,14 @@ internal partial class Program
                     // Use root ancestor for grap — child focus hwnd is useless for targeting
                     var focRootHwnd = NativeMethods.GetAncestor(gti.hwndFocus, NativeMethods.GA_ROOT);
                     if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti.hwndFocus;
-                    var focusGrap = BuildCompactWinGrap(focRootHwnd);
+                    var focusGrap = BuildCompactWinGrap(focRootHwnd); // portable pattern for verify
                     var fsw = System.Diagnostics.Stopwatch.StartNew();
                     var hits = WindowFinder.FindWindows(focusGrap, true);
                     fsw.Stop();
                     var focusOk = hits.Any(h => h.Handle == focRootHwnd);
                     Console.Error.WriteLine($"[FOCUS] {focusGrap} [{(focusOk ? "OK" : "MISS")}] {fsw.ElapsedMilliseconds}ms");
-                    var focInner = focusGrap.TrimStart('{').TrimEnd('}').Trim();
-                    var focPaste = QuoteGrapExpression($"{{hwnd:0x{focRootHwnd.ToInt64():X},{focInner}}}");
+                    // Full grap with UIA abs tag path (consistent with TARGET format)
+                    var focPaste = QuoteGrapExpression(BuildTargetGrapWithFocusPath(focRootHwnd));
                     PrintFocusBlock(focPaste, focusOk ? "OK" : "MISS", fsw.ElapsedMilliseconds);
                 }
             }
