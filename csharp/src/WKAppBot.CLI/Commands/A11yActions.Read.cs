@@ -113,12 +113,27 @@ internal partial class Program
         }
 
         // Verify the grap resolves to the correct hwnd → [OK] or [?]
+        // If ambiguous (multiple matches), append pid to disambiguate
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         try
         {
             var verifyHits = WindowFinder.FindByTitle(compactGrap, true);
-            verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
+            if (verifyHits.Any(v => v.Handle == hwnd))
+            {
+                if (verifyHits.Count > 1)
+                {
+                    verifyMark = "OK";
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint pidDisamb);
+                    // Inject pid: bare domain→{domain:'x',pid:N}; JSON5→add ,pid:N before }
+                    if (!fullGrap.StartsWith('{'))
+                        fullGrap = $"{{domain:'{fullGrap}',pid:{pidDisamb}}}";
+                    else
+                        fullGrap = fullGrap.TrimEnd('}') + $",pid:{pidDisamb}}}";
+                }
+                else verifyMark = "OK";
+            }
+            else verifyMark = "MISS";
         }
         catch { }
         sw.Stop();
