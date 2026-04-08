@@ -79,7 +79,9 @@ internal partial class Program
             var gti2 = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             NativeMethods.GetGUIThreadInfo(0, ref gti2);
-            var focWin = gti2.hwndFocus != IntPtr.Zero ? BuildCompactWinGrap(gti2.hwndFocus) : "?";
+            var focWin = gti2.hwndFocus != IntPtr.Zero
+                ? InjectHwnd(BuildCompactWinGrap(gti2.hwndFocus), gti2.hwndFocus)
+                : "?";
             // Abs path from parent chain: reversed, 3-char type prefix, skip Window nodes
             static string Abb(string t) => t.Length > 3 ? t[..3] : t;
             var chain = focInfo.ParentChain
@@ -139,19 +141,13 @@ internal partial class Program
         catch { }
         sw.Stop();
 
-        // Always resolve hwnd + proc for meta suffix
+        // Inject hwnd into grap via shared helper; resolve proc for meta
+        fullGrap = InjectHwnd(fullGrap, hwnd);
         NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
         string procName = "";
-        try
-        {
-            using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid);
-            procName = proc.ProcessName;
-        }
-        catch { }
-        var metaParts = new System.Text.StringBuilder();
-        metaParts.Append($"  hwnd=0x{hwnd.ToInt64():X8} proc={procName}");
-        if (verifyHits.Count > 1) metaParts.Append($" pid={resolvedPid}");
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaParts}"));
+        try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
+        var metaSuffix = $"  proc={procName}";
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaSuffix}"));
 
         // Window title → stderr
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
