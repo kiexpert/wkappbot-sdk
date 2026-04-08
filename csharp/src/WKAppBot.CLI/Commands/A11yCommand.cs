@@ -569,13 +569,17 @@ internal partial class Program
         if (action == "find")
         {
             using var findAutomation = new UIA3Automation();
-            foreach (var win in targets)
+            if (targets.Count > 1)
+                Console.WriteLine(Ansi.Dim($"## TARGETS  {targets.Count} matches"));
+            var findExtraArgs = args.Skip(2).Where(a => !a.StartsWith("--deep") && a != "--depth").ToArray();
+            for (int idx = 0; idx < targets.Count; idx++)
             {
+                var win = targets[idx];
                 try
                 {
                     var findRoot = findAutomation.FromHandle(win.Handle);
                     if (findRoot != null)
-                        A11yFind(findRoot, win.Handle, findDepth);
+                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs);
                 }
                 catch (Exception ex)
                 {
