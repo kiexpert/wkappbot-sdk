@@ -2,8 +2,11 @@
 
 ## 클롣 운영 규칙 (필독!)
 
+> ⚠️ **CLAUDE.md / AgentsPolicy / skill files / any AI-facing file MUST be written in English.**
+> Korean uses 2-3x more tokens. Violating this wastes budget on every session load.
+
 ### 언어/소통
-- **유저: 항상 한국어** / 내부 문서·AI 파일: 영어 (토큰 절약)
+- **유저: 항상 한국어** / 내부 문서·AI 파일: **영어 필수** (한글 = 토큰 2-3배 낭비)
 - **질문 시**: `wkappbot slack send "질문"` + 프롬프트 동시 발송 (슬랙 단독 발송 금지)
 - **슬랙 수신**: 반드시 슬랙 쓰레드로 답장 (`--msg TS` 있으면 reply, 없으면 send)
 
