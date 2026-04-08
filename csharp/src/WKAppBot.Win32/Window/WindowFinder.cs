@@ -1381,8 +1381,13 @@ public static class WindowFinder
         }
 
         // ── Enumerate all visible windows ──
+        // Build pid→hwnd map in the same pass (used by secondary windowless-proc scan below).
+        var pidToHwnd = new Dictionary<uint, IntPtr>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint p);
+            if (!pidToHwnd.ContainsKey(p)) pidToHwnd[p] = hWnd;
+
             if (!NativeMethods.IsWindowVisible(hWnd)) return true;
             if (MatchesMultiField(hWnd, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
                     domainMatchers, urlMatchers, procNameCache, cmdMatchers))
@@ -1393,11 +1398,72 @@ public static class WindowFinder
             return true;
         }, IntPtr.Zero);
 
+        // ── Secondary scan: windowless processes matching proc:/cmd: ──
+        // Handles processes with no own top-level window (e.g. terminal-hosted CLI tools).
+        // For each matching process, walk parent PID chain to find effective host window.
+        if (procMatchers != null || cmdMatchers != null)
+        {
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    var pid = (uint)proc.Id;
+                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window — already handled above
+
+                    var procName = proc.ProcessName;
+                    if (procMatchers != null && !procMatchers.Any(m => m.IsMatch(procName))) continue;
+
+                    string cmdLine = "";
+                    string matchedToken = "";
+                    if (cmdMatchers != null)
+                    {
+                        cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                        if (!cmdMatchers.Any(m => m.IsMatch(cmdLine))) continue;
+                        var tokens = cmdLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        matchedToken = tokens.FirstOrDefault(t => cmdMatchers.Any(m => m.IsMatch(t)))
+                                       ?? (cmdLine.Length > 60 ? cmdLine[..60] : cmdLine);
+                        matchedToken = matchedToken.Trim('"', '\'');
+                        if (matchedToken.Length > 60) matchedToken = matchedToken[..60];
+                    }
+
+                    // Walk parent PID chain to find effective host window
+                    var effectiveHwnd = ResolveEffectiveHwnd(pid, pidToHwnd);
+                    if (effectiveHwnd == IntPtr.Zero) continue;
+                    if (results.Any(r => r.Handle == effectiveHwnd)) continue;
+
+                    var info = WindowInfo.FromHwnd(effectiveHwnd);
+                    info.MatchedVia = "child-cmd";
+                    info.MatchedSnippet = $"{procName}:{matchedToken}";
+                    info.Coverage = 0.5;
+                    results.Add(info);
+                }
+                catch { }
+                finally { try { proc.Dispose(); } catch { } }
+            }
+        }
+
         // Sort: focus priority
         if (results.Count > 1)
             results.Sort((a, b) => focus.GetPriority(b.Handle).CompareTo(focus.GetPriority(a.Handle)));
 
         return results;
+    }
+
+    /// <summary>
+    /// Walk parent PID chain to find the nearest ancestor that owns a top-level window.
+    /// Returns IntPtr.Zero if no windowed ancestor found within 8 hops.
+    /// </summary>
+    static IntPtr ResolveEffectiveHwnd(uint pid, Dictionary<uint, IntPtr> pidToHwnd)
+    {
+        int cur = (int)pid;
+        for (int depth = 0; depth < 8; depth++)
+        {
+            int parent = NativeMethods.GetParentProcessId(cur);
+            if (parent <= 0 || parent == cur) break;
+            if (pidToHwnd.TryGetValue((uint)parent, out var ph)) return ph;
+            cur = parent;
+        }
+        return IntPtr.Zero;
     }
 
     // Parse hwnd or pid value: auto-detects decimal vs hex.
