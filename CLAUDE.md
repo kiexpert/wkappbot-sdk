@@ -3,13 +3,13 @@
 ## 클롣 운영 규칙 (필독!)
 
 > ⚠️ **LANGUAGE RULE — Korean is ONLY for final responses to the user.**
-> Everything else MUST be in English: CLAUDE.md, AgentsPolicy, skills, memory files,
-> commit messages, comments, docs, prompts, internal notes — ALL English.
-> Korean uses 2-3x more tokens. One Korean doc = wasted budget on every session load.
+> EVERYTHING else MUST be in English: source code, comments, CLAUDE.md, AgentsPolicy,
+> skills, memory files, commit messages, docs, prompts, internal notes — ALL English.
+> Korean uses 2-3x more tokens. One Korean file = wasted budget on every session load.
 
 ### 언어/소통
 - **최종 답변만 한국어** (유저에게 보고할 때만) — 나머지 전부 영어
-- CLAUDE.md / skills / memory / commits / comments / docs → **English only, no exceptions**
+- Source code / comments / CLAUDE.md / skills / memory / commits / docs → **English only, no exceptions**
 - **질문 시**: `wkappbot slack send "질문"` + 프롬프트 동시 발송 (슬랙 단독 발송 금지)
 - **슬랙 수신**: 반드시 슬랙 쓰레드로 답장 (`--msg TS` 있으면 reply, 없으면 send)
 
