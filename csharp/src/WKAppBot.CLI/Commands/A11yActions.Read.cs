@@ -92,12 +92,13 @@ internal partial class Program
         {
             bool alreadyCovered = hit.MatchedVia switch
             {
-                "domain" => hasDomainOrFile,
-                "url"    => hasDomainOrFile,
-                "file"   => hasDomainOrFile,
-                "proc"   => true, // already in proc field
-                "cls"    => clsMatch.Success,
-                _        => false
+                "domain"  => hasDomainOrFile,
+                "url"     => hasDomainOrFile,
+                "file"    => hasDomainOrFile,
+                "proc"    => true, // already in proc field
+                "cls"     => clsMatch.Success,
+                "context" => true, // internal heuristic (foreground host) — not a real grap field
+                _         => false
             };
             if (!alreadyCovered)
             {
@@ -111,7 +112,8 @@ internal partial class Program
         return f.ToString();
     }
 
-    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true, string[]? extraArgs = null)
+    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true, string[]? extraArgs = null,
+        WKAppBot.Win32.Window.WindowInfo? originalHit = null)
     {
         FocusedElementInfo? focInfo = null;
         try
@@ -181,7 +183,10 @@ internal partial class Program
         var title = NativeMethods.GetWindowTextW(hwnd);
         if (title.Length > 90) title = title[..87] + "...";
 
-        var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, primaryHit);
+        // Prefer originalHit for matched-field injection: verify re-searches by compact grap,
+        // losing the original matched field (e.g. cmdLine:'chatgpt.com' for a VS Code window).
+        var hitForGrap = originalHit ?? primaryHit;
+        var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, hitForGrap);
         var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
         var titleHeading = !string.IsNullOrWhiteSpace(title) ? title : "TARGET";
@@ -192,8 +197,19 @@ internal partial class Program
         if (extraArgs != null && extraArgs.Length > 0)
             cmdLine += " " + string.Join(" ", extraArgs);
         Console.WriteLine(Ansi.TargetLine(cmdLine));
-        // Verify mark on its own line (after command, for readability)
-        Console.WriteLine(Ansi.TargetLine($"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms"));
+        // Verify mark + match reason annotation
+        var matchNote = "";
+        if (originalHit != null && !string.IsNullOrEmpty(originalHit.MatchedVia))
+        {
+            matchNote = originalHit.MatchedVia switch
+            {
+                "context" => $"  ← {originalHit.MatchedSnippet}",  // e.g. "foreground host"
+                "uia"     => $"  ← uia: {originalHit.MatchedSnippet}",
+                "proc" or "domain" or "url" or "file" or "cls" or "title" => "", // shown in grap already
+                _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
+            };
+        }
+        Console.WriteLine(Ansi.TargetLine($"{Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{Ansi.Dim(matchNote)}"));
 
         return true;
     }

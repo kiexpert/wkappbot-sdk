@@ -1182,6 +1182,26 @@ public static partial class NativeMethods
     /// Read the command line of any process via NtQueryInformationProcess → PEB.
     /// Returns null on failure.
     /// </summary>
+    /// <summary>
+    /// Returns the parent process ID for the given PID using NtQueryInformationProcess.
+    /// Returns 0 on failure.
+    /// </summary>
+    public static int GetParentProcessId(int pid)
+    {
+        IntPtr hProcess = IntPtr.Zero;
+        try
+        {
+            hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, false, (uint)pid);
+            if (hProcess == IntPtr.Zero) return 0;
+            var pbi = new ProcessBasicInformation();
+            if (NtQueryInformationProcess(hProcess, 0, ref pbi, Marshal.SizeOf<ProcessBasicInformation>(), out _) != 0)
+                return 0;
+            return (int)pbi.Reserved3.ToInt64(); // Reserved3 = InheritedFromUniqueProcessId
+        }
+        catch { return 0; }
+        finally { if (hProcess != IntPtr.Zero) CloseHandle(hProcess); }
+    }
+
     public static string? GetProcessCommandLine(int pid)
     {
         IntPtr hProcess = IntPtr.Zero;

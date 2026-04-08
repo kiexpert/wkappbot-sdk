@@ -571,6 +571,8 @@ internal partial class Program
 
         if (action == "find")
         {
+            // Exclude foreground-host heuristic entries — they matched no real field
+            targets = targets.Where(t => t.MatchedVia != "context").ToList();
             using var findAutomation = new UIA3Automation();
             if (targets.Count > 1)
                 Console.WriteLine(Ansi.Dim($"## TARGETS  {targets.Count} matches"));
@@ -582,7 +584,7 @@ internal partial class Program
                 {
                     var findRoot = findAutomation.FromHandle(win.Handle);
                     if (findRoot != null)
-                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs);
+                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs, originalHit: win);
                 }
                 catch (Exception ex)
                 {
