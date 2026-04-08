@@ -90,6 +90,14 @@ Patch = commits since the bump commit, auto-found by searching git history.
 - Source comments: English only (Korean corrupts MFC/Win32 CP949 builds).
 - Korean string literals: verify UTF-8 BOM preserved after editing.
 
+━━ Accumulated Knowhow (Skills) ━━
+Project and global knowhow is stored as skills. ALWAYS check before attempting unfamiliar tasks.
+  wkappbot skill list                  — browse all skills by category
+  wkappbot skill show <id>             — full detail: steps, rationale, examples
+  wkappbot skill search <keyword>      — find relevant skills by topic
+Skills cover: grap targeting, UI automation patterns, HTS quirks, CDP edge cases, and more.
+If a task feels hard or you hit a wall → search skills first, ask triad second.
+
 ━━ Tool Reference ━━
 PRIMARY: wkappbot a11y <action> <grap>[#scope] [options]
   24 actions — discovery, window control, element interaction, clipboard, file I/O.
