@@ -79,9 +79,13 @@ internal partial class Program
             var gti2 = new NativeMethods.GUITHREADINFO
                 { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
             NativeMethods.GetGUIThreadInfo(0, ref gti2);
-            var focWin = gti2.hwndFocus != IntPtr.Zero
-                ? InjectHwnd(BuildCompactWinGrap(gti2.hwndFocus), gti2.hwndFocus)
-                : "?";
+            // Use root ancestor for grap — child focus hwnd (GUIThreadInfo) is not pasteable as a target
+            var focRootHwnd = gti2.hwndFocus != IntPtr.Zero
+                ? NativeMethods.GetAncestor(gti2.hwndFocus, NativeMethods.GA_ROOT)
+                : IntPtr.Zero;
+            if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti2.hwndFocus;
+            var focCompact = focRootHwnd != IntPtr.Zero ? BuildCompactWinGrap(focRootHwnd) : "?";
+            var focWinHwnd = focRootHwnd != IntPtr.Zero ? $"hwnd:0x{focRootHwnd.ToInt64():X8}" : "?";
             // Abs path from parent chain: reversed, 3-char type prefix, skip Window nodes
             static string Abb(string t) => t.Length > 3 ? t[..3] : t;
             var chain = focInfo.ParentChain
@@ -111,43 +115,29 @@ internal partial class Program
                 }
                 focPath = $"#{sb2}";
             }
-            Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWin}{focPath}\""));
+            Console.WriteLine(Ansi.Dim($"# FOCUS \"{focWinHwnd}{focPath}\"  {focCompact}"));
         }
 
-        // Verify the grap resolves to the correct hwnd → [OK] or [?]
-        // If ambiguous (multiple matches), append pid to disambiguate
+        // Verify the compact grap resolves to this hwnd → [OK] or [MISS]
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
         try
         {
             verifyHits = WindowFinder.FindWindows(compactGrap, false); // all matches
-            if (verifyHits.Any(v => v.Handle == hwnd))
-            {
-                if (verifyHits.Count > 1)
-                {
-                    verifyMark = "OK";
-                    NativeMethods.GetWindowThreadProcessId(hwnd, out uint pidDisamb);
-                    // Inject pid: JSON5→add ,pid:N before }; else wrap
-                    if (fullGrap.StartsWith('{'))
-                        fullGrap = fullGrap.TrimEnd('}') + $",pid:{pidDisamb}}}";
-                    else
-                        fullGrap = $"{{domain:'{fullGrap}',pid:{pidDisamb}}}";
-                }
-                else verifyMark = "OK";
-            }
-            else verifyMark = "MISS";
+            verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
         }
         catch { }
         sw.Stop();
 
-        // Inject hwnd into grap via shared helper; resolve proc for meta
-        fullGrap = InjectHwnd(fullGrap, hwnd);
+        // bash-safe primary grap: hwnd:0xXXXXXXXX[#scope]  context={...}
         NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
         string procName = "";
         try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
-        var metaSuffix = $"  proc={procName}";
-        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{fullGrap}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms{metaSuffix}"));
+        var hwndPrimary = $"hwnd:0x{hwnd.ToInt64():X8}";
+        var scopeStr = string.IsNullOrEmpty(validAbsPath) ? "" : $"#{validAbsPath}";
+        var contextStr = compactGrap.Length > 2 ? $"  {compactGrap}" : "";
+        Console.WriteLine(Ansi.TargetLine($"# TARGET \"{hwndPrimary}{scopeStr}\" {Ansi.Mark(verifyMark)} {sw.ElapsedMilliseconds}ms  proc={procName}{contextStr}"));
 
         // Window title → stderr
         var winTitle = NativeMethods.GetWindowTextW(hwnd);
