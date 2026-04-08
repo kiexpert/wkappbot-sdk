@@ -60,6 +60,21 @@ internal partial class Program
     static string BuildFindGrap(IntPtr hwnd, uint pid, string procName,
         string compactGrap, WKAppBot.Win32.Window.WindowInfo? hit)
     {
+        // child-cmd: host window found via child process cmdline match.
+        // proc must be the child process (it owns the cmdline), not the host shell.
+        // MatchedSnippet = "childProcName:matchedToken"
+        if (hit != null && hit.MatchedVia == "child-cmd" && !string.IsNullOrEmpty(hit.MatchedSnippet))
+        {
+            var sep = hit.MatchedSnippet.IndexOf(':');
+            if (sep > 0)
+            {
+                var childProc = hit.MatchedSnippet[..sep].Replace("'", "\\'");
+                var token     = hit.MatchedSnippet[(sep + 1)..].Replace("'", "\\'");
+                if (token.Length > 60) token = token[..60];
+                return $"{{hwnd:0x{hwnd.ToInt64():X},proc:'{childProc}',cmd:'{token}'}}";
+            }
+        }
+
         var f = new System.Text.StringBuilder("{");
         f.Append($"hwnd:0x{hwnd.ToInt64():X}");
         f.Append($",pid:{pid}");
