@@ -945,7 +945,8 @@ internal partial class Program
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
             if (frameCount < 3) EyeDiag($"frame-{frameCount}-before-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
             if (frameCount < 3) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
-            if (!TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
+            // Skip tick when hot-swap is imminent — reduces detection latency from ~3s to ~100ms
+            if (!_fswExeDirty && !TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
                 if (frameCount < 3) EyeDiag($"frame-{frameCount}-tick-timeout");
                 Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-timeout");
@@ -960,7 +961,7 @@ internal partial class Program
                     break;
                 }
             }
-            else if (frameCount < 3)
+            else if (!_fswExeDirty && frameCount < 3)
             {
                 EyeDiag($"frame-{frameCount}-tick-ok");
                 Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-ok");
@@ -1387,7 +1388,7 @@ internal partial class Program
                     {
                         try
                         {
-                            using var hc = new HttpClient();
+                            using var hc = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
                             hc.DefaultRequestHeaders.Authorization =
                                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
                             var resp = hc.GetStringAsync("https://slack.com/api/auth.test").GetAwaiter().GetResult();
