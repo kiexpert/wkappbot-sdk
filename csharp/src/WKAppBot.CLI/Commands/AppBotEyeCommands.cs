@@ -785,13 +785,52 @@ internal partial class Program
 
         // --elevated arg: lightweight proxy mode — skip full Eye (WPF/MCP/Slack/watchdog).
         // Just start the admin pipe server immediately and wait. Pipe available in <50ms.
+        // FSW watches for binary update: when new exe arrives and IsBusy=false, exit so caller re-spawns new version.
         if (isElevatedArg)
         {
             Console.WriteLine("[EYE:ADMIN] Elevated proxy mode — pipe server starting (no WPF/MCP/Slack)");
             PulseStep.Mark("elevated-proxy-only");
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
+
+            // FSW: watch for binary update — exit gracefully when idle so new version can be spawned
+            var exePath = Environment.ProcessPath ?? "";
+            var exeStartStamp = File.Exists(exePath) ? File.GetLastWriteTimeUtc(exePath) : DateTime.MinValue;
+            var exeDir = Path.GetDirectoryName(exePath) ?? ".";
+            System.Threading.Timer? fswDebounce = null;
+            var fswAdmin = new FileSystemWatcher(exeDir)
+            {
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime,
+                Filter = Path.GetFileName(exePath),
+                EnableRaisingEvents = true,
+            };
+            fswAdmin.Changed += (_, _) =>
+            {
+                fswDebounce?.Dispose();
+                fswDebounce = new System.Threading.Timer(_ =>
+                {
+                    if (!File.Exists(exePath)) return;
+                    var newStamp = File.GetLastWriteTimeUtc(exePath);
+                    if (newStamp <= exeStartStamp) return;
+                    Console.Error.WriteLine($"[EYE:ADMIN] Binary updated (stamp={newStamp:HH:mm:ss}) — will exit when idle");
+                    // Poll until not busy, then cancel
+                    Task.Run(async () =>
+                    {
+                        for (int i = 0; i < 120 && !proxyCts.IsCancellationRequested; i++)
+                        {
+                            if (!ElevatedEyeServer.IsBusy) { proxyCts.Cancel(); break; }
+                            await Task.Delay(500);
+                        }
+                        if (!proxyCts.IsCancellationRequested) proxyCts.Cancel(); // force after 60s
+                    });
+                }, null, 500, Timeout.Infinite);
+            };
+
             ElevatedEyeServer.ListenAsync(proxyCts.Token).GetAwaiter().GetResult();
+            fswAdmin.EnableRaisingEvents = false;
+            fswAdmin.Dispose();
+            fswDebounce?.Dispose();
+            Console.WriteLine("[EYE:ADMIN] Elevated proxy exiting — caller should re-spawn new version");
             return 0;
         }
 
