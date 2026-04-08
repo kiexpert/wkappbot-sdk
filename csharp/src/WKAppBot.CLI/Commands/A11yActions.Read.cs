@@ -52,6 +52,65 @@ internal partial class Program
     // -- Find: CURSOR -> TARGET -> VERDICT structured output --
     // stdout: clean result sections only
     // stderr: only hard errors, not the full analysis dump
+    /// <summary>
+    /// Build the paste-ready JSON5 grap for find output.
+    /// Required fields: hwnd, pid (after hwnd for collision safety), proc,
+    /// domain/file (web/browser), cls (legacy no-a11y), matched search field.
+    /// </summary>
+    static string BuildFindGrap(IntPtr hwnd, uint pid, string procName,
+        string compactGrap, WKAppBot.Win32.Window.WindowInfo? hit)
+    {
+        var f = new System.Text.StringBuilder("{");
+        f.Append($"hwnd:0x{hwnd.ToInt64():X}");
+        f.Append($",pid:{pid}");
+        f.Append($",proc:'{procName.Replace("'", "\\'")}'");
+
+        // domain or file for web/browser windows
+        var domainMatch = System.Text.RegularExpressions.Regex.Match(compactGrap, @"domain:'([^']*)'");
+        var fileMatch   = System.Text.RegularExpressions.Regex.Match(compactGrap, @"file:'([^']*)'");
+        var clsMatch    = System.Text.RegularExpressions.Regex.Match(compactGrap, @"cls:'([^']*)'");
+
+        bool hasDomainOrFile = false;
+        if (domainMatch.Success)
+        {
+            f.Append($",domain:'{domainMatch.Groups[1].Value}'");
+            hasDomainOrFile = true;
+        }
+        else if (fileMatch.Success)
+        {
+            f.Append($",file:'{fileMatch.Groups[1].Value}'");
+            hasDomainOrFile = true;
+        }
+        else if (clsMatch.Success)
+        {
+            // legacy app — no a11y tree, cls is essential for targeting
+            f.Append($",cls:'{clsMatch.Groups[1].Value.Replace("'", "\\'")}'");
+        }
+
+        // matched search field — always include if not already covered above
+        if (hit != null && !string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
+        {
+            bool alreadyCovered = hit.MatchedVia switch
+            {
+                "domain" => hasDomainOrFile,
+                "url"    => hasDomainOrFile,
+                "file"   => hasDomainOrFile,
+                "proc"   => true, // already in proc field
+                "cls"    => clsMatch.Success,
+                _        => false
+            };
+            if (!alreadyCovered)
+            {
+                var snip = hit.MatchedSnippet.Replace("'", "\\'");
+                if (snip.Length > 60) snip = snip[..60];
+                f.Append($",{hit.MatchedVia}:'{snip}'");
+            }
+        }
+
+        f.Append('}');
+        return f.ToString();
+    }
+
     static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true)
     {
         FocusedElementInfo? focInfo = null;
@@ -82,20 +141,20 @@ internal partial class Program
             var focGrap = focRootHwnd != IntPtr.Zero
                 ? BuildTargetGrapWithFocusPath(focRootHwnd)
                 : BuildTargetGrapWithFocusPath(hwnd);
-            var focHwnd = focRootHwnd != IntPtr.Zero ? $"hwnd:0x{focRootHwnd.ToInt64():X}" : "?";
+            uint focPid = 0;
             string focProc = "";
             if (focRootHwnd != IntPtr.Zero)
             {
-                NativeMethods.GetWindowThreadProcessId(focRootHwnd, out uint focPid);
+                NativeMethods.GetWindowThreadProcessId(focRootHwnd, out focPid);
                 try { using var fp = System.Diagnostics.Process.GetProcessById((int)focPid); focProc = fp.ProcessName; } catch { }
             }
             var focScope = focGrap.Contains('#') ? focGrap[focGrap.IndexOf('#')..] : "";
             var focTitle = focRootHwnd != IntPtr.Zero ? NativeMethods.GetWindowTextW(focRootHwnd) : "";
-
-            var focPaste = QuoteGrapExpression($"{focHwnd}{focScope}");
+            var focCompact = BuildCompactWinGrap(focRootHwnd);
+            var focGrapJson = BuildFindGrap(focRootHwnd, focPid, focProc, focCompact, null);
+            var focPaste = QuoteGrapExpression($"{focGrapJson}{focScope}");
             Console.WriteLine(Ansi.Dim("## FOCUS"));
             Console.WriteLine(Ansi.Dim(focPaste));
-            Console.WriteLine(Ansi.Dim($"proc={focProc}"));
             if (!string.IsNullOrWhiteSpace(focTitle))
                 Console.Error.WriteLine(focTitle);
             Console.WriteLine();
@@ -118,21 +177,17 @@ internal partial class Program
         try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
 
         var primaryHit = verifyHits.FirstOrDefault(v => v.Handle == hwnd);
-        var hwndHex = $"hwnd:0x{hwnd.ToInt64():X}";
         var scope = fullGrap.Contains('#') ? fullGrap[fullGrap.IndexOf('#')..] : "";
         var title = NativeMethods.GetWindowTextW(hwnd);
         if (title.Length > 90) title = title[..87] + "...";
 
-        var paste = QuoteGrapExpression($"{hwndHex}{scope}");
-        var matchedInfo = (!string.IsNullOrWhiteSpace(primaryHit?.MatchedVia) && !string.IsNullOrWhiteSpace(primaryHit?.MatchedSnippet))
-            ? $"  matched: {primaryHit.MatchedVia}={primaryHit.MatchedSnippet}"
-            : "";
+        var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, primaryHit);
+        var paste = QuoteGrapExpression($"{grapJson}{scope}");
 
         if (verifyHits.Count <= 1)
         {
             Console.WriteLine(Ansi.TargetLine($"## TARGET  [{Ansi.Mark(verifyMark)}] {sw.ElapsedMilliseconds}ms"));
             Console.WriteLine(Ansi.TargetLine(paste));
-            Console.WriteLine(Ansi.TargetLine($"proc={procName}{matchedInfo}"));
             if (!string.IsNullOrWhiteSpace(title))
                 Console.Error.WriteLine(title);
         }
@@ -145,20 +200,17 @@ internal partial class Program
                 NativeMethods.GetWindowThreadProcessId(hit.Handle, out uint hitPid);
                 string hitProc = "";
                 try { using var hp = System.Diagnostics.Process.GetProcessById((int)hitPid); hitProc = hp.ProcessName; } catch { }
+                var hitCompact = BuildCompactWinGrap(hit.Handle);
                 var hitFullGrap = BuildTargetGrapWithFocusPath(hit);
-                var hitHwnd = $"hwnd:0x{hit.Handle.ToInt64():X}";
                 var hitScope = hitFullGrap.Contains('#') ? hitFullGrap[hitFullGrap.IndexOf('#')..] : "";
-                var hitPaste = QuoteGrapExpression($"{hitHwnd}{hitScope}");
+                var hitGrapJson = BuildFindGrap(hit.Handle, hitPid, hitProc, hitCompact, hit);
+                var hitPaste = QuoteGrapExpression($"{hitGrapJson}{hitScope}");
                 var hitTitle = NativeMethods.GetWindowTextW(hit.Handle);
                 if (hitTitle.Length > 90) hitTitle = hitTitle[..87] + "...";
                 var marker = hit.Handle == hwnd ? " *" : "";
-                var hitMatchedInfo = (!string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
-                    ? $"  matched: {hit.MatchedVia}={hit.MatchedSnippet}"
-                    : "";
 
                 Console.WriteLine(Ansi.TargetLine($"### TARGET{marker}  [{Ansi.Mark("OK")}]"));
                 Console.WriteLine(Ansi.TargetLine(hitPaste));
-                Console.WriteLine(Ansi.TargetLine($"proc={hitProc}{hitMatchedInfo}"));
                 if (!string.IsNullOrWhiteSpace(hitTitle))
                     Console.Error.WriteLine(hitTitle);
             }
