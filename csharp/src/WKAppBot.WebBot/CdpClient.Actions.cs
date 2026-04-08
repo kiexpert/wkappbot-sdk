@@ -11,23 +11,26 @@ namespace WKAppBot.WebBot;
 
 public sealed partial class CdpClient
 {
-    /// <summary>Evaluate JavaScript and return the result as string. Retries with backoff on timeout/cancellation.</summary>
-    public async Task<string?> EvalAsync(string expression, bool awaitPromise = false)
+    /// <summary>Evaluate JavaScript and return the result as string. Retries with backoff on timeout/cancellation.
+    /// <param name="timeoutMs">Per-attempt timeout in ms. 0 = use SendAsync default (10s). Use higher values for heavy JS (e.g. ArmPromptPump).</param>
+    /// </summary>
+    public async Task<string?> EvalAsync(string expression, bool awaitPromise = false, int timeoutMs = 0)
     {
-        for (int attempt = 0; attempt < 3; attempt++)
+        // 2 retries with 500ms/1000ms backoff, then 1 final attempt (3 total)
+        for (int attempt = 0; attempt < 2; attempt++)
         {
-            try { return await EvalAsyncCore(expression, awaitPromise); }
-            catch (Exception ex) when (ex is TimeoutException or TaskCanceledException && attempt < 2)
+            try { return await EvalAsyncCore(expression, awaitPromise, timeoutMs); }
+            catch (Exception ex) when (ex is TimeoutException or TaskCanceledException)
             {
                 var delayMs = (attempt + 1) * 500; // 500ms, 1000ms
                 Console.Error.WriteLine($"[CDP:EVAL] {ex.GetType().Name} attempt {attempt} — retry in {delayMs}ms ({expression[..Math.Min(60, expression.Length)]})");
                 await Task.Delay(delayMs);
             }
         }
-        return await EvalAsyncCore(expression, awaitPromise); // final attempt, let exception propagate
+        return await EvalAsyncCore(expression, awaitPromise, timeoutMs); // final attempt, let exception propagate
     }
 
-    private async Task<string?> EvalAsyncCore(string expression, bool awaitPromise)
+    private async Task<string?> EvalAsyncCore(string expression, bool awaitPromise, int timeoutMs = 0)
     {
         var parameters = new JsonObject
         {
@@ -38,14 +41,15 @@ public sealed partial class CdpClient
             parameters["awaitPromise"] = true;
 
         JsonNode? result;
+        var sendTimeoutMs = timeoutMs > 0 ? timeoutMs : 10000; // default 10s
         if (_currentContextId.HasValue)
         {
             parameters["contextId"] = _currentContextId.Value;
-            result = await SendAsync("Runtime.evaluate", parameters);
+            result = await SendAsync("Runtime.evaluate", parameters, sendTimeoutMs);
         }
         else
         {
-            result = await SendAsync("Runtime.evaluate", parameters);
+            result = await SendAsync("Runtime.evaluate", parameters, sendTimeoutMs);
         }
 
         // Log JS exceptions — critical for debugging CDP automation bugs

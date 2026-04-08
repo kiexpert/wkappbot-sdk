@@ -205,8 +205,7 @@ public sealed partial class CdpClient
     {
         var esc = Esc(selector);
         var jsIdleMs = JsonSerializer.Serialize(idleMs);
-        var result = await EvalAsync(
-            "(()=>{" +
+        var armJs = "(()=>{" +
             "var sel='" + esc + "';" +
             "var idleMs=" + jsIdleMs + ";" +
             "var root=(window.__wkAskPump||(window.__wkAskPump={}));" +
@@ -265,7 +264,8 @@ public sealed partial class CdpClient
                 "}" +
             "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
-            "})()");
+            "})()";
+        var result = await EvalAsync(armJs, timeoutMs: 20000); // heavy JS: allow 20s — Chrome may be throttled during streaming
         return result == "ARMED";
     }
 
