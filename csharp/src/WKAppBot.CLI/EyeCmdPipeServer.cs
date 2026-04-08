@@ -166,15 +166,17 @@ internal static class EyeCmdPipeServer
             Program.RunningInEye = true;
             // ReadOnlyMode no longer set here — Eye routes all a11y through MCP subprocess
             var memBefore = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
+            int bgCode = 0;
             using (ThreadRoutingWriter.Route(tee))
             {
-                try { Program.Main(args); }
-                catch (Exception ex) { tee.WriteLine($"[DISPATCHBG] error: {ex.Message}"); }
+                try { bgCode = Program.Main(args); }
+                catch (Exception ex) { tee.WriteLine($"[DISPATCHBG] error: {ex.Message}"); bgCode = 1; }
             }
             var memAfter = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             var delta = memAfter - memBefore;
             if (Math.Abs(delta) >= 5) // log only significant changes (±5MB)
                 Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore}→{memAfter}MB ({(delta >= 0 ? "+" : "")}{delta})");
+            tee.ExitCode = bgCode;
             tee.Dispose();
         });
     }
@@ -358,11 +360,13 @@ internal static class EyeCmdPipeServer
                 CallerArgs.Value = args;
                 CurrentCommandGlobal = args;
                 Program.RunningInEye = true;
+                int bgCode2 = 0;
                 using (ThreadRoutingWriter.Route(bgTee))
                 {
-                    try { Program.Main(args); }
-                    catch (Exception ex) { bgTee.WriteLine($"[BG] error: {ex.Message}"); }
+                    try { bgCode2 = Program.Main(args); }
+                    catch (Exception ex) { bgTee.WriteLine($"[BG] error: {ex.Message}"); bgCode2 = 1; }
                 }
+                bgTee.ExitCode = bgCode2;
                 bgTee.Dispose();
             });
             return 0; // immediate return to launcher
