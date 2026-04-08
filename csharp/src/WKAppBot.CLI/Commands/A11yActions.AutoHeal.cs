@@ -366,7 +366,7 @@ internal partial class Program
 
             Window : class={cls}, title="{windowTitle}", hwnd=0x{hwnd.ToInt64():X8}
             State  : {stateInfo}
-            Element: name="{name}", type={type}, automationId="{aid}", {coords}{ocrLine}
+            Element: name="{(name.Length > 200 ? name[..200] + "…" : name)}", type={type}, automationId="{aid}", {coords}{ocrLine}
 
             Tried (all failed / unverified):
             {triedStr}
@@ -380,7 +380,8 @@ internal partial class Program
         Console.Error.WriteLine($"[AUTO-HEAL] {action} — all tiers failed → querying triad ({attachFiles.Count} attachments)...");
         Console.ResetColor();
 
-        SlackPostToThread($"🔧 *[AUTO-HEAL]* `{action}` 전 티어 실패 (`{name}` on `{windowTitle}`) → 삼두 해결방법 문의 중... ({attachFiles.Count}개 스샷 첨부)");
+        var nameShort = name.Length > 60 ? name[..60] + "…" : name;
+        SlackPostToThread($"🔧 *[AUTO-HEAL]* `{action}` 전 티어 실패 (`{nameShort}` on `{windowTitle}`) → 삼두 해결방법 문의 중... ({attachFiles.Count}개 스샷 첨부)");
 
         var capturedFiles = attachFiles.ToList(); // snapshot for closure
         var capturedLogForHeal = capturedLogPathForHeal;
