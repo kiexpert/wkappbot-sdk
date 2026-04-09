@@ -220,8 +220,8 @@ partial class Program
                 System.Threading.Tasks.Task.WhenAll(stdoutRelay, stderrRelay).Wait(500);
                 stdoutStream.Flush();
                 rawStdout.Flush();
-                _lDiagStep = "TerminateSelf";
-                TerminateSelf(0);
+                _lDiagStep = "AppBotQuitFlush";
+                AppBotQuitFlush(0); // relay already waited above
                 return 0; // unreachable
             }
 
@@ -263,7 +263,7 @@ partial class Program
                             try { System.IO.File.Delete(readyPath); } catch { }
                             try { System.IO.File.Delete(ackPath); } catch { }
                         }
-                        TerminateSelf(0);
+                        AppBotQuitFlush(0);
                         return 0; // unreachable
                     }
                     Prof("relay: .ready timeout → killing Core, no output");
@@ -319,9 +319,9 @@ partial class Program
                                    && buf[2] == sentinel[2] && buf[3] == sentinel[3])
                         {
                             Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
-                            try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
+                            try { CloseHandle(GetStdHandle(-11)); } catch { }
                             var ec = proc.WaitForExit(500) ? proc.ExitCode : 0;
-                            TerminateSelf((uint)ec);
+                            AppBotQuitFlush((uint)ec); // no stderrRelay — we ARE the relay task
                             return;
                         }
                         // Relay to terminal immediately (real-time)
@@ -373,7 +373,7 @@ partial class Program
                     Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
                     try { proc.Kill(entireProcessTree: true); } catch { }
                     try { _stdout.Flush(); } catch { }
-                    TerminateSelf((uint)timeoutExit);
+                    AppBotQuitFlush((uint)timeoutExit, stderrRelayTask, stderrWaitMs: 500);
                     return timeoutExit; // unreachable
                 }
 
@@ -404,17 +404,13 @@ partial class Program
             // Core's TeeTextWriter normally handles this, but crashes before TeeWriter setup are silent.
             // Wait for stderr relay to finish flushing — Core's pipe closes on exit, relay exits naturally.
             // This ensures piped-relay mode flushes error output identically to standalone Core exit.
-            stderrRelayTask.Wait(2000);
             // Launcher's entry uses raw last-20 stderr lines — always a useful safety net.
             if (coreExitCode != 0)
             {
                 try { AppendLauncherErrorRecord(coreExitCode, args, capturedLogPath, stderrLastLines, stderrLock); }
                 catch { /* best-effort */ }
             }
-            Console.Out.Flush();
-            Console.Error.Flush();
-            // TerminateSelf: Core's output already written (inherited handles); hard-kill Launcher immediately.
-            TerminateSelf((uint)coreExitCode);
+            AppBotQuitFlush((uint)coreExitCode, stderrRelayTask);
             return coreExitCode; // unreachable
         }
         catch (Exception ex)
@@ -422,6 +418,21 @@ partial class Program
             Console.Error.WriteLine($"[LAUNCHER] Failed to run core: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Flush all pending output then hard-exit the Launcher process.
+    /// - Waits for stderr relay task (if any) so piped mode flushes identically to standalone Core exit.
+    /// - Flushes stdout + stderr.
+    /// - Calls TerminateSelf (hard-kill, no further code runs after this).
+    /// Always use this instead of bare TerminateSelf to avoid truncated output.
+    /// </summary>
+    static void AppBotQuitFlush(uint exitCode, System.Threading.Tasks.Task? stderrRelay = null, int stderrWaitMs = 2000)
+    {
+        try { stderrRelay?.Wait(stderrWaitMs); } catch { }
+        try { Console.Out.Flush(); } catch { }
+        try { Console.Error.Flush(); } catch { }
+        TerminateSelf(exitCode);
     }
 
     /// <summary>
