@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -12,12 +12,14 @@ namespace WKAppBot.CLI;
 //   list/search merges both
 internal partial class Program
 {
+    static readonly string[] SkillAudiences = ["operator", "developer", "project", "user"];
+
     // Project skills dir: callerCwd/skills/ (version-controlled, editable)
     static string ProjectSkillsDir
     {
         get
         {
-            var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
             return Path.Combine(cwd, "skills");
         }
     }
@@ -48,18 +50,30 @@ internal partial class Program
         };
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
+    // ?? List ??????????????????????????????????????????????????????????????????
 
     static int SkillListCommand(string[] args)
     {
-        string? appFilter = args.Length > 0 && !args[0].StartsWith('-') ? args[0] : null;
+        string? appFilter = null;
+        string? audienceFilter = null;
+        foreach (var arg in args.Where(a => !a.StartsWith('-')))
+        {
+            if (audienceFilter == null && IsSkillAudience(arg))
+                audienceFilter = arg;
+            else if (appFilter == null)
+                appFilter = arg;
+        }
 
         var all = LoadAllSkills(appFilter);
+        if (!string.IsNullOrWhiteSpace(audienceFilter))
+            all = [.. all.Where(s => HasAudience(s, audienceFilter))];
         if (all.Count == 0)
         {
-            Console.WriteLine(appFilter != null
-                ? $"[SKILL] No skills for app: {appFilter}"
-                : "[SKILL] No skills yet. Use: wkappbot skill contribute --app X --title Y --desc Z");
+            Console.WriteLine(audienceFilter != null
+                ? $"[SKILL] No skills for audience: {audienceFilter}"
+                : appFilter != null
+                    ? $"[SKILL] No skills for app: {appFilter}"
+                    : "[SKILL] No skills yet. Use: wkappbot skill contribute --app X --title Y --desc Z");
             return 0;
         }
 
@@ -68,7 +82,11 @@ internal partial class Program
             .OrderByDescending(g => g.Max(s => s.LastActivity)); // app with most recent skill first
 
         int total = all.Count;
-        Console.Error.WriteLine($"[SKILL] {total} skill(s){(appFilter != null ? $" in '{appFilter}'" : "")} — most recent first:");
+        var filterBits = new List<string>();
+        if (appFilter != null) filterBits.Add($"app='{appFilter}'");
+        if (!string.IsNullOrWhiteSpace(audienceFilter)) filterBits.Add($"audience='{audienceFilter}'");
+        var filterSuffix = filterBits.Count > 0 ? $" ({string.Join(", ", filterBits)})" : "";
+        Console.Error.WriteLine($"[SKILL] {total} skill(s){filterSuffix} - most recent first:");
         foreach (var group in byApp)
         {
             Console.WriteLine($"  [{group.Key}]");
@@ -79,14 +97,14 @@ internal partial class Program
                 var titleSlug = Slugify(s.Title);
                 var idPart = titleSlug != s.Id ? $" ({s.Id})" : "";
                 var age = FormatAge(s.LastActivity);
-                Console.WriteLine($"    • {s.Title}{idPart}{ver}{src} [{age}] — {s.Desc}");
+                Console.WriteLine($"    - {s.Title}{idPart}{ver}{src} [{age}] [{AudienceProfile(s)}] - {s.Desc}");
             }
         }
 
         return 0;
     }
 
-    // ── Show ──────────────────────────────────────────────────────────────────
+    // ?? Show ??????????????????????????????????????????????????????????????????
 
     static int SkillShowCommand(string[] args)
     {
@@ -108,6 +126,7 @@ internal partial class Program
         Console.WriteLine($"  ID     : {skill.Id}");
         Console.WriteLine($"  App    : {skill.App}");
         Console.WriteLine($"  Desc   : {skill.Desc}");
+        Console.WriteLine($"  Audience: {AudienceProfile(skill)}");
         if (skill.Tags?.Count > 0)
             Console.WriteLine($"  Tags   : {string.Join(", ", skill.Tags)}");
         if (skill.Steps?.Count > 0)
@@ -133,25 +152,28 @@ internal partial class Program
         return 0;
     }
 
-    // ── Search ────────────────────────────────────────────────────────────────
+    // ?? Search ????????????????????????????????????????????????????????????????
 
     static int SkillSearchCommand(string[] args)
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot skill search <keyword> [--app X]");
+            Console.WriteLine("Usage: wkappbot skill search <keyword> [--app X] [--audience operator|developer|project|user]");
             return 1;
         }
 
         string? appFilter = null;
+        string? audienceFilter = null;
         var keywords = new List<string>();
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--app" && i + 1 < args.Length) appFilter = args[++i];
+            else if (args[i] == "--audience" && i + 1 < args.Length) audienceFilter = args[++i];
             else keywords.Add(args[i].ToLowerInvariant());
         }
 
         var hits = LoadAllSkills(appFilter)
+            .Where(s => string.IsNullOrWhiteSpace(audienceFilter) || HasAudience(s, audienceFilter))
             .Where(s => keywords.All(kw =>
                 s.Id.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
                 s.Title.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
@@ -168,12 +190,12 @@ internal partial class Program
 
         Console.Error.WriteLine($"[SKILL] {hits.Count} match(es):");
         foreach (var s in hits)
-            Console.WriteLine($"  [{s.App}] {s.Id} — {s.Title}");
+            Console.WriteLine($"  [{s.App}] {s.Id} [{AudienceProfile(s)}] - {s.Title}");
         Console.WriteLine($"\n  Use: wkappbot skill show <id>");
         return 0;
     }
 
-    // ── Contribute ────────────────────────────────────────────────────────────
+    // ?? Contribute ????????????????????????????????????????????????????????????
 
     static int SkillContributeCommand(string[] args)
     {
@@ -297,7 +319,7 @@ internal partial class Program
         return relPath;
     }
 
-    // ── Edit (partial update) ─────────────────────────────────────────────────
+    // ?? Edit (partial update) ?????????????????????????????????????????????????
 
     static int SkillEditCommand(string[] args)
     {
@@ -395,7 +417,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Delete ────────────────────────────────────────────────────────────────
+    // ?? Delete ????????????????????????????????????????????????????????????????
 
     static int SkillDeleteCommand(string[] args)
     {
@@ -425,7 +447,7 @@ internal partial class Program
         return 1;
     }
 
-    // ── Install ───────────────────────────────────────────────────────────────
+    // ?? Install ???????????????????????????????????????????????????????????????
 
     static int SkillInstallCommand(string[] args)
     {
@@ -485,7 +507,7 @@ internal partial class Program
         return cmp != 0 ? cmp : an.CompareTo(bn);
     }
 
-    // ── Export ────────────────────────────────────────────────────────────────
+    // ?? Export ????????????????????????????????????????????????????????????????
 
     static int SkillExportCommand(string[] args)
     {
@@ -522,7 +544,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Import ────────────────────────────────────────────────────────────────
+    // ?? Import ????????????????????????????????????????????????????????????????
 
     static int SkillImportCommand(string[] args)
     {
@@ -554,7 +576,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Verify ────────────────────────────────────────────────────────────────
+    // ?? Verify ????????????????????????????????????????????????????????????????
 
     static int SkillVerifyCommand(string[] args)
     {
@@ -573,7 +595,7 @@ internal partial class Program
         return (missing + stale > 0 || regResult > 0) ? 1 : 0;
     }
 
-    // ── Audit ─────────────────────────────────────────────────────────────────
+    // ?? Audit ?????????????????????????????????????????????????????????????????
 
     static int SkillAuditCommand(string[] args)
     {
@@ -734,19 +756,19 @@ internal partial class Program
         if (exit == 0)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine($"[SKILL] Regression PASS ✅");
+            Console.Error.WriteLine($"[SKILL] Regression PASS");
             Console.ResetColor();
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"[SKILL] Regression FAIL ❌ (exit={exit})");
+            Console.Error.WriteLine($"[SKILL] Regression FAIL (exit={exit})");
             Console.ResetColor();
         }
         return exit == 0 ? 0 : 1;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ?? Helpers ???????????????????????????????????????????????????????????????
 
     // Loads from project dir + hq dir, deduplicating by id (project wins)
     static List<SkillRecord> LoadAllSkills(string? appFilter = null)
@@ -840,7 +862,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine($"Skills for {label}: (wkappbot skill show <id>)");
             foreach (var (s, score) in scored)
-                Console.WriteLine($"  • {s.Title}  [{s.Id}]");
+                Console.WriteLine($"  - {s.Title}  [{s.Id}] [{AudienceProfile(s)}]");
         }
         catch { /* never break usage output */ }
     }
@@ -891,6 +913,45 @@ internal partial class Program
         return v + ".1";
     }
 
+    static bool IsSkillAudience(string value) =>
+        SkillAudiences.Any(a => a.Equals(value, StringComparison.OrdinalIgnoreCase));
+
+    static bool HasAudience(SkillRecord skill, string? audience) =>
+        !string.IsNullOrWhiteSpace(audience) &&
+        skill.Tags?.Any(t => t.Equals(audience, StringComparison.OrdinalIgnoreCase)) == true;
+
+    static string AudienceLabel(SkillRecord skill)
+    {
+        var labels = skill.Tags?
+            .Where(IsSkillAudience)
+            .Select(t => t.ToLowerInvariant())
+            .Distinct()
+            .ToList() ?? [];
+
+        return labels.Count switch
+        {
+            0 => "unclassified",
+            1 => labels[0],
+            _ => string.Join("/", labels)
+        };
+    }
+
+    static string AudienceProfile(SkillRecord skill)
+    {
+        var labels = skill.Tags?
+            .Where(IsSkillAudience)
+            .Select(t => t.ToLowerInvariant())
+            .Distinct()
+            .ToList() ?? [];
+
+        return labels.Count switch
+        {
+            0 => "unclassified",
+            1 => $"{labels[0]} (pure)",
+            _ => $"{string.Join("/", labels)} (mixed)"
+        };
+    }
+
     static int SkillUsage()
     {
         Console.WriteLine("Usage: wkappbot skill <command>");
@@ -898,9 +959,9 @@ internal partial class Program
         Console.WriteLine("Storage: {callerCwd}/skills/  (project, git-tracked)");
         Console.WriteLine("         {hq}/skills/          (installed, [HQ] tag in list)");
         Console.WriteLine();
-        Console.WriteLine("  list [app]                        List skills grouped by app");
+        Console.WriteLine("  list [app|audience]               List skills grouped by app or audience");
         Console.WriteLine("  show <id>                         Show skill details");
-        Console.WriteLine("  search <keyword> [--app X]        Search by keyword in title/desc/tags");
+        Console.WriteLine("  search <keyword> [--app X] [--audience X]  Search by keyword in title/desc/tags");
         Console.WriteLine("  contribute --app X --title Y --desc Z");
         Console.WriteLine("             [--steps \"s1|s2\"] [--tags \"t1,t2\"] [--id <slug>]");
         Console.WriteLine("                                    Create or update skill in project dir");
@@ -917,9 +978,15 @@ internal partial class Program
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  wkappbot skill list");
+        Console.WriteLine("  wkappbot skill list operator");
         Console.WriteLine("  wkappbot skill audit");
+        Console.WriteLine("  wkappbot skill list developer");
+        Console.WriteLine("  wkappbot skill list project");
+        Console.WriteLine("  wkappbot skill list user");
         Console.WriteLine("  wkappbot skill verify chatgpt-blank-false-positive-guard");
         Console.WriteLine("  wkappbot skill search retry");
+        Console.WriteLine("  wkappbot skill search retry --audience developer");
+        Console.WriteLine("  wkappbot skill search retry --audience operator");
         Console.WriteLine("  wkappbot skill show cdp-eval-taskcancel-retry");
         Console.WriteLine("  wkappbot skill contribute --app wkappbot-webbot \\");
         Console.WriteLine("    --title \"CDP EvalAsync Retry\" --desc \"retry on cancel/timeout\" \\");
@@ -932,7 +999,7 @@ internal partial class Program
     }
 }
 
-// ── SkillSource / SkillRecord ─────────────────────────────────────────────────
+// ?? SkillSource / SkillRecord ?????????????????????????????????????????????????
 
 internal enum SkillSource { Project, Hq }
 

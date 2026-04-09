@@ -72,16 +72,27 @@ Usage:
       Type text into a window (focusless PostMessage preferred).
   whisper [options]
       Real-time speech recognition + sound tokenization overlay.
+  whisper dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]
+      Dictate live microphone speech into the focused control as text.
   whisper study [--batch N] [--for <duration>] [--engine gemini|gpt]
       Batch-transcribe MP3 segments via AI. --for loops until timeout.
       Duration: 30=30s, 2m, 500ms, 1.1s, 2h
+  whisper pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>]
+      Stable orchestration: study -> auto-slice/index -> phoneme harvest.
+      Use with schedule add --every ... --cmd ""wkappbot whisper pipeline --once ..."" for periodic runs.
   whisper slice [--in <dir>] [--min-ms N] [--max-ms N]
       Slice long audio into word-level MP3 segments.
   whisper clean [--wav-dir <dir>] [--dry-run]
       Sort wav/ root: voice→_unknown, noise→Recycle Bin.
-  whisper index [--in <slices-dir>] [--out <db-dir>] [--move] [--dry-run]
-      Extract first-syllable soundCode → phoneme_db/<octal>/word.mp3.
+  whisper index [--in <slices-dir>] [--out <db-dir>] [--move] [--dry-run] [--split]
+      Extract first-syllable soundCode -> phoneme_db/<bucket>/word.mp3.
+      With --split, split each MP3 into phoneme chunks and save them under phoneme_db/<bucket>/.
       Files with <9 voiced frames (~90ms) → Recycle Bin automatically.
+  whisper phoneme-search [--db <dir>] [--query <file|text>] [--top N] [--no-harvest]
+      Rank phoneme_db results by path/code similarity and optionally harvest query chunks back into the DB.
+  whisper phoneme-loop [--in <slices-dir>] [--out <db-dir>] [--interval N] [--move] [--dry-run] [--once]
+      Repeated phoneme split loop for new MP3s. Default runs until Ctrl+C; --once exits after one scan.
+      Global --timeout <duration> also applies when passed after the whisper command.
   mcp
       Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).
       Add to .mcp.json: {{ ""wkappbot"": {{ ""command"": ""wkappbot"", ""args"": [""mcp""] }} }}

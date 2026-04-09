@@ -39,6 +39,8 @@ internal partial class Program
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
     internal static bool QuietFindOutput = Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") == "1";
+    internal static volatile bool GlobalTimeoutRequested = false;
+    internal static long GlobalTimeoutRequestedTicks = 0;
     private static readonly HashSet<string> _autoBugDedup = new();
 
     /// <summary>
@@ -552,10 +554,9 @@ internal partial class Program
         int exitCode = 1;
         bool _skipTick = true; // default skip; set to false once command is known
         System.Threading.Timer? timeoutTimer = null;
-        try
-        {
+        try {
             // Policy broadcast only on Eye spawn (not every CLI command)
-            // — prevents stdout pollution for ask/web/other commands
+            // This prevents stdout pollution for ask/web/other commands.
             
             if (args.Length == 0)
             {
@@ -567,39 +568,40 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
-            // [BUG-AUTO] hooks wired below — AutoBugReport() is a class-level static method
+            // [BUG-AUTO] hooks are wired below; AutoBugReport() is a class-level static method.
 
-            // [FL] Chrome focus theft → focusless warning overlay + auto bug report
+            // [FL] Chrome focus theft -> focusless warning overlay + auto bug report
             WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
             {
-                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
+                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome focus theft detected; restoring focusless warning overlay.", "chrome");
                 AutoBugReport($"Chrome focus theft: chrome=0x{chromeHwnd:X} prevFg=0x{prevFgHwnd:X}");
             };
 
-            // [FOCUSSTEALER] UIA action stole focus → stamp prop + auto-record knowhow + auto bug report
+            // [FOCUSSTEALER] UIA action stole focus -> stamp prop + auto-record knowhow + auto bug report
             ActionApi.OnFocusStealer ??= (rootHwnd, action) =>
             {
                 AppendFocusStealerKnowhow(rootHwnd, action);
-                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
+                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} stole focus; yielding and auto-recording knowhow.", null);
                 AutoBugReport($"UIA focus steal: action={action} hwnd=0x{rootHwnd:X}");
             };
 
-            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (Eye pipe — zero spawn)
+            // [CDP-FALLBACK] Auto-suggest when the CDP caller has no fallback (Eye pipe -> zero spawn)
             WKAppBot.WebBot.CdpClient.OnFallbackSuggest ??= (text) =>
             {
                 EyeCmdPipeServer.DispatchBg(["suggest", "[CDP-FALLBACK] " + text]);
             };
 
-            // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
+            // Global option: disable zoom overlay -> intentionally obnoxious name to discourage use
             if (restArgs.Any(a => a == "--i-dont-want-to-see-the-zoom-magnifier-overlay"))
             {
                 ActionApi.ZoomEnabled = false;
                 restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-zoom-magnifier-overlay").ToArray();
             }
 
-            // Global option: --timeout <duration> (hard kill after N time, exit code 124)
-            // Supports: 30=30s, 1.5s=1.5s, 2m=2min, 500ms=500ms, 1h=1h
-            // Use --for in subcommands (e.g. whisper study --for 20m) for clean loop shutdown.
+            // Global option: --timeout <duration>.
+            // Supported forms: 30=30s, 1.5s=1.5s, 2m=2min, 500ms=500ms, 1h=1h.
+            // The timeout only requests a graceful stop. Long-running commands should finish
+            // the current step and then exit cleanly.
             for (int ti = 0; ti < restArgs.Length; ti++)
             {
                 if (restArgs[ti] == "--timeout" && ti + 1 < restArgs.Length)
@@ -611,9 +613,9 @@ internal partial class Program
                         var timeoutMs = (long)dur.TotalMilliseconds;
                         timeoutTimer = new System.Threading.Timer(_ =>
                         {
-                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed — exiting (code 124)");
+                            GlobalTimeoutRequested = true;
+                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed; requesting graceful shutdown");
                             try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
-                            Environment.Exit(124);
                         }, null, timeoutMs, Timeout.Infinite);
                     }
                     break;
@@ -622,17 +624,16 @@ internal partial class Program
 
             prof($"command={command}");
 
-            // Global Eye tick (for eye --global multi-parent monitor)
-            // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
-            // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
-            // Skip tick for fast-exit aliases (grap/grep) and Eye pipe commands.
+            // Global Eye tick for multi-parent monitoring.
+            // Skip for grap/grep because EmitEyeTick can leave pending I/O and slow exit.
+            // Skip for fast-exit aliases and Eye pipe commands.
             bool isFileCommand = command == "file" || command.StartsWith("file-", StringComparison.Ordinal);
             _skipTick = _fastExitAfterCommand || RunningInEye || isFileCommand;
             if (!_skipTick && !QuietFindOutput)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
                 if (!GrepModeActive && !IsPipeMode) Console.Error.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
-                try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
+                try { EmitEyeTick(command, cmdTag, "step:1/3:prepare"); } catch { }
                 try
                 {
                     var promptPreview = BuildPromptPreview(command, restArgs);
@@ -642,46 +643,40 @@ internal partial class Program
                 catch { }
             }
 
-            // Auto-launch AppBotEye for ALL commands except help and eye commands.
-            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 전체 제외 — 무한 cascade 방지)
-            // eye tick은 내부에서 자체적으로 LaunchAppBotEyeIfNeeded 호출함 → Main에서 중복 호출 금지.
-            // Eye는 간접 런칭만! (wkappbot inspect 등 일반 명령 실행 시 자동 spawn)
-            // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
-            var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
-            // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
-            // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
+            // Auto-launch AppBotEye for all commands except help and eye commands.
+            // The eye command itself is excluded so the auto-launch path does not cascade.
+            // ThreadPool dispatch keeps the launch fire-and-forget and avoids blocking startup.
+            var isEyeCommand = command == "eye";
+            // _fastExitAfterCommand (grap/grep alias): skip Eye spawn so the spawned process
+            // does not inherit the stdout pipe write end and block the Launcher relay task.
             var isMcpCommand = command == "mcp";
-            // kill/close subcommands may target Eye itself — don't auto-launch Eye before they run.
+            // kill/close subcommands may target Eye itself, so do not auto-launch Eye first.
             var subCmd = restArgs.Length > 0 ? restArgs[0].ToLowerInvariant() : "";
             bool isKillOrClose = command == "a11y" && subCmd is "kill" or "close";
             bool isHackWorker = command == "a11y" && subCmd.StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
-            // Eye auto-launch: 긴급 명령만 제외, 나머지는 무조건 발동 (ThreadPool — 블록 없음).
-            // 제외: eye 데몬 자체, kill/close (Eye 대상 가능), mcp (stdio), grap/grep (FastExit), hack-* (독립 워커)
+            // Exclusions: eye, kill/close, mcp (stdio), grap/grep (fast exit), hack-* workers.
             var isExcluded = isEyeCommand || isMcpCommand || isKillOrClose || isHackWorker || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
-            // ── Global --help / --regression interceptor ──
-            // Any position, any combination of other args — these flags win immediately.
-            // Must set exitCode before return — finally block writes exitCode to exit file.
             if (TryPrintCommandHelp(command, restArgs)) { exitCode = 0; return 0; }
             if (TryRunRegression(command, restArgs)) { exitCode = 0; return 0; }
 
-            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
-            if (!QuietFindOutput && !GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
+            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:dispatch"); } catch { }
+            if (!QuietFindOutput && !GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine("[ACT] cmd=" + command + " args='" + string.Join(" ", restArgs) + "'"); } catch { }
             prof("dispatch");
 
-            // ErrorScope: stderr auto-captured with timestamps (default: hidden from console).
-            // --stderr: bypass ErrorScope, show stderr in real-time (debug/troubleshooting).
-            // Success → clean output. Error → timestamped error log via AppBotExit.
-            // Errors always logged to TeeWriter log file regardless.
-            // ErrorScope: suppress stderr only when directly connected to user console.
-            // Piped processes (MCP, Eye, pipe) → stderr pass-through (immediate output + flush).
-            // stderr redirected → real-time output (like --stderr)
+            // ErrorScope captures stderr with timestamps by default.
+            // --stderr bypasses ErrorScope and shows stderr in real time for debugging.
+            // Success: clean output. Error: timestamped error log via AppBotExit.
+            // Errors are always logged to the TeeWriter log file.
+            // ErrorScope is only suppressed when stderr is already redirected to the console.
+            // Piped processes (MCP, Eye, pipe) pass stderr through immediately.
+            // Redirected stderr stays real-time, similar to --stderr.
             bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode && !Console.IsErrorRedirected;
-            // eye/agent/tick: diagnostic-heavy commands that legitimately write to stderr — skip ErrorScope
+            // eye/agent/tick: diagnostic-heavy commands that legitimately write to stderr, so skip ErrorScope.
             bool isErrScopeExcluded = command is "eye" or "agent" or "tick";
             using var _errScope = (isConsoleDirect && !isErrScopeExcluded) ? ErrorScope.Begin() : null;
 
@@ -864,8 +859,8 @@ internal partial class Program
             try
             {
                 var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
-                if (exitCode == 0) EmitEyeTick(cmd, cmdTag, "done:작업 완료");
-                else EmitEyeTick(cmd, cmdTag, "step:3/3:오류 처리");
+                if (exitCode == 0) EmitEyeTick(cmd, cmdTag, "done:ok");
+                else EmitEyeTick(cmd, cmdTag, "step:3/3:error");
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
@@ -1127,7 +1122,7 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(raw))
             return string.Empty;
 
-        var first = raw.Split(new[] { '\r', '\n', '.', '!', '?', '。' }, StringSplitOptions.RemoveEmptyEntries)
+        var first = raw.Split(new[] { '\r', '\n', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault()?.Trim() ?? raw;
 
         if (first.Length > 80)
@@ -1493,10 +1488,10 @@ internal partial class Program
                     : "";
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [EXP] ⚠ 이전 기록 {summary.TotalEntries}건");
+                Console.Write($"  [EXP] total logs {summary.TotalEntries}");
                 if (!string.IsNullOrEmpty(breakdown))
                     Console.Write($" ({breakdown})");
-                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
+                Console.WriteLine($", screenshots {summary.ScreenshotCount}");
                 Console.ResetColor();
             }
 
@@ -1531,14 +1526,14 @@ internal partial class Program
                     : "";
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [EXP] cid={cid}: 이전 기록 {summary.TotalEntries}건");
+                Console.Write($"  [EXP] cid={cid}: total logs {summary.TotalEntries}");
                 if (!string.IsNullOrEmpty(breakdown))
                     Console.Write($" ({breakdown})");
-                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
+                Console.WriteLine($", screenshots {summary.ScreenshotCount}");
                 Console.ResetColor();
             }
 
-            // 액션별 노하우 우선 → 일반 노하우 폴백
+            // Try to resolve knowhow from form/action first, then fall back to form-level knowhow.
             bool found = false;
             if (!string.IsNullOrEmpty(actionName))
             {
@@ -1632,7 +1627,7 @@ internal partial class Program
 
             // 출력: [KNOWHOW] (N sections) [title] paragraph...
             Console.ForegroundColor = ConsoleColor.Magenta;
-            var countInfo = sectionCount > 1 ? $" ({sectionCount}§)" : "";
+            var countInfo = sectionCount > 1 ? $" ({sectionCount}癲?" : "";
             Console.Error.Write($"  [{tag}]{countInfo} ");
             Console.ResetColor();
 
@@ -2259,3 +2254,4 @@ internal partial class Program
         Environment.Exit(code);
     }
 }
+

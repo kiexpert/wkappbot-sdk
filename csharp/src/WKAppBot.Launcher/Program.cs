@@ -48,6 +48,10 @@ partial class Program
     // Prof: only outputs when WKAPPBOT_PROFILE=1 (was: also on stderr redirect, but that fires in every bash pipe)
     static readonly bool _stderrRedirected = Console.IsErrorRedirected;
     static void Prof(string label) { if (_prof) try { Console.Error.WriteLine($"[LAUNCHER] {_sw.ElapsedMilliseconds}ms {label}"); } catch { } }
+    static bool IsQuietFindCommand(string[] args)
+        => args.Length > 1
+           && args[0].Equals("a11y", StringComparison.OrdinalIgnoreCase)
+           && args[1].Equals("find", StringComparison.OrdinalIgnoreCase);
 
     [STAThread]
     static int Main(string[] args)
@@ -90,6 +94,9 @@ partial class Program
             if (isUtf8Term) _consoleCodePage = 65001;
         }
         prof($"encoding-recovery: sysCP={GetConsoleOutputCP()} needsTranscode={_needsTranscode}");
+        bool quietFind = IsQuietFindCommand(args);
+        if (quietFind)
+            Environment.SetEnvironmentVariable("WKAPPBOT_QUIET_FIND", "1");
 
         // ── Identity: who am I, who's my parent, what terminal am I in? ──
         try
@@ -140,6 +147,8 @@ partial class Program
             var fgTitle = "";
             try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
             // Build JSON with stealth \r after each field — cursor resets, no wrap
+            if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase)))
+            {
             var err = Console.Error;
             void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
             F($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
@@ -172,6 +181,7 @@ partial class Program
             err.Write("]}");
             err.Write("\r" + new string(' ', 80) + "\r"); // final erase
             err.Flush();
+            }
         }
         catch { }
 
@@ -204,6 +214,7 @@ partial class Program
                 args = new[] { prependCmd }.Concat(args).ToArray();
             prof($"busybox-prepend={prependCmd}");
         }
+
 
         // ── FAST EXITS ────────────────────────────────────────────────────────────────────────────
         // Encoding is set by app.manifest activeCodePage=UTF-8 (OS load, no runtime API call needed).
@@ -341,7 +352,7 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ — must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
-        if (!onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite
+        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
@@ -427,6 +438,7 @@ partial class Program
                 if (_relayFound)
                 {
                     LDbg("reading relay file");
+                    bool relayPipeBroken = false;
                     try
                     {
                         var _content = File.ReadAllText(_relayFile, Encoding.UTF8);
@@ -436,7 +448,17 @@ partial class Program
                         Console.Out.Flush();
                         LDbg("flush done");
                     }
+                    catch (IOException ex)
+                    {
+                        relayPipeBroken = true;
+                        LDbg($"relay read/write BROKEN PIPE: {ex.Message}");
+                    }
                     catch (Exception ex) { LDbg($"relay read/write FAILED: {ex.Message}"); }
+                    if (relayPipeBroken)
+                    {
+                        LDbg("relay pipe broken: grace sleep 3000ms");
+                        Thread.Sleep(3000);
+                    }
                     LDbg("writing .ack");
                     try { File.WriteAllText(_ackPath, "1"); LDbg(".ack written"); } catch (Exception ex) { LDbg($".ack FAILED: {ex.Message}"); }
                 }
