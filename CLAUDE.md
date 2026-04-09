@@ -47,6 +47,7 @@
 - **Parallelize independent tool calls** — glob + grep + read in parallel when not dependent
 - **Don't repeat what the user already explained** — use their words, move on
 - **ctx% check**: `wkappbot claude-usage` — handoff at 8MB, urgent at 10MB, use `/compact` when growing
+- **Use `qmd search` before reading files** — BM25+vector pre-index of all C# + skills + docs (MCP: qmd)
 
 ### Forbidden
 - Directly spawning Eye / options that block Claude delivery / options that skip Eye — all forbidden

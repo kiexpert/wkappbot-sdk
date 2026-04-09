@@ -4,6 +4,11 @@
       "type": "stdio",
       "command": "W:\\SDK\\bin\\wkappbot.exe",
       "args": ["mcp"]
+    },
+    "qmd": {
+      "type": "stdio",
+      "command": "C:\\Users\\edenc\\.bun\\bin\\bun.exe",
+      "args": ["C:\\Users\\edenc\\.bun\\install\\global\\node_modules\\@tobilu\\qmd\\dist\\cli\\qmd.js", "mcp"]
     }
   }
 }
