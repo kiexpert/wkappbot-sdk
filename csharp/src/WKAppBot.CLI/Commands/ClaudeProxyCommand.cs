@@ -167,9 +167,11 @@ internal partial class Program
             bool isSSE = contentType.Contains("text/event-stream");
             bool isError = (int)upstreamResp.StatusCode >= 400;
 
+            bool isStreaming = requestBody != null && requestBody.Contains("\"stream\":true");
+
             if (isSSE)
             {
-                // Stream SSE — check for context limit events inline
+                // Stream SSE — buffer to detect context limit before forwarding
                 resp.ContentType = "text/event-stream";
                 resp.Headers["Cache-Control"] = "no-cache";
 
@@ -180,17 +182,16 @@ internal partial class Program
                 string? line;
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
-                    // Detect context limit in SSE data
-                    if (line.StartsWith("data:") && line.Contains("\"context_window_exceeded\""))
+                    if (line.StartsWith("data:") && (line.Contains("\"context_window_exceeded\"") || line.Contains("\"context_length_exceeded\"")))
                     {
-                        var injected = InjectHandoffIntoSSEData(line);
-                        await writer.WriteLineAsync(injected);
-                        if (verbose) Console.Error.WriteLine("[PROXY] Context limit detected — handoff injected");
+                        if (verbose) Console.Error.WriteLine("[PROXY] Context limit in SSE — generating summary...");
+                        var apiKey = req.Headers["x-api-key"] ?? req.Headers["Authorization"]?.Replace("Bearer ", "");
+                        var model = ExtractModel(requestBody);
+                        var summary = await GenerateHandoffSummaryAsync(http, apiKey, model, requestBody, verbose);
+                        await WriteFakeSseResponseAsync(writer, summary);
+                        return; // don't forward the error
                     }
-                    else
-                    {
-                        await writer.WriteLineAsync(line);
-                    }
+                    await writer.WriteLineAsync(line);
                     await writer.FlushAsync();
                 }
             }
@@ -201,8 +202,29 @@ internal partial class Program
 
                 if (errorBody.Contains("context_window_exceeded") || errorBody.Contains("context_length_exceeded"))
                 {
-                    errorBody = InjectHandoffIntoErrorBody(errorBody);
-                    if (verbose) Console.Error.WriteLine("[PROXY] Context limit error — handoff injected");
+                    if (verbose) Console.Error.WriteLine("[PROXY] Context limit error — generating summary...");
+                    var apiKey = req.Headers["x-api-key"] ?? req.Headers["Authorization"]?.Replace("Bearer ", "");
+                    var model = ExtractModel(requestBody);
+                    var summary = await GenerateHandoffSummaryAsync(http, apiKey, model, requestBody, verbose);
+
+                    // Return as normal 200 response (SSE or JSON depending on request)
+                    resp.StatusCode = 200;
+                    if (isStreaming)
+                    {
+                        resp.ContentType = "text/event-stream";
+                        resp.Headers["Cache-Control"] = "no-cache";
+                        using var writer = new StreamWriter(resp.OutputStream, Encoding.UTF8, leaveOpen: true);
+                        await WriteFakeSseResponseAsync(writer, summary);
+                    }
+                    else
+                    {
+                        var fakeJson = BuildFakeJsonResponse(summary, model ?? "claude-proxy");
+                        var fakeBytes = Encoding.UTF8.GetBytes(fakeJson);
+                        resp.ContentType = "application/json";
+                        resp.ContentLength64 = fakeBytes.Length;
+                        await resp.OutputStream.WriteAsync(fakeBytes);
+                    }
+                    return;
                 }
 
                 var errorBytes = Encoding.UTF8.GetBytes(errorBody);
@@ -361,7 +383,6 @@ internal partial class Program
         sb.AppendLine("── WKAppBot Context Limit Handoff ──");
         sb.AppendLine("Run: wkappbot newchat \"<brief summary of current work>\"");
 
-        // Pending suggests
         try
         {
             var suggestPath = Path.Combine(DataDir, "suggestions.jsonl");
@@ -376,5 +397,127 @@ internal partial class Program
         catch { }
 
         return sb.ToString().Trim();
+    }
+
+    static string? ExtractModel(string? requestBody)
+    {
+        if (requestBody == null) return null;
+        try
+        {
+            var node = JsonSerializer.Deserialize<JsonNode>(requestBody);
+            return node?["model"]?.GetValue<string>();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Call Claude API to summarize the conversation, return as handoff message.
+    /// Used when context limit is hit — instead of forwarding the error, return a summary.
+    /// </summary>
+    static async Task<string> GenerateHandoffSummaryAsync(HttpClient http, string? apiKey, string? model, string? requestBody, bool verbose)
+    {
+        var fallback = BuildHandoffNote() + "\n\n(Auto-summary unavailable — run wkappbot newchat manually)";
+        if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(requestBody)) return fallback;
+
+        try
+        {
+            // Extract conversation history from the original request
+            var origNode = JsonSerializer.Deserialize<JsonNode>(requestBody);
+            var messages = origNode?["messages"]?.AsArray();
+            if (messages == null || messages.Count == 0) return fallback;
+
+            // Build a concise conversation transcript (last 20 turns max to fit summary model)
+            var transcript = new StringBuilder();
+            var turns = messages.TakeLast(20).ToArray();
+            foreach (var msg in turns)
+            {
+                var role = msg?["role"]?.GetValue<string>() ?? "?";
+                var contentNode = msg?["content"];
+                string text = "";
+                if (contentNode is JsonValue cv) text = cv.GetValue<string>();
+                else if (contentNode is JsonArray ca)
+                    text = string.Join(" ", ca.Select(b => b?["text"]?.GetValue<string>() ?? "").Where(t => !string.IsNullOrEmpty(t)));
+                if (!string.IsNullOrEmpty(text))
+                    transcript.AppendLine($"{role.ToUpperInvariant()}: {text[..Math.Min(text.Length, 500)]}");
+            }
+
+            var summaryPrompt = $"""
+                The following is a conversation that hit the context window limit.
+                Please provide a concise handoff summary (3-5 bullet points) covering:
+                - What was being worked on
+                - Key decisions made
+                - Current status / what was just completed
+                - What to do next
+
+                Then add: "Run: wkappbot newchat \"<your summary here>\""
+
+                Conversation (last {turns.Length} turns):
+                {transcript}
+                """;
+
+            var summaryRequest = new
+            {
+                model = model ?? "claude-haiku-4-5-20251001",
+                max_tokens = 1024,
+                messages = new[] { new { role = "user", content = summaryPrompt } }
+            };
+
+            var summaryJson = JsonSerializer.Serialize(summaryRequest);
+            var summaryReq = new HttpRequestMessage(HttpMethod.Post, AnthropicApiBase + "/v1/messages");
+            summaryReq.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+            summaryReq.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
+            summaryReq.Content = new StringContent(summaryJson, Encoding.UTF8, "application/json");
+
+            var summaryResp = await http.SendAsync(summaryReq);
+            var summaryBody = await summaryResp.Content.ReadAsStringAsync();
+
+            var summaryNode = JsonSerializer.Deserialize<JsonNode>(summaryBody);
+            var summaryText = summaryNode?["content"]?[0]?["text"]?.GetValue<string>();
+
+            if (!string.IsNullOrEmpty(summaryText))
+            {
+                if (verbose) Console.Error.WriteLine($"[PROXY] Summary generated ({summaryText.Length} chars)");
+                return "## Context Limit Reached — Auto-generated Handoff\n\n" + summaryText;
+            }
+        }
+        catch (Exception ex)
+        {
+            if (verbose) Console.Error.WriteLine($"[PROXY] Summary failed: {ex.Message}");
+        }
+
+        return fallback;
+    }
+
+    /// <summary>Write a fake SSE response stream with the given text content.</summary>
+    static async Task WriteFakeSseResponseAsync(StreamWriter writer, string text)
+    {
+        var msgId = $"msg_proxy_{DateTime.UtcNow:yyyyMMddHHmmss}";
+        // message_start
+        await writer.WriteLineAsync($"data: {{\"type\":\"message_start\",\"message\":{{\"id\":\"{msgId}\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"claude-proxy\",\"stop_reason\":null,\"usage\":{{\"input_tokens\":0,\"output_tokens\":0}}}}}}");
+        await writer.WriteLineAsync();
+        // content_block_start
+        await writer.WriteLineAsync("data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}");
+        await writer.WriteLineAsync();
+        // content_block_delta (text)
+        var escaped = JsonSerializer.Serialize(text);
+        await writer.WriteLineAsync($"data: {{\"type\":\"content_block_delta\",\"index\":0,\"delta\":{{\"type\":\"text_delta\",\"text\":{escaped}}}}}");
+        await writer.WriteLineAsync();
+        // content_block_stop
+        await writer.WriteLineAsync("data: {\"type\":\"content_block_stop\",\"index\":0}");
+        await writer.WriteLineAsync();
+        // message_delta
+        await writer.WriteLineAsync("data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"output_tokens\":100}}");
+        await writer.WriteLineAsync();
+        // message_stop
+        await writer.WriteLineAsync("data: {\"type\":\"message_stop\"}");
+        await writer.WriteLineAsync();
+        await writer.FlushAsync();
+    }
+
+    /// <summary>Build a fake non-streaming JSON response.</summary>
+    static string BuildFakeJsonResponse(string text, string model)
+    {
+        var escaped = JsonSerializer.Serialize(text);
+        return $"{{\"id\":\"msg_proxy\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":{escaped}}}],\"model\":\"{model}\",\"stop_reason\":\"end_turn\",\"usage\":{{\"input_tokens\":0,\"output_tokens\":0}}}}";
     }
 }
