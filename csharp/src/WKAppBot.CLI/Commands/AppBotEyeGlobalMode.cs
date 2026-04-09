@@ -889,6 +889,21 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}");
         }
 
+        // ── Claude Proxy: auto-start on port 7788 (ANTHROPIC_BASE_URL passthrough + limit handoff) ──
+        try
+        {
+            var proxyPath = Environment.ProcessPath ?? "wkappbot";
+            AppBotPipe.Spawn(proxyPath, "claude-proxy --inject-context",
+                cwd: callerCwd,
+                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
+                caller: "EYE-CLAUDE-PROXY");
+            Console.Error.WriteLine($"[EYE] Claude proxy spawned on port {ProxyDefaultPort}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[EYE] Claude proxy spawn failed: {ex.Message}");
+        }
+
         // ── Context usage monitor (per-card) ──
         // Track last warned MB + JSONL path per CWD.
         // Path change = new session (ctime-new file) → reset MB counter so new session gets fresh warnings.
