@@ -137,22 +137,29 @@ internal partial class Program
         {
             // Steps prefixed with [DEV] are developer-only — hidden in default view.
             // All other steps are operator-visible.
-            var opSteps  = skill.Steps.Select((s, i) => (s, i)).Where(x => !IsDevStep(x.s)).ToList();
-            var devSteps = skill.Steps.Select((s, i) => (s, i)).Where(x =>  IsDevStep(x.s)).ToList();
-
-            Console.WriteLine("  Steps  :");
-            int display = 1;
-            foreach (var (s, _) in opSteps)
-                Console.WriteLine($"    {display++}. {s}");
+            var opSteps  = skill.Steps.Where(s => !IsDevStep(s)).ToList();
+            var devSteps = skill.Steps.Where(s =>  IsDevStep(s)).ToList();
 
             if (developerMode)
             {
-                foreach (var (s, _) in devSteps)
-                    Console.WriteLine($"    {display++}. {s}");
+                // Developer view: all steps, no filtering
+                Console.WriteLine("  Steps  :");
+                for (int i = 0; i < skill.Steps.Count; i++)
+                    Console.WriteLine($"    {i + 1}. {skill.Steps[i]}");
             }
-            else if (devSteps.Count > 0)
+            else if (opSteps.Count == 0)
             {
-                Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
+                // All steps are [DEV] — skip Steps section entirely, just show hint
+                Console.WriteLine($"  Steps  : (all {devSteps.Count} step(s) are [DEV] — use --developer to show)");
+            }
+            else
+            {
+                // Mixed: show operator steps numbered from 1, hint if any DEV hidden
+                Console.WriteLine("  Steps  :");
+                for (int i = 0; i < opSteps.Count; i++)
+                    Console.WriteLine($"    {i + 1}. {opSteps[i]}");
+                if (devSteps.Count > 0)
+                    Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
             }
         }
 
@@ -176,20 +183,21 @@ internal partial class Program
 
     // A step is developer-only if:
     // (1) explicitly tagged [DEV], OR
-    // (2) auto-detected as implementation detail:
-    //     - contains a source file reference (path with .cs/.vbs/.json + : or /)
-    //     - contains a method/function call (Word followed by parentheses)
-    //     - contains a Windows absolute path (X:\ or csharp/ or src/)
-    //     - contains a line-number reference (SomeFile.cs:123)
+    // (2) auto-detected as implementation detail — strong signals only:
+    //     - Windows/Unix source path (C:\, W:\, csharp/, src/)
+    //     - Source file reference with line number (Foo.cs:123)
+    //     - Implementation note: "in Foo.cs", "see Foo.cs", "→ Foo.cs"
+    //     - Multiple chained method calls indicating code walkthrough (Foo() → Bar())
+    // Intentionally NOT flagged: single method name mention in conceptual description
+    // e.g. "stderrRelay.Wait(2000)" in a rule explanation stays as operator.
     static readonly System.Text.RegularExpressions.Regex _devStepPattern =
         new(@"
-            \[DEV\]                             # explicit tag
-            | [A-Za-z]:\\                       # Windows path (C:\, W:\)
-            | \bcsharp/|\bsrc/                  # Unix-style source path
-            | \w+\.cs[:/\s]                     # .cs file reference
-            | \w+\.[A-Za-z]+\(\)               # MethodCall() or Class.Method()
-            | \w+\.[A-Za-z]+\([^)]{1,40}\)     # Method(args) — code call with args
-            | :\d{2,}                           # :123 line number reference
+            \[DEV\]                                     # explicit tag
+            | [A-Za-z]:\\                               # Windows absolute path (C:\, W:\)
+            | \bcsharp/|\bsrc/                          # Unix-style source root path
+            | \w+\.cs:\d+                               # Foo.cs:123 — file+line ref
+            | \b(in|see|→)\s+\w+\.cs\b                 # 'in Foo.cs' / 'see Foo.cs' / '→ Foo.cs'
+            | \w+\(\)\s*→\s*\w+\(\)                    # Foo() → Bar() — chained calls = code walkthrough
         ", System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace |
            System.Text.RegularExpressions.RegexOptions.IgnoreCase |
            System.Text.RegularExpressions.RegexOptions.Compiled);
