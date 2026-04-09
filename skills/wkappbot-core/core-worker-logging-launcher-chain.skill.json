@@ -16,7 +16,8 @@
     "Empty stdout \u002B non-zero exit: [LAUNCHER] Core exited N with no stdout \u2014 check stderr log above. Alerts caller who would otherwise see only a bare exit code.",
     "Sentinel \\0UIT: must be checked on RAW BYTES before any text encoding. StreamReader.ReadLine() breaks sentinel detection \u2014 always read raw bytes first, accumulate text separately in StringBuilder for line extraction.",
     "UNIFIED EXIT FUNCTIONS (v5.13.137\u002B): Two functions own ALL exit paths \u2014 AppBotQuitFlush (Launcher) \u002B AppBotExit (Core). Launcher: AppBotQuitFlush(exitCode, stderrRelayTask?) \u2192 stderrRelay.Wait(2000) \u2192 AppBotExit(code) \u2192 stderr dump \u002B Console.Out/Error.Flush() \u002B TerminateSelf. Core: AppBotExit(exitCode) returns int, then ProcessExit hook fires \u2192 Console.Out.Flush() \u002B Console.Error.Flush() \u002B DoRequiredExitCleanup (tee.Dispose \u002B Console.Error.Flush() \u002B WriteExitFile [also flushes STD_ERROR_HANDLE]) \u002B \\0UIT \u002B TerminateProcess. Rule: no bare TerminateSelf/TerminateProcess \u2014 always go through the two-function chain.",
-    "MCP LOOP EXIT: McpCommand returns before TeeWriter setup (MCP must own stdout). No _activeTee \u2192 DoRequiredExitCleanup is no-op for tee. Exit path: return 0/1 \u2192 Main() \u2192 AppBotExit(code) (ErrorScope flush) \u2192 finally/DoRequiredExitCleanup \u2192 ProcessExit \u2192 Console.Error.Flush() \u2192 \\0UIT \u2192 TerminateProcess. The Console.Error.Flush() in ProcessExit hook is critical for MCP \u2014 it ensures trailing log lines written inside McpCommand (e.g. \u0027[MCP] Fatal: ...\u0027) are not lost when TerminateProcess kills the process. Without it, the last few stderr bytes may sit in .NET\u0027s internal TextWriter buffer and never reach the pipe."
+    "MCP LOOP EXIT: McpCommand returns before TeeWriter setup (MCP must own stdout). No _activeTee \u2192 DoRequiredExitCleanup is no-op for tee. Exit path: return 0/1 \u2192 Main() \u2192 AppBotExit(code) (ErrorScope flush) \u2192 finally/DoRequiredExitCleanup \u2192 ProcessExit \u2192 Console.Error.Flush() \u2192 \\0UIT \u2192 TerminateProcess. The Console.Error.Flush() in ProcessExit hook is critical for MCP \u2014 it ensures trailing log lines written inside McpCommand (e.g. \u0027[MCP] Fatal: ...\u0027) are not lost when TerminateProcess kills the process. Without it, the last few stderr bytes may sit in .NET\u0027s internal TextWriter buffer and never reach the pipe.",
+    "[DEV] Implementation: IsLauncherInParentChain() in Program.cs \u2014 WMI Win32_Process ancestor walk (max 10 levels). WorkerStderrTeeWriter sealed class tees stderr to log file. AppBotQuitFlush() in CoreRunner.cs wraps stderrRelay.Wait(2000)\u002BAppBotExit(code)."
   ],
   "tags": [
     "logging",
@@ -29,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-09T16:17:27.1541427Z",
-  "updated": "2026-04-09T16:42:00.6754843Z",
-  "version": "1.7"
+  "updated": "2026-04-09T18:40:48.5191406Z",
+  "version": "1.8"
 }
