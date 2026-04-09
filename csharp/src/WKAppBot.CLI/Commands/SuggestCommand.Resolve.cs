@@ -322,9 +322,14 @@ internal partial class Program
                 if (expectedCmdPattern == null)
                     cmdPatternHit = true;
                 else if (mergeAffectedCmds != null)
-                    // Merge mode: any affectedCommand appearing in [CMD] lines
-                    cmdPatternHit = mergeAffectedCmds.Any(cmd =>
-                        dbgLines.Any(l => l.Contains($"cmd={cmd}") || l.Contains($"-{cmd}>")));
+                {
+                    // "all" = any command counts; otherwise any affectedCommand must appear in [CMD] lines
+                    bool isAllCommands = mergeAffectedCmds.Any(cmd => cmd.Equals("all", StringComparison.OrdinalIgnoreCase));
+                    cmdPatternHit = isAllCommands
+                        ? cmdCount > 0
+                        : mergeAffectedCmds.Any(cmd =>
+                            dbgLines.Any(l => l.Contains($"cmd={cmd}") || l.Contains($"-{cmd}>")));
+                }
                 else
                     cmdPatternHit = dbgLines.Any(l => l.Contains($"-{expectedCmdPattern}>"));
 
