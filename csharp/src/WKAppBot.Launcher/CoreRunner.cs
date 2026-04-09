@@ -303,7 +303,7 @@ partial class Program
             var stderrLastLines = new System.Collections.Generic.Queue<string>(); // ring buffer last 20 lines
             string? capturedLogPath = null;
             var stderrLock = new object();
-            _ = System.Threading.Tasks.Task.Run(() =>
+            var stderrRelayTask = System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
@@ -402,6 +402,9 @@ partial class Program
                 Console.Error.WriteLine($"[LAUNCHER] Core exited {coreExitCode} with no stdout — check stderr log above");
             // Fallback errors.jsonl: write from Launcher when Core exits non-zero.
             // Core's TeeTextWriter normally handles this, but crashes before TeeWriter setup are silent.
+            // Wait for stderr relay to finish flushing — Core's pipe closes on exit, relay exits naturally.
+            // This ensures piped-relay mode flushes error output identically to standalone Core exit.
+            stderrRelayTask.Wait(2000);
             // Launcher's entry uses raw last-20 stderr lines — always a useful safety net.
             if (coreExitCode != 0)
             {
