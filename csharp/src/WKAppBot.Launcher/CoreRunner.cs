@@ -329,7 +329,7 @@ partial class Program
                 : Console.OpenStandardOutput();
             int effectiveTimeoutMs = timeoutSec > 0 ? timeoutSec * 1000 : 0;
             var relayBuf = new byte[65536];
-            int coreExitFromRelay = -1;
+            long stdoutBytesWritten = 0;
             while (true)
             {
                 int n;
@@ -347,7 +347,7 @@ partial class Program
                     return timeoutExit; // unreachable
                 }
 
-                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); } catch { break; }
+                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); stdoutBytesWritten += n; } catch { break; }
             }
             try { _stdout.Flush(); } catch { }
             if (!proc.HasExited) proc.WaitForExit();
@@ -355,6 +355,10 @@ partial class Program
             _lDiagStep = $"proc-exited(code={proc.ExitCode})";
             Prof($"proc exited code={proc.ExitCode}");
             int coreExitCode = proc.ExitCode;
+            // Empty stdout + non-zero exit: Core failed silently (crash before output, or ErrorScope
+            // swallowed everything). Warn so the caller isn't left with just a bare exit code.
+            if (coreExitCode != 0 && stdoutBytesWritten == 0)
+                Console.Error.WriteLine($"[LAUNCHER] Core exited {coreExitCode} with no stdout — check stderr log above");
             Console.Out.Flush();
             Console.Error.Flush();
             // TerminateSelf: Core's output already written (inherited handles); hard-kill Launcher immediately.
