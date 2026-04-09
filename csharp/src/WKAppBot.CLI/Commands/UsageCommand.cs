@@ -77,8 +77,10 @@ Usage:
   whisper study [--batch N] [--for <duration>] [--engine gemini|gpt]
       Batch-transcribe MP3 segments via AI. --for loops until timeout.
       Duration: 30=30s, 2m, 500ms, 1.1s, 2h
-  whisper pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>]
+  whisper pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>] [--script <path>|--appbot-cmd <path>]
       Stable orchestration: study -> auto-slice/index -> phoneme harvest.
+      Runs the external learning script if present, otherwise falls back to the built-in pipeline.
+      Phoneme maintenance runs automatically when coverage is missing.
       Use with schedule add --every ... --cmd ""wkappbot whisper pipeline --once ..."" for periodic runs.
   whisper slice [--in <dir>] [--min-ms N] [--max-ms N]
       Slice long audio into word-level MP3 segments.
@@ -92,6 +94,8 @@ Usage:
       Rank phoneme_db results by path/code similarity and optionally harvest query chunks back into the DB.
   whisper phoneme-loop [--in <slices-dir>] [--out <db-dir>] [--interval N] [--move] [--dry-run] [--once]
       Repeated phoneme split loop for new MP3s. Default runs until Ctrl+C; --once exits after one scan.
+      Basic phoneme buckets are maintained automatically.
+      If no source audio exists, bootstrap samples are synthesized with rotated TTS voices and then sent to study.
       Global --timeout <duration> also applies when passed after the whisper command.
   mcp
       Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).

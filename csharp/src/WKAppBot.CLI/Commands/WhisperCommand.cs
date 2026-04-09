@@ -110,30 +110,31 @@ internal partial class Program
         int maxLevel = (1 << bitsPerBand) - 1; // 15 or 3
 
         Console.Error.WriteLine($"[WHISPER] Mel-Scale Spectrum Analyzer + Tokenizer ({bandCount}-band × {bitsPerBand}bit = 32bit)");
-        Console.WriteLine("[WHISPER] Bands (Mel-scale):");
+        Console.Error.WriteLine("[WHISPER] Bands (Mel-scale):");
         for (int i = 0; i < bandCount; i++)
-            Console.WriteLine($"  B{i,2}: {bands[i].Lo,5}-{bands[i].Hi,5} Hz  ({bands[i].Name})");
-        Console.WriteLine();
+            Console.Error.WriteLine($"  B{i,2}: {bands[i].Lo,5}-{bands[i].Hi,5} Hz  ({bands[i].Name})");
+        Console.Error.WriteLine("");
 
         // Find microphone
         int deviceCount = WaveInEvent.DeviceCount;
         if (deviceCount == 0)
         {
-            Console.WriteLine("[WHISPER] ERROR: No microphone found!");
+            Console.Error.WriteLine("[WHISPER] ERROR: No microphone found!");
             return 1;
         }
 
-        Console.WriteLine("[WHISPER] Audio devices:");
+        Console.Error.WriteLine("[WHISPER] Audio devices:");
         for (int i = 0; i < deviceCount; i++)
         {
             var cap = WaveInEvent.GetCapabilities(i);
-            Console.WriteLine($"  [{i}] {cap.ProductName} ({cap.Channels}ch)");
+            Console.Error.WriteLine($"  [{i}] {cap.ProductName} ({cap.Channels}ch)");
         }
         Console.Error.WriteLine($"[WHISPER] Using device [{deviceIndex}]");
-        if (useRing) Console.WriteLine("[WHISPER] Ring HUD overlay enabled (--ring)");
+        if (useRing) Console.Error.WriteLine("[WHISPER] Ring HUD overlay enabled (--ring)");
         if (hardKill) Console.Error.WriteLine($"[WHISPER] DUET hard kill enabled (kill-db={killLevelDb})");
         Console.Error.WriteLine($"[WHISPER] Noise gate: {noiseGateDb} dBFS");
-        Console.WriteLine("[WHISPER] Press Ctrl+C to stop\n");
+        Console.Error.WriteLine("[WHISPER] Press Ctrl+C to stop");
+        Console.Error.WriteLine("");
 
         // Ring HUD overlay (--ring mode, 8-band only for now)
         WhisperRingHost? ringHost = null;
@@ -325,23 +326,23 @@ internal partial class Program
                         Console.Write(label);
                         Console.Write($"[{bar}]");
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($" {levels[b]}  ");
+                    Console.Error.WriteLine($" {levels[b]}  ");
                     }
 
-                    Console.WriteLine();
+                    Console.Error.WriteLine("");
                     Console.ForegroundColor = mode switch
                     {
                         "VOICE" => ConsoleColor.Yellow,
                         "WHSPR" => ConsoleColor.Green,
                         _ => ConsoleColor.DarkGray,
                     };
-                    Console.WriteLine($"  Token: 0x{token:X8}  Mode: [{mode}]  Frame: {frameCount}    ");
+                    Console.Error.WriteLine($"  Token: 0x{token:X8}  Mode: [{mode}]  Frame: {frameCount}    ");
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write("  Recent: ");
                     int start = Math.Max(0, prevTokens.Count - 8);
                     for (int i = start; i < prevTokens.Count; i++)
                         Console.Write($"{prevTokens[i]:X8} ");
-                    Console.WriteLine("                    ");
+                    Console.Error.WriteLine("                    ");
                     Console.ResetColor();
                 }
                 else
@@ -365,7 +366,8 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine("\n[WHISPER] Stopped.");
+        Console.Error.WriteLine("");
+        Console.Error.WriteLine("[WHISPER] Stopped.");
         Console.Error.WriteLine($"[WHISPER] Collected {prevTokens.Count} tokens.");
         return 0;
     }

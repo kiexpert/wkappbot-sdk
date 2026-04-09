@@ -21,7 +21,7 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot speak \"text\" [--bg] [--mouse] [--target <grap>]");
+            Console.WriteLine("Usage: wkappbot speak \"text\" [--bg] [--mouse] [--target <grap>] [--voice <name|culture>]");
             Console.WriteLine("  Windows TTS 음성 출력 + 카라오케 오버레이");
             Console.WriteLine("  --bg: 백그라운드 실행 (즉시 리턴)");
             Console.WriteLine("  --size N: 글자 크기 px (기본 32, 활성 1.5배)");
@@ -33,6 +33,14 @@ internal partial class Program
         var argList = args.ToList();
         bool bg = argList.Remove("--bg");
         bool atMouse = argList.Remove("--mouse");
+        string? voiceName = null;
+
+        int voiceIdx = argList.IndexOf("--voice");
+        if (voiceIdx >= 0 && voiceIdx + 1 < argList.Count)
+        {
+            voiceName = argList[voiceIdx + 1];
+            argList.RemoveRange(voiceIdx, 2);
+        }
 
         // --target <grap> 파싱
         string? targetGrap = null;
@@ -58,8 +66,9 @@ internal partial class Program
             var textArgs = string.Join(" ", argList.Select(a => $"\"{a}\""));
             var sizeArg = sizePx > 0 ? $" --size {sizePx}" : "";
             var mouseArg = atMouse ? " --mouse" : "";
+            var voiceArg = !string.IsNullOrWhiteSpace(voiceName) ? $" --voice \"{voiceName}\"" : "";
             var targetArg = targetGrap != null ? $" --target \"{targetGrap}\"" : "";
-            AppBotPipe.Spawn(exe, $"speak {textArgs}{sizeArg}{mouseArg}{targetArg}", Environment.CurrentDirectory, caller: "SPEAK");
+            AppBotPipe.Spawn(exe, $"speak {textArgs}{sizeArg}{mouseArg}{voiceArg}{targetArg}", Environment.CurrentDirectory, caller: "SPEAK");
             return 0;
         }
 
@@ -72,7 +81,7 @@ internal partial class Program
 
         // 1) TTS WAV 렌더링 + 타이밍 마커 수집
         var markers = new List<SpeakMarker>();
-        var tmpFile = RenderTtsWav(text, markers, gain: 3.0f);
+        var tmpFile = RenderTtsWav(text, markers, gain: 3.0f, voiceName);
 
         // 2) 공유 Stopwatch — 오디오 재생 직전에 Start
         var sharedStopwatch = new Stopwatch();
@@ -172,17 +181,82 @@ internal partial class Program
 
     // ── TTS → WAV + 게인 증폭 + 타이밍 수집 ──
 
-    static string RenderTtsWav(string text, List<SpeakMarker> markers, float gain = 3.0f)
+    internal static IReadOnlyList<string> GetBootstrapVoiceNames()
+    {
+        try
+        {
+            using var synth = new SpeechSynthesizer();
+            return synth.GetInstalledVoices()
+                .Where(v => v.Enabled)
+                .OrderByDescending(v => v.VoiceInfo.Culture.Name.StartsWith("ko", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(v => v.VoiceInfo.Culture.Name.StartsWith("en", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(v => v.VoiceInfo.Culture.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(v => v.VoiceInfo.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(v => v.VoiceInfo.Name)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    internal static string? ResolveTtsVoiceName(string? requestedVoice = null)
+    {
+        try
+        {
+            using var synth = new SpeechSynthesizer();
+            var voices = synth.GetInstalledVoices().Where(v => v.Enabled).Select(v => v.VoiceInfo).ToArray();
+            if (voices.Length == 0)
+                return null;
+
+            if (!string.IsNullOrWhiteSpace(requestedVoice))
+            {
+                var exact = voices.FirstOrDefault(v => string.Equals(v.Name, requestedVoice, StringComparison.OrdinalIgnoreCase));
+                if (exact != null)
+                    return exact.Name;
+
+                var cultureMatch = voices.FirstOrDefault(v =>
+                    v.Culture.Name.StartsWith(requestedVoice, StringComparison.OrdinalIgnoreCase) ||
+                    v.Name.StartsWith(requestedVoice, StringComparison.OrdinalIgnoreCase));
+                if (cultureMatch != null)
+                    return cultureMatch.Name;
+            }
+
+            return voices
+                .OrderByDescending(v => v.Culture.Name.StartsWith("ko", StringComparison.OrdinalIgnoreCase))
+                .ThenByDescending(v => v.Culture.Name.StartsWith("en", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(v => v.Culture.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(v => v.Name)
+                .FirstOrDefault();
+        }
+        catch
+        {
+            return requestedVoice;
+        }
+    }
+
+    static string RenderTtsWav(string text, List<SpeakMarker> markers, float gain = 3.0f, string? voiceName = null)
     {
         var synth = new SpeechSynthesizer();
         synth.Volume = 100;
         synth.Rate = 1;
-        foreach (var voice in synth.GetInstalledVoices())
+        var resolvedVoice = ResolveTtsVoiceName(voiceName);
+        if (!string.IsNullOrWhiteSpace(resolvedVoice))
         {
-            if (voice.VoiceInfo.Culture.Name.StartsWith("ko"))
+            try { synth.SelectVoice(resolvedVoice); } catch { }
+        }
+        else
+        {
+            foreach (var voice in synth.GetInstalledVoices())
             {
-                synth.SelectVoice(voice.VoiceInfo.Name);
-                break;
+                if (voice.VoiceInfo.Culture.Name.StartsWith("ko"))
+                {
+                    synth.SelectVoice(voice.VoiceInfo.Name);
+                    break;
+                }
             }
         }
 
