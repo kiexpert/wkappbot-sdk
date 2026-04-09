@@ -759,6 +759,7 @@ internal partial class Program
                 "screen" => ScreenCommand(restArgs),
                 "clipboard" => ClipboardCommand(restArgs),
                 "claude-usage" => A11yClaudeUsage(),
+                "claude-proxy" => ClaudeProxyCommand(restArgs),
                 "enc-test" => EncTestCommand(),
                 "suggest" => SuggestCommand(restArgs),
                 "gc" => GcCommand(restArgs),
@@ -950,7 +951,7 @@ internal partial class Program
                     "readiness", "uia-test", "form-dump", "toolbar-ocr", "titlebar", "validate",
                     "chart-analyze", "hts-stress", "tooltip-probe", "speak", "whisper", "newchat",
                     "analyze-hack", "screensaver", "whisper-ring", "prompt", "dashboard", "win-move",
-                    "screen", "clipboard", "claude-usage", "enc-test", "suggest", "gc", "hotswap", "tick",
+                    "screen", "clipboard", "claude-usage", "claude-proxy", "enc-test", "suggest", "gc", "hotswap", "tick",
                     "kiwoom", "com", "telegram", "stock-scan", "logcat", "grep", "grap",
                     "help", "--help", "-h", "mcp", "claude-detect", "noise", "capture",
                     "elevate", "webbot", "code", "vscode", "version", "--version"

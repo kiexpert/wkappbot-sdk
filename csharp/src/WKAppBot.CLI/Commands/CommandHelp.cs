@@ -522,9 +522,9 @@ internal partial class Program
 
         ["hack-input"] = "a11y hack-input [--parent-pid N] [--timeout Ns]\nKeyboard focus analysis worker. Tracks focused element → input capabilities + parent chain.\nShows: patterns (Value/Text/Invoke/Toggle), grap, process info. Ctrl+C to stop.",
 
-        ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--size N: font size px (default 32).",
+        ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--voice <name|culture>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--voice <name|culture>: select an installed voice.\n--size N: font size px (default 32).",
 
-        ["whisper"] = "whisper [options]\nReal-time speech analysis and tokenization.\nSubcommands:\n  dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]\n    Live dictation into the focused control as text.\n  study [--batch N] [--for <duration>] [--engine gemini|gpt]\n    Batch-transcribe MP3 segments via AI.\n  pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>]\n    Stable orchestration: study -> auto-slice/index -> phoneme harvest.\n  slice | clean | index [--split]\n    Offline segment processing and phoneme indexing.\n  phoneme-search [--db <dir>] [--query <file|text>] [--top N] [--no-harvest]\n    Rank phoneme_db candidates and harvest query chunks back into the DB.\n  phoneme-loop [--in <slices-dir>] [--out <db-dir>] [--interval N] [--move] [--dry-run] [--once]\n    Repeated phoneme split loop for new MP3s. Default runs until Ctrl+C; --once exits after one scan.\n",
+        ["whisper"] = "whisper [options]\nReal-time speech analysis and tokenization.\nSubcommands:\n  dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]\n    Live dictation into the focused control as text.\n  study [--batch N] [--for <duration>] [--engine gemini|gpt]\n    Batch-transcribe MP3 segments via AI.\n  pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>]\n    Stable orchestration: study -> auto-slice/index -> phoneme harvest.\n    Phoneme maintenance runs automatically when coverage is missing.\n  slice | clean | index [--split]\n    Offline segment processing and phoneme indexing.\n  phoneme-search [--db <dir>] [--query <file|text>] [--top N] [--no-harvest]\n    Rank phoneme_db candidates and harvest query chunks back into the DB.\n  phoneme-loop [--in <slices-dir>] [--out <db-dir>] [--interval N] [--move] [--dry-run] [--once]\n    Repeated phoneme split loop for new MP3s. Default runs until Ctrl+C; --once exits after one scan.\n    Basic phoneme buckets are maintained automatically.\n    If no source audio exists, bootstrap samples are synthesized with rotated TTS voices and then sent to study.\n",
 
         ["whisper dictate"] = "whisper dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]\nLive microphone dictation into the focused control.\nDefault target: focused control in the foreground window.\nUse --target <grap> to force a specific window/control.\nUse --confidence N to ignore weak recognitions (default 0.45).\nUse --no-space to suppress the trailing space after each phrase.\nUse --enter to send Enter after each accepted phrase.",
 
@@ -608,6 +608,23 @@ internal partial class Program
 
             Also probes claude.ai/settings/usage via CDP for plan usage %
             (fallback: UIA scrape of Claude Desktop).
+            """,
+
+        ["claude-proxy"] = """
+            claude-proxy [--port 7070] [--inject-context] [--verbose]
+
+            Local Anthropic API proxy — sits between Claude Code and the real API.
+            Configure: ANTHROPIC_BASE_URL=http://localhost:7070 (in .claude/settings.json or env).
+
+            Features:
+              - Transparent SSE streaming proxy to https://api.anthropic.com
+              - --inject-context: prepends WKAppBot session info (ctx%, pending suggests)
+                into every request's system message
+              - Context-limit detection: injects handoff note into the error response
+                so Claude sees it directly instead of a generic error
+
+            stdout: the proxy URL (for scripting)
+            stderr: request log
             """,
     };
 }
