@@ -77,6 +77,20 @@ internal partial class Program
             return 1;
         }
 
+        // Create log file (proxy may be spawned directly from Eye without Launcher log infra)
+        var logPath = BuildProxyLogPath(port);
+        StreamWriter? logWriter = null;
+        try
+        {
+            logWriter = new StreamWriter(logPath, append: false, System.Text.Encoding.UTF8) { AutoFlush = true };
+            Console.SetError(new ProxyTeeWriter(Console.Error, logWriter));
+            Console.Error.WriteLine($"[LOG] {logPath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PROXY] Log file unavailable: {ex.Message}");
+        }
+
         Console.Error.WriteLine($"[PROXY] Listening on {prefix}");
         Console.Error.WriteLine($"[PROXY] Set: ANTHROPIC_BASE_URL={prefix}");
         Console.WriteLine(prefix.TrimEnd('/'));
@@ -99,6 +113,7 @@ internal partial class Program
         }
 
         listener?.Close();
+        logWriter?.Dispose();
         Console.Error.WriteLine("[PROXY] Stopped.");
         return cleanExit ? 0 : 1; // non-clean exit → AppBotExit(1) flushes error log
     }
@@ -107,14 +122,14 @@ internal partial class Program
     {
         var req = ctx.Request;
         var resp = ctx.Response;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
             var path = req.Url?.PathAndQuery ?? "/";
             var targetUrl = AnthropicApiBase + path;
 
-            if (verbose)
-                Console.Error.WriteLine($"[PROXY] {req.HttpMethod} {path}");
+            Console.Error.WriteLine($"[PROXY] {req.HttpMethod} {path}");
 
             // Read request body
             string? requestBody = null;
@@ -174,6 +189,7 @@ internal partial class Program
                 // Stream SSE — buffer to detect context limit before forwarding
                 resp.ContentType = "text/event-stream";
                 resp.Headers["Cache-Control"] = "no-cache";
+                Console.Error.WriteLine($"[PROXY] ← 200 SSE stream started ({sw.ElapsedMilliseconds}ms)");
 
                 var upstreamStream = await upstreamResp.Content.ReadAsStreamAsync();
                 using var reader = new StreamReader(upstreamStream, Encoding.UTF8);
@@ -184,7 +200,7 @@ internal partial class Program
                 {
                     if (line.StartsWith("data:") && IsAnthropicLimitError(line))
                     {
-                        if (verbose) Console.Error.WriteLine("[PROXY] Limit hit in SSE — handing off to Gemini agent...");
+                        Console.Error.WriteLine("[PROXY] Limit hit in SSE — handing off to Gemini agent...");
                         var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
                         await WriteFakeSseResponseAsync(writer, handoffMsg);
                         return;
@@ -192,6 +208,7 @@ internal partial class Program
                     await writer.WriteLineAsync(line);
                     await writer.FlushAsync();
                 }
+                Console.Error.WriteLine($"[PROXY] ← SSE done ({sw.ElapsedMilliseconds}ms)");
             }
             else if (isError)
             {
@@ -199,7 +216,7 @@ internal partial class Program
 
                 if (IsAnthropicLimitError(errorBody))
                 {
-                    if (verbose) Console.Error.WriteLine("[PROXY] Limit hit — handing off to Gemini agent...");
+                    Console.Error.WriteLine($"[PROXY] Limit hit ({(int)upstreamResp.StatusCode}) — handing off to Gemini agent...");
                     var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
 
                     resp.StatusCode = 200;
@@ -221,6 +238,8 @@ internal partial class Program
                     return;
                 }
 
+                Console.Error.WriteLine($"[PROXY] ← {(int)upstreamResp.StatusCode} error ({sw.ElapsedMilliseconds}ms)");
+                if (verbose) Console.Error.WriteLine($"[PROXY] error body: {errorBody[..Math.Min(200, errorBody.Length)]}");
                 var errorBytes = Encoding.UTF8.GetBytes(errorBody);
                 resp.ContentLength64 = errorBytes.Length;
                 resp.ContentType = "application/json";
@@ -228,6 +247,7 @@ internal partial class Program
             }
             else
             {
+                Console.Error.WriteLine($"[PROXY] ← {(int)upstreamResp.StatusCode} ({sw.ElapsedMilliseconds}ms)");
                 // Pass through response body directly
                 var bodyStream = await upstreamResp.Content.ReadAsStreamAsync();
                 await bodyStream.CopyToAsync(resp.OutputStream);
@@ -235,7 +255,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            if (verbose) Console.Error.WriteLine($"[PROXY] Error: {ex.Message}");
+            Console.Error.WriteLine($"[PROXY] ERROR: {ex.Message}");
             try
             {
                 resp.StatusCode = 500;
@@ -525,5 +545,26 @@ internal partial class Program
     {
         var escaped = JsonSerializer.Serialize(text);
         return $"{{\"id\":\"msg_proxy\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":{escaped}}}],\"model\":\"{model}\",\"stop_reason\":\"end_turn\",\"usage\":{{\"input_tokens\":0,\"output_tokens\":0}}}}";
+    }
+
+    static string BuildProxyLogPath(int port)
+    {
+        var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? ".";
+        var logsDir = Path.Combine(exeDir, "wkappbot.hq", "logs");
+        Directory.CreateDirectory(logsDir);
+        var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var pid = Environment.ProcessId;
+        return Path.Combine(logsDir, $"wkappbot-core.exe.out-{ts}.claude-proxy-{port}.pid={pid}.log");
+    }
+
+    /// <summary>Tees TextWriter output to two writers (original stderr + log file).</summary>
+    sealed class ProxyTeeWriter(TextWriter primary, TextWriter secondary) : TextWriter
+    {
+        public override System.Text.Encoding Encoding => primary.Encoding;
+        public override void Write(char value) { primary.Write(value); secondary.Write(value); }
+        public override void Write(string? value) { primary.Write(value); secondary.Write(value); }
+        public override void WriteLine(string? value) { primary.WriteLine(value); secondary.WriteLine(value); }
+        public override void Flush() { primary.Flush(); secondary.Flush(); }
+        protected override void Dispose(bool disposing) { if (disposing) secondary.Dispose(); base.Dispose(disposing); }
     }
 }
