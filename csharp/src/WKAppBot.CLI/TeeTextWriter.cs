@@ -34,6 +34,10 @@ public sealed class TeeTextWriter : TextWriter
     private volatile bool _spinnerStopped;
 
     public TextWriter OriginalConsole => _console;
+
+    // Non-whitespace chars written to stdout — used by AppBotExit to detect blank output
+    private long _nonWsChars;
+    public bool StdoutIsBlank => Interlocked.Read(ref _nonWsChars) == 0;
     public override Encoding Encoding => Encoding.UTF8;
     public bool IsPipeBroken => _pipeBroken;
 
@@ -194,6 +198,7 @@ public sealed class TeeTextWriter : TextWriter
     public override void Write(char value)
     {
         TouchWriteTime();
+        if (!char.IsWhiteSpace(value)) Interlocked.Increment(ref _nonWsChars);
         ConsoleWrite(value);
         if (!_fileClosed) try { _file.Write(value); } catch { }
     }
@@ -201,6 +206,8 @@ public sealed class TeeTextWriter : TextWriter
     public override void Write(string? value)
     {
         TouchWriteTime();
+        if (!string.IsNullOrEmpty(value))
+            foreach (var c in value) if (!char.IsWhiteSpace(c)) { Interlocked.Increment(ref _nonWsChars); break; }
         ConsoleWrite(value);
         if (!_fileClosed) try { _file.Write(value); } catch { }
         PeriodicFlush();
@@ -209,6 +216,8 @@ public sealed class TeeTextWriter : TextWriter
     public override void Write(char[] buffer, int index, int count)
     {
         TouchWriteTime();
+        for (int i = index; i < index + count; i++)
+            if (!char.IsWhiteSpace(buffer[i])) { Interlocked.Increment(ref _nonWsChars); break; }
         ConsoleWrite(buffer, index, count);
         if (!_fileClosed) try { _file.Write(buffer, index, count); } catch { }
         PeriodicFlush();
@@ -224,6 +233,8 @@ public sealed class TeeTextWriter : TextWriter
     public override void WriteLine(string? value)
     {
         TouchWriteTime();
+        if (!string.IsNullOrEmpty(value))
+            foreach (var c in value) if (!char.IsWhiteSpace(c)) { Interlocked.Increment(ref _nonWsChars); break; }
         ConsoleWriteLine(value);
         if (!_fileClosed) try { _file.WriteLine(value); } catch { }
         PeriodicFlush();
