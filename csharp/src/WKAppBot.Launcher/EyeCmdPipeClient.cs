@@ -86,8 +86,7 @@ internal static class EyeCmdPipeClient
             }
 
             bool gotEndMarker = false;
-            int outputLines = 0;      // non-LAUNCH lines written to stdout
-            bool hasLaunchJson = false; // {"_":"LAUNCH"...} peeked line
+            int outputLines = 0; // non-LAUNCH lines written to stdout
             try
             {
                 // Drain: process peeked line first (if first-output timeout was used), then loop.
@@ -108,10 +107,8 @@ internal static class EyeCmdPipeClient
                         break;
                     }
                     writeLine(line);
-                    // Track whether this is the LAUNCH JSON sentinel vs real output
-                    if (line.StartsWith("{\"_\":\"LAUNCH\"") || line.StartsWith("{\"_\": \"LAUNCH\""))
-                        hasLaunchJson = true;
-                    else
+                    // LAUNCH JSON is a sentinel header — don't count as real output
+                    if (!line.StartsWith("{\"_\":\"LAUNCH\"") && !line.StartsWith("{\"_\": \"LAUNCH\""))
                         outputLines++;
                 }
                 if (timedOut) exitCode = timeoutExitCode;
