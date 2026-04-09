@@ -867,13 +867,17 @@ internal partial class Program
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
+            // Write errors.jsonl BEFORE signaling exit — Launcher may kill Core immediately after
+            // WriteExitFile(), so errors.jsonl must be written first (WriteErrorRecordNow is a no-op if exit=0).
+            if (tee != null) tee.ExitCode = exitCode;
+            tee?.WriteErrorRecordNow();
+
             // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
             // Launcher polls this file every 50ms and exits immediately when found.
             if (!_fastExitAfterCommand)
                 WriteExitFile(exitCode);
 
             if (tee != null) Console.SetOut(tee.OriginalConsole);
-            if (tee != null) tee.ExitCode = exitCode;
             tee?.Dispose(); // normal-exit atexit-style move to logs/old
             if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
@@ -2076,8 +2080,6 @@ internal partial class Program
     /// </summary>
     static void WriteExitFile(int code)
     {
-        void Dbg(string s) { try { System.IO.File.AppendAllText(@"C:\Temp\exitfile_dbg.txt", $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
-        Dbg($"WriteExitFile enter code={code} _exitFilePath={_exitFilePath ?? "(null)"}");
         try { Console.Out.Flush(); } catch { }
         try
         {
@@ -2089,7 +2091,6 @@ internal partial class Program
         try
         {
             var exitFile = _exitFilePath ?? Environment.GetEnvironmentVariable("WKAPPBOT_EXIT_FILE");
-            Dbg($"exitFile={exitFile ?? "(null)"}");
             if (!string.IsNullOrEmpty(exitFile))
             {
                 // Use Win32 API directly — File.WriteAllText may leave pending I/O
@@ -2102,15 +2103,10 @@ internal partial class Program
                     WriteFile(hFile, ecBytes, (uint)ecBytes.Length, out _, IntPtr.Zero);
                     FlushFileBuffers(hFile);
                     CloseHandle(hFile);
-                    Dbg($"written (Win32): {exitFile}");
-                }
-                else
-                {
-                    Dbg($"CreateFileW failed err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
                 }
             }
         }
-        catch (Exception ex) { Dbg($"FAILED: {ex.Message}"); }
+        catch { }
 
         // Signal named event (Launcher waits on this — instant, no FS visibility delay)
         if (!string.IsNullOrEmpty(_exitEventName))
@@ -2123,14 +2119,9 @@ internal partial class Program
                 {
                     SetEvent(hEvt);
                     CloseHandle(hEvt);
-                    Dbg($"exit event signaled: {_exitEventName}");
-                }
-                else
-                {
-                    Dbg($"OpenEventW failed err={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}");
                 }
             }
-            catch (Exception ex) { Dbg($"exit event FAILED: {ex.Message}"); }
+            catch { }
         }
     }
 
