@@ -122,10 +122,11 @@ internal static class EyeCmdPipeClient
 
             // Empty pipe guard: pipe closed without EndMarker and without any output
             // → silent failure (process hard-killed or crashed before writing anything)
+            // Return false so Launcher falls back to Core (which will TryRenameSwap on startup).
             if (!timedOut && !gotEndMarker && outputLines == 0 && peekedLine == null)
             {
-                Console.Error.WriteLine("[PIPE] empty closed — process exited without output or end marker (possible crash/kill)");
-                exitCode = -1;
+                Console.Error.WriteLine("[PIPE] empty closed — falling back to Core (possible crash/kill)");
+                return false;
             }
 
             return true;
