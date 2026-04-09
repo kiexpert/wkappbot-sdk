@@ -1,29 +1,32 @@
-{
-  "id": "wkedit",
-  "app": "wkappbot-workflow",
-  "title": "wkedit \u2014 Bulk Transaction Edit (Regex, Multi-File, Backup \u0026 Undo)",
-  "desc": "wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits \u2014 saves tokens, prevents CP949 corruption.",
-  "steps": [
-    "[WHEN-TO-USE] Prefer wkedit for: (1) regex bulk substitution across a file, (2) multi-occurrence replace, (3) any edit on CP949/EUC-KR files. Avoid sed/awk \u2014 they ignore encoding and corrupt Korean source. Avoid Python one-liners \u2014 they waste tokens and miss edge cases.\n[BASIC] wkappbot file edit \u0027\u003Cold\u003E\u0027 \u0027\u003Cnew\u003E\u0027 \u003Cpath\u003E [--replace-all]\n  Literal substitution. Fails if old not found (safe by default).\n  --replace-all: replace every occurrence in the file.\n  Backup auto-created at .bak/\u003Cfilename\u003E.bak-\u003Ctimestamp\u003E.txt\n[REGEX] wkappbot file edit \u0027\u003C.NET-regex\u003E\u0027 \u0027\u003Creplacement\u003E\u0027 \u003Cpath\u003E --replace-all --regex\n  old_string is a .NET regex. new_string may use $1/$2 capture groups.\n  NOTE: Escape parens/dots. TIP: test with \u0027wkappbot file grep \u003Cregex\u003E --path \u003Cdir\u003E\u0027 first.\n[MULTI-FILE] Pass multiple paths \u2014 wkedit processes all in one call.\n  GOTCHA: if ANY file has zero matches, the whole batch fails with \u0027validation failed\u0027.\n  SOLUTION: pre-filter: files=$(grep -rl \u0027\u003Cpattern\u003E\u0027 \u003Cdir\u003E --include=\u0027*.cs\u0027 ",
-    " tr \u0027\\n\u0027 \u0027 \u0027)\n  wkappbot file edit \u0027\u003Cregex\u003E\u0027 \u0027\u003Cnew\u003E\u0027 $files --replace-all --regex\n[BULK-PATTERN] Real-world bulk refactor (124 files, 1353 replacements, ~2s):\n  files=$(grep -rl \u0027Console.WriteLine($\u0022[\u0027 ./Commands/ --include=\u0027*.cs\u0027 ",
-    " tr \u0027\\n\u0027 \u0027 \u0027)\n  wkappbot file edit \u0027Console\\.WriteLine\\(\\$\u0022\\[\u0027 \u0027Console.Error.WriteLine($\u0022[\u0027 $files --replace-all --regex\n[DRY-RUN] Add --dry-run to preview without writing. Shows diff but does NOT write the file.\n  CAUTION: dry-run output still shows \u0027backup -\u003E ...\u0027 lines \u2014 those are NOT created.\n[UNDO] ALWAYS use undo when you make a mistake \u2014 backups accumulate in .bak/ automatically.\n  wkappbot file edit --undo \u003Cpath\u003E          restore most recent backup\n  wkappbot file write \u003Cpath\u003E --source-file .bak/\u003Cname\u003E.bak-\u003Ctimestamp\u003E.txt  restore specific version\n  List backups: ls .bak/\u003Cfilename\u003E.bak-* ",
-    " sort\n  LESSON: regex that captures only part of a match and replaces with partial text will silently\n  corrupt the rest. Example: \u0027Console.Write(\u0022  [OS]\u0027 -\u003E \u0027Console.Error.Write(\u0022  [\u0027 drops \u0027OS]\u0027.\n  Always include the full match in both old and new string, or use capture groups ($1) to preserve.\n[ENCODING] wkedit auto-detects UTF-8 vs CP949. Never use sed/awk on WKAppBot sources.\n  Post-edit sanity: \u0027wkappbot file grep \u0027\\uFFFD\u0027 --path \u003Cdir\u003E\u0027 checks for corruption.\n[TIPS-FROM-USE] Batch \u003E loop: 124 files in one call ~2s. grep -rl filter mandatory for multi-file.\n  .NET regex escaping: escape ( ) . in single-quotes for shell AND .NET.\n  Safepoint commit before bulk edit = stress-free. Do NOT git add .bak/ accidentally."
-  ],
-  "tags": [
-    "wkedit",
-    "file-edit",
-    "regex",
-    "bulk",
-    "refactor",
-    "encoding",
-    "backup",
-    "undo",
-    "transaction",
-    "multi-file"
-  ],
-  "source_refs": null,
-  "author": "claude",
-  "created": "2026-04-07T16:16:02.995056Z",
-  "updated": "2026-04-07T17:52:06.4464407Z",
-  "version": "1.3"
+﻿{
+    "id":  "wkedit",
+    "app":  "wkappbot-workflow",
+    "title":  "wkedit — Bulk Transaction Edit (Regex, Multi-File, Backup \u0026 Undo)",
+    "desc":  "wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits — saves tokens, prevents CP949 corruption.",
+    "steps":  [
+                  "[WHEN-TO-USE] Prefer wkedit for: (1) regex bulk substitution across a file, (2) multi-occurrence replace, (3) any edit on CP949/EUC-KR files. Avoid sed/awk — they ignore encoding and corrupt Korean source. Avoid Python one-liners — they waste tokens and miss edge cases.\n[BASIC] wkappbot file edit \u0027\u003cold\u003e\u0027 \u0027\u003cnew\u003e\u0027 \u003cpath\u003e [--replace-all]\n  Literal substitution. Fails if old not found (safe by default).\n  --replace-all: replace every occurrence in the file.\n  Backup auto-created at .bak/\u003cfilename\u003e.bak-\u003ctimestamp\u003e.txt\n[REGEX] wkappbot file edit \u0027\u003c.NET-regex\u003e\u0027 \u0027\u003creplacement\u003e\u0027 \u003cpath\u003e --replace-all --regex\n  old_string is a .NET regex. new_string may use $1/$2 capture groups.\n  NOTE: Escape parens/dots. TIP: test with \u0027wkappbot file grep \u003cregex\u003e --path \u003cdir\u003e\u0027 first.\n[MULTI-FILE] Pass multiple paths — wkedit processes all in one call.\n  GOTCHA: if ANY file has zero matches, the whole batch fails with \u0027validation failed\u0027.\n  SOLUTION: pre-filter: files=$(grep -rl \u0027\u003cpattern\u003e\u0027 \u003cdir\u003e --include=\u0027*.cs\u0027 ",
+                  " tr \u0027\\n\u0027 \u0027 \u0027)\n  wkappbot file edit \u0027\u003cregex\u003e\u0027 \u0027\u003cnew\u003e\u0027 $files --replace-all --regex\n[BULK-PATTERN] Real-world bulk refactor (124 files, 1353 replacements, ~2s):\n  files=$(grep -rl \u0027Console.WriteLine($\"[\u0027 ./Commands/ --include=\u0027*.cs\u0027 ",
+                  " tr \u0027\\n\u0027 \u0027 \u0027)\n  wkappbot file edit \u0027Console\\.WriteLine\\(\\$\"\\[\u0027 \u0027Console.Error.WriteLine($\"[\u0027 $files --replace-all --regex\n[DRY-RUN] Add --dry-run to preview without writing. Shows diff but does NOT write the file.\n  CAUTION: dry-run output still shows \u0027backup -\u003e ...\u0027 lines — those are NOT created.\n[UNDO] ALWAYS use undo when you make a mistake — backups accumulate in .bak/ automatically.\n  wkappbot file edit --undo \u003cpath\u003e          restore most recent backup\n  wkappbot file write \u003cpath\u003e --source-file .bak/\u003cname\u003e.bak-\u003ctimestamp\u003e.txt  restore specific version\n  List backups: ls .bak/\u003cfilename\u003e.bak-* ",
+                  " sort\n  LESSON: regex that captures only part of a match and replaces with partial text will silently\n  corrupt the rest. Example: \u0027Console.Write(\"  [OS]\u0027 -\u003e \u0027Console.Error.Write(\"  [\u0027 drops \u0027OS]\u0027.\n  Always include the full match in both old and new string, or use capture groups ($1) to preserve.\n[ENCODING] wkedit auto-detects UTF-8 vs CP949. Never use sed/awk on WKAppBot sources.\n  Post-edit sanity: \u0027wkappbot file grep \u0027\\uFFFD\u0027 --path \u003cdir\u003e\u0027 checks for corruption.\n[TIPS-FROM-USE] Batch \u003e loop: 124 files in one call ~2s. grep -rl filter mandatory for multi-file.\n  .NET regex escaping: escape ( ) . in single-quotes for shell AND .NET.\n  Safepoint commit before bulk edit = stress-free. Do NOT git add .bak/ accidentally."
+              ],
+    "tags":  [
+                 "wkedit",
+                 "file-edit",
+                 "regex",
+                 "bulk",
+                 "refactor",
+                 "encoding",
+                 "backup",
+                 "undo",
+                 "transaction",
+                 "multi-file",
+                 "developer",
+                 "project"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T16:16:02.995056Z",
+    "updated":  "2026-04-08T16:49:15.5946273Z",
+    "version":  "1.6"
 }

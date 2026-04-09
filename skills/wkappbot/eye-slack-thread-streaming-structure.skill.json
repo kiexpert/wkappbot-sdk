@@ -1,44 +1,45 @@
-{
-  "id": "eye-slack-thread-streaming-structure",
-  "app": "wkappbot",
-  "title": "Eye Slack Thread \u2014 Live Streaming Structure \u0026 CCABot Slot Design",
-  "desc": "Eye posts a single Slack thread as a live dashboard. All bots unified under \uC571\uBD07\uC544\uC774 username (no CWD suffix). Thread slot contract: root=status(\uC571\uBD07\uC544\uC774), [0]=card placeholder(\uC571\uBD07\uC544\uC774), [1]=\uC571\uBD07\uC544\uC774 mouse\u002BCCA analysis. Slot [0] ALWAYS force-created so \uC571\uBD07\uC544\uC774 CCA reply reliably lands at [1].",
-  "steps": [
-    "[THREAD-CONTRACT] Fixed slot layout: root=\uC571\uBD07\uC544\uC774 status (\uD83D\uDFE2 Eye alive PID/uptime/mem/frame). [0]=\uC571\uBD07\uC544\uC774 card reply (IPC summary / active card content). [1]=CCABot mouse\u002BCCA live analysis. Thread reused across restarts \u2014 never post new root if existing \uC571\uBD07\uC544\uC774 msg found (FindEyeStatusTsForReuse).",
-    "[SLOT-GUARANTEE] Reply [0] MUST always exist after new thread creation. If IPC summary empty at startup \u2192 post \u0027_(loading...)_\u0027 placeholder (username=\uC571\uBD07\uC544\uC774). Without this: CCABot occupies [0], index-based lookup fails, duplicate CCABot replies accumulate forever. Code: AppBotEyeGlobalMode.cs frameCount==0 block.",
-    "[CCA-REUSE] CCA reply reuse: search by username==\u0027\uC571\uBD07\uC544\uC774\u0027 via FirstOrDefault \u2014 NOT by index. Bug history: children[1] hardcoded \u2192 fails when card slot absent or thread has extra replies. _mouseCcaReplyTs holds ts; UpdateMouseCcaSlack() edits in-place via SlackUpdateMessageAsync(). New post only when ts==null.",
-    "[STARTUP-RECOVERY] Eye restart with existing thread: FindEyeStatusTsForReuse() finds root by username. SlackGetThreadRepliesAsync() recovers child ts values: filter username=\uC571\uBD07\uC544\uC774 \u2192 children[0]=_eyeSummaryReplyTs. CCA ts recovered in UnifiedAnalysisLoop by username=\uC571\uBD07\uC544\uC774 search. RestoreHoverReplyTs() applied when found.",
-    "[UPDATE-ONLY] All live content (card, CCA) uses chat.update (edit in-place) not new posts. Change-detection (_lastMouseCcaResult) skips Slack update when content unchanged. Purpose: conserve Slack message quota \u2014 free plan 90-day history cap.",
-    "[USERNAME-POLICY] All Slack posts from Eye use username=\uC571\uBD07\uC544\uC774 (no CWD suffix \u2014 Eye is global, not per-folder). \uD074\uB863/\uCF54\uB373\uC571 bots keep CWD tag (e.g. \uD074\uB863[WG-WKAppBot]) since they are per-session. Ack messages in AppBotEyeSlackHandlers also use \uC571\uBD07\uC544\uC774 directly (not BuildSlackBotUsername)."
-  ],
-  "tags": [
-    "eye",
-    "slack",
-    "streaming",
-    "ccabot",
-    "thread",
-    "placeholder",
-    "reuse",
-    "live-dashboard",
-    "slot"
-  ],
-  "source_refs": [
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs",
-      "line": null,
-      "pattern": null,
-      "note": null
-    }
-  ],
-  "regression_script": null,
-  "author": "claude",
-  "created": "2026-04-07T14:33:43.5386081Z",
-  "updated": "2026-04-08T12:05:47.5896918Z",
-  "version": "1.10"
+﻿{
+    "id":  "eye-slack-thread-streaming-structure",
+    "app":  "wkappbot",
+    "title":  "Eye Slack Thread — Live Streaming Structure \u0026 CCABot Slot Design",
+    "desc":  "Eye posts a single Slack thread as a live dashboard. All bots unified under 앱봇아이 username (no CWD suffix). Thread slot contract: root=status(앱봇아이), [0]=card placeholder(앱봇아이), [1]=앱봇아이 mouse+CCA analysis. Slot [0] ALWAYS force-created so 앱봇아이 CCA reply reliably lands at [1].",
+    "steps":  [
+                  "[THREAD-CONTRACT] Fixed slot layout: root=앱봇아이 status (🟢 Eye alive PID/uptime/mem/frame). [0]=앱봇아이 card reply (IPC summary / active card content). [1]=CCABot mouse+CCA live analysis. Thread reused across restarts — never post new root if existing 앱봇아이 msg found (FindEyeStatusTsForReuse).",
+                  "[SLOT-GUARANTEE] Reply [0] MUST always exist after new thread creation. If IPC summary empty at startup → post \u0027_(loading...)_\u0027 placeholder (username=앱봇아이). Without this: CCABot occupies [0], index-based lookup fails, duplicate CCABot replies accumulate forever. Code: AppBotEyeGlobalMode.cs frameCount==0 block.",
+                  "[CCA-REUSE] CCA reply reuse: search by username==\u0027앱봇아이\u0027 via FirstOrDefault — NOT by index. Bug history: children[1] hardcoded → fails when card slot absent or thread has extra replies. _mouseCcaReplyTs holds ts; UpdateMouseCcaSlack() edits in-place via SlackUpdateMessageAsync(). New post only when ts==null.",
+                  "[STARTUP-RECOVERY] Eye restart with existing thread: FindEyeStatusTsForReuse() finds root by username. SlackGetThreadRepliesAsync() recovers child ts values: filter username=앱봇아이 → children[0]=_eyeSummaryReplyTs. CCA ts recovered in UnifiedAnalysisLoop by username=앱봇아이 search. RestoreHoverReplyTs() applied when found.",
+                  "[UPDATE-ONLY] All live content (card, CCA) uses chat.update (edit in-place) not new posts. Change-detection (_lastMouseCcaResult) skips Slack update when content unchanged. Purpose: conserve Slack message quota — free plan 90-day history cap.",
+                  "[USERNAME-POLICY] All Slack posts from Eye use username=앱봇아이 (no CWD suffix — Eye is global, not per-folder). 클롣/코덳앱 bots keep CWD tag (e.g. 클롣[WG-WKAppBot]) since they are per-session. Ack messages in AppBotEyeSlackHandlers also use 앱봇아이 directly (not BuildSlackBotUsername)."
+              ],
+    "tags":  [
+                 "eye",
+                 "slack",
+                 "streaming",
+                 "ccabot",
+                 "thread",
+                 "placeholder",
+                 "reuse",
+                 "live-dashboard",
+                 "slot",
+                 "project"
+             ],
+    "source_refs":  [
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs",
+                            "line":  null,
+                            "pattern":  null,
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs",
+                            "line":  null,
+                            "pattern":  null,
+                            "note":  null
+                        }
+                    ],
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T14:33:43.5386081Z",
+    "updated":  "2026-04-08T12:05:47.5896918Z",
+    "version":  "1.11"
 }

@@ -1,0 +1,26 @@
+﻿{
+    "id":  "shell-safe-find-grap-outputs",
+    "app":  "wkappbot",
+    "title":  "Shell-safe find grap outputs",
+    "desc":  "The find command must emit minimal but high-signal grap strings that are safe to paste into a shell and re-run verbatim. Keep # FOCUS for the current focused leaf path because unrelated popups can still affect interaction, and keep # TARGET hwnd-first with only the essential discriminators needed to resolve ambiguity.",
+    "steps":  [
+                  "Emit # FOCUS with the full focused leaf path.",
+                  "Emit # TARGET as a shell-friendly, paste-ready grap string with hwnd as the primary token.",
+                  "Verify copy-pasted grap strings by rerunning find and checking that they resolve back to the same target."
+              ],
+    "tags":  [
+                 "find",
+                 "grap",
+                 "target",
+                 "shell",
+                 "safety",
+                 "verification",
+                 "project"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T08:25:09.4635335Z",
+    "updated":  "2026-04-08T08:25:09.4635666Z",
+    "version":  "1.1"
+}

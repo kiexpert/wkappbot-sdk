@@ -1,0 +1,27 @@
+﻿{
+    "id":  "quoted-grap-focus-and-info-lines",
+    "app":  "wkappbot",
+    "title":  "Quoted grap focus and info lines",
+    "desc":  "Find output should quote the full grap expression so it can be pasted as one shell argument. Print one shared # FOCUS line per invocation using the common grap builder, print one # TARGET line per match, include the matched field/snippet in a brace block, and indent # INFO lines for compact markdown-like readability.",
+    "steps":  [
+                  "Quote the full grap expression in # FOCUS and # TARGET so the output is paste-ready as one shell argument.",
+                  "Use the shared grap builders for both focus and target output instead of hardcoded formatting.",
+                  "Indent # INFO lines under each target and keep them short, high-signal, and markdown-friendly."
+              ],
+    "tags":  [
+                 "grap",
+                 "find",
+                 "focus",
+                 "target",
+                 "info",
+                 "shell-safe",
+                 "markdown",
+                 "project"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T09:21:37.5903896Z",
+    "updated":  "2026-04-08T09:21:37.5904072Z",
+    "version":  "1.1"
+}

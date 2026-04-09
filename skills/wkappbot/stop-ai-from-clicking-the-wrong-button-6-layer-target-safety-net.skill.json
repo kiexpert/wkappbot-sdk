@@ -1,21 +1,24 @@
-{
-  "id": "stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net",
-  "app": "wkappbot",
-  "title": "Stop AI From Clicking the Wrong Button \u2014 6-Layer Target Safety Net",
-  "desc": "L1: ambiguous pattern matches multiple windows \u2192 list \u002B hwnd auto-heal. L2: modal alert blocking \u2192 auto-find buttons inside. L3: FOCUSED/LEAF terminal node \u2192 suggest grab target. L4: Win32 child not found \u2192 list siblings (MFC/HTS). L5: no #scope on element action \u2192 root children \u002B focus chain. L6: UIA scope element miss \u2192 list available elements.",
-  "steps": [],
-  "tags": [
-    "ambiguity",
-    "uia",
-    "guard",
-    "safety",
-    "mfc",
-    "ai",
-    "target"
-  ],
-  "source_refs": null,
-  "author": "claude",
-  "created": "2026-04-07T04:53:02.3505015Z",
-  "updated": "2026-04-07T04:53:02.3505276Z",
-  "version": "1.0"
+﻿{
+    "id":  "stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net",
+    "app":  "wkappbot",
+    "title":  "Stop AI From Clicking the Wrong Button — 6-Layer Target Safety Net",
+    "desc":  "L1: ambiguous pattern matches multiple windows → list + hwnd auto-heal. L2: modal alert blocking → auto-find buttons inside. L3: FOCUSED/LEAF terminal node → suggest grab target. L4: Win32 child not found → list siblings (MFC/HTS). L5: no #scope on element action → root children + focus chain. L6: UIA scope element miss → list available elements.",
+    "steps":  [
+
+              ],
+    "tags":  [
+                 "ambiguity",
+                 "uia",
+                 "guard",
+                 "safety",
+                 "mfc",
+                 "ai",
+                 "target",
+                 "project"
+             ],
+    "source_refs":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T04:53:02.3505015Z",
+    "updated":  "2026-04-07T04:53:02.3505276Z",
+    "version":  "1.1"
 }

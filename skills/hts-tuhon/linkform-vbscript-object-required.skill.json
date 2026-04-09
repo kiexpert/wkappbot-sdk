@@ -1,23 +1,24 @@
-{
-  "id": "linkform-vbscript-object-required",
-  "app": "hts-tuhon",
-  "title": "LinkForm VBScript Object required \uC6D0\uC778",
-  "desc": "GetControlDispatch\uAC00 Nothing \uBC18\uD658\uD558\uBA74 \u0027Object required: CodeCtl\u0027 \uC5D0\uB7EC. \uC790\uC2DD\uD3FC \uB85C\uB4DC \uD0C0\uC774\uBC0D \uBB38\uC81C \uB610\uB294 \uCEE8\uD2B8\uB864 \uC774\uB984 \uBD88\uC77C\uCE58\uAC00 \uC6D0\uC778.",
-  "steps": [
-    "\uD655\uC778: \uC790\uC2DD\uD3FC(A20B/C1101) \uC644\uC804 \uB85C\uB4DC \uD6C4 \uC811\uADFC",
-    "\uCEE8\uD2B8\uB864 \uC774\uB984 \uC815\uD655\uD788 \uB9E4\uCE6D (\u0027ItemCode1\u0027 vs \u0027exchCode\u0027 \uB4F1)",
-    "\uC678\uBD80 \uBC84\uD2BC \uD074\uB9AD\uC73C\uB85C \uD2B8\uB9AC\uAC70 \uC2DC VBScript \uCD08\uAE30\uD654 \uC21C\uC11C \uBD88\uC644\uC804 \u2192 \uC9C1\uC811 Dispatch \uD638\uCD9C\uB85C \uC6B0\uD68C",
-    "\uB514\uBC84\uAC70 \uC608\uC678\uCC3D \uBE14\uB85D \uC8FC\uC758 \u2014 \uBC29\uD574\uCC3D \uAC10\uC9C0(#32770 \uB4F1) \uC120\uD589 \uD544\uC218"
-  ],
-  "tags": [
-    "hts",
-    "tuhon",
-    "vbscript",
-    "com",
-    "linkform",
-    "\uB514\uBC84\uAE45"
-  ],
-  "author": "claude",
-  "created": "2026-04-06T17:05:41.4363068Z",
-  "version": "1.1"
+﻿{
+    "id":  "linkform-vbscript-object-required",
+    "app":  "hts-tuhon",
+    "title":  "LinkForm VBScript Object required 원인",
+    "desc":  "GetControlDispatch가 Nothing 반환하면 \u0027Object required: CodeCtl\u0027 에러. 자식폼 로드 타이밍 문제 또는 컨트롤 이름 불일치가 원인.",
+    "steps":  [
+                  "확인: 자식폼(A20B/C1101) 완전 로드 후 접근",
+                  "컨트롤 이름 정확히 매칭 (\u0027ItemCode1\u0027 vs \u0027exchCode\u0027 등)",
+                  "외부 버튼 클릭으로 트리거 시 VBScript 초기화 순서 불완전 → 직접 Dispatch 호출로 우회",
+                  "디버거 예외창 블록 주의 — 방해창 감지(#32770 등) 선행 필수"
+              ],
+    "tags":  [
+                 "hts",
+                 "tuhon",
+                 "vbscript",
+                 "com",
+                 "linkform",
+                 "디버깅",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:05:41.4363068Z",
+    "version":  "1.2"
 }

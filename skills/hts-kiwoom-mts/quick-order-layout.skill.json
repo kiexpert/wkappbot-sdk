@@ -1,23 +1,24 @@
-{
-  "id": "quick-order-layout",
-  "app": "hts-kiwoom-mts",
-  "title": "\uCF8C\uC18D\uC8FC\uBB38 \uD638\uAC00\uCC3D \uD035\uBC84\uD2BC \uB808\uC774\uC544\uC6C3",
-  "desc": "\uD035\uBC84\uD2BC content-desc\uAC00 \uC804\uBD80 \u0027\uC815\uC815\u0027\uC73C\uB85C \uC798\uBABB \uD45C\uC2DC\uB428(\uC571 \uBC84\uADF8). text(\uB9E4\uC218/\uB9E4\uB3C4/\uC815\uC815/\uCDE8\uC18C)\uB85C \uAD6C\uBD84\uD574\uC57C \uD568.",
-  "steps": [
-    "\uB9E4\uC218/\uB9E4\uB3C4: a11y click \u0027adb://*heromts*#\uB9E4\uC218\u0027 (\uCCAB \uB9E4\uCE58=\uC0C1\uB2E8 \uBC84\uD2BC)",
-    "\uD035\uBC84\uD2BC content-desc \uC804\uBD80 \u0027\uC815\uC815\u0027 \u2192 text \uC18D\uC131\uC73C\uB85C \uAD6C\uBD84 \uD544\uC218",
-    "\uD638\uAC00 \uD0ED: \uD638\uAC00\uC774\uBCA4\uD2B8\uD074\uB9AD\uD22C\uBA85\uBC84\uD2BC 12\uAC1C, \uC88C\uD45C \uAE30\uBC18 \uD0ED",
-    "\uC8FC\uBB38 \uD6C4 \uD655\uC778 \uB2E4\uC774\uC5BC\uB85C\uADF8 \uC608\uC0C1 \u2014 \uC790\uB3D9 \uC218\uB77D \uCC98\uB9AC \uD544\uC694"
-  ],
-  "tags": [
-    "android",
-    "adb",
-    "heromts",
-    "quick-order",
-    "\uD638\uAC00",
-    "\uBC84\uADF8"
-  ],
-  "author": "claude",
-  "created": "2026-04-06T17:06:57.9769054Z",
-  "version": "1.1"
+﻿{
+    "id":  "quick-order-layout",
+    "app":  "hts-kiwoom-mts",
+    "title":  "쾌속주문 호가창 퀵버튼 레이아웃",
+    "desc":  "퀵버튼 content-desc가 전부 \u0027정정\u0027으로 잘못 표시됨(앱 버그). text(매수/매도/정정/취소)로 구분해야 함.",
+    "steps":  [
+                  "매수/매도: a11y click \u0027adb://*heromts*#매수\u0027 (첫 매치=상단 버튼)",
+                  "퀵버튼 content-desc 전부 \u0027정정\u0027 → text 속성으로 구분 필수",
+                  "호가 탭: 호가이벤트클릭투명버튼 12개, 좌표 기반 탭",
+                  "주문 후 확인 다이얼로그 예상 — 자동 수락 처리 필요"
+              ],
+    "tags":  [
+                 "android",
+                 "adb",
+                 "heromts",
+                 "quick-order",
+                 "호가",
+                 "버그",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:06:57.9769054Z",
+    "version":  "1.2"
 }

@@ -1,21 +1,24 @@
-{
-  "id": "automating-legacy-mfc-apps-with-no-uia-hts-playbook",
-  "app": "wkappbot",
-  "title": "Automating Legacy MFC Apps With No UIA \u2014 HTS Playbook",
-  "desc": "MFC owner-drawn controls have almost no UIA patterns \u2192 Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL \u2014 double input). GetSupportedPatterns() on MFC = COM corruption \u2014 use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein \u22642 for bitmap OCR instability.",
-  "steps": [],
-  "tags": [
-    "hts",
-    "mfc",
-    "ocr",
-    "win32",
-    "uia",
-    "legacy",
-    "owner-drawn"
-  ],
-  "source_refs": null,
-  "author": "claude",
-  "created": "2026-04-07T04:53:02.4064792Z",
-  "updated": "2026-04-07T04:53:02.4065072Z",
-  "version": "1.0"
+﻿{
+    "id":  "automating-legacy-mfc-apps-with-no-uia-hts-playbook",
+    "app":  "wkappbot",
+    "title":  "Automating Legacy MFC Apps With No UIA — HTS Playbook",
+    "desc":  "MFC owner-drawn controls have almost no UIA patterns → Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL — double input). GetSupportedPatterns() on MFC = COM corruption — use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein ≤2 for bitmap OCR instability.",
+    "steps":  [
+
+              ],
+    "tags":  [
+                 "hts",
+                 "mfc",
+                 "ocr",
+                 "win32",
+                 "uia",
+                 "legacy",
+                 "owner-drawn",
+                 "project"
+             ],
+    "source_refs":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T04:53:02.4064792Z",
+    "updated":  "2026-04-07T04:53:02.4065072Z",
+    "version":  "1.1"
 }
