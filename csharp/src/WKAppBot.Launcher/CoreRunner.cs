@@ -430,9 +430,7 @@ partial class Program
     static void AppBotQuitFlush(uint exitCode, System.Threading.Tasks.Task? stderrRelay = null, int stderrWaitMs = 2000)
     {
         try { stderrRelay?.Wait(stderrWaitMs); } catch { }
-        try { Console.Out.Flush(); } catch { }
-        try { Console.Error.Flush(); } catch { }
-        TerminateSelf(exitCode);
+        AppBotExit((int)exitCode); // stderr buffer dump + flush + TerminateSelf
     }
 
     /// <summary>
