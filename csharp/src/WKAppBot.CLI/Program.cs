@@ -509,6 +509,20 @@ internal partial class Program
         // Print log path early — so if the caller times out, they know where to tail the live log.
         if (tee != null && !GrepModeActive && !QuietFindOutput)
             Console.Error.WriteLine($"[LOG] {logFile}");
+        // No TeeWriter yet: either RunningInEye (Eye-internal route OR spawned worker) or fast-exit.
+        // Rule: if wkappbot.exe Launcher is not in the parent process chain, always create a stderr log.
+        // Eye-internal routes (EyeCmdPipeServer.RunInEye in-process): same PID as Eye → Launcher IS
+        //   ancestor of Eye → skip. All other fresh processes without Launcher ancestor → create log.
+        if (tee == null && !_fastExitAfterCommand && !IsLauncherInParentChain())
+        {
+            try
+            {
+                var workerLog = new System.IO.StreamWriter(logFile, append: false, System.Text.Encoding.UTF8) { AutoFlush = true };
+                Console.SetError(new WorkerStderrTeeWriter(Console.Error, workerLog));
+                Console.Error.WriteLine($"[LOG] {logFile}");
+            }
+            catch { /* non-fatal — logging best-effort */ }
+        }
         // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
         {
             var launchCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
@@ -2285,6 +2299,50 @@ internal partial class Program
         TerminateProcess(GetCurrentProcess(), (uint)code);
         System.Threading.Thread.Sleep(500);
         Environment.Exit(code);
+    }
+
+    /// <summary>
+    /// Returns true if wkappbot.exe (the Launcher) is in this process's ancestor chain.
+    /// Used to detect whether Launcher log infra is active — if not, we self-create a log.
+    /// </summary>
+    static bool IsLauncherInParentChain()
+    {
+        try
+        {
+            var visited = new HashSet<int>();
+            int pid = Environment.ProcessId;
+            for (int depth = 0; depth < 10; depth++)
+            {
+                var query = new System.Management.ManagementObjectSearcher(
+                    $"SELECT ParentProcessId,Name FROM Win32_Process WHERE ProcessId={pid}");
+                using var results = query.Get();
+                int parentPid = 0;
+                string? parentName = null;
+                foreach (System.Management.ManagementObject obj in results)
+                {
+                    parentPid = Convert.ToInt32(obj["ParentProcessId"]);
+                    parentName = obj["Name"]?.ToString();
+                }
+                if (parentPid == 0 || !visited.Add(parentPid)) break;
+                if (parentName?.StartsWith("wkappbot", StringComparison.OrdinalIgnoreCase) == true
+                    && !parentName.Contains("core", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                pid = parentPid;
+            }
+        }
+        catch { /* WMI unavailable — assume no Launcher */ }
+        return false;
+    }
+
+    /// <summary>Tees stderr to a log file for Core processes spawned without Launcher log infra.</summary>
+    sealed class WorkerStderrTeeWriter(TextWriter original, System.IO.StreamWriter logFile) : TextWriter
+    {
+        public override System.Text.Encoding Encoding => original.Encoding;
+        public override void Write(char value) { original.Write(value); logFile.Write(value); }
+        public override void Write(string? value) { original.Write(value); logFile.Write(value); }
+        public override void WriteLine(string? value) { original.WriteLine(value); logFile.WriteLine(value); }
+        public override void Flush() { original.Flush(); logFile.Flush(); }
+        protected override void Dispose(bool disposing) { if (disposing) logFile.Dispose(); base.Dispose(disposing); }
     }
 }
 
