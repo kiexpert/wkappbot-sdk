@@ -100,8 +100,8 @@ internal partial class Program
         }
 
         // Separate text vs files (shared ParseTextAndFiles)
-        bool force = args.Contains("--force");
-        var (textParts, files) = ParseTextAndFiles(args.Where(a => a != "--force").ToArray());
+        bool force = args.Contains("--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste");
+        var (textParts, files) = ParseTextAndFiles(args.Where(a => a != "--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste").ToArray());
         var text = string.Join("\n", textParts);
         if (!force && HasEncodingRisk(text, "suggest")) return 1;
         var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
@@ -606,7 +606,7 @@ internal partial class Program
         {
             Console.Error.WriteLine($"[ENCODING-GUARD] {context}: {risky}/{total} risky chars ({ratio:P1}) > 0.1% threshold.");
             Console.Error.WriteLine($"  Korean/emoji in AI-facing text = 2-3x token waste + CP949 corruption risk.");
-            Console.Error.WriteLine($"  Write in English. Use --force to bypass.");
+            Console.Error.WriteLine($"  Write in English. Use --i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste to bypass.");
             return true;
         }
         return false;
