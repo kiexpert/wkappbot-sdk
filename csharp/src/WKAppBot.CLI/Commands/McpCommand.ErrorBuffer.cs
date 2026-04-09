@@ -6,23 +6,33 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// Universal exit point — flushes timestamped error log on failure.
-    /// Usage: return AppBotExit(0);          // success, discard errors
-    ///        return AppBotExit(1);          // error, auto-flush error log
-    ///        return AppBotExit(1, true);    // error, force flush even if code==0
+    /// Core common exit point — call before returning from any command handler.
+    /// Handles: ErrorScope flush, stdout-blank + error-detected override, DoRequiredExitCleanup.
+    ///
+    /// stdout blank + ErrorScope.ErrorDetected + code==0 → override to -9999 (silent error guard).
+    /// forceErrorLog=true: flush error log even on success (for commands that always want stderr visible).
+    /// signalLauncher=false: skip WriteExitFile (used by ProcessExit hook which signals via UIT).
     /// </summary>
-    static int AppBotExit(int code, bool forceErrorLog = false)
+    static int AppBotExit(int code, bool forceErrorLog = false, bool runCleanup = false)
     {
         var scope = ErrorScope.Current;
         if (scope != null)
         {
-            // ErrorScope active → stderr was buffered. Flush on error.
+            bool errorDetected = scope.ErrorDetected;
+            // stdout blank + stderr error-like + exit 0 = silent swallowed error
+            if (code == 0 && errorDetected && (_activeTee?.StdoutIsBlank ?? false))
+            {
+                AutoRegisterBug($"[BUG-AUTO] `{Environment.GetCommandLineArgs().Skip(1).FirstOrDefault()}` exited 0 but stderr had errors and stdout was blank");
+                code = -9999;
+            }
             bool isError = code != 0 || forceErrorLog;
             var log = scope.Finalize(isError);
             if (isError && log.Length > 0)
                 Console.Error.Write(log);
         }
-        // No ErrorScope (--stderr mode) → stderr already shown in real-time, nothing to flush.
+        // No ErrorScope (--stderr / RunningInEye / pipe mode) → stderr already real-time, nothing to flush.
+        if (runCleanup)
+            DoRequiredExitCleanup(code);
         return code;
     }
 

@@ -319,9 +319,9 @@ internal partial class Program
                         try
                         {
                             using var ph = System.Diagnostics.Process.GetProcessById(parentPid);
-                            if (ph.HasExited) { Environment.Exit(0); return; }
+                            if (ph.HasExited) { AppBotExit(0, runCleanup: true); Environment.Exit(0); return; }
                         }
-                        catch (ArgumentException) { Environment.Exit(0); return; } // parent gone
+                        catch (ArgumentException) { AppBotExit(0, runCleanup: true); Environment.Exit(0); return; } // parent gone
                         catch { } // access denied etc. — keep watching
                     }
                 }) { IsBackground = true, Name = "OrphanGuard" };
@@ -836,19 +836,8 @@ internal partial class Program
             }
             catch { }
 
-            // ErrorScope: passthrough already emitted on first error; Finalize cleans up.
-            // Guard: if stderr was written but exitCode=0, that's a bug — report + override.
-            if (_errScope != null)
-            {
-                bool errorDetected = _errScope.ErrorDetected;
-                _errScope.Finalize(exitCode != 0); // restore stderr
-                if (errorDetected && exitCode == 0)
-                {
-                    // Stderr output with successful exit — caller swallowed an error
-                    AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr — error suppressed");
-                    exitCode = -9999;
-                }
-            }
+            // AppBotExit: ErrorScope flush + stdout-blank guard + DoRequiredExitCleanup via finally.
+            exitCode = AppBotExit(exitCode);
             _exitCode = exitCode;
             return exitCode;
         }
