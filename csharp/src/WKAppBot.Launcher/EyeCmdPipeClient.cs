@@ -86,7 +86,8 @@ internal static class EyeCmdPipeClient
             }
 
             bool gotEndMarker = false;
-            int outputLines = 0;
+            int outputLines = 0;      // non-LAUNCH lines written to stdout
+            bool hasLaunchJson = false; // {"_":"LAUNCH"...} peeked line
             try
             {
                 // Drain: process peeked line first (if first-output timeout was used), then loop.
@@ -107,7 +108,11 @@ internal static class EyeCmdPipeClient
                         break;
                     }
                     writeLine(line);
-                    outputLines++;
+                    // Track whether this is the LAUNCH JSON sentinel vs real output
+                    if (line.StartsWith("{\"_\":\"LAUNCH\"") || line.StartsWith("{\"_\": \"LAUNCH\""))
+                        hasLaunchJson = true;
+                    else
+                        outputLines++;
                 }
                 if (timedOut) exitCode = timeoutExitCode;
             }
@@ -120,13 +125,21 @@ internal static class EyeCmdPipeClient
                 timeoutTimer?.Dispose();
             }
 
-            // Empty pipe guard: pipe closed without EndMarker and without any output
-            // → silent failure (process hard-killed or crashed before writing anything)
-            // Return false so Launcher falls back to Core (which will TryRenameSwap on startup).
-            if (!timedOut && !gotEndMarker && outputLines == 0 && peekedLine == null)
+            // Incomplete pipe guard: pipe closed without EndMarker
+            //   Case A: only LAUNCH JSON came (or nothing) → Core fallback (silent crash/kill)
+            //   Case B: some real output came + no EndMarker → error but no re-run (partial output already sent)
+            if (!timedOut && !gotEndMarker)
             {
-                Console.Error.WriteLine("[PIPE] empty closed — falling back to Core (possible crash/kill)");
-                return false;
+                if (outputLines == 0) // only LAUNCH JSON or truly empty
+                {
+                    Console.Error.WriteLine("[PIPE] incomplete — no output after LAUNCH, falling back to Core");
+                    return false; // Launcher will re-run via Core
+                }
+                else // partial real output was already written
+                {
+                    Console.Error.WriteLine("[PIPE] incomplete — pipe closed without EndMarker (partial output)");
+                    exitCode = -1;
+                }
             }
 
             return true;
