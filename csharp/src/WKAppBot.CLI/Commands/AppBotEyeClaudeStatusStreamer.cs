@@ -239,16 +239,23 @@ internal partial class Program
             foreach (var card in _cachedCards)
             {
                 if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
-                var (pct, _, jsonlPath, fileSize) = GetContextInfoForCwdEx(card.Cwd);
+                // Use exact SessionJsonl from registry when available — avoids CWD scan ambiguity
+                // (two AIs sharing the same CWD would otherwise get the same JSONL from CWD scan)
+                var (pct, _, jsonlPath, fileSize) = !string.IsNullOrEmpty(card.SessionJsonl) && File.Exists(card.SessionJsonl)
+                    ? GetContextInfoForJsonl(card.SessionJsonl)
+                    : GetContextInfoForCwdEx(card.Cwd, card.HostType);
                 var sizeMB = fileSize / (1024.0 * 1024.0);
                 const double ContextLimitMB = 20.0;
-                const double SkillNudgeMB  = 9.9;   // 스킬 기여 넛지
-                const double UrgentMB      = 10.0;   // 긴급 (10MB 초과 → 인수인계)
+                const double SkillNudgeMB  = 9.5;   // skill contribute nudge
+                const double UrgentMB      = 10.0;   // urgent handoff threshold
                 if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
 
-                var cwdKey = card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
+                // Key by SessionJsonl when available — two AIs with same CWD must not share dedup state
+                var cwdKey = !string.IsNullOrEmpty(card.SessionJsonl)
+                    ? card.SessionJsonl.Replace('\\', '/').ToLowerInvariant()
+                    : card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                 contextWarnedPcts.TryGetValue(cwdKey, out var prevWarned);
-                var curMB = (int)sizeMB; // 1MB 단위 dedup
+                var curMB = (int)sizeMB; // deduplicate at 1MB granularity
 
                 // New session detected: jsonlPath changed (ctime-new file selected by mtime) → reset counter
                 if (prevWarned.path != null && prevWarned.path != jsonlPath)
@@ -262,11 +269,16 @@ internal partial class Program
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 contextWarnedPcts[cwdKey] = (curMB, jsonlPath);
 
+                // Resolve Slack username from card host type (Claude vs Codex)
+                var cardSlackUser = ClaudePromptHelper.IsCodexHostType(card.HostType)
+                    ? BuildSlackBotUsername(SlackCodexPrefix, cwdTag)
+                    : BuildSlackBotUsername(SlackClaudePrefix, cwdTag);
+
                 if (sizeMB >= SkillNudgeMB && sizeMB < UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
-                    // 9.5MB~10MB: 인수인계 전 스킬 기여 넛지
+                    // 9.5MB-10MB: nudge to contribute a skill before handoff
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — skill 기여 후 인수인계하세요");
+                    Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — contribute a skill then hand off");
                     Console.ResetColor();
                     try
                     {
@@ -281,10 +293,10 @@ internal partial class Program
                 else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — 즉시 인수인계하세요!");
+                    Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — handoff immediately!");
                     Console.ResetColor();
 
-                    // 프창에도 긴급 경고 전송 (MCP subprocess에서 실행)
+                    // Forward urgent warning to the prompt window (runs in MCP subprocess)
                     try
                     {
                         var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요! wkappbot newchat \"...\"을 실행하세요";
@@ -295,12 +307,12 @@ internal partial class Program
 
                     Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                         $":rotating_light: *[{cwdTag}] 컨텍스트 {pct}%!* ({sizeMB:F1}/{ContextLimitMB}MB)\n클롣이 아직 인수인계 안 했습니다! `wkappbot newchat` 실행 필요",
-                        username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
+                        username: cardSlackUser)).Wait(3000);
                 }
                 else if (!string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — 인수인계 준비하세요");
+                    Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — prepare for handoff");
                     Console.ResetColor();
 
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
@@ -316,7 +328,7 @@ internal partial class Program
                         Console.Error.WriteLine($"[EYE] ✅ [{cwdTag}] Handoff nudge sent via MCP");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                             $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n클롣에게 인수인계 프롬프트를 전달했습니다.",
-                            username: BuildSlackBotUsername(SlackClaudePrefix, cwdTag))).Wait(3000);
+                            username: cardSlackUser)).Wait(3000);
                     }
                     catch (Exception ex)
                     {
