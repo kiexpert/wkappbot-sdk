@@ -77,20 +77,6 @@ internal partial class Program
             return 1;
         }
 
-        // Create log file (proxy may be spawned directly from Eye without Launcher log infra)
-        var logPath = BuildProxyLogPath(port);
-        StreamWriter? logWriter = null;
-        try
-        {
-            logWriter = new StreamWriter(logPath, append: false, System.Text.Encoding.UTF8) { AutoFlush = true };
-            Console.SetError(new ProxyTeeWriter(Console.Error, logWriter));
-            Console.Error.WriteLine($"[LOG] {logPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[PROXY] Log file unavailable: {ex.Message}");
-        }
-
         Console.Error.WriteLine($"[PROXY] Listening on {prefix}");
         Console.Error.WriteLine($"[PROXY] Set: ANTHROPIC_BASE_URL={prefix}");
         Console.WriteLine(prefix.TrimEnd('/'));
@@ -113,7 +99,6 @@ internal partial class Program
         }
 
         listener?.Close();
-        logWriter?.Dispose();
         Console.Error.WriteLine("[PROXY] Stopped.");
         return cleanExit ? 0 : 1; // non-clean exit → AppBotExit(1) flushes error log
     }
@@ -547,24 +532,4 @@ internal partial class Program
         return $"{{\"id\":\"msg_proxy\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{{\"type\":\"text\",\"text\":{escaped}}}],\"model\":\"{model}\",\"stop_reason\":\"end_turn\",\"usage\":{{\"input_tokens\":0,\"output_tokens\":0}}}}";
     }
 
-    static string BuildProxyLogPath(int port)
-    {
-        var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? AppContext.BaseDirectory) ?? ".";
-        var logsDir = Path.Combine(exeDir, "wkappbot.hq", "logs");
-        Directory.CreateDirectory(logsDir);
-        var ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        var pid = Environment.ProcessId;
-        return Path.Combine(logsDir, $"wkappbot-core.exe.out-{ts}.claude-proxy-{port}.pid={pid}.log");
-    }
-
-    /// <summary>Tees TextWriter output to two writers (original stderr + log file).</summary>
-    sealed class ProxyTeeWriter(TextWriter primary, TextWriter secondary) : TextWriter
-    {
-        public override System.Text.Encoding Encoding => primary.Encoding;
-        public override void Write(char value) { primary.Write(value); secondary.Write(value); }
-        public override void Write(string? value) { primary.Write(value); secondary.Write(value); }
-        public override void WriteLine(string? value) { primary.WriteLine(value); secondary.WriteLine(value); }
-        public override void Flush() { primary.Flush(); secondary.Flush(); }
-        protected override void Dispose(bool disposing) { if (disposing) secondary.Dispose(); base.Dispose(disposing); }
-    }
 }
