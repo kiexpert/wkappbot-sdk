@@ -132,6 +132,7 @@ internal partial class Program
         {
             try { XRayHelper.RestoreAll(); } catch { }
             try { Console.Out.Flush(); } catch { }
+            try { Console.Error.Flush(); } catch { }
             // DoRequiredExitCleanup: tee.Dispose (log move) + WriteExitFile, idempotent.
             // signalLauncher=false — we signal via UIT + TerminateProcess below instead,
             // to avoid the named-event SetEvent racing with TerminateProcess handle closure.
@@ -2130,6 +2131,10 @@ internal partial class Program
             try { tee.Dispose(); } catch { } // moves log to logs/old
         }
 
+        // Flush stderr so MCP / worker-spawned Core paths don't lose trailing log lines
+        // before TerminateProcess (which skips CLR finalization).
+        try { Console.Error.Flush(); } catch { }
+
         if (signalLauncher)
             WriteExitFile(code);
     }
@@ -2141,11 +2146,19 @@ internal partial class Program
     static void WriteExitFile(int code)
     {
         try { Console.Out.Flush(); } catch { }
+        try { Console.Error.Flush(); } catch { }
         try
         {
-            var hOut = GetStdHandle(-11);
+            var hOut = GetStdHandle(-11); // STD_OUTPUT_HANDLE
             if (hOut != IntPtr.Zero && hOut != new IntPtr(-1))
                 FlushFileBuffers(hOut);
+        }
+        catch { }
+        try
+        {
+            var hErr = GetStdHandle(-12); // STD_ERROR_HANDLE
+            if (hErr != IntPtr.Zero && hErr != new IntPtr(-1))
+                FlushFileBuffers(hErr);
         }
         catch { }
         try
