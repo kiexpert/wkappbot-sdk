@@ -299,8 +299,7 @@ partial class Program
             // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
             // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
             // Also buffer last 20 stderr lines + capture [LOG] path for fallback errors.jsonl.
-            var _stderr = Console.OpenStandardError();
-            var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
+            // Raw-byte read preserves sentinel detection; text accumulation handles line extraction.
             var stderrLastLines = new System.Collections.Generic.Queue<string>(); // ring buffer last 20 lines
             string? capturedLogPath = null;
             var stderrLock = new object();
@@ -308,16 +307,16 @@ partial class Program
             {
                 try
                 {
-                    using var reader = new System.IO.StreamReader(proc.StandardError.BaseStream,
-                        System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false,
-                        bufferSize: 4096, leaveOpen: true);
                     var rawStderr = Console.OpenStandardError();
-                    string? line;
-                    while ((line = reader.ReadLine()) != null)
+                    var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
+                    var buf = new byte[4096];
+                    var lineAcc = new System.Text.StringBuilder();
+                    int n;
+                    while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
                     {
-                        var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
-                        // Sentinel check on raw bytes equivalent: \0UIT won't appear as a text line
-                        if (lineBytes.Length == 4 && lineBytes[0] == 0)
+                        // Sentinel check must happen on raw bytes before any encoding
+                        if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
+                                   && buf[2] == sentinel[2] && buf[3] == sentinel[3])
                         {
                             Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
                             try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
@@ -325,18 +324,31 @@ partial class Program
                             TerminateSelf((uint)ec);
                             return;
                         }
-                        rawStderr.Write(lineBytes, 0, lineBytes.Length); rawStderr.Flush();
-                        lock (stderrLock)
+                        // Relay to terminal immediately (real-time)
+                        rawStderr.Write(buf, 0, n); rawStderr.Flush();
+                        // Accumulate text for line extraction (last-lines ring buffer + [LOG] capture)
+                        lineAcc.Append(System.Text.Encoding.UTF8.GetString(buf, 0, n));
+                        var s = lineAcc.ToString();
+                        var nl = s.LastIndexOf('\n');
+                        if (nl >= 0)
                         {
-                            // Capture [LOG] path for fallback errors.jsonl
-                            if (line.StartsWith("[LOG] ", StringComparison.Ordinal))
-                                capturedLogPath = line[6..].Trim();
-                            stderrLastLines.Enqueue(line);
-                            if (stderrLastLines.Count > 20) stderrLastLines.Dequeue();
+                            var complete = s[..nl];
+                            lineAcc.Clear(); lineAcc.Append(s[(nl + 1)..]);
+                            foreach (var raw in complete.Split('\n'))
+                            {
+                                var line = raw.TrimEnd('\r');
+                                lock (stderrLock)
+                                {
+                                    if (line.StartsWith("[LOG] ", StringComparison.Ordinal))
+                                        capturedLogPath = line[6..].Trim();
+                                    stderrLastLines.Enqueue(line);
+                                    if (stderrLastLines.Count > 20) stderrLastLines.Dequeue();
+                                }
+                            }
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex) { Console.Error.WriteLine($"[LAUNCHER] stderr relay error: {ex.Message}"); }
             });
             Stream _stdout = _needsTranscode
                 ? new TranscodeStream(Console.OpenStandardOutput(), _consoleCodePage)
@@ -348,8 +360,12 @@ partial class Program
             {
                 int n;
                 try { n = proc.StandardOutput.BaseStream.Read(relayBuf, 0, relayBuf.Length); }
-                catch { break; }
-                if (n == 0) break; // EOF — Core exited normally
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[LAUNCHER] stdout pipe error: {ex.GetType().Name}: {ex.Message}");
+                    break;
+                }
+                if (n == 0) break; // EOF — Core stdout closed (normal or crash)
 
                 // Timeout check (--timeout N flag)
                 if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
@@ -361,10 +377,21 @@ partial class Program
                     return timeoutExit; // unreachable
                 }
 
-                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); stdoutBytesWritten += n; } catch { break; }
+                try { _stdout.Write(relayBuf, 0, n); _stdout.Flush(); stdoutBytesWritten += n; }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[LAUNCHER] stdout write error: {ex.GetType().Name}: {ex.Message}");
+                    break;
+                }
             }
             try { _stdout.Flush(); } catch { }
-            if (!proc.HasExited) proc.WaitForExit();
+            // WaitForExit with timeout: stdout EOF doesn't guarantee Core exited (e.g. crash mid-output).
+            if (!proc.HasExited && !proc.WaitForExit(5000))
+            {
+                Console.Error.WriteLine($"[LAUNCHER] Core still alive 5s after stdout EOF — killing (pid={proc.Id})");
+                try { proc.Kill(entireProcessTree: false); } catch { }
+                proc.WaitForExit(1000);
+            }
 
             _lDiagStep = $"proc-exited(code={proc.ExitCode})";
             Prof($"proc exited code={proc.ExitCode}");
