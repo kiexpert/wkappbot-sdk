@@ -1,6 +1,6 @@
 // ClaudeProxyCommand.cs — Local Anthropic API proxy for Claude Code
-// Usage: wkappbot claude-proxy [--port 7070] [--inject-context] [--verbose]
-//   Set ANTHROPIC_BASE_URL=http://localhost:7070 in Claude Code settings or env.
+// Usage: wkappbot claude-proxy [--port 7788] [--inject-context] [--verbose]
+//   Set ANTHROPIC_BASE_URL=http://localhost:7788 in Claude Code settings or env.
 //   Proxies all requests to https://api.anthropic.com with optional injection.
 //
 // Injection features:
@@ -24,15 +24,15 @@ internal partial class Program
     {
         if (args.Contains("-h") || args.Contains("--help"))
         {
-            Console.WriteLine("Usage: wkappbot claude-proxy [--port 7070] [--inject-context] [--verbose]");
+            Console.WriteLine("Usage: wkappbot claude-proxy [--port 7788] [--inject-context] [--verbose]");
             Console.WriteLine();
             Console.WriteLine("  Starts a local Anthropic API proxy on localhost.");
             Console.WriteLine("  Configure Claude Code to use it:");
-            Console.WriteLine("    ANTHROPIC_BASE_URL=http://localhost:7070");
+            Console.WriteLine("    ANTHROPIC_BASE_URL=http://localhost:7788");
             Console.WriteLine("    (set in ~/.claude/settings.json or env)");
             Console.WriteLine();
             Console.WriteLine("  Options:");
-            Console.WriteLine("    --port N          Listen port (default: 7070)");
+            Console.WriteLine("    --port N          Listen port (default: 7788)");
             Console.WriteLine("    --inject-context  Inject WKAppBot session context into system messages");
             Console.WriteLine("    --verbose         Log all requests/responses");
             return 0;
