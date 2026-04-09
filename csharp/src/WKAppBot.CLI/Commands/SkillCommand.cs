@@ -204,6 +204,7 @@ internal partial class Program
         var tags = new List<string>();
         var refs = new List<SkillSourceRef>();
 
+        bool force = args.Contains("--force");
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -216,6 +217,7 @@ internal partial class Program
                 case "--steps"             when i + 1 < args.Length: steps.AddRange(args[++i].Split('|')); break;
                 case "--tags"              when i + 1 < args.Length: tags.AddRange(args[++i].Split(',')); break;
                 case "--regression-script" when i + 1 < args.Length: regressionScript = args[++i]; break;
+                case "--force": break;
                 // --refs "file.cs:42:pattern|file2.cs::pattern2"
                 case "--refs"   when i + 1 < args.Length:
                     foreach (var r in args[++i].Split('|'))
@@ -239,6 +241,10 @@ internal partial class Program
             Console.WriteLine("           --regression-script <path>  (registers test script into experience/tests/)");
             return 1;
         }
+
+        // Encoding risk check: reject Korean/emoji in skill content
+        var allContent = string.Join(" ", new[] { title, desc }.Concat(steps).Where(s => s != null)!);
+        if (!force && HasEncodingRisk(allContent, "skill contribute")) return 1;
 
         var slug = id ?? Slugify(title);
         if (string.IsNullOrEmpty(slug))
@@ -338,6 +344,7 @@ internal partial class Program
         List<string>? steps = null, tags = null;
         int stepIndex = -1;   // 1-based; -1 = not set
         bool addStep  = false;
+        bool force    = args.Contains("--force");
 
         for (int i = 1; i < args.Length; i++)
         {
@@ -351,8 +358,13 @@ internal partial class Program
                     if (int.TryParse(args[++i], out var si)) stepIndex = si; break;
                 case "--content"   when i + 1 < args.Length: stepContent = args[++i]; break;
                 case "--add-step"  when i + 1 < args.Length: stepContent = args[++i]; addStep = true; break;
+                case "--force": break;
             }
         }
+
+        // Encoding risk check on edited content
+        var editedContent = string.Join(" ", new[] { title, desc, stepContent }.Concat(steps ?? []).Where(s => s != null)!);
+        if (!force && !string.IsNullOrEmpty(editedContent) && HasEncodingRisk(editedContent, "skill edit")) return 1;
 
         bool hasSingleStep = stepIndex > 0 && stepContent != null;
         if (title == null && desc == null && steps == null && tags == null && !hasSingleStep && !addStep)
@@ -999,7 +1011,7 @@ internal partial class Program
     }
 }
 
-// ?? SkillSource / SkillRecord ?????????????????????????????????????????????????
+// ── SkillSource / SkillRecord ─────────────────────────────────────────────
 
 internal enum SkillSource { Project, Hq }
 
