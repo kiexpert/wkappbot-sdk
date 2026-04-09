@@ -302,6 +302,10 @@ Examples:
         bool newSession, bool loopMode, int loopMaxSteps, int loopRetry, int loopMaxParallel,
         string? modelHint, bool noWait, bool debateMode = false)
     {
+        // Triad minimum timeout: 120s. Analysis questions easily exceed the default 30s.
+        // User can still raise via --timeout N; we only enforce the floor here.
+        if (timeoutSec < 120) timeoutSec = 120;
+
         // Triad always starts fresh per-AI — prevents stale session cross-contamination.
         var freshSession = newSession; // --new-session only when explicitly requested
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
