@@ -100,8 +100,10 @@ internal partial class Program
         }
 
         // Separate text vs files (shared ParseTextAndFiles)
-        var (textParts, files) = ParseTextAndFiles(args);
+        bool force = args.Contains("--force");
+        var (textParts, files) = ParseTextAndFiles(args.Where(a => a != "--force").ToArray());
         var text = string.Join("\n", textParts);
+        if (!force && HasEncodingRisk(text, "suggest")) return 1;
         var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
         if (string.IsNullOrEmpty(cwdTag)) cwdTag = "unknown";
 
@@ -578,6 +580,36 @@ internal partial class Program
 
         Console.WriteLine(reposted > 0 ? $"[REPOST] Done: {reposted} reposted, slack_ts saved." : "[REPOST] Nothing to repost.");
         return 0;
+    }
+
+    // ── Encoding Risk Guard ────────────────────────────────────────────────────
+    // Returns true (and prints error) if text contains >0.1% Korean/emoji chars.
+    // Korean in AI-facing text costs 2-3x tokens; emojis corrupt in CP949 builds.
+    internal static bool HasEncodingRisk(string text, string context)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        int total = text.Length;
+        int risky = 0;
+        foreach (var ch in text)
+        {
+            // Korean syllables / Jamo
+            if (ch >= '\uAC00' && ch <= '\uD7A3') { risky++; continue; }
+            if (ch >= '\u1100' && ch <= '\u11FF') { risky++; continue; }
+            if (ch >= '\u3130' && ch <= '\u318F') { risky++; continue; }
+            // Emoji blocks (BMP dingbats, misc symbols)
+            if (ch >= '\u2600' && ch <= '\u27BF') { risky++; continue; }
+            // Supplementary emoji via surrogate pairs
+            if (char.IsHighSurrogate(ch)) { risky++; continue; }
+        }
+        double ratio = (double)risky / total;
+        if (ratio > 0.001)
+        {
+            Console.Error.WriteLine($"[ENCODING-GUARD] {context}: {risky}/{total} risky chars ({ratio:P1}) > 0.1% threshold.");
+            Console.Error.WriteLine($"  Korean/emoji in AI-facing text = 2-3x token waste + CP949 corruption risk.");
+            Console.Error.WriteLine($"  Write in English. Use --force to bypass.");
+            return true;
+        }
+        return false;
     }
 
 }
