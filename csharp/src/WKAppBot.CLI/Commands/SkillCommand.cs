@@ -114,7 +114,7 @@ internal partial class Program
             return 1;
         }
 
-        bool developerMode = args.Any(a => a == "--developer" || a == "--dev");
+        bool explicitDev = args.Any(a => a == "--developer" || a == "--dev");
         var id = args.First(a => !a.StartsWith("--"));
 
         var skill = FindSkill(id);
@@ -124,6 +124,12 @@ internal partial class Program
             Console.WriteLine("  Hint: wkappbot skill list  or  wkappbot skill search <keyword>");
             return 1;
         }
+
+        // Project skills (loaded from CWD/skills/) are shown in full by default —
+        // you're already in the right codebase context. HQ skills from other projects
+        // show step titles only; full content requires --developer.
+        bool developerMode = explicitDev || skill.Source == SkillSource.Project;
+        bool hqForeignSkill = !explicitDev && skill.Source == SkillSource.Hq;
 
         Console.Error.WriteLine($"[SKILL] {skill.Title}");
         Console.WriteLine($"  ID     : {skill.Id}");
@@ -135,31 +141,42 @@ internal partial class Program
 
         if (skill.Steps?.Count > 0)
         {
-            // Steps prefixed with [DEV] are developer-only — hidden in default view.
-            // All other steps are operator-visible.
-            var opSteps  = skill.Steps.Where(s => !IsDevStep(s)).ToList();
-            var devSteps = skill.Steps.Where(s =>  IsDevStep(s)).ToList();
-
-            if (developerMode)
+            if (hqForeignSkill)
             {
-                // Developer view: all steps, no filtering
+                // HQ skill from another project — show step titles only (first sentence),
+                // full content hidden behind --developer
                 Console.WriteLine("  Steps  :");
                 for (int i = 0; i < skill.Steps.Count; i++)
-                    Console.WriteLine($"    {i + 1}. {skill.Steps[i]}");
-            }
-            else if (opSteps.Count == 0)
-            {
-                // All steps are [DEV] — skip Steps section entirely, just show hint
-                Console.WriteLine($"  Steps  : (all {devSteps.Count} step(s) are [DEV] — use --developer to show)");
+                {
+                    var title = StepTitle(skill.Steps[i]);
+                    var hasMore = skill.Steps[i].Length > title.Length;
+                    Console.WriteLine($"    {i + 1}. {title}{(hasMore ? "  (developer only)" : "")}");
+                }
             }
             else
             {
-                // Mixed: show operator steps numbered from 1, hint if any DEV hidden
-                Console.WriteLine("  Steps  :");
-                for (int i = 0; i < opSteps.Count; i++)
-                    Console.WriteLine($"    {i + 1}. {opSteps[i]}");
-                if (devSteps.Count > 0)
-                    Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
+                // Project skill (full) or --developer: apply [DEV] filtering unless explicit dev
+                var opSteps  = skill.Steps.Where(s => !IsDevStep(s)).ToList();
+                var devSteps = skill.Steps.Where(s =>  IsDevStep(s)).ToList();
+
+                if (explicitDev)
+                {
+                    Console.WriteLine("  Steps  :");
+                    for (int i = 0; i < skill.Steps.Count; i++)
+                        Console.WriteLine($"    {i + 1}. {skill.Steps[i]}");
+                }
+                else if (opSteps.Count == 0)
+                {
+                    Console.WriteLine($"  Steps  : (all {devSteps.Count} step(s) are [DEV] — use --developer to show)");
+                }
+                else
+                {
+                    Console.WriteLine("  Steps  :");
+                    for (int i = 0; i < opSteps.Count; i++)
+                        Console.WriteLine($"    {i + 1}. {opSteps[i]}");
+                    if (devSteps.Count > 0)
+                        Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
+                }
             }
         }
 
@@ -179,6 +196,23 @@ internal partial class Program
             Console.WriteLine($"  Author : {skill.Author}");
         Console.WriteLine($"  Created: {skill.Created:yyyy-MM-dd}  Version: {skill.Version ?? "1.0"}");
         return 0;
+    }
+
+    /// <summary>
+    /// Extract step title: text up to first sentence boundary (. ! ? or —) or 80 chars.
+    /// Preserves bracket tags like [RULE], [DEV] etc. at the start.
+    /// </summary>
+    static string StepTitle(string step)
+    {
+        // Keep leading [TAG] if present, then cut at first sentence end
+        var m = System.Text.RegularExpressions.Regex.Match(step, @"^(\[[A-Z:]+\]\s*)?(.{0,120})");
+        var text = step;
+        // Cut at sentence boundary: '. ' or '— ' or end of 80 chars
+        var cut = System.Text.RegularExpressions.Regex.Match(text, @"^.{10,}?(?:[.!?](?:\s|$)|(?:\s—\s))");
+        if (cut.Success && cut.Value.Length < text.Length)
+            return cut.Value.TrimEnd();
+        // Fallback: hard cut at 80 chars with ellipsis
+        return text.Length <= 80 ? text : text[..77] + "...";
     }
 
     // A step is developer-only if:
