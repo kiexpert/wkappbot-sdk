@@ -18,7 +18,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     const string AnthropicApiBase = "https://api.anthropic.com";
-    const int ProxyDefaultPort = 7070;
+    const int ProxyDefaultPort = 7788; // lucky 77 + will's 88
 
     static int ClaudeProxyCommand(string[] args)
     {
