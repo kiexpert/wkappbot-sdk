@@ -41,6 +41,13 @@
   - Do not use `|` in step content — use newline instead
 - After creating a skill, always verify with `wkappbot skill show <id>`
 
+### Token Efficiency Rules
+- **Never re-read a file already in context** — use what you already loaded
+- **No speculative tool calls** — only read/search files you have a concrete reason to need
+- **Parallelize independent tool calls** — glob + grep + read in parallel when not dependent
+- **Don't repeat what the user already explained** — use their words, move on
+- **ctx% check**: `wkappbot claude-usage` — handoff at 8MB, urgent at 10MB, use `/compact` when growing
+
 ### Forbidden
 - Directly spawning Eye / options that block Claude delivery / options that skip Eye — all forbidden
 - Asking user questions in prompt only (must send to Slack simultaneously)

@@ -1,0 +1,34 @@
+{
+  "id": "claude-token-optimization",
+  "app": "wkappbot-workflow",
+  "title": "Claude Code Token Optimization — 3 Techniques",
+  "desc": "80-90% of tokens are spent on file exploration, not writing code. Three techniques to cut waste: (1) .claudeignore + lean CLAUDE.md + session management saves 30-40%. (2) Codebase pre-indexing saves 90%+ of exploration tokens. (3) 3-agent team (Architect/Builder/Reviewer) eliminates scope creep token waste.",
+  "steps": [
+    "[CLAUDEIGNORE] Create .claudeignore in project root — lists files Claude must never read. Same concept as .gitignore. Exclude: node_modules/, .next/, dist/, bin/, obj/, .bak/, *.log, *.out. One-time setup, no maintenance needed.",
+    "[CLAUDE-MD] Keep CLAUDE.md under 200 lines. Every conversation loads it in full — bloated CLAUDE.md = constant token tax. Move detailed rules to separate topic files, reference them only when needed. Saves 5-10% per conversation.",
+    "[SESSION] Use /compact when conversation grows long (summarizes history, cuts context). Use /clear when switching to a completely new task. Check context% with wkappbot claude-usage — handoff at 8MB, urgent at 10MB.",
+    "[MCP] Only connect MCP servers you actively use. Each connected server adds tool definitions to every message. Disconnecting 3 unused servers gives immediate relief.",
+    "[PRE-INDEX] Tools like QMD pre-index the codebase so Claude jumps directly to the right file. Without indexing: glob → grep → read = 2700 tokens per lookup. With indexing: ~250 tokens. 91% reduction per lookup.",
+    "[PRE-INDEX-RULE] Add one line to CLAUDE.md: 'Always search the index before reading files.' This prevents Claude from blindly globbing the whole repo on every question.",
+    "[3-AGENT] Split work into 3 roles: (1) Architect — reads codebase, writes detailed brief (what files, what order, what changes). (2) Builder — implements ONLY what the brief specifies, nothing extra. (3) Reviewer — validates output, returns specific failures to Builder.",
+    "[3-AGENT-WHY] Without role separation, Claude reads the entire codebase for a login feature, adds untested CSS, writes unrequested tests. Every off-brief action = wasted tokens. Builder never needs to read files the Architect didn't specify.",
+    "[CLAUDE-MD-RULES] Add these 5 rules to CLAUDE.md: (1) Never re-read a file already in context. (2) No speculative tool calls. (3) Parallelize independent tool calls. (4) Route 20+ line non-essential output to sub-agents. (5) Never repeat what the user already explained.",
+    "[PRIORITY] Apply in order: first .claudeignore + lean CLAUDE.md (immediate, zero cost). Then pre-indexing (5 min setup, 90% exploration savings). Then 3-agent structure when project grows large.",
+    "[IMPACT] Combined: same token budget handles 2-3x more work. For Claude Pro users with tight limits, this effectively doubles monthly task capacity."
+  ],
+  "tags": [
+    "token",
+    "optimization",
+    "claudeignore",
+    "claude.md",
+    "session",
+    "compact",
+    "pre-index",
+    "3-agent",
+    "cost"
+  ],
+  "author": "claude",
+  "created": "2026-04-09T12:43:16.0000000Z",
+  "updated": "2026-04-09T12:43:16.0000000Z",
+  "version": "1.0"
+}

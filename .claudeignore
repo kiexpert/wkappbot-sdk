@@ -1,0 +1,18 @@
+# Build artifacts
+csharp/src/**/bin/
+csharp/src/**/obj/
+
+# Backup files (file edit auto-backup)
+.bak/
+
+# WKAppBot runtime data (logs, ask history, test output)
+.wkappbot/
+.dotnet/
+
+# Log and diagnostic files
+*.log
+*.out
+artifacts_*.log
+
+# VS Code local settings
+.vscode/
