@@ -1949,6 +1949,22 @@ internal partial class Program
         g = System.Text.RegularExpressions.Regex.Replace(g, @"\{,+", "{");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",+\}", "}");
         g = System.Text.RegularExpressions.Regex.Replace(g, @",{2,}", ",");
+        // If all fields were stripped (e.g. process name unavailable + Chrome class removed),
+        // fall back to a minimal {proc,cls} grap directly from Win32 to avoid useless "{}"
+        if (g == "{}" || g == "{ }")
+        {
+            WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint fallbackPid);
+            var fallbackProc = WKAppBot.Win32.Native.NativeMethods.TryGetProcessNameFast(fallbackPid) ?? "";
+            var fallbackCls  = WindowFinder.GetClassName(hwnd) ?? "";
+            fallbackProc = fallbackProc.Replace("'", "\\'");
+            fallbackCls  = fallbackCls.Replace("'", "\\'");
+            if (!string.IsNullOrEmpty(fallbackProc) && !string.IsNullOrEmpty(fallbackCls))
+                return $"{{proc:'{fallbackProc}',cls:'{fallbackCls}'}}";
+            if (!string.IsNullOrEmpty(fallbackProc))
+                return $"{{proc:'{fallbackProc}'}}";
+            if (!string.IsNullOrEmpty(fallbackCls))
+                return $"{{cls:'{fallbackCls}'}}";
+        }
         return g;
     }
 
