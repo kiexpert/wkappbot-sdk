@@ -110,14 +110,17 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot skill show <id>");
+            Console.WriteLine("Usage: wkappbot skill show <id> [--developer]");
             return 1;
         }
 
-        var skill = FindSkill(args[0]);
+        bool developerMode = args.Any(a => a == "--developer" || a == "--dev");
+        var id = args.First(a => !a.StartsWith("--"));
+
+        var skill = FindSkill(id);
         if (skill == null)
         {
-            Console.Error.WriteLine($"[SKILL] Not found: {args[0]}");
+            Console.Error.WriteLine($"[SKILL] Not found: {id}");
             Console.WriteLine("  Hint: wkappbot skill list  or  wkappbot skill search <keyword>");
             return 1;
         }
@@ -129,13 +132,31 @@ internal partial class Program
         Console.WriteLine($"  Audience: {AudienceProfile(skill)}");
         if (skill.Tags?.Count > 0)
             Console.WriteLine($"  Tags   : {string.Join(", ", skill.Tags)}");
+
         if (skill.Steps?.Count > 0)
         {
+            // Steps prefixed with [DEV] are developer-only — hidden in default view.
+            // All other steps are operator-visible.
+            var opSteps  = skill.Steps.Select((s, i) => (s, i)).Where(x => !IsDevStep(x.s)).ToList();
+            var devSteps = skill.Steps.Select((s, i) => (s, i)).Where(x =>  IsDevStep(x.s)).ToList();
+
             Console.WriteLine("  Steps  :");
-            for (int i = 0; i < skill.Steps.Count; i++)
-                Console.WriteLine($"    {i + 1}. {skill.Steps[i]}");
+            int display = 1;
+            foreach (var (s, _) in opSteps)
+                Console.WriteLine($"    {display++}. {s}");
+
+            if (developerMode)
+            {
+                foreach (var (s, _) in devSteps)
+                    Console.WriteLine($"    {display++}. {s}");
+            }
+            else if (devSteps.Count > 0)
+            {
+                Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
+            }
         }
-        if (skill.SourceRefs?.Count > 0)
+
+        if (developerMode && skill.SourceRefs?.Count > 0)
         {
             Console.WriteLine("  Refs   :");
             foreach (var r in skill.SourceRefs)
@@ -146,11 +167,34 @@ internal partial class Program
                 Console.WriteLine($"    {r.File}{suffix}{pat}{note}");
             }
         }
+
         if (!string.IsNullOrEmpty(skill.Author))
             Console.WriteLine($"  Author : {skill.Author}");
         Console.WriteLine($"  Created: {skill.Created:yyyy-MM-dd}  Version: {skill.Version ?? "1.0"}");
         return 0;
     }
+
+    // A step is developer-only if:
+    // (1) explicitly tagged [DEV], OR
+    // (2) auto-detected as implementation detail:
+    //     - contains a source file reference (path with .cs/.vbs/.json + : or /)
+    //     - contains a method/function call (Word followed by parentheses)
+    //     - contains a Windows absolute path (X:\ or csharp/ or src/)
+    //     - contains a line-number reference (SomeFile.cs:123)
+    static readonly System.Text.RegularExpressions.Regex _devStepPattern =
+        new(@"
+            \[DEV\]                             # explicit tag
+            | [A-Za-z]:\\                       # Windows path (C:\, W:\)
+            | \bcsharp/|\bsrc/                  # Unix-style source path
+            | \w+\.cs[:/\s]                     # .cs file reference
+            | \w+\.[A-Za-z]+\(\)               # MethodCall() or Class.Method()
+            | \w+\.[A-Za-z]+\([^)]{1,40}\)     # Method(args) — code call with args
+            | :\d{2,}                           # :123 line number reference
+        ", System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace |
+           System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+           System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    static bool IsDevStep(string step) => _devStepPattern.IsMatch(step);
 
     // ── Search ───────────────────────────────────────────────────────────────────
 
