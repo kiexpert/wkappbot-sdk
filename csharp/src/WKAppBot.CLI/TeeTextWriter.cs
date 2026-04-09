@@ -80,6 +80,21 @@ public sealed class TeeTextWriter : TextWriter
     /// <summary>Set before Dispose() — if non-zero, a one-line error summary is appended to errors.jsonl.</summary>
     public int ExitCode { get; set; } = 0;
 
+    private bool _errorRecordWritten = false;
+
+    /// <summary>
+    /// Write errors.jsonl entry immediately — call BEFORE WriteExitFile() so the record is
+    /// written before the Launcher kills Core via TerminateProcess after the exit event fires.
+    /// Dispose() skips errors.jsonl if already written.
+    /// </summary>
+    public void WriteErrorRecordNow()
+    {
+        if (ExitCode == 0 || !_moveToOldOnDispose || _errorRecordWritten) return;
+        _errorRecordWritten = true;
+        // Log file is still at _logPath (not moved yet), AutoFlush=true so content is current
+        TryAppendErrorRecord(_logPath, ExitCode, Environment.TickCount64 - _startMs, _startCpuMs);
+    }
+
     // ── Broken-pipe-safe console write helpers ──────────────────
 
     private void ConsoleWrite(char value)
@@ -248,7 +263,7 @@ public sealed class TeeTextWriter : TextWriter
 
     public static volatile bool _focusTheftDetected = false;
 
-    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", EntryPoint = "GetConsoleWindow")]
     private static extern IntPtr WinApi_GetConsoleWindow();
 
     private static bool NativeMethods_IsAdmin()
@@ -296,6 +311,72 @@ public sealed class TeeTextWriter : TextWriter
         };
 
     /// <summary>
+    /// Write errors.jsonl from captured output string (no log file).
+    /// Used by MCP in-process runner where no TeeTextWriter is created.
+    /// </summary>
+    internal static void TryAppendErrorRecordFromOutput(
+        string capturedOutput, string cmd, int exitCode, long durMs, long startCpuMs, string logsDir)
+    {
+        try
+        {
+            var fields = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+            var lastLines = new System.Collections.Generic.List<string>();
+            foreach (var raw in capturedOutput.Split('\n'))
+            {
+                var line = raw.TrimEnd('\r').Trim();
+                if (string.IsNullOrEmpty(line)) continue;
+                lastLines.Add(line.Length > 200 ? line[..200] : line);
+                if (lastLines.Count > 3) lastLines.RemoveAt(0);
+                if (line.Length < 3 || line[0] != '[') continue;
+                var close = line.IndexOf(']');
+                if (close < 2 || close > 30) continue;
+                var tag = line[1..close];
+                if (_noiseTags.Contains(tag)) continue;
+                if (tag.StartsWith('+')) continue;
+                var msg = line[(close + 1)..].TrimStart();
+                if (string.IsNullOrEmpty(msg)) continue;
+                fields[tag] = msg.Length > 200 ? msg[..200] : msg;
+            }
+            if (fields.Count == 0)
+            {
+                if (lastLines.Count == 0) return;
+                fields["_last"] = string.Join(" | ", lastLines);
+            }
+            var errorsFile = Path.Combine(logsDir, "errors.jsonl");
+            if (cmd.Length > 300) cmd = cmd[..300];
+            long memMb = 0; long cpuMs = 0; int threads = 0;
+            try
+            {
+                var proc = System.Diagnostics.Process.GetCurrentProcess(); proc.Refresh();
+                memMb = proc.WorkingSet64 / 1024 / 1024;
+                cpuMs = (long)proc.TotalProcessorTime.TotalMilliseconds - startCpuMs;
+                threads = proc.Threads.Count;
+            }
+            catch { }
+            var record = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                ts           = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                exit         = exitCode,
+                dur_ms       = durMs,
+                mem_mb       = memMb,
+                cpu_ms       = cpuMs,
+                threads,
+                ver          = typeof(TeeTextWriter).Assembly.GetName().Version?.ToString(3) ?? "",
+                via_eye      = true, // MCP path is always via Eye
+                cwd          = Environment.CurrentDirectory,
+                has_console  = WinApi_GetConsoleWindow() != IntPtr.Zero,
+                focus_stolen = _focusTheftDetected,
+                is_admin     = NativeMethods_IsAdmin(),
+                cmd,
+                log          = "mcp-inline",
+                fields,
+            });
+            File.AppendAllText(errorsFile, record + Environment.NewLine, Encoding.UTF8);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
     /// Scan the log file and collect the last output line per [TAG],
     /// then append a JSON record { ts, exit, cmd, log, fields:{TAG:lastLine} } to errors.jsonl.
     /// </summary>
@@ -305,11 +386,22 @@ public sealed class TeeTextWriter : TextWriter
         {
             // Collect last value per [TAG] — forward scan, later lines overwrite earlier ones
             var fields = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+            var lastLines = new System.Collections.Generic.List<string>(); // fallback: last non-empty lines
             if (File.Exists(logPath))
             {
-                foreach (var raw in File.ReadLines(logPath))
+                // Must open with FileShare.ReadWrite — TeeTextWriter holds file open for writing;
+                // File.ReadLines defaults to FileShare.Read which conflicts with the write handle.
+                using var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var sr = new StreamReader(fs, Encoding.UTF8);
+                string? rawLine;
+                while ((rawLine = sr.ReadLine()) != null)
                 {
-                    var line = raw.Trim();
+                    var line = rawLine.Trim();
+                    if (string.IsNullOrEmpty(line)) continue;
+                    // Collect last 3 non-empty lines for fallback (regardless of tag format)
+                    lastLines.Add(line.Length > 200 ? line[..200] : line);
+                    if (lastLines.Count > 3) lastLines.RemoveAt(0);
+
                     if (line.Length < 3 || line[0] != '[') continue;
                     var close = line.IndexOf(']');
                     if (close < 2 || close > 30) continue;
@@ -322,7 +414,12 @@ public sealed class TeeTextWriter : TextWriter
                 }
             }
 
-            if (fields.Count == 0) return; // nothing interesting — skip
+            // If no tagged fields found, fall back to last log lines so exit≠0 is always recorded
+            if (fields.Count == 0)
+            {
+                if (lastLines.Count == 0) return; // log was completely empty — nothing useful
+                fields["_last"] = string.Join(" | ", lastLines);
+            }
 
             var logsDir = Path.GetDirectoryName(logPath);
             // Step up from "old xxx/" subdirs to the parent logs/ dir
@@ -450,8 +547,8 @@ public sealed class TeeTextWriter : TextWriter
                     // Best-effort on normal exit only.
                 }
 
-                // Append one-line error summary to errors.jsonl (exit≠0 only)
-                if (ExitCode != 0)
+                // Append one-line error summary to errors.jsonl (exit≠0 only; skip if already written)
+                if (ExitCode != 0 && !_errorRecordWritten)
                     TryAppendErrorRecord(_logPath, ExitCode, Environment.TickCount64 - _startMs, _startCpuMs);
             }
         }

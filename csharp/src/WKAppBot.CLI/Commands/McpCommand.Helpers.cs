@@ -59,6 +59,9 @@ internal partial class Program
         var toolName = @params?["name"]?.GetValue<string>() ?? "";
         var arguments = @params?["arguments"] as JsonObject ?? new JsonObject();
         var action = arguments["action"]?.GetValue<string>() ?? "";
+        var _toolStartMs = Environment.TickCount64;
+        var _toolStartCpuMs = 0L;
+        try { _toolStartCpuMs = (long)System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime.TotalMilliseconds; } catch { }
 
         // Extract per-call caller context from _meta (set by EyeMcpClient)
         // Fallback to _mcpDetectedCwd (VS Code parent process title → workspace folder)
@@ -126,6 +129,20 @@ internal partial class Program
 
             // Update session card: command done
             SessionUpdate(status: exitCode == 0 ? "result=ok" : $"result=err:{exitCode}");
+
+            // Write errors.jsonl for non-zero exits (no TeeTextWriter in MCP in-process path)
+            if (exitCode != 0)
+            {
+                try
+                {
+                    var logsDir = System.IO.Path.Combine(DataDir, "logs");
+                    var cmd = $"mcp {toolName} {action}".Trim();
+                    TeeTextWriter.TryAppendErrorRecordFromOutput(
+                        output, cmd, exitCode,
+                        Environment.TickCount64 - _toolStartMs, _toolStartCpuMs, logsDir);
+                }
+                catch { /* best-effort */ }
+            }
 
             var result = new JsonObject
             {
