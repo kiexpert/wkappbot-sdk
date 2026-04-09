@@ -314,6 +314,12 @@ public sealed class TeeTextWriter : TextWriter
     }
 
     // Noise tags to skip when building per-field last-value map
+    // Matches [TAG] anywhere in a line (after optional whitespace/ANSI escapes).
+    // Groups: 1=TAG, 2=message after '] '
+    private static readonly System.Text.RegularExpressions.Regex _tagLinePattern =
+        new(@"(?:\x1b\[[0-9;]*m|\s)*\[([A-Z][A-Z0-9:_\-]{0,28})\]\s*(.*)",
+            System.Text.RegularExpressions.RegexOptions.Compiled);
+
     private static readonly System.Collections.Generic.HashSet<string> _noiseTags =
         new(System.StringComparer.OrdinalIgnoreCase)
         {
@@ -338,13 +344,11 @@ public sealed class TeeTextWriter : TextWriter
                 if (string.IsNullOrEmpty(line)) continue;
                 lastLines.Add(line.Length > 200 ? line[..200] : line);
                 if (lastLines.Count > 3) lastLines.RemoveAt(0);
-                if (line.Length < 3 || line[0] != '[') continue;
-                var close = line.IndexOf(']');
-                if (close < 2 || close > 30) continue;
-                var tag = line[1..close];
+                var m = _tagLinePattern.Match(line);
+                if (!m.Success) continue;
+                var tag = m.Groups[1].Value;
                 if (_noiseTags.Contains(tag)) continue;
-                if (tag.StartsWith('+')) continue;
-                var msg = line[(close + 1)..].TrimStart();
+                var msg = m.Groups[2].Value.Trim();
                 if (string.IsNullOrEmpty(msg)) continue;
                 fields[tag] = msg.Length > 200 ? msg[..200] : msg;
             }
@@ -413,13 +417,11 @@ public sealed class TeeTextWriter : TextWriter
                     lastLines.Add(line.Length > 200 ? line[..200] : line);
                     if (lastLines.Count > 3) lastLines.RemoveAt(0);
 
-                    if (line.Length < 3 || line[0] != '[') continue;
-                    var close = line.IndexOf(']');
-                    if (close < 2 || close > 30) continue;
-                    var tag = line[1..close];
+                    var m = _tagLinePattern.Match(line);
+                    if (!m.Success) continue;
+                    var tag = m.Groups[1].Value;
                     if (_noiseTags.Contains(tag)) continue;
-                    if (tag.StartsWith('+')) continue; // timestamp prefix lines
-                    var msg = line[(close + 1)..].TrimStart();
+                    var msg = m.Groups[2].Value.Trim();
                     if (string.IsNullOrEmpty(msg)) continue;
                     fields[tag] = msg.Length > 200 ? msg[..200] : msg;
                 }
