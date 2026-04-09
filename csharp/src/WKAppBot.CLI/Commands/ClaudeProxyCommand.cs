@@ -182,14 +182,12 @@ internal partial class Program
                 string? line;
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
-                    if (line.StartsWith("data:") && (line.Contains("\"context_window_exceeded\"") || line.Contains("\"context_length_exceeded\"")))
+                    if (line.StartsWith("data:") && IsAnthropicLimitError(line))
                     {
-                        if (verbose) Console.Error.WriteLine("[PROXY] Context limit in SSE — generating summary...");
-                        var apiKey = req.Headers["x-api-key"] ?? req.Headers["Authorization"]?.Replace("Bearer ", "");
-                        var model = ExtractModel(requestBody);
-                        var summary = await GenerateHandoffSummaryAsync(http, apiKey, model, requestBody, verbose);
-                        await WriteFakeSseResponseAsync(writer, summary);
-                        return; // don't forward the error
+                        if (verbose) Console.Error.WriteLine("[PROXY] Limit hit in SSE — handing off to Gemini agent...");
+                        var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
+                        await WriteFakeSseResponseAsync(writer, handoffMsg);
+                        return;
                     }
                     await writer.WriteLineAsync(line);
                     await writer.FlushAsync();
@@ -197,28 +195,24 @@ internal partial class Program
             }
             else if (isError)
             {
-                // Read error body, check for context limit
                 var errorBody = await upstreamResp.Content.ReadAsStringAsync();
 
-                if (errorBody.Contains("context_window_exceeded") || errorBody.Contains("context_length_exceeded"))
+                if (IsAnthropicLimitError(errorBody))
                 {
-                    if (verbose) Console.Error.WriteLine("[PROXY] Context limit error — generating summary...");
-                    var apiKey = req.Headers["x-api-key"] ?? req.Headers["Authorization"]?.Replace("Bearer ", "");
-                    var model = ExtractModel(requestBody);
-                    var summary = await GenerateHandoffSummaryAsync(http, apiKey, model, requestBody, verbose);
+                    if (verbose) Console.Error.WriteLine("[PROXY] Limit hit — handing off to Gemini agent...");
+                    var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
 
-                    // Return as normal 200 response (SSE or JSON depending on request)
                     resp.StatusCode = 200;
                     if (isStreaming)
                     {
                         resp.ContentType = "text/event-stream";
                         resp.Headers["Cache-Control"] = "no-cache";
                         using var writer = new StreamWriter(resp.OutputStream, Encoding.UTF8, leaveOpen: true);
-                        await WriteFakeSseResponseAsync(writer, summary);
+                        await WriteFakeSseResponseAsync(writer, handoffMsg);
                     }
                     else
                     {
-                        var fakeJson = BuildFakeJsonResponse(summary, model ?? "claude-proxy");
+                        var fakeJson = BuildFakeJsonResponse(handoffMsg, ExtractModel(requestBody) ?? "claude-proxy");
                         var fakeBytes = Encoding.UTF8.GetBytes(fakeJson);
                         resp.ContentType = "application/json";
                         resp.ContentLength64 = fakeBytes.Length;
@@ -399,6 +393,11 @@ internal partial class Program
         return sb.ToString().Trim();
     }
 
+    static bool IsAnthropicLimitError(string text) =>
+        text.Contains("context_window_exceeded") || text.Contains("context_length_exceeded") ||
+        text.Contains("overloaded_error") || text.Contains("rate_limit_exceeded") ||
+        text.Contains("\"529\"") || text.Contains("\"529 \"");
+
     static string? ExtractModel(string? requestBody)
     {
         if (requestBody == null) return null;
@@ -411,81 +410,88 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Call Claude API to summarize the conversation, return as handoff message.
-    /// Used when context limit is hit — instead of forwarding the error, return a summary.
+    /// Spawn wkappbot agent gemini --new-session with CLAUDE.md + MEMORY.md + last user prompt.
+    /// No Anthropic API calls — works even when weekly limit is hit.
+    /// Returns a status message to show in Claude Code while Gemini agent starts.
     /// </summary>
-    static async Task<string> GenerateHandoffSummaryAsync(HttpClient http, string? apiKey, string? model, string? requestBody, bool verbose)
+    static async Task<string> SpawnGeminiAgentHandoffAsync(string? requestBody, bool verbose)
     {
-        var fallback = BuildHandoffNote() + "\n\n(Auto-summary unavailable — run wkappbot newchat manually)";
-        if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(requestBody)) return fallback;
-
         try
         {
-            // Extract conversation history from the original request
-            var origNode = JsonSerializer.Deserialize<JsonNode>(requestBody);
-            var messages = origNode?["messages"]?.AsArray();
-            if (messages == null || messages.Count == 0) return fallback;
-
-            // Build a concise conversation transcript (last 20 turns max to fit summary model)
-            var transcript = new StringBuilder();
-            var turns = messages.TakeLast(20).ToArray();
-            foreach (var msg in turns)
+            // Extract last user prompt from the failed request
+            var lastPrompt = "";
+            try
             {
-                var role = msg?["role"]?.GetValue<string>() ?? "?";
-                var contentNode = msg?["content"];
-                string text = "";
-                if (contentNode is JsonValue cv) text = cv.GetValue<string>();
-                else if (contentNode is JsonArray ca)
-                    text = string.Join(" ", ca.Select(b => b?["text"]?.GetValue<string>() ?? "").Where(t => !string.IsNullOrEmpty(t)));
-                if (!string.IsNullOrEmpty(text))
-                    transcript.AppendLine($"{role.ToUpperInvariant()}: {text[..Math.Min(text.Length, 500)]}");
+                var node = JsonSerializer.Deserialize<JsonNode>(requestBody ?? "{}");
+                var messages = node?["messages"]?.AsArray();
+                if (messages != null)
+                {
+                    var lastUser = messages.LastOrDefault(m => m?["role"]?.GetValue<string>() == "user");
+                    var content = lastUser?["content"];
+                    if (content is JsonValue cv) lastPrompt = cv.GetValue<string>();
+                    else if (content is JsonArray ca)
+                        lastPrompt = string.Join("\n", ca
+                            .Select(b => b?["text"]?.GetValue<string>() ?? "")
+                            .Where(t => !string.IsNullOrEmpty(t)));
+                }
             }
+            catch { }
 
-            var summaryPrompt = $"""
-                The following is a conversation that hit the context window limit.
-                Please provide a concise handoff summary (3-5 bullet points) covering:
-                - What was being worked on
-                - Key decisions made
-                - Current status / what was just completed
-                - What to do next
+            // Build context: CLAUDE.md + MEMORY.md + last prompt → temp file → agent gemini --file
+            var claudeMdPath = Path.Combine(AppContext.BaseDirectory, "../../../../../../CLAUDE.md");  // project CLAUDE.md
+            var globalClaudeMd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "CLAUDE.md");
+            var memoryMd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects", "w--GitHub-WKAppBot", "memory", "MEMORY.md");
 
-                Then add: "Run: wkappbot newchat \"<your summary here>\""
-
-                Conversation (last {turns.Length} turns):
-                {transcript}
-                """;
-
-            var summaryRequest = new
+            // Write combined context to temp file
+            var tempCtx = Path.Combine(Path.GetTempPath(), $"wkappbot-proxy-handoff-{DateTime.Now:yyyyMMddHHmmss}.md");
+            var sb = new StringBuilder();
+            sb.AppendLine("# WKAppBot Proxy Handoff Context");
+            sb.AppendLine($"*Handed off from Claude Code at {DateTime.Now:yyyy-MM-dd HH:mm}*");
+            sb.AppendLine();
+            foreach (var f in new[] { globalClaudeMd, claudeMdPath, memoryMd })
             {
-                model = model ?? "claude-haiku-4-5-20251001",
-                max_tokens = 1024,
-                messages = new[] { new { role = "user", content = summaryPrompt } }
+                var resolved = Path.GetFullPath(f);
+                if (File.Exists(resolved))
+                {
+                    sb.AppendLine($"## {Path.GetFileName(resolved)}");
+                    sb.AppendLine(File.ReadAllText(resolved));
+                    sb.AppendLine();
+                }
+            }
+            sb.AppendLine("## Original Prompt");
+            sb.AppendLine(lastPrompt);
+            File.WriteAllText(tempCtx, sb.ToString(), Encoding.UTF8);
+
+            // Spawn agent gemini --new-session in background (non-blocking)
+            var wkappbot = Path.Combine(AppContext.BaseDirectory, "wkappbot.exe");
+            if (!File.Exists(wkappbot)) wkappbot = "wkappbot";
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = wkappbot,
+                Arguments = $"agent gemini --new-session --file \"{tempCtx}\" \"{lastPrompt.Replace("\"", "'")}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
             };
+            System.Diagnostics.Process.Start(psi);
 
-            var summaryJson = JsonSerializer.Serialize(summaryRequest);
-            var summaryReq = new HttpRequestMessage(HttpMethod.Post, AnthropicApiBase + "/v1/messages");
-            summaryReq.Headers.TryAddWithoutValidation("x-api-key", apiKey);
-            summaryReq.Headers.TryAddWithoutValidation("anthropic-version", "2023-06-01");
-            summaryReq.Content = new StringContent(summaryJson, Encoding.UTF8, "application/json");
+            if (verbose) Console.Error.WriteLine($"[PROXY] Gemini agent spawned with {sb.Length}ch context");
 
-            var summaryResp = await http.SendAsync(summaryReq);
-            var summaryBody = await summaryResp.Content.ReadAsStringAsync();
+            return $"""
+                ## Anthropic Limit Reached — Handed off to Gemini Agent
 
-            var summaryNode = JsonSerializer.Deserialize<JsonNode>(summaryBody);
-            var summaryText = summaryNode?["content"]?[0]?["text"]?.GetValue<string>();
+                Your session has been forwarded to `wkappbot agent gemini --new-session`.
+                Context included: CLAUDE.md + MEMORY.md + your prompt.
 
-            if (!string.IsNullOrEmpty(summaryText))
-            {
-                if (verbose) Console.Error.WriteLine($"[PROXY] Summary generated ({summaryText.Length} chars)");
-                return "## Context Limit Reached — Auto-generated Handoff\n\n" + summaryText;
-            }
+                Gemini is starting up — check the Gemini browser tab or Slack for the response.
+                Subsequent messages here will be relayed to the Gemini session via `--interrupt`.
+
+                *(Prompt: {lastPrompt[..Math.Min(lastPrompt.Length, 100)]}...)*
+                """;
         }
         catch (Exception ex)
         {
-            if (verbose) Console.Error.WriteLine($"[PROXY] Summary failed: {ex.Message}");
+            return $"## Anthropic Limit Reached\n\nAuto-handoff failed: {ex.Message}\n\nManual: `wkappbot agent gemini --new-session`";
         }
-
-        return fallback;
     }
 
     /// <summary>Write a fake SSE response stream with the given text content.</summary>
