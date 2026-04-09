@@ -290,6 +290,15 @@ internal partial class Program
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
+        // Startup hot-swap: if .new.exe was staged while Eye/Core was busy, apply it now.
+        // Covers the case where Launcher fell back to Core due to empty Eye pipe (Eye crash/kill).
+        if (!RunningInEye)
+        {
+            var coreExePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
+            if (!string.IsNullOrEmpty(coreExePath))
+                ThreadPool.QueueUserWorkItem(_ => { try { TryRenameSwap(coreExePath, "CORE:STARTUP"); } catch { } });
+        }
+
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
 

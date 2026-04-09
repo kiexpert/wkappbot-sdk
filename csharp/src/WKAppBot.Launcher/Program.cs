@@ -320,6 +320,7 @@ partial class Program
 
         var cmd = forwardArgs[0].ToLowerInvariant();
         prof($"cmd={cmd}");
+        var relayArgs = forwardArgs;
 
         // mcp: Launcher holds the stdio pipe to Claude Code and manages Core lifecycle
         if (cmd == "mcp")
@@ -366,7 +367,7 @@ partial class Program
 
             int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard → Core fallback
             prof($"Eye pipe attempt cmd={cmd}");
-            if (EyeCmdPipeClient.TryDelegate(forwardArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
+            if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
                 // TerminateSelf: all output already flushed by TryDelegate; hard-kill Launcher immediately.
@@ -499,13 +500,13 @@ partial class Program
 
             // Core calls FastExit (TerminateProcess) after flushing help output.
             // proc.WaitForExit detects termination immediately — no named-event needed.
-            var code = RunCore(forwardArgs, fastExitTimeoutMs: 2000);
+            var code = RunCore(relayArgs, fastExitTimeoutMs: 2000);
             _lDiagStep = "post-RunCore";
             TerminateSelf((uint)code);
             return code; // unreachable
         }
 
-        int finalCode = RunCoreDetachedNormal(forwardArgs, showStderr, stderrBuf);
+        int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
         AppBotExit(finalCode);
         return finalCode; // unreachable
     }
