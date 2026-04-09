@@ -14,9 +14,10 @@ using System.Runtime.InteropServices;
 /// </summary>
 internal static class AppBotPipe
 {
-    // Verbose: show CreateProcessW diagnostics on stderr (WKAPPBOT_PROFILE=1 or stderr redirected)
+    // Verbose: show CreateProcessW diagnostics only when explicitly requested.
+    // Normal tool runs should stay quiet; failures still surface below.
     static readonly bool _verbose = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1"
-                                 || Console.IsErrorRedirected;
+                                 && Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") != "1";
 
     // ── Structs ──────────────────────────────────────────────
 
