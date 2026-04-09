@@ -85,6 +85,8 @@ internal static class EyeCmdPipeClient
                 }, null, timeoutMs, Timeout.Infinite);
             }
 
+            bool gotEndMarker = false;
+            int outputLines = 0;
             try
             {
                 // Drain: process peeked line first (if first-output timeout was used), then loop.
@@ -101,9 +103,11 @@ internal static class EyeCmdPipeClient
                     if (line.StartsWith(EndMarker))
                     {
                         int.TryParse(line.AsSpan(EndMarker.Length).Trim(), out exitCode);
+                        gotEndMarker = true;
                         break;
                     }
                     writeLine(line);
+                    outputLines++;
                 }
                 if (timedOut) exitCode = timeoutExitCode;
             }
@@ -114,6 +118,14 @@ internal static class EyeCmdPipeClient
             finally
             {
                 timeoutTimer?.Dispose();
+            }
+
+            // Empty pipe guard: pipe closed without EndMarker and without any output
+            // → silent failure (process hard-killed or crashed before writing anything)
+            if (!timedOut && !gotEndMarker && outputLines == 0 && peekedLine == null)
+            {
+                Console.Error.WriteLine("[PIPE] empty closed — process exited without output or end marker (possible crash/kill)");
+                exitCode = -1;
             }
 
             return true;
