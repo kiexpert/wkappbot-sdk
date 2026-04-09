@@ -86,12 +86,13 @@ internal partial class Program
 
         Console.Error.WriteLine($"[PROXY] Ready. Waiting for requests...");
 
+        bool cleanExit = false;
         while (true)
         {
             HttpListenerContext ctx;
             try { ctx = listener.GetContext(); }
-            catch (HttpListenerException ex) { Console.Error.WriteLine($"[PROXY] Listener stopped: {ex.Message}"); break; }
-            catch (ObjectDisposedException) { Console.Error.WriteLine("[PROXY] Listener disposed."); break; }
+            catch (HttpListenerException ex) { Console.Error.WriteLine($"[PROXY] ERROR: listener stopped: {ex.Message}"); break; }
+            catch (ObjectDisposedException) { cleanExit = true; break; } // intentional Close()
             catch (Exception ex) { Console.Error.WriteLine($"[PROXY] ERROR: unexpected {ex.GetType().Name}: {ex.Message}"); break; }
 
             _ = Task.Run(() => HandleProxyRequest(ctx, http, injectContext, verbose));
@@ -99,7 +100,7 @@ internal partial class Program
 
         listener?.Close();
         Console.Error.WriteLine("[PROXY] Stopped.");
-        return 0;
+        return cleanExit ? 0 : 1; // non-clean exit → AppBotExit(1) flushes error log
     }
 
     static async Task HandleProxyRequest(HttpListenerContext ctx, HttpClient http, bool injectContext, bool verbose)
