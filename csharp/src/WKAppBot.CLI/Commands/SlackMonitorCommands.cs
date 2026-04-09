@@ -365,6 +365,10 @@ internal partial class Program
         return username;
     }
 
+    /// <summary>
+    /// True if running from Claude Code (VS Code extension) or Claude Desktop.
+    /// Use IsRunningFromClaudeDesktop() to distinguish desktop vs extension.
+    /// </summary>
     static bool IsRunningFromClaudeAppCertain()
     {
         try
@@ -373,11 +377,21 @@ internal partial class Program
             if (forced is "1" or "true" or "yes" or "on") return true;
             if (forced is "0" or "false" or "no" or "off") return false;
 
-            // CLAUDE_CODE_ENTRYPOINT=claude-vscode: set by Claude Code VS Code extension in all child processes.
+            // CLAUDE_CODE_ENTRYPOINT=claude-vscode: set by Claude Code VS Code extension.
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT")))
                 return true;
 
-            // Parent/ancestor chain contains claude process (Claude Desktop).
+            // Parent/ancestor chain contains "claude" process = Claude Desktop.
+            return IsRunningFromClaudeDesktop();
+        }
+        catch { return false; }
+    }
+
+    /// <summary>True only if Claude Desktop (standalone) is in the parent process chain.</summary>
+    static bool IsRunningFromClaudeDesktop()
+    {
+        try
+        {
             using var cur = Process.GetCurrentProcess();
             int pid = cur.Id;
             for (int depth = 0; depth < 6; depth++)
@@ -395,20 +409,33 @@ internal partial class Program
         catch { return false; }
     }
 
+    /// <summary>
+    /// True if running from Codex (VS Code extension) or Codex Desktop.
+    /// Use IsRunningFromCodexDesktop() to distinguish desktop vs extension.
+    /// </summary>
     static bool IsRunningFromCodexAppCertain()
     {
         try
         {
-            // Explicit override first.
             var forced = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CODEX_APP")?.Trim().ToLowerInvariant();
             if (forced is "1" or "true" or "yes" or "on") return true;
             if (forced is "0" or "false" or "no" or "off") return false;
 
-            // CODEX_HOME: set by Codex in all child processes.
+            // CODEX_HOME: set by Codex VS Code extension.
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
                 return true;
 
-            // Certainty rule: parent/ancestor process chain contains codex.
+            // Parent/ancestor chain contains "codex" process = Codex Desktop.
+            return IsRunningFromCodexDesktop();
+        }
+        catch { return false; }
+    }
+
+    /// <summary>True only if Codex Desktop (standalone) is in the parent process chain.</summary>
+    static bool IsRunningFromCodexDesktop()
+    {
+        try
+        {
             using var cur = Process.GetCurrentProcess();
             int pid = cur.Id;
             for (int depth = 0; depth < 6; depth++)
@@ -423,10 +450,7 @@ internal partial class Program
             }
             return false;
         }
-        catch
-        {
-            return false;
-        }
+        catch { return false; }
     }
 
     static int GetParentPidForCodexCheck(int pid)
@@ -828,11 +852,17 @@ internal partial class Program
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
         // Parent-chain-only detection: no AI in parent → treat as human user.
-        // Heuristics (window scan, IsProcessAlive) are too broad — fire when AI is open but not our parent.
-        if (IsRunningFromCodexAppCertain())
+        // Prefix is determined by host type: vscode-extension → short name, desktop app → "앱" suffix.
+        // Codex: CODEX_HOME (VS Code ext) → 코덳, parent "codex" process (desktop) → 코덳앱.
+        // Claude: CLAUDE_CODE_ENTRYPOINT (VS Code ext) → 클롣, parent "claude" process (desktop) → 클롣앱.
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
-        if (IsRunningFromClaudeAppCertain())
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT")))
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
+        if (IsRunningFromCodexDesktop())   // parent chain "codex" = Codex Desktop → 코덳앱
+            return BuildSlackBotUsername(SlackCodexAppPrefix, instanceName, spaceBeforeBracket: false);
+        if (IsRunningFromClaudeDesktop())  // parent chain "claude" = Claude Desktop → 클롣앱
+            return BuildSlackBotUsername(SlackClaudeAppPrefix, instanceName, spaceBeforeBracket: false);
 
         // No AI in parent chain → human user
         var loginUser = Environment.UserName;
