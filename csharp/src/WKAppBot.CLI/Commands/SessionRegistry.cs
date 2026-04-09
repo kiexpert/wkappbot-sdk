@@ -213,7 +213,7 @@ internal partial class Program
                 if (name == "claude" || name.StartsWith("claude"))
                     return "claude-desktop";
                 if (name == "codex" || title.Contains("Codex", StringComparison.OrdinalIgnoreCase))
-                    return "codex";
+                    return "codex-desktop";   // standalone Codex Desktop app → 코덳앱
                 if (name == "cursor" || title.Contains("Cursor", StringComparison.OrdinalIgnoreCase))
                     return "cursor";
                 if (name == "copilot")
