@@ -1,77 +1,77 @@
-{
-  "id": "grap-target",
-  "app": "wkappbot",
-  "title": "grap-target",
-  "desc": "How to construct a verified, bash-safe grap target string using a11y find. Output must include # FOCUS for the current focused leaf path, and # TARGET as the primary paste-ready hwnd:0x... token plus JSON5 context. Grap output must be shell-friendly, and copy-paste verification is part of the default contract. Covers why {a,b} brace expansion breaks in bash and how hwnd-first format avoids it.",
-  "steps": [
-    "Run a11y find \u003Cpattern\u003E and treat all fields title/proc/domain/cmd/url as matchable",
-    "Always print # FOCUS when the focused leaf can affect interaction, even if unrelated to the target (for example modal/error popups)",
-    "Print ## TARGET section (stdout, bold cyan). Format (v5.13\u002B):\n## TARGET\n\u0022{hwnd:0x...,pid:...,proc:\u0027chrome\u0027,domain:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms\nWindowTitle \u2192 stderr (not stdout \u2014 prevents noise from unrelated tab names)\n\nMandatory field order in grap JSON5: hwnd first, pid second (collision safety), proc, then domain/file/cls/matchedField.\nmatchedField auto-injected: if search matched via cmd/title/uia, that field\u002Bsnippet appended (e.g. cmd:\u0027...\u0027 when chatgpt.com search matched VS Code via cmdline).",
-    "Grap output must be shell-friendly: a pasted target string should work without manual editing, quoting, or brace escaping",
-    "Always verify pasted grap targets by re-running a11y find on the emitted hwnd:0x... form; [OK] means the pasted token resolves back to the same hwnd",
-    "Multiple windows match \u2192 ## TARGETS N matches header (outer loop in A11yCommand), then one ## TARGET block per window \u2014 each with its own paste grap \u002B command line \u002B [OK] Nms.\nDo NOT use --all or --nth to force: show all blocks, let user pick specific grap.\nEach block\u0027s grap has matchedField injected so the reason for match is explicit.",
-    "OUTPUT FORMAT (v5.13\u002B): Each section wrapped in code fence for markdown compatibility. FOCUS section:\n## FOCUS\n\u0060\u0060\u0060\n\u0022{hwnd:...}#absTagPath\u0022\n[OK] Nms\n\u0060\u0060\u0060\nTARGET section:\n## WindowTitle\n\u0060\u0060\u0060\n\u0022{hwnd:...,proc:...,cmd:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms  \u2190 cmd: chatgpt.com\n\u0060\u0060\u0060\nMultiple matches: ### TARGETS N matches header before first block. Blank line between blocks. Window title in ## heading (not in grap). matchedField annotation on [OK] line (e.g. \u2190 cmd: chatgpt.com).",
-    "OUTPUT FORMAT (v5.13\u002B): Each section wrapped in code fence for markdown compatibility. FOCUS section:\n## FOCUS\n\u0060\u0060\u0060\n\u0022{hwnd:...}#absTagPath\u0022\n[OK] Nms\n\u0060\u0060\u0060\nTARGET section:\n## WindowTitle\n\u0060\u0060\u0060\n\u0022{hwnd:...,proc:...,cmd:\u0027chatgpt.com\u0027}#absTagPath\u0022\nwkappbot a11y find \u0022...\u0022\n[OK] Nms  \u2190 cmd: chatgpt.com\n\u0060\u0060\u0060\nMultiple matches: ### TARGETS N matches header before first block. Blank line between blocks. Window title in ## heading (not in grap). matchedField annotation on [OK] line (e.g. \u2190 cmd: chatgpt.com).",
-    "WINDOWLESS PROCESS SCAN: After EnumWindows, scan all processes for cmdLine matches. Walk PPID chain (NativeMethods.GetParentProcessId via NtQueryInformationProcess.Reserved3) to find host window (e.g. VS Code terminal running chatgpt.com session). MatchedVia=\u0027cmd\u0027, MatchedSnippet=matching token only (not full cmdline). context matches (foreground heuristic) filtered out of find results.",
-    "WINDOWLESS PROCESS SCAN: After EnumWindows, scan all processes for cmdLine matches. Walk PPID chain (NativeMethods.GetParentProcessId via NtQueryInformationProcess.Reserved3) to find host window (e.g. VS Code terminal running chatgpt.com session). MatchedVia=\u0027cmd\u0027, MatchedSnippet=matching token only (not full cmdline). context matches (foreground heuristic) filtered out of find results."
-  ],
-  "tags": [
-    "grap",
-    "find",
-    "target",
-    "window",
-    "bash",
-    "focus",
-    "shell-safe",
-    "verify"
-  ],
-  "source_refs": [
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "55:# FOCUS",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "92:# TARGET",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "1731:BuildTargetGrapWithFocusPath",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "176:UiaLocator.QuickSearch",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "228:foreground host",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "1104:vscode-app",
-      "note": null
-    },
-    {
-      "file": "w",
-      "line": null,
-      "pattern": "23:Focus Hot-Chain",
-      "note": null
-    }
-  ],
-  "regression_script": null,
-  "author": "claude",
-  "created": "2026-04-08T07:01:01.1192756Z",
-  "updated": "2026-04-08T12:06:08.4549074Z",
-  "version": "1.11"
+﻿{
+    "id":  "grap-target",
+    "app":  "wkappbot",
+    "title":  "grap-target",
+    "desc":  "Shell-safe output contract for a11y find. Use when you need a paste-ready grap target that survives shell copy/paste, re-run verification, and code-review/debug workflows. Keep # FOCUS for the currently focused leaf path when interaction side effects matter, and keep # TARGET as the primary hwnd:0x... token with high-signal context for both Claude and Codex. Favor minimal operator options such as verify, review, and dry-run only when they improve safety or ambiguity.",
+    "steps":  [
+                  "Treat a11y find as a contract for both humans and Codex: the output must be paste-ready, shell-safe, and verifiable.",
+                  "Emit one shared # FOCUS line when the focused leaf may affect interaction, including modal/error popups; keep it as a full grap string in quotes.",
+                  "Emit one # TARGET block per match; use {..} with hwnd first, then pid/proc, then the matching field/snippet, and quote the full grap expression so it can be pasted as one argument.",
+                  "Include the matching field/snippet in a compact {match:"
+              ],
+    "tags":  [
+                 "grap",
+                 "find",
+                 "target",
+                 "window",
+                 "bash",
+                 "focus",
+                 "shell-safe",
+                 "verify",
+                 "codex",
+                 "code-review",
+                 "review",
+                 "dry-run",
+                 "operator",
+                 "project"
+             ],
+    "source_refs":  [
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yActions.Output.cs",
+                            "line":  15,
+                            "pattern":  "## FOCUS",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  569,
+                            "pattern":  "# TARGET",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  44,
+                            "pattern":  "BuildTargetGrapWithFocusPath",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.cs",
+                            "line":  140,
+                            "pattern":  "UiaLocator.QuickSearch",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+                            "line":  292,
+                            "pattern":  "foreground host",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+                            "line":  1168,
+                            "pattern":  "vscode-app",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  23,
+                            "pattern":  "Focus Hot-Chain",
+                            "note":  null
+                        }
+                    ],
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T07:01:01.1192756Z",
+    "updated":  "2026-04-08T16:48:52.229657Z",
+    "version":  "1.26"
 }

@@ -1052,7 +1052,7 @@ internal partial class Program
                 DrainSlackQueue();
             }
 
-            // ── Skill audit (once per day — detect stale source_refs, Slack alert) ──
+            // ── Skill audit (once per day — detect stale source_refs, prompt agent via newchat) ──
             if ((DateTime.UtcNow - _lastSkillAuditUtc).TotalHours >= 24)
             {
                 _lastSkillAuditUtc = DateTime.UtcNow;
@@ -1061,19 +1061,17 @@ internal partial class Program
                     var cwd = _cachedCards.FirstOrDefault(c => !string.IsNullOrEmpty(c.Cwd))?.Cwd
                               ?? Environment.CurrentDirectory;
                     var issues = RunSkillAuditSilent(cwd);
-                    if (issues.Count > 0 && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                    if (issues.Count > 0)
                     {
-                        var msg = $":books: *스킬 감사*: {issues.Count}개 스킬 source_refs 불일치 감지\n"
-                                + string.Join("\n", issues.Select(id => $"  • `wkappbot skill verify {id}`"))
-                                + "\n`wkappbot skill audit` 으로 상세 확인 후 수정해주세요";
-                        Task.Run(async () =>
-                        {
-                            try { await SlackSendViaApi(slackBotToken, slackChannel, msg, username: "앱봇아이"); }
-                            catch { }
-                        });
-                        Console.Error.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — Slack notified");
+                        var verifyLines = string.Join("\n", issues.Select(id => $"  wkappbot skill verify {id}"));
+                        var prompt = $"[SKILL AUDIT] {issues.Count} skill(s) have stale source_refs.\n"
+                                   + verifyLines
+                                   + "\nRun `wkappbot skill audit` for details, then fix each skill's source_refs with correct file paths and line numbers.";
+                        var cwdFolder = Path.GetFileName(cwd) ?? "";
+                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, prompt, "--timeout", "30s"]);
+                        Console.Error.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — agent prompted via prompt send");
                     }
-                    else if (issues.Count == 0)
+                    else
                         Console.Error.WriteLine($"[EYE] Skill audit: all refs OK");
                 }
                 catch (Exception ex) { Console.Error.WriteLine($"[EYE] Skill audit error: {ex.Message}"); }
