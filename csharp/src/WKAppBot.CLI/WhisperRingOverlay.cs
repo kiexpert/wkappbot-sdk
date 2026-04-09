@@ -41,6 +41,7 @@ internal sealed class WhisperRingWindow : Window
     // Sound code RLE trail string (just append + trim front)
     private string _scTrail = "";
     private ushort _scLast = ushort.MaxValue;
+    private string? _bottomScrollOverride;
 
     /// <summary>Minimum sound code count before showing codes instead of clock. Default 9.</summary>
     public int SoundCodeMinCount { get; set; } = 9;
@@ -337,6 +338,7 @@ internal sealed class WhisperRingWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x77)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 12,
+            FontWeight = FontWeights.Bold,
             TextAlignment = TextAlignment.Left, // left-align for scroll
             RenderTransform = _recentTx,
         };
@@ -386,6 +388,19 @@ internal sealed class WhisperRingWindow : Window
             string.Join("-", p.Split(' ', StringSplitOptions.RemoveEmptyEntries))));
         // Collapse any remaining multiple spaces
         return System.Text.RegularExpressions.Regex.Replace(joined, " +", " ").Trim();
+    }
+
+    public void SetBottomScrollText(string text)
+    {
+        if (!_canvas.Dispatcher.CheckAccess())
+        {
+            _canvas.Dispatcher.BeginInvoke(() => SetBottomScrollText(text));
+            return;
+        }
+
+        _bottomScrollOverride = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        _recentTx.BeginAnimation(TranslateTransform.XProperty, null);
+        _recentTx.X = 0;
     }
 
     /// <summary>Update a single arc segment geometry.</summary>
@@ -617,7 +632,9 @@ internal sealed class WhisperRingWindow : Window
         }
 
         // Display: spaces between tokens → '-', ".." → ' ', collapse multiple spaces
-        var display = FormatTrailDisplay(_scTrail);
+        var display = !string.IsNullOrWhiteSpace(_bottomScrollOverride)
+            ? _bottomScrollOverride!
+            : FormatTrailDisplay(_scTrail);
 
         // Clock area: show sound codes only when enough accumulated, else clock
         int scCount = display.Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries).Length;

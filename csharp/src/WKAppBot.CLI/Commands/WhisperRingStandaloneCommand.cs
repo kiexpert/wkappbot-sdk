@@ -36,6 +36,7 @@ internal partial class Program
         WhisperEngine? engine = null;
         WhisperExperienceDb? exp = null;
         WhisperRingWindow? window = null;
+        WhisperWorkerRelay? workers = null;
         try
         {
             engine = new WhisperEngine();
@@ -54,6 +55,7 @@ internal partial class Program
             exp = new WhisperExperienceDb();
             exp.StartLogging();
             bool sttOk = exp.StartStt();
+            workers = new WhisperWorkerRelay(window, FindRepoRoot(), "W:\\SDK\\bin\\wkappbot.exe");
 
             // Auto-study (only when user idle >= 1 hour)
             DateTime lastStudyTime = DateTime.MinValue;
@@ -67,9 +69,9 @@ internal partial class Program
                 if ((now - startTime).TotalMinutes < 2 || (now - lastStudyTime).TotalMinutes < 2)
                 { exp.NotifyAutoStudyDone(); return; }
                 lastStudyTime = now;
-                ThreadPool.QueueUserWorkItem(_ =>
+                _ = Task.Run(async () =>
                 {
-                    try { WhisperStudyCommand(["--batch", count.ToString()]); }
+                    try { if (workers != null) await workers.QueueStudyAsync(count).ConfigureAwait(false); }
                     catch { }
                     finally { exp.NotifyAutoStudyDone(); }
                 });
@@ -100,13 +102,17 @@ internal partial class Program
 
             exp!.OnMicSegmentReady += (mp3Path) =>
             {
+                var movedPath = mp3Path;
                 try
                 {
                     var unknownDir = Path.Combine(Path.GetDirectoryName(mp3Path)!, "..", "_unknown");
                     Directory.CreateDirectory(unknownDir);
-                    File.Move(mp3Path, Path.Combine(unknownDir, Path.GetFileName(mp3Path)));
+                    movedPath = Path.Combine(unknownDir, Path.GetFileName(mp3Path));
+                    File.Move(mp3Path, movedPath);
                 }
                 catch { }
+
+                _ = workers?.QueueSearchAsync(movedPath);
             };
 
             // Parent PID watchdog — timer on dispatcher
@@ -135,8 +141,26 @@ internal partial class Program
         }
         finally
         {
+            workers?.Dispose();
             exp?.Stop();
             engine?.Dispose();
         }
+    }
+
+    private static string FindRepoRoot()
+    {
+        var dir = new DirectoryInfo(Environment.CurrentDirectory);
+        while (dir != null)
+        {
+            var scriptsDir = Path.Combine(dir.FullName, "scripts");
+            if (File.Exists(Path.Combine(scriptsDir, "whisper-search-worker.ps1")) &&
+                File.Exists(Path.Combine(scriptsDir, "whisper-study-worker.ps1")))
+            {
+                return dir.FullName;
+            }
+            dir = dir.Parent;
+        }
+
+        return Environment.CurrentDirectory;
     }
 }
