@@ -681,7 +681,9 @@ internal partial class Program
             // Piped processes (MCP, Eye, pipe) → stderr pass-through (immediate output + flush).
             // stderr redirected → real-time output (like --stderr)
             bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode && !Console.IsErrorRedirected;
-            using var _errScope = isConsoleDirect ? ErrorScope.Begin() : null;
+            // eye/agent/tick: diagnostic-heavy commands that legitimately write to stderr — skip ErrorScope
+            bool isErrScopeExcluded = command is "eye" or "agent" or "tick";
+            using var _errScope = (isConsoleDirect && !isErrScopeExcluded) ? ErrorScope.Begin() : null;
 
             exitCode = command switch
             {
