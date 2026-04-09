@@ -27,7 +27,7 @@ internal partial class Program
         thread.Start();
         thread.Join(); // block until done
 
-        Console.WriteLine("[WHISPER-RING] Exiting");
+        Console.Error.WriteLine("[WHISPER-RING] Exiting");
         return 0;
     }
 
@@ -41,7 +41,7 @@ internal partial class Program
             engine = new WhisperEngine();
             if (!engine.Start())
             {
-                Console.WriteLine("[WHISPER-RING] No microphone — exiting");
+                Console.Error.WriteLine("[WHISPER-RING] No microphone — exiting");
                 engine.Dispose();
                 return;
             }
@@ -118,7 +118,7 @@ internal partial class Program
                     try { System.Diagnostics.Process.GetProcessById(ppid); }
                     catch
                     {
-                        Console.WriteLine("[WHISPER-RING] Parent gone — closing");
+                        Console.Error.WriteLine("[WHISPER-RING] Parent gone — closing");
                         window.Close();
                     }
                 };

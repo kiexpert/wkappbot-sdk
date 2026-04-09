@@ -1,4 +1,4 @@
-# WKAppBot v5.13.0 - Windows + Android App Automation Test Framework
+# WKAppBot v5.13.140 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -88,6 +88,14 @@ Eye ↔ MCP worker(Core) JSON-RPC over pipe. a11y/UIA isolated in separate proce
 ### Self-Healing DYN-A11Y
 MFC owner-drawn with no UIA → CCA segmentation → OCR triple cross-validation → Gemini Vision inference
 → `dyn_r{row}c{col}` dynamic ID + Experience DB cache + CCA parameter auto-tuning
+
+### v5.13.133~140 (2026-04-10, Session 8)
+- **Core worker self-log** (v5.13.133): `IsLauncherInParentChain()` WMI walk — if Launcher not in ancestor chain, Core auto-creates `WorkerStderrTeeWriter` log. Covers Eye-spawned workers (claude-proxy, whisper-ring, analyze-hack) that bypass Launcher.
+- **Launcher stderr relay hardening** (v5.13.136): buffers last-20 stderr lines + captures `[LOG]` path; writes `{source:launcher}` fallback `errors.jsonl` entry on non-zero exit. Raw-byte sentinel detection (`\0UIT`) + StringBuilder line accumulation.
+- **AppBotQuitFlush** (v5.13.137): unified Launcher exit function — `stderrRelay.Wait(2000)` → `AppBotExit(code)` → flush + TerminateSelf. All bare `TerminateSelf` calls replaced.
+- **Core stderr flush** (v5.13.140): `Console.Error.Flush()` added to ProcessExit hook, `DoRequiredExitCleanup`, and `WriteExitFile` (`FlushFileBuffers(STD_ERROR_HANDLE)`). Critical for MCP loop which has no `_activeTee`.
+- **claude-proxy** (v5.13.130): local Anthropic API proxy on port 7788. Always-on `[PROXY] ← STATUS (Nms)` logging. `ANTHROPIC_BASE_URL=http://localhost:7788` in `~/.claude/settings.json`. Context-limit → auto Gemini handoff.
+- **Skills added**: `core-worker-logging-launcher-chain` (13-step logging architecture guide), `a11y-command-cheatsheet` v2.11 (ambiguous grap auto-resolution via L1 TargetAmbiguityGuard documented)
 
 ### v5.11.101+ (2026-04-08, Session 7)
 - **# TARGET output redesign** (copy-paste-ready grap):

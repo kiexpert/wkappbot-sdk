@@ -33,6 +33,7 @@ internal sealed class WhisperRingWindow : Window
     private readonly TextBlock _recentText;
     private readonly Canvas _recentClip;              // clip container for tween scroll
     private readonly TranslateTransform _recentTx;    // scroll transform
+    private readonly Border _recentBox;               // separate box below ring
     private readonly TextBlock _sttText;    // STT recognized word(s)
     private readonly WpfEllipse _coreGlow;
     private readonly WpfEllipse _coreDot;
@@ -96,9 +97,11 @@ internal sealed class WhisperRingWindow : Window
     public WhisperRingWindow()
     {
         const double size = 180;
+        const double recentGap = 10;
+        const double recentBoxHeight = 66;
         Title = "WhisperRing";
         Width = size;
-        Height = size + 22; // extra for recent tokens text
+        Height = size + recentGap + recentBoxHeight;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -108,7 +111,14 @@ internal sealed class WhisperRingWindow : Window
         ResizeMode = ResizeMode.NoResize;
         Opacity = 0.88;
 
-        var root = new Grid();
+        var root = new Grid
+        {
+            Width = size,
+            Height = size + recentGap + recentBoxHeight,
+        };
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(size) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(recentGap) });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(recentBoxHeight) });
 
         // Main canvas for ring
         _canvas = new Canvas
@@ -316,6 +326,7 @@ internal sealed class WhisperRingWindow : Window
         _sttText.Width = 100;
         _canvas.Children.Add(_sttText);
 
+        Grid.SetRow(_canvas, 0);
         root.Children.Add(_canvas);
 
         // Recent tokens (bottom bar) — tween-scroll container
@@ -325,19 +336,30 @@ internal sealed class WhisperRingWindow : Window
             Text = "",
             Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x77)),
             FontFamily = new FontFamily("Consolas"),
-            FontSize = 8,
+            FontSize = 12,
             TextAlignment = TextAlignment.Left, // left-align for scroll
             RenderTransform = _recentTx,
         };
         _recentClip = new Canvas
         {
-            Height = 14,
+            Width = size - 10,
+            Height = 24,
             ClipToBounds = true,
-            VerticalAlignment = VerticalAlignment.Bottom,
-            Margin = new Thickness(4, 0, 4, 2),
+            VerticalAlignment = VerticalAlignment.Center,
         };
         _recentClip.Children.Add(_recentText);
-        root.Children.Add(_recentClip);
+
+        _recentBox = new Border
+        {
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(0xCC, 0x10, 0x10, 0x18)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0x88, 0x88, 0xAA)),
+            BorderThickness = new Thickness(1),
+            Margin = new Thickness(4, 0, 4, 0),
+            Child = _recentClip,
+        };
+        Grid.SetRow(_recentBox, 2);
+        root.Children.Add(_recentBox);
 
         Content = root;
     }
