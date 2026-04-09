@@ -1,4 +1,4 @@
-﻿// CommandHelp.cs -- Per-command --help descriptions for future Claude instances.
+// CommandHelp.cs -- Per-command --help descriptions for future Claude instances.
 // Usage: wkappbot <command> --help  |  wkappbot <command> <subcommand> --help
 //        wkappbot <command> [<subcommand>] --regression  -- help + run stored test scripts
 //
@@ -524,6 +524,12 @@ internal partial class Program
 
         ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--size N: font size px (default 32).",
 
+        ["whisper"] = "whisper [options]\nReal-time speech analysis and tokenization.\nSubcommands:\n  dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]\n    Live dictation into the focused control as text.\n  study [--batch N] [--for <duration>] [--engine gemini|gpt]\n    Batch-transcribe MP3 segments via AI.\n  pipeline [--batch N] [--interval N] [--engine gemini|gpt] [--loop|--once] [--for <duration>]\n    Stable orchestration: study -> auto-slice/index -> phoneme harvest.\n  slice | clean | index [--split]\n    Offline segment processing and phoneme indexing.\n  phoneme-search [--db <dir>] [--query <file|text>] [--top N] [--no-harvest]\n    Rank phoneme_db candidates and harvest query chunks back into the DB.\n  phoneme-loop [--in <slices-dir>] [--out <db-dir>] [--interval N] [--move] [--dry-run] [--once]\n    Repeated phoneme split loop for new MP3s. Default runs until Ctrl+C; --once exits after one scan.\n",
+
+        ["whisper dictate"] = "whisper dictate [--target <grap>] [--lang ko|en] [--confidence N] [--no-space] [--enter]\nLive microphone dictation into the focused control.\nDefault target: focused control in the foreground window.\nUse --target <grap> to force a specific window/control.\nUse --confidence N to ignore weak recognitions (default 0.45).\nUse --no-space to suppress the trailing space after each phrase.\nUse --enter to send Enter after each accepted phrase.",
+
+        ["whisper-ring"] = "whisper-ring [x y] [--keyboard|--dictate]\nStandalone Whisper Ring worker. Default: overlay/analysis only.\nWith --keyboard or --dictate: reuse whisper dictate behavior and type recognized text.\nPosition arguments x y place the ring window when not dictating.",
+
         ["screen"] = "screen blank [--duration N] | restore\nBlank all monitors (privacy/automation). Auto-restore after N seconds.",
 
         ["hotswap"] = "hotswap\nManually trigger Eye hot-swap check (normally automatic on publish).",
@@ -605,4 +611,3 @@ internal partial class Program
             """,
     };
 }
-

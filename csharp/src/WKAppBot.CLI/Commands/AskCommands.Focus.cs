@@ -300,7 +300,6 @@ internal partial class Program
                 var (dwmColor, hexColor) = GetBotColors(label);
                 cdp.SetDwmBorderColor(dwmColor);
                 await cdp.SetBotOverlayAsync(true, hexColor);
-                _ = cdp.SetBotTitlePrefixAsync(label ?? "WKBot");
             }
 
             Console.Error.WriteLine($"[AAR:CDP] Ready: {action}");
@@ -343,7 +342,6 @@ internal partial class Program
         // Remove bot decoration after send completes
         cdp.SetDwmBorderColor(null);
         _ = cdp.SetBotOverlayAsync(false);
-        _ = cdp.RestoreWindowTitleAsync();
     }
 
     /// <summary>

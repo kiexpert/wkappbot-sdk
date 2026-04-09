@@ -233,52 +233,7 @@ public sealed partial class CdpClient
         catch { /* Windows 10 or earlier -- no-op */ }
     }
 
-    private string? _originalWindowTitle;
     private bool _overlayInjected;
-
-    /// <summary>
-    /// Prepend "[host]" prefix to Chrome window title so the OS taskbar shows which AI is active.
-    /// Saves the original title for RestoreWindowTitleAsync(). Fire-and-forget friendly.
-    /// </summary>
-    public async Task SetBotTitlePrefixAsync(string host)
-    {
-        var hwnd = FindChromeMainWindow();
-        if (hwnd == IntPtr.Zero) return;
-        try
-        {
-            // Snapshot original title before first decoration (don't double-prefix on re-arm)
-            var sb = new StringBuilder(512);
-            GetWindowTextW(hwnd, sb, sb.Capacity);
-            var current = sb.ToString();
-            var prefix = $"[{host}] ";
-            if (!current.StartsWith("[") && !string.IsNullOrEmpty(current))
-                _originalWindowTitle = current;
-            var desired = prefix + (_originalWindowTitle ?? current);
-            SetWindowTextW(hwnd, desired);
-        }
-        catch { }
-        await Task.CompletedTask;
-    }
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-
-    /// <summary>Restore original Chrome window title after bot decoration ends.</summary>
-    public async Task RestoreWindowTitleAsync()
-    {
-        var hwnd = FindChromeMainWindow();
-        if (hwnd == IntPtr.Zero) return;
-        try
-        {
-            if (_originalWindowTitle != null)
-            {
-                SetWindowTextW(hwnd, _originalWindowTitle);
-                _originalWindowTitle = null;
-            }
-        }
-        catch { }
-        await Task.CompletedTask;
-    }
 
     /// <summary>
     /// Inject a thin fixed-position CSS overlay into the page that pulses on each bot tick.
