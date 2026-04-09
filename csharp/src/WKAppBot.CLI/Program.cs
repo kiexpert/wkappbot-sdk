@@ -83,6 +83,8 @@ internal partial class Program
     internal static string? RelayFilePath = null;
     static string? _exitFilePath = null; // --exit-file arg from Launcher (IOCP exit sentinel)
     static string? _exitEventName = null; // --exit-event arg from Launcher (named event for instant signaling)
+    static volatile int _exitCleanupDone = 0; // interlocked guard: DoRequiredExitCleanup runs exactly once
+    static TeeTextWriter? _activeTee = null;  // set after tee is created; used by ProcessExit hook
 
     /// <summary>Original Console.Out before TeeTextWriter is installed. Used by grep-mode to write matches to real stdout.</summary>
     internal static TextWriter OriginalStdout = Console.Out;
@@ -130,6 +132,12 @@ internal partial class Program
         {
             try { XRayHelper.RestoreAll(); } catch { }
             try { Console.Out.Flush(); } catch { }
+            // DoRequiredExitCleanup: tee.Dispose (log move) + WriteExitFile, idempotent.
+            // signalLauncher=false — we signal via UIT + TerminateProcess below instead,
+            // to avoid the named-event SetEvent racing with TerminateProcess handle closure.
+            // FastExit (TerminateProcess) bypasses CLR entirely → never reaches here.
+            // RunningInEye/IsMcpMode: no _exitFilePath/_exitEventName → WriteExitFile is no-op.
+            DoRequiredExitCleanup(_exitCode, signalLauncher: false);
             // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
             try
             {
@@ -485,6 +493,7 @@ internal partial class Program
         // Skip TeeWriter for grap/grep fast-exit: writing log file on W:/ (SMB) leaves kernel-level
         // pending I/O that blocks TerminateProcess (STILL_ACTIVE) for ~27s (SMB cancel timeout).
         TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
+        _activeTee = tee; // expose for ProcessExit hook
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
@@ -864,19 +873,20 @@ internal partial class Program
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
-            // Write errors.jsonl BEFORE signaling exit — Launcher may kill Core immediately after
-            // WriteExitFile(), so errors.jsonl must be written first (WriteErrorRecordNow is a no-op if exit=0).
-            if (tee != null) tee.ExitCode = exitCode;
-            tee?.WriteErrorRecordNow();
-
-            // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
-            // Launcher polls this file every 50ms and exits immediately when found.
+            // DoRequiredExitCleanup: errors.jsonl write + tee.Dispose (log move) + WriteExitFile.
+            // Idempotent — ProcessExit hook calls this too as fallback for abnormal exits.
+            // fastExitAfterCommand (grap/grep): skip signalLauncher here; FastExit handles it.
             if (!_fastExitAfterCommand)
-                WriteExitFile(exitCode);
+                DoRequiredExitCleanup(exitCode);
+            else
+            {
+                // grap/grep: still need errors.jsonl write; tee is null here (skipped for fast-exit).
+                // FastExit below handles WriteExitFile + TerminateProcess.
+                try { if (tee != null) { tee.ExitCode = exitCode; tee.WriteErrorRecordNow(); } } catch { }
+            }
 
-            if (tee != null) Console.SetOut(tee.OriginalConsole);
-            tee?.Dispose(); // normal-exit atexit-style move to logs/old
-            if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
+            var logPath = tee?.LogPath;
+            if (logPath != null) Console.Error.WriteLine($"Log saved: {logPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
             // grap/grep path still uses FastExit (relay file + TerminateProcess).
             if (_fastExitAfterCommand)
@@ -2085,6 +2095,30 @@ internal partial class Program
     {
         // No-op: sync FileStream on overlapped pipe handles throws ArgumentException.
         // FastExit() uses FlushFileBuffers + TerminateProcess instead — see FastExit comments.
+    }
+
+    /// <summary>
+    /// Required exit cleanup: log move (tee.Dispose) + WriteExitFile.
+    /// Idempotent — safe to call from both normal Main exit and ProcessExit hook.
+    /// The ProcessExit hook calls this with signalLauncher=false because the named-event
+    /// signal races with TerminateProcess; we let the hook's own UIT + TerminateProcess handle that.
+    /// FastExit (TerminateProcess) bypasses CLR shutdown entirely, so it calls WriteExitFile directly.
+    /// </summary>
+    static void DoRequiredExitCleanup(int code, bool signalLauncher = true)
+    {
+        if (System.Threading.Interlocked.Exchange(ref _exitCleanupDone, 1) != 0) return;
+
+        var tee = _activeTee;
+        if (tee != null)
+        {
+            try { tee.ExitCode = code; } catch { }
+            try { tee.WriteErrorRecordNow(); } catch { }
+            try { Console.SetOut(tee.OriginalConsole); } catch { }
+            try { tee.Dispose(); } catch { } // moves log to logs/old
+        }
+
+        if (signalLauncher)
+            WriteExitFile(code);
     }
 
     /// <summary>
