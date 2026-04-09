@@ -20,12 +20,11 @@ internal partial class Program
         {
             bool errorDetected = scope.ErrorDetected;
             // stdout blank + stderr error-like + exit 0 = silent swallowed error
-            if (code == 0 && errorDetected && (_activeTee?.StdoutIsBlank ?? false))
-            {
+            // → force error log output + errors.jsonl entry, but keep exit code as-is (0 in errors.jsonl = suspicious red flag)
+            bool silentSwallow = code == 0 && errorDetected && (_activeTee?.StdoutIsBlank ?? false);
+            if (silentSwallow)
                 AutoRegisterBug($"[BUG-AUTO] `{Environment.GetCommandLineArgs().Skip(1).FirstOrDefault()}` exited 0 but stderr had errors and stdout was blank");
-                code = -9999;
-            }
-            bool isError = code != 0 || forceErrorLog;
+            bool isError = code != 0 || forceErrorLog || silentSwallow;
             var log = scope.Finalize(isError);
             if (isError && log.Length > 0)
                 Console.Error.Write(log);
