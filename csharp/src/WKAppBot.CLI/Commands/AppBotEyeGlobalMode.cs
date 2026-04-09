@@ -1068,8 +1068,9 @@ internal partial class Program
                                    + verifyLines
                                    + "\nRun `wkappbot skill audit` for details, then fix each skill's source_refs with correct file paths and line numbers.";
                         var cwdFolder = Path.GetFileName(cwd) ?? "";
-                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, prompt, "--timeout", "30s"]);
-                        Console.Error.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — agent prompted via prompt send");
+                        // --when-idle 5s: wait until agent input is visible (not busy with a tool call)
+                        EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, prompt, "--when-idle", "5s", "--timeout", "5m"]);
+                        Console.Error.WriteLine($"[EYE] Skill audit: {issues.Count} stale skill(s) — agent prompted via prompt send (--when-idle 5s)");
                     }
                     else
                         Console.Error.WriteLine($"[EYE] Skill audit: all refs OK");
