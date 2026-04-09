@@ -373,7 +373,11 @@ internal partial class Program
             if (forced is "1" or "true" or "yes" or "on") return true;
             if (forced is "0" or "false" or "no" or "off") return false;
 
-            // Certainty: parent/ancestor chain contains claude process.
+            // CLAUDE_CODE_ENTRYPOINT=claude-vscode: set by Claude Code VS Code extension in all child processes.
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT")))
+                return true;
+
+            // Parent/ancestor chain contains claude process (Claude Desktop).
             using var cur = Process.GetCurrentProcess();
             int pid = cur.Id;
             for (int depth = 0; depth < 6; depth++)
@@ -399,6 +403,10 @@ internal partial class Program
             var forced = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CODEX_APP")?.Trim().ToLowerInvariant();
             if (forced is "1" or "true" or "yes" or "on") return true;
             if (forced is "0" or "false" or "no" or "off") return false;
+
+            // CODEX_HOME: set by Codex in all child processes.
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
+                return true;
 
             // Certainty rule: parent/ancestor process chain contains codex.
             using var cur = Process.GetCurrentProcess();

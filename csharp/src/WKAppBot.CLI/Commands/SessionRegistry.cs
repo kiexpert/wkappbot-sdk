@@ -158,12 +158,47 @@ internal partial class Program
         return result;
     }
 
-    /// <summary>Detect host type from parent process chain.</summary>
+    /// <summary>Detect host type from parent process chain + environment variables.</summary>
     static string DetectHostType(int parentPid)
     {
+        // Env-var detection (fastest, most reliable — set by the AI host in all child processes).
+        // Check CODEX_HOME first: Codex sets this even in VS Code terminal mode.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return "vscode-codex";
 
+        // CLAUDE_CODE_ENTRYPOINT=claude-vscode: set by Claude Code VS Code extension.
+        var claudeEntrypoint = Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT");
+        if (!string.IsNullOrWhiteSpace(claudeEntrypoint))
+        {
+            // Classify from VSCODE_PID window title if available.
+            var vscodePidStr = Environment.GetEnvironmentVariable("VSCODE_PID");
+            if (!string.IsNullOrWhiteSpace(vscodePidStr) && int.TryParse(vscodePidStr, out var vscodePid) && vscodePid > 0)
+            {
+                try
+                {
+                    var vsProc = System.Diagnostics.Process.GetProcessById(vscodePid);
+                    return ClaudePromptHelper.ClassifyVsCodeHostType(GetMainWindowTitleSafe(vsProc));
+                }
+                catch { }
+            }
+            return "vscode-claudecode";
+        }
+
+        // VSCODE_PID without CLAUDE_CODE_ENTRYPOINT: generic VS Code terminal (Codex ext, Copilot, etc.)
+        // Only use as fallback — real AI host env vars should have been checked above.
+        var vscodePidOnly = Environment.GetEnvironmentVariable("VSCODE_PID");
+        if (!string.IsNullOrWhiteSpace(vscodePidOnly) && int.TryParse(vscodePidOnly, out var vscPid) && vscPid > 0)
+        {
+            try
+            {
+                var vsProc = System.Diagnostics.Process.GetProcessById(vscPid);
+                return ClaudePromptHelper.ClassifyVsCodeHostType(GetMainWindowTitleSafe(vsProc));
+            }
+            catch { }
+            return "vscode-claudecode";
+        }
+
+        // Parent process chain walk (handles Claude Desktop, standalone Codex, Cursor, etc.)
         int cur = parentPid;
         for (int depth = 0; cur > 0 && depth < 12; depth++)
         {

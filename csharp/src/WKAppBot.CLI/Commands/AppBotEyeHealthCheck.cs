@@ -352,10 +352,24 @@ internal partial class Program
                     if (!cards.TryGetValue(cardKey, out var c))
                     {
                         // Phase 1 may have used sessionJsonl as key (different from cwdRaw/promptHwnd).
-                        // Try CWD match to avoid duplicate cards and update Phase 1 timestamp with tick data.
+                        // Match by CWD + AI family so Claude Code ticks don't update Codex cards (or vice versa)
+                        // when both AIs are running concurrently in the same workspace.
+                        static string AiFamily(string? ht) =>
+                            ClaudePromptHelper.IsCodexHostType(ht) ? "codex"
+                            : ClaudePromptHelper.IsVsCodeHostType(ht) ||
+                              string.Equals(ht, "claude-desktop", StringComparison.OrdinalIgnoreCase) ||
+                              string.Equals(ht, "vscode-claudecode", StringComparison.OrdinalIgnoreCase) ? "claude"
+                            : (ht ?? "").ToLowerInvariant();
+                        var tickFamily = AiFamily(pname);
                         c = cards.Values.FirstOrDefault(x =>
                             !string.IsNullOrEmpty(x.Cwd) &&
-                            x.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') == cwdRaw);
+                            x.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') == cwdRaw &&
+                            AiFamily(x.HostType) == tickFamily);
+                        // Fall back to any CWD match if no family-matched card exists (single-AI scenario).
+                        c ??= cards.Values.FirstOrDefault(x =>
+                            !string.IsNullOrEmpty(x.Cwd) &&
+                            x.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/') == cwdRaw &&
+                            string.IsNullOrEmpty(x.HostType));
                     }
 
                     if (c == null)
