@@ -298,20 +298,26 @@ partial class Program
 
             // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
             // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
-            // Sentinel \0UIT on stderr → TerminateSelf; bash gets control back right away.
+            // Also buffer last 20 stderr lines + capture [LOG] path for fallback errors.jsonl.
             var _stderr = Console.OpenStandardError();
             var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
+            var stderrLastLines = new System.Collections.Generic.Queue<string>(); // ring buffer last 20 lines
+            string? capturedLogPath = null;
+            var stderrLock = new object();
             _ = System.Threading.Tasks.Task.Run(() =>
             {
                 try
                 {
-                    var buf = new byte[4096];
-                    int n;
-                    while ((n = proc.StandardError.BaseStream.Read(buf, 0, buf.Length)) > 0)
+                    using var reader = new System.IO.StreamReader(proc.StandardError.BaseStream,
+                        System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: false,
+                        bufferSize: 4096, leaveOpen: true);
+                    var rawStderr = Console.OpenStandardError();
+                    string? line;
+                    while ((line = reader.ReadLine()) != null)
                     {
-                        // Exact 4-byte sentinel on stderr → TerminateSelf
-                        if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
-                                   && buf[2] == sentinel[2] && buf[3] == sentinel[3])
+                        var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
+                        // Sentinel check on raw bytes equivalent: \0UIT won't appear as a text line
+                        if (lineBytes.Length == 4 && lineBytes[0] == 0)
                         {
                             Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
                             try { Console.Out.Flush(); CloseHandle(GetStdHandle(-11)); } catch { }
@@ -319,7 +325,15 @@ partial class Program
                             TerminateSelf((uint)ec);
                             return;
                         }
-                        _stderr.Write(buf, 0, n); _stderr.Flush();
+                        rawStderr.Write(lineBytes, 0, lineBytes.Length); rawStderr.Flush();
+                        lock (stderrLock)
+                        {
+                            // Capture [LOG] path for fallback errors.jsonl
+                            if (line.StartsWith("[LOG] ", StringComparison.Ordinal))
+                                capturedLogPath = line[6..].Trim();
+                            stderrLastLines.Enqueue(line);
+                            if (stderrLastLines.Count > 20) stderrLastLines.Dequeue();
+                        }
                     }
                 }
                 catch { }
@@ -359,6 +373,14 @@ partial class Program
             // swallowed everything). Warn so the caller isn't left with just a bare exit code.
             if (coreExitCode != 0 && stdoutBytesWritten == 0)
                 Console.Error.WriteLine($"[LAUNCHER] Core exited {coreExitCode} with no stdout — check stderr log above");
+            // Fallback errors.jsonl: write from Launcher when Core exits non-zero.
+            // Core's TeeTextWriter normally handles this, but crashes before TeeWriter setup are silent.
+            // Launcher's entry uses raw last-20 stderr lines — always a useful safety net.
+            if (coreExitCode != 0)
+            {
+                try { AppendLauncherErrorRecord(coreExitCode, args, capturedLogPath, stderrLastLines, stderrLock); }
+                catch { /* best-effort */ }
+            }
             Console.Out.Flush();
             Console.Error.Flush();
             // TerminateSelf: Core's output already written (inherited handles); hard-kill Launcher immediately.
@@ -370,6 +392,44 @@ partial class Program
             Console.Error.WriteLine($"[LAUNCHER] Failed to run core: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Fallback errors.jsonl writer — runs in Launcher when Core exits non-zero.
+    /// Core's TeeTextWriter normally writes this, but if Core crashed before TeeWriter
+    /// was set up, this is the only record. Uses last 20 stderr lines as evidence.
+    /// </summary>
+    static void AppendLauncherErrorRecord(int exitCode, string[] args, string? logPath,
+        System.Collections.Generic.Queue<string> stderrLines, object lockObj)
+    {
+        // Determine logs directory: from captured [LOG] path, or default SDK/bin/wkappbot.hq/logs/
+        string? logsDir = null;
+        if (logPath != null)
+            logsDir = Path.GetDirectoryName(logPath);
+        if (string.IsNullOrEmpty(logsDir))
+        {
+            var exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
+            logsDir = Path.Combine(exeDir, "wkappbot.hq", "logs");
+        }
+        Directory.CreateDirectory(logsDir);
+
+        string[] lastLines;
+        lock (lockObj) lastLines = stderrLines.ToArray();
+
+        var cmd = string.Join(" ", args);
+        if (cmd.Length > 300) cmd = cmd[..300];
+        var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var lastSnippet = string.Join(" | ", lastLines.TakeLast(5).Select(l => l.Length > 150 ? l[..150] : l));
+        // Escape for JSON
+        lastSnippet = lastSnippet.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var logField = logPath != null ? $",\"log\":\"{logPath.Replace("\\", "\\\\")}\"" : "";
+        var record = $"{{\"ts\":\"{ts}\",\"exit\":{exitCode},\"source\":\"launcher\",\"cmd\":\"{cmd.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"{logField},\"fields\":{{\"_stderr\":\"{lastSnippet}\"}}}}";
+
+        var errorsFile = Path.Combine(logsDir, "errors.jsonl");
+        // Append atomically (best-effort)
+        using var fs = new FileStream(errorsFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+        using var sw = new StreamWriter(fs, System.Text.Encoding.UTF8);
+        sw.WriteLine(record);
     }
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
