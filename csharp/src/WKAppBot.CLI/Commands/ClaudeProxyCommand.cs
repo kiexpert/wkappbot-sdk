@@ -62,17 +62,18 @@ internal partial class Program
                 port = tryPort;
                 break;
             }
-            catch
+            catch (Exception ex)
             {
                 listener?.Close();
                 listener = null;
+                var reason = ex.Message.Contains("conflict") || ex.Message.Contains("use") ? "in use" : ex.Message;
                 if (tryPort < port + 9)
-                    Console.Error.WriteLine($"[PROXY] Port {tryPort} in use, trying {tryPort + 1}...");
+                    Console.Error.WriteLine($"[PROXY] Port {tryPort} {reason}, trying {tryPort + 1}...");
             }
         }
         if (listener == null)
         {
-            Console.Error.WriteLine($"[PROXY] No available port in range {port}-{port + 9}. Try --port <other>.");
+            Console.Error.WriteLine($"[PROXY] ERROR: no available port in range {port}-{port + 9}. Try --port <other>.");
             return 1;
         }
 
@@ -89,13 +90,15 @@ internal partial class Program
         {
             HttpListenerContext ctx;
             try { ctx = listener.GetContext(); }
-            catch (HttpListenerException) { break; }
-            catch (ObjectDisposedException) { break; }
+            catch (HttpListenerException ex) { Console.Error.WriteLine($"[PROXY] Listener stopped: {ex.Message}"); break; }
+            catch (ObjectDisposedException) { Console.Error.WriteLine("[PROXY] Listener disposed."); break; }
+            catch (Exception ex) { Console.Error.WriteLine($"[PROXY] ERROR: unexpected {ex.GetType().Name}: {ex.Message}"); break; }
 
             _ = Task.Run(() => HandleProxyRequest(ctx, http, injectContext, verbose));
         }
 
         listener?.Close();
+        Console.Error.WriteLine("[PROXY] Stopped.");
         return 0;
     }
 
