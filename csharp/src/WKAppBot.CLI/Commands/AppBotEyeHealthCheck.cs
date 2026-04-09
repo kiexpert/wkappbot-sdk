@@ -313,6 +313,7 @@ internal partial class Program
                     LastStatus = s.LastStatus,
                     LastTsUtc = hbUtc,
                     Cwd = s.Cwd ?? "",
+                    SessionJsonl = s.SessionJsonl ?? "",  // authoritative JSONL from session registry
                 };
             }
         }

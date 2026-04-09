@@ -51,7 +51,7 @@ internal partial class Program
             if (!string.IsNullOrWhiteSpace(block))
                 kroSb.AppendLine($"크로 이슈: {block}");
 
-            // 크로 생각: OpenClaw session의 최신 assistant/user 텍스트
+            // Latest assistant/user text from OpenClaw session
             if (!string.IsNullOrWhiteSpace(prompt))
             {
                 var kroThought = prompt.Length > 120 ? prompt[..120] + "..." : prompt;
@@ -60,7 +60,7 @@ internal partial class Program
             kroBlock = kroSb.ToString().TrimEnd();
         }
 
-        // ── Apply CardCache to 클롣 cards — sort by MAX(content change, tick activity) ──
+        // ── Apply CardCache to AI cards — sort by MAX(content change, tick activity) ──
         // CardCache tracks when card text (tag|status) actually changed.
         // HealthCheck sets LastTsUtc from eye_ticks.jsonl (real JSONL activity).
         // Using max of both ensures active sessions stay on top even when card text is unchanged.
@@ -121,15 +121,16 @@ internal partial class Program
                     var cwdTag = AbbreviateCwd(c.Cwd);
                     var ageText = age < 60 ? $"{age}초 전" : age < 3600 ? $"{age / 60}분 전" : $"{age / 3600}시간 전";
 
-                    // Header: "{icon} {prefix}[CWD]" — full display name matches Slack bot username format
-                    var hostIcon = HostTypeIcon(c.HostType);
+                    // Header: display name only (no icon — icon is visual noise in Slack)
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : FormatSlackDisplayName(c.HostType, cwdTag);
-                    sb.AppendLine(string.IsNullOrEmpty(hostIcon) ? header : $"{hostIcon} {header}");
-                    // Context % per card (CWD → session JSONL size → ctx%)
+                    sb.AppendLine(header);
+                    // Context % per card: prefer session-registry JSONL (exact file), fall back to CWD scan.
                     var ctxTag = "";
-                    var (cardCtx, jsonlAge, _, jsonlFileSize) = GetContextInfoForCwdEx(c.Cwd, c.HostType);
+                    var (cardCtx, jsonlAge, _, jsonlFileSize) = !string.IsNullOrEmpty(c.SessionJsonl) && File.Exists(c.SessionJsonl)
+                        ? GetContextInfoForJsonl(c.SessionJsonl)
+                        : GetContextInfoForCwdEx(c.Cwd, c.HostType);
                     if (cardCtx >= 0)
                     {
                         var sizeMB = jsonlFileSize / (1024.0 * 1024.0);
@@ -152,8 +153,10 @@ internal partial class Program
                         sb.AppendLine($"작업: {c.LastTag}");
                         sb.AppendLine($"상태: {c.LastStatus} ({ageText}){ctxTag}");
                     }
-                    // 클롣 프롬프트 + 생각: CWD별 Claude Code 세션에서 최신 user/assistant 텍스트
-                    var clotThought = ReadClotThoughtForCwd(c.Cwd, c.HostType);
+                    // Latest user/assistant text: session-registry JSONL (exact) > CWD directory scan
+                    var clotThought = !string.IsNullOrEmpty(c.SessionJsonl) && File.Exists(c.SessionJsonl)
+                        ? ReadClotThoughtFromJsonl(c.SessionJsonl, c.HostType)
+                        : ReadClotThoughtForCwd(c.Cwd, c.HostType);
                     if (!string.IsNullOrWhiteSpace(clotThought))
                     {
                         // May contain "💬 user\n🤖 assistant" — split into separate lines

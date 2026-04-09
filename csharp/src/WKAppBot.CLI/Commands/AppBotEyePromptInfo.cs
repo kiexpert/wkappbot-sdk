@@ -50,14 +50,14 @@ internal partial class Program
     /// <summary>
     /// Extract project folder name from Codex (OpenAI) desktop window UIA tree.
     ///
-    /// [KNOWHOW] Codex CWD 추출 방법:
-    ///   Codex는 Electron 앱 — 타이틀은 항상 "Codex" (폴더 정보 없음).
-    ///   UIA inspect 결과: aid="app-header-portal-main" 그룹 내 두 번째 Button이
-    ///   현재 열린 프로젝트명을 가짐. 예: [Button] "WKAppBot".
-    ///   이 버튼 텍스트 → searchRoots에서 실제 폴더 경로로 역매핑.
+    /// [KNOWHOW] Codex CWD extraction:
+    ///   Codex is an Electron app — title is always "Codex" (no folder info in title).
+    ///   UIA inspect: inside Group[aid=app-header-portal-main], the second Button holds
+    ///   the currently opened project name. e.g. [Button] "WKAppBot".
+    ///   Button text → reverse-mapped to actual folder path via searchRoots.
     ///
     ///   UIA path: RootWebArea → Group[aid=app-header-portal-main] → Button[1] (project name)
-    ///   (Button[0]은 스레드 제목, Button[1]이 프로젝트명)
+    ///   (Button[0] = thread title, Button[1] = project name)
     /// </summary>
     static string? ExtractCwdFromCodexWindow(IntPtr hwnd)
     {
@@ -213,6 +213,79 @@ internal partial class Program
             return (pct, age, latestFile, size);
         }
         catch { return (-1, null, null, 0); }
+    }
+
+    /// <summary>
+    /// Compute context % directly from a known JSONL file path (no CWD scan needed).
+    /// Bypasses _aiSessionFileCache — always uses the exact file from session registry.
+    /// </summary>
+    static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForJsonl(string jsonlPath)
+    {
+        try
+        {
+            var fi = new FileInfo(jsonlPath);
+            if (!fi.Exists) return (-1, null, null, 0);
+            var size = fi.Length;
+            var pct = size > 0 ? (int)(size / (1024.0 * 1024.0) / 20.0 * 100) : -1;
+            var age = DateTime.UtcNow - fi.LastWriteTimeUtc;
+            return (pct, age, jsonlPath, size);
+        }
+        catch { return (-1, null, null, 0); }
+    }
+
+    /// <summary>
+    /// Read last user+assistant thought directly from a known JSONL path.
+    /// Determines parser (claude vs codex) from hostType.
+    /// </summary>
+    static string? ReadClotThoughtFromJsonl(string jsonlPath, string? hostType)
+    {
+        try
+        {
+            var fi = new FileInfo(jsonlPath);
+            if (!fi.Exists) return "";
+
+            var cacheKey = $"jsonl|{jsonlPath.Replace('\\', '/').ToLowerInvariant()}";
+            if (_clotThoughtCache.TryGetValue(cacheKey, out var cached) &&
+                cached.file == jsonlPath && cached.len == fi.Length && cached.mtime == fi.LastWriteTimeUtc)
+                return cached.preview;
+
+            var isCodex = ClaudePromptHelper.IsCodexHostType(hostType);
+            string? selected = null;
+            foreach (var tailSize in new[] { 8 * 1024, 32 * 1024 })
+            {
+                var lines = ReadTailLinesShared(jsonlPath, tailSize);
+                string bestAssistant = "", bestUser = "";
+                for (int i = lines.Length - 1; i >= 0; i--)
+                {
+                    var line = lines[i];
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    bool parsed = isCodex
+                        ? TryExtractRoleAndTextFromCodex(line, out var role, out var text)
+                        : TryExtractRoleAndText(line, out role, out text);
+                    if (parsed)
+                    {
+                        text = NormalizePrompt(text);
+                        if (string.IsNullOrWhiteSpace(text)) continue;
+                        if (role == "assistant" && string.IsNullOrWhiteSpace(bestAssistant))
+                            bestAssistant = text;
+                        if (role == "user" && string.IsNullOrWhiteSpace(bestUser))
+                            bestUser = text;
+                        if (!string.IsNullOrWhiteSpace(bestAssistant) && !string.IsNullOrWhiteSpace(bestUser))
+                            break;
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(bestAssistant) && !string.IsNullOrWhiteSpace(bestUser))
+                    selected = $"💬 {bestUser}\n🤖 {bestAssistant}";
+                else if (!string.IsNullOrWhiteSpace(bestAssistant))
+                    selected = bestAssistant;
+                else if (!string.IsNullOrWhiteSpace(bestUser))
+                    selected = $"💬 {bestUser}";
+                if (!string.IsNullOrWhiteSpace(selected)) break;
+            }
+            _clotThoughtCache[cacheKey] = (jsonlPath, selected, fi.Length, fi.LastWriteTimeUtc);
+            return selected;
+        }
+        catch { return ""; }
     }
 
     // ── JSONL last-output reading ────────────────────────────────────────────
@@ -406,37 +479,37 @@ internal partial class Program
     }
 
     /// <summary>
-    /// hwnd 하나로 (displayName, lastLine, cwdLabel) 한 방에 반환.
-    /// 프창 순회 시 표준 정보 조회 단일 진입점.
+    /// Returns (displayName, lastLine, cwdLabel) for a single hwnd in one call.
+    /// Single entry point for standard info lookup when iterating prompt windows.
     ///
-    /// [KNOWHOW] CWD 해석 삽질 역사 (후배 클롣들이 반복하지 말 것!)
+    /// [KNOWHOW] CWD detection war stories — don't repeat these mistakes!
     ///
-    ///   문제1 — PID 기반 CWD는 다중 VS Code 창에서 틀림:
-    ///     두 VS Code 창(WKAppBot, lucy_securepad)이 같은 PID(Code.exe 37252)를 공유.
-    ///     _cachedCards.FirstOrDefault(c => c.ParentPid == pid) → 첫 번째 카드가 걸림
-    ///     → 항상 한쪽 CWD만 나와서 대화명이 뒤바뀌는 버그 발생.
-    ///     ★ 해결: VS Code는 반드시 창 타이틀에서 CWD 추출 (ExtractCwdFromVsCodeTitle) 우선!
+    ///   Problem 1 — PID-based CWD is wrong with multiple VS Code windows:
+    ///     Two VS Code windows (WKAppBot, lucy_securepad) share the same PID (Code.exe 37252).
+    ///     _cachedCards.FirstOrDefault(c => c.ParentPid == pid) → always hits the first card
+    ///     → only one side's CWD ever appears, display names get swapped.
+    ///     ★ Fix: always extract CWD from VS Code window title first (ExtractCwdFromVsCodeTitle).
     ///
-    ///   문제2 — GetAllCachedPrompts()에 VS Code/Codex가 안 들어가 있었음:
-    ///     ClaudePromptHelper.FindAllPrompts()가 VS Code/Codex 항목을 _turnFormCache에
-    ///     추가하지 않아서 GetAllCachedPrompts()가 빈 리스트 반환.
-    ///     → claudeInstances 비어있어 상태 스트리밍 전혀 안 됨.
-    ///     ★ 해결: FindAllPrompts()에서 vscode-claudecode/codex-desktop도 _turnFormCache에 추가.
+    ///   Problem 2 — GetAllCachedPrompts() missing VS Code/Codex entries:
+    ///     ClaudePromptHelper.FindAllPrompts() did not add VS Code/Codex items to _turnFormCache,
+    ///     so GetAllCachedPrompts() returned an empty list.
+    ///     → claudeInstances empty → no status streaming at all.
+    ///     ★ Fix: FindAllPrompts() now adds vscode-claudecode/codex-desktop to _turnFormCache too.
     ///
-    ///   문제3 — 대화명 fallback이 "최근 업데이트된 카드" → 엉뚱한 인스턴스 선택:
-    ///     GetBotUsernameFromCachedCards() step 2가 최근 카드를 고르는데,
-    ///     lucy_securepad가 더 최근에 tick되면 WKAppBot 명령에서도 lucy 이름으로 전송됨.
-    ///     ★ 해결: callerHwnd 힌트(step 0) → 타이틀 기반 CWD 매칭(step 1b) → 직접 빌드(step 1c)
-    ///             callerCwd 모를 때만 최근 카드 fallback(step 2) 허용.
+    ///   Problem 3 — Display name fallback was "most recently updated card" → wrong instance:
+    ///     GetBotUsernameFromCachedCards() step 2 picked the most recent card;
+    ///     if lucy_securepad ticked more recently, WKAppBot commands sent under lucy's name.
+    ///     ★ Fix: callerHwnd hint (step 0) → title-based CWD match (step 1b) → direct build (step 1c)
+    ///             most-recent fallback (step 2) only when callerCwd is unknown.
     ///
-    ///   문제4 — Slack 스레드 라우팅: 작성자 이름 파싱으로 창 매칭 실패:
-    ///     "클롣[WG-lucy_securepad]" → cwdTag 추출 → 타이틀 Contains → 불안정.
-    ///     ★ 해결: threadTs == state.SlackStatusTs 역방향 조회 (FindHwndBySlackStatusTs)
-    ///             hwnd를 직접 찾아 라우팅 — 프창핸들이 결정적 정보!
+    ///   Problem 4 — Slack thread routing: matching via display name parsing was fragile:
+    ///     "클롣[WG-lucy_securepad]" → extract cwdTag → title Contains → unreliable.
+    ///     ★ Fix: reverse-lookup threadTs == state.SlackStatusTs (FindHwndBySlackStatusTs)
+    ///             find hwnd directly — window handle is the authoritative key.
     ///
-    /// displayName : Slack 대화명 (예: "클롣[WG-WKAppBot]")
-    /// lastLine    : JSONL 마지막 assistant 출력 한 줄
-    /// cwdLabel    : 약식 CWD (예: "WG-WKAppBot")
+    /// displayName : Slack display name (e.g. "클롣[WG-WKAppBot]")
+    /// lastLine    : last assistant output line from JSONL
+    /// cwdLabel    : abbreviated CWD (e.g. "WG-WKAppBot")
     /// </summary>
     internal static (string displayName, string lastLine, string cwdLabel) GetPromptDisplayInfo(IntPtr hwnd)
     {

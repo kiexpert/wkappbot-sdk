@@ -23,6 +23,7 @@ internal partial class Program
         public string LastStatus { get; set; } = "";
         public DateTime LastTsUtc { get; set; }
         public string Cwd { get; set; } = "";    // working directory for display
+        public string SessionJsonl { get; set; } = ""; // explicit JSONL path from session registry (bypasses cache scan)
     }
 
     // ClaudeInstanceState + _instanceStates → moved to AppBotEyeClaudeStatusStreamer.cs
