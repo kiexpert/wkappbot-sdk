@@ -1,65 +1,66 @@
-{
-  "id": "hot-swap-architecture-eye-vs-mcp-launcher-two-layer-swap-design",
-  "app": "wkappbot-core",
-  "title": "Hot-Swap Architecture: Eye / Admin Eye / MCP Launcher \u2014 Three-Layer Swap",
-  "desc": "Three independent hot-swap layers: Eye (file rename), Admin Eye (self-respawn via own token), MCP Launcher (graceful drain). Each layer is autonomous.",
-  "steps": [
-    "## Layer 1 \u2014 Eye swap (TryRenameSwap, AppBotEyeGlobalMode.cs)",
-    "\uD2B8\uB9AC\uAC70: FSW(.new.exe) \u002B 500ms debounce \u2192 _fswExeDirty \u2192 \uBA54\uC778\uB8E8\uD504 \uCC98\uB9AC",
-    "3\uB2E8\uACC4: .exe\u2192.old-YYYYMMDD-HHmm.exe \u2192 .new.exe\u2192.exe (4\uD68C retry) \u2192 \uC2E4\uD328 \uC2DC rollback",
-    "Startup gentle-swap: \uAE30\uB3D9 \uC2DC .new.exe \uC774\uBBF8 \uC788\uC73C\uBA74 \uC989\uC2DC swap \u2192 hotReloadTriggered \u2192 blue-green \uC7AC\uC2DC\uC791",
-    "Admin-busy defer: ElevatedEyeServer.IsBusy \u2192 _pendingSwapWhileAdmin \u2192 admin \uC885\uB8CC \uD6C4 \uCC98\uB9AC",
-    "\uC2E4\uD328 stamp skip: _lastFailedSwapStamp \u2014 \uAC19\uC740 mtime \uC7AC\uC2DC\uB3C4 \uC548 \uD568",
-    "## Layer 2 \u2014 Admin Eye self-respawn (AppBotEyeCommands.cs)",
-    "Admin Eye(--elevated)\uB294 \uC790\uAE30 elevated \uD1A0\uD070\uC73C\uB85C \uC9C1\uC811 \uD6C4\uACC4\uC790 \uC2A4\uD3F0 \u2014 UAC \uC5C6\uC74C!",
-    "Dual FSW: .new.exe \uAC10\uC9C0(\uC870\uAE30 drain) \u002B .exe \uC9C1\uAD50\uCCB4 \uAC10\uC9C0(fast-path) \uB3D9\uC2DC \uAC10\uC2DC",
-    ".new.exe \uACBD\uB85C: drain IsBusy \u2192 .new.exe \uC18C\uBA78 \uB300\uAE30(swap \uC644\uB8CC \uD655\uC778) \u2192 Process.Start(UseShellExecute=false)",
-    ".exe \uC9C1\uAD50\uCCB4 \uACBD\uB85C: drain \uC911\uC774\uBA74 \uC790\uC5F0 \uC644\uB8CC, \uC544\uB2C8\uBA74 \uC989\uC2DC spawn",
-    "drainTriggered \uD50C\uB798\uADF8\uB85C \uC911\uBCF5 spawn \uBC29\uC9C0",
-    "startup \uC2DC .new.exe \uC874\uC7AC\uD558\uBA74 \uC989\uC2DC drain \uC2DC\uC791",
-    "## Layer 3 \u2014 MCP Launcher swap (McpProxy.cs)",
-    "\uD2B8\uB9AC\uAC70: FSW\uAC00 wkappbot-core.exe \uC6D0\uBCF8 \uACBD\uB85C \uBCC0\uACBD \uAC10\uC9C0 (Eye rename-swap \uC644\uB8CC \uD6C4)",
-    "Eye\uAC00 \uD30C\uC77C \uAD50\uCCB4, Launcher\uAC00 Core \uAD50\uCCB4 \u2014 \uC5ED\uD560 \uBD84\uB9AC",
-    "6\uB2E8\uACC4: inflight \uCD94\uC801 \u2192 stdin \uBD84\uB9AC \u2192 \uC0C8 Core spawn \u2192 initialize\u002Btools/list \uB9AC\uD50C\uB808\uC774 \u2192 stdout relay \u2192 \uAE30\uC874 Core drain 60s",
-    "Admin-first: adminMode=true\uBA74 swap defer \u2192 admin \uC885\uB8CC \uD6C4 \uC0C8 stamp\uC5D0\uC11C\uB9CC \uC7AC\uC2DC\uB3C4",
-    "## \uACF5\uD1B5 \uD328\uD134",
-    "\uC2E4\uD328 stamp skip: Eye \u002B Launcher \uAC01\uC790 \uB3C5\uB9BD \uAD00\uB9AC",
-    "\uC58C\uC804\uC2A4\uC651 \uC804\uCCB4 \uD750\uB984: publish \u2192 .new.exe \u2192 Eye rename \u2192 Admin Eye self-respawn \u2192 Launcher Core swap",
-    "MCP \uC11C\uBC84(Eye \uB0B4\uC7A5)\uB294 Eye\uC640 \uD568\uAED8 \uAD50\uCCB4\uB428 \u2014 \uBCC4\uB3C4 \uD56B\uC2A4\uC651 \uBD88\uD544\uC694"
-  ],
-  "tags": [
-    "hotswap",
-    "eye",
-    "admin",
-    "mcp",
-    "launcher",
-    "swap",
-    "architecture",
-    "graceful",
-    "self-respawn"
-  ],
-  "source_refs": [
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs",
-      "line": null,
-      "pattern": "TryRenameSwap",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
-      "line": null,
-      "pattern": "isElevatedArg",
-      "note": null
-    },
-    {
-      "file": "csharp/src/WKAppBot.Launcher/McpProxy.cs",
-      "line": null,
-      "pattern": "HOT-SWAP",
-      "note": null
-    }
-  ],
-  "author": "claude",
-  "created": "2026-04-08T03:42:54.96037Z",
-  "updated": "2026-04-08T03:57:51.4529981Z",
-  "version": "1.1"
+﻿{
+    "id":  "hot-swap-architecture-eye-vs-mcp-launcher-two-layer-swap-design",
+    "app":  "wkappbot-core",
+    "title":  "Hot-Swap Architecture: Eye / Admin Eye / MCP Launcher — Three-Layer Swap",
+    "desc":  "Three independent hot-swap layers: Eye (file rename), Admin Eye (self-respawn via own token), MCP Launcher (graceful drain). Each layer is autonomous.",
+    "steps":  [
+                  "## Layer 1 — Eye swap (TryRenameSwap, AppBotEyeGlobalMode.cs)",
+                  "트리거: FSW(.new.exe) + 500ms debounce → _fswExeDirty → 메인루프 처리",
+                  "3단계: .exe→.old-YYYYMMDD-HHmm.exe → .new.exe→.exe (4회 retry) → 실패 시 rollback",
+                  "Startup gentle-swap: 기동 시 .new.exe 이미 있으면 즉시 swap → hotReloadTriggered → blue-green 재시작",
+                  "Admin-busy defer: ElevatedEyeServer.IsBusy → _pendingSwapWhileAdmin → admin 종료 후 처리",
+                  "실패 stamp skip: _lastFailedSwapStamp — 같은 mtime 재시도 안 함",
+                  "## Layer 2 — Admin Eye self-respawn (AppBotEyeCommands.cs)",
+                  "Admin Eye(--elevated)는 자기 elevated 토큰으로 직접 후계자 스폰 — UAC 없음!",
+                  "Dual FSW: .new.exe 감지(조기 drain) + .exe 직교체 감지(fast-path) 동시 감시",
+                  ".new.exe 경로: drain IsBusy → .new.exe 소멸 대기(swap 완료 확인) → Process.Start(UseShellExecute=false)",
+                  ".exe 직교체 경로: drain 중이면 자연 완료, 아니면 즉시 spawn",
+                  "drainTriggered 플래그로 중복 spawn 방지",
+                  "startup 시 .new.exe 존재하면 즉시 drain 시작",
+                  "## Layer 3 — MCP Launcher swap (McpProxy.cs)",
+                  "트리거: FSW가 wkappbot-core.exe 원본 경로 변경 감지 (Eye rename-swap 완료 후)",
+                  "Eye가 파일 교체, Launcher가 Core 교체 — 역할 분리",
+                  "6단계: inflight 추적 → stdin 분리 → 새 Core spawn → initialize+tools/list 리플레이 → stdout relay → 기존 Core drain 60s",
+                  "Admin-first: adminMode=true면 swap defer → admin 종료 후 새 stamp에서만 재시도",
+                  "## 공통 패턴",
+                  "실패 stamp skip: Eye + Launcher 각자 독립 관리",
+                  "얌전스왑 전체 흐름: publish → .new.exe → Eye rename → Admin Eye self-respawn → Launcher Core swap",
+                  "MCP 서버(Eye 내장)는 Eye와 함께 교체됨 — 별도 핫스왑 불필요"
+              ],
+    "tags":  [
+                 "hotswap",
+                 "eye",
+                 "admin",
+                 "mcp",
+                 "launcher",
+                 "swap",
+                 "architecture",
+                 "graceful",
+                 "self-respawn",
+                 "project"
+             ],
+    "source_refs":  [
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs",
+                            "line":  null,
+                            "pattern":  "TryRenameSwap",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
+                            "line":  null,
+                            "pattern":  "isElevatedArg",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.Launcher/McpProxy.cs",
+                            "line":  null,
+                            "pattern":  "HOT-SWAP",
+                            "note":  null
+                        }
+                    ],
+    "author":  "claude",
+    "created":  "2026-04-08T03:42:54.96037Z",
+    "updated":  "2026-04-08T03:57:51.4529981Z",
+    "version":  "1.2"
 }

@@ -1,31 +1,32 @@
-{
-  "id": "bot-window-decoration-dwm-border-css-overlay",
-  "app": "chrome-cdp",
-  "title": "Bot window decoration: DWM border \u002B CSS overlay",
-  "desc": "Visual CDP bot feedback: colored DWM border (Win32 DWMWA_BORDER_COLOR) on Chrome window \u002B injected CSS overlay div with tick-fade and streaming-pulse animations. Per-AI color coding: Claude=orange #ff781e, GPT=green #10A37F, Gemini=blue #4285F4.",
-  "steps": [
-    "SetDwmBorderColor((R,G,B)?): COLORREF=R",
-    "(G\u003C\u003C8)",
-    "(B\u003C\u003C16); null \u2192 DWMWA_COLOR_DEFAULT=0xFFFFFFFF (Windows 11\u002B only, no-op on Win10)",
-    "SetBotOverlayAsync(show,hexColor): injects #__wkbot_overlay fixed div \u002B CSS keyframes (fade 0.6s / pulse 0.9s infinite) \u002B __wkBotTick / __wkBotStreaming JS fns on window",
-    "TickBotOverlay(): fire-and-forget EvalAsync(\u0027window.__wkBotTick?.()\u0027) on each CDP cmd \u2014 skips if !_overlayInjected",
-    "SetBotOverlayStreaming(bool): toggles .streaming class \u2192 infinite pulse while AI responding",
-    "On cmd start (EnsureCdpReadyAsync): SetDwmBorderColor \u002B SetBotOverlayAsync(true)",
-    "On cmd end (GuardCdpFocusTheft): SetDwmBorderColor(null) \u002B SetBotOverlayAsync(false)",
-    "Claude streaming: SetBotOverlayStreaming(true) on STREAMING detect, false on DONE/early-exit"
-  ],
-  "tags": [
-    "cdp",
-    "decoration",
-    "visual",
-    "dwm",
-    "overlay",
-    "animation",
-    "chrome"
-  ],
-  "source_refs": null,
-  "author": "claude",
-  "created": "2026-04-07T12:44:39.0699712Z",
-  "updated": "2026-04-07T12:44:39.0700306Z",
-  "version": "1.0"
+﻿{
+    "id":  "bot-window-decoration-dwm-border-css-overlay",
+    "app":  "chrome-cdp",
+    "title":  "Bot window decoration: DWM border + CSS overlay",
+    "desc":  "Visual CDP bot feedback: colored DWM border (Win32 DWMWA_BORDER_COLOR) on Chrome window + injected CSS overlay div with tick-fade and streaming-pulse animations. Per-AI color coding: Claude=orange #ff781e, GPT=green #10A37F, Gemini=blue #4285F4.",
+    "steps":  [
+                  "SetDwmBorderColor((R,G,B)?): COLORREF=R",
+                  "(G\u003c\u003c8)",
+                  "(B\u003c\u003c16); null → DWMWA_COLOR_DEFAULT=0xFFFFFFFF (Windows 11+ only, no-op on Win10)",
+                  "SetBotOverlayAsync(show,hexColor): injects #__wkbot_overlay fixed div + CSS keyframes (fade 0.6s / pulse 0.9s infinite) + __wkBotTick / __wkBotStreaming JS fns on window",
+                  "TickBotOverlay(): fire-and-forget EvalAsync(\u0027window.__wkBotTick?.()\u0027) on each CDP cmd — skips if !_overlayInjected",
+                  "SetBotOverlayStreaming(bool): toggles .streaming class → infinite pulse while AI responding",
+                  "On cmd start (EnsureCdpReadyAsync): SetDwmBorderColor + SetBotOverlayAsync(true)",
+                  "On cmd end (GuardCdpFocusTheft): SetDwmBorderColor(null) + SetBotOverlayAsync(false)",
+                  "Claude streaming: SetBotOverlayStreaming(true) on STREAMING detect, false on DONE/early-exit"
+              ],
+    "tags":  [
+                 "cdp",
+                 "decoration",
+                 "visual",
+                 "dwm",
+                 "overlay",
+                 "animation",
+                 "chrome",
+                 "project"
+             ],
+    "source_refs":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T12:44:39.0699712Z",
+    "updated":  "2026-04-07T12:44:39.0700306Z",
+    "version":  "1.1"
 }

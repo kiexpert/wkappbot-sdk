@@ -1,0 +1,30 @@
+﻿{
+    "id":  "suggest-triage-playbook",
+    "app":  "wkappbot-workflow",
+    "title":  "Suggest Triage Playbook",
+    "desc":  "Operator playbook for reviewing wkappbot suggestions: classify duplicates, prioritize by impact, keep evidence requirements explicit, and convert repeated insights into skills.",
+    "steps":  [
+                  "Run suggest list first and treat it as the source of truth for open work.",
+                  "Classify each item by audience and responsibility: operator, developer, project, or user.",
+                  "Merge obvious duplicates conceptually before attempting a fix so one root cause does not create multiple partially solved items.",
+                  "Prioritize by quick win, frequency, and risk; handle the highest signal items first.",
+                  "Keep resolve evidence explicit and minimal: one test script, one pass condition, one note.",
+                  "If a suggestion keeps reappearing, convert the recurring lesson into a skill before closing the item.",
+                  "Prefer a concise triage note over a long analysis: what it is, why it matters, what the next action is."
+              ],
+    "tags":  [
+                 "workflow",
+                 "suggest",
+                 "triage",
+                 "dedupe",
+                 "priority",
+                 "evidence",
+                 "operator"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T16:54:57.9220465Z",
+    "updated":  "2026-04-08T16:54:57.9220599Z",
+    "version":  "1.3"
+}

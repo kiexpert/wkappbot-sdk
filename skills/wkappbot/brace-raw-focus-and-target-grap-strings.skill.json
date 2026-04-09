@@ -1,0 +1,26 @@
+﻿{
+    "id":  "brace-raw-focus-and-target-grap-strings",
+    "app":  "wkappbot",
+    "title":  "Brace raw focus and target grap strings",
+    "desc":  "The emitted # FOCUS and # TARGET lines must show the grap-target expression as a raw brace-wrapped token, not a quoted string. For focus, print {hwnd:0x...#absTagPath}; for targets, print the grap-target token directly so it can be pasted into a shell and rerun without editing.",
+    "steps":  [
+                  "Print # FOCUS as a brace-wrapped raw grap-target token.",
+                  "Print # TARGET as a brace-wrapped raw grap-target token with hwnd-first identity.",
+                  "Verify the exact installed output with a live window after deployment."
+              ],
+    "tags":  [
+                 "grap",
+                 "find",
+                 "target",
+                 "focus",
+                 "shell-safe",
+                 "verify",
+                 "project"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T09:10:33.0395327Z",
+    "updated":  "2026-04-08T09:10:33.0395591Z",
+    "version":  "1.1"
+}

@@ -1,21 +1,24 @@
-{
-  "id": "always-on-ai-automation-daemon-appbot-eye-internals",
-  "app": "wkappbot",
-  "title": "Always-On AI Automation Daemon \u2014 AppBot Eye Internals",
-  "desc": "Eye = always-on overlay \u002B Slack daemon \u002B MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) \u002B 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp \u2192 defers if admin pipe busy \u2192 skips same failed stamp \u2192 spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.",
-  "steps": [],
-  "tags": [
-    "eye",
-    "mcp",
-    "hotswap",
-    "architecture",
-    "admin",
-    "daemon",
-    "fsw"
-  ],
-  "source_refs": null,
-  "author": "claude",
-  "created": "2026-04-07T04:53:02.2511472Z",
-  "updated": "2026-04-07T04:53:02.2511739Z",
-  "version": "1.0"
+﻿{
+    "id":  "always-on-ai-automation-daemon-appbot-eye-internals",
+    "app":  "wkappbot",
+    "title":  "Always-On AI Automation Daemon — AppBot Eye Internals",
+    "desc":  "Eye = always-on overlay + Slack daemon + MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) + 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp → defers if admin pipe busy → skips same failed stamp → spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.",
+    "steps":  [
+
+              ],
+    "tags":  [
+                 "eye",
+                 "mcp",
+                 "hotswap",
+                 "architecture",
+                 "admin",
+                 "daemon",
+                 "fsw",
+                 "project"
+             ],
+    "source_refs":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T04:53:02.2511472Z",
+    "updated":  "2026-04-07T04:53:02.2511739Z",
+    "version":  "1.1"
 }
