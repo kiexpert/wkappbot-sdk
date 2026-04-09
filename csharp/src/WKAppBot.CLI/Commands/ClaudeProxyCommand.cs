@@ -46,25 +46,39 @@ internal partial class Program
             if (args[i] == "--port" && int.TryParse(args[i + 1], out var p))
                 port = p;
 
-        var prefix = $"http://localhost:{port}/";
-        Console.Error.WriteLine($"[PROXY] Starting Claude API proxy on {prefix}");
         Console.Error.WriteLine($"[PROXY] Forwarding to: {AnthropicApiBase}");
         Console.Error.WriteLine($"[PROXY] Context injection: {(injectContext ? "ON" : "OFF")}");
-        Console.Error.WriteLine($"[PROXY] Set: ANTHROPIC_BASE_URL={prefix}");
-        Console.WriteLine(prefix.TrimEnd('/'));
 
+        string prefix = "";
         HttpListener? listener = null;
-        try
+        for (int tryPort = port; tryPort < port + 10; tryPort++)
         {
-            listener = new HttpListener();
-            listener.Prefixes.Add(prefix);
-            listener.Start();
+            prefix = $"http://localhost:{tryPort}/";
+            try
+            {
+                listener = new HttpListener();
+                listener.Prefixes.Add(prefix);
+                listener.Start();
+                port = tryPort;
+                break;
+            }
+            catch
+            {
+                listener?.Close();
+                listener = null;
+                if (tryPort < port + 9)
+                    Console.Error.WriteLine($"[PROXY] Port {tryPort} in use, trying {tryPort + 1}...");
+            }
         }
-        catch (Exception ex)
+        if (listener == null)
         {
-            Console.Error.WriteLine($"[PROXY] Failed to start listener: {ex.Message}");
+            Console.Error.WriteLine($"[PROXY] No available port in range {port}-{port + 9}. Try --port <other>.");
             return 1;
         }
+
+        Console.Error.WriteLine($"[PROXY] Listening on {prefix}");
+        Console.Error.WriteLine($"[PROXY] Set: ANTHROPIC_BASE_URL={prefix}");
+        Console.WriteLine(prefix.TrimEnd('/'));
 
         using var http = new HttpClient();
         http.Timeout = TimeSpan.FromMinutes(10);
