@@ -57,19 +57,31 @@ internal static class EyeCmdPipeClient
             var payload = prefixes.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
-            // First-output timeout: for fast commands, if Eye doesn't respond within N ms,
-            // close the pipe and return false → caller falls back to Core directly.
+            // First-output timeout: both LAUNCH JSON and [CMD] must arrive within N ms.
+            // Normal Eye: LAUNCH JSON + [CMD] come back-to-back in <10ms.
+            // If either is missing within timeout → Eye is stalled → Core fallback.
             string? peekedLine = null;
+            string? peekedLine2 = null;
             if (firstOutputTimeoutMs > 0)
             {
                 var firstReadTask = Task.Run(() => r.ReadLine());
                 if (!firstReadTask.Wait(firstOutputTimeoutMs))
                 {
-                    // Eye is stalled — fall back to Core. Eye will get BrokenPipe and skip.
                     try { pipe.Close(); } catch { }
-                    return false;
+                    return false; // no LAUNCH JSON → Core fallback
                 }
                 peekedLine = firstReadTask.Result;
+
+                // Second line ([CMD]) must also arrive within the same window
+                var secondReadTask = Task.Run(() => r.ReadLine());
+                if (!secondReadTask.Wait(firstOutputTimeoutMs))
+                {
+                    // LAUNCH JSON came but [CMD] didn't → Eye stuck after dispatch
+                    try { pipe.Close(); } catch { }
+                    Console.Error.WriteLine("[PIPE] no [CMD] within timeout — falling back to Core");
+                    return false;
+                }
+                peekedLine2 = secondReadTask.Result;
             }
 
             // Timeout: fire timer closes pipe → unblocks ReadLine with IOException.
@@ -89,10 +101,11 @@ internal static class EyeCmdPipeClient
             int outputLines = 0; // non-LAUNCH lines written to stdout
             try
             {
-                // Drain: process peeked line first (if first-output timeout was used), then loop.
+                // Drain: process peeked lines first (if first-output timeout was used), then loop.
                 IEnumerable<string?> Lines()
                 {
                     if (peekedLine != null) yield return peekedLine;
+                    if (peekedLine2 != null) yield return peekedLine2;
                     string? l;
                     while ((l = r.ReadLine()) != null) yield return l;
                 }
