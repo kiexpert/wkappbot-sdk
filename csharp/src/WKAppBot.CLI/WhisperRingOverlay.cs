@@ -33,7 +33,6 @@ internal sealed class WhisperRingWindow : Window
     private readonly TextBlock _recentText;
     private readonly Canvas _recentClip;              // clip container for tween scroll
     private readonly TranslateTransform _recentTx;    // scroll transform
-    private readonly Border _recentBox;               // separate box below ring
     private readonly TextBlock _sttText;    // STT recognized word(s)
     private readonly WpfEllipse _coreGlow;
     private readonly WpfEllipse _coreDot;
@@ -41,7 +40,6 @@ internal sealed class WhisperRingWindow : Window
     // Sound code RLE trail string (just append + trim front)
     private string _scTrail = "";
     private ushort _scLast = ushort.MaxValue;
-    private string? _bottomScrollOverride;
 
     /// <summary>Minimum sound code count before showing codes instead of clock. Default 9.</summary>
     public int SoundCodeMinCount { get; set; } = 9;
@@ -98,11 +96,9 @@ internal sealed class WhisperRingWindow : Window
     public WhisperRingWindow()
     {
         const double size = 180;
-        const double recentGap = 10;
-        const double recentBoxHeight = 66;
         Title = "WhisperRing";
         Width = size;
-        Height = size + recentGap + recentBoxHeight;
+        Height = size + 22; // extra for recent tokens text
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -112,14 +108,7 @@ internal sealed class WhisperRingWindow : Window
         ResizeMode = ResizeMode.NoResize;
         Opacity = 0.88;
 
-        var root = new Grid
-        {
-            Width = size,
-            Height = size + recentGap + recentBoxHeight,
-        };
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(size) });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(recentGap) });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(recentBoxHeight) });
+        var root = new Grid();
 
         // Main canvas for ring
         _canvas = new Canvas
@@ -327,7 +316,6 @@ internal sealed class WhisperRingWindow : Window
         _sttText.Width = 100;
         _canvas.Children.Add(_sttText);
 
-        Grid.SetRow(_canvas, 0);
         root.Children.Add(_canvas);
 
         // Recent tokens (bottom bar) — tween-scroll container
@@ -337,31 +325,19 @@ internal sealed class WhisperRingWindow : Window
             Text = "",
             Foreground = new SolidColorBrush(Color.FromRgb(0x66, 0x66, 0x77)),
             FontFamily = new FontFamily("Consolas"),
-            FontSize = 12,
-            FontWeight = FontWeights.Bold,
+            FontSize = 8,
             TextAlignment = TextAlignment.Left, // left-align for scroll
             RenderTransform = _recentTx,
         };
         _recentClip = new Canvas
         {
-            Width = size - 10,
-            Height = 24,
+            Height = 14,
             ClipToBounds = true,
-            VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(4, 0, 4, 2),
         };
         _recentClip.Children.Add(_recentText);
-
-        _recentBox = new Border
-        {
-            CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Color.FromArgb(0xCC, 0x10, 0x10, 0x18)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0x88, 0x88, 0xAA)),
-            BorderThickness = new Thickness(1),
-            Margin = new Thickness(4, 0, 4, 0),
-            Child = _recentClip,
-        };
-        Grid.SetRow(_recentBox, 2);
-        root.Children.Add(_recentBox);
+        root.Children.Add(_recentClip);
 
         Content = root;
     }
@@ -388,19 +364,6 @@ internal sealed class WhisperRingWindow : Window
             string.Join("-", p.Split(' ', StringSplitOptions.RemoveEmptyEntries))));
         // Collapse any remaining multiple spaces
         return System.Text.RegularExpressions.Regex.Replace(joined, " +", " ").Trim();
-    }
-
-    public void SetBottomScrollText(string text)
-    {
-        if (!_canvas.Dispatcher.CheckAccess())
-        {
-            _canvas.Dispatcher.BeginInvoke(() => SetBottomScrollText(text));
-            return;
-        }
-
-        _bottomScrollOverride = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
-        _recentTx.BeginAnimation(TranslateTransform.XProperty, null);
-        _recentTx.X = 0;
     }
 
     /// <summary>Update a single arc segment geometry.</summary>
@@ -632,9 +595,7 @@ internal sealed class WhisperRingWindow : Window
         }
 
         // Display: spaces between tokens → '-', ".." → ' ', collapse multiple spaces
-        var display = !string.IsNullOrWhiteSpace(_bottomScrollOverride)
-            ? _bottomScrollOverride!
-            : FormatTrailDisplay(_scTrail);
+        var display = FormatTrailDisplay(_scTrail);
 
         // Clock area: show sound codes only when enough accumulated, else clock
         int scCount = display.Split(new[] { ' ', '-' }, StringSplitOptions.RemoveEmptyEntries).Length;
