@@ -2,7 +2,6 @@ name: build
 
 on:
   push:
-  pull_request:
 
 jobs:
   build:
@@ -11,16 +10,31 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+    - uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
     - name: Restore
-      run: dotnet restore
+      run: dotnet restore ./csharp/src/WKAppBot.sln
 
-    - name: Build
-      run: dotnet build -c Release
+    - name: Publish Launcher
+      run: |
+        dotnet publish ./csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj ^
+          -c Release -r win-x64 --self-contained true
 
-    - name: Publish
-      run: dotnet publish -c Release -r win-x64 --self-contained true
+    - name: Publish Core
+      run: |
+        dotnet publish ./csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj ^
+          -c Release -r win-x64 --self-contained true ^
+          /p:PublishSingleFile=true ^
+          /p:PublishTrimmed=false ^
+          /p:PublishReadyToRun=false ^
+          /p:PublishAot=false
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: wkappbot-build
+        path: |
+          csharp/src/WKAppBot.CLI/bin/Release/**
+          csharp/src/WKAppBot.Launcher/bin/Release/**
