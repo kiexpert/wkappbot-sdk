@@ -1,0 +1,41 @@
+name: admin-history-cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without force-pushing"
+        required: false
+        default: "true"
+      target_branch:
+        description: "Branch to rewrite"
+        required: false
+        default: "main"
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.target_branch || 'main' }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: |
+          python -m pip install --upgrade pip
+          pip install git-filter-repo
+      - run: |
+          git filter-repo --force \
+            --invert-paths \
+            --path handoff_slack_setup.txt \
+            --path .wkappbot/ \
+            --path-glob '*/.wkappbot/*' \
+            --path-glob '*/.bak/*' \
+            --path-glob '*.bak'
+      - run: git log --oneline -n 5
+      - if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push --force --prune origin HEAD:${{ github.event.inputs.target_branch || 'main' }}
