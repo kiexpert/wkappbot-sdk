@@ -39,8 +39,6 @@ internal partial class Program
     /// so downstream tools receive clean data only. Set early in Main, before TeeWriter.</summary>
     internal static bool IsPipeMode = false;
     internal static bool QuietFindOutput = Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") == "1";
-    internal static volatile bool GlobalTimeoutRequested = false;
-    internal static long GlobalTimeoutRequestedTicks = 0;
     private static readonly HashSet<string> _autoBugDedup = new();
 
     /// <summary>
@@ -83,8 +81,6 @@ internal partial class Program
     internal static string? RelayFilePath = null;
     static string? _exitFilePath = null; // --exit-file arg from Launcher (IOCP exit sentinel)
     static string? _exitEventName = null; // --exit-event arg from Launcher (named event for instant signaling)
-    static volatile int _exitCleanupDone = 0; // interlocked guard: DoRequiredExitCleanup runs exactly once
-    static TeeTextWriter? _activeTee = null;  // set after tee is created; used by ProcessExit hook
 
     /// <summary>Original Console.Out before TeeTextWriter is installed. Used by grep-mode to write matches to real stdout.</summary>
     internal static TextWriter OriginalStdout = Console.Out;
@@ -132,13 +128,6 @@ internal partial class Program
         {
             try { XRayHelper.RestoreAll(); } catch { }
             try { Console.Out.Flush(); } catch { }
-            try { Console.Error.Flush(); } catch { }
-            // DoRequiredExitCleanup: tee.Dispose (log move) + WriteExitFile, idempotent.
-            // signalLauncher=false — we signal via UIT + TerminateProcess below instead,
-            // to avoid the named-event SetEvent racing with TerminateProcess handle closure.
-            // FastExit (TerminateProcess) bypasses CLR entirely → never reaches here.
-            // RunningInEye/IsMcpMode: no _exitFilePath/_exitEventName → WriteExitFile is no-op.
-            DoRequiredExitCleanup(_exitCode, signalLauncher: false);
             // Signal Launcher to TerminateSelf immediately — don't wait for Core's ~30s OS cleanup.
             try
             {
@@ -291,15 +280,6 @@ internal partial class Program
         // Enable DPI awareness
         try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
 
-        // Startup hot-swap: if .new.exe was staged while Eye/Core was busy, apply it now.
-        // Covers the case where Launcher fell back to Core due to empty Eye pipe (Eye crash/kill).
-        if (!RunningInEye)
-        {
-            var coreExePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "";
-            if (!string.IsNullOrEmpty(coreExePath))
-                ThreadPool.QueueUserWorkItem(_ => { try { TryRenameSwap(coreExePath, "CORE:STARTUP"); } catch { } });
-        }
-
         // Kill ghost zoom overlays from previous invocations (keeps exe unlocked for publish)
         try { InputZoomHost.CloseAllGhosts(); } catch { }
 
@@ -329,9 +309,9 @@ internal partial class Program
                         try
                         {
                             using var ph = System.Diagnostics.Process.GetProcessById(parentPid);
-                            if (ph.HasExited) { AppBotExit(0, runCleanup: true); Environment.Exit(0); return; }
+                            if (ph.HasExited) { Environment.Exit(0); return; }
                         }
-                        catch (ArgumentException) { AppBotExit(0, runCleanup: true); Environment.Exit(0); return; } // parent gone
+                        catch (ArgumentException) { Environment.Exit(0); return; } // parent gone
                         catch { } // access denied etc. — keep watching
                     }
                 }) { IsBackground = true, Name = "OrphanGuard" };
@@ -503,27 +483,12 @@ internal partial class Program
         // Skip TeeWriter for grap/grep fast-exit: writing log file on W:/ (SMB) leaves kernel-level
         // pending I/O that blocks TerminateProcess (STILL_ACTIVE) for ~27s (SMB cancel timeout).
         TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
-        _activeTee = tee; // expose for ProcessExit hook
         // Wrap tee in ThreadRoutingWriter so EyeCmdPipeServer.Route() can redirect per-command output.
         // Without this, Console.WriteLine always goes to the global Eye tee, bypassing AsyncLocal routing.
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
         // Print log path early — so if the caller times out, they know where to tail the live log.
         if (tee != null && !GrepModeActive && !QuietFindOutput)
             Console.Error.WriteLine($"[LOG] {logFile}");
-        // No TeeWriter yet: either RunningInEye (Eye-internal route OR spawned worker) or fast-exit.
-        // Rule: if wkappbot.exe Launcher is not in the parent process chain, always create a stderr log.
-        // Eye-internal routes (EyeCmdPipeServer.RunInEye in-process): same PID as Eye → Launcher IS
-        //   ancestor of Eye → skip. All other fresh processes without Launcher ancestor → create log.
-        if (tee == null && !_fastExitAfterCommand && !IsLauncherInParentChain())
-        {
-            try
-            {
-                var workerLog = new System.IO.StreamWriter(logFile, append: false, System.Text.Encoding.UTF8) { AutoFlush = true };
-                Console.SetError(new WorkerStderrTeeWriter(Console.Error, workerLog));
-                Console.Error.WriteLine($"[LOG] {logFile}");
-            }
-            catch { /* non-fatal — logging best-effort */ }
-        }
         // LAUNCH identity: callerCwd + callerHwnd → logged by TeeWriter for post-mortem analysis
         {
             var launchCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
@@ -587,9 +552,10 @@ internal partial class Program
         int exitCode = 1;
         bool _skipTick = true; // default skip; set to false once command is known
         System.Threading.Timer? timeoutTimer = null;
-        try {
+        try
+        {
             // Policy broadcast only on Eye spawn (not every CLI command)
-            // This prevents stdout pollution for ask/web/other commands.
+            // — prevents stdout pollution for ask/web/other commands
             
             if (args.Length == 0)
             {
@@ -601,40 +567,39 @@ internal partial class Program
             var command = args[0].ToLowerInvariant();
             var restArgs = args.Skip(1).ToArray();
 
-            // [BUG-AUTO] hooks are wired below; AutoBugReport() is a class-level static method.
+            // [BUG-AUTO] hooks wired below — AutoBugReport() is a class-level static method
 
-            // [FL] Chrome focus theft -> focusless warning overlay + auto bug report
+            // [FL] Chrome focus theft → focusless warning overlay + auto bug report
             WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
             {
-                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome focus theft detected; restoring focusless warning overlay.", "chrome");
+                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
                 AutoBugReport($"Chrome focus theft: chrome=0x{chromeHwnd:X} prevFg=0x{prevFgHwnd:X}");
             };
 
-            // [FOCUSSTEALER] UIA action stole focus -> stamp prop + auto-record knowhow + auto bug report
+            // [FOCUSSTEALER] UIA action stole focus → stamp prop + auto-record knowhow + auto bug report
             ActionApi.OnFocusStealer ??= (rootHwnd, action) =>
             {
                 AppendFocusStealerKnowhow(rootHwnd, action);
-                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} stole focus; yielding and auto-recording knowhow.", null);
+                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
                 AutoBugReport($"UIA focus steal: action={action} hwnd=0x{rootHwnd:X}");
             };
 
-            // [CDP-FALLBACK] Auto-suggest when the CDP caller has no fallback (Eye pipe -> zero spawn)
+            // [CDP-FALLBACK] Auto-suggest when CDP caller has no fallback (Eye pipe — zero spawn)
             WKAppBot.WebBot.CdpClient.OnFallbackSuggest ??= (text) =>
             {
                 EyeCmdPipeServer.DispatchBg(["suggest", "[CDP-FALLBACK] " + text]);
             };
 
-            // Global option: disable zoom overlay -> intentionally obnoxious name to discourage use
+            // Global option: disable zoom overlay — intentionally obnoxious name to discourage use
             if (restArgs.Any(a => a == "--i-dont-want-to-see-the-zoom-magnifier-overlay"))
             {
                 ActionApi.ZoomEnabled = false;
                 restArgs = restArgs.Where(a => a != "--i-dont-want-to-see-the-zoom-magnifier-overlay").ToArray();
             }
 
-            // Global option: --timeout <duration>.
-            // Supported forms: 30=30s, 1.5s=1.5s, 2m=2min, 500ms=500ms, 1h=1h.
-            // The timeout only requests a graceful stop. Long-running commands should finish
-            // the current step and then exit cleanly.
+            // Global option: --timeout <duration> (hard kill after N time, exit code 124)
+            // Supports: 30=30s, 1.5s=1.5s, 2m=2min, 500ms=500ms, 1h=1h
+            // Use --for in subcommands (e.g. whisper study --for 20m) for clean loop shutdown.
             for (int ti = 0; ti < restArgs.Length; ti++)
             {
                 if (restArgs[ti] == "--timeout" && ti + 1 < restArgs.Length)
@@ -646,9 +611,9 @@ internal partial class Program
                         var timeoutMs = (long)dur.TotalMilliseconds;
                         timeoutTimer = new System.Threading.Timer(_ =>
                         {
-                            GlobalTimeoutRequested = true;
-                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed; requesting graceful shutdown");
+                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed — exiting (code 124)");
                             try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
+                            Environment.Exit(124);
                         }, null, timeoutMs, Timeout.Infinite);
                     }
                     break;
@@ -657,16 +622,17 @@ internal partial class Program
 
             prof($"command={command}");
 
-            // Global Eye tick for multi-parent monitoring.
-            // Skip for grap/grep because EmitEyeTick can leave pending I/O and slow exit.
-            // Skip for fast-exit aliases and Eye pipe commands.
+            // Global Eye tick (for eye --global multi-parent monitor)
+            // Skip for grap/grep alias — EmitEyeTick calls FindLogicalHost which may leave pending
+            // I/O (UIA/WMI) that prevents TerminateProcess from completing for ~28s.
+            // Skip tick for fast-exit aliases (grap/grep) and Eye pipe commands.
             bool isFileCommand = command == "file" || command.StartsWith("file-", StringComparison.Ordinal);
             _skipTick = _fastExitAfterCommand || RunningInEye || isFileCommand;
             if (!_skipTick && !QuietFindOutput)
             {
                 try { EmitEyeTick(command, cmdTag, "start"); } catch { }
                 if (!GrepModeActive && !IsPipeMode) Console.Error.WriteLine(string.Join(" ", Environment.GetCommandLineArgs()));
-                try { EmitEyeTick(command, cmdTag, "step:1/3:prepare"); } catch { }
+                try { EmitEyeTick(command, cmdTag, "step:1/3:명령 준비"); } catch { }
                 try
                 {
                     var promptPreview = BuildPromptPreview(command, restArgs);
@@ -676,42 +642,46 @@ internal partial class Program
                 catch { }
             }
 
-            // Auto-launch AppBotEye for all commands except help and eye commands.
-            // The eye command itself is excluded so the auto-launch path does not cascade.
-            // ThreadPool dispatch keeps the launch fire-and-forget and avoids blocking startup.
-            var isEyeCommand = command == "eye";
-            // _fastExitAfterCommand (grap/grep alias): skip Eye spawn so the spawned process
-            // does not inherit the stdout pipe write end and block the Launcher relay task.
+            // Auto-launch AppBotEye for ALL commands except help and eye commands.
+            // 앱봇이 뭔가 하면 눈은 항상 떠있어야! (도움말, eye 전체 제외 — 무한 cascade 방지)
+            // eye tick은 내부에서 자체적으로 LaunchAppBotEyeIfNeeded 호출함 → Main에서 중복 호출 금지.
+            // Eye는 간접 런칭만! (wkappbot inspect 등 일반 명령 실행 시 자동 spawn)
+            // fire-and-forget on ThreadPool — 명령 실행에 0ms 지연
+            var isEyeCommand = command == "eye"; // eye, eye tick, eye tick --timeout 등 전부 제외
+            // _fastExitAfterCommand (grap/grep alias): skip Eye spawn — spawned process inherits
+            // stdout pipe write end, keeping it alive ~28s and blocking the Launcher's relay task.
             var isMcpCommand = command == "mcp";
-            // kill/close subcommands may target Eye itself, so do not auto-launch Eye first.
+            // kill/close subcommands may target Eye itself — don't auto-launch Eye before they run.
             var subCmd = restArgs.Length > 0 ? restArgs[0].ToLowerInvariant() : "";
             bool isKillOrClose = command == "a11y" && subCmd is "kill" or "close";
             bool isHackWorker = command == "a11y" && subCmd.StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
-            // Exclusions: eye, kill/close, mcp (stdio), grap/grep (fast exit), hack-* workers.
+            // Eye auto-launch: 긴급 명령만 제외, 나머지는 무조건 발동 (ThreadPool — 블록 없음).
+            // 제외: eye 데몬 자체, kill/close (Eye 대상 가능), mcp (stdio), grap/grep (FastExit), hack-* (독립 워커)
             var isExcluded = isEyeCommand || isMcpCommand || isKillOrClose || isHackWorker || _fastExitAfterCommand;
             if (!isExcluded && !RunningInEye)
             {
                 ThreadPool.QueueUserWorkItem(_ => { try { LaunchAppBotEyeIfNeeded(); } catch { } });
             }
 
+            // ── Global --help / --regression interceptor ──
+            // Any position, any combination of other args — these flags win immediately.
+            // Must set exitCode before return — finally block writes exitCode to exit file.
             if (TryPrintCommandHelp(command, restArgs)) { exitCode = 0; return 0; }
             if (TryRunRegression(command, restArgs)) { exitCode = 0; return 0; }
 
-            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:dispatch"); } catch { }
-            if (!QuietFindOutput && !GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine("[ACT] cmd=" + command + " args='" + string.Join(" ", restArgs) + "'"); } catch { }
+            if (!_fastExitAfterCommand) try { EmitEyeTick(command, cmdTag, "step:2/3:명령 실행"); } catch { }
+            if (!QuietFindOutput && !GrepModeActive && !GrapMode && !IsPipeMode) try { Console.Error.WriteLine($"[ACT] cmd={command} args='{string.Join(" ", restArgs)}'"); } catch { }
             prof("dispatch");
 
-            // ErrorScope captures stderr with timestamps by default.
-            // --stderr bypasses ErrorScope and shows stderr in real time for debugging.
-            // Success: clean output. Error: timestamped error log via AppBotExit.
-            // Errors are always logged to the TeeWriter log file.
-            // ErrorScope is only suppressed when stderr is already redirected to the console.
-            // Piped processes (MCP, Eye, pipe) pass stderr through immediately.
-            // Redirected stderr stays real-time, similar to --stderr.
+            // ErrorScope: stderr auto-captured with timestamps (default: hidden from console).
+            // --stderr: bypass ErrorScope, show stderr in real-time (debug/troubleshooting).
+            // Success → clean output. Error → timestamped error log via AppBotExit.
+            // Errors always logged to TeeWriter log file regardless.
+            // ErrorScope: suppress stderr only when directly connected to user console.
+            // Piped processes (MCP, Eye, pipe) → stderr pass-through (immediate output + flush).
+            // stderr redirected → real-time output (like --stderr)
             bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode && !Console.IsErrorRedirected;
-            // eye/agent/tick: diagnostic-heavy commands that legitimately write to stderr, so skip ErrorScope.
-            bool isErrScopeExcluded = command is "eye" or "agent" or "tick";
-            using var _errScope = (isConsoleDirect && !isErrScopeExcluded) ? ErrorScope.Begin() : null;
+            using var _errScope = isConsoleDirect ? ErrorScope.Begin() : null;
 
             exitCode = command switch
             {
@@ -783,7 +753,6 @@ internal partial class Program
                 "screen" => ScreenCommand(restArgs),
                 "clipboard" => ClipboardCommand(restArgs),
                 "claude-usage" => A11yClaudeUsage(),
-                "claude-proxy" => ClaudeProxyCommand(restArgs),
                 "enc-test" => EncTestCommand(),
                 "suggest" => SuggestCommand(restArgs),
                 "gc" => GcCommand(restArgs),
@@ -861,8 +830,19 @@ internal partial class Program
             }
             catch { }
 
-            // AppBotExit: ErrorScope flush + stdout-blank guard + DoRequiredExitCleanup via finally.
-            exitCode = AppBotExit(exitCode);
+            // ErrorScope: passthrough already emitted on first error; Finalize cleans up.
+            // Guard: if stderr was written but exitCode=0, that's a bug — report + override.
+            if (_errScope != null)
+            {
+                bool errorDetected = _errScope.ErrorDetected;
+                _errScope.Finalize(exitCode != 0); // restore stderr
+                if (errorDetected && exitCode == 0)
+                {
+                    // Stderr output with successful exit — caller swallowed an error
+                    AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr — error suppressed");
+                    exitCode = -9999;
+                }
+            }
             _exitCode = exitCode;
             return exitCode;
         }
@@ -882,25 +862,24 @@ internal partial class Program
             try
             {
                 var cmd = args.Length > 0 ? args[0].ToLowerInvariant() : "noargs";
-                if (exitCode == 0) EmitEyeTick(cmd, cmdTag, "done:ok");
-                else EmitEyeTick(cmd, cmdTag, "step:3/3:error");
+                if (exitCode == 0) EmitEyeTick(cmd, cmdTag, "done:작업 완료");
+                else EmitEyeTick(cmd, cmdTag, "step:3/3:오류 처리");
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
-            // DoRequiredExitCleanup: errors.jsonl write + tee.Dispose (log move) + WriteExitFile.
-            // Idempotent — ProcessExit hook calls this too as fallback for abnormal exits.
-            // fastExitAfterCommand (grap/grep): skip signalLauncher here; FastExit handles it.
-            if (!_fastExitAfterCommand)
-                DoRequiredExitCleanup(exitCode);
-            else
-            {
-                // grap/grep: still need errors.jsonl write; tee is null here (skipped for fast-exit).
-                // FastExit below handles WriteExitFile + TerminateProcess.
-                try { if (tee != null) { tee.ExitCode = exitCode; tee.WriteErrorRecordNow(); } } catch { }
-            }
+            // Write errors.jsonl BEFORE signaling exit — Launcher may kill Core immediately after
+            // WriteExitFile(), so errors.jsonl must be written first (WriteErrorRecordNow is a no-op if exit=0).
+            if (tee != null) tee.ExitCode = exitCode;
+            tee?.WriteErrorRecordNow();
 
-            var logPath = tee?.LogPath;
-            if (logPath != null) Console.Error.WriteLine($"Log saved: {logPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
+            // Write exit-file FIRST — before tee.Dispose() which may block on SMB I/O.
+            // Launcher polls this file every 50ms and exits immediately when found.
+            if (!_fastExitAfterCommand)
+                WriteExitFile(exitCode);
+
+            if (tee != null) Console.SetOut(tee.OriginalConsole);
+            tee?.Dispose(); // normal-exit atexit-style move to logs/old
+            if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
             // grap/grep path still uses FastExit (relay file + TerminateProcess).
             if (_fastExitAfterCommand)
@@ -975,7 +954,7 @@ internal partial class Program
                     "readiness", "uia-test", "form-dump", "toolbar-ocr", "titlebar", "validate",
                     "chart-analyze", "hts-stress", "tooltip-probe", "speak", "whisper", "newchat",
                     "analyze-hack", "screensaver", "whisper-ring", "prompt", "dashboard", "win-move",
-                    "screen", "clipboard", "claude-usage", "claude-proxy", "enc-test", "suggest", "gc", "hotswap", "tick",
+                    "screen", "clipboard", "claude-usage", "enc-test", "suggest", "gc", "hotswap", "tick",
                     "kiwoom", "com", "telegram", "stock-scan", "logcat", "grep", "grap",
                     "help", "--help", "-h", "mcp", "claude-detect", "noise", "capture",
                     "elevate", "webbot", "code", "vscode", "version", "--version"
@@ -1146,7 +1125,7 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(raw))
             return string.Empty;
 
-        var first = raw.Split(new[] { '\r', '\n', '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+        var first = raw.Split(new[] { '\r', '\n', '.', '!', '?', '。' }, StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault()?.Trim() ?? raw;
 
         if (first.Length > 80)
@@ -1512,10 +1491,10 @@ internal partial class Program
                     : "";
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [EXP] total logs {summary.TotalEntries}");
+                Console.Write($"  [EXP] ⚠ 이전 기록 {summary.TotalEntries}건");
                 if (!string.IsNullOrEmpty(breakdown))
                     Console.Write($" ({breakdown})");
-                Console.WriteLine($", screenshots {summary.ScreenshotCount}");
+                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
                 Console.ResetColor();
             }
 
@@ -1550,14 +1529,14 @@ internal partial class Program
                     : "";
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"  [EXP] cid={cid}: total logs {summary.TotalEntries}");
+                Console.Write($"  [EXP] cid={cid}: 이전 기록 {summary.TotalEntries}건");
                 if (!string.IsNullOrEmpty(breakdown))
                     Console.Write($" ({breakdown})");
-                Console.WriteLine($", screenshots {summary.ScreenshotCount}");
+                Console.WriteLine($", 스크린샷 {summary.ScreenshotCount}장");
                 Console.ResetColor();
             }
 
-            // Try to resolve knowhow from form/action first, then fall back to form-level knowhow.
+            // 액션별 노하우 우선 → 일반 노하우 폴백
             bool found = false;
             if (!string.IsNullOrEmpty(actionName))
             {
@@ -1651,7 +1630,7 @@ internal partial class Program
 
             // 출력: [KNOWHOW] (N sections) [title] paragraph...
             Console.ForegroundColor = ConsoleColor.Magenta;
-            var countInfo = sectionCount > 1 ? $" ({sectionCount}癲?" : "";
+            var countInfo = sectionCount > 1 ? $" ({sectionCount}§)" : "";
             Console.Error.Write($"  [{tag}]{countInfo} ");
             Console.ResetColor();
 
@@ -2112,53 +2091,17 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Required exit cleanup: log move (tee.Dispose) + WriteExitFile.
-    /// Idempotent — safe to call from both normal Main exit and ProcessExit hook.
-    /// The ProcessExit hook calls this with signalLauncher=false because the named-event
-    /// signal races with TerminateProcess; we let the hook's own UIT + TerminateProcess handle that.
-    /// FastExit (TerminateProcess) bypasses CLR shutdown entirely, so it calls WriteExitFile directly.
-    /// </summary>
-    static void DoRequiredExitCleanup(int code, bool signalLauncher = true)
-    {
-        if (System.Threading.Interlocked.Exchange(ref _exitCleanupDone, 1) != 0) return;
-
-        var tee = _activeTee;
-        if (tee != null)
-        {
-            try { tee.ExitCode = code; } catch { }
-            try { tee.WriteErrorRecordNow(); } catch { }
-            try { Console.SetOut(tee.OriginalConsole); } catch { }
-            try { tee.Dispose(); } catch { } // moves log to logs/old
-        }
-
-        // Flush stderr so MCP / worker-spawned Core paths don't lose trailing log lines
-        // before TerminateProcess (which skips CLR finalization).
-        try { Console.Error.Flush(); } catch { }
-
-        if (signalLauncher)
-            WriteExitFile(code);
-    }
-
-    /// <summary>
     /// Write exit-file sentinel for Launcher's IOCP poll. Uses Win32 API directly.
     /// Does NOT call TerminateProcess — caller should return normally from Main.
     /// </summary>
     static void WriteExitFile(int code)
     {
         try { Console.Out.Flush(); } catch { }
-        try { Console.Error.Flush(); } catch { }
         try
         {
-            var hOut = GetStdHandle(-11); // STD_OUTPUT_HANDLE
+            var hOut = GetStdHandle(-11);
             if (hOut != IntPtr.Zero && hOut != new IntPtr(-1))
                 FlushFileBuffers(hOut);
-        }
-        catch { }
-        try
-        {
-            var hErr = GetStdHandle(-12); // STD_ERROR_HANDLE
-            if (hErr != IntPtr.Zero && hErr != new IntPtr(-1))
-                FlushFileBuffers(hErr);
         }
         catch { }
         try
@@ -2313,49 +2256,4 @@ internal partial class Program
         System.Threading.Thread.Sleep(500);
         Environment.Exit(code);
     }
-
-    /// <summary>
-    /// Returns true if wkappbot.exe (the Launcher) is in this process's ancestor chain.
-    /// Used to detect whether Launcher log infra is active — if not, we self-create a log.
-    /// </summary>
-    static bool IsLauncherInParentChain()
-    {
-        try
-        {
-            var visited = new HashSet<int>();
-            int pid = Environment.ProcessId;
-            for (int depth = 0; depth < 10; depth++)
-            {
-                var query = new System.Management.ManagementObjectSearcher(
-                    $"SELECT ParentProcessId,Name FROM Win32_Process WHERE ProcessId={pid}");
-                using var results = query.Get();
-                int parentPid = 0;
-                string? parentName = null;
-                foreach (System.Management.ManagementObject obj in results)
-                {
-                    parentPid = Convert.ToInt32(obj["ParentProcessId"]);
-                    parentName = obj["Name"]?.ToString();
-                }
-                if (parentPid == 0 || !visited.Add(parentPid)) break;
-                if (parentName?.StartsWith("wkappbot", StringComparison.OrdinalIgnoreCase) == true
-                    && !parentName.Contains("core", StringComparison.OrdinalIgnoreCase))
-                    return true;
-                pid = parentPid;
-            }
-        }
-        catch { /* WMI unavailable — assume no Launcher */ }
-        return false;
-    }
-
-    /// <summary>Tees stderr to a log file for Core processes spawned without Launcher log infra.</summary>
-    sealed class WorkerStderrTeeWriter(TextWriter original, System.IO.StreamWriter logFile) : TextWriter
-    {
-        public override System.Text.Encoding Encoding => original.Encoding;
-        public override void Write(char value) { original.Write(value); logFile.Write(value); }
-        public override void Write(string? value) { original.Write(value); logFile.Write(value); }
-        public override void WriteLine(string? value) { original.WriteLine(value); logFile.WriteLine(value); }
-        public override void Flush() { original.Flush(); logFile.Flush(); }
-        protected override void Dispose(bool disposing) { if (disposing) logFile.Dispose(); base.Dispose(disposing); }
-    }
 }
-
