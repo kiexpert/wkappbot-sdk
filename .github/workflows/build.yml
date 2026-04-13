@@ -1,40 +1,43 @@
-name: build
+name: wkappbot-build
 
 on:
   push:
+  pull_request:
 
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-    - uses: actions/setup-dotnet@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
+    # 디버깅용 (문제 생기면 유지, 아니면 삭제 가능)
+    - name: List files
+      run: dir -Recurse
+
+    # ✔ sln 위치 명확히 지정
     - name: Restore
       run: dotnet restore ./csharp/WKAppBot.sln
 
+    # ✔ Launcher (AOT)
     - name: Publish Launcher
-      run: |
-        dotnet publish ./csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj ^
-          -c Release -r win-x64 --self-contained true
+      run: dotnet publish ./csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -r win-x64 --self-contained true
 
+    # ✔ Core
     - name: Publish Core
-      run: |
-        dotnet publish ./csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj ^
-          -c Release -r win-x64 --self-contained true ^
-          /p:PublishSingleFile=true ^
-          /p:PublishTrimmed=false ^
-          /p:PublishReadyToRun=false ^
-          /p:PublishAot=false
+      run: dotnet publish ./csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
 
+    # ✔ 결과 저장
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: wkappbot-build
         path: |
-          csharp/src/WKAppBot.CLI/bin/Release/**
           csharp/src/WKAppBot.Launcher/bin/Release/**
+          csharp/src/WKAppBot.CLI/bin/Release/**
