@@ -21,6 +21,16 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Smoke test --help
+    - name: Verify official binary folder
       shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
+      run: |
+        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
+        if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+
+    - name: Smoke env check
+      shell: pwsh
+      run: dotnet --info
+
+    - name: AppBot help smoke
+      shell: pwsh
+      run: ./scripts/smoke-help.ps1
