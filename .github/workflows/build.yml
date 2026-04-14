@@ -1,6 +1,11 @@
 name: build-csharp
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    paths:
+      - 'csharp/**'
+      - 'handlers/**'
+  workflow_dispatch:
 
 jobs:
   detect:

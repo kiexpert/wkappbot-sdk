@@ -26,15 +26,23 @@ jobs:
           Write-Host 'No valid before SHA. Skip immediate script self-test.'
           exit 0
         }
-        $files = git diff --name-only $before $after | Where-Object { $_ -match '\.(py|ps1|sh)$' }
-        $skipFiles = @('scripts/smoke-help.ps1')
-        $files = @($files | Where-Object { $skipFiles -notcontains $_ })
+        $files = @(git diff --name-only $before $after | Where-Object { $_ -match '\.(py|ps1|sh)$' })
         if (!$files) {
-          Write-Host 'No eligible changed .py/.ps1/.sh files.'
+          Write-Host 'No changed .py/.ps1/.sh files.'
           exit 0
         }
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
+          if ($file -eq 'scripts/smoke-help.ps1') {
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$parseErrors)
+            if ($parseErrors -and $parseErrors.Count -gt 0) {
+              $parseErrors | ForEach-Object { Write-Host $_ }
+              throw "Script self-test failed: $file"
+            }
+            Write-Host 'Syntax OK: scripts/smoke-help.ps1'
+            continue
+          }
           if ($file.EndsWith('.ps1')) {
             & pwsh -NoProfile -ExecutionPolicy Bypass -File $file
           } elseif ($file.EndsWith('.py')) {
