@@ -2,6 +2,10 @@ name: script-selftest
 
 on:
   push:
+    paths:
+      - '**/*.ps1'
+      - '**/*.py'
+      - '**/*.sh'
     paths-ignore:
       - '**/*.self-test.txt'
   workflow_dispatch:
