@@ -24,26 +24,24 @@ jobs:
         key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
           ${{ runner.os }}-wkappbot-bin-
-    - name: Immediate changed script self-test
+    - name: Test scripts from latest script-changing commit
       shell: pwsh
       run: |
         if ('${{ github.event_name }}' -ne 'push') {
-          Write-Host 'Skip immediate script self-test on workflow_dispatch.'
+          Write-Host 'Skip script self-test on workflow_dispatch.'
           exit 0
         }
         $before = '${{ github.event.before }}'
         $after = '${{ github.sha }}'
         if ([string]::IsNullOrWhiteSpace($after)) {
-          Write-Host 'No commit SHA. Skip immediate script self-test.'
+          Write-Host 'No commit SHA. Skip script self-test.'
           exit 0
         }
         $commits = @()
         if (-not [string]::IsNullOrWhiteSpace($before) -and $before -notmatch '^0+$') {
           $commits = @(git rev-list "$before..$after")
         }
-        if (!$commits) {
-          $commits = @($after)
-        }
+        if (!$commits) { $commits = @($after) }
         $selectedCommit = $null
         $files = @()
         foreach ($commit in $commits) {
@@ -60,29 +58,19 @@ jobs:
         }
         Write-Host "Selected commit: $selectedCommit"
         $files | ForEach-Object { Write-Host "SCRIPT: $_" }
-        $needsBin = $files -contains 'scripts/smoke-help.ps1'
-        if ($needsBin) {
-          if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
-            Write-Host 'Official bin missing. Rebuilding fallback bin in script-selftest.'
-            New-Item -ItemType Directory -Force -Path bin | Out-Null
-            dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
-            dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
-          }
+
+        if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
+          Write-Host 'Official bin missing. Rebuilding fallback bin in script-selftest.'
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
         }
+        if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for script self-test' }
+        $env:PATH = "$PWD/bin;$env:PATH"
+
         $bash = Get-Command bash -ErrorAction SilentlyContinue
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
-          if ($file -eq 'scripts/smoke-help.ps1') {
-            $parseErrors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$null, [ref]$parseErrors)
-            if ($parseErrors -and $parseErrors.Count -gt 0) {
-              $parseErrors | ForEach-Object { Write-Host $_ }
-              throw "Script self-test failed: $file"
-            }
-            if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for smoke-help self-test' }
-            Write-Host 'Syntax OK: scripts/smoke-help.ps1'
-            continue
-          }
           if ($file.EndsWith('.ps1')) {
             & pwsh -NoProfile -ExecutionPolicy Bypass -File $file
           } elseif ($file.EndsWith('.py')) {
