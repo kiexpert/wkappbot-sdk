@@ -1,0 +1,46 @@
+name: script-selftest
+
+on: [push, workflow_dispatch]
+
+jobs:
+  script_selftest:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Immediate changed script self-test
+      shell: pwsh
+      run: |
+        if ('${{ github.event_name }}' -ne 'push') {
+          Write-Host 'Skip immediate script self-test on workflow_dispatch.'
+          exit 0
+        }
+        $before = '${{ github.event.before }}'
+        $after = '${{ github.sha }}'
+        if ([string]::IsNullOrWhiteSpace($before) -or $before -match '^0+$') {
+          Write-Host 'No valid before SHA. Skip immediate script self-test.'
+          exit 0
+        }
+        $files = git diff --name-only $before $after | Where-Object { $_ -match '\.(py|ps1|sh)$' }
+        $skipFiles = @('scripts/smoke-help.ps1')
+        $files = @($files | Where-Object { $skipFiles -notcontains $_ })
+        if (!$files) {
+          Write-Host 'No eligible changed .py/.ps1/.sh files.'
+          exit 0
+        }
+        foreach ($file in $files) {
+          Write-Host "== SCRIPT SELF-TEST $file =="
+          if ($file.EndsWith('.ps1')) {
+            & pwsh -NoProfile -ExecutionPolicy Bypass -File $file
+          } elseif ($file.EndsWith('.py')) {
+            & python $file
+          } elseif ($file.EndsWith('.sh')) {
+            & bash $file
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Script self-test failed: $file" }
+        }
