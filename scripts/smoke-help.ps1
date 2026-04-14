@@ -14,8 +14,17 @@ $fail = 0
 function Run-Cmd([string[]]$cmd) {
   $pretty = ($cmd -join ' ')
   Write-Host "== TEST $pretty =="
-  & wkappbot @cmd
+  $lines = & wkappbot @cmd 2>&1
   $code = $LASTEXITCODE
+  $count = 0
+  foreach ($line in $lines) {
+    Write-Host $line
+    $count++
+    if ($count -ge 5) { break }
+  }
+  if ($lines.Count -gt 5) {
+    Write-Host "... TRUNCATED: $($lines.Count - 5) more line(s)"
+  }
   Write-Host "EXITCODE: $code"
   if ($code -ne 0) {
     Write-Host "FAILED($code): $pretty"
