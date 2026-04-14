@@ -7,7 +7,6 @@ $helpCommands = @(
   @('--help'), @('help'), @('version'),
   @('skill','--help','--no-regression'), @('knowhow','--help','--no-regression'), @('schedule','--help','--no-regression'),
   @('file','--help','--no-regression'), @('file-read','--help','--no-regression'), @('file-grep','--help','--no-regression'), @('file-glob','--help','--no-regression'),
-  @('web','--help','--no-regression'), @('ask','--help','--no-regression'), @('agent','--help','--no-regression'),
   @('a11y','--help','--no-regression'), @('inspect','--help','--no-regression'), @('find','--help','--no-regression'), @('windows','--help','--no-regression'),
   @('scan','--help','--no-regression'), @('capture','--help','--no-regression'), @('ocr','--help','--no-regression'), @('input','--help','--no-regression'),
   @('click','--help','--no-regression'), @('dismiss','--help','--no-regression'), @('dialog-click','--help','--no-regression'), @('watch','--help','--no-regression'),
