@@ -5,7 +5,6 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
     - uses: actions/checkout@v4
 
@@ -13,6 +12,16 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.nuget/packages
+          ~\AppData\Local\NuGet\v3-cache
+        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
 
     - name: Ensure bin dir
       shell: pwsh
@@ -31,3 +40,37 @@ jobs:
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+
+    - name: Upload official bin artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wkappbot-bin
+        path: bin/**
+        if-no-files-found: error
+
+  smoke:
+    needs: build
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Download official bin artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: wkappbot-bin
+        path: bin
+
+    - name: Verify official binary folder
+      shell: pwsh
+      run: |
+        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
+        if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+
+    - name: AppBot help smoke
+      shell: pwsh
+      run: ./scripts/smoke-help.ps1
