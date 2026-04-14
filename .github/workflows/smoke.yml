@@ -21,6 +21,18 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+    - name: Ensure bin dir
+      shell: pwsh
+      run: New-Item -ItemType Directory -Force -Path bin | Out-Null
+
+    - name: Publish Core to repo bin
+      shell: pwsh
+      run: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+
+    - name: Publish Launcher to repo bin
+      shell: pwsh
+      run: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+
     - name: Verify official binary folder
       shell: pwsh
       run: |
