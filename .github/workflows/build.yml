@@ -14,18 +14,20 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Restore Core
+    - name: Ensure bin dir
       shell: pwsh
-      run: dotnet restore csharp/src/WKAppBot.Core/WKAppBot.Core.csproj
+      run: New-Item -ItemType Directory -Force -Path bin | Out-Null
 
-    - name: Build Core
+    - name: Publish Core to repo bin
       shell: pwsh
-      run: dotnet build csharp/src/WKAppBot.Core/WKAppBot.Core.csproj --configuration Release --no-restore
+      run: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
 
-    - name: Restore Launcher
+    - name: Publish Launcher to repo bin
       shell: pwsh
-      run: dotnet restore csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj
+      run: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
 
-    - name: Build Launcher
+    - name: Verify official binaries
       shell: pwsh
-      run: dotnet build csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release --no-restore
+      run: |
+        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
+        if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }

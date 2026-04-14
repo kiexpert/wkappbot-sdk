@@ -13,16 +13,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || github.event.workflow_run.head_branch }}
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    - name: Smoke env check
+    - name: Smoke test --help
       shell: pwsh
-      run: dotnet --info
-
-    - name: AppBot help smoke
-      shell: pwsh
-      run: ./scripts/smoke-help.ps1
+      run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
