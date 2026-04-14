@@ -168,6 +168,13 @@ partial class Program
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB,
             IntPtr.Zero, Environment.CurrentDirectory, ref si, out var pi);
+        if (!ok && System.Runtime.InteropServices.Marshal.GetLastWin32Error() == 5)
+        {
+            Prof("IOCP: CreateProcess err=5 with breakaway — retrying without breakaway");
+            ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true,
+                DETACHED_PROCESS,
+                IntPtr.Zero, Environment.CurrentDirectory, ref si, out pi);
+        }
 
         // Close client-side handles in parent (child holds them → EOF on child exit)
         CloseHandle(hClientOut);
