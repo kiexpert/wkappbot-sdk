@@ -7,6 +7,14 @@
 > skills, memory files, commit messages, docs, prompts, internal notes — ALL English.
 > Korean uses 2-3x more tokens. One Korean file = wasted budget on every session load.
 
+## Shared Markdown Cross-Reference Rule
+- Before making non-trivial changes, read all top-level `*.md` files in the repository root.
+- At minimum, check and keep consistent:
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+- Shared AI policy must not drift between these files.
+
 ### Language / Communication
 - **Final responses to user: Korean, polite 해요체 (-요 form). NEVER informal speech.**
 - Source code / comments / CLAUDE.md / skills / memory / commits / docs → **English only, no exceptions**
@@ -274,5 +282,7 @@ W:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ```
 
 ## References
+- `README.md`
+- `AGENTS.md`
 - **MEMORY.md** / **memory/**: build commands, architecture decisions, gotchas detail
 - .NET 8.0 `net8.0-windows10.0.22621.0`, Korean UI support

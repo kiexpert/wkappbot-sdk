@@ -1,7 +1,16 @@
 # WKAppBot AI Shared Reference
 
 This file is the shared reference for AI agents working in this repository.
-Read this first before changing code, scripts, or workflows.
+Read this first before changing code, scripts, workflows, or shared documentation.
+
+## Cross-reference rule
+- Read all top-level Markdown files in the repository root before making non-trivial changes.
+- At minimum, check these files when they exist:
+  - `README.md`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+- Treat these files as shared AI guidance and keep them mutually consistent.
+- If one file changes shared policy, update the other shared-reference files as needed.
 
 ## 1. Official runtime binary
 - The official runtime entrypoint is `bin/wkappbot.exe`.
@@ -81,3 +90,7 @@ Read this first before changing code, scripts, or workflows.
 - PATH injection preferred.
 - No-arg scripts should be healthy.
 - Skill commands are core AI learning surface.
+
+## See also
+- `README.md`
+- `CLAUDE.md`
