@@ -18,10 +18,12 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Restore cached official bin
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: bin
         key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-bin-
     - name: Immediate changed script self-test
       shell: pwsh
       run: |
@@ -29,15 +31,14 @@ jobs:
           Write-Host 'Skip immediate script self-test on workflow_dispatch.'
           exit 0
         }
-        $before = '${{ github.event.before }}'
-        $after = '${{ github.sha }}'
-        if ([string]::IsNullOrWhiteSpace($before) -or $before -match '^0+$') {
-          Write-Host 'No valid before SHA. Skip immediate script self-test.'
+        $sha = '${{ github.sha }}'
+        if ([string]::IsNullOrWhiteSpace($sha)) {
+          Write-Host 'No commit SHA. Skip immediate script self-test.'
           exit 0
         }
-        $files = @(git diff --name-only $before $after | Where-Object { $_ -match '\.(py|ps1|sh)$' })
+        $files = @(git diff-tree --no-commit-id --name-only -r $sha | Where-Object { $_ -match '\.(py|ps1|sh)$' })
         if (!$files) {
-          Write-Host 'No changed .py/.ps1/.sh files.'
+          Write-Host 'No changed .py/.ps1/.sh files in HEAD commit.'
           exit 0
         }
         $needsBin = $files -contains 'scripts/smoke-help.ps1'
@@ -49,6 +50,7 @@ jobs:
             dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
           }
         }
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
           if ($file -eq 'scripts/smoke-help.ps1') {
@@ -67,6 +69,7 @@ jobs:
           } elseif ($file.EndsWith('.py')) {
             & python $file
           } elseif ($file.EndsWith('.sh')) {
+            if (-not $bash) { throw 'bash not found on runner' }
             & bash $file
           }
           if ($LASTEXITCODE -ne 0) { throw "Script self-test failed: $file" }
