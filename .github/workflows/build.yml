@@ -14,6 +14,18 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Build
+    - name: Restore Core
       shell: pwsh
-      run: dotnet build --configuration Release
+      run: dotnet restore csharp/src/WKAppBot.Core/WKAppBot.Core.csproj
+
+    - name: Build Core
+      shell: pwsh
+      run: dotnet build csharp/src/WKAppBot.Core/WKAppBot.Core.csproj --configuration Release --no-restore
+
+    - name: Restore Launcher
+      shell: pwsh
+      run: dotnet restore csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj
+
+    - name: Build Launcher
+      shell: pwsh
+      run: dotnet build csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release --no-restore
