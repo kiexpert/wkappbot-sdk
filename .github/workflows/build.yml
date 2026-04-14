@@ -152,6 +152,8 @@ jobs:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -186,6 +188,34 @@ jobs:
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
-    - name: AppBot help smoke
+    - name: AppBot help smoke with sidecar
       shell: pwsh
-      run: ./scripts/smoke-help.ps1
+      run: |
+        $file = 'scripts/smoke-help.ps1'
+        $outFile = "$file.smoke.txt"
+        $lines = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
+        $code = $LASTEXITCODE
+        @(
+          "commit: ${{ github.sha }}",
+          "workflow: build-csharp/smoke",
+          "script: $file",
+          "exitcode: $code",
+          "timestamp_utc: $(Get-Date -AsUTC -Format o)",
+          ""
+        ) + @($lines) | Set-Content -Path $outFile -Encoding utf8
+        $lines | ForEach-Object { Write-Host $_ }
+        exit $code
+    - name: Commit smoke sidecar files
+      if: ${{ always() && github.event_name == 'push' }}
+      shell: pwsh
+      run: |
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        $changed = @(git status --porcelain -- '**/*.smoke.txt')
+        if ($changed.Count -eq 0) {
+          Write-Host 'No smoke sidecar changes to commit.'
+          exit 0
+        }
+        git add --all -- '*.smoke.txt'
+        git commit -m 'test: update build smoke sidecar files [skip ci]'
+        git push
