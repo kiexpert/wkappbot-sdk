@@ -24,3 +24,7 @@ jobs:
     - name: Smoke test --help
       shell: pwsh
       run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
+
+    - name: Smoke test usage
+      shell: pwsh
+      run: dotnet run --project csharp/src/WKAppBot.CLI -- usage
