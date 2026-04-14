@@ -13,6 +13,15 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore cached official bin
+      uses: actions/cache@v4
+      with:
+        path: bin
+        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     - name: Immediate changed script self-test
       shell: pwsh
       run: |
@@ -31,6 +40,15 @@ jobs:
           Write-Host 'No changed .py/.ps1/.sh files.'
           exit 0
         }
+        $needsBin = $files -contains 'scripts/smoke-help.ps1'
+        if ($needsBin) {
+          if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
+            Write-Host 'Official bin missing. Rebuilding fallback bin in script-selftest.'
+            New-Item -ItemType Directory -Force -Path bin | Out-Null
+            dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+            dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+          }
+        }
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
           if ($file -eq 'scripts/smoke-help.ps1') {
@@ -40,6 +58,7 @@ jobs:
               $parseErrors | ForEach-Object { Write-Host $_ }
               throw "Script self-test failed: $file"
             }
+            if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for smoke-help self-test' }
             Write-Host 'Syntax OK: scripts/smoke-help.ps1'
             continue
           }
