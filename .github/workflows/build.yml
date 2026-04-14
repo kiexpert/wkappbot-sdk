@@ -28,10 +28,8 @@ jobs:
         $files = git diff --name-only $before $after
         $changed = @($files | Where-Object { $_ -match '^(csharp/|handlers/)' })
         if ($changed.Count -gt 0) {
-          Write-Host 'C# related changes detected.'
           "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
         } else {
-          Write-Host 'No C# related changes detected.'
           "csharp_changed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
         }
 
@@ -141,6 +139,17 @@ jobs:
       with:
         name: wkappbot-bin
         path: bin
+    - name: Fallback rebuild official bin when missing
+      shell: pwsh
+      run: |
+        if ((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe)) {
+          Write-Host 'Official bin already present.'
+          exit 0
+        }
+        Write-Host 'Official bin missing. Rebuilding fallback bin in smoke job.'
+        New-Item -ItemType Directory -Force -Path bin | Out-Null
+        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+        dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
     - name: Verify official binary folder
       shell: pwsh
       run: |
