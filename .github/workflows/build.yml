@@ -5,6 +5,7 @@ on:
     paths:
       - 'csharp/**'
       - 'handlers/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 jobs:
@@ -31,7 +32,7 @@ jobs:
           exit 0
         }
         $files = git diff --name-only $before $after
-        $changed = @($files | Where-Object { $_ -match '^(csharp/|handlers/)' })
+        $changed = @($files | Where-Object { $_ -match '^(csharp/|handlers/|\.github/workflows/build\.yml$)' })
         if ($changed.Count -gt 0) {
           "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
         } else {
@@ -66,6 +67,7 @@ jobs:
           csharp/**/obj
         key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
+          ${{ runner.os }}-wkappbot-build-run-
           ${{ runner.os }}-wkappbot-build-
     - name: Restore previous build state
       id: restore_build_state
@@ -110,14 +112,6 @@ jobs:
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
-    - name: Save build cache
-      if: ${{ success() && steps.restore_build_cache.outputs.cache-hit != 'true' }}
-      uses: actions/cache/save@v4
-      with:
-        path: |
-          bin
-          csharp/**/obj
-        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     - name: Mark build success
       if: ${{ success() }}
       shell: pwsh
@@ -130,6 +124,14 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path .ci-state/build | Out-Null
         'true' | Set-Content .ci-state/build/last_build_failed.txt -Encoding ascii
+    - name: Save build snapshot cache
+      if: ${{ always() }}
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          bin
+          csharp/**/obj
+        key: ${{ runner.os }}-wkappbot-build-run-${{ github.run_id }}
     - name: Save build state
       if: ${{ always() }}
       uses: actions/cache/save@v4
@@ -137,12 +139,12 @@ jobs:
         path: .ci-state/build
         key: ${{ runner.os }}-wkappbot-build-state-${{ github.run_id }}
     - name: Upload official bin artifact
-      if: ${{ success() }}
+      if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
-        name: wkappbot-bin
+        name: wkappbot-bin-${{ github.run_id }}
         path: bin/**
-        if-no-files-found: error
+        if-no-files-found: warn
 
   smoke:
     needs: [detect, build]
@@ -160,12 +162,13 @@ jobs:
         path: bin
         key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
+          ${{ runner.os }}-wkappbot-build-run-
           ${{ runner.os }}-wkappbot-build-
     - name: Download official bin artifact
       if: ${{ needs.build.result == 'success' }}
       uses: actions/download-artifact@v4
       with:
-        name: wkappbot-bin
+        name: wkappbot-bin-${{ github.run_id }}
         path: bin
     - name: Fallback rebuild official bin when missing
       shell: pwsh
