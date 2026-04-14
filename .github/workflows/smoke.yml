@@ -21,6 +21,12 @@ jobs:
 
     - name: Smoke env check
       shell: pwsh
-      run: |
-        dotnet --info
-        Write-Host "Smoke workflow passed."
+      run: dotnet --info
+
+    - name: Smoke help
+      shell: pwsh
+      run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
+
+    - name: Smoke usage
+      shell: pwsh
+      run: dotnet run --project csharp/src/WKAppBot.CLI -- usage
