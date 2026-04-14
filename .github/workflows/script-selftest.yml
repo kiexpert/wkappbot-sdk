@@ -1,6 +1,10 @@
 name: script-selftest
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    paths-ignore:
+      - '**/*.self-test.txt'
+  workflow_dispatch:
 
 jobs:
   script_selftest:
@@ -66,16 +70,42 @@ jobs:
         $bash = Get-Command bash -ErrorAction SilentlyContinue
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
+          $outFile = "$file.self-test.txt"
+          $outDir = Split-Path -Parent $outFile
+          if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
           if ($file.EndsWith('.ps1')) {
-            & pwsh -NoProfile -ExecutionPolicy Bypass -File $file
+            $lines = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
           } elseif ($file.EndsWith('.py')) {
-            & python $file
+            $lines = & python $file 2>&1
           } elseif ($file.EndsWith('.sh')) {
             if (-not $bash) { throw 'bash not found on runner' }
-            & bash $file
+            $lines = & bash $file 2>&1
           }
-          if ($LASTEXITCODE -ne 0) { throw "Script self-test failed: $file" }
+          $code = $LASTEXITCODE
+          @(
+            "commit: $($result.selectedCommit)",
+            "script: $file",
+            "exitcode: $code",
+            "timestamp_utc: $(Get-Date -AsUTC -Format o)",
+            ""
+          ) + @($lines) | Set-Content -Path $outFile -Encoding utf8
+          $lines | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) { throw "Script self-test failed: $file" }
         }
+    - name: Commit sidecar self-test files
+      if: ${{ always() && github.event_name == 'push' }}
+      shell: pwsh
+      run: |
+        git config user.name 'github-actions[bot]'
+        git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+        $changed = @(git status --porcelain -- '**/*.self-test.txt')
+        if ($changed.Count -eq 0) {
+          Write-Host 'No self-test sidecar changes to commit.'
+          exit 0
+        }
+        git add --all -- '*.self-test.txt'
+        git commit -m 'test: update script self-test sidecar files [skip ci]'
+        git push
     - name: Save updated repo bin cache
       if: ${{ always() }}
       uses: actions/cache/save@v4
