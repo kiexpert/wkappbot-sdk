@@ -1,3 +1,4 @@
+# smoke-only workflow test marker
 $ErrorActionPreference = 'Stop'
 $repoBin = Join-Path $PWD 'bin'
 if (!(Test-Path (Join-Path $repoBin 'wkappbot.exe'))) { throw 'bin/wkappbot.exe missing' }
