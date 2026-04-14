@@ -57,8 +57,10 @@ jobs:
           exit 0
         }
         $files = git diff --name-only $before $after | Where-Object { $_ -match '\.(py|ps1|sh)$' }
+        $skipFiles = @('scripts/smoke-help.ps1')
+        $files = @($files | Where-Object { $skipFiles -notcontains $_ })
         if (!$files) {
-          Write-Host 'No changed .py/.ps1/.sh files.'
+          Write-Host 'No eligible changed .py/.ps1/.sh files.'
           exit 0
         }
         foreach ($file in $files) {
