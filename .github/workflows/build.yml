@@ -42,14 +42,16 @@ jobs:
     needs: [detect]
     if: ${{ needs.detect.outputs.csharp_changed == 'true' }}
     runs-on: windows-latest
+    env:
+      BUILD_CACHE_KEY: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
+    - name: Restore NuGet packages
+      uses: actions/cache/restore@v4
       with:
         path: |
           ~/.nuget/packages
@@ -57,11 +59,45 @@ jobs:
         key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
-    - name: Cache official bin
-      uses: actions/cache@v4
+    - name: Restore build cache
+      id: restore_build_cache
+      uses: actions/cache/restore@v4
       with:
-        path: bin
-        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        path: |
+          bin
+          csharp/**/obj
+        key: ${{ env.BUILD_CACHE_KEY }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-build-
+    - name: Restore previous build state
+      id: restore_build_state
+      uses: actions/cache/restore@v4
+      with:
+        path: .ci-state/build
+        key: ${{ runner.os }}-wkappbot-build-state-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-build-state-
+    - name: Decide clean build
+      id: decide_clean
+      shell: pwsh
+      run: |
+        $marker = '.ci-state/build/last_build_failed.txt'
+        if (Test-Path $marker) {
+          $value = (Get-Content $marker -Raw).Trim().ToLowerInvariant()
+          if ($value -eq 'true') {
+            'need_clean=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            exit 0
+          }
+        }
+        'need_clean=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+    - name: Clean after previous failed build
+      if: ${{ steps.decide_clean.outputs.need_clean == 'true' }}
+      shell: pwsh
+      run: |
+        if (Test-Path ./bin) { Remove-Item ./bin -Recurse -Force }
+        Get-ChildItem -Path csharp -Directory -Recurse -Filter obj | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        dotnet clean csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release
+        dotnet clean csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release
     - name: Ensure bin dir
       shell: pwsh
       run: New-Item -ItemType Directory -Force -Path bin | Out-Null
@@ -76,7 +112,34 @@ jobs:
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+    - name: Save build cache
+      if: ${{ success() && steps.restore_build_cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          bin
+          csharp/**/obj
+        key: ${{ env.BUILD_CACHE_KEY }}
+    - name: Mark build success
+      if: ${{ success() }}
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path .ci-state/build | Out-Null
+        'false' | Set-Content .ci-state/build/last_build_failed.txt -Encoding ascii
+    - name: Mark build failure
+      if: ${{ failure() }}
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path .ci-state/build | Out-Null
+        'true' | Set-Content .ci-state/build/last_build_failed.txt -Encoding ascii
+    - name: Save build state
+      if: ${{ always() }}
+      uses: actions/cache/save@v4
+      with:
+        path: .ci-state/build
+        key: ${{ runner.os }}-wkappbot-build-state-${{ github.run_id }}
     - name: Upload official bin artifact
+      if: ${{ success() }}
       uses: actions/upload-artifact@v4
       with:
         name: wkappbot-bin
@@ -94,10 +157,12 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Restore cached official bin
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: bin
-        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-build-
     - name: Download official bin artifact
       if: ${{ needs.build.result == 'success' }}
       uses: actions/download-artifact@v4
