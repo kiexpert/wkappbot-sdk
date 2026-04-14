@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 $repoBin = Join-Path $PWD 'bin'
 if (!(Test-Path (Join-Path $repoBin 'wkappbot.exe'))) { throw 'bin/wkappbot.exe missing' }
 $env:PATH = "$repoBin;$env:PATH"
+$env:WKAPPBOT_WORKER = '1'
 $helpCommands = @(
   @('--help'), @('help'), @('version'),
   @('skill','--help','--no-regression'), @('knowhow','--help','--no-regression'), @('schedule','--help','--no-regression'),
