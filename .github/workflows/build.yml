@@ -3,33 +3,48 @@ name: build-csharp
 on: [push, workflow_dispatch]
 
 jobs:
-  build:
+  detect:
+    runs-on: windows-latest
+    outputs:
+      csharp_changed: ${{ steps.diff.outputs.csharp_changed }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Detect C# changes
+      id: diff
+      shell: pwsh
+      run: |
+        if ('${{ github.event_name }}' -ne 'push') {
+          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          exit 0
+        }
+        $before = '${{ github.event.before }}'
+        $after = '${{ github.sha }}'
+        if ([string]::IsNullOrWhiteSpace($before) -or $before -match '^0+$') {
+          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          exit 0
+        }
+        $files = git diff --name-only $before $after
+        $changed = @($files | Where-Object { $_ -match '^(csharp/|handlers/)' })
+        if ($changed.Count -gt 0) {
+          Write-Host 'C# related changes detected.'
+          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        } else {
+          Write-Host 'No C# related changes detected.'
+          "csharp_changed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+        }
+
+  precheck:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
-
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.nuget/packages
-          ~\AppData\Local\NuGet\v3-cache
-        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
     - name: Immediate changed script self-test
       shell: pwsh
       run: |
@@ -60,24 +75,44 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Script self-test failed: $file" }
         }
 
+  build:
+    needs: [detect, precheck]
+    if: ${{ needs.detect.outputs.csharp_changed == 'true' }}
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.nuget/packages
+          ~\AppData\Local\NuGet\v3-cache
+        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    - name: Cache official bin
+      uses: actions/cache@v4
+      with:
+        path: bin
+        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     - name: Ensure bin dir
       shell: pwsh
       run: New-Item -ItemType Directory -Force -Path bin | Out-Null
-
     - name: Publish Core to repo bin
       shell: pwsh
       run: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
-
     - name: Publish Launcher to repo bin
       shell: pwsh
       run: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
-
     - name: Verify official binaries
       shell: pwsh
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
-
     - name: Upload official bin artifact
       uses: actions/upload-artifact@v4
       with:
@@ -86,28 +121,31 @@ jobs:
         if-no-files-found: error
 
   smoke:
-    needs: build
+    needs: [detect, precheck, build]
+    if: ${{ always() && needs.precheck.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
-
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-
+    - name: Restore cached official bin
+      uses: actions/cache@v4
+      with:
+        path: bin
+        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     - name: Download official bin artifact
+      if: ${{ needs.build.result == 'success' }}
       uses: actions/download-artifact@v4
       with:
         name: wkappbot-bin
         path: bin
-
     - name: Verify official binary folder
       shell: pwsh
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
-
     - name: AppBot help smoke
       shell: pwsh
       run: ./scripts/smoke-help.ps1
