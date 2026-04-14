@@ -1,12 +1,26 @@
 name: smoke-csharp
 
 on:
+  workflow_run:
+    workflows: ["build-csharp"]
+    types: [completed]
   workflow_dispatch:
 
 jobs:
   smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: windows-latest
+
     steps:
-    - name: Skip automatic smoke
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Smoke env check
       shell: pwsh
-      run: Write-Host "Smoke workflow is manual-only for now."
+      run: |
+        dotnet --info
+        Write-Host "Smoke workflow passed."
