@@ -115,8 +115,18 @@ internal static class AppBotPipe
         lastError = ok ? 0 : Marshal.GetLastWin32Error();
         try
         {
-            if (ok && _verbose) Console.Error.WriteLine($"[{caller}] CreateProcessW \u2192 pid={pi.dwProcessId}");
-            else if (!ok)       Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
+            if (ok && _verbose)
+            {
+                Console.Error.WriteLine($"[{caller}] CreateProcessW \u2192 pid={pi.dwProcessId}");
+            }
+            else if (!ok)
+            {
+                bool retriableBreakawayDenied = lastError == 5 && (flags & CREATE_BREAKAWAY_FROM_JOB) != 0;
+                if (retriableBreakawayDenied)
+                    Console.Error.WriteLine($"[{caller}:WARN] CreateProcessW breakaway denied err=5 — retry without breakaway");
+                else
+                    Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
+            }
         }
         catch { }
         return ok;
@@ -369,8 +379,8 @@ internal static class AppBotPipe
         pid = 0; stdinStream = stdoutStream = stderrStream = null;
 
         // Pipes: child-side handles inherit, parent-side do not
-        CreatePipe(out var hStdinRead,  out var hStdinWrite,  IntPtr.Zero, 0);
-        SetHandleInformation(hStdinRead,   HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        CreatePipe(out var hStdinRead, out var hStdinWrite, IntPtr.Zero, 0);
+        SetHandleInformation(hStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
         CreatePipe(out var hStdoutRead, out var hStdoutWrite, IntPtr.Zero, 0);
         SetHandleInformation(hStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
         CreatePipe(out var hStderrRead, out var hStderrWrite, IntPtr.Zero, 0);
