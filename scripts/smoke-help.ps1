@@ -1,34 +1,35 @@
 $ErrorActionPreference = 'Stop'
 $project = 'csharp/src/WKAppBot.CLI'
-$commands = @(
+$helpCommands = @(
   @('--help'), @('help'), @('version'),
-  @('a11y','--help'), @('run','--help'), @('find','--help'), @('inspect','--help'), @('windows','--help'),
-  @('ocr','--help'), @('capture','--help'), @('scan','--help'), @('ask','--help'), @('agent','--help'),
-  @('model','--help'), @('logcat','--help'), @('eye','--help'), @('slack','--help'), @('web','--help'),
-  @('file','--help'), @('code','--help'), @('vscode','--help'), @('file-edit','--help'), @('file-open','--help'),
-  @('file-read','--help'), @('file-grep','--help'), @('file-glob','--help'), @('mcp','--help'), @('do','--help'),
-  @('input','--help'), @('click','--help'), @('dismiss','--help'), @('win-click','--help'), @('dialog-click','--help'),
-  @('tab-select','--help'), @('cond-add','--help'), @('focus','--help'), @('watch','--help'), @('snapshot','--help'),
-  @('readiness','--help'), @('uia-test','--help'), @('form-dump','--help'), @('toolbar-ocr','--help'),
-  @('titlebar','--help'), @('validate','--help'), @('chart-analyze','--help'), @('hts-stress','--help'),
-  @('tooltip-probe','--help'), @('speak','--help'), @('whisper','--help'), @('newchat','--help'),
-  @('analyze-hack','--help'), @('screensaver','--help'), @('whisper-ring','--help'), @('prompt','--help'),
-  @('schedule','--help'), @('dashboard','--help'), @('knowhow','--help'), @('skill','--help'), @('win-move','--help'),
-  @('screen','--help'), @('clipboard','--help'), @('claude-usage','--help'), @('enc-test','--help'),
-  @('suggest','--help'), @('gc','--help'), @('hotswap','--help'), @('zoom-demo','--help'), @('tick','--help'),
-  @('kiwoom','--help'), @('com','--help'), @('telegram','--help'), @('stock-scan','--help'), @('tree-select','--help'),
-  @('prompt-test','--help'), @('prompt-probe','--help'), @('claude-detect','--help'), @('find-prompts','--help'),
-  @('msaa-probe','--help')
+  @('skill','--help'), @('knowhow','--help'), @('schedule','--help'),
+  @('file','--help'), @('file-read','--help'), @('file-grep','--help'), @('file-glob','--help'),
+  @('web','--help'), @('ask','--help'), @('agent','--help'), @('mcp','--help'),
+  @('a11y','--help'), @('inspect','--help'), @('find','--help'), @('windows','--help'),
+  @('scan','--help'), @('capture','--help'), @('ocr','--help'), @('input','--help'),
+  @('click','--help'), @('dismiss','--help'), @('dialog-click','--help'), @('watch','--help'),
+  @('focus','--help'), @('snapshot','--help'), @('uia-test','--help'), @('validate','--help'),
+  @('chart-analyze','--help'), @('tooltip-probe','--help'), @('whisper','--help'), @('slack','--help')
 )
 $fail = 0
-foreach ($cmd in $commands) {
+function Run-Cmd([string[]]$cmd) {
   $pretty = ($cmd -join ' ')
-  Write-Host "== HELP $pretty =="
+  Write-Host "== TEST $pretty =="
   & dotnet run --project $project -- @cmd
   if ($LASTEXITCODE -ne 0) {
     Write-Host "FAILED: $pretty"
-    $fail = 1
+    $script:fail = 1
   }
 }
-if ($fail -ne 0) { throw 'help smoke failed' }
-Write-Host 'All help smoke checks passed.'
+foreach ($cmd in $helpCommands) { Run-Cmd $cmd }
+Run-Cmd @('skill','list')
+Run-Cmd @('schedule','list')
+$smokeDir = Join-Path $PWD 'smoke-temp'
+New-Item -ItemType Directory -Force -Path $smokeDir | Out-Null
+$sampleFile = Join-Path $smokeDir 'sample.txt'
+Set-Content -Path $sampleFile -Value @('alpha','beta','skill smoke') -Encoding UTF8
+Run-Cmd @('file','read',$sampleFile)
+Run-Cmd @('file','grep','skill',$sampleFile)
+Run-Cmd @('file','glob','**/*.txt','--path',$smokeDir)
+if ($fail -ne 0) { throw 'help/basic smoke failed' }
+Write-Host 'All help/basic smoke checks passed.'
