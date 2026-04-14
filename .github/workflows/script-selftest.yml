@@ -31,16 +31,15 @@ jobs:
           Write-Host 'Skip script self-test on workflow_dispatch.'
           exit 0
         }
-        $json = & pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/get-latest-script-files.ps1 -Before '${{ github.event.before }}' -After '${{ github.sha }}'
+        $json = & pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/get-latest-script-files.ps1
         $result = $json | ConvertFrom-Json
         if (-not $result.selectedCommit -or -not $result.files -or $result.files.Count -eq 0) {
-          Write-Host 'No changed .py/.ps1/.sh files in the latest script-changing commit.'
+          Write-Host 'No changed .py/.ps1/.sh files in recent commits.'
           exit 0
         }
         $files = @($result.files)
         Write-Host "Selected commit: $($result.selectedCommit)"
         $files | ForEach-Object { Write-Host "SCRIPT: $_" }
-
         if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
           Write-Host 'Official bin missing. Rebuilding fallback bin in script-selftest.'
           New-Item -ItemType Directory -Force -Path bin | Out-Null
@@ -49,7 +48,6 @@ jobs:
         }
         if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for script self-test' }
         $env:PATH = "$PWD/bin;$env:PATH"
-
         $bash = Get-Command bash -ErrorAction SilentlyContinue
         foreach ($file in $files) {
           Write-Host "== SCRIPT SELF-TEST $file =="
