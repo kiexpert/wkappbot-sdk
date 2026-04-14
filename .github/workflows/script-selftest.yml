@@ -31,32 +31,14 @@ jobs:
           Write-Host 'Skip script self-test on workflow_dispatch.'
           exit 0
         }
-        $before = '${{ github.event.before }}'
-        $after = '${{ github.sha }}'
-        if ([string]::IsNullOrWhiteSpace($after)) {
-          Write-Host 'No commit SHA. Skip script self-test.'
-          exit 0
-        }
-        $commits = @()
-        if (-not [string]::IsNullOrWhiteSpace($before) -and $before -notmatch '^0+$') {
-          $commits = @(git rev-list "$before..$after")
-        }
-        if (!$commits) { $commits = @($after) }
-        $selectedCommit = $null
-        $files = @()
-        foreach ($commit in $commits) {
-          $candidateFiles = @(git diff-tree --no-commit-id --name-only -r $commit | Where-Object { $_ -match '\.(py|ps1|sh)$' } | Sort-Object -Unique)
-          if ($candidateFiles.Count -gt 0) {
-            $selectedCommit = $commit
-            $files = $candidateFiles
-            break
-          }
-        }
-        if (!$selectedCommit -or !$files) {
+        $json = & pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/get-latest-script-files.ps1 -Before '${{ github.event.before }}' -After '${{ github.sha }}'
+        $result = $json | ConvertFrom-Json
+        if (-not $result.selectedCommit -or -not $result.files -or $result.files.Count -eq 0) {
           Write-Host 'No changed .py/.ps1/.sh files in the latest script-changing commit.'
           exit 0
         }
-        Write-Host "Selected commit: $selectedCommit"
+        $files = @($result.files)
+        Write-Host "Selected commit: $($result.selectedCommit)"
         $files | ForEach-Object { Write-Host "SCRIPT: $_" }
 
         if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
