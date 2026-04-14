@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
-$project = 'csharp/src/WKAppBot.CLI'
+$repoBin = Join-Path $PWD 'bin'
+if (!(Test-Path (Join-Path $repoBin 'wkappbot.exe'))) { throw 'bin/wkappbot.exe missing' }
+$env:PATH = "$repoBin;$env:PATH"
 $helpCommands = @(
   @('--help'), @('help'), @('version'),
   @('skill','--help'), @('knowhow','--help'), @('schedule','--help'),
@@ -15,7 +17,7 @@ $fail = 0
 function Run-Cmd([string[]]$cmd) {
   $pretty = ($cmd -join ' ')
   Write-Host "== TEST $pretty =="
-  & dotnet run --project $project -- @cmd
+  & wkappbot @cmd
   if ($LASTEXITCODE -ne 0) {
     Write-Host "FAILED: $pretty"
     $script:fail = 1
