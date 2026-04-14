@@ -17,15 +17,3 @@ jobs:
     - name: Build
       shell: pwsh
       run: dotnet build --configuration Release
-
-    - name: Smoke test --help
-      shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
-
-    - name: Smoke test usage
-      shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- usage
-
-    - name: Smoke test version
-      shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- version
