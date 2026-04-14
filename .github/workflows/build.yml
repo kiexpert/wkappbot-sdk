@@ -42,8 +42,6 @@ jobs:
     needs: [detect]
     if: ${{ needs.detect.outputs.csharp_changed == 'true' }}
     runs-on: windows-latest
-    env:
-      BUILD_CACHE_KEY: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -66,7 +64,7 @@ jobs:
         path: |
           bin
           csharp/**/obj
-        key: ${{ env.BUILD_CACHE_KEY }}
+        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
           ${{ runner.os }}-wkappbot-build-
     - name: Restore previous build state
@@ -119,7 +117,7 @@ jobs:
         path: |
           bin
           csharp/**/obj
-        key: ${{ env.BUILD_CACHE_KEY }}
+        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
     - name: Mark build success
       if: ${{ success() }}
       shell: pwsh
