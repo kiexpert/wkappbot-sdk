@@ -23,10 +23,6 @@ jobs:
       shell: pwsh
       run: dotnet --info
 
-    - name: Smoke help
+    - name: AppBot help smoke
       shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- --help
-
-    - name: Smoke usage
-      shell: pwsh
-      run: dotnet run --project csharp/src/WKAppBot.CLI -- usage
+      run: ./scripts/smoke-help.ps1
