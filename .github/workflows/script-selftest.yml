@@ -5,13 +5,6 @@ on: [push, workflow_dispatch]
 jobs:
   script_selftest:
     runs-on: windows-latest
-    env:
-      WKAPPBOT_BIN_EXACT_KEY: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
-      WKAPPBOT_BIN_PREFIX: ${{ runner.os }}-wkappbot-bin-
-      WKAPPBOT_BUILD_PREFIX: ${{ runner.os }}-wkappbot-build-
-      PIP_CACHE_DIR: ${{ github.workspace }}/bin/pip-cache
-      PYTHONUSERBASE: ${{ github.workspace }}/bin/py-user
-      PIP_DISABLE_PIP_VERSION_CHECK: '1'
     steps:
     - uses: actions/checkout@v4
       with:
@@ -29,21 +22,24 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: bin
-        key: ${{ env.WKAPPBOT_BIN_EXACT_KEY }}
+        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
         restore-keys: |
-          ${{ env.WKAPPBOT_BIN_PREFIX }}
-          ${{ env.WKAPPBOT_BUILD_PREFIX }}
+          ${{ runner.os }}-wkappbot-bin-
+          ${{ runner.os }}-wkappbot-build-
     - name: Prepare repo-local helper cache
       shell: pwsh
       run: |
+        $pipCacheDir = Join-Path $PWD 'bin/pip-cache'
+        $pythonUserBase = Join-Path $PWD 'bin/py-user'
         New-Item -ItemType Directory -Force -Path bin | Out-Null
-        New-Item -ItemType Directory -Force -Path $env:PIP_CACHE_DIR | Out-Null
-        New-Item -ItemType Directory -Force -Path $env:PYTHONUSERBASE | Out-Null
-        $pyScripts = Join-Path $env:PYTHONUSERBASE 'Scripts'
+        New-Item -ItemType Directory -Force -Path $pipCacheDir | Out-Null
+        New-Item -ItemType Directory -Force -Path $pythonUserBase | Out-Null
+        $pyScripts = Join-Path $pythonUserBase 'Scripts'
         New-Item -ItemType Directory -Force -Path $pyScripts | Out-Null
         "PATH=$PWD/bin;$pyScripts;$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        "PIP_CACHE_DIR=$env:PIP_CACHE_DIR" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        "PYTHONUSERBASE=$env:PYTHONUSERBASE" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PIP_CACHE_DIR=$pipCacheDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PYTHONUSERBASE=$pythonUserBase" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PIP_DISABLE_PIP_VERSION_CHECK=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
     - name: Test scripts from latest script-changing commit
       shell: pwsh
       run: |
@@ -85,4 +81,4 @@ jobs:
       uses: actions/cache/save@v4
       with:
         path: bin
-        key: ${{ env.WKAPPBOT_BIN_PREFIX }}${{ github.run_id }}
+        key: ${{ runner.os }}-wkappbot-bin-run-${{ github.run_id }}
