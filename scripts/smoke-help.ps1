@@ -15,8 +15,10 @@ function Run-Cmd([string[]]$cmd) {
   $pretty = ($cmd -join ' ')
   Write-Host "== TEST $pretty =="
   & wkappbot @cmd
-  if ($LASTEXITCODE -ne 0) {
-    Write-Host "FAILED: $pretty"
+  $code = $LASTEXITCODE
+  Write-Host "EXITCODE: $code"
+  if ($code -ne 0) {
+    Write-Host "FAILED($code): $pretty"
     $script:fail = 1
   }
 }
