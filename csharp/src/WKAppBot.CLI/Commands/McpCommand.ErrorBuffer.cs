@@ -5,34 +5,19 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    /// <summary>
-    /// Universal exit point — flushes timestamped error log on failure.
-    /// Usage: return AppBotExit(0);          // success, discard errors
-    ///        return AppBotExit(1);          // error, auto-flush error log
-    ///        return AppBotExit(1, true);    // error, force flush even if code==0
-    /// </summary>
     static int AppBotExit(int code, bool forceErrorLog = false)
     {
         var scope = ErrorScope.Current;
         if (scope != null)
         {
-            // ErrorScope active → stderr was buffered. Flush on error.
             bool isError = code != 0 || forceErrorLog;
             var log = scope.Finalize(isError);
             if (isError && log.Length > 0)
                 Console.Error.Write(log);
         }
-        // No ErrorScope (--stderr mode) → stderr already shown in real-time, nothing to flush.
         return code;
     }
 
-    /// <summary>
-    /// MCP tool error scope — auto-captures Console.Error during tool execution.
-    /// Usage:
-    ///   using var _ = ErrorScope.Begin();    // redirects Console.Error
-    ///   ... tool execution ...                   // Console.Error.WriteLine auto-buffered
-    ///   return AppBotExit(exitCode);             // auto-flush on error
-    /// </summary>
     sealed class ErrorScope : IDisposable
     {
         readonly TextWriter _originalStderr;
@@ -50,12 +35,7 @@ internal partial class Program
         }
 
         public static ErrorScope Begin() => new();
-
-        /// <summary>
-        /// Finalize: restore stderr. Returns timestamped error log if isError, empty if success.
-        /// </summary>
         public bool HasErrors => _capture.Entries.Count > 0;
-        /// <summary>True if an error-like message was detected (passthrough mode was triggered).</summary>
         public bool ErrorDetected => _capture.ErrorDetected;
 
         public string Finalize(bool isError)
@@ -63,7 +43,6 @@ internal partial class Program
             Console.SetError(_originalStderr);
             _current = null;
             if (!isError || _capture.Entries.Count == 0) return "";
-
             var sb = new StringBuilder();
             sb.AppendLine("\n--- Error Log ---");
             foreach (var (relMs, msg) in _capture.Entries)
@@ -77,10 +56,6 @@ internal partial class Program
             _current = null;
         }
 
-        /// <summary>
-        /// Captures stderr with timestamps. On first error-like message (error|fail|exception|오류|에러),
-        /// immediately switches to passthrough mode: flushes buffered entries + forwards all subsequent writes directly.
-        /// </summary>
         sealed class ErrorCapture : TextWriter
         {
             readonly TextWriter _inner;
@@ -97,8 +72,17 @@ internal partial class Program
                 new(@"error|fail|exception|오류|에러",
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase |
                     System.Text.RegularExpressions.RegexOptions.Compiled);
+            static readonly System.Text.RegularExpressions.Regex _warningPattern =
+                new(@"warn|warning|경고",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.Compiled);
 
-            static bool IsErrorLike(string msg) => _errorPattern.IsMatch(msg);
+            static bool IsErrorLike(string msg)
+            {
+                if (string.IsNullOrWhiteSpace(msg)) return false;
+                if (_warningPattern.IsMatch(msg)) return false;
+                return _errorPattern.IsMatch(msg);
+            }
 
             void EmitEntry(string msg)
             {
@@ -106,7 +90,6 @@ internal partial class Program
                 Entries.Add((relMs, msg));
                 if (!_passthrough && IsErrorLike(msg))
                 {
-                    // Error-like message detected — switch to passthrough: flush all buffered entries
                     _passthrough = true;
                     foreach (var (t, m) in Entries)
                         _inner.WriteLine($"[+{t / 1000.0:F1}s] {m}");
