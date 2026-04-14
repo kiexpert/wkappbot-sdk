@@ -6,6 +6,7 @@ on:
       - '**/*.ps1'
       - '**/*.py'
       - '**/*.sh'
+      - '.github/workflows/script-selftest.yml'
     paths-ignore:
       - '**/*.self-test.txt'
   workflow_dispatch:
