@@ -1,11 +1,13 @@
 # WKAppBot
 
-> *Building the Eyes of Claude to realize autonomous secretarial ops.*  
+> *Give AI eyes and hands — let it use any app, so it can truly help humans.*  
 > All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
 
 **Windows & Android app automation framework — focusless, self-healing, AI-native.**
 
-WKAppBot automates any desktop or mobile UI without requiring the target app to be in the foreground. It speaks UIA, Win32, and CDP natively, falls back gracefully across tiers, and exposes a single unified CLI that Claude, Codex, and human operators all speak the same way.
+AI models are powerful reasoners, but they live behind a text interface. They can tell you *how* to click a button — but they can't click it. WKAppBot bridges that gap: it gives AI agents **eyes** (read any UI, extract text, recognize controls) and **hands** (click, type, scroll, invoke — without stealing focus), so they can operate existing desktop and mobile apps on behalf of the humans who use them.
+
+No app rewrite required. No API access needed. If a human can use it, WKAppBot can automate it.
 
 ---
 
@@ -13,7 +15,7 @@ WKAppBot automates any desktop or mobile UI without requiring the target app to 
 
 Most automation tools steal focus, break on owner-drawn controls, and go silent when the DOM changes. WKAppBot is built around three hard-won principles:
 
-**Focusless-first** — UIA Invoke/Value/Toggle/Select never steal focus. Win32 PostMessage handles legacy MFC. SendInput is the last resort, used only when nothing else works.
+**Focusless-first** — UIA Invoke/Value/Toggle/Select never steal focus. Win32 PostMessage handles legacy MFC. SendInput is the last resort, used only when nothing else works. The user keeps working while the AI operates in the background.
 
 **Self-healing** — When UIA fails on owner-drawn controls (MFC/HTS), CCA segmentation + OCR triple cross-validation + Gemini Vision inference recover element identity automatically and cache results in an Experience DB for next time.
 
