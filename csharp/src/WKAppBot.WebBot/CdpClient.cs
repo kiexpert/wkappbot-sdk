@@ -696,13 +696,18 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         {
             try
             {
-                await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                // 2-second timeout — prevents indefinite block if Chrome ignores the close frame.
+                // This can happen when running in pipe mode (CreateNoWindow=true) or when Chrome
+                // is busy. CancellationToken.None here would cause Dispose() to hang forever.
+                using var closeCts = new CancellationTokenSource(2000);
+                await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "", closeCts.Token);
             }
             catch { /* best effort */ }
         }
         if (_receiveTask != null)
         {
-            try { await _receiveTask; } catch { }
+            // Timeout on receive task wait to guard against stuck receive loops.
+            try { await _receiveTask.WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
         }
     }
 
