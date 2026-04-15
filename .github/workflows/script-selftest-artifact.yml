@@ -8,8 +8,6 @@ on:
       - '**/*.sh'
       - '.github/workflows/script-selftest.yml'
       - '.github/workflows/script-selftest-artifact.yml'
-    paths-ignore:
-      - '**/*.self-test.txt'
   workflow_dispatch:
 
 jobs:
