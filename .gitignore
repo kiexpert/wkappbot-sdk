@@ -31,6 +31,8 @@ bin/wkappbot.hq/handlers/
 !bin/wkappbot.hq/suggestions.jsonl
 !bin/wkappbot.hq/profiles/
 bin/wkappbot.hq/profiles/*/wav/
+bin/wkappbot.hq/profiles/*/tokens_*.jsonl
+bin/wkappbot.hq/profiles/*/stt_*.jsonl
 !bin/build_info.json
 *.user
 *.suo
