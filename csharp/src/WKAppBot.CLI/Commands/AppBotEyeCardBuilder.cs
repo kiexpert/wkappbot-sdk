@@ -340,9 +340,11 @@ internal partial class Program
             if (screens != null && screens.Length > 0)
             {
                 var rightMost = screens.OrderByDescending(s => s.Bounds.Right).First();
-                var area = rightMost.WorkingArea;
-                var x = area.Right - width - 10;
-                var y = area.Top + 10;
+                // Use Bounds (full monitor edge), not WorkingArea (excludes taskbar).
+                // Screen.AllScreens returns logical pixels (DPI-scaled), matching WPF Window.Left/Top.
+                var bounds = rightMost.Bounds;
+                var x = bounds.Right - width - 10;
+                var y = bounds.Top + 10;
                 return (x, y);
             }
         }
