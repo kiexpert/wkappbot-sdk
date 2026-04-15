@@ -1,0 +1,71 @@
+name: build-smoke-sidecar-artifact
+
+on:
+  push:
+    paths:
+      - 'csharp/**'
+      - 'handlers/**'
+      - 'scripts/smoke-help.ps1'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/build-sidecar-artifact.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke_sidecar:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore cached official bin
+      uses: actions/cache/restore@v4
+      with:
+        path: bin
+        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-build-run-
+          ${{ runner.os }}-wkappbot-build-
+    - name: Fallback rebuild official bin when missing
+      shell: pwsh
+      run: |
+        if ((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe)) {
+          Write-Host 'Official bin already present.'
+          exit 0
+        }
+        Write-Host 'Official bin missing. Rebuilding fallback bin in artifact workflow.'
+        New-Item -ItemType Directory -Force -Path bin | Out-Null
+        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+        dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+    - name: Verify official binary folder
+      shell: pwsh
+      run: |
+        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
+        if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+    - name: Run smoke and persist sidecar
+      shell: pwsh
+      run: |
+        $file = 'scripts/smoke-help.ps1'
+        $outFile = "$file.smoke.txt"
+        $lines = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
+        $code = $LASTEXITCODE
+        @(
+          "commit: ${{ github.sha }}",
+          "workflow: build-smoke-sidecar-artifact",
+          "script: $file",
+          "exitcode: $code",
+          "timestamp_utc: $(Get-Date -AsUTC -Format o)",
+          ""
+        ) + @($lines) | Set-Content -Path $outFile -Encoding utf8
+        $lines | ForEach-Object { Write-Host $_ }
+        exit $code
+    - name: Upload smoke sidecar artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: smoke-sidecar-${{ github.run_id }}
+        path: '**/*.smoke.txt'
+        if-no-files-found: warn
