@@ -1,3 +1,4 @@
+using FlaUI.Core.AutomationElements;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
@@ -547,6 +548,69 @@ internal partial class Program
         if (args.Any(a => a.Equals("--i-really-want-no-backup", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--i-really-want-no-backup");
         if (args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase))) writeArgs.Add("--dry-run");
         return FileCommand(writeArgs.ToArray());
+    }
+
+    /// <summary>
+    /// a11y read with CDP-first for browser windows.
+    /// If hwnd belongs to a browser process and CDP is available, reads the full page text via
+    /// document.body.innerText (no truncation). Falls back to UIA A11yRead on any failure.
+    /// </summary>
+    static bool A11yReadBrowserFirst(AutomationElement el, IntPtr hwnd)
+    {
+        if (hwnd != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                if (WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)pid))
+                {
+                    var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
+                    if (port > 0)
+                    {
+                        Console.Error.WriteLine($"[A11Y] Browser PID={pid} CDP port={port} — reading via CDP");
+                        using var cdp = new WKAppBot.WebBot.CdpClient();
+                        cdp.ConnectAsync(port).GetAwaiter().GetResult();
+                        CdpSwitchToTabByHint(cdp, port, hwnd, hint: null, readOnly: true);
+
+                        // Full text — no 500-char truncation
+                        var result = cdp.EvalAsync(
+                            "JSON.stringify({title:document.title,url:location.href,ready:document.readyState,text:document.body?.innerText||''})"
+                        ).GetAwaiter().GetResult();
+
+                        if (!string.IsNullOrWhiteSpace(result) && result != "null")
+                        {
+                            try
+                            {
+                                var node = System.Text.Json.JsonDocument.Parse(result).RootElement;
+                                var title = node.GetProperty("title").GetString() ?? "";
+                                var url   = node.GetProperty("url").GetString() ?? "";
+                                var ready = node.GetProperty("ready").GetString() ?? "";
+                                var text  = node.GetProperty("text").GetString() ?? "";
+                                Console.Error.WriteLine($"[A11Y] CDP read: title=\"{title}\" url={url} ready={ready} chars={text.Length}");
+                                Console.WriteLine($"Title: {title}");
+                                Console.WriteLine($"URL: {url}");
+                                Console.WriteLine($"ReadyState: {ready}");
+                                Console.WriteLine();
+                                Console.WriteLine(text);
+                            }
+                            catch
+                            {
+                                // JSON parse failed — write raw result
+                                Console.Error.WriteLine($"[A11Y] CDP read: {result}");
+                                Console.WriteLine(result);
+                            }
+                            return true;
+                        }
+                        Console.Error.WriteLine("[A11Y] CDP read returned empty — fallback to UIA");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] CDP read error: {ex.Message} — fallback to UIA");
+            }
+        }
+        return A11yRead(el);
     }
 
     /// <summary>Lookup hack cache in experience DB by pixel hash. Returns description or null.</summary>
