@@ -1,0 +1,722 @@
+{"ts":"2026-04-15T15:09:56.1492056Z","matched":19,"synthetic":83,"avgScore":0.478,"total":361,"topMatches":[{"score":0.931,"uia":"\u003CText\u003E D:\\GitHub\\WKAppBot\\bin","ccaType":"DyIcon","bounds":"110,188 175x20"},{"score":0.58,"uia":"\u003CText\u003E \uD658\uACBD\uBCC0\uC218 \uC124\uC815\uCC3D\uC774 \uC5F4\uB838\uC5B4\uC694.","ccaType":"DyIcon","bounds":"42,87 205x58"},{"score":0.54,"uia":"\u003CText\u003E OUT","ccaType":"DyText","bounds":"62,34 3x7"},{"score":0.509,"uia":"\u003CText\u003E W:\\SDK\\...","ccaType":"DyNoise","bounds":"354,347 3x8"},{"score":0.508,"uia":"\u003CText\u003E wkappbot","ccaType":"DyText","bounds":"244,239 3x5"}]}
+{"ts":"2026-04-15T15:09:59.4187531Z","matched":21,"synthetic":90,"avgScore":0.48,"total":368,"topMatches":[{"score":0.931,"uia":"\u003CText\u003E D:\\GitHub\\WKAppBot\\bin","ccaType":"DyIcon","bounds":"242,215 175x20"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"197,19 2x7"},{"score":0.58,"uia":"\u003CText\u003E \uD658\uACBD\uBCC0\uC218 \uC124\uC815\uCC3D\uC774 \uC5F4\uB838\uC5B4\uC694.","ccaType":"DyIcon","bounds":"174,114 205x58"},{"score":0.54,"uia":"\u003CText\u003E OUT","ccaType":"DyText","bounds":"194,61 3x7"},{"score":0.509,"uia":"\u003CText\u003E W:\\SDK\\...","ccaType":"DyNoise","bounds":"486,374 3x8"}]}
+{"ts":"2026-04-15T15:10:49.0084312Z","matched":6,"synthetic":70,"avgScore":0.533,"total":348,"topMatches":[{"score":0.764,"uia":"\u003CText\u003E \uC644\uB8CC\uB41C \uC791\uC5C5 \uC694\uC57D:","ccaType":"DyIcon","bounds":"235,0 132x22"},{"score":0.591,"uia":"\u003CText\u003E ctrl esc to focus or unfocus Claude","ccaType":"DyIcon","bounds":"200,174 400x49"},{"score":0.509,"uia":"\u003CText\u003E W:\\SDK\\...","ccaType":"DyNoise","bounds":"547,72 3x8"},{"score":0.447,"uia":"\u003CText\u003E WKAppBot v5.13.156","ccaType":"DyText","bounds":"417,49 4x5"},{"score":0.444,"uia":"\u003CText\u003E D:\\GitHub\\WKAppBot\\bin","ccaType":"DyNoise","bounds":"598,49 2x5"}]}
+{"ts":"2026-04-15T15:11:06.3034646Z","matched":12,"synthetic":89,"avgScore":0.572,"total":375,"topMatches":[{"score":0.868,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"207,366 200x30"},{"score":0.851,"uia":"\u003CText\u003E Shimmying...","ccaType":"DyIcon","bounds":"228,295 109x30"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"254,243 2x7"},{"score":0.615,"uia":"\u003CText\u003E *","ccaType":"DyIcon","bounds":"206,299 19x17"},{"score":0.562,"uia":"\u003CText\u003E \uC124\uC815\uCC3D \uB2E4\uC2DC \uB744\uC6CC\uC8FC\uC138\uC694 \u3160","ccaType":"DyIcon","bounds":"201,125 399x34"}]}
+{"ts":"2026-04-15T15:11:07.1135320Z","matched":11,"synthetic":72,"avgScore":0.57,"total":359,"topMatches":[{"score":0.868,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"207,366 200x30"},{"score":0.756,"uia":"\u003CText\u003E Shimmying...","ccaType":"DyIcon","bounds":"201,291 136x34"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"254,201 2x7"},{"score":0.562,"uia":"\u003CText\u003E \uC124\uC815\uCC3D \uB2E4\uC2DC \uB744\uC6CC\uC8FC\uC138\uC694 \u3160","ccaType":"DyIcon","bounds":"201,83 399x34"},{"score":0.54,"uia":"\u003CText\u003E OUT","ccaType":"DyText","bounds":"251,243 3x7"}]}
+{"ts":"2026-04-15T15:11:23.9077687Z","matched":8,"synthetic":45,"avgScore":0.48,"total":335,"topMatches":[{"score":0.785,"uia":"\u003CText\u003E \uC2DC\uC2A4\uD15C \uBCC0\uC218 \u2192 Path \u2192 \uD3B8\uC9D1 \u2192 \uC0C8\uB85C \uB9CC\uB4E4\uAE30 \u2192 ","ccaType":"DyIcon","bounds":"196,89 404x30"},{"score":0.565,"uia":"\u003CText\u003E ctrl esc to focus or unfocus Claude","ccaType":"DyIcon","bounds":"161,167 439x49"},{"score":0.54,"uia":"\u003CText\u003E OUT","ccaType":"DyText","bounds":"216,37 3x7"},{"score":0.521,"uia":"\u003CText\u003E \uC5F4\uC5C8\uC5B4\uC694! ","ccaType":"DyText","bounds":"236,99 4x7"},{"score":0.438,"uia":"\u003CText\u003E [rerun: b1]","ccaType":"DyIcon","bounds":"204,20 396x40"}]}
+{"ts":"2026-04-15T15:11:33.4869191Z","matched":6,"synthetic":55,"avgScore":0.565,"total":348,"topMatches":[{"score":0.75,"uia":"\u003CText\u003E Elucidating...","ccaType":"DyIcon","bounds":"196,108 136x34"},{"score":0.738,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"197,49 403x34"},{"score":0.614,"uia":"\u003CText\u003E \uC2DC\uC2A4\uD15C \uBCC0\uC218 \u2192 Path \u2192 \uD3B8\uC9D1 \u2192 \uC0C8\uB85C \uB9CC\uB4E4\uAE30 \u2192 ","ccaType":"DyIcon","bounds":"227,0 373x19"},{"score":0.522,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"192,171 408x49"},{"score":0.517,"uia":"\u003CText\u003E \uC5F4\uC5C8\uC5B4\uC694! ","ccaType":"DyText","bounds":"267,0 4x6"}]}
+{"ts":"2026-04-15T15:11:34.2003363Z","matched":3,"synthetic":46,"avgScore":0.674,"total":338,"topMatches":[{"score":0.762,"uia":"\u003CText\u003E Wrang\u258Cating...","ccaType":"DyIcon","bounds":"197,108 151x35"},{"score":0.738,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"197,2 403x34"},{"score":0.522,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"192,171 408x49"}]}
+{"ts":"2026-04-15T15:11:35.0363610Z","matched":3,"synthetic":47,"avgScore":0.703,"total":339,"topMatches":[{"score":0.85,"uia":"\u003CText\u003E Wrangling...","ccaType":"DyIcon","bounds":"224,112 103x30"},{"score":0.738,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"197,2 403x34"},{"score":0.522,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"192,171 408x49"}]}
+{"ts":"2026-04-15T15:11:35.9529633Z","matched":3,"synthetic":32,"avgScore":0.623,"total":325,"topMatches":[{"score":0.85,"uia":"\u003CText\u003E Wrangling...","ccaType":"DyIcon","bounds":"224,113 103x30"},{"score":0.664,"uia":"\u003CText\u003E *","ccaType":"DyIcon","bounds":"200,110 23x22"},{"score":0.355,"uia":"\u003CText\u003E \uB098\uB3C4","ccaType":"DyIcon","bounds":"192,171 408x49"}]}
+{"ts":"2026-04-15T15:11:39.0000612Z","matched":8,"synthetic":51,"avgScore":0.56,"total":349,"topMatches":[{"score":0.877,"uia":"\u003CText\u003E \uB098\uB3C4 \uC5B4\uB4DC\uBBFC","ccaType":"DyIcon","bounds":"203,181 92x30"},{"score":0.826,"uia":"\u003CText\u003E Puttering...","ccaType":"DyIcon","bounds":"225,113 94x30"},{"score":0.72,"uia":"\u003CText\u003E Thought for 2s","ccaType":"DyIcon","bounds":"226,0 138x25"},{"score":0.506,"uia":"\u003CText\u003E \uC0AC\uC6A9\uC790 \uBCC0\uC218","ccaType":"DyText","bounds":"305,76 3x6"},{"score":0.455,"uia":"\u003CText\u003E \uB294 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC774 \uD544\uC694\uD574\uC11C Claude Code\uC5D0\uC11C \uC9C1\uC811 \uBABB \uC368\uC694.","ccaType":"DyNoise","bounds":"512,54 3x3"}]}
+{"ts":"2026-04-15T15:11:39.7923530Z","matched":2,"synthetic":48,"avgScore":0.627,"total":346,"topMatches":[{"score":0.737,"uia":"\u003CText\u003E Puttering...","ccaType":"DyIcon","bounds":"197,109 122x34"},{"score":0.516,"uia":"\u003CText\u003E \uB098\uB3C4 \uC5B4\uB4DC\uBBF8","ccaType":"DyText","bounds":"247,191 4x7"}]}
+{"ts":"2026-04-15T15:11:42.5435450Z","matched":1,"synthetic":43,"avgScore":0.436,"total":344,"topMatches":[{"score":0.436,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyIcon","bounds":"227,0 373x92"}]}
+{"ts":"2026-04-15T15:11:43.2461767Z","matched":1,"synthetic":46,"avgScore":0.293,"total":347,"topMatches":[{"score":0.293,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyIcon","bounds":"227,0 373x45"}]}
+{"ts":"2026-04-15T15:11:43.8405188Z","matched":1,"synthetic":48,"avgScore":0.311,"total":349,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:44.4282138Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:45.1242436Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:45.6882633Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:46.3968593Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:46.9544793Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:47.5424651Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:48.1966799Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:48.7844031Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:49.5051081Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:50.0862611Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:50.8202668Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:51.4201956Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:52.1400842Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:52.7345311Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:53.2857942Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:53.9712699Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:54.5705505Z","matched":1,"synthetic":70,"avgScore":0.311,"total":371,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:55.3162192Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:56.0734287Z","matched":1,"synthetic":69,"avgScore":0.311,"total":370,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:11:57.0002493Z","matched":1,"synthetic":68,"avgScore":0.311,"total":369,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"583,79 9x3"}]}
+{"ts":"2026-04-15T15:12:33.7353157Z","matched":1,"synthetic":85,"avgScore":0.806,"total":86,"topMatches":[{"score":0.806,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyNoise","bounds":"208,90 7x20"}]}
+{"ts":"2026-04-15T15:12:33.8976877Z","matched":1,"synthetic":85,"avgScore":0.806,"total":86,"topMatches":[{"score":0.806,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyNoise","bounds":"208,90 7x20"}]}
+{"ts":"2026-04-15T15:12:34.0490403Z","matched":1,"synthetic":85,"avgScore":0.806,"total":86,"topMatches":[{"score":0.806,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyNoise","bounds":"208,90 7x20"}]}
+{"ts":"2026-04-15T15:12:34.1825017Z","matched":1,"synthetic":85,"avgScore":0.806,"total":86,"topMatches":[{"score":0.806,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyNoise","bounds":"208,90 7x20"}]}
+{"ts":"2026-04-15T15:12:42.4542878Z","matched":1,"synthetic":86,"avgScore":0.354,"total":87,"topMatches":[{"score":0.354,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,82 223x36"}]}
+{"ts":"2026-04-15T15:12:42.6352300Z","matched":1,"synthetic":86,"avgScore":0.354,"total":87,"topMatches":[{"score":0.354,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,82 223x36"}]}
+{"ts":"2026-04-15T15:12:42.7740888Z","matched":1,"synthetic":86,"avgScore":0.354,"total":87,"topMatches":[{"score":0.354,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,82 223x36"}]}
+{"ts":"2026-04-15T15:12:42.9258903Z","matched":1,"synthetic":86,"avgScore":0.354,"total":87,"topMatches":[{"score":0.354,"uia":"\u003CEdit\u003E Terminal 3, powershell Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,82 223x36"}]}
+{"ts":"2026-04-15T15:12:47.1072673Z","matched":1,"synthetic":133,"avgScore":0.364,"total":134,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,170 187x36"}]}
+{"ts":"2026-04-15T15:12:47.2701567Z","matched":1,"synthetic":133,"avgScore":0.364,"total":134,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,170 187x36"}]}
+{"ts":"2026-04-15T15:12:47.4226643Z","matched":1,"synthetic":133,"avgScore":0.364,"total":134,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,170 187x36"}]}
+{"ts":"2026-04-15T15:12:47.5631715Z","matched":1,"synthetic":133,"avgScore":0.364,"total":134,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,170 187x36"}]}
+{"ts":"2026-04-15T15:12:47.7074511Z","matched":1,"synthetic":133,"avgScore":0.364,"total":134,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,170 187x36"}]}
+{"ts":"2026-04-15T15:12:52.6394855Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:52.8144212Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:52.9532994Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.0925124Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.2504486Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.3956164Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.5424071Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.6803745Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.8382464Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:53.9834588Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.1227774Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.2682932Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.4019677Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.5406665Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.6934528Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.8263294Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:54.9723833Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.1163638Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.2810806Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.4393073Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.5906863Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.7345850Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:55.8814886Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:56.0456697Z","matched":1,"synthetic":96,"avgScore":0.378,"total":97,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:58.9649959Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.1218528Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.2612036Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.4073217Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.6072427Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.7452702Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:12:59.8969272Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.0361506Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.1756154Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.3214705Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.4799141Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.6252758Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.7650769Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:00.9096912Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.0786033Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.2116100Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.3638199Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.5641990Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.7024051Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:01.8481892Z","matched":1,"synthetic":112,"avgScore":0.378,"total":113,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:13:09.2544502Z","matched":1,"synthetic":8,"avgScore":0.838,"total":10,"topMatches":[{"score":0.838,"uia":"\u003CGroup\u003E Extension: C# Dev Kit","ccaType":"DyIcon","bounds":"27,0 201x45"}]}
+{"ts":"2026-04-15T15:13:09.5323850Z","matched":1,"synthetic":8,"avgScore":0.838,"total":10,"topMatches":[{"score":0.838,"uia":"\u003CGroup\u003E Extension: C# Dev Kit","ccaType":"DyIcon","bounds":"27,0 201x45"}]}
+{"ts":"2026-04-15T15:14:53.7472101Z","matched":11,"synthetic":103,"avgScore":0.519,"total":404,"topMatches":[{"score":0.782,"uia":"\u003CText\u003E Thought for 2s","ccaType":"DyIcon","bounds":"211,97 138x30"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"235,269 2x7"},{"score":0.718,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"182,29 418x34"},{"score":0.525,"uia":"\u003CText\u003E Bash ","ccaType":"DyNoise","bounds":"238,231 4x3"},{"score":0.506,"uia":"\u003CText\u003E \uC0AC\uC6A9\uC790 \uBCC0\uC218","ccaType":"DyText","bounds":"290,178 3x6"}]}
+{"ts":"2026-04-15T15:14:54.4309639Z","matched":11,"synthetic":103,"avgScore":0.519,"total":404,"topMatches":[{"score":0.782,"uia":"\u003CText\u003E Thought for 2s","ccaType":"DyIcon","bounds":"211,97 138x30"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"235,269 2x7"},{"score":0.718,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"182,29 418x34"},{"score":0.525,"uia":"\u003CText\u003E Bash ","ccaType":"DyNoise","bounds":"238,231 4x3"},{"score":0.506,"uia":"\u003CText\u003E \uC0AC\uC6A9\uC790 \uBCC0\uC218","ccaType":"DyText","bounds":"290,178 3x6"}]}
+{"ts":"2026-04-15T15:14:55.2750207Z","matched":11,"synthetic":103,"avgScore":0.519,"total":404,"topMatches":[{"score":0.782,"uia":"\u003CText\u003E Thought for 2s","ccaType":"DyIcon","bounds":"211,97 138x30"},{"score":0.749,"uia":"\u003CText\u003E IN","ccaType":"DyNoise","bounds":"235,269 2x7"},{"score":0.718,"uia":"\u003CText\u003E \uC65C \uC2DC\uC2A4\uD15C \uD658\uACBD\uBCC0\uC218\uB294 \uC124\uC815\uC774 \uC548\uB420\uAE4C\uC694? \u3160","ccaType":"DyIcon","bounds":"182,29 418x34"},{"score":0.525,"uia":"\u003CText\u003E Bash ","ccaType":"DyNoise","bounds":"238,231 4x3"},{"score":0.506,"uia":"\u003CText\u003E \uC0AC\uC6A9\uC790 \uBCC0\uC218","ccaType":"DyText","bounds":"290,178 3x6"}]}
+{"ts":"2026-04-15T15:15:03.3971194Z","matched":1,"synthetic":69,"avgScore":0.364,"total":370,"topMatches":[{"score":0.364,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyNoise","bounds":"419,64 5x2"}]}
+{"ts":"2026-04-15T15:15:03.9841592Z","matched":1,"synthetic":71,"avgScore":0.364,"total":372,"topMatches":[{"score":0.364,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyNoise","bounds":"419,64 5x2"}]}
+{"ts":"2026-04-15T15:15:04.7678340Z","matched":1,"synthetic":71,"avgScore":0.364,"total":372,"topMatches":[{"score":0.364,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyNoise","bounds":"419,64 5x2"}]}
+{"ts":"2026-04-15T15:16:06.6465749Z","matched":1,"synthetic":126,"avgScore":0.378,"total":127,"topMatches":[{"score":0.378,"uia":"\u003CEdit\u003E Terminal 3, cmd Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 703x28"}]}
+{"ts":"2026-04-15T15:16:38.1869509Z","matched":1,"synthetic":84,"avgScore":0.311,"total":385,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"586,80 9x3"}]}
+{"ts":"2026-04-15T15:16:39.2495876Z","matched":1,"synthetic":84,"avgScore":0.311,"total":385,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"586,80 9x3"}]}
+{"ts":"2026-04-15T15:16:40.1706579Z","matched":1,"synthetic":84,"avgScore":0.311,"total":385,"topMatches":[{"score":0.311,"uia":"\u003CText\u003E powershell.exe -Command \u0022\u22EF","ccaType":"DyText","bounds":"586,80 9x3"}]}
+{"ts":"2026-04-15T15:16:50.8483799Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.0451841Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.2025209Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.3595483Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.5046742Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.7015906Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:51.9212513Z","matched":1,"synthetic":132,"avgScore":0.364,"total":133,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:16:55.5562066Z","matched":1,"synthetic":134,"avgScore":0.351,"total":135,"topMatches":[{"score":0.351,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 232x29"}]}
+{"ts":"2026-04-15T15:16:55.7666684Z","matched":1,"synthetic":134,"avgScore":0.351,"total":135,"topMatches":[{"score":0.351,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 232x29"}]}
+{"ts":"2026-04-15T15:16:57.5453007Z","matched":1,"synthetic":134,"avgScore":0.349,"total":135,"topMatches":[{"score":0.349,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 241x29"}]}
+{"ts":"2026-04-15T15:16:57.7028882Z","matched":1,"synthetic":134,"avgScore":0.349,"total":135,"topMatches":[{"score":0.349,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 241x29"}]}
+{"ts":"2026-04-15T15:16:57.8623977Z","matched":1,"synthetic":134,"avgScore":0.349,"total":135,"topMatches":[{"score":0.349,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 241x29"}]}
+{"ts":"2026-04-15T15:17:02.0473431Z","matched":1,"synthetic":234,"avgScore":0.364,"total":235,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:17:02.2106161Z","matched":1,"synthetic":234,"avgScore":0.364,"total":235,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T15:17:02.3563440Z","matched":1,"synthetic":234,"avgScore":0.364,"total":235,"topMatches":[{"score":0.364,"uia":"\u003CEdit\u003E Terminal 2, PowerShell Extension Run the command: Toggle Screen Reader Accessibility Mode for an optimized screen reader experience Use Alt\u002BF1 for terminal accessibility help","ccaType":"DyIcon","bounds":"0,258 187x29"}]}
+{"ts":"2026-04-15T16:20:11.2046251Z","matched":0,"synthetic":43,"avgScore":0,"total":344,"topMatches":[]}
+{"ts":"2026-04-15T16:20:12.0639615Z","matched":0,"synthetic":47,"avgScore":0,"total":348,"topMatches":[]}
+{"ts":"2026-04-15T16:20:13.1792688Z","matched":0,"synthetic":46,"avgScore":0,"total":347,"topMatches":[]}
+{"ts":"2026-04-15T16:20:14.4325253Z","matched":0,"synthetic":47,"avgScore":0,"total":348,"topMatches":[]}
+{"ts":"2026-04-15T16:20:52.3910818Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:53.2868386Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:54.5174685Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:55.9825702Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:56.7846618Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:58.0134365Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:20:59.0077496Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:21:00.1959281Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:21:01.0554711Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:21:02.2136157Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:21:03.1461476Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:21:06.6670720Z","matched":0,"synthetic":102,"avgScore":0,"total":403,"topMatches":[]}
+{"ts":"2026-04-15T16:21:36.9424220Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:21:38.5185701Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:21:39.7900789Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:21:41.1964810Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:21:49.5643123Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:21:50.4909998Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:21:51.7743285Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:21:52.6103814Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:21:54.3552124Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:22:01.5426686Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:22:05.9462353Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:22:11.8609832Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:22:12.6780368Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:22:13.6538177Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:22:14.3751931Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:22:15.2166256Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:22:50.3175528Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:23:08.1991729Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:23:09.1070866Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:23:10.3450239Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:23:11.7585789Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:23:12.5185464Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:23:13.3921584Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:23:14.2937163Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:23:15.5596065Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:23:16.3050241Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:23:17.2020468Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:23:18.1004968Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:23:18.8443594Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:23:19.9050266Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:23:21.3652451Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:23:22.1291745Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:23:23.3040845Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:23:24.0734930Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:23:25.1574899Z","matched":0,"synthetic":118,"avgScore":0,"total":419,"topMatches":[]}
+{"ts":"2026-04-15T16:23:25.9221395Z","matched":0,"synthetic":116,"avgScore":0,"total":417,"topMatches":[]}
+{"ts":"2026-04-15T16:23:27.2538266Z","matched":0,"synthetic":158,"avgScore":0,"total":459,"topMatches":[]}
+{"ts":"2026-04-15T16:23:46.4861998Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-15T16:23:54.3814397Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:23:55.3748136Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:23:56.2779217Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:23:57.3080474Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:23:58.2733625Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:23:59.2957136Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:24:00.2645550Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:24:01.1920435Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:24:02.1422253Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:24:03.1244138Z","matched":0,"synthetic":99,"avgScore":0,"total":400,"topMatches":[]}
+{"ts":"2026-04-15T16:24:04.0819324Z","matched":0,"synthetic":99,"avgScore":0,"total":400,"topMatches":[]}
+{"ts":"2026-04-15T16:24:05.1781851Z","matched":0,"synthetic":104,"avgScore":0,"total":405,"topMatches":[]}
+{"ts":"2026-04-15T16:24:35.0743718Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:24:35.8141863Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:24:39.3408587Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:24:40.2360638Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:24:42.7698211Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:24:44.8176644Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:24:45.5448354Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:24:46.5874025Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:24:47.2469594Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:24:48.3202583Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:24:51.5376779Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:24:52.3732708Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:24:53.1019189Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:24:59.7732671Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:00.7122654Z","matched":0,"synthetic":95,"avgScore":0,"total":396,"topMatches":[]}
+{"ts":"2026-04-15T16:25:01.8515915Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:25:02.8006023Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:25:03.7159995Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:25:04.4422987Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:25:05.4306902Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:25:06.1452772Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:25:07.1574976Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:25:07.9152943Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:25:08.8779739Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:25:09.7083406Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:25:10.7208066Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:25:11.6305888Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:25:12.8011299Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:25:47.4328423Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:25:48.4261174Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:49.6625715Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:25:50.8435857Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:25:51.6619014Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:25:52.4365864Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:25:53.1040363Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:54.0851595Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:54.7288913Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:25:55.7086956Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:56.3751915Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:25:57.4478966Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:58.2434169Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:25:59.4292285Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:26:46.4194267Z","matched":0,"synthetic":55,"avgScore":0,"total":356,"topMatches":[]}
+{"ts":"2026-04-15T16:26:53.7733235Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:26:57.0451123Z","matched":0,"synthetic":45,"avgScore":0,"total":346,"topMatches":[]}
+{"ts":"2026-04-15T16:26:57.7602327Z","matched":0,"synthetic":46,"avgScore":0,"total":347,"topMatches":[]}
+{"ts":"2026-04-15T16:26:58.8090689Z","matched":0,"synthetic":46,"avgScore":0,"total":347,"topMatches":[]}
+{"ts":"2026-04-15T16:26:59.5350504Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:27:00.3594843Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:27:01.1658319Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:27:01.9284930Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:27:03.0075800Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:27:03.7168589Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:27:04.7167701Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:27:05.7529003Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:27:06.7761994Z","matched":0,"synthetic":55,"avgScore":0,"total":356,"topMatches":[]}
+{"ts":"2026-04-15T16:27:07.5460675Z","matched":0,"synthetic":55,"avgScore":0,"total":356,"topMatches":[]}
+{"ts":"2026-04-15T16:27:11.1536929Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:27:12.0133692Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:27:13.2675941Z","matched":0,"synthetic":100,"avgScore":0,"total":401,"topMatches":[]}
+{"ts":"2026-04-15T16:27:14.6370427Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:27:16.4847492Z","matched":0,"synthetic":98,"avgScore":0,"total":399,"topMatches":[]}
+{"ts":"2026-04-15T16:27:17.5843059Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:27:19.2369832Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:27:20.2362116Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:27:21.9087217Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:27:23.5441349Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:27:24.5587185Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:28:08.3260742Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:28:09.3324691Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:28:10.3500978Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:28:11.4281689Z","matched":0,"synthetic":93,"avgScore":0,"total":394,"topMatches":[]}
+{"ts":"2026-04-15T16:28:26.0210733Z","matched":0,"synthetic":106,"avgScore":0,"total":407,"topMatches":[]}
+{"ts":"2026-04-15T16:28:35.1501398Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:28:36.0526915Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:36.8953500Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:28:37.6834482Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:38.7069950Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:28:39.4038780Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:28:40.4289701Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:41.1733097Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:28:42.3546964Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:43.1858205Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:28:44.2271932Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:44.9415796Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:28:45.9711370Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:28:46.6861771Z","matched":0,"synthetic":90,"avgScore":0,"total":391,"topMatches":[]}
+{"ts":"2026-04-15T16:28:47.7829576Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:28:48.5664798Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:28:49.8014353Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:29:36.3126844Z","matched":0,"synthetic":144,"avgScore":0,"total":445,"topMatches":[]}
+{"ts":"2026-04-15T16:29:38.8094454Z","matched":0,"synthetic":99,"avgScore":0,"total":400,"topMatches":[]}
+{"ts":"2026-04-15T16:29:39.8294702Z","matched":0,"synthetic":99,"avgScore":0,"total":400,"topMatches":[]}
+{"ts":"2026-04-15T16:29:49.9026118Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:29:50.6103376Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:29:54.5733193Z","matched":0,"synthetic":94,"avgScore":0,"total":395,"topMatches":[]}
+{"ts":"2026-04-15T16:29:59.8570670Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:00.8878713Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:01.5970182Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:30:02.6321521Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:30:03.4810110Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:30:04.4863585Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:05.2073365Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:30:06.2430338Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:06.9829122Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:07.9456515Z","matched":0,"synthetic":94,"avgScore":0,"total":395,"topMatches":[]}
+{"ts":"2026-04-15T16:30:08.8492783Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:30:09.8979975Z","matched":0,"synthetic":121,"avgScore":0,"total":422,"topMatches":[]}
+{"ts":"2026-04-15T16:30:10.6972406Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:30:11.6900431Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:30:12.5158780Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:30:13.8409739Z","matched":0,"synthetic":105,"avgScore":0,"total":406,"topMatches":[]}
+{"ts":"2026-04-15T16:30:56.9106034Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:30:58.0664036Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:30:59.3879929Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:31:00.5157646Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:31:01.5393027Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:02.2779603Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:03.3015024Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:03.9562041Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:31:04.8166473Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:31:05.6291865Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:06.3677149Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:07.2524167Z","matched":0,"synthetic":82,"avgScore":0,"total":383,"topMatches":[]}
+{"ts":"2026-04-15T16:31:07.9919847Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:31:09.0644550Z","matched":0,"synthetic":82,"avgScore":0,"total":383,"topMatches":[]}
+{"ts":"2026-04-15T16:31:09.9015013Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:31:11.0707307Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:32:11.9561086Z","matched":1,"synthetic":97,"avgScore":0.194,"total":398,"topMatches":[{"score":0.194,"uia":"\u003CButton\u003E Review and handoff from previous session","ccaType":"DyIcon","bounds":"306,13 294x25"}]}
+{"ts":"2026-04-15T16:32:12.8084082Z","matched":1,"synthetic":97,"avgScore":0.194,"total":398,"topMatches":[{"score":0.194,"uia":"\u003CButton\u003E Review and handoff from previous session","ccaType":"DyIcon","bounds":"306,13 294x25"}]}
+{"ts":"2026-04-15T16:32:17.2541393Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:32:18.0303135Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:32:19.0724461Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:19.7626643Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:32:20.8414258Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:32:21.5688288Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:32:22.6467130Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:32:23.4284970Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:32:24.4828657Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:32:25.2158034Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:32:26.3427933Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:32:31.2058368Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:32:32.2451469Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:32:37.4692382Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:32:38.4688816Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:32:39.6871529Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:32:46.8547297Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:32:48.1206311Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:32:49.0844413Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:32:50.0409535Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:32:51.0277692Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:51.9495408Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:52.7194841Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:32:53.7795557Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:54.5122591Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:55.5184310Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:32:56.2993426Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:57.3481997Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:32:58.1294846Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:59.1720584Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:32:59.9228943Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:33:00.9284502Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:33:01.7226198Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:33:02.5643508Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:33:03.3285852Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:33:04.5068037Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:33:28.8794354Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-15T16:33:32.9859894Z","matched":0,"synthetic":126,"avgScore":0,"total":427,"topMatches":[]}
+{"ts":"2026-04-15T16:33:35.1770611Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:35.3762934Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:35.5571701Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:35.7327256Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:36.0302953Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:36.3712179Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:36.6666469Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:36.8487716Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:37.0299240Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:37.2505315Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:37.4482689Z","matched":10,"synthetic":94,"avgScore":0.619,"total":110,"topMatches":[{"score":0.894,"uia":"\u003CText\u003E Shift","ccaType":"DyText","bounds":"80,174 28x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"46,148 23x16"},{"score":0.871,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"38,174 23x16"},{"score":0.819,"uia":"\u003CText\u003E Ctrl","ccaType":"DyText","bounds":"85,201 23x16"},{"score":0.8,"uia":"\u003CText\u003E Alt","ccaType":"DyText","bounds":"87,148 21x16"}]}
+{"ts":"2026-04-15T16:33:40.0839929Z","matched":0,"synthetic":113,"avgScore":0,"total":414,"topMatches":[]}
+{"ts":"2026-04-15T16:33:41.0541209Z","matched":0,"synthetic":113,"avgScore":0,"total":414,"topMatches":[]}
+{"ts":"2026-04-15T16:33:42.4909054Z","matched":0,"synthetic":113,"avgScore":0,"total":414,"topMatches":[]}
+{"ts":"2026-04-15T16:33:45.4834634Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:46.5205080Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:47.5197470Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:48.8328860Z","matched":0,"synthetic":107,"avgScore":0,"total":408,"topMatches":[]}
+{"ts":"2026-04-15T16:33:50.6303656Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:52.0935167Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:53.0646733Z","matched":0,"synthetic":110,"avgScore":0,"total":411,"topMatches":[]}
+{"ts":"2026-04-15T16:33:54.8932842Z","matched":0,"synthetic":113,"avgScore":0,"total":414,"topMatches":[]}
+{"ts":"2026-04-15T16:35:36.8834340Z","matched":0,"synthetic":177,"avgScore":0,"total":478,"topMatches":[]}
+{"ts":"2026-04-15T16:35:48.6786818Z","matched":0,"synthetic":165,"avgScore":0,"total":466,"topMatches":[]}
+{"ts":"2026-04-15T16:35:49.8892529Z","matched":0,"synthetic":165,"avgScore":0,"total":466,"topMatches":[]}
+{"ts":"2026-04-15T16:35:50.8478731Z","matched":0,"synthetic":165,"avgScore":0,"total":466,"topMatches":[]}
+{"ts":"2026-04-15T16:35:52.3085849Z","matched":0,"synthetic":158,"avgScore":0,"total":459,"topMatches":[]}
+{"ts":"2026-04-15T16:35:59.8190540Z","matched":0,"synthetic":97,"avgScore":0,"total":398,"topMatches":[]}
+{"ts":"2026-04-15T16:36:00.8944414Z","matched":0,"synthetic":97,"avgScore":0,"total":398,"topMatches":[]}
+{"ts":"2026-04-15T16:36:02.4201282Z","matched":0,"synthetic":99,"avgScore":0,"total":400,"topMatches":[]}
+{"ts":"2026-04-15T16:36:07.1623082Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:36:19.3782928Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:20.3670289Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:21.5525475Z","matched":0,"synthetic":50,"avgScore":0,"total":351,"topMatches":[]}
+{"ts":"2026-04-15T16:36:22.4455029Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:23.6377347Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:24.4309922Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:25.6198128Z","matched":0,"synthetic":51,"avgScore":0,"total":352,"topMatches":[]}
+{"ts":"2026-04-15T16:36:26.4201331Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:36:27.6325891Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:36:28.9486197Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:36:50.3347271Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:36:52.4203162Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:37:07.2756471Z","matched":0,"synthetic":105,"avgScore":0,"total":406,"topMatches":[]}
+{"ts":"2026-04-15T16:37:08.3724856Z","matched":0,"synthetic":105,"avgScore":0,"total":406,"topMatches":[]}
+{"ts":"2026-04-15T16:37:15.6108872Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:15.8951641Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:19.3620890Z","matched":0,"synthetic":42,"avgScore":0,"total":54,"topMatches":[]}
+{"ts":"2026-04-15T16:37:20.4648242Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:20.7069566Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:20.8760008Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:21.0399479Z","matched":0,"synthetic":39,"avgScore":0,"total":51,"topMatches":[]}
+{"ts":"2026-04-15T16:37:21.3670660Z","matched":0,"synthetic":40,"avgScore":0,"total":52,"topMatches":[]}
+{"ts":"2026-04-15T16:37:26.6578712Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:26.8628935Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:27.0286745Z","matched":0,"synthetic":30,"avgScore":0,"total":42,"topMatches":[]}
+{"ts":"2026-04-15T16:37:27.2387571Z","matched":0,"synthetic":23,"avgScore":0,"total":35,"topMatches":[]}
+{"ts":"2026-04-15T16:37:27.5235698Z","matched":0,"synthetic":23,"avgScore":0,"total":35,"topMatches":[]}
+{"ts":"2026-04-15T16:37:27.8027288Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:28.1469257Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:28.3899301Z","matched":0,"synthetic":22,"avgScore":0,"total":34,"topMatches":[]}
+{"ts":"2026-04-15T16:37:28.6078961Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:28.8267678Z","matched":0,"synthetic":20,"avgScore":0,"total":32,"topMatches":[]}
+{"ts":"2026-04-15T16:37:29.0315606Z","matched":0,"synthetic":20,"avgScore":0,"total":32,"topMatches":[]}
+{"ts":"2026-04-15T16:37:29.2133530Z","matched":0,"synthetic":22,"avgScore":0,"total":34,"topMatches":[]}
+{"ts":"2026-04-15T16:37:29.5711525Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:29.8927421Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:30.1596969Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:30.3773705Z","matched":0,"synthetic":22,"avgScore":0,"total":34,"topMatches":[]}
+{"ts":"2026-04-15T16:37:30.6077948Z","matched":0,"synthetic":21,"avgScore":0,"total":33,"topMatches":[]}
+{"ts":"2026-04-15T16:37:30.8135409Z","matched":0,"synthetic":24,"avgScore":0,"total":36,"topMatches":[]}
+{"ts":"2026-04-15T16:37:31.0491553Z","matched":0,"synthetic":23,"avgScore":0,"total":35,"topMatches":[]}
+{"ts":"2026-04-15T16:37:31.3282381Z","matched":0,"synthetic":25,"avgScore":0,"total":37,"topMatches":[]}
+{"ts":"2026-04-15T16:37:31.7338563Z","matched":0,"synthetic":23,"avgScore":0,"total":35,"topMatches":[]}
+{"ts":"2026-04-15T16:37:31.9217822Z","matched":0,"synthetic":23,"avgScore":0,"total":35,"topMatches":[]}
+{"ts":"2026-04-15T16:37:32.1040734Z","matched":0,"synthetic":24,"avgScore":0,"total":36,"topMatches":[]}
+{"ts":"2026-04-15T16:37:32.3223730Z","matched":0,"synthetic":25,"avgScore":0,"total":37,"topMatches":[]}
+{"ts":"2026-04-15T16:37:32.5291747Z","matched":0,"synthetic":24,"avgScore":0,"total":36,"topMatches":[]}
+{"ts":"2026-04-15T16:37:32.7461498Z","matched":0,"synthetic":25,"avgScore":0,"total":37,"topMatches":[]}
+{"ts":"2026-04-15T16:37:32.9586811Z","matched":0,"synthetic":24,"avgScore":0,"total":36,"topMatches":[]}
+{"ts":"2026-04-15T16:37:33.3335458Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:33.6917150Z","matched":0,"synthetic":29,"avgScore":0,"total":41,"topMatches":[]}
+{"ts":"2026-04-15T16:37:33.9576726Z","matched":0,"synthetic":27,"avgScore":0,"total":39,"topMatches":[]}
+{"ts":"2026-04-15T16:37:34.1757785Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:34.3766300Z","matched":0,"synthetic":29,"avgScore":0,"total":41,"topMatches":[]}
+{"ts":"2026-04-15T16:37:34.5950664Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:34.8696221Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:35.1331538Z","matched":0,"synthetic":28,"avgScore":0,"total":40,"topMatches":[]}
+{"ts":"2026-04-15T16:37:35.5461863Z","matched":0,"synthetic":27,"avgScore":0,"total":39,"topMatches":[]}
+{"ts":"2026-04-15T16:37:35.8620219Z","matched":0,"synthetic":31,"avgScore":0,"total":43,"topMatches":[]}
+{"ts":"2026-04-15T16:37:36.0854168Z","matched":0,"synthetic":29,"avgScore":0,"total":41,"topMatches":[]}
+{"ts":"2026-04-15T16:37:36.3155399Z","matched":0,"synthetic":29,"avgScore":0,"total":41,"topMatches":[]}
+{"ts":"2026-04-15T16:37:36.5715276Z","matched":0,"synthetic":25,"avgScore":0,"total":37,"topMatches":[]}
+{"ts":"2026-04-15T16:37:36.8308381Z","matched":0,"synthetic":24,"avgScore":0,"total":36,"topMatches":[]}
+{"ts":"2026-04-15T16:38:15.1928243Z","matched":0,"synthetic":91,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-15T16:38:21.7972890Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:38:23.9365910Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:38:24.8383643Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:38:25.8084335Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:38:26.5592503Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:38:35.5774304Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:38:36.6964665Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:38:45.0837885Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
+{"ts":"2026-04-15T16:38:55.9240981Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:38:56.8803760Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:38:59.6671435Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:39:04.7380182Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:39:13.8345102Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:39:14.7963506Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:39:15.6748211Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:39:16.7111403Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:39:20.0317854Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:39:27.6424335Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:39:28.6844065Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:39:29.5929824Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:39:30.5331112Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:39:31.4769302Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:39:32.4410686Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:39:33.6046576Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:39:34.5125756Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:39:35.6104214Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:39:36.4768079Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:39:37.5486187Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:39:38.3608983Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:39:39.4274246Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:39:40.2814488Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:39:41.3969695Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:39:42.2976041Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:39:43.5677022Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:40:07.1335139Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:40:08.7311918Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:40:10.1465026Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:40:18.4683350Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:40:19.5056070Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:40:21.0509700Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:40:24.0842708Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:40:26.2283924Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:40:27.9252525Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:40:29.1975465Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:40:30.3789982Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:40:31.5412879Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:40:32.3664742Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:40:33.5109508Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:40:34.3774881Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:40:35.4323427Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:40:36.2382853Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:40:37.3348736Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:40:38.1471027Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:40:39.2734064Z","matched":0,"synthetic":56,"avgScore":0,"total":357,"topMatches":[]}
+{"ts":"2026-04-15T16:40:40.5941855Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:40:59.9182438Z","matched":0,"synthetic":82,"avgScore":0,"total":383,"topMatches":[]}
+{"ts":"2026-04-15T16:41:00.8289571Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:41:01.9614524Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:41:03.1747154Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:41:04.4265046Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:41:05.8218178Z","matched":0,"synthetic":101,"avgScore":0,"total":402,"topMatches":[]}
+{"ts":"2026-04-15T16:41:07.5186041Z","matched":0,"synthetic":95,"avgScore":0,"total":396,"topMatches":[]}
+{"ts":"2026-04-15T16:41:09.8029056Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:41:15.4447817Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:41:19.9266162Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:41:21.7098626Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:41:23.3922305Z","matched":0,"synthetic":75,"avgScore":0,"total":376,"topMatches":[]}
+{"ts":"2026-04-15T16:41:24.9001254Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:41:26.5371843Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:41:28.1317861Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:41:29.7046275Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:41:30.6486502Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:41:32.0492649Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:41:55.0350805Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:41:56.0958756Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:41:57.6208362Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:42:01.9121372Z","matched":0,"synthetic":96,"avgScore":0,"total":397,"topMatches":[]}
+{"ts":"2026-04-15T16:42:05.1276045Z","matched":0,"synthetic":111,"avgScore":0,"total":412,"topMatches":[]}
+{"ts":"2026-04-15T16:42:06.1751122Z","matched":0,"synthetic":140,"avgScore":0,"total":441,"topMatches":[]}
+{"ts":"2026-04-15T16:42:07.6309032Z","matched":0,"synthetic":157,"avgScore":0,"total":458,"topMatches":[]}
+{"ts":"2026-04-15T16:42:08.7701271Z","matched":0,"synthetic":131,"avgScore":0,"total":432,"topMatches":[]}
+{"ts":"2026-04-15T16:42:10.1040516Z","matched":0,"synthetic":133,"avgScore":0,"total":434,"topMatches":[]}
+{"ts":"2026-04-15T16:42:11.2715592Z","matched":0,"synthetic":122,"avgScore":0,"total":423,"topMatches":[]}
+{"ts":"2026-04-15T16:42:12.3864206Z","matched":0,"synthetic":121,"avgScore":0,"total":422,"topMatches":[]}
+{"ts":"2026-04-15T16:42:13.7009391Z","matched":0,"synthetic":121,"avgScore":0,"total":422,"topMatches":[]}
+{"ts":"2026-04-15T16:42:14.5799275Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-15T16:42:15.8110608Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-15T16:42:17.2762732Z","matched":0,"synthetic":102,"avgScore":0,"total":403,"topMatches":[]}
+{"ts":"2026-04-15T16:42:18.3382200Z","matched":0,"synthetic":102,"avgScore":0,"total":403,"topMatches":[]}
+{"ts":"2026-04-15T16:42:19.5121278Z","matched":0,"synthetic":105,"avgScore":0,"total":406,"topMatches":[]}
+{"ts":"2026-04-15T16:42:20.3914314Z","matched":0,"synthetic":107,"avgScore":0,"total":408,"topMatches":[]}
+{"ts":"2026-04-15T16:42:21.6748848Z","matched":0,"synthetic":106,"avgScore":0,"total":407,"topMatches":[]}
+{"ts":"2026-04-15T16:42:22.6460234Z","matched":0,"synthetic":106,"avgScore":0,"total":407,"topMatches":[]}
+{"ts":"2026-04-15T16:42:24.5361664Z","matched":0,"synthetic":134,"avgScore":0,"total":435,"topMatches":[]}
+{"ts":"2026-04-15T16:43:55.9335237Z","matched":0,"synthetic":151,"avgScore":0,"total":452,"topMatches":[]}
+{"ts":"2026-04-15T16:43:58.7864736Z","matched":0,"synthetic":156,"avgScore":0,"total":457,"topMatches":[]}
+{"ts":"2026-04-15T16:44:00.1030534Z","matched":0,"synthetic":156,"avgScore":0,"total":457,"topMatches":[]}
+{"ts":"2026-04-15T16:44:16.6823748Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:44:18.4448518Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:44:19.7495006Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:44:21.2409767Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:46:41.8836248Z","matched":0,"synthetic":89,"avgScore":0,"total":390,"topMatches":[]}
+{"ts":"2026-04-15T16:46:44.8119603Z","matched":0,"synthetic":88,"avgScore":0,"total":389,"topMatches":[]}
+{"ts":"2026-04-15T16:46:56.5529752Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:46:57.8373198Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:46:58.7544865Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:47:00.9463254Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:47:02.2967865Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:47:03.1154896Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:47:04.3833842Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:47:05.3379942Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:47:06.4792999Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:47:07.8497707Z","matched":0,"synthetic":81,"avgScore":0,"total":382,"topMatches":[]}
+{"ts":"2026-04-15T16:47:20.4289921Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:47:23.4556728Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:47:25.1542296Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:47:26.7640989Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:47:28.6614489Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:47:31.0952059Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:47:32.2128975Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:47:33.8409935Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:47:35.7848852Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:47:37.1546934Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:47:38.5126686Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:47:43.1971204Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:47:44.6292298Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:47:45.7402872Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:47:46.7746083Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:47:48.5276144Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:47:49.4915969Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:47:50.8673649Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:47:54.1869261Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:47:55.3163295Z","matched":0,"synthetic":80,"avgScore":0,"total":381,"topMatches":[]}
+{"ts":"2026-04-15T16:47:56.9019958Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:47:58.1466714Z","matched":0,"synthetic":1292,"avgScore":0,"total":1593,"topMatches":[]}
+{"ts":"2026-04-15T16:47:58.8784428Z","matched":0,"synthetic":1293,"avgScore":0,"total":1594,"topMatches":[]}
+{"ts":"2026-04-15T16:48:00.0669084Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:48:08.3339463Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:48:14.7099643Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:48:15.5575375Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:48:16.5977759Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:48:22.9960353Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:48:24.1530198Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:48:25.0984384Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:48:26.2190075Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:48:27.2124839Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:48:28.1247936Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:48:29.1153194Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:48:30.2612308Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:48:33.1221398Z","matched":2,"synthetic":61,"avgScore":0.603,"total":263,"topMatches":[{"score":0.729,"uia":"\u003CText\u003E Coalescing...","ccaType":"DyIcon","bounds":"173,137 97x23"},{"score":0.477,"uia":"\u003CText\u003E Queue another message\u2026","ccaType":"DyIcon","bounds":"166,184 434x39"}]}
+{"ts":"2026-04-15T16:48:34.2654861Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:48:35.0418494Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:48:36.0968717Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:48:36.9031982Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:48:38.1745230Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:48:38.9804969Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:48:40.1283170Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:48:41.7245568Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:49:09.1850311Z","matched":0,"synthetic":100,"avgScore":0,"total":401,"topMatches":[]}
+{"ts":"2026-04-15T16:49:13.0183252Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:49:14.1607363Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:49:15.7157901Z","matched":0,"synthetic":92,"avgScore":0,"total":393,"topMatches":[]}
+{"ts":"2026-04-15T16:49:19.6396202Z","matched":0,"synthetic":122,"avgScore":0,"total":423,"topMatches":[]}
+{"ts":"2026-04-15T16:49:21.2674989Z","matched":0,"synthetic":129,"avgScore":0,"total":430,"topMatches":[]}
+{"ts":"2026-04-15T16:49:22.8253436Z","matched":0,"synthetic":129,"avgScore":0,"total":430,"topMatches":[]}
+{"ts":"2026-04-15T16:49:24.1344642Z","matched":0,"synthetic":127,"avgScore":0,"total":428,"topMatches":[]}
+{"ts":"2026-04-15T16:49:26.1149815Z","matched":0,"synthetic":127,"avgScore":0,"total":428,"topMatches":[]}
+{"ts":"2026-04-15T16:49:27.5152702Z","matched":0,"synthetic":109,"avgScore":0,"total":410,"topMatches":[]}
+{"ts":"2026-04-15T16:49:30.3840235Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:49:34.6614796Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:49:35.9659108Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:49:48.1499669Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:50:01.7244195Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:50:02.4742952Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:50:03.5536195Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:50:04.3529160Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:50:05.4071402Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:50:06.1576949Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:50:07.2387951Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:50:07.9940348Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:50:09.1027768Z","matched":0,"synthetic":65,"avgScore":0,"total":366,"topMatches":[]}
+{"ts":"2026-04-15T16:50:09.9824536Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:50:11.0730485Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:50:12.0204037Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:50:13.0841461Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:50:14.0122350Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:50:22.8973255Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:50:23.7421278Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:50:25.2092087Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:50:26.0752651Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:50:28.3041963Z","matched":0,"synthetic":70,"avgScore":0,"total":371,"topMatches":[]}
+{"ts":"2026-04-15T16:50:29.2631522Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:50:33.2135253Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:50:34.4351598Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:50:38.1543862Z","matched":0,"synthetic":67,"avgScore":0,"total":368,"topMatches":[]}
+{"ts":"2026-04-15T16:50:43.2264675Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:50:46.0930051Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:50:54.3220441Z","matched":0,"synthetic":68,"avgScore":0,"total":369,"topMatches":[]}
+{"ts":"2026-04-15T16:50:56.1384386Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:50:58.0605466Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:00.9749692Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:02.2828891Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:07.1675407Z","matched":0,"synthetic":55,"avgScore":0,"total":356,"topMatches":[]}
+{"ts":"2026-04-15T16:51:08.2813025Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:09.4389782Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:10.8388858Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:51:12.2809303Z","matched":0,"synthetic":72,"avgScore":0,"total":373,"topMatches":[]}
+{"ts":"2026-04-15T16:51:13.6508717Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:51:15.4915269Z","matched":0,"synthetic":66,"avgScore":0,"total":367,"topMatches":[]}
+{"ts":"2026-04-15T16:51:16.7664291Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:51:17.8711607Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:51:18.9616559Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:51:20.1011682Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:51:21.2886124Z","matched":0,"synthetic":56,"avgScore":0,"total":357,"topMatches":[]}
+{"ts":"2026-04-15T16:51:22.5016159Z","matched":0,"synthetic":56,"avgScore":0,"total":357,"topMatches":[]}
+{"ts":"2026-04-15T16:51:24.6086598Z","matched":0,"synthetic":1342,"avgScore":0,"total":1643,"topMatches":[]}
+{"ts":"2026-04-15T16:51:27.6962934Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:30.4357805Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:51:31.8526784Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:32.9862078Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:34.2099367Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:35.5369798Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:36.7065012Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:38.0359326Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:51:39.4710713Z","matched":0,"synthetic":94,"avgScore":0,"total":395,"topMatches":[]}
+{"ts":"2026-04-15T16:51:41.0345804Z","matched":0,"synthetic":95,"avgScore":0,"total":396,"topMatches":[]}
+{"ts":"2026-04-15T16:51:42.5310679Z","matched":0,"synthetic":64,"avgScore":0,"total":365,"topMatches":[]}
+{"ts":"2026-04-15T16:51:44.2474055Z","matched":0,"synthetic":58,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-15T16:51:45.6939998Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:46.9776935Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:51:48.2761628Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:50.1118418Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:51:51.5361728Z","matched":0,"synthetic":63,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-15T16:51:52.8736877Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:51:54.2018160Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:51:55.5110550Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:51:56.9690156Z","matched":0,"synthetic":61,"avgScore":0,"total":362,"topMatches":[]}
+{"ts":"2026-04-15T16:51:58.2439320Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:51:59.6377274Z","matched":0,"synthetic":60,"avgScore":0,"total":361,"topMatches":[]}
+{"ts":"2026-04-15T16:52:01.6923731Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:52:02.9176582Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:52:04.2255425Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:52:05.4191093Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:52:06.8011592Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:52:08.0798942Z","matched":0,"synthetic":74,"avgScore":0,"total":375,"topMatches":[]}
+{"ts":"2026-04-15T16:52:09.3556832Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:52:10.7658646Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:52:12.5735668Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:52:14.6797415Z","matched":0,"synthetic":71,"avgScore":0,"total":372,"topMatches":[]}
+{"ts":"2026-04-15T16:52:16.3321798Z","matched":0,"synthetic":76,"avgScore":0,"total":377,"topMatches":[]}
+{"ts":"2026-04-15T16:52:18.0074771Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:52:19.5103846Z","matched":0,"synthetic":59,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-15T16:52:21.7059986Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:52:27.2626373Z","matched":0,"synthetic":62,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-15T16:52:30.9381641Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:52:36.1094797Z","matched":0,"synthetic":53,"avgScore":0,"total":354,"topMatches":[]}
+{"ts":"2026-04-15T16:52:41.0719414Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:52:43.0234934Z","matched":0,"synthetic":52,"avgScore":0,"total":353,"topMatches":[]}
+{"ts":"2026-04-15T16:52:45.1392431Z","matched":0,"synthetic":53,"avgScore":0,"total":354,"topMatches":[]}
+{"ts":"2026-04-15T16:52:47.8180548Z","matched":0,"synthetic":57,"avgScore":0,"total":358,"topMatches":[]}
+{"ts":"2026-04-15T16:52:52.7906124Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:52:57.3178953Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:52:58.9568902Z","matched":0,"synthetic":87,"avgScore":0,"total":388,"topMatches":[]}
+{"ts":"2026-04-15T16:53:00.5508658Z","matched":0,"synthetic":85,"avgScore":0,"total":386,"topMatches":[]}
+{"ts":"2026-04-15T16:53:02.2816791Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:53:03.7784070Z","matched":0,"synthetic":84,"avgScore":0,"total":385,"topMatches":[]}
+{"ts":"2026-04-15T16:53:05.4142645Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:53:08.0266931Z","matched":0,"synthetic":79,"avgScore":0,"total":380,"topMatches":[]}
+{"ts":"2026-04-15T16:53:34.7836966Z","matched":0,"synthetic":69,"avgScore":0,"total":370,"topMatches":[]}
+{"ts":"2026-04-15T16:53:36.1590807Z","matched":0,"synthetic":73,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-15T16:53:37.8075995Z","matched":0,"synthetic":77,"avgScore":0,"total":378,"topMatches":[]}
+{"ts":"2026-04-15T16:53:39.5404387Z","matched":0,"synthetic":78,"avgScore":0,"total":379,"topMatches":[]}
+{"ts":"2026-04-15T16:53:41.7519364Z","matched":0,"synthetic":83,"avgScore":0,"total":384,"topMatches":[]}
+{"ts":"2026-04-15T16:53:44.5814154Z","matched":0,"synthetic":86,"avgScore":0,"total":387,"topMatches":[]}
