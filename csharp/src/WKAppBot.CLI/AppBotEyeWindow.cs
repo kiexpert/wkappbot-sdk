@@ -38,6 +38,7 @@ internal sealed class AppBotEyeOverlay : Window
     private readonly TextBlock _titleText;
     private readonly DateTime _startTime = DateTime.Now;
     private DateTime _lastUpdate = DateTime.MinValue;
+    private DateTime _lastIdleReap = DateTime.MinValue;
     private DispatcherTimer? _cloakTimer;
     private DispatcherTimer? _scrollTimer; // auto-scroll timer
     private IntPtr _chromeHwnd;
@@ -419,6 +420,13 @@ internal sealed class AppBotEyeOverlay : Window
 
     private void OnCloakTick(object? sender, EventArgs e)
     {
+        // Once per minute: close sandbox tabs idle > 10 minutes
+        if ((DateTime.Now - _lastIdleReap).TotalMinutes >= 1)
+        {
+            _lastIdleReap = DateTime.Now;
+            _ = Task.Run(() => CdpTabManager.PurgeIdleTabsAsync(10));
+        }
+
         // Update title with live uptime
         var elapsed = DateTime.Now - _startTime;
         var uptime = elapsed.TotalHours >= 1
