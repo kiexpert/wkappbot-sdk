@@ -847,6 +847,7 @@ internal partial class Program
                             Console.ForegroundColor = ConsoleColor.Green;
                             Console.Error.WriteLine($"[A11Y] --eval-js OK: {jsResult}");
                             Console.ResetColor();
+                            Console.WriteLine(jsResult);
                             ok++;
                             continue; // JS succeeded — skip UIA/Win32
                         }
