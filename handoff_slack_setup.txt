@@ -1,4 +1,4 @@
-## Slack 앱봇알바생 워크스페이스 설정 — 미완료 인수인계
+﻿## Slack 앱봇알바생 워크스페이스 설정 — 미완료 인수인계
 
 ### 상황
 - 앱봇알바생 워크스페이스: 생성됨 (team_id: T0ANU3Y83D5? 또는 T0BHLLRA6QH)
@@ -39,7 +39,7 @@
 6. Basic Information → App-Level Tokens → Generate (scope: connections:write) → xapp-... 복사
 7. 채널명: #앱봇
 8. webhook.json 업데이트:
-   W:\SDK\bin\wkappbot.hq\profiles\slack_exp\webhook.json
+   D:\SDK\bin\wkappbot.hq\profiles\slack_exp\webhook.json
    → bot_token, app_token, channel, team_id, app_id 교체
 
 ### 웹봇 문제 (서제스트 등록됨)

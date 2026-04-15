@@ -1,4 +1,4 @@
-# Handoff 2026-03-28 Session
+﻿# Handoff 2026-03-28 Session
 
 ## CRITICAL: Eye not launching
 - wkappbot-core.exe starts (process visible) but Main() never reached
@@ -32,7 +32,7 @@
 1. Kill all wkappbot* processes
 2. Rebuild: dotnet publish WKAppBot.CLI.csproj -c Release
 3. Rebuild: dotnet publish WKAppBot.Launcher.csproj -c Release
-4. Deploy both to W:\SDK\bin\
+4. Deploy both to D:\SDK\bin\
 5. Launch: wkappbot eye
 6. Verify: wkappbot eye tick shows healthy output
 

@@ -1,4 +1,4 @@
-using FlaUI.Core.AutomationElements;
+﻿using FlaUI.Core.AutomationElements;
 
 namespace WKAppBot.Win32.Accessibility;
 
@@ -45,7 +45,7 @@ public sealed partial class UiaLocator
         CollectTextLeaves(element, leaves, 0, maxDepth);
         if (leaves.Count == 0) return "_(no text)_";
 
-        // Shorten file paths: "W:\foo\bar\baz\file.txt" → "W:\...\file.txt"
+        // Shorten file paths: "D:\foo\bar\baz\file.txt" → "D:\...\file.txt"
         for (int i = 0; i < leaves.Count; i++)
         {
             var t = leaves[i].text;

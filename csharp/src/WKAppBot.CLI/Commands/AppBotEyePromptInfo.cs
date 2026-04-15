@@ -1,11 +1,11 @@
-// AppBotEyePromptInfo.cs — Per-prompt-window CWD/display-name/last-output resolution.
+﻿// AppBotEyePromptInfo.cs — Per-prompt-window CWD/display-name/last-output resolution.
 // Single source of truth for all "hwnd → who is this? what are they doing?" queries.
 //
 // Key API:
 //   GetPromptDisplayInfo(hwnd)  → (displayName, lastLine, cwdLabel)
 //   GetLastOutputLine(text)     → last meaningful line from JSONL text
 //   ReadClotThoughtForCwd(cwd)  → most recent assistant output from JSONL session
-//   ExtractCwdFromVsCodeTitle() → "... - WKAppBot - Visual Studio Code" → W:\GitHub\WKAppBot
+//   ExtractCwdFromVsCodeTitle() → "... - WKAppBot - Visual Studio Code" → D:\GitHub\WKAppBot
 //   GetContextInfoForCwdEx()    → JSONL size → context usage %
 
 // FlaUI removed from Eye — ExtractCwdFromCodexWindow routed through MCP
@@ -90,7 +90,7 @@ internal partial class Program
     /// <summary>Resolve a project folder name to a full path via searchRoots + ~/.claude/projects/ reverse-map.</summary>
     static string? ResolveProjectFolderToPath(string folderName)
     {
-        var searchRoots = new[] { @"W:\GitHub", @"W:\HTS_Project", @"C:\Users\edenc\projects" };
+        var searchRoots = new[] { @"D:\GitHub", @"D:\HTS_Project", @"C:\Users\kiexp\projects" };
         if (_projectFolderPathCache.TryGetValue(folderName, out var cached))
             return cached;
 

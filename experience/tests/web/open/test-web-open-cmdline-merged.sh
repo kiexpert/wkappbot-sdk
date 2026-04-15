@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: cmdline Chrome ID merged -- WMI GetCommandLine + ResolvePidFromPort verified
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
 P=0; F=0
 
 echo "=== web open cmdline merged verification ==="

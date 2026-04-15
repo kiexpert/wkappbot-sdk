@@ -1,4 +1,4 @@
-{
+﻿{
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -69,7 +69,7 @@
       "Skill(update-config:*)"
     ],
     "additionalDirectories": [
-      "C:\\Users\\edenc\\.claude"
+      "C:\\Users\\kiexp\\.claude"
     ]
   }
 }

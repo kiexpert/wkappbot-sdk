@@ -1,11 +1,11 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-launcher-ansi-pipe.sh
 # Tests: launcher ansi codes are suppressed when stderr is redirected/piped
 # Verifies fix: DimStderrWriter._useAnsi=false when Console.IsErrorRedirected
 # Cmd ref: launcher ansi (DimStderrWriter in Launcher/HelpAndAliases.cs)
 
-WKBOT="${WKBOT:-W:/SDK/bin/wkappbot.exe}"
-SRC="${SRC:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/HelpAndAliases.cs}"
+WKBOT="${WKBOT:-D:/SDK/bin/wkappbot.exe}"
+SRC="${SRC:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/HelpAndAliases.cs}"
 
 if [ ! -f "$WKBOT" ]; then
   echo "[SKIP] wkappbot.exe not found at $WKBOT"

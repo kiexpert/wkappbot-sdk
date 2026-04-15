@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # ──────────────────────────────────────────────────────
 # daily_walk.sh — 자정 전 걷기 포인트 자동 수령
 # 대상 앱 3종: 경기도 기후행동, 모니모, 만보시루
@@ -14,7 +14,7 @@
 set -e
 WK="wkappbot a11y"
 ADB="adb://"
-OUTDIR="W:/SDK/bin/wkappbot.hq/output"
+OUTDIR="D:/SDK/bin/wkappbot.hq/output"
 
 # ── Helpers ────────────────────────────────────────────
 

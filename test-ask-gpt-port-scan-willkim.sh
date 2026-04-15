@@ -1,12 +1,12 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-ask-gpt-port-scan: verify multi-browser CDP port scan for ask gpt/gemini/claude
 set -e
 
-SRC_LAUNCHER="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
-SRC_CDP="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs"
+SRC_LAUNCHER="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRC_CDP="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs"
 
 # 1. ask gpt --help works (runtime check — verifies binary is deployed)
-OUT=$(timeout 8 W:/SDK/bin/wkappbot.exe ask gpt --help 2>&1 || true)
+OUT=$(timeout 8 D:/SDK/bin/wkappbot.exe ask gpt --help 2>&1 || true)
 echo "$OUT" | grep -qi "gpt\|chatgpt\|ask\|question" \
   || { echo "FAIL: ask gpt --help produced no useful output"; exit 1; }
 

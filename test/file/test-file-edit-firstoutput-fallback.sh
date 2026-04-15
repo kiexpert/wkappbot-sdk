@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: file edit Eye pipe first-output timeout → Core fallback in <1s
 # Verifies: suggestion 2026-04-01T03:44 — wkedit 30s startup delay when Eye busy
 # Fix: firstOutputTimeoutMs=100 in EyeCmdPipeClient.TryDelegate for most commands;
 #      all non-slack/ask/newchat commands now get 100ms first-output guard.
 
 set -e
-WKAPPBOT="W:/SDK/bin/wkappbot.exe"
+WKAPPBOT="D:/SDK/bin/wkappbot.exe"
 
 echo "=== Checking EyeCmdPipeClient first-output timeout implementation ==="
-LAUNCHER_SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs"
+LAUNCHER_SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs"
 grep -n "firstOutputTimeoutMs\|firstReadTask\|Wait(firstOutput" "$LAUNCHER_SRC" | head -5
 
 COUNT=$(grep -c "firstOutputTimeoutMs" "$LAUNCHER_SRC")
@@ -21,7 +21,7 @@ fi
 
 echo ""
 echo "=== Checking Launcher applies 100ms guard to most commands ==="
-PROG_SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/Program.cs"
+PROG_SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/Program.cs"
 grep -n "isFirstOutputGuardCmd\|firstOutputMs.*100\|100ms first-output" "$PROG_SRC" | head -5
 
 COUNT2=$(grep -c "isFirstOutputGuardCmd" "$PROG_SRC")

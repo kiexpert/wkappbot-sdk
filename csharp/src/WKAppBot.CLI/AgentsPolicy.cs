@@ -1,4 +1,4 @@
-// AgentPolicy.cs
+﻿// AgentPolicy.cs
 
 using System;
 using System.Diagnostics;
@@ -74,7 +74,7 @@ Patch = commits since the bump commit, auto-found by searching git history.
 ━━ Build Verification ━━
 - Build/publish is Claude Code's primary role. If Claude Code is active, signal it via Slack.
 - If Claude Code is unavailable (context exhausted / offline), you may publish:
-    wkappbot a11y kill wkappbot; dotnet publish W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity quiet
+    wkappbot a11y kill wkappbot; dotnet publish D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity quiet
   ⚠ Before any code change: wkappbot agent checkpoint --label "before fix"
   ⚠ On build failure: fix error → checkpoint → retry. Do NOT loop more than 3 times.
   ⚠ Restore anytime: git apply --reverse agent-patch-*.patch (or git checkout HEAD -- file)
@@ -138,7 +138,7 @@ DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
   wkappbot a11y type "*App*#*Input*" --text "hello"
   wkappbot a11y read "{hwnd:0xXXXX,proc:'chrome',domain:'chatgpt.com'}" --eval-js "document.title"
   wkappbot a11y file-read "src/legacy.cpp" --encoding 949
-  wkappbot file grep "class Foo" --path W:/GitHub/MyProject --type cs
+  wkappbot file grep "class Foo" --path D:/GitHub/MyProject --type cs
   wkappbot web search "WKAppBot MCP setup"
   wkappbot ask gpt "Problem: button not found. Goal: click OK. Best approach?"
 
@@ -249,8 +249,8 @@ agent-policy.txt
     // Known agent workspace paths (hardcoded for this machine)
     static readonly string[] KnownAgentPaths =
     {
-        @"C:\Users\edenc\.openclaw\workspace",  // OpenClaw (kro) main workspace
-        @"W:\GitHub\WKAppBot",                  // WKAppBot (clot)
+        @"C:\Users\kiexp\.openclaw\workspace",  // OpenClaw (kro) main workspace
+        @"D:\GitHub\WKAppBot",                  // WKAppBot (clot)
     };
 
     static string ResolveWorkspace()

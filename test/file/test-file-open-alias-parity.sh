@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Evidence: file open, code open, and vscode open share the same workspace-aware goto behavior.
 
 if [ -z "${WKAPPBOT:-}" ]; then
@@ -36,7 +36,7 @@ run_and_check() {
   esac
 
   case "$out" in
-    *"[FILE] open target -> hwnd="*"cwd=W:\\GitHub\\WKAppBot"*) ;;
+    *"[FILE] open target -> hwnd="*"cwd=D:\\GitHub\\WKAppBot"*) ;;
     *)
       echo "FAIL: $label did not bind to the responsible WKAppBot workspace window"
       echo "$out"

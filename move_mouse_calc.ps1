@@ -1,4 +1,4 @@
-Add-Type @"
+﻿Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -24,8 +24,8 @@ public class CalcMover2 {
 "@
 
 # Use appbot to find the calc window handle
-$env:DOTNET_ROOT = "W:\$env:USERPROFILE\.dotnet"
-$appbot = "W:\GitHub\AppBot\csharp\src\AppBot.CLI\bin\Release\net8.0-windows\appbot.exe"
+$env:DOTNET_ROOT = "D:\$env:USERPROFILE\.dotnet"
+$appbot = "D:\GitHub\AppBot\csharp\src\AppBot.CLI\bin\Release\net8.0-windows\appbot.exe"
 $focusOutput = & $appbot focus --title "계산기" 2>&1 | Out-String
 
 # Extract HWND from focus output

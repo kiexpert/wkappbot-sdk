@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: web open 버그 수정 증거 -- TabID 출력 + Aborting 제거 (2026-04)
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
 P=0; F=0
 
 echo "=== web open fix 2026-04 source check ==="

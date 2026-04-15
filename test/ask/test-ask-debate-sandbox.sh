@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask debate Tab Sandbox Policy for parallel isolation
 # Verifies CDP tab sandboxing prevents context collision in parallel debates
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src"
+SRC="D:/GitHub/WKAppBot/csharp/src"
 P=0; F=0
 
 echo "=== CDP Tab Sandbox for Parallel Debates ==="

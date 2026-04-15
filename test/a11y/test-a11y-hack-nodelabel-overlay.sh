@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: a11y hack segment overlay — UIA node name in top-right corner
 # Verifies: merge 2026-04-04T08:37 (partial — node label rendering)
 
 set -e
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.cs"
 
 echo "=== Checking top-right UIA node label rendering ==="
 grep -n "Top-right label\|nodeName\|nodeLabel\|nodeBg\|nodeFg\|LightCyan" "$SRC" | head -8
@@ -27,7 +27,7 @@ fi
 
 echo ""
 echo "=== Live: a11y hack --help ==="
-"W:/SDK/bin/wkappbot.exe" a11y hack --help 2>&1 | head -5
+"D:/SDK/bin/wkappbot.exe" a11y hack --help 2>&1 | head -5
 echo "PASS: a11y hack command accessible"
 
 echo "ALL PASS"

@@ -218,7 +218,7 @@ internal partial class Program
     // A step is developer-only if:
     // (1) explicitly tagged [DEV], OR
     // (2) auto-detected as implementation detail — strong signals only:
-    //     - Windows/Unix source path (C:\, W:\, csharp/, src/)
+    //     - Windows/Unix source path (C:\, D:\, csharp/, src/)
     //     - Source file reference with line number (Foo.cs:123)
     //     - Implementation note: "in Foo.cs", "see Foo.cs", "→ Foo.cs"
     //     - Multiple chained method calls indicating code walkthrough (Foo() → Bar())
@@ -227,7 +227,7 @@ internal partial class Program
     static readonly System.Text.RegularExpressions.Regex _devStepPattern =
         new(@"
             \[DEV\]                                     # explicit tag
-            | [A-Za-z]:\\                               # Windows absolute path (C:\, W:\)
+            | [A-Za-z]:\\                               # Windows absolute path (C:\, D:\)
             | \bcsharp/|\bsrc/                          # Unix-style source root path
             | \w+\.cs:\d+                               # Foo.cs:123 — file+line ref
             | \b(in|see|→)\s+\w+\.cs\b                 # 'in Foo.cs' / 'see Foo.cs' / '→ Foo.cs'

@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -583,7 +583,7 @@ internal partial class Program
                         // Also check the publish output directly
                         if (!File.Exists(hotReloadSource))
                         {
-                            // Convention: csproj PostPublish copies to W:\SDK\bin\
+                            // Convention: csproj PostPublish copies to D:\SDK\bin\
                             // After publish, the new EXE replaces the old one via rename trick
                             // Check if current EXE timestamp changed (another process renamed+copied)
                             var newTime = File.GetLastWriteTimeUtc(currentExePath);

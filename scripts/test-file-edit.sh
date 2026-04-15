@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-file-edit.sh — wkappbot file edit integration tests
 # Usage: bash scripts/test-file-edit.sh [WKAPPBOT_EXE]
-# Default exe: wkappbot (must be on PATH or W:/SDK/bin/wkappbot.exe)
+# Default exe: wkappbot (must be on PATH or D:/SDK/bin/wkappbot.exe)
 set -uo pipefail
 
-WK="${1:-W:/SDK/bin/wkappbot.exe}"
-# Use Windows temp dir (not MSYS2 /tmp which maps to W:\tmp and confuses PowerShell)
+WK="${1:-D:/SDK/bin/wkappbot.exe}"
+# Use Windows temp dir (not MSYS2 /tmp which maps to D:\tmp and confuses PowerShell)
 TMP="$(powershell -Command "[IO.Path]::GetTempPath()" | tr -d '\r\n' | sed 's|\\|/|g')test-file-edit-$$"
 mkdir -p "$TMP"
 PASS=0; FAIL=0

@@ -107,6 +107,20 @@ jobs:
     - name: Publish Launcher to repo bin
       shell: pwsh
       run: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+    - name: Seed bin/wkappbot.hq from repo
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq | Out-Null
+        if (Test-Path wkappbot.hq) {
+          Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
+        }
+    - name: Install skills to bin/wkappbot.hq
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
+        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
     - name: Verify official binaries
       shell: pwsh
       run: |
@@ -183,18 +197,33 @@ jobs:
         New-Item -ItemType Directory -Force -Path bin | Out-Null
         dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
         dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
+        Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
+        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
     - name: Verify official binary folder
       shell: pwsh
       run: |
         if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+    - name: Seed bin/wkappbot.hq
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        if (Test-Path wkappbot.hq) {
+          Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
+        }
+        Copy-Item -Path skills/*   -Destination bin/wkappbot.hq/skills   -Recurse -Force
+        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
     - name: AppBot help smoke with sidecar
       shell: pwsh
       run: |
-        $file = 'scripts/smoke-help.ps1'
+        $file    = 'scripts/smoke-help.ps1'
         $outFile = "$file.smoke.txt"
-        $lines = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
-        $code = $LASTEXITCODE
+        $lines   = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
+        $code    = $LASTEXITCODE
         @(
           "commit: ${{ github.sha }}",
           "workflow: build-csharp/smoke",
@@ -209,13 +238,13 @@ jobs:
       if: ${{ always() && github.event_name == 'push' }}
       shell: pwsh
       run: |
-        git config user.name 'github-actions[bot]'
+        git config user.name  'github-actions[bot]'
         git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         $changed = @(git status --porcelain -- '**/*.smoke.txt')
         if ($changed.Count -eq 0) {
           Write-Host 'No smoke sidecar changes to commit.'
           exit 0
         }
-        git add --all -- '*.smoke.txt'
+        git add -- '**/*.smoke.txt'
         git commit -m 'test: update build smoke sidecar files [skip ci]'
         git push

@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-grap-json.sh — grap --json integration test suite
 # Usage: bash scripts/test-grap-json.sh [GRAP_EXE]
-# Default: W:/SDK/bin/grap.exe
+# Default: D:/SDK/bin/grap.exe
 set -uo pipefail
 
 # Use wkappbot-core.exe logcat directly (avoids Launcher/Eye pipe latency)
-WK="${1:-W:/SDK/bin/wkappbot-core.exe}"
+WK="${1:-D:/SDK/bin/wkappbot-core.exe}"
 grap() { "$WK" logcat "$@"; }
 TMP="$(powershell -Command "[IO.Path]::GetTempPath()" | tr -d '\r\n' | sed 's|\\|/|g')test-grap-json-$$"
 mkdir -p "$TMP"

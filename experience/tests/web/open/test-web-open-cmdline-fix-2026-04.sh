@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: cmdline-based Chrome identification -- safe kill + PID isolation (2026-04)
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
 P=0; F=0
 
 echo "=== web open cmdline Chrome fix 2026-04 source check ==="
@@ -20,7 +20,7 @@ if chk 'normalizedDir'; then echo "PASS: normalizedDir path match prevents forei
 else echo "FAIL: normalizedDir not found"; F=$((F+1)); fi
 
 # ResolvePidFromPort: CDP port to PID mapping avoids wrong Chrome
-if python3 -c "import sys; txt=open('W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.cs','rb').read().decode('utf-8','ignore'); sys.exit(0 if 'ResolvePidFromPort' in txt else 1)" 2>/dev/null
+if python3 -c "import sys; txt=open('D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.cs','rb').read().decode('utf-8','ignore'); sys.exit(0 if 'ResolvePidFromPort' in txt else 1)" 2>/dev/null
 then echo "PASS: ResolvePidFromPort CDP-PID mapping in CdpClient.cs"; P=$((P+1))
 else echo "FAIL: ResolvePidFromPort not found"; F=$((F+1)); fi
 

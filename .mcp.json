@@ -1,14 +1,14 @@
-{
+﻿{
   "mcpServers": {
     "wkappbot": {
       "type": "stdio",
-      "command": "W:\\SDK\\bin\\wkappbot.exe",
+      "command": "D:\\SDK\\bin\\wkappbot.exe",
       "args": ["mcp"]
     },
     "qmd": {
       "type": "stdio",
-      "command": "C:\\Users\\edenc\\.bun\\bin\\bun.exe",
-      "args": ["C:\\Users\\edenc\\.bun\\install\\global\\node_modules\\@tobilu\\qmd\\dist\\cli\\qmd.js", "mcp"]
+      "command": "C:\\Users\\kiexp\\.bun\\bin\\bun.exe",
+      "args": ["C:\\Users\\kiexp\\.bun\\install\\global\\node_modules\\@tobilu\\qmd\\dist\\cli\\qmd.js", "mcp"]
     }
   }
 }

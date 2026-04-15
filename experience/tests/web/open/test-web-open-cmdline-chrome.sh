@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: web open identifies Chrome by cmdline (--remote-debugging-port) — safe kill
-SRC_LAUNCH="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRC_LAUNCH="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
 P=0; F=0
 
 echo "=== web open cmdline Chrome identification source check ==="

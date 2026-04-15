@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Evidence: file open routes to the best matching VS Code workspace window.
 
 if [ -z "${WKAPPBOT:-}" ]; then
@@ -31,7 +31,7 @@ if [ $STATUS -ne 0 ]; then
 fi
 
 case "$OUT" in
-  *"[FILE] open target -> hwnd="*"cwd=W:\\GitHub\\WKAppBot"*) ;;
+  *"[FILE] open target -> hwnd="*"cwd=D:\\GitHub\\WKAppBot"*) ;;
   *)
     echo "FAIL: missing workspace-routed VS Code target"
     echo "$OUT"

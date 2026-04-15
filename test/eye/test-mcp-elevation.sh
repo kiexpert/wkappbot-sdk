@@ -1,11 +1,11 @@
-#!/bin/bash
+﻿#!/bin/bash
 # MCP Elevation Handoff Test
 # Tests: proxy detection → admin Core spawn → pipe relay → response
 set -e
 
 PASS=0
 FAIL=0
-WKAPPBOT="W:/SDK/bin/wkappbot-core.exe"
+WKAPPBOT="D:/SDK/bin/wkappbot-core.exe"
 
 log() { echo "[TEST] $1"; }
 pass() { log "✅ PASS: $1"; PASS=$((PASS+1)); }

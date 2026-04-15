@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot newchat session handoff with context compression
 # Verifies the full newchat pipeline: compress → /clear → inject
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.cs"
 P=0; F=0
 
 echo "=== Newchat Session Handoff Pipeline ==="

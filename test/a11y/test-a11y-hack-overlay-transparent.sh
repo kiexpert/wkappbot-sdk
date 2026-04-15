@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-a11y-hack-overlay-transparent.sh — verify hack overlay is no longer opaque black
 # Fix: Window.Opacity removed (AllowsTransparency + Opacity<1 = opaque black bug),
 #      transparency moved to Canvas.Opacity instead.
@@ -13,7 +13,7 @@ check() {
     fi
 }
 
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/A11yHackOverlay.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/A11yHackOverlay.cs"
 
 # Fix: Window-level Opacity assignment must NOT exist (causes opaque black with AllowsTransparency)
 # Old bad code: standalone `Opacity = 0.5;`
@@ -36,7 +36,7 @@ check "fix comment about AllowsTransparency+Opacity bug" \
 # Functional: run hack on an always-present window (Desktop) to produce [CMD] entry
 # hack exits non-zero if no UIA tree, but [CMD] entry is emitted — that's enough
 check "a11y hack runs without crash (no unhandled exception)" \
-    "! \"W:/SDK/bin/wkappbot.exe\" a11y hack \"*\" 2>&1 | grep -qa 'Unhandled exception\|FileNotFoundException'"
+    "! \"D:/SDK/bin/wkappbot.exe\" a11y hack \"*\" 2>&1 | grep -qa 'Unhandled exception\|FileNotFoundException'"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

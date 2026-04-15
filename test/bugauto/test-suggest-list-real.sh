@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="/w/GitHub/WKAppBot"
-EXE="W:\\SDK\\bin\\wkappbot-core.exe"
+EXE="D:\\SDK\\bin\\wkappbot-core.exe"
 PASS=0
 FAIL=0
 

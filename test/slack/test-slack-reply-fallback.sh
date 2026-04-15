@@ -1,6 +1,6 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-slack-reply-fallback.sh — verify slack reply thread-not-found fallback
-ROOT="${WKAPPBOT_ROOT:-W:/GitHub/WKAppBot}"
+ROOT="${WKAPPBOT_ROOT:-D:/GitHub/WKAppBot}"
 PASS=0; FAIL=0
 check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
 

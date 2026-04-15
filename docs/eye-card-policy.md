@@ -1,4 +1,4 @@
-# Eye Card System — Architecture & Policy
+﻿# Eye Card System — Architecture & Policy
 
 > How WKAppBot tracks active AI sessions and displays status cards.
 > Written for fellow Clots (Claude agents) and future contributors.
@@ -14,7 +14,7 @@ Each card is the synthesis of three signals:
 |--------|--------|-------------|
 | **Prompt HWND** | Window handle of the IDE/AI prompt | High (unique per window) |
 | **Session JSONL** | `~/.claude/projects/.../session.jsonl` | High (file mtime = liveness) |
-| **Working Directory** | Project root (e.g. `W:\GitHub\WKAppBot`) | Medium (detection varies) |
+| **Working Directory** | Project root (e.g. `D:\GitHub\WKAppBot`) | Medium (detection varies) |
 
 Card key priority: `PromptHwnd > SessionJsonl > CWD`
 
@@ -54,7 +54,7 @@ Eye reads Layer 1 first; Layer 3 fills gaps for CWDs not covered by sessions.
   "ParentPid": 12345,
   "HostType": "vscode",
   "HostTitle": "Program.cs - WKAppBot - Visual Studio Code",
-  "Cwd": "W:\\GitHub\\WKAppBot",
+  "Cwd": "D:\\GitHub\\WKAppBot",
   "PromptHwnd": "0x403EE",
   "SessionJsonl": "~/.claude/projects/w--GitHub-WKAppBot/.../session.jsonl",
   "StartedAt": "2026-03-29T21:42:00Z",
@@ -97,13 +97,13 @@ Watch session directories of all AI tools to auto-detect active sessions:
 
 ### Reverse-Map: Directory → CWD
 
-Claude example: `~/.claude/projects/w--GitHub-WKAppBot/` → `W:\GitHub\WKAppBot`
+Claude example: `~/.claude/projects/w--GitHub-WKAppBot/` → `D:\GitHub\WKAppBot`
 
 ```
 dir name: w--GitHub-WKAppBot
-decode:   w-- → W:\   (double-dash = drive separator)
+decode:   w-- → D:\   (double-dash = drive separator)
           GitHub-WKAppBot → GitHub\WKAppBot  (dash = path separator)
-result:   W:\GitHub\WKAppBot
+result:   D:\GitHub\WKAppBot
 ```
 
 ### Design Principles (from Triad Debate, 2026-03-29)
@@ -133,7 +133,7 @@ Each direct CLI command (`wkappbot a11y ...`) appends a tick:
   "Command": "a11y",
   "Tag": "inspect",
   "Status": "step:2/3:executing",
-  "Cwd": "W:\\GitHub\\WKAppBot",
+  "Cwd": "D:\\GitHub\\WKAppBot",
   "PromptHwnd": "0x403EE"
 }
 ```
@@ -157,7 +157,7 @@ Walk parent PIDs → find VS Code → parse window title:
                 ↓
          ExtractCwdFromVsCodeTitle()
                 ↓
-         "W:\GitHub\WKAppBot"
+         "D:\GitHub\WKAppBot"
 ```
 
 ### Strategy 2: CWD Heuristic (Universal)
@@ -212,7 +212,7 @@ Eye renders cards in Slack. Each card shows:
 클롣 생각: 🔧mcp__wkappbot__wkappbot_cli
 ```
 
-- `[WG-WKAppBot]` — abbreviated CWD (`W:\GitHub\WKAppBot`)
+- `[WG-WKAppBot]` — abbreviated CWD (`D:\GitHub\WKAppBot`)
 - `클롣 작업` — last command
 - `클롣 상태` — last status + context usage %
 - `클롣 생각` — latest thought from AI session JSONL

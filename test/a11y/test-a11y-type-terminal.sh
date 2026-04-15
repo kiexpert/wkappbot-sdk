@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot a11y type terminal — focusless typing for terminal windows
 # Verifies TerminalClasses detection and SendInput fallback for ConPTY
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yActions.Type.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yActions.Type.cs"
 P=0; F=0
 
 echo "=== Terminal Focusless Typing ==="

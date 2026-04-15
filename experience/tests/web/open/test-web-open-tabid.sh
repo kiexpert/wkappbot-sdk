@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: web open prints TabID, URL, title — no "Aborting" on foreign Chrome
-SRC_WEB="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
+SRC_WEB="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
 P=0; F=0
 
 echo "=== web open tabid + no-abort source check ==="

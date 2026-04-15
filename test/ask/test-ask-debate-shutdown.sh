@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask debate shutdown — verify abort integration across files
 # Checks that Entry.cs calls RunDebateLoop which now has abort support
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-CLI="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
+CLI="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
 P=0; F=0
 
 echo "=== Debate Shutdown Integration ==="

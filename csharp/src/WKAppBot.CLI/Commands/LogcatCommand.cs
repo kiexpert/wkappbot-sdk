@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 
 namespace WKAppBot.CLI;
@@ -98,13 +98,13 @@ internal partial class Program
             positional.Insert(0, "*"); // shift: treat original [0] as file arg, pattern = match-all
         // Each positional[1..] is a file glob; ';' within a segment = OR at that path level
         // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
-        // Absolute path args: "W:/foo/bar/*.log" → dir=W:/foo/bar, pattern=*.log (auto-added to dirs)
+        // Absolute path args: "D:/foo/bar/*.log" → dir=D:/foo/bar, pattern=*.log (auto-added to dirs)
         var rawFileArgs = positional.Count > 1 ? positional.Skip(1).ToList() : new List<string> { fileFilterArg };
         var extraDirsFromArgs = new List<(string dir, string pattern)>();
         var relativeFileArgs = new List<string>();
         foreach (var raw in rawFileArgs)
         {
-            // Detect absolute path: starts with drive letter (e.g. "C:/", "W:\") or UNC "//"
+            // Detect absolute path: starts with drive letter (e.g. "C:/", "D:\") or UNC "//"
             bool isAbs = (raw.Length >= 2 && raw[1] == ':') || raw.StartsWith('/') || raw.StartsWith('\\');
             if (isAbs)
             {

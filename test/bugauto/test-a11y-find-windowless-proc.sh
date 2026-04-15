@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: FindByMultiField secondary scan — windowless process search
 # Verifies: WindowFinder window-centric limitation fix (suggest 2026-04-08T13:21)
 #   - {proc:'wkappbot-core'} finds terminal host window via parent PID chain walk
@@ -6,7 +6,7 @@
 #   - windows --pid enumerates all windows owned by a process
 
 set -e
-WKAPPBOT="W:/SDK/bin/wkappbot.exe"
+WKAPPBOT="D:/SDK/bin/wkappbot.exe"
 
 # ── Test 1: {proc:'wkappbot-core'} finds a result ──
 # wkappbot-core has no own top-level window; must be found via parent chain.

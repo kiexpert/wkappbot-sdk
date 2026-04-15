@@ -68,7 +68,7 @@ internal partial class Program
 
                 // Download image
                 var outputDir = Path.Combine(
-                    Environment.GetEnvironmentVariable("WKAPPBOT_HQ") ?? @"W:\SDK\bin\wkappbot.hq",
+                    Environment.GetEnvironmentVariable("WKAPPBOT_HQ") ?? Path.Combine(AppContext.BaseDirectory, "wkappbot.hq"),
                     "output");
                 Directory.CreateDirectory(outputDir);
                 var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");

@@ -1,4 +1,4 @@
-namespace WKAppBot.CLI;
+﻿namespace WKAppBot.CLI;
 
 internal partial class Program
 {
@@ -17,7 +17,7 @@ internal partial class Program
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  wkappbot hotswap                    # swap wkappbot-core.exe");
-            Console.WriteLine("  wkappbot hotswap W:/SDK/bin/a11y.exe # swap specific binary");
+            Console.WriteLine("  wkappbot hotswap D:/SDK/bin/a11y.exe # swap specific binary");
             return 0;
         }
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: a11y zoom auto-scale — dynamic zoom factor from control size
 # Verifies ClickZoomHelper computes scale = clamp(min(480/w, 240/h), 2, 8)
 # Implements suggest #9: 배율 자동 산정 (2026-03-30T12:38)
@@ -7,7 +7,7 @@
 #   → wkappbot a11y windows shows "*InputZoom*" or "*AppBot*zoom*"
 
 PASS=0; FAIL=0
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/ClickZoomHelper.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/ClickZoomHelper.cs"
 
 echo "=== Test: a11y zoom auto-scale ==="
 

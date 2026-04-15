@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-slack-route-dryrun.sh
 # Tests: slack route --dry-run traces routing without delivering
 # Verifies:
@@ -8,8 +8,8 @@
 #   4. No actual Slack ack sent (no "전달했습니다" in output)
 # Cmd ref: slack route --dry-run (SlackCommands.Route.cs)
 
-WKBOT="${WKBOT:-W:/SDK/bin/wkappbot.exe}"
-SRC="${SRC:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SlackCommands.Route.cs}"
+WKBOT="${WKBOT:-D:/SDK/bin/wkappbot.exe}"
+SRC="${SRC:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SlackCommands.Route.cs}"
 
 if [ ! -f "$WKBOT" ]; then
   echo "[SKIP] wkappbot.exe not found"
@@ -35,7 +35,7 @@ if [ -f "$SRC" ]; then
 fi
 
 # 3. Source check: display name fix (GetPromptDisplayInfo replaces hardcoded 클롣[tag])
-HANDLERS_SRC="${HANDLERS_SRC:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeSlackHandlers.cs}"
+HANDLERS_SRC="${HANDLERS_SRC:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeSlackHandlers.cs}"
 if [ -f "$HANDLERS_SRC" ]; then
   if grep -q 'ExtractCwdFromVsCodeTitle.*promptNames' "$HANDLERS_SRC" 2>/dev/null || \
      grep -q '"클롣\[{tag}\]"' "$HANDLERS_SRC" 2>/dev/null; then
@@ -61,7 +61,7 @@ fi
 # 5. Runtime: --dry-run with --file (avoids shell quoting issues)
 TMPJSON=$(mktemp /tmp/route_test_XXXXXX.json 2>/dev/null || echo "/tmp/route_test_$$.json")
 cat > "$TMPJSON" <<'ENDJSON'
-{"text":"클롣 테스트","user":"U123","ts":"1700000000.000001","channel":"C123","eyeCwd":"W:/GitHub/WKAppBot"}
+{"text":"클롣 테스트","user":"U123","ts":"1700000000.000001","channel":"C123","eyeCwd":"D:/GitHub/WKAppBot"}
 ENDJSON
 
 route_out=$("$WKBOT" slack route --dry-run --file "$TMPJSON" 2>/dev/null)

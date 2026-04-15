@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask debate graceful shutdown architecture
 # Verifies the wrapper/core split pattern and resource cleanup
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateRunner.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateRunner.cs"
 PASS=0
 FAIL=0
 

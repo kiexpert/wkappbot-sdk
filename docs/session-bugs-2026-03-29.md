@@ -1,4 +1,4 @@
-# Session Bugs & Issues — 2026-03-29
+﻿# Session Bugs & Issues — 2026-03-29
 
 Bugs and friction points discovered during Eye Card System implementation
 and Slack workspace migration session.
@@ -71,7 +71,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 **Symptom**: Card shows `[WS-bin]` (SDK/bin directory) instead of project CWD. Bot name shows "system32".
 
-**Root Cause**: MCP server's `Environment.CurrentDirectory` inherits from launcher (W:\SDK\bin) or defaults to system32. Claude Desktop and Codex don't set child process CWD to project root.
+**Root Cause**: MCP server's `Environment.CurrentDirectory` inherits from launcher (D:\SDK\bin) or defaults to system32. Claude Desktop and Codex don't set child process CWD to project root.
 
 **Fix Applied** (commit 41cbd0f):
 - `DetectMcpParentCwd()`: walks parent process chain for VS Code title parse + CWD heuristic (.mcp.json/.git/CLAUDE.md)

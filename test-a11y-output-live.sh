@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Live regression: a11y FOCUS/TARGET grap output format + exit codes
 # Launches Calculator, tests key actions, verifies stdout patterns + exit codes.
 # Usage: bash test-a11y-output-live.sh [--no-launch]
@@ -7,7 +7,7 @@
 #   match found  → exit 0,  stdout has ## FOCUS + # TARGET (non-find) or ## heading (find)
 #   no match     → exit 1,  stdout has no # TARGET / no ## heading
 
-WKA="W:/SDK/bin/wkappbot.exe"
+WKA="D:/SDK/bin/wkappbot.exe"
 P=0; F=0; S=0  # passed, failed, skipped
 
 # ── helpers ──────────────────────────────────────────────────────────────────

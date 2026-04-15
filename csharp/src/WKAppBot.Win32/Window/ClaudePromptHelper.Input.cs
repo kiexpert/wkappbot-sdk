@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using FlaUI.Core.Conditions;
 using FlaUI.Core.Definitions;
 using WKAppBot.Win32.Input;
@@ -54,7 +54,7 @@ public sealed partial class ClaudePromptHelper
     /// </summary>
     public bool TypeAndSubmit(PromptInfo prompt, string text, PromptDeliveryContext? ctx = null)
     {
-        // Resolve delivery decision: context takes precedence over legacy static flag
+        // Resolve delivery decision: context takes preckiexpe over legacy static flag
         bool focusStealAllowed;
         if (ctx != null)
         {

@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask cdp Runtime.evaluate timeout retry
 # Verifies EvalAsync retry handles Runtime.evaluate timeouts
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
 PASS=0
 FAIL=0
 

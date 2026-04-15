@@ -1,11 +1,11 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-ask-triad-mod-redirect.sh — verify Triad moderator redirect implementation details (ask triad)
 PASS=0; FAIL=0
 check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
 
 echo "=== Ask Triad Moderator Redirect Test ==="
-DR="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateRunner.cs"
-TC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Triad.cs"
+DR="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateRunner.cs"
+TC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Triad.cs"
 
 echo -n "Test 1: 2+ CLI pattern threshold for off-topic detection... "; check grep -q "matches >= 2" "$DR"
 echo -n "Test 2: DEBATE_JSON pattern in off-topic list... "; check grep -q "DEBATE_JSON" "$DR"

@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-a11y-platforms.sh — cross-platform a11y access test suite
 # Tests: Windows UIA, Chrome UIA, Chrome CDP (WebBot), Android ADB
 # Usage: bash scripts/test-a11y-platforms.sh [WK_EXE]
 set -uo pipefail
 
-WK="${1:-W:/SDK/bin/wkappbot.exe}"
+WK="${1:-D:/SDK/bin/wkappbot.exe}"
 PASS=0; FAIL=0; SKIP=0
 
 pass() { echo "[PASS] $1"; ((PASS++)); }

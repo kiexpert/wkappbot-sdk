@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot eye codex bot-name detection via UIA + session JSONL
 # Verifies Codex CLI active session detection
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
 P=0; F=0
 
 echo "=== Codex CLI Bot-Name Session Detection ==="

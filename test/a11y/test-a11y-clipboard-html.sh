@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot a11y clipboard-write --html CF_HTML support
 # Verifies CF_HTML clipboard format for rich paste in Gmail/Outlook
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-CLI="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
+CLI="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
 P=0; F=0
 
 echo "=== Clipboard CF_HTML Support ==="

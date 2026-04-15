@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Text.Json;
 
 namespace WKAppBot.CLI;
@@ -295,7 +295,7 @@ internal static class EyeCmdPipeServer
                 && (args.Length > 0 && args[0].ToLowerInvariant() is "a11y" or "file" or "logcat" or "inspect"))
             {
                 // Benign case: caller is at a parent directory of Eye's CWD.
-                // e.g. caller=W:\GitHub\WKAppBot, eye=W:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI
+                // e.g. caller=D:\GitHub\WKAppBot, eye=D:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI
                 // Eye launched from a subdir (hot-swap artifact). Auto-correct EyeCallerCwd upward.
                 var callerNorm = callerCwd.TrimEnd('\\', '/').Replace('/', '\\');
                 var eyeNorm = eyeCwd.TrimEnd('\\', '/').Replace('/', '\\');

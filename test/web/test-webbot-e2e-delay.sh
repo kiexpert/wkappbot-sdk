@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-webbot-e2e-delay.sh — End-to-end WebBot CDP delay optimization test
 # Tests: Chrome launch → connect → navigate → tab switch → minimize/restore → close
 # Validates state-based polling replaced all fixed delays (v5.10.51)
@@ -9,7 +9,7 @@
 
 set -o pipefail
 PASS=0; FAIL=0; SLOW=0
-WKBOT="${WKBOT:-W:/SDK/bin/wkappbot.exe}"
+WKBOT="${WKBOT:-D:/SDK/bin/wkappbot.exe}"
 PORT=9222
 KEEP=0
 for arg in "$@"; do
@@ -99,7 +99,7 @@ echo ""
 
 # ── Phase 0: Source code verification ────────────────────────────────────────
 echo "── Phase 0: Source Verification ────────────────"
-ROOT="${WKAPPBOT_ROOT:-W:/GitHub/WKAppBot}"
+ROOT="${WKAPPBOT_ROOT:-D:/GitHub/WKAppBot}"
 WINDOW_CS="$ROOT/csharp/src/WKAppBot.WebBot/CdpClient.Window.cs"
 TAB_CS="$ROOT/csharp/src/WKAppBot.WebBot/CdpClient.TabManagement.cs"
 WEB_CS="$ROOT/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
@@ -834,8 +834,8 @@ Examples:
   wkappbot file edit legacy.cpp 'old function body' 'new function body'
   wkappbot file edit AskCommands.Entry.cs '??one-command' '- one-command'
   wkappbot file edit config.cs 'DEBUG' 'RELEASE' --replace-all
-  wkappbot file grep ""static int.*Command"" --path W:/GitHub/WKAppBot/csharp --type cs
-  wkappbot file glob ""**/*.cs"" --path W:/GitHub/WKAppBot/csharp/src
+  wkappbot file grep ""static int.*Command"" --path D:/GitHub/WKAppBot/csharp --type cs
+  wkappbot file glob ""**/*.cs"" --path D:/GitHub/WKAppBot/csharp/src
 ");
         PrintRelatedSkills("file");
         return 1;

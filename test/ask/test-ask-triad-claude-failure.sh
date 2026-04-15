@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-ask-triad-claude-failure.sh — verify Claude triad failure detection and reporting
 # Covers suggest #12: BUG: Claude response failure in triad ask — repeatable pattern (ts=2026-03-30T13:01)
 # The failure: ClipboardEvent paste EMPTY → Input.insertText fallback → still failed twice
@@ -7,9 +7,9 @@ check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo
 
 # Command under test: wkappbot ask triad "<question>"
 echo "=== Claude Triad Failure Test ==="
-CLAUDE="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Claude.cs"
-DEBATE="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Debate.cs"
-DEBATE_MODE="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateMode.cs"
+CLAUDE="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Claude.cs"
+DEBATE="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Debate.cs"
+DEBATE_MODE="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateMode.cs"
 
 echo -n "Test 1: Claude failure posted to Slack thread as visible error... "
 check grep -q "Claude.*응답 실패" "$CLAUDE"
@@ -33,7 +33,7 @@ echo -n "Test 7: Null-response guard prevents crash on Claude silence... "
 check grep -q "null\|hasResponse\|== null" "$CLAUDE"
 
 echo -n "Test 8: ask triad (AskTriadDebate) command exists in DebateMode... "
-check grep -q "AskTriadDebate" "W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateMode.cs"
+check grep -q "AskTriadDebate" "D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.DebateMode.cs"
 
 echo ""
 echo "=== Results: $PASS PASS, $FAIL FAIL ==="

@@ -1,8 +1,8 @@
-# WebBot CDP Batch Test — exercises all major features
+﻿# WebBot CDP Batch Test — exercises all major features
 # Lines starting with # are comments
 
 # 1. Navigate to test page
-navigate file:///W:/GitHub/WKAppBot/output/web_test.html
+navigate file:///D:/GitHub/WKAppBot/output/web_test.html
 
 # 2. Button clicks
 click #btn-hello
@@ -38,14 +38,14 @@ click #btn-add-row
 eval document.title
 
 # 9. Page 2 navigation
-navigate file:///W:/GitHub/WKAppBot/output/web_test_page2.html
+navigate file:///D:/GitHub/WKAppBot/output/web_test_page2.html
 type #search-input "batch test"
 click #btn-search
 text #result2
 
 # 10. Back to page 1
-navigate file:///W:/GitHub/WKAppBot/output/web_test.html
+navigate file:///D:/GitHub/WKAppBot/output/web_test.html
 text #result
 
 # 11. Screenshot
-screenshot -o W:/GitHub/WKAppBot/output/webbot_batch_result.png
+screenshot -o D:/GitHub/WKAppBot/output/webbot_batch_result.png

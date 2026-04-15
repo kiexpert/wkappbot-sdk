@@ -21,6 +21,16 @@ obj/
 output/
 logs/
 profiles/
+
+# wkappbot.hq: ignore runtime-generated dirs, track learned data (experience/, profiles/)
+wkappbot.hq/logs/
+wkappbot.hq/runtime/
+wkappbot.hq/output/
+wkappbot.hq/sessions/
+wkappbot.hq/skills/
+wkappbot.hq/handlers/
+!wkappbot.hq/experience/
+!wkappbot.hq/profiles/
 chart_debug_*.png
 ocr_*.png
 nul

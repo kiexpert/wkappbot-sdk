@@ -1,10 +1,10 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 SRC="csharp/src/WKAppBot.Win32/Window/ClaudePromptHelper.HostFinders.cs"
 CONTENT="$(<"$SRC")"
-CORE="W:/SDK/bin/wkappbot-core.exe"
-NEW_CORE="W:/SDK/bin/wkappbot-core.new.exe"
+CORE="D:/SDK/bin/wkappbot-core.exe"
+NEW_CORE="D:/SDK/bin/wkappbot-core.new.exe"
 
 pass() { printf 'PASS: %s\n' "$1"; }
 fail() { printf 'FAIL: %s\n' "$1"; exit 1; }

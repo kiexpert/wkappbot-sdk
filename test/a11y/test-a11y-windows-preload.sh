@@ -1,10 +1,10 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot a11y windows FlaUI preload + host discovery infra
 # Verifies code-level: preload in MCP, owner chain, ClassName filter, GetWindowTextSafe
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-CLI="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
-WIN32="W:/GitHub/WKAppBot/csharp/src/WKAppBot.Win32"
+CLI="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands"
+WIN32="D:/GitHub/WKAppBot/csharp/src/WKAppBot.Win32"
 P=0; F=0
 
 echo "=== FlaUI Preload + Host Discovery Infrastructure ==="

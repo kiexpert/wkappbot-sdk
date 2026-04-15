@@ -1,12 +1,12 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-suggest-channel-fallback.sh
 # Tests: suggest channel API failure triggers webhook fallback
 # Verifies fix: when chat.postMessage fails (e.g. channel_not_found),
 #               suggest command falls back to webhook instead of silently failing
 # Cmd ref: suggest channel (SuggestCommand.cs webhook fallback)
 
-WKBOT="${WKBOT:-W:/SDK/bin/wkappbot.exe}"
-SRC="${SRC:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SuggestCommand.cs}"
+WKBOT="${WKBOT:-D:/SDK/bin/wkappbot.exe}"
+SRC="${SRC:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SuggestCommand.cs}"
 
 if [ ! -f "$WKBOT" ]; then
   echo "[SKIP] wkappbot.exe not found"

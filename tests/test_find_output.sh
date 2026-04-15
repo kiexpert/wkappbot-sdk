@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test_find_output.sh — verify a11y find output format + ambiguity guard find-redirections
 #
 # Tests:
@@ -9,11 +9,11 @@
 #   5. Layer 5 (no #scope on click) → redirects to find, tip has BuildFindGrap-style grap
 #   6. Layer 6 (scope miss on invoke) → lists elements, tip has BuildFindGrap-style grap
 #
-# Requires: VS Code open (proc=Code), wkappbot in PATH or W:/SDK/bin/
+# Requires: VS Code open (proc=Code), wkappbot in PATH or D:/SDK/bin/
 
 # Note: run after hot-swap completes (a few seconds after publish).
 # If you get "wkappbot-core.exe not found", wait 3s and retry.
-WK="${WKAPPBOT:-W:/SDK/bin/wkappbot.exe} a11y"
+WK="${WKAPPBOT:-D:/SDK/bin/wkappbot.exe} a11y"
 PASS=0
 FAIL=0
 

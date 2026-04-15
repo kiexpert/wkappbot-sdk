@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: OcrCorrectionDb — self-learning OCR correction dictionary
 # Verifies: suggestion 2026-04-02T11:59 — OCR mismatch pixel-hash cache
 
 set -e
-REPO="W:/GitHub/WKAppBot"
+REPO="D:/GitHub/WKAppBot"
 VISION_SRC="$REPO/csharp/src/WKAppBot.Vision/OcrCorrectionDb.cs"
 HACK_SRC="$REPO/csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.cs"
 
@@ -38,7 +38,7 @@ echo "PASS: manual > uia > vision priority"
 
 echo ""
 echo "=== Live: a11y hack --help ==="
-"W:/SDK/bin/wkappbot.exe" a11y hack --help 2>&1 | head -3
+"D:/SDK/bin/wkappbot.exe" a11y hack --help 2>&1 | head -3
 echo "PASS: a11y hack accessible"
 
 echo "ALL PASS"

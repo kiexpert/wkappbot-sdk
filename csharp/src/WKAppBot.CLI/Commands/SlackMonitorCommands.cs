@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -843,7 +843,7 @@ internal partial class Program
 
     static string GetGeneralBotUsername(string? instanceName = null)
     {
-        // Explicit override precedence.
+        // Explicit override preckiexpe.
         var forceCodex = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CODEX_APP")?.Trim().ToLowerInvariant();
         var forceClaude = Environment.GetEnvironmentVariable("WKAPPBOT_ASSUME_CLAUDE_APP")?.Trim().ToLowerInvariant();
         if (forceCodex is "1" or "true" or "yes" or "on")

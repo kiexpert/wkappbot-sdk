@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Evidence: file open chooses the responsible VS Code workspace window when one is already open.
 
 if [ -z "${WKAPPBOT:-}" ]; then
@@ -23,7 +23,7 @@ if [ $STATUS -ne 0 ]; then
 fi
 
 case "$OUT" in
-  *"[FILE] open target -> hwnd="*"cwd=W:\\GitHub\\WKAppBot"*) ;;
+  *"[FILE] open target -> hwnd="*"cwd=D:\\GitHub\\WKAppBot"*) ;;
   *)
     echo "FAIL: missing workspace-matched VS Code target"
     echo "$OUT"

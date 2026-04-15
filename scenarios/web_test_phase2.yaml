@@ -1,8 +1,8 @@
-scenario:
+﻿scenario:
   name: "Web UI Phase 2 — Navigation & Cross-page"
 
 app:
-  launch: "chrome.exe file:///W:/GitHub/WKAppBot/output/web_test.html"
+  launch: "chrome.exe file:///D:/GitHub/WKAppBot/output/web_test.html"
   wait_for_window:
     title_contains: "WKAppBot Web"
 
@@ -95,7 +95,7 @@ steps:
   - name: "[Nav] Type URL in address bar"
     action: type_text
     params:
-      text: "file:///W:/GitHub/WKAppBot/output/web_test_page2.html"
+      text: "file:///D:/GitHub/WKAppBot/output/web_test_page2.html"
 
   - name: "[Nav] Press Enter to navigate"
     action: press_key

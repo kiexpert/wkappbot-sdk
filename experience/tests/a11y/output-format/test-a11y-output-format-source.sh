@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: a11y FOCUS/TARGET output format — code-level checks
 # Verifies that: find uses code-fence blocks, non-find uses # TARGET line,
 # FOCUS block is printed for all non-find actions.
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI"
 P=0; F=0
 
 echo "=== a11y output format: code-level checks ==="

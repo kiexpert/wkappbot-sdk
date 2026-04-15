@@ -1,19 +1,19 @@
-{
+﻿{
   "profiles": {
     "WKAppBot.CLI": {
       "commandName": "Project",
       "commandLineArgs": "help",
-      "workingDirectory": "W:\\GitHub\\WKAppBot"
+      "workingDirectory": "D:\\GitHub\\WKAppBot"
     },
     "eye": {
       "commandName": "Project",
       "commandLineArgs": "eye",
-      "workingDirectory": "W:\\GitHub\\WKAppBot"
+      "workingDirectory": "D:\\GitHub\\WKAppBot"
     },
     "eye-tick": {
       "commandName": "Project",
       "commandLineArgs": "eye tick",
-      "workingDirectory": "W:\\GitHub\\WKAppBot"
+      "workingDirectory": "D:\\GitHub\\WKAppBot"
     }
   }
 }

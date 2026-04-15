@@ -1,10 +1,10 @@
-// ProgramStaticInit.cs — Forces eager static initialization of the Program class.
+﻿// ProgramStaticInit.cs — Forces eager static initialization of the Program class.
 //
 // WHY THIS EXISTS:
 // Without an explicit static constructor, C# marks the class as `beforefieldinit`.
 // With beforefieldinit, the static field initializers (BuildWindowHierarchyAncestors,
 // BuildAncestorPids, Regex compilations, etc.) run LAZILY — at the moment the first
-// static field is accessed in Main(). On VHD/network drives (e.g. W:\), this lazy
+// static field is accessed in Main(). On VHD/network drives (e.g. D:\), this lazy
 // initialization inside Main() takes ~2.3 seconds, blocking the main thread.
 //
 // Adding `static Program() {}` removes beforefieldinit, forcing the runtime to run

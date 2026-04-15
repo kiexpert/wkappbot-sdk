@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: Eye/Launcher hot-swap + self-restart + guardian + startup gentle-swap
 # Verifies: merge 2026-04-04T09:12 — Eye/Launcher 자기 핫스왑 + 재시작 흐름 개선
 
 set -e
-REPO="W:/GitHub/WKAppBot"
+REPO="D:/GitHub/WKAppBot"
 EYE_SRC="$REPO/csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs"
 CMD_SRC="$REPO/csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs"
 
@@ -39,7 +39,7 @@ echo "PASS: eye shutdown command exists"
 
 echo ""
 echo "=== Live: eye tick ==="
-"W:/SDK/bin/wkappbot.exe" eye tick 2>&1 | head -3
+"D:/SDK/bin/wkappbot.exe" eye tick 2>&1 | head -3
 echo "PASS: eye tick completed"
 
 echo "ALL PASS"
