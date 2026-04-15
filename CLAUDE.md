@@ -49,6 +49,11 @@
   - Do not use `|` in step content — use newline instead
 - After creating a skill, always verify with `wkappbot skill show <id>`
 
+### Suggest-Driven Backlog
+- **Spot a bug or improvement during another task?** Don't interrupt — queue it: `wkappbot suggest "title: description"`
+- Resolve suggests when there's spare time between tasks (`wkappbot suggest list` → `suggest resolve`)
+- This keeps the current task focused and nothing slips through the cracks
+
 ### Token Efficiency Rules
 - **Never re-read a file already in context** — use what you already loaded
 - **No speculative tool calls** — only read/search files you have a concrete reason to need
