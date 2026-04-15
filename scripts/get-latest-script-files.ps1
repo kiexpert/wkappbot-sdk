@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $Extensions = @('ps1','py','sh')
+# Exclude GUI/integration test scripts that require a running display or browser
+$ExcludePathPrefixes = @('experience/')
 $FallbackRecentCount = 100
 $head = (git rev-parse HEAD).Trim()
 if ([string]::IsNullOrWhiteSpace($head)) { throw 'HEAD SHA is required.' }
@@ -9,7 +11,10 @@ if (!$commits) { $commits = @($head) }
 $selectedCommit = $null
 $files = @()
 foreach ($commit in $commits) {
-  $candidateFiles = @(git show --name-only --pretty='' $commit | Where-Object { $_ -match $pattern } | Sort-Object -Unique)
+  $candidateFiles = @(git show --name-only --pretty='' $commit |
+    Where-Object { $_ -match $pattern } |
+    Where-Object { $f = $_; -not ($ExcludePathPrefixes | Where-Object { $f -like "$_*" }) } |
+    Sort-Object -Unique)
   if ($candidateFiles.Count -gt 0) {
     $selectedCommit = $commit
     $files = $candidateFiles
