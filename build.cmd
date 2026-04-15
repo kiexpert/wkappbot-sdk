@@ -12,7 +12,7 @@ rem    build.cmd --no-build    Skip compile; just package + copy + hot-swap.
 rem                            Use when invoked from a csproj post-publish event
 rem                            (MSBuild already compiled; avoids double-compile).
 rem
-rem  Deploy target:  W:\SDK\bin\
+rem  Deploy target:  <repo>\bin\
 rem    wkappbot.exe       Launcher  (AOT, ~1 MB; starts core, relays pipe cmds,
 rem                                  handles hot-swap trigger)
 rem    wkappbot-core.exe  Core      (single-file ~25 MB; all CLI logic + Eye loop)
@@ -27,18 +27,19 @@ rem  AI note: never pass --no-verify or skip hooks; never force-push; always
 rem    use hot-swap path (do NOT taskkill manually before building).
 rem ═══════════════════════════════════════════════════════════════════════════
 
-set "SDK_DIR=W:\SDK\dotnet"
-set "DOTNET_EXE=%SDK_DIR%\dotnet.exe"
-set "SDK_VER=8.0.418"
-set "WORKLOAD_LOCATOR=%SDK_DIR%\sdk\%SDK_VER%\Sdks\Microsoft.NET.SDK.WorkloadAutoImportPropsLocator\Sdk"
-set "MANIFEST_LOCATOR=%SDK_DIR%\sdk\%SDK_VER%\Sdks\Microsoft.NET.SDK.WorkloadManifestTargetsLocator\Sdk"
+rem ROOT_DIR: auto-detect from this script's location (works on any machine)
+set "ROOT_DIR=%~dp0"
+if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 
-set "ROOT_DIR=W:\GitHub\WKAppBot"
+rem DOTNET_EXE: prefer system install, fall back to repo-local dotnet
+set "DOTNET_EXE=dotnet"
+if exist "C:\Program Files\dotnet\dotnet.exe" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
+
 set "CLI_PROJ=%ROOT_DIR%\csharp\src\WKAppBot.CLI\WKAppBot.CLI.csproj"
 set "LAUNCHER_PROJ=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj"
 set "CLI_OUT=%ROOT_DIR%\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows10.0.22621.0\win-x64\publish"
 set "LAUNCHER_OUT=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\bin\Release\net8.0-windows\win-x64\publish"
-set "BIN_DIR=W:\SDK\bin"
+set "BIN_DIR=%ROOT_DIR%\bin"
 set "DEPLOY_ONLY=0"
 set "NO_BUILD=0"
 if /I "%~1"=="--deploy-only" set "DEPLOY_ONLY=1"
@@ -57,13 +58,15 @@ if exist "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" 
   set "PATH=C:\Program Files (x86)\Microsoft Visual Studio\Installer;%PATH%"
 )
 
-if not exist "%DOTNET_EXE%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
-if exist "%DOTNET_EXE%" if not exist "%WORKLOAD_LOCATOR%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
-if exist "%DOTNET_EXE%" if not exist "%MANIFEST_LOCATOR%" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
-if not exist "%DOTNET_EXE%" (
-  echo [BUILD] dotnet.exe not found.
-  exit /b 1
+rem Verify dotnet is available (either system PATH or explicit path set above)
+where dotnet >nul 2>nul
+if errorlevel 1 (
+  if not exist "%DOTNET_EXE%" (
+    echo [BUILD] dotnet not found. Install .NET SDK 8 from https://dot.net
+    exit /b 1
+  )
 )
+echo [BUILD] dotnet: %DOTNET_EXE%
 
 if "%DEPLOY_ONLY%"=="0" (
   echo [1/4] Publish launcher (AOT, single-file, self-contained)

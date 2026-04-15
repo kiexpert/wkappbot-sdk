@@ -21,12 +21,18 @@
     <Compile Include="..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
   </ItemGroup>
 
+  <!-- Repo-relative bin dir: <repo>/bin (resolved from csproj: csharp/src/WKAppBot.Launcher/) -->
+  <PropertyGroup>
+    <RepoBin Condition="'$(RepoBin)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\bin'))</RepoBin>
+  </PropertyGroup>
+
   <!-- Post-publish: deploy launcher directly (running exe can be renamed on NTFS) -->
   <!-- build.cmd renames current→.old-timestamp.exe, then copies new one to original path -->
   <!-- Standalone publish (no build.cmd): ContinueOnError=true if locked, .new.exe as fallback -->
   <Target Name="DeployLauncher" AfterTargets="CopyNativeBinary" Condition="'$(SkipDeployLauncher)' != 'true'">
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="D:\SDK\bin\wkappbot.exe" OverwriteReadOnlyFiles="true" ContinueOnError="true" />
-    <Message Text="[Launcher] wkappbot.exe deployed" Importance="high" />
+    <MakeDir Directories="$(RepoBin)" />
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="$(RepoBin)\wkappbot.exe" OverwriteReadOnlyFiles="true" ContinueOnError="true" />
+    <Message Text="[Launcher] wkappbot.exe deployed to $(RepoBin)" Importance="high" />
   </Target>
 
 </Project>

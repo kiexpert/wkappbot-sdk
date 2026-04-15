@@ -54,18 +54,24 @@
     <Content Include="..\..\..\handlers\**\*.yml" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" LinkBase="handlers" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
-  <!-- Post-publish: deploy wkappbot-core.exe (Eye hot-swap via .new.exe if locked) -->
+  <!-- Repo-relative bin dir: <repo>/bin (resolved from csproj location: csharp/src/WKAppBot.CLI/) -->
+  <PropertyGroup>
+    <RepoBin Condition="'$(RepoBin)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\bin'))</RepoBin>
+  </PropertyGroup>
+
+  <!-- Post-publish: deploy wkappbot-core.exe to repo bin/ (Eye hot-swap via .new.exe if locked) -->
   <Target Name="DeployToSdkBin" AfterTargets="Publish" Condition="'$(SkipDeployCore)' != 'true'">
-    <Message Importance="high" Text="[BUILD] WKAppBot v$(Version)" />
+    <MakeDir Directories="$(RepoBin)\wkappbot.hq\handlers" />
+    <Message Importance="high" Text="[BUILD] WKAppBot v$(Version) → $(RepoBin)" />
     <!-- Step 1: Copy handlers -->
-    <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="D:\SDK\bin\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_HandlersPublish)" DestinationFolder="$(RepoBin)\wkappbot.hq\handlers\%(RecursiveDir)" SkipUnchangedFiles="true" />
     <!-- Step 2a: Backup current binary as .bak (rollback if new binary crashes Eye) -->
-    <Exec Command="if exist &quot;D:\SDK\bin\wkappbot-core.exe&quot; copy /Y &quot;D:\SDK\bin\wkappbot-core.exe&quot; &quot;D:\SDK\bin\wkappbot-core.exe.bak&quot;" IgnoreExitCode="true" />
+    <Exec Command="if exist &quot;$(RepoBin)\wkappbot-core.exe&quot; copy /Y &quot;$(RepoBin)\wkappbot-core.exe&quot; &quot;$(RepoBin)\wkappbot-core.exe.bak&quot;" IgnoreExitCode="true" />
     <!-- Step 2b: Try direct copy first. If locked (Eye running), stage as .new.exe for hot-swap -->
     <!-- Eye FSW watches wkappbot-core.exe/.new.exe (uses Environment.ProcessPath dynamically) -->
-    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;D:\SDK\bin\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;D:\SDK\bin\wkappbot-core.exe&quot; eye tick --timeout 15 &gt;nul 2&gt;&amp;1) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;D:\SDK\bin\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
+    <Exec Command="copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;$(RepoBin)\wkappbot-core.exe&quot; &amp;&amp; (echo [Deploy] wkappbot-core.exe updated &amp; &quot;$(RepoBin)\wkappbot-core.exe&quot; eye tick --timeout 15 &gt;nul 2&gt;&amp;1) || (copy /Y &quot;$(PublishDir)wkappbot-core.exe&quot; &quot;$(RepoBin)\wkappbot-core.new.exe&quot; &amp;&amp; echo [Deploy] wkappbot-core.new.exe staged for hot-swap)" IgnoreExitCode="true" />
     <!-- Step 3: Install project skills → HQ (CWD = repo root so CallerCwd finds skills/) -->
-    <Exec Command="cd /d &quot;$(MSBuildProjectDirectory)\..\..\..&quot; &amp;&amp; &quot;D:\SDK\bin\wkappbot-core.exe&quot; skill install 2&gt;nul &amp;&amp; echo [Deploy] skills installed to HQ" IgnoreExitCode="true" />
+    <Exec Command="cd /d &quot;$(MSBuildProjectDirectory)\..\..\..&quot; &amp;&amp; &quot;$(RepoBin)\wkappbot-core.exe&quot; skill install 2&gt;nul &amp;&amp; echo [Deploy] skills installed to HQ" IgnoreExitCode="true" />
   </Target>
   <ItemGroup>
     <_HandlersPublish Include="$(PublishDir)handlers\**\*.*" />
