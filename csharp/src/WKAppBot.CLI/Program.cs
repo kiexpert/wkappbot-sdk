@@ -488,6 +488,7 @@ internal partial class Program
                 "suggest" => SuggestCommand(restArgs),
                 "gc" => GcCommand(restArgs),
                 "hotswap" => HotSwapCommand(restArgs),
+                "update" => UpdateCommand(restArgs),
                 "zoom-demo" => ZoomDemoCommand(restArgs),
                 "tick" => TickCommand(restArgs),
                 "kiwoom" => KiwoomCommand(restArgs),

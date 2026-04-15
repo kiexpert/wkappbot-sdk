@@ -121,6 +121,11 @@ jobs:
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
         Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
         Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
+    - name: Write build info
+      shell: pwsh
+      run: |
+        $info = [ordered]@{ run_id = "${{ github.run_id }}"; sha = "${{ github.sha }}"; built_at = (Get-Date -AsUTC -Format o) } | ConvertTo-Json -Compress
+        $info | Set-Content -Path bin/build_info.json -Encoding utf8
     - name: Verify official binaries
       shell: pwsh
       run: |
