@@ -1,0 +1,119 @@
+commit: e74033504c2d4b54ba0825d86cf79d91ad02b5f8
+workflow: build-csharp/smoke
+script: scripts/smoke-help.ps1
+exitcode: 0
+timestamp_utc: 2026-04-15T16:16:03.7050113Z
+
+== TEST --help ==
+{"_":"LAUNCH","pid":1192,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 225 more line(s)
+EXITCODE: 0
+== TEST help ==
+{"_":"LAUNCH","pid":6224,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 225 more line(s)
+EXITCODE: 0
+== TEST version ==
+{"_":"LAUNCH","pid":8744,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 7 more line(s)
+EXITCODE: 0
+== TEST skill --help --no-regression ==
+[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 — retry without breakaway
+[CMD] skill --help --no-regression
+[LAUNCH:CORE] cwd=D:\a\WKAppBot\WKAppBot hwnd=0x cmd=skill --help --no-regression
+skill <subcommand> [options]
+AI skill management — executable knowhow for Claude instances.
+... TRUNCATED: 31 more line(s)
+EXITCODE: 0
+== TEST knowhow --help --no-regression ==
+{"_":"LAUNCH","pid":1004,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 8 more line(s)
+EXITCODE: 0
+== TEST schedule --help --no-regression ==
+{"_":"LAUNCH","pid":9152,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 15 more line(s)
+EXITCODE: 0
+== TEST file --help --no-regression ==
+{"_":"LAUNCH","pid":9048,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 36 more line(s)
+EXITCODE: 0
+== TEST file-read --help --no-regression ==
+{"_":"LAUNCH","pid":3204,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 8 more line(s)
+EXITCODE: 0
+== TEST file-grep --help --no-regression ==
+{"_":"LAUNCH","pid":4872,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 8 more line(s)
+EXITCODE: 0
+== TEST file-glob --help --no-regression ==
+{"_":"LAUNCH","pid":5368,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 8 more line(s)
+EXITCODE: 0
+== TEST skill list ==
+[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 — retry without breakaway
+[CMD] skill list
+[LAUNCH:CORE] cwd=D:\a\WKAppBot\WKAppBot hwnd=0x cmd=skill list
+[SKILL] 67 skill(s) - most recent first:
+  [wkappbot-workflow]
+... TRUNCATED: 78 more line(s)
+EXITCODE: 0
+== TEST schedule list ==
+{"_":"LAUNCH","pid":5488,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 8 more line(s)
+EXITCODE: 0
+== TEST file read D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
+{"_":"LAUNCH","pid":4660,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 11 more line(s)
+EXITCODE: 0
+== TEST file grep skill D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
+{"_":"LAUNCH","pid":7308,"sid":2
+,"fg":"0x1020A"
+,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"chain":[
+... TRUNCATED: 11 more line(s)
+EXITCODE: 0
+All help/basic smoke checks passed.
