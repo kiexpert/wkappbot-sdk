@@ -93,6 +93,7 @@ internal partial class Program
                 {
                     var jsResult = cdp.EvalAsync(evalJs).GetAwaiter().GetResult();
                     Console.Error.WriteLine($"[A11Y] --eval-js result: {jsResult}");
+                    Console.WriteLine(jsResult);
                 }
                 catch (Exception jsEx)
                 {
@@ -408,6 +409,7 @@ internal partial class Program
             {
                 Console.Error.WriteLine($"[A11Y] read --eval-js: null signal → streaming done");
                 Console.Error.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+                Console.WriteLine(lastResult);
                 return true;
             }
 
@@ -418,6 +420,7 @@ internal partial class Program
                 {
                     // Result stabilized — done
                     Console.Error.WriteLine($"[A11Y] read --eval-js: {result}");
+                    Console.WriteLine(result);
                     return result != null;
                 }
             }
@@ -431,6 +434,7 @@ internal partial class Program
                     if (intervalMs >= 500 && timeoutMs <= 10000)
                     {
                         Console.Error.WriteLine($"[A11Y] read --eval-js: {result}");
+                        Console.WriteLine(result);
                         return result != null;
                     }
                 }
@@ -452,6 +456,7 @@ internal partial class Program
             Console.ResetColor();
         }
         Console.Error.WriteLine($"[A11Y] read --eval-js: {lastResult}");
+        if (lastResult != null) Console.WriteLine(lastResult);
         return lastResult != null;
     }
 
