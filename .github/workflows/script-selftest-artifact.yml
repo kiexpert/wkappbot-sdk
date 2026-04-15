@@ -1,0 +1,107 @@
+name: script-selftest-sidecar-artifact
+
+on:
+  push:
+    paths:
+      - '**/*.ps1'
+      - '**/*.py'
+      - '**/*.sh'
+      - '.github/workflows/script-selftest.yml'
+      - '.github/workflows/script-selftest-artifact.yml'
+    paths-ignore:
+      - '**/*.self-test.txt'
+  workflow_dispatch:
+
+jobs:
+  selftest_sidecar:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+    - name: Restore cached repo bin
+      uses: actions/cache/restore@v4
+      with:
+        path: bin
+        key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        restore-keys: |
+          ${{ runner.os }}-wkappbot-bin-
+          ${{ runner.os }}-wkappbot-build-
+    - name: Prepare repo-local helper cache
+      shell: pwsh
+      run: |
+        $pipCacheDir = Join-Path $PWD 'bin/pip-cache'
+        $pythonUserBase = Join-Path $PWD 'bin/py-user'
+        New-Item -ItemType Directory -Force -Path bin | Out-Null
+        New-Item -ItemType Directory -Force -Path $pipCacheDir | Out-Null
+        New-Item -ItemType Directory -Force -Path $pythonUserBase | Out-Null
+        $pyScripts = Join-Path $pythonUserBase 'Scripts'
+        New-Item -ItemType Directory -Force -Path $pyScripts | Out-Null
+        "PATH=$PWD/bin;$pyScripts;$env:PATH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PIP_CACHE_DIR=$pipCacheDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PYTHONUSERBASE=$pythonUserBase" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "PIP_DISABLE_PIP_VERSION_CHECK=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+    - name: Run latest script self-test and persist sidecar
+      shell: pwsh
+      run: |
+        if ('${{ github.event_name }}' -ne 'push') {
+          Write-Host 'Skip script self-test on workflow_dispatch.'
+          exit 0
+        }
+        $json = & pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/get-latest-script-files.ps1
+        $result = $json | ConvertFrom-Json
+        if (-not $result.selectedCommit -or -not $result.files -or $result.files.Count -eq 0) {
+          Write-Host 'No changed .py/.ps1/.sh files in recent commits.'
+          exit 0
+        }
+        $files = @($result.files)
+        Write-Host "Selected commit: $($result.selectedCommit)"
+        $files | ForEach-Object { Write-Host "SCRIPT: $_" }
+        if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
+          Write-Host 'Official bin missing. Rebuilding fallback bin in artifact workflow.'
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
+          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+        }
+        if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for script self-test artifact workflow' }
+        $bash = Get-Command bash -ErrorAction SilentlyContinue
+        foreach ($file in $files) {
+          Write-Host "== SCRIPT SELF-TEST $file =="
+          $outFile = "$file.self-test.txt"
+          $outDir = Split-Path -Parent $outFile
+          if ($outDir) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
+          if ($file.EndsWith('.ps1')) {
+            $lines = & pwsh -NoProfile -ExecutionPolicy Bypass -File $file 2>&1
+          } elseif ($file.EndsWith('.py')) {
+            $lines = & python $file 2>&1
+          } elseif ($file.EndsWith('.sh')) {
+            if (-not $bash) { throw 'bash not found on runner' }
+            $lines = & bash $file 2>&1
+          }
+          $code = $LASTEXITCODE
+          @(
+            "commit: $($result.selectedCommit)",
+            "workflow: script-selftest-sidecar-artifact",
+            "script: $file",
+            "exitcode: $code",
+            "timestamp_utc: $(Get-Date -AsUTC -Format o)",
+            ""
+          ) + @($lines) | Set-Content -Path $outFile -Encoding utf8
+          $lines | ForEach-Object { Write-Host $_ }
+          if ($code -ne 0) { throw "Script self-test failed: $file" }
+        }
+    - name: Upload self-test sidecar artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: selftest-sidecar-${{ github.run_id }}
+        path: '**/*.self-test.txt'
+        if-no-files-found: warn
