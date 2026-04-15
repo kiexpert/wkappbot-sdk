@@ -17,7 +17,7 @@ internal partial class Program
         var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
         return $@"
 WKAppBot{verStr} - Windows App Automation Test Framework
-Building the Eyes of Claude to realize WilKim's vision of autonomous secretarial ops.
+Give AI eyes and hands — operate any app, help any human. No API, no rewrite needed.
 All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
 
