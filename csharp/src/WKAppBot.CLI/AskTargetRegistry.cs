@@ -21,7 +21,8 @@ internal static class AskTargetRegistry
 
     internal record RegistryEntry(
         [property: JsonPropertyName("targetId")]  string TargetId,
-        [property: JsonPropertyName("expectedHost")] string ExpectedHost);
+        [property: JsonPropertyName("expectedHost")] string ExpectedHost,
+        [property: JsonPropertyName("lastUsed")] DateTimeOffset? LastUsed = null);
 
     private static Dictionary<string, RegistryEntry> Load()
     {
@@ -53,12 +54,41 @@ internal static class AskTargetRegistry
         return dict.TryGetValue(key, out var entry) ? entry : null;
     }
 
-    /// <summary>Register or update a sandbox key → (targetId, expectedHost).</summary>
+    /// <summary>Register or update a sandbox key → (targetId, expectedHost). Stamps lastUsed = now.</summary>
     internal static void SetEntry(string key, string targetId, string expectedHost)
     {
         var dict = Load();
-        dict[key] = new RegistryEntry(targetId, expectedHost);
+        dict[key] = new RegistryEntry(targetId, expectedHost, DateTimeOffset.UtcNow);
         Save(dict);
+    }
+
+    /// <summary>Update lastUsed timestamp for an existing entry (called on cache hit).</summary>
+    internal static void TouchEntry(string key)
+    {
+        var dict = Load();
+        if (dict.TryGetValue(key, out var e))
+        {
+            dict[key] = e with { LastUsed = DateTimeOffset.UtcNow };
+            Save(dict);
+        }
+    }
+
+    /// <summary>
+    /// Remove and return all entries idle longer than maxIdle.
+    /// Callers are responsible for closing the returned tabs via CDP.
+    /// </summary>
+    internal static List<(string Key, string TargetId)> ConsumeIdleEntries(TimeSpan maxIdle)
+    {
+        var dict = Load();
+        var now = DateTimeOffset.UtcNow;
+        var idle = dict
+            .Where(kvp => kvp.Value.LastUsed.HasValue && (now - kvp.Value.LastUsed.Value) > maxIdle)
+            .Select(kvp => (kvp.Key, kvp.Value.TargetId))
+            .ToList();
+        if (idle.Count == 0) return idle;
+        foreach (var (key, _) in idle) dict.Remove(key);
+        Save(dict);
+        return idle;
     }
 
     /// <summary>Immediately invalidate a key (fast-fail on URL mismatch).</summary>

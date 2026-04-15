@@ -165,6 +165,7 @@ internal static class CdpTabManager
                         Console.ResetColor();
                         if (cdp.TargetId != entry.TargetId)
                             cdp.SwitchToTargetAsync(entry.TargetId, detectedPort).GetAwaiter().GetResult();
+                        AskTargetRegistry.TouchEntry(key); // refresh idle timer
                         return cdp;
                     }
                     else
@@ -217,6 +218,42 @@ internal static class CdpTabManager
             Console.Error.WriteLine($"[TAB] Session error: {ex.Message}");
             cdp.Dispose();
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Close all sandbox tabs that have been idle longer than <paramref name="idleMinutes"/>.
+    /// Called by Eye once per minute. Best-effort — errors are logged, not thrown.
+    /// </summary>
+    internal static async Task PurgeIdleTabsAsync(int idleMinutes = 10)
+    {
+        var idle = AskTargetRegistry.ConsumeIdleEntries(TimeSpan.FromMinutes(idleMinutes));
+        if (idle.Count == 0) return;
+
+        var port = CdpClient.DetectCdpPort(9222);
+        if (port <= 0)
+        {
+            Console.Error.WriteLine($"[REAPER] {idle.Count} idle tab(s) evicted from registry (Chrome not running)");
+            return;
+        }
+
+        using var cdp = new CdpClient();
+        try
+        {
+            await cdp.ConnectAsync(port);
+            foreach (var (key, targetId) in idle)
+            {
+                try
+                {
+                    await cdp.TryCloseTabByIdAsync(port, targetId, "idle-reaper");
+                    Console.Error.WriteLine($"[REAPER] Closed idle tab: {key}");
+                }
+                catch { /* tab may already be gone */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[REAPER] CDP connect failed: {ex.Message}");
         }
     }
 
