@@ -1,10 +1,10 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-suggest-junk-guard.sh — verify suggest show command doesn't create junk suggests (suggest junk)
 PASS=0; FAIL=0
 check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL"; FAIL=$((FAIL+1)); fi; }
 
 echo "=== Suggest Junk Guard Test ==="
-SC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SuggestCommand.cs"
+SC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SuggestCommand.cs"
 
 echo -n "Test 1: SuggestCommand.cs exists... "; check test -f "$SC"
 echo -n "Test 2: suggest list shows pending suggestions... "; check grep -q "show pending suggestions" "$SC"

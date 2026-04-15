@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Forms;
@@ -197,9 +197,9 @@ internal partial class Program
     /// <summary>
     /// Abbreviate a working directory path for compact display.
     /// Drive letter + first letter of each intermediate folder + "-" + leaf folder.
-    /// e.g. "W:\GitHub\WKAppBot" → "WG-WKAppBot"
-    ///      "W:\HTS-Project\Source\Main\MainLib" → "WHSM-MainLib"
-    ///      "W:\VIGSOne" → "W-VIGSOne"
+    /// e.g. "D:\GitHub\WKAppBot" → "WG-WKAppBot"
+    ///      "D:\HTS-Project\Source\Main\MainLib" → "WHSM-MainLib"
+    ///      "D:\VIGSOne" → "W-VIGSOne"
     /// </summary>
     static string AbbreviateCwd(string? cwd)
     {

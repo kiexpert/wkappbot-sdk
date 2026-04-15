@@ -1,6 +1,6 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-a11y-ocr-png-format.sh — verify a11y ocr handles non-standard PNG pixel formats
-ROOT="${WKAPPBOT_ROOT:-W:/GitHub/WKAppBot}"
+ROOT="${WKAPPBOT_ROOT:-D:/GitHub/WKAppBot}"
 PASS=0; FAIL=0
 check() { if "$@" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL: $*"; FAIL=$((FAIL+1)); fi; }
 checkgrep() { if grep -q "$1" "$2" >/dev/null 2>&1; then echo "PASS"; PASS=$((PASS+1)); else echo "FAIL: pattern '$1' not found in $2"; FAIL=$((FAIL+1)); fi; }

@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask cdp Runtime.enable reconnect resilience
 # Verifies CDP has reconnect logic for transient connection failures
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
 P=0; F=0
 
 echo "=== CDP Reconnect Resilience ==="

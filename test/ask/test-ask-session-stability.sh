@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-ask-cdp-session-stability.sh — verify CDP ask session stability fixes
 # Fix #8: EvalAsync catches TaskCanceledException (not just TimeoutException)
 # Fix #9: Native file dialog tier disables focus-theft monitoring (expected HWND change)
@@ -13,8 +13,8 @@ check() {
     fi
 }
 
-EVAL_SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs"
-ATTACH_SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Attachments.FileInput.cs"
+EVAL_SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs"
+ATTACH_SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.Attachments.FileInput.cs"
 
 # Bug #8: TaskCanceledException now retried in EvalAsync
 check "EvalAsync catches TaskCanceledException" \
@@ -38,7 +38,7 @@ check "prevFocusMonitor backup before disable" \
 
 # Functional: ask commands accessible and EvalAsync code deployed
 check "wkappbot ask --help accessible" \
-    "\"W:/SDK/bin/wkappbot.exe\" ask --help 2>&1 | grep -qa 'ask\|gpt\|gemini\|claude'"
+    "\"D:/SDK/bin/wkappbot.exe\" ask --help 2>&1 | grep -qa 'ask\|gpt\|gemini\|claude'"
 
 # Source: verify both fixes are deployed together
 check "both fixes in same EvalAsync file (deployed)" \

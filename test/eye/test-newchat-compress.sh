@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot newchat --compress session compression before clear
 # Verifies summary injection step before /clear in newchat flow
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.cs"
 P=0; F=0
 
 echo "=== Newchat --compress Session Compression ==="

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -26,7 +26,7 @@ internal partial class Program
             {
                 var line = sr.ReadLine();
                 if (line == null) break;
-                // Look for "cwd":"W:\\GitHub\\WKAppBot" pattern
+                // Look for "cwd":"D:\\GitHub\\WKAppBot" pattern
                 var m = System.Text.RegularExpressions.Regex.Match(line, "\"cwd\":\"([^\"]+)\"");
                 if (m.Success)
                 {
@@ -330,7 +330,7 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
     /// </summary>
     static bool HasHandoffSectionInClaudeMd()
     {
-        const string claudeMdPath = @"W:\GitHub\WKAppBot\CLAUDE.md";
+        const string claudeMdPath = @"D:\GitHub\WKAppBot\CLAUDE.md";
         const string handoffMarker = "## \U0001f504 Handoff";
         try
         {
@@ -344,11 +344,11 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
     /// <summary>
     /// Write handoff section to CLAUDE.md (at the end, before roadmap section).
     /// If a previous handoff section exists, replace it.
-    /// CLAUDE.md path: W:/GitHub/WKAppBot/CLAUDE.md
+    /// CLAUDE.md path: D:/GitHub/WKAppBot/CLAUDE.md
     /// </summary>
     static void WriteHandoffToClaudeMd(string handoffSection)
     {
-        const string claudeMdPath = @"W:\GitHub\WKAppBot\CLAUDE.md";
+        const string claudeMdPath = @"D:\GitHub\WKAppBot\CLAUDE.md";
         const string handoffMarker = "## 🔄 Handoff";
         const string handoffEndMarker = "## "; // next section starts
 

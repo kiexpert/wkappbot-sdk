@@ -1,4 +1,4 @@
-// AppBotEyeSlackHandlers.cs — Shared Slack event handlers + schedule executor for AppBotEye.
+﻿// AppBotEyeSlackHandlers.cs — Shared Slack event handlers + schedule executor for AppBotEye.
 // Used by EyeGlobalPollingLoop (GlobalMode) — the only Eye mode.
 // Kept as separate partial class file for readability (SetupSlackEventHandlers is ~440 lines).
 
@@ -136,7 +136,7 @@ internal partial class Program
         if (DateTime.UtcNow - _lastAppbotVsCodeSpawnAt < cooldown) return;
         _lastAppbotVsCodeSpawnAt = DateTime.UtcNow;
 
-        var appbotDir = Environment.CurrentDirectory; // "W:\GitHub\WKAppBot"
+        var appbotDir = Environment.CurrentDirectory; // "D:\GitHub\WKAppBot"
         if (string.IsNullOrWhiteSpace(appbotDir) || IsSystemOrInstallDirectory(appbotDir)) return;
 
         Console.ForegroundColor = ConsoleColor.Yellow;
@@ -503,7 +503,7 @@ internal partial class Program
         }
 
         // "클롣 [WG-WKAppBot]" → "WG-WKAppBot" 추출 + leaf name도 추가
-        // AbbreviateCwd("W:\GitHub\WKAppBot") = "WG-WKAppBot" → leaf = "WKAppBot"
+        // AbbreviateCwd("D:\GitHub\WKAppBot") = "WG-WKAppBot" → leaf = "WKAppBot"
         // 윈도우 타이틀엔 원본 폴더명("WKAppBot")만 있으므로 leaf도 매칭 시도
         var cwdNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var uname in botUsernames)

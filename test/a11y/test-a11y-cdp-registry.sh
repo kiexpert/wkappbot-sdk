@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot a11y cdp selector registry infrastructure
 # Verifies CdpSelectorRegistry class with JSON config + defaults
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpSelectorRegistry.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpSelectorRegistry.cs"
 P=0; F=0
 
 echo "=== CDP Selector Registry Infrastructure ==="

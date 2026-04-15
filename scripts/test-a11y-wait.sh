@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-a11y-wait.sh — a11y wait --condition / --not test suite
 # Usage: bash scripts/test-a11y-wait.sh [WK_EXE]
 set -uo pipefail
 
-WK="${1:-W:/SDK/bin/wkappbot.exe}"
+WK="${1:-D:/SDK/bin/wkappbot.exe}"
 PASS=0; FAIL=0; SKIP=0
 
 pass() { echo "[PASS] $1"; ((PASS++)); }

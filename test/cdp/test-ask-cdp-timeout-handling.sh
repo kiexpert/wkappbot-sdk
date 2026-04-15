@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: wkappbot ask cdp timeout handling completeness
 # Verifies all timeout paths: command-level, eval-level, connection-level
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
 P=0; F=0
 
 echo "=== CDP Timeout Handling Completeness ==="

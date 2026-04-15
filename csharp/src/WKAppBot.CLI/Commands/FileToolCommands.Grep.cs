@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
@@ -104,7 +104,7 @@ internal partial class Program
 
         try
         {
-            // ';' in path segments = OR expansion: "W:/A;B/logs" → two roots
+            // ';' in path segments = OR expansion: "D:/A;B/logs" → two roots
             var searchRoots = ExpandGlobSegments(searchRoot).ToList();
             IEnumerable<string> files;
             if (searchRoots.Count == 1 && File.Exists(searchRoots[0]))
@@ -201,7 +201,7 @@ Pattern formats:
 Examples:
   wkappbot file json-grep '{ ""role"": ""user"" }' session.jsonl
   wkappbot file json-grep '{ ""role"": ""user"", ""content"": ""screensaver"" }' *.jsonl
-  wkappbot file json-grep ""error"" --path W:/SDK/bin/wkappbot.hq --max 20
+  wkappbot file json-grep ""error"" --path D:/SDK/bin/wkappbot.hq --max 20
   wkappbot json-grep ""TypeAndSubmit"" ~/.claude/projects/**/sessions/*.jsonl");
             return 0;
         }

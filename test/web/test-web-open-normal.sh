@@ -1,13 +1,13 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-web-open-normal.sh
 # Tests: web open always uses normal Chrome browser mode (not app mode)
 # Verifies fix: appMode removed — Chrome launches with normal UI (tabs + address bar)
 #               IME input works correctly in normal mode (was broken in --app= mode)
 # Cmd ref: web open (ChromeLauncher.cs LaunchAsync)
 
-WKBOT="${WKBOT:-W:/SDK/bin/wkappbot.exe}"
-LAUNCHER="${LAUNCHER:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs}"
-WEBCMD="${WEBCMD:-W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs}"
+WKBOT="${WKBOT:-D:/SDK/bin/wkappbot.exe}"
+LAUNCHER="${LAUNCHER:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs}"
+WEBCMD="${WEBCMD:-D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs}"
 
 if [ ! -f "$WKBOT" ]; then
   echo "[SKIP] wkappbot.exe not found"

@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -392,7 +392,7 @@ internal partial class Program
                         ["image_path"] = Prop("string",
                             "Image file path for vision AI actions (ask-gpt, ask-gemini, ask-claude).\n" +
                             "Pass a screenshot or image file to attach it as visual context.\n" +
-                            "Example: image_path=\"W:/SDK/bin/wkappbot.hq/output/capture_001.png\"\n" +
+                            "Example: image_path=\"D:/SDK/bin/wkappbot.hq/output/capture_001.png\"\n" +
                             "Note: 'grap' also works for backward compatibility, but image_path is preferred for clarity."),
                         ["text"] = Prop("string", "Text for type/set-value/file-write/ask-*/slack actions. Use @filename to reference a temp file (e.g. \"@/tmp/edit.txt\")"),
                         ["new_string"] = Prop("string", "For file-edit: alias of text. Replacement text to write."),

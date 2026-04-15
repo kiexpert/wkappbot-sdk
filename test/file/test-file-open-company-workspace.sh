@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Evidence: file open routes an HTS project source file to the responsible company VS Code workspace window.
 
 if [ -z "${WKAPPBOT:-}" ]; then
@@ -12,8 +12,8 @@ if [ -z "${WKAPPBOT:-}" ]; then
   fi
 fi
 
-TARGET="W:\\HTS_Project\\Source\\RunControls\\ScGridCheCtl\\ScCtlGridChe.cpp:5352"
-EXPECTED_CWD="W:\\HTS_Project\\Source\\RunControls\\ScGridCheCtl"
+TARGET="D:\\HTS_Project\\Source\\RunControls\\ScGridCheCtl\\ScCtlGridChe.cpp:5352"
+EXPECTED_CWD="D:\\HTS_Project\\Source\\RunControls\\ScGridCheCtl"
 
 OUT=$("$WKAPPBOT" file open "$TARGET" 2>&1)
 STATUS=$?

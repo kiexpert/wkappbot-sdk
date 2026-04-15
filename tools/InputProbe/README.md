@@ -1,4 +1,4 @@
-# InputProbe
+﻿# InputProbe
 
 입력 파이프라인 검증용 경량 프로브입니다.
 
@@ -9,7 +9,7 @@
 
 ## 실행
 ```powershell
-W:\SDK\dotnet\dotnet.exe run --project W:\GitHub\WKAppBot\tools\InputProbe\InputProbe.csproj -- "메모장" "HELLO WORLD"
+D:\SDK\dotnet\dotnet.exe run --project D:\GitHub\WKAppBot\tools\InputProbe\InputProbe.csproj -- "메모장" "HELLO WORLD"
 ```
 
 옵션:

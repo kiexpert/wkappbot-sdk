@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: web open and navigate both output TabID -- CDP-first Chrome validation (no Aborting)
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
 P=0; F=0
 
 echo "=== web open target output source check ==="

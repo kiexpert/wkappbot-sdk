@@ -1,9 +1,9 @@
-# test-encoding.ps1 — Encoding test for wkappbot Launcher pipe relay
+﻿# test-encoding.ps1 — Encoding test for wkappbot Launcher pipe relay
 # Captures raw bytes from wkappbot output, decodes as UTF-8 and CP949, verifies Korean text.
 # Usage: powershell -File scripts/test-encoding.ps1 [wkappbot-path]
 
 param(
-    [string]$WkPath = "W:\SDK\bin\wkappbot.exe"
+    [string]$WkPath = "D:\SDK\bin\wkappbot.exe"
 )
 
 $ErrorActionPreference = "Continue"

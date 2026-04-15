@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 
 namespace WKAppBot.Android;
@@ -283,7 +283,7 @@ public class AdbClient
         var candidates = new[]
         {
             Path.Combine(Environment.GetEnvironmentVariable("ANDROID_HOME") ?? "", "platform-tools", "adb.exe"),
-            @"W:\SDK\Android\platform-tools\adb.exe",
+            @"D:\SDK\Android\platform-tools\adb.exe",
             @"C:\Android\platform-tools\adb.exe",
         };
         foreach (var c in candidates)

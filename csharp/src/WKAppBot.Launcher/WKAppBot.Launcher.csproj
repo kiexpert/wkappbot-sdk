@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -25,7 +25,7 @@
   <!-- build.cmd renames current→.old-timestamp.exe, then copies new one to original path -->
   <!-- Standalone publish (no build.cmd): ContinueOnError=true if locked, .new.exe as fallback -->
   <Target Name="DeployLauncher" AfterTargets="CopyNativeBinary" Condition="'$(SkipDeployLauncher)' != 'true'">
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="W:\SDK\bin\wkappbot.exe" OverwriteReadOnlyFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="D:\SDK\bin\wkappbot.exe" OverwriteReadOnlyFiles="true" ContinueOnError="true" />
     <Message Text="[Launcher] wkappbot.exe deployed" Importance="high" />
   </Target>
 

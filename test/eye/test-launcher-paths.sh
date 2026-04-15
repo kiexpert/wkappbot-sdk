@@ -1,10 +1,10 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-launcher-paths.sh — Launcher 전 경로 스모크 테스트
 # Usage: bash test/test-launcher-paths.sh
 # 후배 클롣들은 코드 변경 후 반드시 실행!
 
-WK=W:/SDK/bin/wkappbot.exe
-CORE=W:/SDK/bin/wkappbot-core.exe
+WK=D:/SDK/bin/wkappbot.exe
+CORE=D:/SDK/bin/wkappbot-core.exe
 PASS=0; FAIL=0; SKIP=0
 RESULTS=()
 

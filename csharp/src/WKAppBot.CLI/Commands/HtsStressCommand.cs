@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using WKAppBot.Core.Runner;
 using WKAppBot.Vision;
 using WKAppBot.Win32.Native;
@@ -67,7 +67,7 @@ Options:
         if (!File.Exists(formPath))
         {
             // Try relative to VIGSOne
-            var alt = $@"W:\VIGSOne\BinD\Win32\MultiByte\HTSRun\screen\{formPath}";
+            var alt = $@"D:\VIGSOne\BinD\Win32\MultiByte\HTSRun\screen\{formPath}";
             if (File.Exists(alt)) formPath = alt;
             else return Error($"Form file not found: {formPath}");
         }

@@ -1,4 +1,4 @@
-# WKAppBot v5.13.140 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v5.13.140 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -27,11 +27,11 @@
 - **eye tick**: one-shot status query (includes ctx=N%) / **eye**: FSW hybrid loop
 - **Handoff**: `wkappbot newchat "prompt"` — passes context summary to new chat
 - **Cro card forbidden!**: OpenClaw(Cro) is a separate service — do not modify. Only Claude cards OK.
-- **CWD shorthand**: `W:\GitHub\WKAppBot` → `WG-WKAppBot` / noise filters: `NO_REPLY`, `ㄱㄱ`
+- **CWD shorthand**: `D:\GitHub\WKAppBot` → `WG-WKAppBot` / noise filters: `NO_REPLY`, `ㄱㄱ`
 
 ### Build & Deploy
 ```bash
-"W:/SDK/dotnet/dotnet" publish 'W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal
+"D:/SDK/dotnet/dotnet" publish 'D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal
 ```
 - **Hot-Swap**: publish triggers auto-detect + swap by Eye. **NEVER kill Eye!**
 - Auto-publish after any `.cs` edit without waiting for instructions
@@ -278,7 +278,7 @@ Supported actions: click/double_click/right_click/type_text/press_key/hotkey/wai
 
 ## Deploy Structure
 ```
-W:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
+D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ```
 
 ## References

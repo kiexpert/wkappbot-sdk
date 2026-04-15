@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: Eye card CWD cross-match fix for reliable sort order
 # Verifies: suggestion 2026-04-02T01:15 — Eye cards sort by most recently active
 
 set -e
-REPO="W:/GitHub/WKAppBot"
+REPO="D:/GitHub/WKAppBot"
 FILE="$REPO/csharp/src/WKAppBot.CLI/Commands/AppBotEyeHealthCheck.cs"
 
 echo "=== Checking Eye card CWD cross-match fix ==="
@@ -19,5 +19,5 @@ fi
 
 echo ""
 echo "=== Live: eye tick (exercises card build path) ==="
-"W:/SDK/bin/wkappbot.exe" eye tick 2>&1 | head -3
+"D:/SDK/bin/wkappbot.exe" eye tick 2>&1 | head -3
 echo "PASS: eye tick card path verified"

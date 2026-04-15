@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Evidence: ASK CDP stability fixes (3 bugs + minimize 과잉 제거 + 포커스 워치독)
 # Verifies: merge 2026-04-04T08:37:50 (CDP 안정성) + merge 2026-04-04T08:38:35 (포커스 워치독)
 
 set -e
-REPO="W:/GitHub/WKAppBot"
+REPO="D:/GitHub/WKAppBot"
 CDP_SRC="$REPO/csharp/src/WKAppBot.WebBot/CdpClient.cs"
 
 echo "=== Bug 1: Runtime.enable retry with backoff ==="
@@ -49,7 +49,7 @@ echo "PASS: focus-stealing method auto-restores after send"
 
 echo ""
 echo "=== Live: ask --help ==="
-"W:/SDK/bin/wkappbot.exe" ask --help 2>&1 | head -3
+"D:/SDK/bin/wkappbot.exe" ask --help 2>&1 | head -3
 echo "PASS: ask command accessible"
 
 echo "ALL PASS"

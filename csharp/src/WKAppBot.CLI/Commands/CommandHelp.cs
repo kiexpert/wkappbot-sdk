@@ -1,4 +1,4 @@
-// CommandHelp.cs -- Per-command --help descriptions for future Claude instances.
+﻿// CommandHelp.cs -- Per-command --help descriptions for future Claude instances.
 // Usage: wkappbot <command> --help  |  wkappbot <command> <subcommand> --help
 //        wkappbot <command> [<subcommand>] --regression  -- help + run stored test scripts
 //
@@ -136,7 +136,7 @@ internal partial class Program
         var gitBash = @"C:\Program Files\Git\usr\bin\bash.exe";
         var bashExe = File.Exists(gitBash) ? gitBash : "bash";
 
-        // Convert Windows path to POSIX for bash (e.g. W:\path \u2192 /w/path)
+        // Convert Windows path to POSIX for bash (e.g. D:\path \u2192 /w/path)
         static string ToPosix(string winPath) =>
             System.Text.RegularExpressions.Regex.Replace(
                 winPath.Replace('\\', '/'),
@@ -385,7 +385,7 @@ internal partial class Program
                   Same old+new = search-only (no write). --old-file/--new-file for Korean args.
                   Option aliases also work: --old-string/--text/--path/--dry-run.
               grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
-                  Regex search. ';' OR in --path: "W:/A;B" expands.
+                  Regex search. ';' OR in --path: "D:/A;B" expands.
                   Aliases: --pattern/--query, --root, --file.
               glob <pattern> [--path <dir>]
                   ** glob. NOTE: ALWAYS use **/ prefix: "**/*.cs" not "*.cs".

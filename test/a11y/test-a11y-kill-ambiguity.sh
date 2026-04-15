@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-a11y-kill-ambiguity.sh — verify a11y kill ambiguity guard
 # Fix: multi-match without --nth → find-mode list (no kill)
 #      self-kill guard: cmdline-only match on wkappbot-core → skip unless firstArg matches
@@ -13,7 +13,7 @@ check() {
     fi
 }
 
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.Kill.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.Kill.cs"
 
 # Source-level: ambiguity guard present
 check "ambiguity guard: candidates.Count > 1 block" \
@@ -38,11 +38,11 @@ check "self-kill guard: isDaemonTarget firstArg check" \
 
 # Functional: unmatchable pattern exits 1 (no crash, no kill)
 check "a11y kill nomatch exits 1" \
-    "! \"W:/SDK/bin/wkappbot.exe\" a11y kill \"__no_such_proc_xyz__\" > /dev/null 2>&1"
+    "! \"D:/SDK/bin/wkappbot.exe\" a11y kill \"__no_such_proc_xyz__\" > /dev/null 2>&1"
 
 # Functional: --dry-run with 'wkappbot' pattern shows dry output or guard (not actual kill)
 check "a11y kill wkappbot --dry-run does not hard-kill" \
-    "\"W:/SDK/bin/wkappbot.exe\" a11y kill \"wkappbot\" --dry-run 2>&1 | grep -qiE 'DRY|ambiguous|no matching|GUARD'"
+    "\"D:/SDK/bin/wkappbot.exe\" a11y kill \"wkappbot\" --dry-run 2>&1 | grep -qiE 'DRY|ambiguous|no matching|GUARD'"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

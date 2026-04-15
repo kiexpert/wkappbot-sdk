@@ -1,11 +1,11 @@
-{
+﻿{
   "id": "qmd-local-codebase-search-install-index-and-query",
   "app": "wkappbot-workflow",
   "title": "QMD Local Codebase Search \u2014 Install, Index, and Query",
   "desc": "QMD: BM25 \u002B vector semantic \u002B optional LLM reranking local search engine. Pre-indexes C# source, skill JSONs, and docs. Claude resolves qmd://collection/file.cs:42 references directly to file\u002Bline, cutting exploration tokens by 91%. MCP server exposes search as mcp__qmd__* tools.",
   "steps": [
     "[WHAT] QMD is a local search engine (BM25 \u002B vector embeddings) that pre-indexes your codebase. Claude uses it to jump directly to the right file:line instead of globbing and grepping the entire repo.",
-    "[INSTALL] Install via bun: bun install -g @tobilu/qmd. On Windows, create a wrapper: W:/SDK/bin/qmd.cmd pointing to bun.exe \u002B dist/cli/qmd.js %* . npm install also works but creates shell script wrappers that fail on Windows.",
+    "[INSTALL] Install via bun: bun install -g @tobilu/qmd. On Windows, create a wrapper: D:/SDK/bin/qmd.cmd pointing to bun.exe \u002B dist/cli/qmd.js %* . npm install also works but creates shell script wrappers that fail on Windows.",
     "[COLLECTIONS] Add collections from the project root: qmd collection add wkappbot-src --mask **/*.cs , qmd collection add wkappbot-skills --mask **/*.skill.json , qmd collection add wkappbot-docs --mask **/*.md . Use --mask (not --glob) for glob patterns.",
     "[CONTEXT] Add human descriptions to help Claude understand each collection: qmd context add \u0027WKAppBot C# source...\u0027 -- qmd://wkappbot-src/ . This description appears in every search result.",
     "[EMBED] Generate vector embeddings: qmd embed . Downloads 329MB embedding model on first run (embeddinggemma-300M-Q8_0.gguf). Subsequent runs are incremental. Run after adding new files.",

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # test-a11y-hack-ocr-unavailable.sh — verify SimpleOcrAnalyzer ctor exception is caught gracefully
 # Fix: RunOcrWorker now wraps new SimpleOcrAnalyzer() in try-catch, returns early on failure
 PASS=0; FAIL=0
@@ -12,7 +12,7 @@ check() {
     fi
 }
 
-SRC="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.OcrWorker.cs"
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.OcrWorker.cs"
 
 # Fix: constructor is wrapped in try-catch
 check "SimpleOcrAnalyzer ctor in try-catch" \
@@ -28,7 +28,7 @@ check "ocr disposed via using" \
 
 # No unhandled exception: wkappbot a11y windows runs (smoke test)
 check "wkappbot a11y windows smoke test" \
-    "! \"W:/SDK/bin/wkappbot.exe\" a11y windows 2>&1 | grep -qa 'FileNotFoundException\|Unhandled exception'"
+    "! \"D:/SDK/bin/wkappbot.exe\" a11y windows 2>&1 | grep -qa 'FileNotFoundException\|Unhandled exception'"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

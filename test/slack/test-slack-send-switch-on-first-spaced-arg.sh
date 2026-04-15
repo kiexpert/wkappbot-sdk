@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="/w/GitHub/WKAppBot"
-EXE="W:\\SDK\\bin\\wkappbot-core.exe"
+EXE="D:\\SDK\\bin\\wkappbot-core.exe"
 cd "$ROOT"
 
 out="$(powershell.exe -NoProfile -Command "& '$EXE' slack send notice \"first item\" \"second item\" --dry-run | Out-String -Width 4096")"

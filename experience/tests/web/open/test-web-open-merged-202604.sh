@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # Test: web open merged bugs -- Aborting removed, cmdline Chrome ID, TabID output verified
-SRC_WEB="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
-SRC_LAUNCH="W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRC_WEB="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs"
+SRC_LAUNCH="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
 P=0; F=0
 
 echo "=== web open merged bug verification 2026-04 ==="

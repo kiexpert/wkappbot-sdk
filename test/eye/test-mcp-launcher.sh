@@ -1,8 +1,8 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: MCP server via Launcher (wkappbot.exe mcp) — full launcher relay
 # Verifies: Launcher spawns Core, stdin→pipe→Core→pipe→stdout relay works
 
-WKAPPBOT="${WKAPPBOT:-W:/SDK/bin/wkappbot.exe}"
+WKAPPBOT="${WKAPPBOT:-D:/SDK/bin/wkappbot.exe}"
 PASS=0; FAIL=0
 OUTFILE=/tmp/mcp_launcher_stdout.txt
 ERRFILE=/tmp/mcp_launcher_stderr.txt

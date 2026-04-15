@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # WKAppBot comprehensive smoke test — all major commands
 # Usage: bash scripts/smoke_test.sh [--no-slack] [--quick]
 #
@@ -15,7 +15,7 @@ for arg in "$@"; do
     [[ "$arg" == "--quick" ]] && QUICK=1
 done
 
-WKA="W:/SDK/bin/wkappbot.exe"
+WKA="D:/SDK/bin/wkappbot.exe"
 
 # ─── warmup: ensure Eye is running (spawns if not) ─────────────────────────
 echo "── Warmup (eye tick) ──────────────────────────"
@@ -152,8 +152,8 @@ banner "Eye"
 
 # ─── Validate (YAML) ───────────────────────────────────────────────────────
 banner "Validate"
-if [ -f "W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml" ]; then
-    check_g "validate yaml"  bash -c "\"$WKA\" validate 'W:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' 2>&1 | grep -qiE 'valid|ok|error|scenario'"
+if [ -f "D:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml" ]; then
+    check_g "validate yaml"  bash -c "\"$WKA\" validate 'D:/GitHub/WKAppBot/scenarios/calc_four_ops.yaml' 2>&1 | grep -qiE 'valid|ok|error|scenario'"
 else
     skip "validate yaml (no scenario file)"
 fi
@@ -219,7 +219,7 @@ if [ "$QUICK" -eq 0 ]; then
 
     if [ "$CHROME_RUNNING" -gt 0 ]; then
         CRM="*Chrome*;*Chromium*;*Edge*"
-        TEST_URL="file:///W:/GitHub/WKAppBot/scripts/smoke_test.html"
+        TEST_URL="file:///D:/GitHub/WKAppBot/scripts/smoke_test.html"
         TEST_HINT="smoke_test.html"
 
         # -- Open test page --

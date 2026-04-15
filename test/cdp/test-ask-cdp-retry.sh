@@ -1,9 +1,9 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: CDP timeout retry logic exists and EvalAsync has retry(1)
 # Verifies BUG-AUTO CDP timeout suggests are already handled
 
 GRAP=${GRAP:-/w/SDK/bin/grap.exe}
-SRC="W:/GitHub/WKAppBot/csharp/src"
+SRC="D:/GitHub/WKAppBot/csharp/src"
 PASS=0
 FAIL=0
 

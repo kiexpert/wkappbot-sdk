@@ -16,8 +16,7 @@ public class AdbDeviceRegistry
     public AdbDeviceRegistry(AdbClient adb, string? hqPath = null)
     {
         _adb = adb;
-        var hq = hqPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            "SDK", "bin", "wkappbot.hq");
+        var hq = hqPath ?? Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
         _aliasPath = Path.Combine(hq, "profiles", "adb_devices.json");
     }
 

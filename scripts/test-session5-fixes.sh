@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Session 5 fixes verification
 # Tests: speak help, CDP eval retry, pump watchdog, hack-hover improvements
 
@@ -25,18 +25,18 @@ echo "[CMD] wkappbot a11y hack — verify hack"
 # #10: CDP EvalAsync retry (code check — no runtime needed)
 echo "[CMD] ask web commands verified via code grep"
 echo "[TEST] CDP EvalAsync 3-retry"
-grep -q "attempt < 3" W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
+grep -q "attempt < 3" D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
 check $? "EvalAsync 3 attempts"
-grep -q "delayMs" W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
+grep -q "delayMs" D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
 check $? "EvalAsync backoff delay"
 
 # #7: pump watchdog 5s + 2-phase
 echo "[TEST] pump watchdog 5s"
-grep -q "await Task.Delay(3000)" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
+grep -q "await Task.Delay(3000)" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
 check $? "watchdog phase 1 (3s)"
-grep -q "await Task.Delay(2000)" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
+grep -q "await Task.Delay(2000)" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
 check $? "watchdog phase 2 (2s)"
-grep -q "second < first" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
+grep -q "second < first" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CdpPromptPump.cs
 check $? "watchdog decrease check"
 
 # hack-hover improvements (code check)
@@ -44,30 +44,30 @@ echo "[CMD] wkappbot a11y hack --help"
 timeout 10 $WKAPPBOT a11y hack --help 2>&1 | head -3
 echo "[CMD] wkappbot a11y hack-input verified"
 echo "[TEST] hack-hover"
-grep -q "ScreenReaderMode.Enable" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
+grep -q "ScreenReaderMode.Enable" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
 check $? "screen reader auto-enable"
-grep -q "TryRenameSwap" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
+grep -q "TryRenameSwap" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
 check $? "hotswap support"
-grep -q "FindAllDescendants" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
+grep -q "FindAllDescendants" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
 check $? "full UIA descendant scan"
-grep -q "FileSystemWatcher" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
+grep -q "FileSystemWatcher" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yHackWorkers.cs
 check $? "experience DB FSW"
 
 # auto-hack spawn isolation
 echo "[TEST] auto-hack process isolation"
-grep -q 'caller: "AUTO-HACK"' W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs
+grep -q 'caller: "AUTO-HACK"' D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs
 check $? "auto-hack spawns separate process"
 
 # overlay no-fill
 echo "[TEST] overlay no-fill"
-grep -c "Brushes.Transparent" W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/A11yHackOverlay.cs | grep -q "[4-9]"
+grep -c "Brushes.Transparent" D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/A11yHackOverlay.cs | grep -q "[4-9]"
 check $? "all roles use transparent fill"
 
 # web/ask command code verification
 echo "[TEST] ask/web CDP code"
-grep -q "EvalAsync" W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
+grep -q "EvalAsync" D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs
 check $? "ask: EvalAsync exists"
-grep -q "ConnectAsync" W:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.cs
+grep -q "ConnectAsync" D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/CdpClient.cs
 check $? "web: ConnectAsync exists"
 
 echo ""

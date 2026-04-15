@@ -1,4 +1,4 @@
-# Prompt Window Discovery & Status Tracking
+﻿# Prompt Window Discovery & Status Tracking
 
 How WKAppBot identifies *which* Claude/Codex prompt window issued a command,
 and how it tracks per-window Slack status state across Eye restarts.
@@ -79,7 +79,7 @@ prompt windows with fields:
 VS Code window title format `"... — {cwd} — Visual Studio Code"`.
 
 **CWD abbreviation**: `AbbreviateCwd(path)` converts full paths to short tags,
-e.g. `W:\GitHub\lucy_securepad` → `lucy-securepad`.
+e.g. `D:\GitHub\lucy_securepad` → `lucy-securepad`.
 
 ---
 

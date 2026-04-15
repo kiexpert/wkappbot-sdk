@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Test: a11y zoom live capture — real-time WriteableBitmap rendering for occluded windows
 # Verifies InputZoomOverlay has fast raw-pixel path (no codec encode/decode)
 # Implements suggest #8: 돋보기 실시간 뷰 (2026-03-30T12:37)
@@ -7,9 +7,9 @@
 #   even when target is fully occluded (PrintWindow ignores Z-order)
 
 PASS=0; FAIL=0
-OVERLAY="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/InputZoomOverlay.cs"
-ZOOM="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/ClickZoomHelper.cs"
-INPUT="W:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/InputCommand.cs"
+OVERLAY="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/InputZoomOverlay.cs"
+ZOOM="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/ClickZoomHelper.cs"
+INPUT="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/InputCommand.cs"
 
 echo "=== Test: a11y zoom live capture (WriteableBitmap fast path) ==="
 

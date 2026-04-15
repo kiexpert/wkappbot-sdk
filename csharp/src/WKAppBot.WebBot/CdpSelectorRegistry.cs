@@ -9,9 +9,7 @@ namespace WKAppBot.WebBot;
 /// </summary>
 public static class CdpSelectorRegistry
 {
-    static readonly string _jsonPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "..", "SDK", "bin", "wkappbot.hq", "cdp_selectors.json");
+    static readonly string _jsonPath = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "cdp_selectors.json");
 
     static Dictionary<string, Dictionary<string, string[]>>? _cache;
     static DateTime _cacheTime;

@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Evidence: file open sends a real HTS source file to the matched HTS VS Code workspace window.
 
 set -euo pipefail
@@ -14,7 +14,7 @@ if [ -z "${WKAPPBOT:-}" ]; then
   fi
 fi
 
-TARGET='W:\HTS_Project\Source\RunControls\ScGridCheCtl\ScCtlGridChe.cpp:5352'
+TARGET='D:\HTS_Project\Source\RunControls\ScGridCheCtl\ScCtlGridChe.cpp:5352'
 TMP="${TMPDIR:-/tmp}/wkappbot-file-open-hts-$$.log"
 : >"$TMP"
 
@@ -23,7 +23,7 @@ powershell.exe -Command "Start-Sleep -Seconds 31" >/dev/null 2>&1
 
 "$WKAPPBOT" file open "$TARGET" >"$TMP" 2>&1
 
-grep -F 'cwd=W:\HTS_Project\Source\RunControls\ScGridCheCtl' "$TMP" >/dev/null || {
+grep -F 'cwd=D:\HTS_Project\Source\RunControls\ScGridCheCtl' "$TMP" >/dev/null || {
   echo "FAIL: HTS workspace cwd was not selected"
   cat "$TMP"
   exit 1

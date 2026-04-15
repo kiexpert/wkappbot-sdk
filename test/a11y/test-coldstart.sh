@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # test-coldstart.sh — 30s cold start analysis + zombie detection
 # Usage: bash test/test-coldstart.sh
 #
@@ -6,8 +6,8 @@
 # Tests IOCP path + Core direct, counts zombies after each.
 # PASS: all runs < 5s, zombies = 0 after cleanup
 
-WK=W:/SDK/bin/wkappbot.exe
-CORE=W:/SDK/bin/wkappbot-core.exe
+WK=D:/SDK/bin/wkappbot.exe
+CORE=D:/SDK/bin/wkappbot-core.exe
 PASS=0; FAIL=0
 
 echo "=== Cold Start + Zombie Test ==="

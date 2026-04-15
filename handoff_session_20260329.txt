@@ -1,4 +1,4 @@
-# Handoff 2026-03-29 Session (continued from 03-28)
+﻿# Handoff 2026-03-29 Session (continued from 03-28)
 
 ## CURRENT STATE: v5.3.38+ (25+ commits today), Eye running, all pushed
 
@@ -87,4 +87,4 @@
 - csharp/src/WKAppBot.Launcher/Program.cs — LAUNCH JSON + CreateProcessW trace
 
 ## GOLDEN BINARY
-W:\SDK\bin\wkappbot.hq\wkappbot-core.known-good-v5.3.21.exe
+D:\SDK\bin\wkappbot.hq\wkappbot-core.known-good-v5.3.21.exe
