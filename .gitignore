@@ -10,8 +10,28 @@ build/
 venv/
 
 # C# / .NET
-bin/
 obj/
+# bin/: allow wkappbot.hq learned data, ignore build artifacts
+bin/*.exe
+bin/*.dll
+bin/*.pdb
+bin/*.vbs
+bin/*.deps.json
+bin/*.runtimeconfig.json
+bin/pip-cache/
+bin/py-user/
+# bin/wkappbot.hq: mirror same rules as repo-root wkappbot.hq/
+bin/wkappbot.hq/logs/
+bin/wkappbot.hq/runtime/
+bin/wkappbot.hq/output/
+bin/wkappbot.hq/sessions/
+bin/wkappbot.hq/skills/
+bin/wkappbot.hq/handlers/
+!bin/wkappbot.hq/experience/
+!bin/wkappbot.hq/suggestions.jsonl
+!bin/wkappbot.hq/profiles/
+bin/wkappbot.hq/profiles/*/wav/
+!bin/build_info.json
 *.user
 *.suo
 *.cache
@@ -20,7 +40,7 @@ obj/
 # Output & Temp files
 output/
 logs/
-profiles/
+/profiles/
 
 # wkappbot.hq: ignore runtime-generated dirs, track learned data (experience/, profiles/)
 wkappbot.hq/logs/
