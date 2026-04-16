@@ -207,7 +207,30 @@ static class ElevatedEyeServer
 
             var stdoutTask = proc.StandardOutput.ReadToEndAsync();
             var stderrTask = proc.StandardError.ReadToEndAsync();
-            await proc.WaitForExitAsync();
+
+            // Hard timeout: admin Eye must respond promptly or client will abandon.
+            // 30s gives slow commands room; if subprocess itself hangs, we kill + return error
+            // instead of holding the pipe handler forever (which was the Bug 1 root cause).
+            using var subprocCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await proc.WaitForExitAsync(subprocCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.Error.WriteLine($"[EYE:ADMIN] Subprocess timeout (30s) for '{req.Command}' — killing");
+                try { proc.Kill(entireProcessTree: true); } catch { }
+                // Give reader tasks a moment to drain whatever was captured
+                try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
+                return new EyeProxyResponse
+                {
+                    Id = req.Id,
+                    ExitCode = -1,
+                    Error = "Subprocess timeout (30s) — admin Eye killed the runaway process",
+                    Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
+                    Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
+                };
+            }
 
             return new EyeProxyResponse
             {
