@@ -273,6 +273,32 @@ partial class Program
             prof("EnsureBusyboxAliases done");
         }
 
+        // --sudo admin Eye 100ms liveness probe (Launcher-side first layer).
+        // Paired with a 100ms probe in Core — total worst-case handshake budget 200ms.
+        // Pipe path check: \\.\pipe\wkappbot_elevated
+        // Connect attempt bounded at 100ms. If admin Eye is in bad state (pipe file present
+        // but unresponsive), we fall through to Core spawn — Core's own 100ms probe will re-check,
+        // then enter sudo protection (LaunchElevatedEye spawns a fresh admin Eye).
+        if (args.Any(a => a == "--sudo"))
+        {
+            try
+            {
+                using var pipe = new System.IO.Pipes.NamedPipeClientStream(
+                    ".", "wkappbot_elevated",
+                    System.IO.Pipes.PipeDirection.InOut,
+                    System.IO.Pipes.PipeOptions.Asynchronous);
+                using var cts = new System.Threading.CancellationTokenSource(100);
+                pipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
+                Console.Error.WriteLine(pipe.IsConnected
+                    ? "[LAUNCHER:SUDO] admin Eye ping (100ms): alive — Core will reuse"
+                    : "[LAUNCHER:SUDO] admin Eye ping (100ms): unreachable");
+            }
+            catch
+            {
+                Console.Error.WriteLine("[LAUNCHER:SUDO] admin Eye ping (100ms): unreachable (fallthrough to Core)");
+            }
+        }
+
         // --stderr: show stderr in real-time (default: buffered, shown only on error)
         // --sudo: implicitly pass through stderr so PULSE trail + ELEVATION reasons are visible
         bool showStderr = args.Any(a => a == "--stderr" || a == "--sudo");
