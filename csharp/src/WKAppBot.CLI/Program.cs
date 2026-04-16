@@ -289,8 +289,7 @@ internal partial class Program
                     PulseStep.Line("admin pipe available (reused)");
                 }
                 // Fast-fail: 1500ms first attempt. If admin Eye accepts connect but hangs on
-                // request (Bug 1 pattern), we detect in 1.5s instead of 5s and trigger recovery
-                // (spawn fresh admin Eye via LaunchElevatedEye).
+                // request (Bug 1 pattern), we detect in 1.5s instead of 5s+5s=10s.
                 PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=1500ms fast-fail)");
                 var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 1500);
                 PulseStep.Line($"first attempt exit={exit}");
@@ -298,8 +297,10 @@ internal partial class Program
                 {
                     PulseStep.Line("fast-fail: admin Eye hung on request → sudo protection path");
                     Console.Error.WriteLine("[SUDO] Admin Eye proxy timed out → spawning fresh admin Eye...");
-                    // Drop the hung admin Eye reference (if any) and spawn a fresh one.
-                    // LaunchElevatedEye has hot-swap piggyback (v5.14) so new admin runs latest core.
+                    // Recovery: LaunchElevatedEye has hot-swap piggyback (v5.14) so new admin runs latest core.
+                    // Note: if hung admin Eye still holds pipe, new admin may queue behind — LaunchElevatedEye
+                    // uses IsAvailable() file check which is satisfied by the hung one. True recovery requires
+                    // a responding admin Eye; if still hung after spawn, retry will also fail (error exit 1).
                     if (!ElevationHelper.LaunchElevatedEye("recovery: hung admin Eye replaced"))
                     {
                         PulseStep.Finish("LaunchElevatedEye recovery FAILED");
@@ -314,6 +315,7 @@ internal partial class Program
                 {
                     PulseStep.Finish("proxy unrecoverable even after recovery");
                     Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed after recovery");
+                    Console.Error.WriteLine("[SUDO] Likely cause: hung admin Eye still holds pipe. Kill it manually then retry.");
                     return 1;
                 }
                 PulseStep.Finish($"proxy OK exit={exit}");

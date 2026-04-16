@@ -256,9 +256,10 @@ else
 fi
 
 # Evidence 5: PULSE trail captured (shows path taken through Core)
-if grep -q "\[PULSE:core-sudo\]" "$RT_ERR"; then
+# StepProfiler uses CallerMemberName ("Main"), so tag is [PULSE:Main] not [PULSE:core-sudo]
+if grep -q "\[PULSE:Main\]" "$RT_ERR"; then
   pass "T7e: PulseStep trail captured in stderr"
-  grep "\[PULSE:core-sudo\]" "$RT_ERR" | head -4
+  grep "\[PULSE:Main\]" "$RT_ERR" | head -4
 else
   fail "T7e: PulseStep trail missing — pulse instrumentation not firing"
 fi
