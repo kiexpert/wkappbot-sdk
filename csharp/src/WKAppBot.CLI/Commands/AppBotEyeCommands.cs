@@ -96,7 +96,10 @@ internal partial class Program
         var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
         var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
         var vbsLog = Path.Combine(vbsDir, "watchdog.log");
-        var guardianArgs = "eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000";
+        // Inherit admin privilege marker: if parent is elevated, new Eye also launches with --sudo
+        // so it registers on admin pipe and behaves as admin Eye (child inherits elevation naturally).
+        var sudoSuffix = Program.IsElevated() ? " --sudo" : "";
+        var guardianArgs = "eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000" + sudoSuffix;
 
         var cwdLine = watchdogCwd != null ? $"ws.CurrentDirectory = \"{watchdogCwd}\"\n" : "";
         var vbsContent =
@@ -168,7 +171,8 @@ internal partial class Program
             string? watchdogCwd = EyeCallerCwd.Length > 0 ? EyeCallerCwd : null;
             var vbsDir = watchdogCwd != null ? Path.Combine(watchdogCwd, ".wkappbot") : dir;
             var vbsPath = Path.Combine(vbsDir, "wkappbot-silent.vbs");
-            var guardianArgs = $"eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000 --eye-hwnd 0x{hwnd.ToInt64():X}";
+            var sudoSuffix = Program.IsElevated() ? " --sudo" : "";
+            var guardianArgs = $"eye guardian --respawn-delay 10 --poll-ms 10000 --tick-timeout-ms 5000 --eye-hwnd 0x{hwnd.ToInt64():X}" + sudoSuffix;
             bool launched = TryLaunchEyeGuardianBootstrap(vbsPath, corePath, guardianArgs, out var launchReason);
             Console.WriteLine(launched
                 ? $"[EYE] Guardian bootstrap launched ({launchReason}, hwnd=0x{hwnd.ToInt64():X})"

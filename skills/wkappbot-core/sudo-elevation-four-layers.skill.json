@@ -1,0 +1,32 @@
+{
+  "id": "sudo-elevation-four-layers",
+  "app": "wkappbot-core",
+  "title": "--sudo option: 4-layer elevation architecture with pulse tracing",
+  "desc": "How the --sudo flag triggers elevation across four independent layers: (1) MCP Launcher pre-execution gate, (2) Core startup CLI handler, (3) eye --sudo force-launch (non-destructive recovery), (4) Eye auto-launch inheritance. Pulse trail \u002B reason string make UAC prompts traceable.",
+  "steps": [
+    "LAYER 1 \u2014 MCP Launcher gate (McpProxy.cs stdin router)\nPre-execution gate detects \u0027\u0022--sudo\u0022\u0027 in incoming JSON-RPC lines.\nIf admin Core not running (_adminProc == IntPtr.Zero \u0026\u0026 !_adminMode):\n  - Save request to _elevationRequestLine\n  - Call existing SpawnAdminCore (unchanged)\n  - Skip forwarding to normal Core\nExisting reactive UIPI \u2192 _elevationRequired path untouched.",
+    "LAYER 2 \u2014 Core startup --sudo handler (Program.cs:233)\nRuns when Core process starts with --sudo in its args.\nFlow:\n  1. Strip --sudo flag\n  2. IsElevated() check \u2014 if already admin, no-op\n  3. If not elevated:\n     - eye command \u2192 force-launch path (layer 3)\n     - other command \u2192 admin Eye proxy route (pipe-persistent)\n       -\u003E ElevatedEyeClient.IsAvailable() \u2192 ExecuteViaProxy\n       -\u003E UAC triggered only if admin Eye missing\nPULSE steps: init \u0027core-sudo\u0027, line \u0027path=X\u0027, finish with result",
+    "LAYER 3 \u2014 eye --sudo force-launch (non-destructive)\nReplaces old destructive kill-then-runas path.\nRationale: when Core sees --sudo without admin, Eye is likely abnormal.\nForce-launch adds admin Eye side-by-side; new admin Eye cleans up old itself.\nCode path:\n  if (IsAvailable()) return \u0027already running\u0027; exit 0\n  else if (LaunchElevatedEye(reason)) return \u0027launched\u0027; exit 0\n  else return \u0027UAC cancelled\u0027; exit 1\nOld user Eye never killed by Core \u2014 responsibility delegated to new admin.",
+    "LAYER 4 \u2014 Eye auto-launch inheritance (AppBotEyeCommands.cs)\nGuardian args now include \u0027--sudo\u0027 when Program.IsElevated() is true.\nEffect:\n  - Admin Core respawning Eye \u2192 new Eye also admin \u002B --sudo marker\n  - User Core respawning Eye \u2192 regular user Eye (no --sudo)\nChild process elevation is inherited from parent automatically;\n--sudo just serves as the marker so new Eye routes through admin pipe.",
+    "PULSE TRACING \u2014 step-by-step debug via stderr\nPulseStep.Init/Line/Finish calls scattered through Program.cs --sudo block.\nAll use force mode (bypass WKAPPBOT_PROFILE env var) so output always visible.\nFormat: [PULSE:core-sudo] \u0027label\u0027 \u002BN ms (total=Nms)\nRing buffer (PulseStep.GetRecentTrail) retains last 20 lines for UAC prompts.",
+    "UAC REASON \u002B TRAIL DUMP (ElevatedEyeProxy.cs)\nLaunchElevatedEye(string reason) prints to stderr BEFORE UAC:\n  [ELEVATION] \u25BC Requesting admin rights: \u003Creason\u003E\n  [ELEVATION] \u2500\u2500 recent step trail \u2500\u2500\n  [ELEVATION]   \u003Clast 5 pulse lines\u003E\n  [ELEVATION] \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nCaller sites provide contextual reasons:\n  eye force-launch \u2192 \u0027eye --sudo force-launch (Eye may be abnormal; recovery)\u0027\n  proxy route \u2192 \u0027--sudo proxy route: command \u003Ccmd\u003E\u0027\n  Readiness UIPI fallback \u2192 \u0027Readiness: UIPI-blocked target, proxy fallback\u0027",
+    "DEBUGGING CHECKLIST\nWhen --sudo behaves unexpectedly:\n  1. Run \u0027wkappbot --sudo \u003Ccmd\u003E 2\u003E\u00261 ",
+    " grep PULSE\u0027 \u2014 see step-by-step flow\n  2. Check trail output before UAC \u2014 \u0027ELEVATION \u25BC\u0027 reason tells you why\n  3. Check admin Eye process: tasklist ",
+    " grep wkappbot-core (expect 2\u002B cores)\n  4. Check admin pipe: Test-Path \u0027\\.\\pipe\\wkappbot_elevated\u0027 (PowerShell)\n  5. Regression tests: bin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh\n     Covers all 4 layers \u002B pulse infrastructure, 9/9 tests."
+  ],
+  "tags": [
+    "operator",
+    "project",
+    "sudo",
+    "elevation",
+    "admin",
+    "debugging",
+    "pulse"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T08:14:14.9665016Z",
+  "updated": "2026-04-16T08:14:14.9665107Z",
+  "version": "1.0"
+}

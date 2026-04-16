@@ -232,61 +232,77 @@ internal partial class Program
         IsPipeMode = Console.IsOutputRedirected;
         if (args.Contains("--sudo"))
         {
+            PulseStep.Init("core-sudo");
             args = args.Where(a => a != "--sudo").ToArray();
+            PulseStep.Line($"flag stripped: remaining args={args.Length}");
             if (!IsElevated())
             {
+                PulseStep.Line("not-elevated: entering admin routing");
                 bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
                 if (isEyeRelaunch)
                 {
-                    Console.WriteLine("[SUDO] Stopping current Eye before admin re-launch...");
-                    foreach (var proc in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
+                    PulseStep.Line("path=eye-force-launch (non-destructive)");
+                    // Force-launch admin Eye side-by-side (non-destructive).
+                    // Keeps existing user Eye alive; spawns separate admin Eye via LaunchElevatedEye.
+                    if (ElevatedEyeClient.IsAvailable())
                     {
-                        try { if (proc.Id != System.Environment.ProcessId) proc.Kill(entireProcessTree: false); } catch { }
-                    }
-                    System.Threading.Thread.Sleep(1500);
-                    Console.WriteLine("[SUDO] Eye stopped — launching admin Eye...");
-                    var quotedArgs2 = string.Join(" ", args.Select(a => a.Contains(' ') ? $"\"{a}\"" : a));
-                    try
-                    {
-                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                        {
-                            FileName = Environment.ProcessPath ?? exePath,
-                            Arguments = quotedArgs2,
-                            Verb = "runas",
-                            UseShellExecute = true,
-                            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                        });
+                        PulseStep.Finish("admin Eye already running");
+                        Console.WriteLine("[SUDO] Admin Eye already running — no action needed");
                         return 0;
                     }
-                    catch (Exception ex)
+                    PulseStep.Line("admin pipe unavailable → LaunchElevatedEye()");
+                    Console.WriteLine("[SUDO] Force-launching admin Eye side-by-side...");
+                    if (ElevationHelper.LaunchElevatedEye("eye --sudo force-launch (Eye may be abnormal; recovery)"))
                     {
-                        Console.Error.WriteLine($"[SUDO] UAC cancelled or failed: {ex.Message}");
-                        return 1;
+                        PulseStep.Finish("admin Eye launched OK");
+                        Console.WriteLine("[SUDO] Admin Eye launched successfully");
+                        return 0;
                     }
+                    PulseStep.Finish("LaunchElevatedEye FAILED (UAC/timeout)");
+                    Console.Error.WriteLine("[SUDO] Failed to launch admin Eye (UAC cancelled or timeout)");
+                    return 1;
                 }
+                PulseStep.Line("path=proxy-route (non-eye command)");
                 Console.WriteLine("[SUDO] Routing via admin Eye proxy (no new window)...");
                 if (!ElevatedEyeClient.IsAvailable())
                 {
-                    if (!ElevationHelper.LaunchElevatedEye())
+                    PulseStep.Line("admin pipe unavailable → LaunchElevatedEye()");
+                    var sudoReason = args.Length > 0
+                        ? $"--sudo proxy route: command '{args[0]}'"
+                        : "--sudo proxy route";
+                    if (!ElevationHelper.LaunchElevatedEye(sudoReason))
                     {
+                        PulseStep.Finish("LaunchElevatedEye FAILED");
                         Console.Error.WriteLine("[SUDO] Failed to launch admin Eye proxy");
                         return 1;
                     }
+                    PulseStep.Line("admin Eye ready");
                 }
+                else
+                {
+                    PulseStep.Line("admin pipe available (reused)");
+                }
+                PulseStep.Line($"ExecuteViaProxy: {args[0]}");
                 var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
+                PulseStep.Line($"first attempt exit={exit}");
                 if (exit == -1)
                 {
+                    PulseStep.Line("exit=-1: retry after 500ms");
                     Console.Error.WriteLine("[SUDO] Proxy communication failed — retrying in 500ms...");
                     Thread.Sleep(500);
                     exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
+                    PulseStep.Line($"retry exit={exit}");
                 }
                 if (exit == -1)
                 {
+                    PulseStep.Finish("proxy unrecoverable");
                     Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed");
                     return 1;
                 }
+                PulseStep.Finish($"proxy OK exit={exit}");
                 return exit;
             }
+            PulseStep.Finish("already elevated: --sudo is no-op");
         }
         if (args.Contains("--read-only"))
         {

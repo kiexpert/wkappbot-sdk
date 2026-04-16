@@ -131,13 +131,16 @@ static class ElevatedEyeServer
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[EYE:PIPE] Pipe error: {ex.Message}");
+                // Backoff to avoid log-spam tight loop when another process holds the pipe name
+                try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                catch (OperationCanceledException) { break; }
             }
             finally
             {
                 pipe?.Dispose();
             }
 
-            // No delay between connections — next WaitForConnectionAsync starts immediately
+            // No delay on happy-path connections — next WaitForConnectionAsync starts immediately
         }
 
         Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
@@ -443,7 +446,7 @@ static class ElevationHelper
         });
     }
 
-    public static bool LaunchElevatedEye()
+    public static bool LaunchElevatedEye(string reason = "Eye proxy")
     {
         try
         {
@@ -458,8 +461,17 @@ static class ElevationHelper
             };
 
             PlayElevationMelody(); // 🎵 before UAC
+
+            // Print reason + recent pulse trail BEFORE UAC so user knows why elevation was requested
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[ELEVATION] Requesting admin rights for Eye proxy...");
+            Console.Error.WriteLine($"[ELEVATION] ▼ Requesting admin rights: {reason}");
+            var trail = WKAppBot.CLI.PulseStep.GetRecentTrail(5);
+            if (trail.Count > 0)
+            {
+                Console.Error.WriteLine("[ELEVATION] ── recent step trail ──");
+                foreach (var line in trail) Console.Error.WriteLine($"[ELEVATION]   {line}");
+                Console.Error.WriteLine("[ELEVATION] ──────────────────────");
+            }
             Console.ResetColor();
 
             var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-ELEVATED");

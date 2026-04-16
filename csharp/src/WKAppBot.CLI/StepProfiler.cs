@@ -28,6 +28,34 @@ internal static class PulseStep
     // One implicit session per caller method name
     private static readonly Dictionary<string, StepProfiler> _sessions = new();
 
+    // Ring buffer of recent emitted pulse lines (for elevation prompt context)
+    private const int _trailSize = 20;
+    private static readonly LinkedList<string> _trail = new();
+    private static readonly object _trailLock = new();
+
+    internal static void RecordTrail(string line)
+    {
+        lock (_trailLock)
+        {
+            _trail.AddLast(line);
+            while (_trail.Count > _trailSize) _trail.RemoveFirst();
+        }
+    }
+
+    /// <summary>Get the last N emitted pulse lines (newest last). Useful for UAC/elevation prompts.</summary>
+    public static IReadOnlyList<string> GetRecentTrail(int n = 5)
+    {
+        lock (_trailLock)
+        {
+            var take = System.Math.Min(n, _trail.Count);
+            var arr = new string[take];
+            int i = take - 1;
+            var node = _trail.Last;
+            while (node != null && i >= 0) { arr[i--] = node.Value; node = node.Previous; }
+            return arr;
+        }
+    }
+
     /// <summary>
     /// Start a new profiling session. Always prints the init line (no threshold).
     /// Resets the session if one already exists for this caller.
@@ -130,7 +158,9 @@ internal sealed class StepProfiler
         if (force || _profEnabled)
         {
             var indent = _myDepth > 0 ? new string(' ', _myDepth * 2) : "";
-            try { Console.Error.WriteLine($"{indent}{msg}"); } catch { }
+            var full = $"{indent}{msg}";
+            try { Console.Error.WriteLine(full); } catch { }
+            PulseStep.RecordTrail(full);
         }
     }
 
