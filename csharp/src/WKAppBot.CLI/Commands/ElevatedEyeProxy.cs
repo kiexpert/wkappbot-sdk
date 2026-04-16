@@ -295,11 +295,14 @@ static class ElevatedEyeClient
 
     /// <summary>
     /// Execute a command via elevated Eye proxy, printing stdout/stderr transparently.
-    /// Returns exit code, or -1 if proxy unavailable.
+    /// Returns exit code, or -1 if proxy unavailable / timed out.
+    /// timeoutMs governs total pipe-round-trip budget (default 5000).
+    /// Use short timeout (e.g. 1500ms) for fast-fail detection of hung admin Eye —
+    /// caller then falls through to LaunchElevatedEye for recovery.
     /// </summary>
-    public static int ExecuteViaProxy(string command, string[] args)
+    public static int ExecuteViaProxy(string command, string[] args, int timeoutMs = 5000)
     {
-        var resp = SendCommandAsync(command, args).GetAwaiter().GetResult();
+        var resp = SendCommandAsync(command, args, timeoutMs).GetAwaiter().GetResult();
         if (resp == null) return -1;
 
         if (!string.IsNullOrEmpty(resp.Stdout))

@@ -288,21 +288,32 @@ internal partial class Program
                 {
                     PulseStep.Line("admin pipe available (reused)");
                 }
-                PulseStep.Line($"ExecuteViaProxy: {args[0]}");
-                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
+                // Fast-fail: 1500ms first attempt. If admin Eye accepts connect but hangs on
+                // request (Bug 1 pattern), we detect in 1.5s instead of 5s and trigger recovery
+                // (spawn fresh admin Eye via LaunchElevatedEye).
+                PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=1500ms fast-fail)");
+                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 1500);
                 PulseStep.Line($"first attempt exit={exit}");
                 if (exit == -1)
                 {
-                    PulseStep.Line("exit=-1: retry after 500ms");
-                    Console.Error.WriteLine("[SUDO] Proxy communication failed — retrying in 500ms...");
-                    Thread.Sleep(500);
-                    exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray());
-                    PulseStep.Line($"retry exit={exit}");
+                    PulseStep.Line("fast-fail: admin Eye hung on request → sudo protection path");
+                    Console.Error.WriteLine("[SUDO] Admin Eye proxy timed out → spawning fresh admin Eye...");
+                    // Drop the hung admin Eye reference (if any) and spawn a fresh one.
+                    // LaunchElevatedEye has hot-swap piggyback (v5.14) so new admin runs latest core.
+                    if (!ElevationHelper.LaunchElevatedEye("recovery: hung admin Eye replaced"))
+                    {
+                        PulseStep.Finish("LaunchElevatedEye recovery FAILED");
+                        Console.Error.WriteLine("[SUDO] Recovery spawn failed (UAC cancelled or timeout)");
+                        return 1;
+                    }
+                    PulseStep.Line("recovery admin Eye launched → retry ExecuteViaProxy (5s)");
+                    exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 5000);
+                    PulseStep.Line($"retry-after-recovery exit={exit}");
                 }
                 if (exit == -1)
                 {
-                    PulseStep.Finish("proxy unrecoverable");
-                    Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed");
+                    PulseStep.Finish("proxy unrecoverable even after recovery");
+                    Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed after recovery");
                     return 1;
                 }
                 PulseStep.Finish($"proxy OK exit={exit}");
