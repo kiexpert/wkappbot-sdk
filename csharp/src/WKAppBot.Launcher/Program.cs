@@ -274,7 +274,8 @@ partial class Program
         }
 
         // --stderr: show stderr in real-time (default: buffered, shown only on error)
-        bool showStderr = args.Any(a => a == "--stderr");
+        // --sudo: implicitly pass through stderr so PULSE trail + ELEVATION reasons are visible
+        bool showStderr = args.Any(a => a == "--stderr" || a == "--sudo");
         var stderrBuf = !showStderr ? new System.Collections.Generic.List<(long ms, string msg)>() : null;
         _stderrBuf = stderrBuf; // for AppBotExit
         _originalStderr = Console.Error; // save before redirect
@@ -353,7 +354,10 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ — must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
-        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite
+        // --sudo must always go to a fresh Core (stale in-memory user Eye can't do admin work
+        // and may bypass new --sudo logic added to Core).
+        var isSudoRequest = forwardArgs.Any(a => a == "--sudo");
+        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
