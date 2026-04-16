@@ -26,6 +26,44 @@
     <RepoBin Condition="'$(RepoBin)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\bin'))</RepoBin>
   </PropertyGroup>
 
+  <!-- PublishAot native linker invokes vswhere.exe to locate Visual Studio Build Tools. -->
+  <!-- vswhere.exe lives at "C:\Program Files (x86)\Microsoft Visual Studio\Installer"     -->
+  <!-- but that directory isn't on PATH by default in shells outside Developer PowerShell. -->
+  <!-- Without this fix, `dotnet publish` from plain bash/cmd fails with                   -->
+  <!--   MSB3073: 'vswhere.exe' is not recognized ... command exited with code 123.        -->
+  <!-- Fix: prepend the VS Installer dir to the MSBuild process's PATH before IlcCompile   -->
+  <!-- runs. Child <Exec> tasks (including the native linker) inherit this PATH.           -->
+  <UsingTask TaskName="PrependVsInstallerPath"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        string[] candidates = {
+          @"C:\Program Files (x86)\Microsoft Visual Studio\Installer",
+          @"C:\Program Files\Microsoft Visual Studio\Installer"
+        };
+        foreach (var dir in candidates) {
+          var exe = Path.Combine(dir, "vswhere.exe");
+          if (!File.Exists(exe)) continue;
+          var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+          var sep = path.Length > 0 && !path.EndsWith(";") ? ";" : "";
+          if (path.IndexOf(dir, StringComparison.OrdinalIgnoreCase) < 0) {
+            Environment.SetEnvironmentVariable("PATH", dir + ";" + path);
+            Log.LogMessage(MessageImportance.High, "[AOT] prepended to PATH for vswhere: " + dir);
+          }
+          break;
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+  <Target Name="EnsureVsWhereOnPath" BeforeTargets="CollectFrameworkReferences;PrepareForBuild;CoreCompile;IlcCompile" Condition="'$(OS)' == 'Windows_NT' and '$(PublishAot)' == 'true'">
+    <PrependVsInstallerPath />
+  </Target>
+
   <!-- Post-publish: deploy launcher directly (running exe can be renamed on NTFS) -->
   <!-- build.cmd renames current→.old-timestamp.exe, then copies new one to original path -->
   <!-- Standalone publish (no build.cmd): ContinueOnError=true if locked, .new.exe as fallback -->
