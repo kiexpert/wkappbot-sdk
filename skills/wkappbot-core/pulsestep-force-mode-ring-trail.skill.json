@@ -1,0 +1,34 @@
+{
+  "id": "pulsestep-force-mode-ring-trail",
+  "app": "wkappbot-core",
+  "title": "PulseStep: force-mode emit \u002B ring-buffer trail for always-visible tracing",
+  "desc": "PulseStep.Init/Line/Done emit to stderr gated by WKAPPBOT_PROFILE env \u2014 use .Line and .Finish (force=true) for always-visible tracing independent of env. Ring buffer GetRecentTrail(n) captures last 20 emitted lines; used to dump recent context in UAC/elevation prompts.",
+  "steps": [
+    "WHEN TO USE WHICH METHOD\n  PulseStep.Init(label)     \u2014 opens session, prints only if WKAPPBOT_PROFILE=1\n  PulseStep.Mark(label)     \u2014 threshold-gated (\u003C100ms delta = silent)\n  PulseStep.Line(label)     \u2014 FORCE mode, always prints (force=true)\n  PulseStep.Done(label)     \u2014 closes session, threshold-gated\n  PulseStep.Finish(label)   \u2014 FORCE close, always prints\nFor always-on tracing (e.g. --sudo flow), use Line \u002B Finish.",
+    "FORCE MODE VS WKAPPBOT_PROFILE\nEmit(msg, force=false) path:\n  if (force ",
+    "",
+    " _profEnabled) { Console.Error.WriteLine(msg); RecordTrail(msg); }\nWhere _profEnabled = Environment.GetEnvironmentVariable(\u0022WKAPPBOT_PROFILE\u0022) == \u00221\u0022.\nSo Init/Mark/Done are silent in prod unless env set.\nLine/Finish pass force=true \u2192 always emit AND record to ring buffer.",
+    "RING BUFFER (v5.14)\nPulseStep maintains LinkedList _trail (size 20).\nEvery Emit call adds to trail (even throttled ones that didn\u0027t print? \u2014 actually only when force ",
+    "",
+    " _profEnabled).\nQuery: PulseStep.GetRecentTrail(int n = 5) \u2192 IReadOnlyList string (newest last).\nUse case: dump recent pulse lines before UAC / on error / in crash log.",
+    "EXAMPLE \u2014 --sudo handler (Program.cs:233\u002B)\n  if (args.Contains(\u0022--sudo\u0022))\n  {\n      PulseStep.Init(\u0022core-sudo\u0022);\n      args = args.Where(...).ToArray();\n      PulseStep.Line(\u0022flag stripped: remaining args=N\u0022);\n      if (!IsElevated())\n      {\n          PulseStep.Line(\u0022not-elevated: entering admin routing\u0022);\n          // ...\n          PulseStep.Finish(\u0022proxy OK exit=0\u0022);\n      }\n  }",
+    "EXAMPLE \u2014 UAC prompt context dump (ElevatedEyeProxy.LaunchElevatedEye)\n  var trail = WKAppBot.CLI.PulseStep.GetRecentTrail(5);\n  foreach (var line in trail)\n      Console.Error.WriteLine(\u0022[ELEVATION]   \u0022 \u002B line);\nShows user what led up to elevation request.",
+    "GOTCHA \u2014 STDERR VISIBILITY UNDER LAUNCHER\nOutput goes to Console.Error.\nLauncher IocpPipeRelay default = stderr buffered (invisible).\nFor visibility: run with --stderr flag (or --sudo since v5.14.x auto-enables).\nSee: skill iocp-stderr-default-buffered",
+    "NESTING \u002B ASYNC\nEach session has its own depth via AsyncLocal _nestDepth.\nPrinted with 2-space indent per level.\nGC finalizer warns if Init called without Done/Finish (leaked session).",
+    "FILES\n  csharp/src/WKAppBot.CLI/StepProfiler.cs \u2014 implementation\n  csharp/src/WKAppBot.CLI/Program.cs:233\u002B \u2014 --sudo usage\n  csharp/src/WKAppBot.CLI/Commands/ElevatedEyeProxy.cs \u2014 trail consumer"
+  ],
+  "tags": [
+    "developer",
+    "project",
+    "debugging",
+    "pulse",
+    "stepprofiler",
+    "tracing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T08:42:42.005189Z",
+  "updated": "2026-04-16T08:42:42.0051984Z",
+  "version": "1.0"
+}

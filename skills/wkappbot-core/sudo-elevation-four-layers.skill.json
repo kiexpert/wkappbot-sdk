@@ -1,18 +1,21 @@
 {
   "id": "sudo-elevation-four-layers",
   "app": "wkappbot-core",
-  "title": "--sudo option: 4-layer elevation architecture with pulse tracing",
-  "desc": "How the --sudo flag triggers elevation across four independent layers: (1) MCP Launcher pre-execution gate, (2) Core startup CLI handler, (3) eye --sudo force-launch (non-destructive recovery), (4) Eye auto-launch inheritance. Pulse trail \u002B reason string make UAC prompts traceable.",
+  "title": "--sudo option: 6-layer elevation architecture with pulse tracing (v5.14)",
+  "desc": "How --sudo triggers elevation across six coordinated layers: (1) MCP Launcher gate, (2) Core startup handler, (3) eye --sudo force-launch (non-destructive), (4) Eye auto-launch --sudo inheritance, (5) Pre-spawn hot-swap piggyback in LaunchElevatedEye, (6) Launcher --sudo always bypasses stale Eye pipe \u002B implicit stderr passthrough. Pulse ring-buffer \u002B reason dump make UAC prompts traceable.",
   "steps": [
-    "LAYER 1 \u2014 MCP Launcher gate (McpProxy.cs stdin router)\nPre-execution gate detects \u0027\u0022--sudo\u0022\u0027 in incoming JSON-RPC lines.\nIf admin Core not running (_adminProc == IntPtr.Zero \u0026\u0026 !_adminMode):\n  - Save request to _elevationRequestLine\n  - Call existing SpawnAdminCore (unchanged)\n  - Skip forwarding to normal Core\nExisting reactive UIPI \u2192 _elevationRequired path untouched.",
-    "LAYER 2 \u2014 Core startup --sudo handler (Program.cs:233)\nRuns when Core process starts with --sudo in its args.\nFlow:\n  1. Strip --sudo flag\n  2. IsElevated() check \u2014 if already admin, no-op\n  3. If not elevated:\n     - eye command \u2192 force-launch path (layer 3)\n     - other command \u2192 admin Eye proxy route (pipe-persistent)\n       -\u003E ElevatedEyeClient.IsAvailable() \u2192 ExecuteViaProxy\n       -\u003E UAC triggered only if admin Eye missing\nPULSE steps: init \u0027core-sudo\u0027, line \u0027path=X\u0027, finish with result",
-    "LAYER 3 \u2014 eye --sudo force-launch (non-destructive)\nReplaces old destructive kill-then-runas path.\nRationale: when Core sees --sudo without admin, Eye is likely abnormal.\nForce-launch adds admin Eye side-by-side; new admin Eye cleans up old itself.\nCode path:\n  if (IsAvailable()) return \u0027already running\u0027; exit 0\n  else if (LaunchElevatedEye(reason)) return \u0027launched\u0027; exit 0\n  else return \u0027UAC cancelled\u0027; exit 1\nOld user Eye never killed by Core \u2014 responsibility delegated to new admin.",
-    "LAYER 4 \u2014 Eye auto-launch inheritance (AppBotEyeCommands.cs)\nGuardian args now include \u0027--sudo\u0027 when Program.IsElevated() is true.\nEffect:\n  - Admin Core respawning Eye \u2192 new Eye also admin \u002B --sudo marker\n  - User Core respawning Eye \u2192 regular user Eye (no --sudo)\nChild process elevation is inherited from parent automatically;\n--sudo just serves as the marker so new Eye routes through admin pipe.",
-    "PULSE TRACING \u2014 step-by-step debug via stderr\nPulseStep.Init/Line/Finish calls scattered through Program.cs --sudo block.\nAll use force mode (bypass WKAPPBOT_PROFILE env var) so output always visible.\nFormat: [PULSE:core-sudo] \u0027label\u0027 \u002BN ms (total=Nms)\nRing buffer (PulseStep.GetRecentTrail) retains last 20 lines for UAC prompts.",
-    "UAC REASON \u002B TRAIL DUMP (ElevatedEyeProxy.cs)\nLaunchElevatedEye(string reason) prints to stderr BEFORE UAC:\n  [ELEVATION] \u25BC Requesting admin rights: \u003Creason\u003E\n  [ELEVATION] \u2500\u2500 recent step trail \u2500\u2500\n  [ELEVATION]   \u003Clast 5 pulse lines\u003E\n  [ELEVATION] \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nCaller sites provide contextual reasons:\n  eye force-launch \u2192 \u0027eye --sudo force-launch (Eye may be abnormal; recovery)\u0027\n  proxy route \u2192 \u0027--sudo proxy route: command \u003Ccmd\u003E\u0027\n  Readiness UIPI fallback \u2192 \u0027Readiness: UIPI-blocked target, proxy fallback\u0027",
-    "DEBUGGING CHECKLIST\nWhen --sudo behaves unexpectedly:\n  1. Run \u0027wkappbot --sudo \u003Ccmd\u003E 2\u003E\u00261 ",
-    " grep PULSE\u0027 \u2014 see step-by-step flow\n  2. Check trail output before UAC \u2014 \u0027ELEVATION \u25BC\u0027 reason tells you why\n  3. Check admin Eye process: tasklist ",
-    " grep wkappbot-core (expect 2\u002B cores)\n  4. Check admin pipe: Test-Path \u0027\\.\\pipe\\wkappbot_elevated\u0027 (PowerShell)\n  5. Regression tests: bin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh\n     Covers all 4 layers \u002B pulse infrastructure, 9/9 tests."
+    "LAYER 1 \u2014 MCP Launcher pre-execution gate (McpProxy.cs stdin router)\nPre-detects \u0027\u0022--sudo\u0022\u0027 in JSON-RPC requests; preemptively calls SpawnAdminCore if admin not running. Existing reactive UIPI path untouched.",
+    "LAYER 2 \u2014 Core startup --sudo handler (Program.cs:233\u002B)\nStrips --sudo, checks IsElevated.\nBranches: eye command \u2192 force-launch (layer 3) / other \u2192 proxy route.\nPulseStep markers at every decision point (Init/Line/Finish).",
+    "LAYER 3 \u2014 eye --sudo non-destructive force-launch\nReplaced old destructive kill\u002Brunas path. Now just calls LaunchElevatedEye side-by-side:\n  if (IsAvailable()) \u2192 \u0027already running\u0027, exit 0\n  else if (LaunchElevatedEye) \u2192 \u0027launched\u0027, exit 0\n  else \u2192 \u0027UAC cancelled\u0027, exit 1\nOld user Eye preserved; new admin Eye cleans up abnormal Eye itself.",
+    "LAYER 4 \u2014 Eye auto-launch --sudo inheritance (AppBotEyeCommands.cs)\nGuardian args append \u0027 --sudo\u0027 when Program.IsElevated()==true.\nAdmin Core respawning Eye \u2192 new Eye also admin\u002B--sudo marker.\nUser Core respawning Eye \u2192 regular user Eye.",
+    "LAYER 5 \u2014 Pre-spawn hot-swap piggyback (v5.14)\nLaunchElevatedEye, before runas\u002BUAC, checks for wkappbot-core.new.exe.\nIf pending: rename current exe \u2192 backup name, rename .new.exe \u2192 .exe.\nAdmin Eye starts from latest code.\nRename of running exe is permitted on Windows (delete/overwrite is not).\nLogs: \u0027[ELEVATION:HOT-SWAP] pending .new.exe detected \u2014 promoting before admin spawn\u0027",
+    "LAYER 6 \u2014 Launcher-side --sudo bypass \u002B stderr passthrough (v5.14.x hotfix)\nBug 3 (stale Eye bypass): Launcher adds isSudoRequest to Eye pipe delegation skip condition.\n  Prevents stale in-memory user Eye from handling --sudo with old code.\nBug 4 (stderr visibility): showStderr now implicitly true when --sudo in args.\n  Otherwise IocpPipeRelay buffers stderr (invisible for DETACHED_PROCESS Core).\nWithout Layer 6 fixes, PULSE tracing \u002B [ELEVATION] reason/trail never reach user.",
+    "PULSE TRACING \u2014 step-by-step debug via stderr\nProgram.cs uses PulseStep.Init/Line/Finish throughout --sudo block.\nForce mode (Line) always emits (bypass WKAPPBOT_PROFILE env).\nRing buffer (20 lines) captured in PulseStep.GetRecentTrail \u2014 used by UAC prompt.",
+    "UAC REASON \u002B TRAIL DUMP (ElevatedEyeProxy.LaunchElevatedEye(reason))\nBefore UAC, prints to stderr:\n  [ELEVATION] \u25BC Requesting admin rights: \u003Creason\u003E\n  [ELEVATION] \u2500\u2500 recent step trail \u2500\u2500\n  [ELEVATION]   \u003Clast 5 pulse lines\u003E\n  [ELEVATION] \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nSites provide contextual reasons:\n  eye force-launch: \u0027eye --sudo force-launch (Eye may be abnormal; recovery)\u0027\n  proxy route: \u0027--sudo proxy route: command \u003Ccmd\u003E\u0027\n  Readiness UIPI: \u0027Readiness: UIPI-blocked target, proxy fallback\u0027",
+    "DEBUGGING CHECKLIST\nWhen --sudo misbehaves:\n  1. Run \u0027wkappbot --sudo \u003Ccmd\u003E 2\u003E\u00261 ",
+    " grep PULSE\u0027 \u2014 step-by-step flow\n  2. Trail before UAC tells you which step requested admin\n  3. tasklist ",
+    " grep wkappbot-core \u2192 expect 2\u002B cores (user\u002Badmin)\n  4. Admin pipe: Test-Path \u0027\\.\\pipe\\wkappbot_elevated\u0027\n  5. Regression: bin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh (T1-T7)",
+    "KNOWN OPEN ISSUE (v5.14.x)\nBug 1: admin Eye receives request via pipe but hangs inside its request handler.\n  Symptom: ExecuteViaProxy returns -1 after 5s OperationCanceledException.\n  Retry also times out \u2192 returns exit 1.\n  Requires deeper dive into admin Eye request processing."
   ],
   "tags": [
     "operator",
@@ -21,12 +24,13 @@
     "elevation",
     "admin",
     "debugging",
-    "pulse"
+    "pulse",
+    "v5.14"
   ],
   "source_refs": null,
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-16T08:14:14.9665016Z",
-  "updated": "2026-04-16T08:14:14.9665107Z",
-  "version": "1.0"
+  "updated": "2026-04-16T08:41:37.7190903Z",
+  "version": "1.1"
 }
