@@ -150,6 +150,62 @@ else
 fi
 echo ""
 
+# ── S5: admin Eye process actually has High integrity (proves UAC-granted elevation) ──
+echo "=== S5: admin Eye highest integrity level is High (admin) ==="
+if [ "$(admin_pipe_alive)" = "NO" ]; then
+  fail "S5: admin pipe not alive — skip (cannot verify integrity without admin Eye)"
+else
+  IL_OUT=$(powershell -Command "
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class IL {
+  [DllImport(\"kernel32.dll\", SetLastError=true)]
+  public static extern IntPtr OpenProcess(int access, bool inherit, int pid);
+  [DllImport(\"kernel32.dll\")] public static extern bool CloseHandle(IntPtr h);
+  [DllImport(\"advapi32.dll\", SetLastError=true)]
+  public static extern bool OpenProcessToken(IntPtr p, int access, out IntPtr tok);
+  [DllImport(\"advapi32.dll\", SetLastError=true)]
+  public static extern bool GetTokenInformation(IntPtr tok, int cls, IntPtr info, int len, out int ret);
+  [DllImport(\"advapi32.dll\", SetLastError=true)]
+  public static extern IntPtr GetSidSubAuthority(IntPtr sid, int idx);
+  public const int TokenIntegrityLevel=25;
+  public const int TOKEN_QUERY=8;
+  public const int PROCESS_QUERY_LIMITED_INFORMATION=0x1000;
+  public static int Level(int pid) {
+    var h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+    if (h == IntPtr.Zero) return 0;
+    try {
+      IntPtr tok;
+      if (!OpenProcessToken(h, TOKEN_QUERY, out tok)) return 0;
+      try {
+        int sz; GetTokenInformation(tok, TokenIntegrityLevel, IntPtr.Zero, 0, out sz);
+        var buf = Marshal.AllocHGlobal(sz);
+        try {
+          if (!GetTokenInformation(tok, TokenIntegrityLevel, buf, sz, out sz)) return 0;
+          var sid = Marshal.ReadIntPtr(buf);
+          var last = GetSidSubAuthority(sid, Marshal.ReadByte(sid,1)-1);
+          return Marshal.ReadInt32(last);
+        } finally { Marshal.FreeHGlobal(buf); }
+      } finally { CloseHandle(tok); }
+    } finally { CloseHandle(h); }
+  }
+}
+'@ -PassThru | Out-Null
+Get-Process wkappbot-core -ErrorAction SilentlyContinue | ForEach-Object {
+  \$il = [IL]::Level(\$_.Id)
+  Write-Host ('pid={0} il=0x{1:X}' -f \$_.Id, \$il)
+}
+  " 2>/dev/null)
+  echo "$IL_OUT" | head -12
+  if echo "$IL_OUT" | grep -qE "il=0x[34][0-9A-Fa-f]{3}"; then
+    pass "S5: at least one wkappbot-core runs with High (0x3000+) integrity — UAC elevation confirmed"
+  else
+    fail "S5: NO wkappbot-core has High integrity — admin Eye not actually elevated"
+  fi
+fi
+echo ""
+
 # ── Summary ──
 echo "=== Summary ==="
 echo "PASS: $PASS  FAIL: $FAIL"
