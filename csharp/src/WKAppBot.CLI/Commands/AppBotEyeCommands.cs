@@ -800,10 +800,17 @@ internal partial class Program
         // admin Eye spawns the new version itself (already elevated — no UAC needed) then exits.
         if (isElevatedArg)
         {
+            // "나야말로 진짜다" — broadcast close signal: existing admin Eye(s) drain + exit.
+            // Must fire BEFORE starting own pipe so old admin releases its pipe first → clean gap.
+            AdminEyeBroadcastClose.FireBroadcast();
+
             Console.WriteLine("[EYE:ADMIN] Elevated proxy mode — pipe server starting (no WPF/MCP/Slack)");
             PulseStep.Mark("elevated-proxy-only");
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
+
+            // Watch for future new-admin-Eye broadcasts → graceful self-exit.
+            AdminEyeBroadcastClose.StartListener(proxyCts);
 
             // Dual FSW: .new.exe staging (early drain trigger) + .exe replacement (fast path).
             // .new.exe → start draining immediately, then poll until swap complete → spawn
