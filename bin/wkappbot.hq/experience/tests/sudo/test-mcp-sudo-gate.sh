@@ -166,6 +166,48 @@ fi
 rm -f "$EYE_OUT" "$EYE_ERR"
 echo ""
 
+# ── Test 6: eye --sudo hot-swap piggyback (promotes .new.exe before UAC) ──
+#   Expected: ElevatedEyeProxy.LaunchElevatedEye detects wkappbot-core.new.exe
+#   and promotes it before spawning admin Eye (admin runs latest code).
+#   Logs [ELEVATION:HOT-SWAP] line if pending swap existed.
+echo "=== Test 6: eye --sudo promotes pending .new.exe (hot-swap piggyback) ==="
+HS_OUT=$(mktemp)
+HS_ERR=$(mktemp)
+BIN_DIR="D:/GitHub/WKAppBot/bin"
+FAKE_NEW="$BIN_DIR/wkappbot-core.new.exe"
+
+# Only run swap probe if admin Eye not running AND there isn't already a .new.exe
+# (we don't disturb running admin Eye; this is a code-path coverage test)
+if [ ! -f "$FAKE_NEW" ]; then
+  # Seed a synthetic .new.exe by duplicating current core (same size/hash; just to trigger promotion path)
+  cp "$BIN_DIR/wkappbot-core.exe" "$FAKE_NEW" 2>/dev/null
+  SEEDED=1
+else
+  SEEDED=0
+fi
+
+timeout 15 "$WKAPPBOT" eye --sudo 1>"$HS_OUT" 2>"$HS_ERR"
+EXIT6=$?
+echo "exit=$EXIT6"
+
+# If admin Eye was already running, promotion path is skipped (not a failure, just no-op).
+# Otherwise: [ELEVATION:HOT-SWAP] markers should appear.
+if grep -q "Admin Eye already running" "$HS_ERR" "$HS_OUT"; then
+  pass "T6: admin Eye already running — hot-swap probe skipped (not a failure)"
+elif grep -q "\[ELEVATION:HOT-SWAP\] promoted\|\[ELEVATION:HOT-SWAP\] pending" "$HS_ERR" "$HS_OUT"; then
+  pass "T6: hot-swap piggyback fired — .new.exe promoted before admin spawn"
+  grep "\[ELEVATION:HOT-SWAP\]" "$HS_ERR" "$HS_OUT" | head -3
+else
+  fail "T6: no hot-swap markers and admin Eye not acknowledged"
+  tail -10 "$HS_ERR"
+fi
+
+# Cleanup seeded file if we added it and it wasn't promoted
+[ "$SEEDED" -eq 1 ] && [ -f "$FAKE_NEW" ] && rm -f "$FAKE_NEW"
+
+rm -f "$HS_OUT" "$HS_ERR"
+echo ""
+
 # ── Summary ──
 echo "=== Summary ==="
 echo "PASS: $PASS  FAIL: $FAIL"
