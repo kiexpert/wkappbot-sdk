@@ -337,6 +337,22 @@ partial class Program
                         else if (line.Contains("\"method\":\"tools/list\""))
                             _toolsListLine = line;
 
+                        // Pre-execution gate: --sudo detected + admin Core not yet running
+                        // → trigger admin spawn (same machinery as reactive elevation intercept).
+                        // Queue this request as _elevationRequestLine; SpawnAdminCore replays it on success.
+                        // If spawn fails, existing SpawnAdminCore error path handles the response.
+                        if (id != null && line.Contains("\"--sudo\"") && _adminProc == IntPtr.Zero && !_adminMode)
+                        {
+                            Console.Error.WriteLine($"[LAUNCHER:MCP] --sudo requested (id={id}) — preemptive admin Core spawn");
+                            _inflight[id] = line;
+                            _elevationRequestLine = line;
+                            new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
+                                ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
+                                ref _activeStdinWriter, ref _adminMode, ref _pendingSwapWhileAdmin, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
+                            { IsBackground = true, Name = "mcp-sudo-spawn" }.Start();
+                            continue; // don't forward to normal Core — admin will handle after spawn
+                        }
+
                         // Track in-flight requests
                         if (id != null)
                             _inflight[id] = line;

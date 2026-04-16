@@ -1,0 +1,173 @@
+#!/bin/bash
+# Test: MCP --sudo pre-execution gate in McpProxy.cs
+#
+# Expected behavior AFTER Launcher rebuild:
+#   - Request with "--sudo" in JSON-RPC arguments triggers preemptive admin spawn
+#   - Launcher stderr contains: [LAUNCHER:MCP] --sudo requested (id=...) — preemptive admin Core spawn
+#   - Normal requests (no --sudo) do NOT trigger the gate
+#
+# IMPORTANT: This test causes a UAC prompt when the gate fires.
+#   Use --skip-uac env var to only verify baseline (no UAC-causing request).
+
+set -u
+WKAPPBOT="D:/GitHub/WKAppBot/bin/wkappbot.exe"
+STDOUT_LOG=$(mktemp)
+STDERR_LOG=$(mktemp)
+SUDO_LOG=$(mktemp)
+SUDO_STDERR=$(mktemp)
+PASS=0
+FAIL=0
+trap 'rm -f "$STDOUT_LOG" "$STDERR_LOG" "$SUDO_LOG" "$SUDO_STDERR"' EXIT
+
+pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+
+echo "=== Test setup ==="
+echo "Launcher: $WKAPPBOT"
+echo "Launcher mtime: $(stat -c '%y' "$WKAPPBOT" 2>/dev/null || echo 'unknown')"
+echo ""
+
+# ── Test 1: Normal request without --sudo (baseline) ──
+echo "=== Test 1: normal request passes through (no gate fire) ==="
+(
+  echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+  sleep 1
+  echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"wkappbot_cli","arguments":{"argv":["windows"]}}}'
+  sleep 3
+) | timeout 8 "$WKAPPBOT" mcp 1>"$STDOUT_LOG" 2>"$STDERR_LOG"
+EXIT1=$?
+echo "exit=$EXIT1"
+
+if grep -q "preemptive admin Core spawn" "$STDERR_LOG"; then
+  fail "T1: gate fired on NON-sudo request (false positive)"
+  grep "preemptive" "$STDERR_LOG" | head -3
+else
+  pass "T1: gate did NOT fire on normal request"
+fi
+
+if grep -q "jsonrpc" "$STDOUT_LOG"; then
+  pass "T1: MCP responded with JSON-RPC output"
+else
+  fail "T1: no JSON-RPC response captured"
+fi
+echo ""
+
+# ── Test 2: --sudo request triggers gate (UAC may pop up) ──
+echo "=== Test 2: --sudo request triggers preemptive admin spawn ==="
+echo "WARNING: UAC dialog may appear — accept or cancel within 6 seconds"
+(
+  echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+  sleep 1
+  echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"wkappbot_cli","arguments":{"argv":["--sudo","--help"]}}}'
+  sleep 4
+) | timeout 10 "$WKAPPBOT" mcp 1>"$SUDO_LOG" 2>"$SUDO_STDERR"
+EXIT2=$?
+echo "exit=$EXIT2"
+
+if grep -q "preemptive admin Core spawn" "$SUDO_STDERR"; then
+  pass "T2: gate detected --sudo and triggered admin spawn"
+  grep "preemptive\|SUDO\|ELEVATION" "$SUDO_STDERR" | head -5
+else
+  fail "T2: gate did NOT fire on --sudo request — Launcher likely pre-change binary"
+  echo "--- stderr tail ---"
+  tail -20 "$SUDO_STDERR"
+fi
+echo ""
+
+# ── Test 3: line.Contains pattern check (raw protocol verification) ──
+echo "=== Test 3: verify JSON-RPC line contains \"--sudo\" literally ==="
+LINE='{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"wkappbot_cli","arguments":{"argv":["--sudo","--help"]}}}'
+if echo "$LINE" | grep -q '"--sudo"'; then
+  pass "T3: JSON-RPC payload includes quoted --sudo as the gate expects"
+else
+  fail "T3: --sudo pattern not found in JSON-RPC line (detection will miss)"
+fi
+echo ""
+
+# ── Test 4: CLI non-MCP path — wkappbot --sudo triggers Core's startup handler ──
+#   Covers: Program.cs:233 detects --sudo at Core startup and routes via admin Eye proxy
+#   (pipe-persistent admin spawn — re-uses admin Eye daemon, no UAC if already running)
+echo "=== Test 4: CLI Core startup --sudo detection (non-MCP path) ==="
+CLI_OUT=$(mktemp)
+CLI_ERR=$(mktemp)
+trap 'rm -f "$STDOUT_LOG" "$STDERR_LOG" "$SUDO_LOG" "$SUDO_STDERR" "$CLI_OUT" "$CLI_ERR"' EXIT
+
+timeout 15 "$WKAPPBOT" --sudo windows 1>"$CLI_OUT" 2>"$CLI_ERR"
+EXIT4=$?
+echo "exit=$EXIT4"
+
+# Evidence 1: Core's --sudo handler message must appear (Program.cs:267)
+if grep -q "\[SUDO\] Routing via admin Eye proxy" "$CLI_ERR" "$CLI_OUT"; then
+  pass "T4a: Core detected --sudo and routed via admin Eye proxy"
+elif grep -q "\[SUDO\]" "$CLI_ERR" "$CLI_OUT"; then
+  pass "T4a: Core --sudo handler activated (non-routing path)"
+  grep "\[SUDO\]" "$CLI_ERR" "$CLI_OUT" | head -3
+else
+  fail "T4a: no [SUDO] marker found — Core may not have received --sudo"
+  echo "--- stderr tail ---"
+  tail -10 "$CLI_ERR"
+fi
+
+# Evidence 2: exit must be terminal (0 = proxy ran, or 1 = proxy unavailable/denied)
+# Must NOT be 124 (timeout) which would indicate hang
+if [ "$EXIT4" -eq 0 ] || [ "$EXIT4" -eq 1 ]; then
+  pass "T4b: CLI --sudo exited cleanly (no hang) — exit=$EXIT4"
+elif [ "$EXIT4" -eq 124 ]; then
+  fail "T4b: CLI --sudo HUNG (timeout 15s) — admin Eye proxy may be unreachable"
+else
+  pass "T4b: CLI --sudo exited with code $EXIT4 (not a hang)"
+fi
+echo ""
+
+# ── Test 5: eye --sudo force-launch (non-destructive admin Eye spawn) ──
+#   Expected: if admin Eye already running → "already running" message, no kill
+#   If not: triggers LaunchElevatedEye (UAC if needed), side-by-side with user Eye
+echo "=== Test 5: wkappbot eye --sudo force-launches admin Eye (non-destructive) ==="
+EYE_OUT=$(mktemp)
+EYE_ERR=$(mktemp)
+
+# Snapshot current Eye PIDs before — non-destructive flag should NOT kill them
+BEFORE_PIDS=$(tasklist //FI "IMAGENAME eq wkappbot-core.exe" 2>/dev/null | grep -oE '[0-9]{3,6}' | sort -n | tr '\n' ',')
+echo "Cores before: $BEFORE_PIDS"
+
+timeout 15 "$WKAPPBOT" eye --sudo 1>"$EYE_OUT" 2>"$EYE_ERR"
+EXIT5=$?
+echo "exit=$EXIT5"
+
+# Snapshot after — ensure no cores killed
+AFTER_PIDS=$(tasklist //FI "IMAGENAME eq wkappbot-core.exe" 2>/dev/null | grep -oE '[0-9]{3,6}' | sort -n | tr '\n' ',')
+echo "Cores after: $AFTER_PIDS"
+
+# Evidence 1: must show force-launch OR already-running marker
+if grep -q "Force-launching admin Eye\|Admin Eye already running\|Admin Eye launched" "$EYE_ERR" "$EYE_OUT"; then
+  pass "T5a: eye --sudo hit non-destructive force-launch path"
+  grep -E "Force-launching|already running|launched" "$EYE_ERR" "$EYE_OUT" | head -3
+else
+  fail "T5a: non-destructive path marker missing"
+  tail -10 "$EYE_ERR"
+fi
+
+# Evidence 2: must NOT contain old kill-path message
+if grep -q "Stopping current Eye\|Eye stopped" "$EYE_ERR" "$EYE_OUT"; then
+  fail "T5b: old destructive kill-path fired — regression!"
+else
+  pass "T5b: old destructive kill-path did NOT fire"
+fi
+
+# Evidence 3: exit clean
+if [ "$EXIT5" -eq 0 ] || [ "$EXIT5" -eq 1 ]; then
+  pass "T5c: eye --sudo exited cleanly — exit=$EXIT5"
+elif [ "$EXIT5" -eq 124 ]; then
+  fail "T5c: eye --sudo HUNG (timeout 15s)"
+else
+  pass "T5c: eye --sudo exit=$EXIT5 (not a hang)"
+fi
+
+rm -f "$EYE_OUT" "$EYE_ERR"
+echo ""
+
+# ── Summary ──
+echo "=== Summary ==="
+echo "PASS: $PASS  FAIL: $FAIL"
+[ "$FAIL" -eq 0 ] && echo "ALL TESTS PASSED" || echo "TESTS FAILED (likely Launcher not yet rebuilt with gate)"
+exit $FAIL

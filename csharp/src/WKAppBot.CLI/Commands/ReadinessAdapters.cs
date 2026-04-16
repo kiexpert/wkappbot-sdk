@@ -196,7 +196,7 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
 
         // Strategy 2: Launch elevated Eye, then delegate
         Console.WriteLine("  [ELEVATION] No elevated Eye — launching admin Eye proxy...");
-        if (ElevationHelper.LaunchElevatedEye())
+        if (ElevationHelper.LaunchElevatedEye("Readiness: UIPI-blocked target, proxy fallback"))
         {
             return DelegateViaProxy();
         }
