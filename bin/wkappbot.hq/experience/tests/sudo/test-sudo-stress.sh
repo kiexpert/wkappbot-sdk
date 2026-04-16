@@ -126,6 +126,9 @@ fi
 echo ""
 
 # ── S4: user Eye pipe FALLBACK integrity ──
+# Give user Eye a moment to drain any queued work from earlier tests so Connect
+# doesn't race with in-flight delegations.
+sleep 2
 echo "=== S4: user Eye pipe refuses --sudo with FALLBACK marker (exit 125) ==="
 if [ "$(user_pipe_alive)" = "NO" ]; then
   fail "S4: user Eye pipe not alive — skip (start Eye first)"
@@ -133,7 +136,7 @@ else
   S4_OUT=$(mktemp)
   powershell -Command "
     \$pipe = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'WKAppBotCmdPipe', [System.IO.Pipes.PipeDirection]::InOut)
-    \$pipe.Connect(2000)
+    \$pipe.Connect(5000)
     \$w = New-Object System.IO.StreamWriter(\$pipe); \$w.AutoFlush = \$true
     \$r = New-Object System.IO.StreamReader(\$pipe)
     \$payload = ConvertTo-Json @('--sudo','windows') -Compress
@@ -148,8 +151,10 @@ else
     \$pipe.Close()
   " 2>&1 | tr -d '\r' > "$S4_OUT"
 
-  got_fallback=$(grep -c "EYE:FALLBACK" "$S4_OUT")
-  got_125=$(grep -c "END 125" "$S4_OUT")
+  # -a: treat as text (PS output contains \x00 null byte before END marker,
+  # which makes grep default to binary-mode "Binary file matches" → count 0).
+  got_fallback=$(grep -ac "EYE:FALLBACK" "$S4_OUT")
+  got_125=$(grep -ac "END 125" "$S4_OUT")
   if [ "$got_fallback" -ge 1 ] && [ "$got_125" -ge 1 ]; then
     pass "S4: user Eye returned [EYE:FALLBACK] + exit 125 as expected"
   else
