@@ -234,6 +234,21 @@ internal static class EyeCmdPipeServer
                     args = args[1..];
                 }
 
+                // ── --sudo fallback guard ──
+                // Regular (non-elevated) user Eye must NOT attempt to handle --sudo requests:
+                // it can't elevate itself and proxying via admin Eye is the caller's job.
+                // Respond with explicit FALLBACK marker + exit 125 so the Launcher can re-run
+                // the command against a fresh Core (which owns the --sudo routing logic).
+                // Belt-and-suspenders: Launcher already skips pipe delegation for --sudo, but a
+                // misbehaving caller could still slip one through. Refuse clearly, not silently.
+                if (args.Contains("--sudo"))
+                {
+                    await pw.WriteLineAsync("[EYE:FALLBACK] --sudo 실패: 일반 아이는 admin 요청을 처리하지 않음");
+                    await pw.WriteLineAsync("[EYE:FALLBACK] Launcher 가 Core 로 재실행하세요 (exit=125)");
+                    await pw.WriteLineAsync($"{EndMarker} 125");
+                    return;
+                }
+
                 // Check __bg flag — fire-and-forget: return immediately, run in background
                 bool isBg = args.Contains(BgFlag, StringComparer.Ordinal);
                 if (isBg)
