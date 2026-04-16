@@ -264,9 +264,15 @@ internal partial class Program
                 }
                 PulseStep.Line("path=proxy-route (non-eye command)");
                 Console.WriteLine("[SUDO] Routing via admin Eye proxy (no new window)...");
-                if (!ElevatedEyeClient.IsAvailable())
+                // 100ms liveness probe (Core side).
+                // Paired with a 100ms probe in Launcher — total worst-case handshake budget 200ms.
+                // If admin Eye is in bad state (pipe file present but unresponsive), fall through to
+                // the sudo protection path (LaunchElevatedEye spawns a fresh admin Eye).
+                bool adminAlive = ElevatedEyeClient.Ping(100);
+                PulseStep.Line($"admin Eye ping (100ms): {(adminAlive ? "alive" : "unreachable")}");
+                if (!adminAlive)
                 {
-                    PulseStep.Line("admin pipe unavailable → LaunchElevatedEye()");
+                    PulseStep.Line("admin pipe unreachable within 100ms → sudo protection: LaunchElevatedEye()");
                     var sudoReason = args.Length > 0
                         ? $"--sudo proxy route: command '{args[0]}'"
                         : "--sudo proxy route";

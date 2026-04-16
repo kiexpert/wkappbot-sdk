@@ -238,6 +238,27 @@ static class ElevatedEyeClient
     public static bool IsAvailable()
         => File.Exists($@"\\.\pipe\{ElevatedEyeServer.PipeName}");
 
+    /// <summary>
+    /// Liveness probe: attempt to connect to admin Eye pipe within connectMs.
+    /// Stronger than IsAvailable (which only checks pipe file existence).
+    /// Confirms a server is actually accepting connections.
+    /// Returns true only if connect succeeded within the timeout.
+    /// Caller should use a hard ceiling (e.g. 200ms) — if admin Eye is in bad state,
+    /// fall through to LaunchElevatedEye (sudo protection path) for recovery.
+    /// </summary>
+    public static bool Ping(int connectMs = 200)
+    {
+        try
+        {
+            using var pipe = new NamedPipeClientStream(
+                ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            using var cts = new CancellationTokenSource(connectMs);
+            pipe.ConnectAsync(connectMs, cts.Token).GetAwaiter().GetResult();
+            return pipe.IsConnected;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Send a command to elevated Eye and get the result.</summary>
     public static async Task<EyeProxyResponse?> SendCommandAsync(
         string command, string[] args, int timeoutMs = 5000)
