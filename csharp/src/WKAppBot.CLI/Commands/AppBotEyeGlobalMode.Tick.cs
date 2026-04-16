@@ -76,7 +76,12 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
-        host.SetElevatedBorder(ElevationHelper.IsElevated());
+        // Amber border when admin Eye proxy is reachable — NOT when current process is
+        // elevated. User Eye itself is never elevated; what matters is whether a separate
+        // admin Eye is serving the wkappbot_elevated pipe so --sudo commands can route
+        // to it. IsElevated() here was a long-standing bug that kept the border blue
+        // forever regardless of admin session state.
+        host.SetElevatedBorder(ElevatedEyeClient.Ping(100));
         PulseStep.Mark("tick-host-info");
         var eyeSummary = BuildEyeSummary(cards, latest, promptPreview, promptDiag.FileWriteUtc);
         Console.WriteLine(string.IsNullOrWhiteSpace(eyeSummary)
