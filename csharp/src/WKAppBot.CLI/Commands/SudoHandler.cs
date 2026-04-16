@@ -131,6 +131,12 @@ internal static class SudoHandler
             PulseStep.Line($"SudoHandler: UAC cancelled err={ex.NativeErrorCode}");
         }
 
+        // Prominent UAC outcome marker — not just PulseStep ring buffer
+        Console.ForegroundColor = uacApproved ? ConsoleColor.Green : ConsoleColor.DarkYellow;
+        Console.Error.WriteLine($"[SUDO:UAC] approved={(uacApproved ? "YES" : "NO")}"
+            + (uacEx != null ? $" (err={uacEx.NativeErrorCode})" : ""));
+        Console.ResetColor();
+
         // Post-UAC 100ms handshake — pre-booting admin Eye may have finished
         // during the UAC dialog wait.
         if (ElevatedEyeClient.Ping(100))
@@ -138,6 +144,7 @@ internal static class SudoHandler
             Console.ForegroundColor = ConsoleColor.Green;
             Console.Error.WriteLine("[SUDO] admin Eye responsive post-UAC — reusing (skipping our spawn)");
             Console.ResetColor();
+            VerifyAndReportAdminIntegrity();
             return true;
         }
 
@@ -158,6 +165,7 @@ internal static class SudoHandler
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.Error.WriteLine("[SUDO] admin Eye pipe up — handshake OK");
                 Console.ResetColor();
+                VerifyAndReportAdminIntegrity();
                 return true;
             }
         }
@@ -166,6 +174,48 @@ internal static class SudoHandler
         Console.Error.WriteLine("[SUDO] admin Eye did not respond within 10s");
         Console.ResetColor();
         return false;
+    }
+
+    /// <summary>
+    /// After admin Eye becomes responsive, verify its integrity level is actually High
+    /// (admin) and emit a prominent marker. If the "admin" Eye is somehow running as
+    /// medium integrity (e.g. pipe squatter, misconfigured runas), the user sees the
+    /// discrepancy immediately instead of assuming elevation succeeded.
+    /// </summary>
+    static void VerifyAndReportAdminIntegrity()
+    {
+        try
+        {
+            // Find wkappbot-core processes. The admin one has High/System integrity.
+            uint highestIL = 0;
+            uint highestPid = 0;
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
+            {
+                try
+                {
+                    var il = WKAppBot.Win32.Native.NativeMethods.GetProcessIntegrityLevel((uint)p.Id);
+                    if (il > highestIL) { highestIL = il; highestPid = (uint)p.Id; }
+                }
+                catch { }
+                finally { p.Dispose(); }
+            }
+            // 0x1000=Low, 0x2000=Medium (user), 0x3000=High (admin), 0x4000=System
+            var label = highestIL switch
+            {
+                >= 0x4000 => "System",
+                >= 0x3000 => "High (admin)",
+                >= 0x2000 => "Medium (user)",
+                _ => $"Low/Unknown (0x{highestIL:X})"
+            };
+            var color = highestIL >= 0x3000 ? ConsoleColor.Green : ConsoleColor.Red;
+            Console.ForegroundColor = color;
+            Console.Error.WriteLine($"[SUDO:VERIFY] highest wkappbot-core integrity level: {label} pid={highestPid}");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SUDO:VERIFY] integrity check skipped: {ex.Message}");
+        }
     }
 
     /// <summary>Fire-and-forget speak: alerts user before UAC dialog appears.</summary>
