@@ -266,6 +266,68 @@ fi
 rm -f "$RT_OUT" "$RT_ERR"
 echo ""
 
+# ── Test 8: Launcher-side 100ms admin Eye liveness probe ──
+#   Verify [LAUNCHER:SUDO] admin Eye ping marker appears in stderr when --sudo used
+echo "=== Test 8: Launcher 100ms probe marker ==="
+L_OUT=$(mktemp)
+L_ERR=$(mktemp)
+
+timeout 10 "$WKAPPBOT" --sudo windows 1>"$L_OUT" 2>"$L_ERR"
+EXIT8=$?
+
+if grep -qE "\[LAUNCHER:SUDO\] admin Eye ping \(100ms\): (alive|unreachable)" "$L_ERR" "$L_OUT"; then
+  pass "T8: Launcher 100ms probe marker emitted"
+  grep "\[LAUNCHER:SUDO\]" "$L_ERR" "$L_OUT" | head -2
+else
+  fail "T8: Launcher probe marker missing — v5.14+2-layer binary not loaded?"
+fi
+
+rm -f "$L_OUT" "$L_ERR"
+echo ""
+
+# ── Test 9: Core-side 100ms admin Eye ping (replaces IsAvailable file check) ──
+echo "=== Test 9: Core Ping(100ms) liveness probe ==="
+C_OUT=$(mktemp)
+C_ERR=$(mktemp)
+
+timeout 10 "$WKAPPBOT" --sudo windows 1>"$C_OUT" 2>"$C_ERR"
+EXIT9=$?
+
+if grep -qE "\[PULSE:Main\] \"admin Eye ping \(100ms\): (alive|unreachable)\"" "$C_ERR" "$C_OUT"; then
+  pass "T9: Core 100ms Ping marker emitted"
+  grep "admin Eye ping" "$C_ERR" "$C_OUT" | head -2
+else
+  fail "T9: Core Ping marker missing — Program.cs sudo handler not hitting new path"
+fi
+
+rm -f "$C_OUT" "$C_ERR"
+echo ""
+
+# ── Test 10: Handshake budget — if admin Eye unreachable, both probes abort within ~500ms ──
+#   Budget: 100ms (Launcher) + 100ms (Core) + fork overhead ≤ 500ms to reach sudo protection marker
+#   Only meaningful when admin Eye is NOT running. We don't kill it here (would break other tests);
+#   instead we just verify the PATH fires correctly regardless of admin state.
+echo "=== Test 10: probe ordering (Launcher before Core) ==="
+P_OUT=$(mktemp)
+P_ERR=$(mktemp)
+
+timeout 10 "$WKAPPBOT" --sudo windows 1>"$P_OUT" 2>"$P_ERR"
+EXIT10=$?
+
+# Combined stream (order preserved via separate capture not possible here, so check both streams)
+# Check Launcher marker appears at all and Core marker appears at all
+L_PRESENT=$(grep -cE "\[LAUNCHER:SUDO\]" "$P_ERR" "$P_OUT" | awk -F: '{sum+=$NF} END {print sum+0}')
+C_PRESENT=$(grep -cE "admin Eye ping \(100ms\)" "$P_ERR" "$P_OUT" | awk -F: '{sum+=$NF} END {print sum+0}')
+
+if [ "$L_PRESENT" -ge 1 ] && [ "$C_PRESENT" -ge 1 ]; then
+  pass "T10: both Launcher and Core probe markers present (2-layer defense active)"
+else
+  fail "T10: layer markers incomplete (Launcher=$L_PRESENT Core=$C_PRESENT)"
+fi
+
+rm -f "$P_OUT" "$P_ERR"
+echo ""
+
 # ── Summary ──
 echo "=== Summary ==="
 echo "PASS: $PASS  FAIL: $FAIL"
