@@ -61,20 +61,33 @@ internal partial class Program
         {
             if (processPerfCache.TryGetValue(pid, out var cached)) return cached;
 
+            // Timeout-protected: some restricted processes (e.g. broker-side security apps like
+            // Shinhan StSess32/NzSess32MainWndCN) can stall Process.GetProcessById or property
+            // accesses for 30s. Run in a worker thread with a 300ms budget; on timeout, return
+            // zero metrics so the listing stays responsive.
             double? cpuPct = null;
             long wsMb = 0;
             long pmMb = 0;
-            try
+            var done = new System.Threading.ManualResetEventSlim(false);
+            var worker = new Thread(() =>
             {
-                using var proc = Process.GetProcessById((int)pid);
-                wsMb = proc.WorkingSet64 / (1024 * 1024);
-                pmMb = proc.PrivateMemorySize64 / (1024 * 1024);
-                var elapsedSec = (DateTime.Now - proc.StartTime).TotalSeconds;
-                var cpuSec = proc.TotalProcessorTime.TotalSeconds;
-                if (elapsedSec > 0.5)
-                    cpuPct = Math.Round(cpuSec / (elapsedSec * Environment.ProcessorCount) * 100, 1);
-            }
-            catch { }
+                try
+                {
+                    using var proc = Process.GetProcessById((int)pid);
+                    wsMb = proc.WorkingSet64 / (1024 * 1024);
+                    pmMb = proc.PrivateMemorySize64 / (1024 * 1024);
+                    var elapsedSec = (DateTime.Now - proc.StartTime).TotalSeconds;
+                    var cpuSec = proc.TotalProcessorTime.TotalSeconds;
+                    if (elapsedSec > 0.5)
+                        cpuPct = Math.Round(cpuSec / (elapsedSec * Environment.ProcessorCount) * 100, 1);
+                }
+                catch { }
+                finally { done.Set(); }
+            }) { IsBackground = true, Name = $"GetProcessPerf-{pid}" };
+            worker.Start();
+            done.Wait(300);
+            // If timed out, worker keeps running but we abandon it; cache the partial result
+            // so we don't retry the same pid within this enumeration.
 
             var perf = (cpuPct, wsMb, pmMb);
             processPerfCache[pid] = perf;
