@@ -380,6 +380,32 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ — must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
+        // --sudo admin session auto-inherit (Layer 10):
+        // --sudo is a SESSION START, not per-invocation. While admin Eye (pipe
+        // wkappbot_elevated) is alive, every subsequent command inherits admin privilege
+        // without the user having to re-type --sudo. To end the session, kill admin Eye
+        // (wkappbot a11y kill …). Matches shell sudo semantics.
+        //
+        // Skip auto-inherit for Eye daemon itself (would re-entrantly hit admin path) and
+        // for commands already carrying --sudo (nothing to add).
+        if (!forwardArgs.Any(a => a == "--sudo") && !isEyeDaemon)
+        {
+            try
+            {
+                using var probePipe = new System.IO.Pipes.NamedPipeClientStream(
+                    ".", "wkappbot_elevated", System.IO.Pipes.PipeDirection.InOut);
+                using var cts = new System.Threading.CancellationTokenSource(100);
+                probePipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
+                if (probePipe.IsConnected)
+                {
+                    Console.Error.WriteLine("[LAUNCHER:SESSION] admin Eye alive — auto-inheriting --sudo");
+                    forwardArgs = forwardArgs.Append("--sudo").ToArray();
+                    relayArgs = forwardArgs;
+                }
+            }
+            catch { /* admin Eye down — proceed as regular user */ }
+        }
+
         // --sudo must always go to a fresh Core (stale in-memory user Eye can't do admin work
         // and may bypass new --sudo logic added to Core).
         var isSudoRequest = forwardArgs.Any(a => a == "--sudo");
