@@ -34,9 +34,11 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.13` — bumped at 2026-04-07 (kill ambiguity guard --nth, CDP browser-process gate, inspect --paths UIA flat listing, Launcher TranscodeStream CP949, misc fixes)
+`5.14` — bumped at 2026-04-16 (--sudo 4-layer elevation: MCP Launcher pre-exec gate, Core startup handler with PulseStep tracing, eye --sudo non-destructive force-launch, Eye auto-launch inheritance, LaunchElevatedEye pre-spawn hot-swap + reason/trail for UAC)
 
 ## Previous versions
+
+`5.13` — bumped at 2026-04-07 (kill ambiguity guard --nth, CDP browser-process gate, inspect --paths UIA flat listing, Launcher TranscodeStream CP949, misc fixes)
 
 `5.12` — bumped at 2026-04-07 (multi-browser CDP port scan 9222-9230, 스킬 시스템 self-healing verify/audit, 샌드박스 경로 window positioning 누락 수정, newchat/handoff 스킬 프롬프트 주입)
 

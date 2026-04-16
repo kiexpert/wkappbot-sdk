@@ -451,6 +451,31 @@ static class ElevationHelper
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
+
+            // ── Pre-spawn hot-swap: promote wkappbot-core.new.exe if pending ──
+            // Admin Eye starts from exePath; rename-swap latest before UAC so admin runs newest code.
+            // Rename of running exe is permitted on Windows; delete/overwrite is not.
+            try
+            {
+                var exeDir = System.IO.Path.GetDirectoryName(exePath);
+                if (!string.IsNullOrEmpty(exeDir))
+                {
+                    var newExePath = System.IO.Path.Combine(exeDir, "wkappbot-core.new.exe");
+                    if (System.IO.File.Exists(newExePath))
+                    {
+                        var backupPath = System.IO.Path.Combine(exeDir, $"wkappbot-core.old-sudo-{DateTime.Now:yyyyMMdd-HHmmss}.exe");
+                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] pending .new.exe detected — promoting before admin spawn");
+                        try { System.IO.File.Move(exePath, backupPath); } catch { /* already renamed */ }
+                        System.IO.File.Move(newExePath, exePath);
+                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] promoted — admin Eye will run latest core");
+                    }
+                }
+            }
+            catch (Exception hsEx)
+            {
+                Console.Error.WriteLine($"[ELEVATION:HOT-SWAP] skipped: {hsEx.Message} — proceeding with current exe");
+            }
+
             var psi = new ProcessStartInfo
             {
                 FileName = exePath,
