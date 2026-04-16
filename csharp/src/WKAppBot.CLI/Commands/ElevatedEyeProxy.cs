@@ -182,10 +182,10 @@ static class ElevatedEyeServer
             return new EyeProxyResponse { Id = req.Id, ExitCode = 0, Stdout = tickJson };
         }
 
+        var reqTag = $"id={req.Id} cmd='{req.Command}'";
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
-            // Build args: command + original args
             var allArgs = new List<string> { req.Command };
             allArgs.AddRange(req.Args);
             var argsStr = string.Join(" ", allArgs.Select(a =>
@@ -200,35 +200,62 @@ static class ElevatedEyeServer
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             };
+            // Subprocess-tag: skip Eye auto-spawn in child. When elevated parent already holds
+            // stdout pipe, a grandchild Eye would inherit it and block ReadToEndAsync forever.
+            psi.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = "eye-proxy";
 
+            Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} StartTracked exe={Path.GetFileName(exePath)} args=\"{argsStr}\"");
+            var swStart = System.Diagnostics.Stopwatch.StartNew();
             using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-PROXY");
             if (proc == null)
+            {
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} StartTracked returned null");
                 return new EyeProxyResponse { Id = req.Id, ExitCode = -1, Error = "Failed to start process" };
+            }
+            Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} child pid={proc.Id} started in {swStart.ElapsedMilliseconds}ms");
 
             var stdoutTask = proc.StandardOutput.ReadToEndAsync();
             var stderrTask = proc.StandardError.ReadToEndAsync();
 
             // Hard timeout: admin Eye must respond promptly or client will abandon.
-            // 30s gives slow commands room; if subprocess itself hangs, we kill + return error
-            // instead of holding the pipe handler forever (which was the Bug 1 root cause).
+            // 30s gives slow commands room; if subprocess itself hangs, we kill + return error.
             using var subprocCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
                 await proc.WaitForExitAsync(subprocCts.Token);
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} child exited code={proc.ExitCode} in {swStart.ElapsedMilliseconds}ms");
             }
             catch (OperationCanceledException)
             {
-                Console.Error.WriteLine($"[EYE:ADMIN] Subprocess timeout (30s) for '{req.Command}' — killing");
+                bool stdoutDone = stdoutTask.IsCompleted;
+                bool stderrDone = stderrTask.IsCompleted;
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} TIMEOUT (30s) — stdoutDone={stdoutDone} stderrDone={stderrDone} — killing tree");
                 try { proc.Kill(entireProcessTree: true); } catch { }
-                // Give reader tasks a moment to drain whatever was captured
                 try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
                 return new EyeProxyResponse
                 {
                     Id = req.Id,
                     ExitCode = -1,
-                    Error = "Subprocess timeout (30s) — admin Eye killed the runaway process",
+                    Error = $"Subprocess timeout (30s) — stdoutDone={stdoutDone} stderrDone={stderrDone}",
                     Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
                     Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
+                };
+            }
+
+            // Child has exited. Reader tasks should complete quickly (pipe EOF on child close).
+            // But if a grandchild inherited stdout, these can hang — cap with a short timeout.
+            var readDeadline = Task.Delay(TimeSpan.FromSeconds(3));
+            var readDone = Task.WhenAll(stdoutTask, stderrTask);
+            if (await Task.WhenAny(readDone, readDeadline) == readDeadline)
+            {
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} stdout/stderr drain TIMEOUT (3s after child exit) — grandchild may still hold pipe");
+                return new EyeProxyResponse
+                {
+                    Id = req.Id,
+                    ExitCode = proc.ExitCode,
+                    Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
+                    Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
+                    Error = "stdout/stderr readers did not close within 3s of child exit",
                 };
             }
 
@@ -236,12 +263,13 @@ static class ElevatedEyeServer
             {
                 Id = req.Id,
                 ExitCode = proc.ExitCode,
-                Stdout = await stdoutTask,
-                Stderr = await stderrTask,
+                Stdout = stdoutTask.Result,
+                Stderr = stderrTask.Result,
             };
         }
         catch (Exception ex)
         {
+            Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} EXCEPTION {ex.GetType().Name}: {ex.Message}");
             return new EyeProxyResponse { Id = req.Id, ExitCode = -1, Error = ex.Message };
         }
     }
