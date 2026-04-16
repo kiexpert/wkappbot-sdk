@@ -288,10 +288,12 @@ internal partial class Program
                 {
                     PulseStep.Line("admin pipe available (reused)");
                 }
-                // Fast-fail: 1500ms first attempt. If admin Eye accepts connect but hangs on
-                // request (Bug 1 pattern), we detect in 1.5s instead of 5s+5s=10s.
-                PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=1500ms fast-fail)");
-                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 1500);
+                // Fast-fail: 3000ms first attempt. If admin Eye accepts connect but hangs on
+                // request, we detect in 3s instead of 5+5=10s. Budget must accommodate real
+                // subprocess latency (windows cmd ~1.3s, plus pipe + StartTracked overhead)
+                // so healthy admin Eye is not prematurely aborted into broadcast-close cycle.
+                PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=3000ms fast-fail)");
+                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 3000);
                 PulseStep.Line($"first attempt exit={exit}");
                 if (exit == -1)
                 {
