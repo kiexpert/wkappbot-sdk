@@ -254,4 +254,13 @@ jobs:
         }
         git add -- '**/*.smoke.txt'
         git commit -m 'test: update build smoke sidecar files [skip ci]'
-        git push
+        # Retry push with rebase to handle concurrent-push races (multiple pushes while CI runs)
+        $ok = $false
+        for ($i = 1; $i -le 5; $i++) {
+          git pull --rebase origin main
+          git push
+          if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "Pushed on attempt $i"; break }
+          Write-Host "Push attempt $i failed (exit=$LASTEXITCODE), retrying..."
+          Start-Sleep -Seconds (2 * $i)
+        }
+        if (-not $ok) { Write-Host 'All push attempts failed'; exit 1 }
