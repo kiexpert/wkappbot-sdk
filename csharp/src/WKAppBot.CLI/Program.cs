@@ -237,7 +237,9 @@ internal partial class Program
             PulseStep.Line($"flag stripped: remaining args={args.Length}");
             if (!IsElevated())
             {
-                bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
+                // "eye --sudo" alone = bootstrap admin Eye session (no other command).
+                // "eye tick --sudo", "eye hotswap --sudo" etc. = proxy eye subcommand through admin Eye.
+                bool isEyeRelaunch = args.Length == 1 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
                 if (isEyeRelaunch)
                 {
                     // eye --sudo: just ensure admin Eye is running (no command execution)
