@@ -237,96 +237,57 @@ internal partial class Program
             PulseStep.Line($"flag stripped: remaining args={args.Length}");
             if (!IsElevated())
             {
-                PulseStep.Line("not-elevated: entering admin routing");
                 bool isEyeRelaunch = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
                 if (isEyeRelaunch)
                 {
-                    PulseStep.Line("path=eye-force-launch (non-destructive)");
-                    // Force-launch admin Eye side-by-side (non-destructive).
-                    // Keeps existing user Eye alive; spawns separate admin Eye via LaunchElevatedEye.
-                    // Use Ping (actual pipe connect) not IsAvailable (file exists) — the pipe
-                    // path can outlive a crashed admin Eye for a moment, making IsAvailable
-                    // return true on a dead daemon and causing "already running" false positives.
-                    if (ElevatedEyeClient.Ping(100))
+                    // eye --sudo: just ensure admin Eye is running (no command execution)
+                    PulseStep.Line("path=eye --sudo force-launch");
+                    if (SudoHandler.EnsureAdminForSudo("eye --sudo force-launch"))
                     {
-                        PulseStep.Finish("admin Eye already running");
-                        Console.WriteLine("[SUDO] Admin Eye already running — no action needed");
+                        PulseStep.Finish("admin Eye ready (reused or spawned)");
+                        Console.WriteLine("[SUDO] Admin Eye ready");
                         return 0;
                     }
-                    PulseStep.Line("admin pipe unavailable → LaunchElevatedEye()");
-                    Console.WriteLine("[SUDO] Force-launching admin Eye side-by-side...");
-                    if (ElevationHelper.LaunchElevatedEye("eye --sudo force-launch (Eye may be abnormal; recovery)"))
-                    {
-                        PulseStep.Finish("admin Eye launched OK");
-                        Console.WriteLine("[SUDO] Admin Eye launched successfully");
-                        return 0;
-                    }
-                    PulseStep.Finish("LaunchElevatedEye FAILED (UAC/timeout)");
-                    Console.Error.WriteLine("[SUDO] Failed to launch admin Eye (UAC cancelled or timeout)");
+                    PulseStep.Finish("EnsureAdminForSudo FAILED (UAC cancelled or spawn timeout)");
+                    Console.Error.WriteLine("[SUDO] Failed to ensure admin Eye — UAC cancelled or timeout");
                     return 1;
                 }
+
+                // Normal --sudo command: ensure admin Eye, then proxy execution
                 PulseStep.Line("path=proxy-route (non-eye command)");
-                Console.WriteLine("[SUDO] Routing via admin Eye proxy (no new window)...");
-                // 100ms liveness probe (Core side).
-                // Paired with a 100ms probe in Launcher — total worst-case handshake budget 200ms.
-                // If admin Eye is in bad state (pipe file present but unresponsive), fall through to
-                // the sudo protection path (LaunchElevatedEye spawns a fresh admin Eye).
-                bool adminAlive = ElevatedEyeClient.Ping(100);
-                PulseStep.Line($"admin Eye ping (100ms): {(adminAlive ? "alive" : "unreachable")}");
-                if (!adminAlive)
+                var sudoReason = args.Length > 0
+                    ? $"--sudo {args[0]}"
+                    : "--sudo request";
+                if (SudoHandler.EnsureAdminForSudo(sudoReason))
                 {
-                    PulseStep.Line("admin pipe unreachable within 100ms → sudo protection: LaunchElevatedEye()");
-                    var sudoReason = args.Length > 0
-                        ? $"--sudo proxy route: command '{args[0]}'"
-                        : "--sudo proxy route";
-                    if (!ElevationHelper.LaunchElevatedEye(sudoReason))
+                    // admin Eye is responsive — proxy the command
+                    PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=5s)");
+                    var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 5000);
+                    PulseStep.Line($"proxy attempt exit={exit}");
+                    if (exit != -1)
                     {
-                        PulseStep.Finish("LaunchElevatedEye FAILED");
-                        Console.Error.WriteLine("[SUDO] Failed to launch admin Eye proxy");
-                        return 1;
+                        PulseStep.Finish($"proxy OK exit={exit}");
+                        return exit;
                     }
-                    PulseStep.Line("admin Eye ready");
+                    // EnsureAdmin said alive but proxy comms dropped — rare; fall through
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Error.WriteLine("[SUDO:FALLBACK] admin Eye proxy dropped request mid-execution");
+                    Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user (admin-only ops will fail)");
+                    Console.ResetColor();
+                    PulseStep.Line("proxy drop → fallthrough to non-admin");
                 }
                 else
                 {
-                    PulseStep.Line("admin pipe available (reused)");
+                    // UAC cancelled or spawn failed
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Error.WriteLine("[SUDO:FALLBACK] admin Eye unavailable (UAC cancelled or spawn failed)");
+                    Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user — admin-only targets will fail with Access Denied");
+                    Console.ResetColor();
+                    PulseStep.Line("EnsureAdmin failed → fallthrough to non-admin");
                 }
-                // Fast-fail: 3000ms first attempt. If admin Eye accepts connect but hangs on
-                // request, we detect in 3s instead of 5+5=10s. Budget must accommodate real
-                // subprocess latency (windows cmd ~1.3s, plus pipe + StartTracked overhead)
-                // so healthy admin Eye is not prematurely aborted into broadcast-close cycle.
-                PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=3000ms fast-fail)");
-                var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 3000);
-                PulseStep.Line($"first attempt exit={exit}");
-                if (exit == -1)
-                {
-                    PulseStep.Line("fast-fail: admin Eye hung on request → sudo protection path");
-                    Console.Error.WriteLine("[SUDO] Admin Eye proxy timed out → spawning fresh admin Eye...");
-                    // Recovery: LaunchElevatedEye has hot-swap piggyback (v5.14) so new admin runs latest core.
-                    // Note: if hung admin Eye still holds pipe, new admin may queue behind — LaunchElevatedEye
-                    // uses IsAvailable() file check which is satisfied by the hung one. True recovery requires
-                    // a responding admin Eye; if still hung after spawn, retry will also fail (error exit 1).
-                    if (!ElevationHelper.LaunchElevatedEye("recovery: hung admin Eye replaced"))
-                    {
-                        PulseStep.Finish("LaunchElevatedEye recovery FAILED");
-                        Console.Error.WriteLine("[SUDO] Recovery spawn failed (UAC cancelled or timeout)");
-                        return 1;
-                    }
-                    PulseStep.Line("recovery admin Eye launched → retry ExecuteViaProxy (5s)");
-                    exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 5000);
-                    PulseStep.Line($"retry-after-recovery exit={exit}");
-                }
-                if (exit == -1)
-                {
-                    PulseStep.Finish("proxy unrecoverable even after recovery");
-                    Console.Error.WriteLine("[SUDO] Admin Eye proxy communication failed after recovery");
-                    Console.Error.WriteLine("[SUDO] Likely cause: hung admin Eye still holds pipe. Kill it manually then retry.");
-                    return 1;
-                }
-                PulseStep.Finish($"proxy OK exit={exit}");
-                return exit;
+                // Fall through: args already has --sudo stripped, normal dispatch will run
             }
-            PulseStep.Finish("already elevated: --sudo is no-op");
+            PulseStep.Finish("already elevated or --sudo fallthrough → normal dispatch");
         }
         if (args.Contains("--read-only"))
         {
