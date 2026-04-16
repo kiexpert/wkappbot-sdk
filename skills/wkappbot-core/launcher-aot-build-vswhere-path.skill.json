@@ -2,14 +2,16 @@
   "id": "launcher-aot-build-vswhere-path",
   "app": "wkappbot-core",
   "title": "Launcher NativeAOT build needs vswhere.exe in PATH",
-  "desc": "When publishing WKAppBot.Launcher with PublishAot=true, native linker fails with \u0027vswhere.exe is not recognized\u0027 error. Root cause: VS Build Tools\u0027 vswhere.exe path not in environment PATH. Quick fix: prepend Installer directory to PATH before dotnet publish.",
+  "desc": "RESOLVED in commit 65846b1: WKAppBot.Launcher.csproj now auto-prepends the VS Installer dir to the MSBuild process PATH before IlcCompile via a RoslynCodeTaskFactory inline task. Plain \u0027dotnet publish\u0027 from bash/cmd works without manual PATH setup. Skill retained as a reference for the symptom (MSB3073 vswhere not recognized) and how the csproj-embedded fix works.",
   "steps": [
-    "SYMPTOM\n  [error MSB3073] \u0027vswhere.exe\u0027 is not recognized as internal/external command\n  Native AOT linker cannot locate MSVC link.exe because vswhere.exe PATH lookup fails.\n  File location on Windows: C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe",
-    "FIX \u2014 prepend installer path in current shell\n  export PATH=\u0022/c/Program Files (x86)/Microsoft Visual Studio/Installer:$PATH\u0022\nThen run the publish normally:\n  \u0022C:/Program Files/dotnet/dotnet\u0022 publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release\nOnly needed in Bash/Git-Bash shells where VS environment is not auto-loaded.\nDeveloper PowerShell for VS has this path built-in.",
-    "PERMANENT FIX OPTIONS\n  1. Add installer path to system PATH (System Properties \u2192 Environment Variables)\n  2. Symlink: mklink /H C:\\Windows\\System32\\vswhere.exe to the installer one (requires admin)\n  3. Wrap build command in script that always prepends the path\n  4. Use VS Developer Shell / Developer PowerShell which sets PATH automatically",
-    "WHY CORE DOESN\u0027T NEED THIS\nWKAppBot.CLI.csproj does NOT use PublishAot \u2014 regular dotnet publish works.\nOnly WKAppBot.Launcher.csproj has PublishAot=true (for fast startup ~100ms).\nThus Core builds succeed in plain Bash while Launcher needs PATH fix.",
-    "VERIFY\nwhich vswhere.exe  # should print full path\nThen retry publish. Look for \u0027Generating native code\u0027 in output.",
-    "RELATED\nPublished to bin/wkappbot.exe (~3.6MB single-file AOT).\nIf Launcher rebuild fails silently and you get old binary behavior, check output for the [MSB3073] vswhere error."
+    "RESOLVED (commit 65846b1) \u2014 manual PATH export no longer needed. csproj now self-heals.",
+    "SYMPTOM (if ever regressed): error MSB3073 \u0027vswhere.exe\u0027 is not recognized ... command exited with code 123 during PublishAot native link.",
+    "ROOT CAUSE: ILCompiler\u0027s native link target spawns vswhere.exe via \u003CExec\u003E relying on PATH. vswhere lives at \u0027C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\u0027 which is absent from default shell PATH outside Developer PowerShell.",
+    "FIX IN csproj: UsingTask TaskFactory=RoslynCodeTaskFactory runs inline C# that calls Environment.SetEnvironmentVariable(PATH, installer-dir \u002B \u0027;\u0027 \u002B currentPath). Triggered via Target BeforeTargets=CollectFrameworkReferences;PrepareForBuild;CoreCompile;IlcCompile and gated by PublishAot==true \u002B Windows_NT.",
+    "WHY MULTIPLE BeforeTargets: the first vswhere lookup happens in a pre-ILC target; a single BeforeTargets=IlcCompile fires too late. Prepending PATH across multiple early hooks covers all invocations; the task is idempotent (skips when already present).",
+    "VERIFY: log shows \u0027[AOT] prepended to PATH for vswhere: \u003Cdir\u003E\u0027. If you see the old MSB3073 error, check whether the inline task was removed or whether vswhere\u0027s location moved (2 candidates probed: Program Files (x86) and Program Files).",
+    "CORE DOES NOT NEED THIS: WKAppBot.CLI.csproj is not PublishAot, so plain dotnet publish without vswhere works there.",
+    "DEPLOY PATH: Launcher publishes wkappbot.exe (~3.6MB single-file AOT) to repo/bin via DeployLauncher target."
   ],
   "tags": [
     "developer",
@@ -25,6 +27,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-16T08:41:56.8387693Z",
-  "updated": "2026-04-16T08:41:56.8387786Z",
-  "version": "1.0"
+  "updated": "2026-04-16T18:26:39.9857566Z",
+  "version": "1.2"
 }
