@@ -208,6 +208,64 @@ fi
 rm -f "$HS_OUT" "$HS_ERR"
 echo ""
 
+# ── Test 7: Launcher ↔ admin Eye round-trip communication ──
+#   Sends `wkappbot --sudo windows` and verifies the full round-trip:
+#     Launcher → Core → ElevatedEyeClient → admin Eye pipe → admin Core → response
+#   Also asserts no "communication failed" marker appears.
+echo "=== Test 7: Launcher ↔ admin Eye round-trip (pipe + exec + response) ==="
+RT_OUT=$(mktemp)
+RT_ERR=$(mktemp)
+
+RT_START=$(date +%s%N)
+timeout 10 "$WKAPPBOT" --sudo windows 1>"$RT_OUT" 2>"$RT_ERR"
+EXIT7=$?
+RT_END=$(date +%s%N)
+RT_MS=$(( (RT_END - RT_START) / 1000000 ))
+echo "exit=$EXIT7  rtt=${RT_MS}ms"
+
+# Evidence 1: Routing marker must appear (Core entered proxy path)
+if grep -q "\[SUDO\] Routing via admin Eye proxy" "$RT_ERR" "$RT_OUT"; then
+  pass "T7a: Core routed via admin Eye proxy"
+else
+  fail "T7a: no proxy routing marker — Core may not have reached admin path"
+fi
+
+# Evidence 2: no explicit communication failure
+if grep -q "Admin Eye proxy communication failed\|Proxy communication failed" "$RT_ERR" "$RT_OUT"; then
+  fail "T7b: proxy reported communication failure"
+  grep "communication failed" "$RT_ERR" "$RT_OUT" | head -2
+else
+  pass "T7b: no proxy communication failure markers"
+fi
+
+# Evidence 3: response came back (hwnd patterns from windows listing OR any JSON-ish content)
+if grep -qE "hwnd:0x[0-9A-Fa-f]+|# TARGET|\"hwnd\"" "$RT_OUT"; then
+  pass "T7c: admin Eye returned a windows-command response"
+elif [ "$EXIT7" -eq 0 ]; then
+  pass "T7c: command returned exit=0 (response OK even without hwnd marker)"
+else
+  fail "T7c: admin Eye returned no recognizable windows output (exit=$EXIT7)"
+  head -5 "$RT_OUT"
+fi
+
+# Evidence 4: round-trip time sanity (<= 8000ms)
+if [ "$RT_MS" -le 8000 ]; then
+  pass "T7d: round-trip within 8s budget (${RT_MS}ms)"
+else
+  fail "T7d: round-trip slow (${RT_MS}ms > 8000ms) — pipe or admin Eye may be stalled"
+fi
+
+# Evidence 5: PULSE trail captured (shows path taken through Core)
+if grep -q "\[PULSE:core-sudo\]" "$RT_ERR"; then
+  pass "T7e: PulseStep trail captured in stderr"
+  grep "\[PULSE:core-sudo\]" "$RT_ERR" | head -4
+else
+  fail "T7e: PulseStep trail missing — pulse instrumentation not firing"
+fi
+
+rm -f "$RT_OUT" "$RT_ERR"
+echo ""
+
 # ── Summary ──
 echo "=== Summary ==="
 echo "PASS: $PASS  FAIL: $FAIL"
