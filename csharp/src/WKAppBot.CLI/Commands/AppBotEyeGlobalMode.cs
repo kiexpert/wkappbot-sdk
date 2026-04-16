@@ -495,6 +495,9 @@ internal partial class Program
         EyeDiag("host-update-info");
         host.UpdateAccessibilityText(string.Empty);
         EyeDiag("host-update-empty");
+        // Initial border color reflects admin Eye state at startup — otherwise the
+        // window briefly shows blue before the first tick flips it to amber.
+        host.SetElevatedBorder(ElevatedEyeClient.Ping(100));
 
         PulseStep.Mark("host-started");
         EyeDiag("host-started");
