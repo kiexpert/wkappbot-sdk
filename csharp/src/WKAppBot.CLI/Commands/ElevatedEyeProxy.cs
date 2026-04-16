@@ -578,16 +578,50 @@ static class ElevationHelper
             }
             Console.ResetColor();
 
-            var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-ELEVATED");
-            if (proc == null) return false;
+            System.Diagnostics.Process? proc = null;
+            bool uacApproved = false;
+            System.ComponentModel.Win32Exception? uacEx = null;
+            try
+            {
+                proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "EYE-ELEVATED");
+                uacApproved = proc != null;
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                // UAC cancelled or runas denied. Don't exit yet — the UAC dialog time may
+                // have overlapped with a pre-existing admin Eye still booting, so we still
+                // owe the caller one handshake chance below.
+                uacEx = ex;
+            }
 
-            // Wait for pipe file to appear (proxy ready) — up to 10s
+            // ── Post-UAC handshake (100ms) ──
+            // Admin Eye boot time and UAC dialog time tend to overlap. A pre-existing Eye
+            // that started booting just before this call may be ready NOW. Regardless of
+            // UAC outcome, give it exactly one 100ms Ping chance before we commit to either
+            // our own spawned instance or a hard failure.
+            if (ElevatedEyeClient.Ping(100))
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Error.WriteLine("[ELEVATION] admin Eye responsive after UAC wait — reusing existing instance");
+                Console.ResetColor();
+                return true;
+            }
+
+            if (!uacApproved)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Error.WriteLine($"[ELEVATION] UAC cancelled ({uacEx?.NativeErrorCode}) — no admin Eye available");
+                Console.ResetColor();
+                return false;
+            }
+
+            // UAC approved + our admin Eye spawning. Poll for pipe readiness — up to 10s.
+            // Use Ping (actual connect) over IsAvailable (file exists) for authoritative liveness.
             for (int i = 0; i < 40; i++)
             {
                 Thread.Sleep(250);
-                if (ElevatedEyeClient.IsAvailable())
+                if (ElevatedEyeClient.Ping(100))
                 {
-                    Thread.Sleep(200); // settle — give server time to enter WaitForConnectionAsync
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine("[ELEVATION] Elevated Eye proxy is ready!");
                     Console.ResetColor();
@@ -596,15 +630,7 @@ static class ElevationHelper
             }
 
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("[ELEVATION] Elevated Eye did not start in time");
-            Console.ResetColor();
-            return false;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            // UAC cancelled by user
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("[ELEVATION] UAC cancelled — continuing without admin rights");
+            Console.WriteLine("[ELEVATION] Elevated Eye did not start in time (10s)");
             Console.ResetColor();
             return false;
         }
