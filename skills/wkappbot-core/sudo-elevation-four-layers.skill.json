@@ -5,6 +5,7 @@
   "desc": "--sudo is a SESSION START trigger. While admin Eye (pipe: wkappbot_elevated) is alive, subsequent commands should route through it and inherit admin privilege \u2014 like shell sudo. Architecture: Core/SudoHandler = single owner for spawning admin Eye (Ping pre-check, hot-swap-if-needed, UAC, post-UAC 100ms handshake). User Eye (pipe: WKAppBotCmdPipe) refuses --sudo with [EYE:FALLBACK] \u002B exit 125. Pipe names are FIXED: admin=wkappbot_elevated, user=WKAppBotCmdPipe. IsAvailable\u2192Ping migration for liveness.",
   "steps": [
     "SEMANTIC MODEL \u2014 --sudo is a SESSION START, not per-invocation. Once admin Eye (pipe wkappbot_elevated) is up, subsequent commands should inherit admin privilege without re-typing --sudo. Like shell sudo. This means Launcher should prefer admin pipe over user pipe when admin Eye is alive.",
+    "TO END ADMIN SESSION \u2014 kill admin Eye via a11y kill. There is NO --no-sudo flag; the session lifetime is the admin Eye process lifetime. Once admin Eye exits, commands fall back to user Eye / user privilege automatically.",
     "PIPE NAME INVARIANTS \u2014 NEVER rename these. Admin Eye: \\.\\pipe\\wkappbot_elevated (served by ElevatedEyeServer). User Eye: \\.\\pipe\\WKAppBotCmdPipe (served by EyeCmdPipeServer). Both exist simultaneously when both Eyes run. Changing either breaks every downstream caller, PS scripts, and tests.",
     "LAYER 1 \u2014 MCP Launcher pre-execution gate (McpProxy.cs). Detects --sudo in JSON-RPC requests; pre-spawns admin Core.",
     "LAYER 3 \u2014 eye --sudo uses SudoHandler.EnsureAdminForSudo side-by-side (non-destructive). Old user Eye preserved.",
@@ -39,6 +40,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-16T08:14:14.9665016Z",
-  "updated": "2026-04-16T14:03:18.087804Z",
-  "version": "1.8"
+  "updated": "2026-04-16T14:03:44.7276066Z",
+  "version": "1.9"
 }
