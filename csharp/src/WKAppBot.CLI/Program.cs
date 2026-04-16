@@ -244,7 +244,10 @@ internal partial class Program
                     PulseStep.Line("path=eye-force-launch (non-destructive)");
                     // Force-launch admin Eye side-by-side (non-destructive).
                     // Keeps existing user Eye alive; spawns separate admin Eye via LaunchElevatedEye.
-                    if (ElevatedEyeClient.IsAvailable())
+                    // Use Ping (actual pipe connect) not IsAvailable (file exists) — the pipe
+                    // path can outlive a crashed admin Eye for a moment, making IsAvailable
+                    // return true on a dead daemon and causing "already running" false positives.
+                    if (ElevatedEyeClient.Ping(100))
                     {
                         PulseStep.Finish("admin Eye already running");
                         Console.WriteLine("[SUDO] Admin Eye already running — no action needed");
