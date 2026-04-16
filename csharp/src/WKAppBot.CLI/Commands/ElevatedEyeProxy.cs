@@ -402,7 +402,9 @@ static class ElevationHelper
             Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: target pid={mcpPid} elevated={mcpTargetElev} IsMcp={Program.IsMcpMode} InEye={Program.RunningInEye}");
             if (mcpTargetElev == true)
             {
-                if (ElevatedEyeClient.IsAvailable())
+                // Use Ping (actual connect) not IsAvailable (file exists) — pipe path can
+                // outlive a crashed admin Eye briefly, giving false "alive" on dead daemon.
+                if (ElevatedEyeClient.Ping(100))
                 {
                     Console.Error.WriteLine("[ELEVATION] Delegating via existing elevated Eye proxy pipe");
                     var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
@@ -449,7 +451,8 @@ static class ElevationHelper
         Console.ResetColor();
 
         // Strategy 1: try existing Elevated Eye proxy
-        if (ElevatedEyeClient.IsAvailable())
+        // Ping (actual connect) avoids false-positive when pipe file lingers after admin crash.
+        if (ElevatedEyeClient.Ping(100))
         {
             Console.WriteLine("[ELEVATION] Delegating via Elevated Eye proxy...");
             var exit1 = ElevatedEyeClient.ExecuteViaProxy(command, args);
@@ -480,8 +483,9 @@ static class ElevationHelper
     /// </summary>
     public static bool WaitForAdminServer()
     {
-        // Already available?
-        if (ElevatedEyeClient.IsAvailable()) return true;
+        // Already available? Ping is the authoritative check — IsAvailable only tests
+        // for the pipe file in the namespace, which can persist briefly after crash.
+        if (ElevatedEyeClient.Ping(100)) return true;
 
         if (Program.IsMcpMode)
         {
