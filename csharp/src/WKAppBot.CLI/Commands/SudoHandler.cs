@@ -32,16 +32,8 @@ internal static class SudoHandler
     /// </summary>
     public static bool EnsureAdminForSudo(string reason = "--sudo request")
     {
-        // Initial pre-check with a generous budget. 100ms was too aggressive: a healthy
-        // admin Eye already handling another request briefly stalls new ConnectAsync
-        // before HandleClient's Task.Run accepts it, causing the pre-check to miss the
-        // live admin Eye and trigger a spurious UAC prompt on the user's screen. Bump
-        // to 1500ms so reuse remains reliable under moderate load (MCP parallel sudo,
-        // back-to-back --sudo invocations). Failure path still falls through to UAC +
-        // SpawnAndAwaitAdmin with proper process-liveness guards.
-        const int PreCheckPingMs = 1500;
-        PulseStep.Line($"SudoHandler: pre-check Ping({PreCheckPingMs})");
-        if (ElevatedEyeClient.Ping(PreCheckPingMs))
+        PulseStep.Line("SudoHandler: pre-check Ping(100)");
+        if (ElevatedEyeClient.Ping(100))
         {
             PulseStep.Line("SudoHandler: admin Eye alive -- reuse, no hot-swap, no spawn");
             // Print "reusing" line only when --sudo was typed explicitly by the user,
