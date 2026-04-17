@@ -1,0 +1,8 @@
+# Experience DB: Eye writes continuously -> rebase/push races.
+# Periodic snapshot: git add -f <pattern> && git commit -m "[EXP] snapshot"
+
+# CCA + UIA fused match learning
+**/fused_match.jsonl
+
+# OCR correction logs (auto-appended per recognition)
+ocr_corrections/**/*.jsonl
