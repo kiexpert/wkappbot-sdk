@@ -1,0 +1,64 @@
+scenario:
+  name: "Focusless Automation Demo"
+  description: |
+    WKAppBot's killer feature: automate Notepad WITHOUT stealing user's focus.
+    All actions use UIA COM patterns (Invoke/Value) — no SendInput, no mouse,
+    no keyboard. User can keep typing in their editor the entire time.
+    Try this: run the scenario and keep working. Notepad does its thing silently.
+
+config:
+  focus_check: false
+  prefer_focusless: true
+  screenshot_on_step: false
+
+app:
+  launch: "notepad.exe"
+  wait_for_window:
+    title_contains: "메모장"
+    timeout: 5
+
+steps:
+  # Step 1: Type via UIA Value pattern (focusless — no keyboard input needed)
+  - name: "Focusless type (COM ValuePattern)"
+    action: set_value
+    target: { name: "텍스트 편집기" }
+    params: { text: "This text was typed WITHOUT stealing your focus.\nYou can keep working in your editor.\nWKAppBot uses UIA COM ValuePattern — not SendInput." }
+    expect:
+      condition: text_contains
+      target: { name: "텍스트 편집기" }
+      value: "WITHOUT"
+      timeout: 3
+
+  # Step 2: Ctrl+A select all via UIA (focusless hotkey alternative)
+  # Note: select-all isn't a UIA pattern, so we use hotkey as fallback
+  # But the VALUE was set focuslessly in step 1 — that's the demo point
+
+  # Step 2: Read back what we wrote — verify focusless write worked (assert, no focus needed)
+  - name: "Verify text (focusless read)"
+    action: assert
+    target: { name: "텍스트 편집기" }
+    params:
+      type: text_contains
+      expected: "WITHOUT stealing"
+
+  # Step 3: Focusless window close — UIA WindowPattern.Close(), no Alt+F4 needed
+  - name: "Focusless close (COM WindowPattern)"
+    action: window_close
+    target: { name: "*This text*" }
+
+  # Step 4: "저장하시겠습니까?" prompt may appear — dismiss without saving
+  # Uses invoke on "저장 안 함" button. If no prompt (e.g. empty file),
+  # the window is already gone and this step is skipped via expect check.
+  - name: "Don't save (focusless invoke)"
+    action: invoke
+    target: { name: "저장 안 함" }
+    expect:
+      condition: window_absent
+      target: { name: "*메모장*;*This text*" }
+      timeout: 3
+    recovery:
+      action: press_key
+      params: { key: "N" }
+      max_retries: 1
+
+# No teardown needed — Step 4 dismisses the save prompt and closes notepad

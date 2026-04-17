@@ -1,0 +1,32 @@
+{
+  "id": "compete-roadmap-2026q2",
+  "app": "wkappbot",
+  "title": "Competition Response Roadmap 2026-Q2 (Gemini draft)",
+  "desc": "Implementation plan to respond to UI Automata and DirectShell competition. Prioritized by Gemini triad analysis. Draft \u2014 pending GPT and Claude review for complementary perspectives.",
+  "steps": [
+    "PRIORITY 1 (Sprint 1-2): Expect-Recovery per scenario step. Add expect and recovery fields to existing scenario YAML schema. ActionExecutor gets a retry loop: execute action \u2192 poll for expected UIA state \u2192 if timeout, run recovery handler \u2192 retry or fail. Key constraint: polling must NOT violate focusless principle (use UIA polling, not SendInput probes). Gemini risk flag: aggressive polling may steal focus \u2014 guard with SW_SHOWNOACTIVATE checks. Estimated effort: small (YAML schema \u002B ActionExecutor loop). Highest ROI \u2014 directly matches UI Automata\u0027s strongest differentiator.",
+    "PRIORITY 2 (Sprint 2-3): UIA Shadow DOM cache with subtree re-resolve. Cache UIA tree snapshot per window (like UI Automata\u0027s Shadow DOM). On element access, do liveness check (not timer-based). If stale, re-resolve from cached parent (subtree scan) before falling back to full tree walk. Integrate with existing Experience DB as persistent layer. Benefit: eliminates repeated cross-process UIA round-trips (current bottleneck in windows command). Gemini note: WebView2 apps growing fast \u2014 shadow DOM penetration critical.",
+    "PRIORITY 3 (Sprint 3-4): Experience DB community sharing. Export format: JSON bundle of fused_match.jsonl per app/class with version metadata. Import with merge-or-replace semantics. Validation protocol: imported mappings run through a quick UIA spot-check before activating (Gemini risk: DB poisoning causes multi-bot failure). Distribution: GitHub repo of community profiles (like DirectShell vision). WKAppBot unique angle: our Experience DB already has production-hardened HTS/trading app mappings that no competitor has.",
+    "PRIORITY 4 (Sprint 4-5): CSS selector parser alongside grap. Add a CSS-like selector frontend that compiles to internal grap representation. Syntax: \u003E\u003E [role=button][name=Save], :first, :parent, \u003E (child combinator). Grap remains the power syntax for internal and AI agent use. CSS syntax targets human developers and documentation. Gemini assessment: lowest priority \u2014 convenience, not core competitiveness.",
+    "PRIORITY 5 (Evaluation): Rust for performance-critical paths. Benchmark before committing: measure UIA tree enumeration in C# (.NET 8 NativeAOT) vs Rust with identical Win32 API calls. If delta less than 2x, not worth the interop complexity. Gemini risk: C#-Rust P/Invoke overhead may negate gains if boundary crossings are frequent. Candidate hot paths: EnumWindows callback, UIA tree walker, GetProcessPerf batch. Decision gate: benchmark results determine if this proceeds to implementation.",
+    "MISSING ITEMS FLAGGED BY ANALYSIS: (1) No mention of Android automation parity \u2014 competitors are Windows-only but we have ADB advantage to extend. (2) No API-key-based AI integration \u2014 all three frameworks use MCP but direct API calls (Claude/GPT) for inline reasoning would be faster than CDP browser round-trips. (3) No telemetry/observability story \u2014 UI Automata has structured traces for every step; our PulseStep is internal-only. (4) Deterministic replay \u2014 UI Automata YAML workflows can be replayed exactly; our scenarios are close but lack the expect-gate that makes replay deterministic.",
+    "GEMINI RISK SUMMARY: (1) Expect polling vs focusless \u2014 guard carefully. (2) Rust interop overhead \u2014 benchmark first. (3) Experience DB poisoning \u2014 validation protocol required. (4) Recovery timeout in latency-sensitive contexts (HTS trading) \u2014 make recovery timeout adaptive per scenario intensity.",
+    "STATUS: Gemini-only draft. Pending GPT and Claude review when CDP prompt-blocked bug is resolved. Update this skill after triad consensus."
+  ],
+  "tags": [
+    "roadmap",
+    "competition",
+    "strategy",
+    "expect-recovery",
+    "shadow-dom",
+    "rust",
+    "experience-db",
+    "css-selector"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T04:41:07.0991813Z",
+  "updated": "2026-04-17T04:41:07.0991906Z",
+  "version": "1.0"
+}

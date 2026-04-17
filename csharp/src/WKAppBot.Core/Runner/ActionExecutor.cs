@@ -268,6 +268,15 @@ public sealed class ActionExecutor : IDisposable
                     DoWindowAction(step, result, "maximize");
                     break;
 
+                // ── Focusless UIA pattern actions (pure COM, no SendInput) ──
+                case "invoke":
+                    DoInvoke(step, result);
+                    break;
+
+                case "set_value":
+                    DoSetValue(step, result);
+                    break;
+
                 default:
                     throw new InvalidOperationException($"Unknown action: {step.Action}");
             }
@@ -416,7 +425,7 @@ public sealed class ActionExecutor : IDisposable
         if (target == null) return false;
         var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
         if (el == null) return false;
-        var text = el.Properties.Name.ValueOrDefault ?? "";
+        var text = ReadElementText(el);
         return text.Contains(value, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -425,8 +434,15 @@ public sealed class ActionExecutor : IDisposable
         if (target == null) return false;
         var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
         if (el == null) return false;
-        var text = el.Properties.Name.ValueOrDefault ?? "";
+        var text = ReadElementText(el);
         return text.Equals(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Read text: ValuePattern.Value first (edit controls), then Name property.</summary>
+    private static string ReadElementText(AutomationElement el)
+    {
+        try { if (el.Patterns.Value.IsSupported) return el.Patterns.Value.Pattern.Value.Value ?? ""; } catch { }
+        return el.Properties.Name.ValueOrDefault ?? "";
     }
 
     private bool CheckWindowPresent(TargetDefinition? target)
@@ -892,6 +908,70 @@ public sealed class ActionExecutor : IDisposable
         }
 
         throw new InvalidOperationException($"Toggle failed: no UIA Toggle pattern and no click target for {elemDesc}");
+    }
+
+    /// <summary>
+    /// Focusless UIA Invoke — click a button/menu without stealing focus.
+    /// Pure COM call: IUIAutomationInvokePattern::Invoke().
+    /// </summary>
+    private void DoInvoke(StepDefinition step, StepResult result)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException($"Cannot locate element for invoke: {step.Target?.AutomationId ?? step.Target?.Name ?? "(no target)"}");
+
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+        BeginZoomForElement(element, step);
+
+        if (UiaLocator.TryInvoke(element))
+        {
+            result.ActionDetail = $"Invoke {elemDesc} ({method}, focusless COM)";
+            Log($"  Invoked via UIA ({method}, focusless COM)");
+            return;
+        }
+
+        // Fallback: click
+        var center = UiaLocator.GetCenter(element);
+        if (center != null)
+        {
+            MouseInput.Click(center.Value.x, center.Value.y);
+            result.ActionDetail = $"Invoke {elemDesc} (click fallback)";
+            Log($"  Invoke fallback → click at ({center.Value.x},{center.Value.y})");
+            return;
+        }
+
+        throw new InvalidOperationException($"Invoke failed: no UIA Invoke pattern and no click target for {elemDesc}");
+    }
+
+    /// <summary>
+    /// Focusless UIA SetValue — type text without focus or keyboard.
+    /// Pure COM call: IUIAutomationValuePattern::SetValue().
+    /// </summary>
+    private void DoSetValue(StepDefinition step, StepResult result)
+    {
+        var (element, method) = LocateElement(step);
+        if (element == null)
+            throw new InvalidOperationException($"Cannot locate element for set_value: {step.Target?.AutomationId ?? step.Target?.Name ?? "(no target)"}");
+
+        var text = _ctx.Resolve(step.Params?.Text ?? "");
+        var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
+        BeginZoomForElement(element, step);
+
+        // UIA ValuePattern.SetValue — pure COM, focusless
+        try
+        {
+            var vp = element.Patterns.Value;
+            if (vp.IsSupported)
+            {
+                vp.Pattern.SetValue(text);
+                result.ActionDetail = $"SetValue \"{text}\" on {elemDesc} ({method}, focusless COM)";
+                Log($"  SetValue via UIA ({method}, focusless COM): \"{text}\"");
+                return;
+            }
+        }
+        catch { }
+
+        throw new InvalidOperationException($"SetValue failed: no UIA Value pattern on {elemDesc}. Use type_text for SendInput fallback.");
     }
 
     /// <summary>
