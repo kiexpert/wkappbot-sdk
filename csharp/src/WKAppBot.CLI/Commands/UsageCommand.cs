@@ -27,16 +27,18 @@ Usage:
 === Public Commands ===================================================
 
   a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
-      Universal accessibility interface — 20 standard actions for ANY window.
+      Universal accessibility interface — 31 standard actions for ANY window.
       3-tier fallback: UIA → Win32 → SendInput. Busybox: symlink `a11y.exe` works.
 
       Auto-pipeline per action: blocker dismiss → minimize restore → tab activate
         → zoom/magnifier → execute (3-tier) → result feedback (green/amber) → fade
 
-      Window (7):  close  minimize  maximize  restore  focus  move  resize
+      Window (8):  close  kill  minimize  maximize  restore  focus  move  resize
       Element (13): read  find  highlight  invoke  click  toggle
                     expand  collapse  select  scroll  type  set-value  set-range
-      Utility:     clipboard  clipboard-read  clipboard-write (text/files/mixed)
+      Async (2):   wait  eval
+      Utility (4): clipboard  clipboard-write  file-read  file-write
+      Discovery (4): inspect  windows  screenshot  ocr
 
       Target:  --nth 3 | 3~ | ~3 | 2~4 | 1,3~    --all    (default: first match)
       Options: --depth N  --force  --value N  --direction  --amount
