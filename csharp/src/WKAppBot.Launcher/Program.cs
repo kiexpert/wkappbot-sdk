@@ -418,39 +418,10 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
-        // --sudo admin session auto-inherit (Layer 10):
-        // --sudo is a SESSION START, not per-invocation. While admin Eye (pipe
-        // wkappbot_elevated) is alive, every subsequent command inherits admin privilege
-        // without the user having to re-type --sudo. To end the session, kill admin Eye
-        // (wkappbot a11y kill ...). Matches shell sudo semantics.
-        //
-        // Skip auto-inherit for:
-        //   - Eye daemon (re-entrant admin path)
-        //   - Already --sudo
-        //   - CDP-dependent commands (ask, web, agent, newchat) -- these need local Chrome
-        //     access which admin Eye's subprocess context cannot provide
-        // CDP commands need local Chrome; run/do need local UIA/window access
-        var isCdpCommand = cmd is "ask" or "web" or "agent" or "newchat" or "run" or "do";
-        if (!forwardArgs.Any(a => a == "--sudo") && !isEyeDaemon && !isCdpCommand)
-        {
-            try
-            {
-                using var probePipe = new System.IO.Pipes.NamedPipeClientStream(
-                    ".", "wkappbot_elevated", System.IO.Pipes.PipeDirection.InOut);
-                using var cts = new System.Threading.CancellationTokenSource(100);
-                probePipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
-                if (probePipe.IsConnected)
-                {
-                    // Silent auto-inherit (no stderr line) -- reduces noise on common commands.
-                    // Explicit `wkappbot ... --sudo` still prints "[SUDO] admin Eye alive -- reusing..."
-                    // from Core; auto-inherit path sets WKAPPBOT_SUDO_AUTO=1 to suppress that too.
-                    Environment.SetEnvironmentVariable("WKAPPBOT_SUDO_AUTO", "1");
-                    forwardArgs = forwardArgs.Append("--sudo").ToArray();
-                    relayArgs = forwardArgs;
-                }
-            }
-            catch { /* admin Eye down -- proceed as regular user */ }
-        }
+        // --sudo is per-invocation only. Auto-inherit across commands was removed --
+        // users pass --sudo explicitly when they want an admin-privileged run.
+        // To launch an admin Eye: wkappbot eye --sudo (once).
+        // To end admin session: close admin Eye window / kill the process.
 
         // --sudo must always go to a fresh Core (stale in-memory user Eye can't do admin work
         // and may bypass new --sudo logic added to Core).
