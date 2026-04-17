@@ -1001,7 +1001,7 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Force foreground window -- AttachThreadInput trick, no FocuslessGuard.
+    /// Force foreground window -- AttachThreadInput trick, no NativeHookFocusless.
     /// Use ONLY for focus RESTORATION after a detected theft (defensive).
     /// Do NOT use for offensive focus acquisition.
     /// </summary>
@@ -1009,16 +1009,16 @@ public static partial class NativeMethods
         => SetForegroundWindowCore(hWnd);
 
     /// <summary>
-    /// Public SetForegroundWindow proxy -- routes through FocuslessGuard + AttachThreadInput trick.
+    /// Public SetForegroundWindow proxy -- routes through NativeHookFocusless + AttachThreadInput trick.
     /// Use for any focus action (window activation, bring-to-front).
-    /// BLOCKED by FocuslessGuard in focusless mode.
+    /// BLOCKED by NativeHookFocusless in focusless mode.
     /// Does NOT require Probe() (no AssertReadiness) -- safe for dialog/restore-adjacent contexts.
     /// For full input acquisition (SendInput path): use SmartSetForegroundWindow.
     /// </summary>
     public static bool SetForegroundWindow(IntPtr hWnd)
     {
         if (GetForegroundWindow() == hWnd) return true;
-        Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
+        Input.NativeHookFocusless.AssertAllowed("SetForegroundWindow");
         return SetForegroundWindowCore(hWnd);
     }
 
@@ -1026,15 +1026,15 @@ public static partial class NativeMethods
     /// Smart SetForegroundWindow -- full input acquisition gate.
     /// Windows normally blocks SetForegroundWindow from non-foreground threads.
     /// By attaching our input queue to the foreground thread, we gain permission.
-    /// BLOCKED by FocuslessGuard + AssertReadiness (requires Probe() before call).
+    /// BLOCKED by NativeHookFocusless + AssertReadiness (requires Probe() before call).
     /// </summary>
     public static bool SmartSetForegroundWindow(IntPtr hWnd)
     {
         // 정확 핸들 비교 -- 같은 프로세스의 다른 창은 "foreground"가 아님!
         if (GetForegroundWindow() == hWnd) return true;
 
-        // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
-        Input.FocuslessGuard.AssertAllowed("SetForegroundWindow");
+        // NativeHookFocusless: block if enabled (only when we actually NEED to steal focus)
+        Input.NativeHookFocusless.AssertAllowed("SetForegroundWindow");
 
         // Readiness gate: delegates to AssertReadiness which throws if Probe() was not called.
         // Also logs [IDLE] idle time on success.

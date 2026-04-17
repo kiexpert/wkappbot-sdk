@@ -12,7 +12,7 @@ namespace WKAppBot.Win32.Input;
 /// Design: "매 키스트로크 전 포커스 검증 -> 간섭 감지 시 대기+재입력"
 /// Tag: [GUARD]
 /// </summary>
-public class InputFocusGuard
+public class NativeHookInputFocus
 {
     // -- Interference classification ------------------------------
     public enum InterferenceType
@@ -47,7 +47,7 @@ public class InputFocusGuard
     public int RetryCount => _retryCount;
 
     // -- Constructor ----------------------------------------------
-    public InputFocusGuard(IntPtr targetHwnd, IntPtr mainWindow, int maxRetries = 3)
+    public NativeHookInputFocus(IntPtr targetHwnd, IntPtr mainWindow, int maxRetries = 3)
     {
         _targetHwnd = targetHwnd;
         _mainWindow = mainWindow;

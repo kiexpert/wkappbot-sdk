@@ -39,8 +39,8 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard -- pre/post batch focus verification with retry
-                var guard8 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                // NativeHookInputFocus -- pre/post batch focus verification with retry
+                var guard8 = new NativeHookInputFocus(targetHwnd, win.Handle, maxRetries: 3);
                 bool m8InputDone = false;
 
                 while (!m8InputDone)
@@ -229,8 +229,8 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard -- pre-batch focus verification with retry
-                var guard4 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                // NativeHookInputFocus -- pre-batch focus verification with retry
+                var guard4 = new NativeHookInputFocus(targetHwnd, win.Handle, maxRetries: 3);
                 bool m4InputDone = false;
 
                 while (!m4InputDone)
@@ -496,8 +496,8 @@ internal partial class Program
                     return (IntPtr)lp;
                 }
 
-                // InputFocusGuard -- verify focus before SendInput portion
-                var guard5 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                // NativeHookInputFocus -- verify focus before SendInput portion
+                var guard5 = new NativeHookInputFocus(targetHwnd, win.Handle, maxRetries: 3);
                 bool m5InputDone = false;
 
                 while (!m5InputDone)
@@ -684,8 +684,8 @@ internal partial class Program
                 int cx = ctlRect.Left + clickXOffset;
                 int cy = ctlRect.Top + ctlRect.Height / 2;
 
-                // InputFocusGuard -- per-keystroke focus verification
-                var guard = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                // NativeHookInputFocus -- per-keystroke focus verification
+                var guard = new NativeHookInputFocus(targetHwnd, win.Handle, maxRetries: 3);
                 bool m2InputDone = false;
 
                 while (!m2InputDone)

@@ -453,13 +453,13 @@ public static class KeyboardInput
     /// <summary>
     /// Type a text string using Unicode input events.
     /// Works with any language (Korean, etc.) without VK mapping.
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// intendedHwnd: when non-zero, checks focus per-character and restores on drift.
     /// </summary>
     public static void TypeText(string text, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard TypeText)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard TypeText)");
         InputReadiness.AssertReadiness("KeyboardInput.TypeText");
         if (!InputReadiness.CheckActiveGuard("SendInput:TypeText")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
@@ -560,12 +560,12 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press and release a single key by name.
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// </summary>
     public static void PressKey(string keyName)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard PressKey)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard PressKey)");
         InputReadiness.AssertReadiness("KeyboardInput.PressKey");
         if (!InputReadiness.CheckActiveGuard("SendInput:PressKey")) return;
         ushort vk = NameToVk(keyName);
@@ -576,12 +576,12 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press a hotkey combination (e.g., ["ctrl", "s"]).
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// BLOCKED by CheckActiveGuard if user is actively typing.
     /// </summary>
     public static void Hotkey(IReadOnlyList<string> keys)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard Hotkey)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard Hotkey)");
         InputReadiness.AssertReadiness("KeyboardInput.Hotkey");
         if (!InputReadiness.CheckActiveGuard("SendInput:Hotkey")) return;
         // Press modifiers first, then the final key
@@ -605,11 +605,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Press a key down (no release).
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// </summary>
     public static void KeyDown(ushort vk)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard KeyDown)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard KeyDown)");
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_KEYBOARD;
         inputs[0].u.ki.wVk = vk;
@@ -620,11 +620,11 @@ public static class KeyboardInput
 
     /// <summary>
     /// Release a key.
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// </summary>
     public static void KeyUp(ushort vk)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard KeyUp)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard KeyUp)");
         var inputs = new INPUT[1];
         inputs[0].type = INPUT.INPUT_KEYBOARD;
         inputs[0].u.ki.wVk = vk;
@@ -641,11 +641,11 @@ public static class KeyboardInput
     ///   F5       -> PressKey (down+up)
     ///   hello    -> per-char keystroke via VkKeyScanW (auto Shift wrap)
     /// Unreleased modifiers auto-released in LIFO order at end.
-    /// BLOCKED by FocuslessGuard (SendInput).
+    /// BLOCKED by NativeHookFocusless (SendInput).
     /// </summary>
     public static void SendKeys(string sequence, IntPtr intendedHwnd = default, TypeInputContext? ctx = null)
     {
-        FocuslessGuard.AssertAllowed("SendInput(keyboard SendKeys)");
+        NativeHookFocusless.AssertAllowed("SendInput(keyboard SendKeys)");
         InputReadiness.AssertReadiness("KeyboardInput.SendKeys");
         if (!InputReadiness.CheckActiveGuard("SendInput:SendKeys")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;

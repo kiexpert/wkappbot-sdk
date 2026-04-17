@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 ///   var ok = ActionApi.Select(tabItem, hwnd, "잔고(15단)");
 ///   // = zoom appears -> UiaLocator.TrySelect() -> zoom shows pass/fail -> auto-fade
 ///
-/// Modeled after FocuslessGuard: global static class, policy at API boundary.
+/// Modeled after NativeHookFocusless: global static class, policy at API boundary.
 /// Tag: [ZOOM]
 /// Tag: [FOCUSSTEALER] -- marks windows that steal focus during nominally-focusless UIA actions.
 /// </summary>
