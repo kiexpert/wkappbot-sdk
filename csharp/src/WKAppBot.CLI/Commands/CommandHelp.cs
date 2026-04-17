@@ -560,6 +560,20 @@ internal partial class Program
 
         ["win-move"] = "win-move <grap> --x N --y N [--w N] [--h N]\nMove/resize a window by grap pattern.",
 
+        ["com"] = "com ls|use|current|methods|call [args]\nCOM adapter commands (session per folder).\n  ls              List profiles/adapters\n  use <name>      Select profile for current folder (.wkcom/session.json)\n  current         Show selected profile\n  methods         List callable methods\n  call <m> [p]    Invoke method via selected adapter",
+
+        ["telegram"] = "telegram send \"text\" [--window <title>] [--no-fallback-enter]\nSend message via Telegram desktop client (A11Y-first, Enter fallback).",
+
+        ["watch"] = "watch [--duration N] [--live] [--win32] [--interval N]\nReal-time element tracking under mouse cursor. --live: print cursor position updates.",
+
+        ["win-click"] = "win-click <window-title> <x> <y> [--uia]\nClick a coordinate inside a window + detect UIA element at that point.",
+
+        ["do"] = "do <window-title> <form-id> <button-text> [--confirm]\nFull automation: combo select + button click + dialog handling.",
+
+        ["snapshot"] = "snapshot <window-title> [--tag N] [--depth N]\nOne-shot diagnostic: UIA tree + screenshot + OCR.",
+
+        ["find-prompts"] = "find-prompts\nList all Claude Code prompt windows (FindAllPrompts). Shows usable/blocked/hidden state.",
+
         ["a11y hack-hover"] = """
             a11y hack-hover [--parent-pid N]
             Standalone hover analysis worker — mouse CCA + UIA + overlay.
