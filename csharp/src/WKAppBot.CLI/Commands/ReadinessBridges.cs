@@ -99,6 +99,20 @@ internal partial class Program
         /// </summary>
         public bool Checkpoint() => DetectAndRecover(phase: "mid");
 
+        /// <summary>
+        /// Read-only theft check -- returns true if the foreground window changed since
+        /// entry, but does NOT restore focus and does NOT file an auto bug report.
+        /// Use when the focus change may be a legitimate user action (e.g. user interacting
+        /// with a save-dialog raised by WM_CLOSE during kill) and we want to de-escalate
+        /// WITHOUT ripping focus back from the user.
+        /// </summary>
+        public bool Peek()
+        {
+            if (_skip || _prevFg == IntPtr.Zero) return false;
+            try { return NativeMethods.GetForegroundWindow() != _prevFg; }
+            catch { return false; }
+        }
+
         private bool DetectAndRecover(string phase)
         {
             if (_skip || _prevFg == IntPtr.Zero) return false;
@@ -110,6 +124,22 @@ internal partial class Program
                 string curTitle = "";
                 try { curTitle = WindowFinder.GetWindowText(curFg); } catch { }
                 if (curTitle.Length > 40) curTitle = curTitle[..40] + "...";
+
+                // User-active guard: if the user is currently typing/clicking on the new
+                // foreground (e.g. interacting with a save-dialog raised by WM_CLOSE),
+                // ripping focus back would destroy their input. Report but do NOT restore.
+                var idleMs = NativeMethods.GetUserIdleMs();
+                if (idleMs < 2000)
+                {
+                    Console.Error.WriteLine(
+                        $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
+                        $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- user active ({idleMs}ms), NOT restoring");
+                    AutoBugReport(
+                        $"FOCUS-STEAL {phase} during a11y {_action} (user active, not restored): " +
+                        $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
+                    return true;
+                }
+
                 Console.Error.WriteLine(
                     $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
                     $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- restoring");

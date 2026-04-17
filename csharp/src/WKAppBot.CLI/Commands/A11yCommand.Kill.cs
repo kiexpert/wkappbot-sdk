@@ -20,6 +20,10 @@ internal partial class Program
 
     static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false, string? argFilter = null, string? nthRaw = null)
     {
+        // [FOCUS-STEAL] Local sentinel so Peek() inside the kill loop can see fg changes
+        // triggered by per-target WM_CLOSE (save-prompt dialogs). The outer A11yCommand
+        // sentinel is fine for end-of-command; this one enables mid-loop Peek.
+        using var killSentinel = new FocusStealSentinel("a11y-kill");
         // Global dry-run mode overrides local flag
         if (_dryRunMode.Value) dryRun = true;
         // Split '#' for optional exe-path sub-filter
@@ -272,6 +276,20 @@ internal partial class Program
                         killed.Add(c.NodeKey);
                         continue;
                     }
+
+                    // [FOCUS-STEAL:peek] WM_CLOSE may have raised a save/confirm dialog that
+                    // now owns focus. If so, the user is likely interacting with it -- do
+                    // not escalate to force-kill for THIS target. Other targets still get
+                    // their turn (we `continue`, not `return`).
+                    if (killSentinel.Peek())
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Error.WriteLine($"[KILL] {c.NodeKey} -- focus moved after WM_CLOSE (dialog?) -- skipping force-kill, user may be deciding");
+                        Console.ResetColor();
+                        skipped.Add($"[{p.Id}]{procName} (focus-moved-after-close)");
+                        continue;
+                    }
+
                     Console.Error.WriteLine($"[KILL] {c.NodeKey} -- still alive, force kill");
                 }
                 else
