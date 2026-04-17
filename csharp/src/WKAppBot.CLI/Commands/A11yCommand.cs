@@ -134,7 +134,7 @@ internal partial class Program
             Console.WriteLine($"  WKAppBot a11y {verStr}");
             Console.WriteLine($"  A MUD-style portal for AI to see and touch the real world.");
             Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
-            Console.WriteLine($"  26 actions · 3-tier fallback · focusless · zoom overlay");
+            Console.WriteLine($"  31 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA → Win32 → SendInput + CDP web fallback — just works.");
             Console.WriteLine();
             Console.WriteLine("  Usage: a11y <action> <grap>[#uia-scope] [options]");
@@ -145,7 +145,7 @@ internal partial class Program
             Console.WriteLine("  screenshot  Capture window screenshot (delegates to capture)");
             Console.WriteLine("  ocr         OCR text extraction (delegates to ocr command)");
             Console.WriteLine();
-            Console.WriteLine("═══ Window Actions (7) ════════════════════════════════════");
+            Console.WriteLine("═══ Window Actions (8) ════════════════════════════════════");
             Console.WriteLine("  close       Close window (UIA → WM_CLOSE → Process.Kill)");
             Console.WriteLine("  kill        Kill processes by name pattern (no window needed)");
             Console.WriteLine("              WM_CLOSE first if window exists, else force kill");

@@ -102,7 +102,7 @@ If a task feels hard or you hit a wall → search skills first, ask triad second
 
 ━━ Tool Reference ━━
 PRIMARY: wkappbot a11y <action> <grap>[#scope] [options]
-  24 actions — discovery, window control, element interaction, clipboard, file I/O.
+  31 actions — discovery, window control, element interaction, async, clipboard, file I/O.
   Grap: "*App*" wildcard | "regex:..." | "*a*;*b*" OR | "*hwnd=XX*" handle
   #scope: drills into UIA — "*App*#*MenuBar*"
   CSS auto-detected for web: "*Chrome*#button.submit" → CDP engine
