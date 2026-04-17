@@ -311,29 +311,32 @@ partial class Program
             prof("EnsureBusyboxAliases done");
         }
 
-        // --sudo admin Eye 100ms liveness probe (Launcher-side first layer).
-        // Paired with a 100ms probe in Core -- total worst-case handshake budget 200ms.
-        // Pipe path check: \\.\pipe\wkappbot_elevated
-        // Connect attempt bounded at 100ms. If admin Eye is in bad state (pipe file present
-        // but unresponsive), we fall through to Core spawn -- Core's own 100ms probe will re-check,
-        // then enter sudo protection (LaunchElevatedEye spawns a fresh admin Eye).
+        // --sudo admin Eye liveness probe (Launcher-side first layer).
+        // --sudo ONLY: use a generous 1500ms connect budget. A healthy admin Eye that
+        // is currently servicing another client briefly stalls new ConnectAsync before
+        // HandleClient's Task.Run accepts it; a 100ms window was falsely concluding
+        // "unreachable" under moderate load and leaking a confusing log line even though
+        // Core correctly reused. Only --sudo invocations pay the cost; everyone else
+        // still sees a 100ms probe elsewhere in the stack. Core's own Ping is untouched.
+        // Pipe path: \\.\pipe\wkappbot_elevated
         if (args.Any(a => a == "--sudo"))
         {
+            const int sudoProbeMs = 1500;
             try
             {
                 using var pipe = new System.IO.Pipes.NamedPipeClientStream(
                     ".", "wkappbot_elevated",
                     System.IO.Pipes.PipeDirection.InOut,
                     System.IO.Pipes.PipeOptions.Asynchronous);
-                using var cts = new System.Threading.CancellationTokenSource(100);
-                pipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
+                using var cts = new System.Threading.CancellationTokenSource(sudoProbeMs);
+                pipe.ConnectAsync(sudoProbeMs, cts.Token).GetAwaiter().GetResult();
                 Console.Error.WriteLine(pipe.IsConnected
-                    ? "[LAUNCHER:SUDO] admin Eye ping (100ms): alive -- Core will reuse"
-                    : "[LAUNCHER:SUDO] admin Eye ping (100ms): unreachable");
+                    ? $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): alive -- Core will reuse"
+                    : $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable");
             }
             catch
             {
-                Console.Error.WriteLine("[LAUNCHER:SUDO] admin Eye ping (100ms): unreachable (fallthrough to Core)");
+                Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable (fallthrough to Core)");
             }
         }
 
