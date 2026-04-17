@@ -70,6 +70,12 @@ internal partial class Program
             return 1;
         }
 
+        // Serialize concurrent speak calls — only one TTS at a time.
+        // Without this, parallel callers produce overlapping audio.
+        using var speakMutex = new System.Threading.Mutex(false, "Global\\WKAppBotSpeak");
+        try { speakMutex.WaitOne(); }
+        catch (System.Threading.AbandonedMutexException) { /* previous speaker crashed — take over */ }
+
         // 1) TTS WAV 렌더링 + 타이밍 마커 수집
         var markers = new List<SpeakMarker>();
         var tmpFile = RenderTtsWav(text, markers, gain: 3.0f);
