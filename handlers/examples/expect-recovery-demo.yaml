@@ -41,3 +41,8 @@ steps:
       condition: window_absent
       target: { name: "*저장*" }
       timeout: 3
+
+teardown:
+  - name: "Close notepad"
+    action: window_close
+    target: { name: "*메모장*" }
