@@ -292,9 +292,162 @@ public sealed class ActionExecutor : IDisposable
             _currentZoom = null;
         }
 
+        // ── Expect-Recovery gate (P1 competition response) ──
+        // After the action executes, poll for expected UI state.
+        // If expect fails and recovery is defined, run recovery then retry.
+        // All polling uses focusless UIA queries — no SendInput, no focus steal.
+        if (result.Status == StepStatus.Pass && step.Expect != null)
+        {
+            var expectResult = PollExpect(step.Expect, step.Target);
+            if (!expectResult)
+            {
+                Log($"  [EXPECT] condition '{step.Expect.Condition}' NOT met after {step.Expect.Timeout}s");
+                if (step.Recovery != null)
+                {
+                    for (int attempt = 0; attempt < step.Recovery.MaxRetries; attempt++)
+                    {
+                        Log($"  [RECOVERY] attempt {attempt + 1}/{step.Recovery.MaxRetries}: {step.Recovery.Action}");
+                        ExecuteRecoveryAction(step.Recovery);
+
+                        if (step.Recovery.Retry)
+                        {
+                            Log($"  [RECOVERY] retrying original action: {step.Action}");
+                            var retryResult = Execute(new StepDefinition
+                            {
+                                Name = step.Name + $" (retry {attempt + 1})",
+                                Action = step.Action,
+                                Target = step.Target,
+                                Params = step.Params,
+                                Expect = step.Expect,
+                            });
+                            if (retryResult.Status == StepStatus.Pass)
+                            {
+                                result.Status = StepStatus.Pass;
+                                result.Message = $"Recovered after {attempt + 1} attempt(s)";
+                                Log($"  [RECOVERY] success on attempt {attempt + 1}");
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            var recheck = PollExpect(step.Expect, step.Target);
+                            if (recheck)
+                            {
+                                Log($"  [RECOVERY] expect met after recovery (no retry)");
+                                break;
+                            }
+                        }
+
+                        if (attempt == step.Recovery.MaxRetries - 1)
+                        {
+                            result.Status = StepStatus.Fail;
+                            result.Message = $"Expect '{step.Expect.Condition}' failed after {step.Recovery.MaxRetries} recovery attempts";
+                            Log($"  [RECOVERY] exhausted — step fails");
+                        }
+                    }
+                }
+                else
+                {
+                    result.Status = StepStatus.Fail;
+                    result.Message = $"Expect '{step.Expect.Condition}' not met (no recovery defined)";
+                }
+            }
+            else
+            {
+                Log($"  [EXPECT] condition '{step.Expect.Condition}' met");
+            }
+        }
+
         sw.Stop();
         result.ElapsedMs = sw.Elapsed.TotalMilliseconds;
         return result;
+    }
+
+    /// <summary>
+    /// Poll for expected UI state using focusless UIA queries only.
+    /// Returns true if condition met within timeout.
+    /// </summary>
+    private bool PollExpect(ExpectDefinition expect, TargetDefinition? stepTarget)
+    {
+        var target = expect.Target ?? stepTarget;
+        var deadline = Stopwatch.StartNew();
+        var intervalMs = (int)(expect.Interval * 1000);
+
+        while (deadline.Elapsed.TotalSeconds < expect.Timeout)
+        {
+            try
+            {
+                bool met = expect.Condition switch
+                {
+                    "element_visible" => CheckElementVisible(target),
+                    "element_enabled" => CheckElementEnabled(target),
+                    "element_absent" => !CheckElementVisible(target),
+                    "text_contains" => CheckTextContains(target, expect.Value ?? ""),
+                    "text_equals" => CheckTextEquals(target, expect.Value ?? ""),
+                    "window_present" => CheckWindowPresent(target),
+                    "window_absent" => !CheckWindowPresent(target),
+                    _ => throw new InvalidOperationException($"Unknown expect condition: {expect.Condition}")
+                };
+                if (met) return true;
+            }
+            catch { /* element not found yet — keep polling */ }
+
+            Thread.Sleep(intervalMs);
+        }
+        return false;
+    }
+
+    private bool CheckElementVisible(TargetDefinition? target)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        return el != null && !el.IsOffscreen;
+    }
+
+    private bool CheckElementEnabled(TargetDefinition? target)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        return el != null && el.IsEnabled;
+    }
+
+    private bool CheckTextContains(TargetDefinition? target, string value)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        if (el == null) return false;
+        var text = el.Properties.Name.ValueOrDefault ?? "";
+        return text.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CheckTextEquals(TargetDefinition? target, string value)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        if (el == null) return false;
+        var text = el.Properties.Name.ValueOrDefault ?? "";
+        return text.Equals(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool CheckWindowPresent(TargetDefinition? target)
+    {
+        if (target == null) return false;
+        var name = target.Name ?? target.AutomationId ?? "";
+        var windows = WindowFinder.FindWindows(name);
+        return windows.Count > 0;
+    }
+
+    /// <summary>Execute a recovery mini-step (no expect/recovery on recovery itself).</summary>
+    private void ExecuteRecoveryAction(RecoveryDefinition recovery)
+    {
+        var recoveryStep = new StepDefinition
+        {
+            Name = "_recovery",
+            Action = recovery.Action,
+            Target = recovery.Target,
+            Params = recovery.Params,
+        };
+        Execute(recoveryStep);
     }
 
     // ── Click actions ──────────────────────────────────────────
