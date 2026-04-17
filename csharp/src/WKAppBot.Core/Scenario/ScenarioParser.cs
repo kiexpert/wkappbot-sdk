@@ -151,9 +151,25 @@ public static class ScenarioParser
             case "set_range":
             case "invoke":
             case "set_value":
-            case "window_close":
             case "window_minimize":
             case "window_maximize":
+                break;
+
+            case "window_close":
+                // dialog_policy is optional; unspecified -> "dont_save" (legacy).
+                if (!string.IsNullOrWhiteSpace(step.DialogPolicy))
+                {
+                    var p = step.DialogPolicy.Trim().ToLowerInvariant()
+                        .Replace("-", "_").Replace(" ", "_");
+                    if (p is not ("save" or "dont_save" or "discard" or "no"
+                        or "cancel" or "abort" or "keep" or "yes"
+                        or "ask_user" or "ask" or "report"))
+                    {
+                        throw new ScenarioParseException(
+                            $"steps[{index}]: window_close.dialog_policy='{step.DialogPolicy}' is invalid. " +
+                            "Valid: save | dont_save | cancel | ask_user");
+                    }
+                }
                 break;
 
             default:

@@ -24,7 +24,10 @@ namespace WKAppBot.Core.Runner;
 /// </summary>
 public sealed class ActionExecutor : IDisposable
 {
-    private static readonly string[] SaveDismissButtonPatterns =
+    // Dialog policy button patterns -- one set per window_close dialog_policy value.
+    // Matched case-insensitively against UIA Button.Name after NormalizeUiText
+    // (strips '&' accelerator and whitespace).
+    private static readonly string[] DontSavePatterns =
     [
         "저장 안 함",
         "저장안함",
@@ -37,6 +40,26 @@ public sealed class ActionExecutor : IDisposable
         "Discard",
     ];
 
+    private static readonly string[] SavePatterns =
+    [
+        "저장",
+        "저장(&S)",
+        "Save",
+        "&Save",
+        "Yes",
+        "&Yes",
+        "예",
+        "예(&Y)",
+    ];
+
+    private static readonly string[] CancelPatterns =
+    [
+        "취소",
+        "취소(&C)",
+        "Cancel",
+        "&Cancel",
+    ];
+
     private static readonly string[] SaveDialogTitleHints =
     [
         "저장",
@@ -45,6 +68,36 @@ public sealed class ActionExecutor : IDisposable
         "메모장",
         "Notepad",
     ];
+
+    /// <summary>
+    /// Normalize a raw dialog_policy string (case-insensitive, trims whitespace and hyphens).
+    /// Returns canonical "dont_save" | "save" | "cancel" | "ask_user". Null/empty -> "dont_save" (legacy default).
+    /// </summary>
+    private static string NormalizeDialogPolicy(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "dont_save";
+        var k = raw.Trim().ToLowerInvariant().Replace("-", "_").Replace(" ", "_");
+        return k switch
+        {
+            "save" or "keep" or "yes" => "save",
+            "dont_save" or "discard" or "no" => "dont_save",
+            "cancel" or "abort" => "cancel",
+            "ask_user" or "ask" or "report" => "ask_user",
+            _ => k,
+        };
+    }
+
+    /// <summary>
+    /// Select the button-name patterns that match the requested policy.
+    /// Returns null for "ask_user" (skip auto-dismiss).
+    /// </summary>
+    private static string[]? PatternsForPolicy(string policy) => policy switch
+    {
+        "save" => SavePatterns,
+        "dont_save" => DontSavePatterns,
+        "cancel" => CancelPatterns,
+        _ => null, // ask_user or unknown -> let DetectModalDialogAfterClose surface buttons
+    };
 
     private readonly UiaLocator _uia;
     private readonly RuntimeContext _ctx;
@@ -1262,24 +1315,56 @@ public sealed class ActionExecutor : IDisposable
         if (!success)
             throw new InvalidOperationException($"Window {action} failed for {elemDesc}");
 
-        // Close post-action: give OS 500ms, then check/dismiss modal dialogs
+        // Close post-action: poll up to 500ms for target to disappear.
+        // Early-out the moment the window is gone -- no need to probe for modals.
         if (action == "close")
         {
-            Thread.Sleep(500);
-            if (TryDismissSavePromptAfterClose(element, out var dismissDetail))
+            var targetHwnd = element.Properties.NativeWindowHandle.ValueOrDefault;
+            bool stillAlive = true;
+            for (int i = 0; i < 5; i++)
             {
-                result.ActionDetail = $"Window close {elemDesc} ({viaLabel}) + {dismissDetail}";
-                Log($"  [CLOSE-GUARD] {dismissDetail}");
+                Thread.Sleep(100);
+                if (targetHwnd == IntPtr.Zero || !NativeMethods.IsWindow(targetHwnd))
+                {
+                    stillAlive = false;
+                    break;
+                }
+            }
+
+            if (!stillAlive)
+            {
+                result.ActionDetail = $"Window close {elemDesc} ({viaLabel})";
+                Log($"  Window close via {viaLabel}");
                 return;
             }
+
+            var policy = NormalizeDialogPolicy(step.DialogPolicy);
+            var patterns = PatternsForPolicy(policy);
+
+            if (patterns != null &&
+                TryDismissSavePromptAfterClose(element, patterns, out var dismissDetail))
+            {
+                result.ActionDetail = $"Window close {elemDesc} ({viaLabel}) + [{policy}] {dismissDetail}";
+                Log($"  [CLOSE-GUARD] policy={policy} {dismissDetail}");
+                return;
+            }
+
+            // Target still alive + no matching dismiss button -> dump focused node grap
+            // (paste-ready), then fail. Gives operator/AI a concrete next-step target.
+            var focusDump = BuildFocusedNodeReport(targetHwnd);
             var dialogInfo = DetectModalDialogAfterClose(element);
-            if (dialogInfo != null)
-            {
-                result.Status = StepStatus.Fail;
-                result.Message = dialogInfo;
-                Log($"  [CLOSE-GUARD] {dialogInfo}");
-                return;
-            }
+
+            result.Status = StepStatus.Fail;
+            var baseMsg = policy == "ask_user"
+                ? "[dialog_policy=ask_user] window still alive after close"
+                : $"[dialog_policy={policy}] no matching button -- window still alive after close";
+            result.Message = focusDump != null
+                ? $"{baseMsg}\n{focusDump}\n{dialogInfo ?? ""}".TrimEnd()
+                : $"{baseMsg} -- {dialogInfo ?? "(no focused node found)"}";
+
+            Log($"  [CLOSE-GUARD] policy={policy} -- FAILED, focus-node dump follows");
+            if (focusDump != null) Log(focusDump);
+            return;
         }
 
         result.ActionDetail = $"Window {action} {elemDesc} ({viaLabel})";
@@ -1287,10 +1372,11 @@ public sealed class ActionExecutor : IDisposable
     }
 
     /// <summary>
-    /// After a close action, try to find a save prompt and click the dismiss button.
-    /// Returns true if a dismiss button was found and invoked.
+    /// After a close action, try to find a save prompt and invoke the button whose
+    /// name matches one of <paramref name="patterns"/>. Returns true if a button was found and clicked.
     /// </summary>
-    private bool TryDismissSavePromptAfterClose(AutomationElement closedElement, out string? detail)
+    private bool TryDismissSavePromptAfterClose(
+        AutomationElement closedElement, string[] patterns, out string? detail)
     {
         detail = null;
 
@@ -1309,7 +1395,7 @@ public sealed class ActionExecutor : IDisposable
                 var dialogRoot = _uia.Automation.FromHandle(dialogHwnd);
                 if (dialogRoot == null) continue;
 
-                if (TryInvokeDismissButton(dialogRoot, out var buttonName))
+                if (TryInvokeDismissButton(dialogRoot, patterns, out var buttonName))
                 {
                     detail = $"save prompt dismissed via [{buttonName}]";
                     Thread.Sleep(250);
@@ -1358,9 +1444,11 @@ public sealed class ActionExecutor : IDisposable
     }
 
     /// <summary>
-    /// Recursively scan a dialog for a matching dismiss button and invoke it.
+    /// Recursively scan a dialog for a button whose normalized name matches any of
+    /// <paramref name="patterns"/> and invoke it.
     /// </summary>
-    private bool TryInvokeDismissButton(AutomationElement dialogRoot, out string? buttonName)
+    private bool TryInvokeDismissButton(
+        AutomationElement dialogRoot, string[] patterns, out string? buttonName)
     {
         buttonName = null;
 
@@ -1382,7 +1470,7 @@ public sealed class ActionExecutor : IDisposable
                     if (controlType == FlaUI.Core.Definitions.ControlType.Button)
                     {
                         var normalized = NormalizeUiText(name);
-                        if (SaveDismissButtonPatterns.Any(pattern =>
+                        if (patterns.Any(pattern =>
                             string.Equals(NormalizeUiText(pattern), normalized, StringComparison.OrdinalIgnoreCase)))
                         {
                             var tagPath = _uia.GetAbsoluteTagPath(current);
@@ -1423,6 +1511,45 @@ public sealed class ActionExecutor : IDisposable
     /// </summary>
     private static string NormalizeUiText(string value)
         => new string(value.Where(ch => ch != '&' && !char.IsWhiteSpace(ch)).ToArray());
+
+    /// <summary>
+    /// Build a multi-line, paste-ready focus-node report for a window that refused to close.
+    /// Shape mirrors a11y ambiguity-guard output so operators/AI can copy the suggested grap.
+    /// Returns null if no focused element belongs to the target's process.
+    /// </summary>
+    private static string? BuildFocusedNodeReport(IntPtr targetHwnd)
+    {
+        try
+        {
+            if (targetHwnd == IntPtr.Zero) return null;
+
+            using var focLoc = new UiaLocator();
+            var foc = focLoc.GetFocusedElementInfo();
+            if (foc == null) return null;
+
+            NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint winPid);
+            if (foc.ProcessId != (int)winPid) return null; // focus is in a different process
+
+            var label = !string.IsNullOrEmpty(foc.AutomationId) ? foc.AutomationId : foc.Name;
+            if (label.Length > 40) label = label[..40];
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"[CLOSE-GUARD] FOCUSED: {foc.ControlType}(\"{label}\")");
+            if (foc.Patterns.Count > 0) sb.Append($" [{string.Join(",", foc.Patterns)}]");
+            sb.AppendLine();
+            foreach (var (pType, pName, _) in foc.ParentChain)
+            {
+                if (string.IsNullOrEmpty(pName)) continue;
+                sb.AppendLine($"         <- {pType}(\"{pName}\")");
+            }
+            if (!string.IsNullOrEmpty(label) && !string.IsNullOrEmpty(foc.WindowTitle))
+            {
+                sb.Append($"[CLOSE-GUARD] FIND: a11y find \"*{foc.WindowTitle}*#*{label}*\"");
+            }
+            return sb.ToString().TrimEnd();
+        }
+        catch { return null; }
+    }
 
     /// <summary>
     /// After window_close, check if the process is still alive (modal dialog blocking close).
