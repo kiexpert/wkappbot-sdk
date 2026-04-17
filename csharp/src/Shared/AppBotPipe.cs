@@ -376,6 +376,17 @@ internal static partial class AppBotPipe
         return proc;
     }
 
+    /// <summary>
+    /// Convenience wrapper: `AppBotPipe.Start(psi)` -- same as `StartTracked(psi, Env.CWD, "LEGACY")`.
+    /// Use for mechanical migration of raw `Process.Start(psi)` call sites; prefer the
+    /// explicit StartTracked(..., cwd, caller) form for new code.
+    /// </summary>
+    internal static System.Diagnostics.Process? Start(System.Diagnostics.ProcessStartInfo psi, string caller = "LEGACY")
+    {
+        var cwd = string.IsNullOrEmpty(psi.WorkingDirectory) ? Environment.CurrentDirectory : psi.WorkingDirectory;
+        return StartTracked(psi, cwd, caller);
+    }
+
     // -- SpawnMcp: DETACHED_PROCESS + stdin/stdout/stderr pipes --
     /// <summary>
     /// Spawn MCP subprocess with DETACHED_PROCESS flag and full pipe I/O.

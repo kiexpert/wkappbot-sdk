@@ -44,7 +44,7 @@ public static class ChromeLauncher
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.Start(psi);
             if (proc != null)
             {
                 var output = proc.StandardOutput.ReadLine();
@@ -128,7 +128,7 @@ public static class ChromeLauncher
             WindowStyle = ProcessWindowStyle.Minimized,
         };
 
-        var process = Process.Start(psi)
+        var process = AppBotPipe.Start(psi)
             ?? throw new InvalidOperationException("Failed to start Chrome");
 
         // Wait for CDP endpoint to become available
@@ -266,7 +266,7 @@ public static class ChromeLauncher
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.Start(psi);
             if (proc == null) return 0;
             var output = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit(3000);
@@ -331,7 +331,7 @@ public static class ChromeLauncher
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.Start(psi);
             if (proc == null) return null;
             var output = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit(2000);
