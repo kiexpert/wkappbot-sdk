@@ -65,6 +65,7 @@
 ### Forbidden
 - Directly spawning Eye / options that block Claude delivery / options that skip Eye — all forbidden
 - Asking user questions in prompt only (must send to Slack simultaneously)
+- **Bandaid/workaround code (땜빵)** — if you find yourself duplicating existing logic, adding local "; OR" splits, or wrapping a proper function with ad-hoc retry loops, STOP. Fix the shared function instead. Bandaids compound: future Claude/Codex sessions burn tokens untangling your workaround, then re-add their own on top. Rule of thumb: if the same concept exists elsewhere in the codebase, reuse it — don't reinvent a narrower version.
 
 ---
 

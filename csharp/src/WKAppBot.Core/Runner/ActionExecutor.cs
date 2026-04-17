@@ -24,6 +24,28 @@ namespace WKAppBot.Core.Runner;
 /// </summary>
 public sealed class ActionExecutor : IDisposable
 {
+    private static readonly string[] SaveDismissButtonPatterns =
+    [
+        "저장 안 함",
+        "저장안함",
+        "Don't Save",
+        "Dont Save",
+        "Don't save",
+        "Dont save",
+        "&Don't Save",
+        "No",
+        "Discard",
+    ];
+
+    private static readonly string[] SaveDialogTitleHints =
+    [
+        "저장",
+        "save",
+        "Save",
+        "메모장",
+        "Notepad",
+    ];
+
     private readonly UiaLocator _uia;
     private readonly RuntimeContext _ctx;
     private readonly bool _verbose;
@@ -1117,8 +1139,9 @@ public sealed class ActionExecutor : IDisposable
     }
 
     /// <summary>
-    /// Close, minimize, or maximize a window.
-    /// Focusless via UIA Window pattern.
+    /// Close, minimize, or maximize a window. Focusless via UIA Window pattern.
+    /// For close: if a modal (save prompt etc.) blocks the close, try to dismiss
+    /// it; if it can't be dismissed, fail the step with a descriptive error.
     /// </summary>
     private void DoWindowAction(StepDefinition step, StepResult result, string action)
     {
@@ -1138,32 +1161,30 @@ public sealed class ActionExecutor : IDisposable
             _ => false
         };
 
-        if (success)
-        {
-            // Close: check if process still alive after 500ms — modal dialog may have blocked close
-            if (action == "close")
-            {
-                Thread.Sleep(500);
-                var dialogInfo = DetectModalDialogAfterClose(element);
-                if (dialogInfo != null)
-                {
-                    result.Status = StepStatus.Fail;
-                    result.Message = dialogInfo;
-                    Log($"  [CLOSE-GUARD] {dialogInfo}");
-                    return;
-                }
-            }
-            result.ActionDetail = $"Window {action} {elemDesc} ({method}, focusless)";
-            Log($"  Window {action} via UIA ({method}, focusless)");
-            return;
-        }
+        var viaLabel = success ? $"{method}, focusless" : null;
 
-        // Fallback for close: Alt+F4
-        if (action == "close")
+        // Fallback for close: Alt+F4 (needs focus, SendInput)
+        if (!success && action == "close")
         {
             EnsureFocus();
             KeyboardInput.Hotkey(new[] { "alt", "F4" });
+            success = true;
+            viaLabel = "Alt+F4 fallback";
+        }
+
+        if (!success)
+            throw new InvalidOperationException($"Window {action} failed for {elemDesc}");
+
+        // Close post-action: give OS 500ms, then check/dismiss modal dialogs
+        if (action == "close")
+        {
             Thread.Sleep(500);
+            if (TryDismissSavePromptAfterClose(element, out var dismissDetail))
+            {
+                result.ActionDetail = $"Window close {elemDesc} ({viaLabel}) + {dismissDetail}";
+                Log($"  [CLOSE-GUARD] {dismissDetail}");
+                return;
+            }
             var dialogInfo = DetectModalDialogAfterClose(element);
             if (dialogInfo != null)
             {
@@ -1172,13 +1193,149 @@ public sealed class ActionExecutor : IDisposable
                 Log($"  [CLOSE-GUARD] {dialogInfo}");
                 return;
             }
-            result.ActionDetail = $"Window close {elemDesc} (Alt+F4 fallback)";
-            Log($"  Window close via Alt+F4 fallback");
-            return;
         }
 
-        throw new InvalidOperationException($"Window {action} failed for {elemDesc}");
+        result.ActionDetail = $"Window {action} {elemDesc} ({viaLabel})";
+        Log($"  Window {action} via {viaLabel}");
     }
+
+    /// <summary>
+    /// After a close action, try to find a save prompt and click the dismiss button.
+    /// Returns true if a dismiss button was found and invoked.
+    /// </summary>
+    private bool TryDismissSavePromptAfterClose(AutomationElement closedElement, out string? detail)
+    {
+        detail = null;
+
+        try
+        {
+            var hwnd = closedElement.Properties.NativeWindowHandle.ValueOrDefault;
+            if (hwnd == IntPtr.Zero) return false;
+
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint ownerPid);
+            if (ownerPid == 0) return false;
+
+            Thread.Sleep(200);
+
+            foreach (var dialogHwnd in FindLikelySaveDialogs(ownerPid))
+            {
+                var dialogRoot = _uia.Automation.FromHandle(dialogHwnd);
+                if (dialogRoot == null) continue;
+
+                if (TryInvokeDismissButton(dialogRoot, out var buttonName))
+                {
+                    detail = $"save prompt dismissed via [{buttonName}]";
+                    Thread.Sleep(250);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"  [CLOSE-GUARD] save prompt handler error: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Find likely save prompt windows belonging to the same process.
+    /// </summary>
+    private List<IntPtr> FindLikelySaveDialogs(uint ownerPid)
+    {
+        var results = new List<IntPtr>();
+
+        NativeMethods.EnumWindows((hWnd, _) =>
+        {
+            if (!NativeMethods.IsWindowVisible(hWnd))
+                return true;
+
+            NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+            if (pid != ownerPid)
+                return true;
+
+            var title = WindowFinder.GetWindowText(hWnd);
+            var className = WindowFinder.GetClassName(hWnd);
+
+            bool looksLikeDialog = className == "#32770"
+                || SaveDialogTitleHints.Any(hint =>
+                    title.Contains(hint, StringComparison.OrdinalIgnoreCase));
+
+            if (looksLikeDialog)
+                results.Add(hWnd);
+
+            return true;
+        }, IntPtr.Zero);
+
+        return results;
+    }
+
+    /// <summary>
+    /// Recursively scan a dialog for a matching dismiss button and invoke it.
+    /// </summary>
+    private bool TryInvokeDismissButton(AutomationElement dialogRoot, out string? buttonName)
+    {
+        buttonName = null;
+
+        try
+        {
+            var walker = dialogRoot.Automation.TreeWalkerFactory.GetControlViewWalker();
+            var queue = new Queue<AutomationElement>();
+            queue.Enqueue(dialogRoot);
+
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+
+                try
+                {
+                    var controlType = current.Properties.ControlType.ValueOrDefault;
+                    var name = current.Properties.Name.ValueOrDefault ?? "";
+
+                    if (controlType == FlaUI.Core.Definitions.ControlType.Button)
+                    {
+                        var normalized = NormalizeUiText(name);
+                        if (SaveDismissButtonPatterns.Any(pattern =>
+                            string.Equals(NormalizeUiText(pattern), normalized, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var tagPath = _uia.GetAbsoluteTagPath(current);
+                            var resolved = !string.IsNullOrEmpty(tagPath)
+                                ? GrapHelper.FindUiaScope(dialogRoot, tagPath, maxDepth: 15) ?? current
+                                : current;
+
+                            if (UiaLocator.TryInvoke(resolved))
+                            {
+                                buttonName = string.IsNullOrEmpty(tagPath) ? name : $"{name} [{tagPath}]";
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch { }
+
+                try
+                {
+                    var child = walker.GetFirstChild(current);
+                    while (child != null)
+                    {
+                        queue.Enqueue(child);
+                        try { child = walker.GetNextSibling(child); }
+                        catch { break; }
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Normalize UI text so accelerator markers and spaces do not block matching.
+    /// </summary>
+    private static string NormalizeUiText(string value)
+        => new string(value.Where(ch => ch != '&' && !char.IsWhiteSpace(ch)).ToArray());
 
     /// <summary>
     /// After window_close, check if the process is still alive (modal dialog blocking close).
@@ -1249,7 +1406,7 @@ public sealed class ActionExecutor : IDisposable
     {
         if (step.Target == null) return (null, null);
 
-        // ── Tier 1: UIA (Accessibility) ─────────────────────
+        // ── Tier 1: UIA (Accessibility) — UiaLocator handles ";" OR internally ──
         var (element, method) = _uia.FindElement(
             _ctx.MainWindowHandle,
             step.Target.AutomationId,

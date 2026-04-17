@@ -151,44 +151,65 @@ public sealed partial class UiaLocator : IDisposable
         string? name,
         string? controlType)
     {
-        // ── AutomationId: exact first, pattern fallback ──
-        if (automationId != null)
+        // ── AutomationId: supports ";" OR, exact + pattern fallback ──
+        foreach (var id in SplitOr(automationId))
         {
-            if (PatternMatcher.IsPattern(automationId))
+            if (PatternMatcher.IsPattern(id))
             {
-                var el = FindByAutomationIdPattern(hWnd, automationId);
+                var el = FindByAutomationIdPattern(hWnd, id);
                 if (el != null) return (el, "automation_id_pattern");
             }
             else
             {
-                var el = FindByAutomationId(hWnd, automationId);
+                var el = FindByAutomationId(hWnd, id);
                 if (el != null) return (el, "automation_id");
             }
         }
 
-        // ── Name: exact first, pattern fallback ──
-        if (name != null)
+        // ── Name: supports ";" OR, exact + pattern fallback ──
+        foreach (var n in SplitOr(name))
         {
-            if (PatternMatcher.IsPattern(name))
+            if (PatternMatcher.IsPattern(n))
             {
-                var el = FindByNamePattern(hWnd, name);
+                var el = FindByNamePattern(hWnd, n);
                 if (el != null) return (el, "name_pattern");
             }
             else
             {
-                var el = FindByName(hWnd, name);
+                var el = FindByName(hWnd, n);
                 if (el != null) return (el, "name");
             }
         }
 
-        // ── ControlType ──
+        // ── ControlType (with name hint if provided — try each name alternative) ──
         if (controlType != null)
         {
-            var el = FindByControlType(hWnd, controlType, name);
-            if (el != null) return (el, "control_type");
+            foreach (var n in SplitOr(name))
+            {
+                var el = FindByControlType(hWnd, controlType, string.IsNullOrEmpty(n) ? null : n);
+                if (el != null) return (el, "control_type");
+            }
+            if (string.IsNullOrEmpty(name))
+            {
+                var el = FindByControlType(hWnd, controlType, null);
+                if (el != null) return (el, "control_type");
+            }
         }
 
         return (null, null);
+    }
+
+    /// <summary>
+    /// Split a pattern on ";" for OR semantics — mirrors a11y CLI behavior.
+    /// "A;B" → [A, B]. Single value (no ";") → [value]. Null/empty → empty.
+    /// Each part is trimmed; empty parts dropped.
+    /// </summary>
+    private static IEnumerable<string> SplitOr(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) yield break;
+        if (!value.Contains(';')) { yield return value; yield break; }
+        foreach (var part in value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            yield return part;
     }
 
     /// <summary>
