@@ -65,6 +65,24 @@ internal partial class Program
 
     static bool A11yClose(UIA3Automation automation, IntPtr hwnd, string tag, bool force, InputReadiness readiness)
     {
+        // Pre-flight: show the plan -- process name + any pre-existing modal -- so the
+        // user sees what's about to happen before any WM_CLOSE fires.
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(hwnd, out uint targetPid);
+            string procName = "?";
+            try { procName = System.Diagnostics.Process.GetProcessById((int)targetPid).ProcessName; } catch { }
+            string modalNote = "";
+            try
+            {
+                if (HasUiaInternalModal(automation, hwnd, out var preModalBtn))
+                    modalNote = $" [modal: \"{preModalBtn}\" -- use --force to dismiss]";
+            }
+            catch { }
+            Console.Error.WriteLine($"[CLOSE-PLAN] {tag} proc={procName}{modalNote}");
+        }
+        catch { }
+
         try
         {
             var el = automation.FromHandle(hwnd);
@@ -77,7 +95,10 @@ internal partial class Program
                     Console.Error.WriteLine($"[A11Y] close {tag} -- UIA WindowPattern");
                     return true;
                 }
-                // Window still alive -- save dialog may have appeared (WinUI internal modal)
+                // Window still alive after 500ms -- dump current focus node so the caller
+                // sees what's blocking (save dialog, modal, Korean IME composition, etc.)
+                LogCurrentFocusNode(automation, "UIA-Close-500ms", tag);
+                // Save dialog may have appeared (WinUI internal modal)
                 Console.Error.WriteLine($"[A11Y] close {tag} -- UIA Close sent but window still alive, checking internal modal...");
                 if (HasUiaInternalModal(automation, hwnd, out var modalButtonName))
                 {
@@ -109,10 +130,18 @@ internal partial class Program
         try
         {
             NativeMethods.SendMessageTimeoutW(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 3000, out _);
-            Thread.Sleep(1000);
+            Thread.Sleep(500);
             if (!NativeMethods.IsWindow(hwnd))
             {
                 Console.Error.WriteLine($"[A11Y] close {tag} -- Win32 WM_CLOSE");
+                return true;
+            }
+            // Still alive 500ms after WM_CLOSE -- dump focus node so caller sees the blocker
+            LogCurrentFocusNode(automation, "WM_CLOSE-500ms", tag);
+            Thread.Sleep(500);
+            if (!NativeMethods.IsWindow(hwnd))
+            {
+                Console.Error.WriteLine($"[A11Y] close {tag} -- Win32 WM_CLOSE (delayed)");
                 return true;
             }
             var blocker = readiness.DetectBlocker(hwnd);
@@ -183,6 +212,32 @@ internal partial class Program
     }
 
     /// <summary>Known dismiss button names for save dialogs (priority-ordered: don't-save first).</summary>
+    /// <summary>
+    /// Dump current UIA focused element so the caller can see what's blocking a close.
+    /// Typical causes: save dialog modal, IME composition, focus handed off to a child window.
+    /// </summary>
+    static void LogCurrentFocusNode(UIA3Automation automation, string phase, string tag)
+    {
+        try
+        {
+            var focused = automation.FocusedElement();
+            if (focused == null) { Console.Error.WriteLine($"[A11Y] close {tag} -- [{phase}] focus=none"); return; }
+            string fType = "?"; try { fType = focused.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+            string fName = "";  try { fName = focused.Properties.Name.ValueOrDefault ?? ""; } catch { }
+            if (fName.Length > 60) fName = fName[..57] + "...";
+            string fAid = "";   try { fAid = focused.Properties.AutomationId.ValueOrDefault ?? ""; } catch { }
+            var focHwnd = IntPtr.Zero;
+            try { focHwnd = focused.Properties.NativeWindowHandle.ValueOrDefault; } catch { }
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[A11Y] close {tag} -- [{phase}] still alive. focus: {fType} \"{fName}\" aid=\"{fAid}\" hwnd=0x{focHwnd.ToInt64():X}");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] close {tag} -- [{phase}] still alive. focus-probe error: {ex.Message}");
+        }
+    }
+
     static readonly string[] SaveDialogDismissNames = [
         "저장하지 않음", "Don't Save", "Don\u2019t Save",
         "아니오", "No",

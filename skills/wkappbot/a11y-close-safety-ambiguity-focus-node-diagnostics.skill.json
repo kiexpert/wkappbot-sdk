@@ -1,0 +1,26 @@
+{
+  "id": "a11y-close-safety-ambiguity-focus-node-diagnostics",
+  "app": "wkappbot",
+  "title": "a11y close safety: ambiguity \u002B focus-node diagnostics",
+  "desc": "Close action defaults: multi-match without narrower -\u003E abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -\u003E dump UIA focused element so the blocker is visible",
+  "steps": [
+    "Ambiguity guard: close detects grap matching \u003E1 windows with no #scope / hwnd: / --nth / --all -\u003E prints candidate list \u002B returns exit 2; caller must narrow explicitly",
+    "Never hardcode critical-process list (Code/chrome/etc) as a bandaid -- user rejected this pattern; the narrower-required rule is the proper fix",
+    "LogCurrentFocusNode helper dumps UIA focused element (ControlType, Name, AutomationId, hwnd) on post-close liveness check -- surfaces save dialogs, IME composition, focus handoff bugs",
+    "Place focus-node logging at both UIA WindowPattern.Close (\u002B500ms) and Win32 WM_CLOSE (\u002B500ms) checkpoints for two-tier visibility",
+    "[DEV] Implementation: csharp/src/WKAppBot.CLI/Commands/A11yCommand.WindowActions.cs A11yClose \u002B A11yCommand.cs close dispatch near targets loop"
+  ],
+  "tags": [
+    "a11y",
+    "close",
+    "safety",
+    "diagnostics",
+    "focus"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T13:08:42.6150692Z",
+  "updated": "2026-04-17T13:08:42.6150777Z",
+  "version": "1.0"
+}
