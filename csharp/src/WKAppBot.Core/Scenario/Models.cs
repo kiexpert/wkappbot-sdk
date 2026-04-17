@@ -127,6 +127,14 @@ public sealed class StepDefinition
     /// Recovery action executed when expect fails. Can retry original action.
     /// </summary>
     public RecoveryDefinition? Recovery { get; set; }
+
+    /// <summary>
+    /// window_close: declarative auto-response when a modal (save/confirm) dialog appears.
+    /// Values: "save" | "dont_save" | "cancel" | "ask_user" (case-insensitive).
+    /// Default (null / unspecified) preserves legacy behavior = "dont_save".
+    /// "ask_user" skips auto-dismiss and fails the step with a button list so the operator/AI decides.
+    /// </summary>
+    public string? DialogPolicy { get; set; }
 }
 
 /// <summary>
