@@ -408,16 +408,38 @@ public sealed class ActionExecutor : IDisposable
         {
             try
             {
+                // Condition names are UIA-aligned: extensions of IUIAutomation properties/patterns.
+                //   element_*       → AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus, …)
+                //   value_*         → ValuePattern.Value operations (UIA ValuePattern)
+                //   window_*        → window-scope checks via WindowFinder
+                //   toggle_*, selected, expanded, collapsed → UIA pattern states
                 bool met = expect.Condition switch
                 {
-                    "element_visible" => CheckElementVisible(target),
-                    "element_enabled" => CheckElementEnabled(target),
-                    "element_absent" => !CheckElementVisible(target),
-                    "text_contains" => CheckTextContains(target, expect.Value ?? ""),
-                    "text_equals" => CheckTextEquals(target, expect.Value ?? ""),
-                    "window_present" => CheckWindowPresent(target),
-                    "window_absent" => !CheckWindowPresent(target),
-                    _ => throw new InvalidOperationException($"Unknown expect condition: {expect.Condition}")
+                    // Element presence / state (UIA AutomationElement properties)
+                    "element_visible"  => CheckElementVisible(target),   // !IsOffscreen
+                    "element_enabled"  => CheckElementEnabled(target),   // IsEnabled
+                    "element_absent"   => !CheckElementVisible(target),
+                    "element_focused"  => CheckElementFocused(target),   // HasKeyboardFocus
+
+                    // ValuePattern (UIA) — the element's Value property
+                    "value_contains"   => CheckValueContains(target, expect.Value ?? ""),
+                    "value_equals"     => CheckValueEquals(target, expect.Value ?? ""),
+
+                    // Window-scope (Win32 window enumeration)
+                    "window_present"   => CheckWindowPresent(target),
+                    "window_absent"    => !CheckWindowPresent(target),
+
+                    // TogglePattern / SelectionItemPattern / ExpandCollapsePattern
+                    "toggle_on"        => CheckToggleState(target, true),
+                    "toggle_off"       => CheckToggleState(target, false),
+                    "selected"         => CheckSelected(target),
+                    "expanded"         => CheckExpandState(target, true),
+                    "collapsed"        => CheckExpandState(target, false),
+
+                    _ => throw new InvalidOperationException(
+                        $"Unknown expect condition: {expect.Condition}. " +
+                        "Valid: element_visible/enabled/absent/focused, value_contains/equals, " +
+                        "window_present/absent, toggle_on/off, selected, expanded, collapsed.")
                 };
                 if (met) return true;
             }
@@ -442,26 +464,36 @@ public sealed class ActionExecutor : IDisposable
         return el != null && el.IsEnabled;
     }
 
-    private bool CheckTextContains(TargetDefinition? target, string value)
+    private bool CheckElementFocused(TargetDefinition? target)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        return el != null && el.Properties.HasKeyboardFocus.ValueOrDefault;
+    }
+
+    /// <summary>ValuePattern.Value contains substring (case-insensitive).</summary>
+    private bool CheckValueContains(TargetDefinition? target, string value)
     {
         if (target == null) return false;
         var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
         if (el == null) return false;
-        var text = ReadElementText(el);
-        return text.Contains(value, StringComparison.OrdinalIgnoreCase);
+        return ReadElementValue(el).Contains(value, StringComparison.OrdinalIgnoreCase);
     }
 
-    private bool CheckTextEquals(TargetDefinition? target, string value)
+    /// <summary>ValuePattern.Value equals (case-insensitive).</summary>
+    private bool CheckValueEquals(TargetDefinition? target, string value)
     {
         if (target == null) return false;
         var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
         if (el == null) return false;
-        var text = ReadElementText(el);
-        return text.Equals(value, StringComparison.OrdinalIgnoreCase);
+        return ReadElementValue(el).Equals(value, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Read text: ValuePattern.Value first (edit controls), then Name property.</summary>
-    private static string ReadElementText(AutomationElement el)
+    /// <summary>
+    /// Read an element's text value: UIA ValuePattern.Value first (edit controls,
+    /// the canonical "value"), falling back to Name property for labels and buttons.
+    /// </summary>
+    private static string ReadElementValue(AutomationElement el)
     {
         try { if (el.Patterns.Value.IsSupported) return el.Patterns.Value.Pattern.Value.Value ?? ""; } catch { }
         return el.Properties.Name.ValueOrDefault ?? "";
@@ -473,6 +505,54 @@ public sealed class ActionExecutor : IDisposable
         var name = target.Name ?? target.AutomationId ?? "";
         var windows = WindowFinder.FindWindows(name);
         return windows.Count > 0;
+    }
+
+    /// <summary>UIA TogglePattern.ToggleState matches expected on/off.</summary>
+    private bool CheckToggleState(TargetDefinition? target, bool expectedOn)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        if (el == null) return false;
+        try
+        {
+            if (!el.Patterns.Toggle.IsSupported) return false;
+            var state = el.Patterns.Toggle.Pattern.ToggleState.Value;
+            return expectedOn
+                ? state == FlaUI.Core.Definitions.ToggleState.On
+                : state == FlaUI.Core.Definitions.ToggleState.Off;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>UIA SelectionItemPattern.IsSelected.</summary>
+    private bool CheckSelected(TargetDefinition? target)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        if (el == null) return false;
+        try
+        {
+            return el.Patterns.SelectionItem.IsSupported
+                && el.Patterns.SelectionItem.Pattern.IsSelected.Value;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>UIA ExpandCollapsePattern.ExpandCollapseState matches expanded/collapsed.</summary>
+    private bool CheckExpandState(TargetDefinition? target, bool expanded)
+    {
+        if (target == null) return false;
+        var (el, _) = LocateElement(new StepDefinition { Target = target, Action = "assert", Name = "_expect" });
+        if (el == null) return false;
+        try
+        {
+            if (!el.Patterns.ExpandCollapse.IsSupported) return false;
+            var state = el.Patterns.ExpandCollapse.Pattern.ExpandCollapseState.Value;
+            return expanded
+                ? state == FlaUI.Core.Definitions.ExpandCollapseState.Expanded
+                : state == FlaUI.Core.Definitions.ExpandCollapseState.Collapsed;
+        }
+        catch { return false; }
     }
 
     /// <summary>Execute a recovery mini-step (no expect/recovery on recovery itself).</summary>
@@ -775,13 +855,17 @@ public sealed class ActionExecutor : IDisposable
 
         Log($"  Assert {assertType}: actual=\"{actualText}\" expected=\"{expected}\"");
 
+        // Assert types use the same vocabulary as ExpectDefinition conditions —
+        // value_* operate on UIA ValuePattern.Value, consistent across assert + expect.
         bool pass = assertType switch
         {
-            "text_contains" => actualText.Contains(expected, StringComparison.OrdinalIgnoreCase),
-            "text_equals" => actualText.Equals(expected, StringComparison.OrdinalIgnoreCase),
-            "text_starts_with" => actualText.StartsWith(expected, StringComparison.OrdinalIgnoreCase),
-            "text_not_empty" => !string.IsNullOrWhiteSpace(actualText),
-            _ => throw new InvalidOperationException($"Unknown assert type: {assertType}")
+            "value_contains"    => actualText.Contains(expected, StringComparison.OrdinalIgnoreCase),
+            "value_equals"      => actualText.Equals(expected, StringComparison.OrdinalIgnoreCase),
+            "value_starts_with" => actualText.StartsWith(expected, StringComparison.OrdinalIgnoreCase),
+            "value_not_empty"   => !string.IsNullOrWhiteSpace(actualText),
+            _ => throw new InvalidOperationException(
+                $"Unknown assert type: {assertType}. " +
+                "Valid: value_contains, value_equals, value_starts_with, value_not_empty.")
         };
 
         result.Status = pass ? StepStatus.Pass : StepStatus.Fail;

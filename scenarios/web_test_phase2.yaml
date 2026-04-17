@@ -19,7 +19,7 @@ steps:
       automation_id: "subtitle"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Phase 1"
 
   # ── 2. Click link to navigate to Page 2 ──
@@ -39,7 +39,7 @@ steps:
       automation_id: "arrival-msg"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Page 2"
 
   # ── 4. Interact on Page 2 ──
@@ -63,7 +63,7 @@ steps:
       automation_id: "result2"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "WKAppBot web automation"
 
   # ── 5. Browser Back (via Chrome button) ──
@@ -83,7 +83,7 @@ steps:
       automation_id: "subtitle"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Phase 1"
 
   # ── 7. Navigate via address bar ──
@@ -113,7 +113,7 @@ steps:
       automation_id: "arrival-msg"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Page 2"
 
   # ── 9. Navigate back to Page 1 via link ──
@@ -132,5 +132,5 @@ steps:
       automation_id: "subtitle"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Phase 1"

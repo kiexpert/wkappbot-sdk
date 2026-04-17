@@ -34,5 +34,5 @@ steps:
       automation_id: "3780"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "005930"

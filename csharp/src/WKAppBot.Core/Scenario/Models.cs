@@ -136,8 +136,16 @@ public sealed class StepDefinition
 public sealed class ExpectDefinition
 {
     /// <summary>
-    /// Condition type: element_visible, element_enabled, element_absent,
-    /// text_contains, text_equals, window_present, window_absent.
+    /// UIA-aligned expect condition. Naming extends UIA property/pattern names:
+    ///   element_visible / element_enabled / element_absent / element_focused
+    ///       — AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus)
+    ///   value_contains / value_equals
+    ///       — ValuePattern.Value string match (UIA ValuePattern)
+    ///   window_present / window_absent
+    ///       — window enumeration via WindowFinder
+    ///   toggle_on / toggle_off — TogglePattern.ToggleState
+    ///   selected               — SelectionItemPattern.IsSelected
+    ///   expanded / collapsed   — ExpandCollapsePattern.ExpandCollapseState
     /// </summary>
     public string Condition { get; set; } = "element_visible";
 
