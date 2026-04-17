@@ -184,6 +184,9 @@ Usage:
       File reading, search, and pattern matching.
   ask gpt|gemini|claude|triad ""question"" [file.png]
       Ask AI via CDP (focusless). ask triad = parallel 3-way.
+  chat [""question""] [-p] [--no-fallback]
+      Claude Code CLI passthrough. On rate-limit → auto-fallback to ask triad.
+      No args: exec claude interactively (inherits stdio).
   logcat [regex] [files] [--past N] [-f] [--timeout N] [--hq]
       Stream/search logs. grep/grap = aliases with grep-compat arg order.
 

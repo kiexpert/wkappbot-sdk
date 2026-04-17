@@ -574,6 +574,23 @@ internal partial class Program
 
         ["find-prompts"] = "find-prompts\nList all Claude Code prompt windows (FindAllPrompts). Shows usable/blocked/hidden state.",
 
+        ["chat"] = """
+            chat [<question>] [-p] [--no-fallback]
+            Claude Code CLI passthrough with auto-fallback to ask triad on rate-limit.
+
+              wkappbot chat                Interactive session (exec claude, inherit stdio)
+              wkappbot chat "<q>"          Non-interactive: claude -p <q>, fallback on limit
+              wkappbot chat -p "<q>"       Same as above (explicit print mode)
+              wkappbot chat --no-fallback  Disable auto-fallback to ask triad
+
+            Fallback triggers:
+              1) `claude` binary not on PATH  → route to ask triad
+              2) stdout/stderr contains:      usage limit, rate limit, 5-hour limit,
+                                              session exhausted, HTTP 429,
+                                              Claude is temporarily unavailable
+              3) exit != 0 + one of the above signatures in output
+            """,
+
         ["a11y hack-hover"] = """
             a11y hack-hover [--parent-pid N]
             Standalone hover analysis worker — mouse CCA + UIA + overlay.

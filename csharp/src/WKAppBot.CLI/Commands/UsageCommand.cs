@@ -188,6 +188,9 @@ Utility:
   ask triad ""question"" [--debate [N]]
       Parallel GPT + Gemini + Claude. --debate: dialectic loop (max 3 rounds, cross-prompting).
       --debate N: early exit at N consensus. Without --debate: R0 only (one answer each).
+  chat [""question""] [-p] [--no-fallback]
+      Claude Code CLI passthrough. On rate-limit markers → auto-fallback to ask triad.
+      No args: exec claude interactively (inherits stdio).
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
   agent checkpoint [--label ""text""]
