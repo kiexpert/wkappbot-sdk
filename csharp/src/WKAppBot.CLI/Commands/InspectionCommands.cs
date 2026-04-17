@@ -176,6 +176,8 @@ internal partial class Program
 
     static int InspectCommand(string[] args)
     {
+        // End-of-command focus-steal sentinel (restore + auto bug report if stolen).
+        using var focusSentinel = new FocusStealSentinel("a11y-inspect");
         if (args.Length == 0)
             return Error("Usage: appbot inspect <window-title>[/<child-pattern>][#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]\n" +
                 "  <child-pattern>: MDI/자식 윈도우 glob 매칭 (예: 투혼/**현재가, 투혼/[0600]*)\n" +
