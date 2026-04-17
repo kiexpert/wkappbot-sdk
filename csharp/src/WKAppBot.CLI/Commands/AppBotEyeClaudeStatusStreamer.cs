@@ -250,24 +250,24 @@ internal partial class Program
                 const double UrgentMB      = 10.0;   // urgent handoff threshold
                 if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
 
-                // Key by SessionJsonl when available -- two AIs with same CWD must not share dedup state
-                var cwdKey = !string.IsNullOrEmpty(card.SessionJsonl)
-                    ? card.SessionJsonl.Replace('\\', '/').ToLowerInvariant()
-                    : card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
-                contextWarnedPcts.TryGetValue(cwdKey, out var prevWarned);
+                // Key dedup by the ACTUAL measured jsonlPath -- NOT by CWD or card.SessionJsonl.
+                // Root cause of the "new AI pops up and immediately re-warns" bug: when a new
+                // instance appears, card.SessionJsonl may not be registered yet, so Eye falls
+                // back to GetContextInfoForCwdEx which mtime-picks a pre-existing large JSONL
+                // from the same CWD. If that keyed by cwd/SessionJsonl, the same dedup entry
+                // kept flipping paths -> reset counter -> re-warn at the same MB level.
+                //
+                // Keying by jsonlPath directly: each distinct file gets its own warn history.
+                // A large pre-existing JSONL that already fired its warnings stays deduped;
+                // a brand-new session starts fresh from 0MB and warns as it genuinely grows.
+                var jsonlKey = jsonlPath.Replace('\\', '/').ToLowerInvariant();
+                contextWarnedPcts.TryGetValue(jsonlKey, out var prevWarned);
                 var curMB = (int)sizeMB; // deduplicate at 1MB granularity
-
-                // New session detected: jsonlPath changed (ctime-new file selected by mtime) -> reset counter
-                if (prevWarned.path != null && prevWarned.path != jsonlPath)
-                {
-                    Console.Error.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL -- context warn counter reset (was {prevWarned.mb}MB)");
-                    prevWarned = (0, null);
-                }
 
                 if (curMB <= prevWarned.mb) continue;
 
                 var cwdTag = AbbreviateCwd(card.Cwd);
-                contextWarnedPcts[cwdKey] = (curMB, jsonlPath);
+                contextWarnedPcts[jsonlKey] = (curMB, jsonlPath);
 
                 // Resolve Slack username from card host type (Claude vs Codex)
                 var cardSlackUser = ClaudePromptHelper.IsCodexHostType(card.HostType)
@@ -292,16 +292,6 @@ internal partial class Program
                 }
                 else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
-                    // Fire the urgent nudge ONCE per session -- previously this re-fired on every
-                    // +1MB tick past 10MB (10 -> 11 -> 12 ...), spamming the prompt window and
-                    // Slack with identical alerts. A single warning at the threshold crossing
-                    // is enough; the status line keeps showing the live MB regardless.
-                    if (prevWarned.mb >= (int)UrgentMB)
-                    {
-                        Console.Error.WriteLine($"[EYE] [{cwdTag}] urgent already warned at {prevWarned.mb}MB, suppressing ({sizeMB:F1}MB now)");
-                        continue;
-                    }
-
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) -- handoff immediately!");
                     Console.ResetColor();
