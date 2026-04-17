@@ -5754,3 +5754,18 @@
 {"ts":"2026-04-17T02:54:07.3753129Z","matched":0,"synthetic":136,"avgScore":0,"total":437,"topMatches":[]}
 {"ts":"2026-04-17T02:54:09.2965602Z","matched":0,"synthetic":128,"avgScore":0,"total":429,"topMatches":[]}
 {"ts":"2026-04-17T02:54:11.2296165Z","matched":0,"synthetic":130,"avgScore":0,"total":431,"topMatches":[]}
+{"ts":"2026-04-17T09:07:17.7045999Z","matched":14,"synthetic":107,"avgScore":0.607,"total":365,"topMatches":[{"score":0.797,"uia":"\u003CText\u003E Work locally","ccaType":"DyIcon","bounds":"0,225 83x23"},{"score":0.786,"uia":"\u003CText\u003E Default permissions","ccaType":"DyIcon","bounds":"25,184 133x24"},{"score":0.778,"uia":"\u003CButton_radix\u003E GPT-5.3-Codex","ccaType":"DyIcon","bounds":"237,187 84x18"},{"score":0.771,"uia":"\u003CMenuItem\u003E GPT-5.1-Codex-Mini","ccaType":"DyIcon","bounds":"236,152 120x23"},{"score":0.762,"uia":"\u003CMenuItem\u003E GPT-5.1-Codex-Max","ccaType":"DyIcon","bounds":"236,51 118x23"}]}
+{"ts":"2026-04-17T09:07:20.9705530Z","matched":16,"synthetic":110,"avgScore":0.602,"total":370,"topMatches":[{"score":0.8,"uia":"\u003CText\u003E Model","ccaType":"DyText","bounds":"209,18 45x21"},{"score":0.793,"uia":"\u003CText\u003E Default permissions","ccaType":"DyIcon","bounds":"0,224 130x23"},{"score":0.778,"uia":"\u003CButton_radix\u003E GPT-5.3-Codex","ccaType":"DyIcon","bounds":"209,226 84x18"},{"score":0.762,"uia":"\u003CMenuItem\u003E GPT-5.1-Codex-Max","ccaType":"DyIcon","bounds":"208,90 118x23"},{"score":0.757,"uia":"\u003CText\u003E Optimized for codex. Cheaper, faster, but less capable","ccaType":"DyIcon","bounds":"0,183 176x39"}]}
+{"ts":"2026-04-17T09:07:26.6558207Z","matched":7,"synthetic":97,"avgScore":0.658,"total":348,"topMatches":[{"score":0.787,"uia":"\u003CButton_radix\u003E GPT-5.4-Mini","ccaType":"DyText","bounds":"304,235 80x22"},{"score":0.786,"uia":"\u003CText\u003E Default permissions","ccaType":"DyIcon","bounds":"85,234 133x24"},{"score":0.768,"uia":"\u003CText\u003E \uD1A0","ccaType":"DyText","bounds":"47,181 24x28"},{"score":0.744,"uia":"\u003CText\u003E Work locally","ccaType":"DyIcon","bounds":"51,275 92x23"},{"score":0.629,"uia":"\u003CText\u003E \uC0AC\uC6A9\uC790\uB2D8 \uB9D0\uD22C\uB97C \uB530\uB77C\uD558\uC9C0 \uC54A\uACE0, \uC81C \uAE30\uBCF8 \uD1A4\uC73C\uB85C \uC815\uC911\uD558\uAC8C \uC9C4\uD589\uD558\uACA0\uC2B5\uB2C8\uB2E4.","ccaType":"DyIcon","bounds":"35,48 401x64"}]}
+{"ts":"2026-04-17T09:08:02.6474984Z","matched":0,"synthetic":119,"avgScore":0,"total":420,"topMatches":[]}
+{"ts":"2026-04-17T09:08:48.7236282Z","matched":0,"synthetic":147,"avgScore":0,"total":448,"topMatches":[]}
+{"ts":"2026-04-17T09:08:54.8333896Z","matched":0,"synthetic":151,"avgScore":0,"total":452,"topMatches":[]}
+{"ts":"2026-04-17T09:09:03.2537404Z","matched":0,"synthetic":119,"avgScore":0,"total":420,"topMatches":[]}
+{"ts":"2026-04-17T09:09:04.7306502Z","matched":0,"synthetic":119,"avgScore":0,"total":420,"topMatches":[]}
+{"ts":"2026-04-17T09:09:05.5563991Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-17T09:09:07.1034280Z","matched":0,"synthetic":120,"avgScore":0,"total":421,"topMatches":[]}
+{"ts":"2026-04-17T09:09:08.4811119Z","matched":0,"synthetic":98,"avgScore":0,"total":399,"topMatches":[]}
+{"ts":"2026-04-17T09:09:09.8278469Z","matched":0,"synthetic":98,"avgScore":0,"total":399,"topMatches":[]}
+{"ts":"2026-04-17T09:09:10.6198011Z","matched":0,"synthetic":98,"avgScore":0,"total":399,"topMatches":[]}
+{"ts":"2026-04-17T09:09:11.9465440Z","matched":0,"synthetic":100,"avgScore":0,"total":401,"topMatches":[]}
+{"ts":"2026-04-17T09:09:13.4370234Z","matched":0,"synthetic":101,"avgScore":0,"total":402,"topMatches":[]}
