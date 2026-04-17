@@ -503,6 +503,7 @@ internal partial class Program
                 "prompt-probe" => PromptProbeCommand(restArgs),
                 "claude-detect" => ClaudeDetectCommand(restArgs),
                 "find-prompts" => FindPromptsCommand(restArgs),
+                "chat" => ChatCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
