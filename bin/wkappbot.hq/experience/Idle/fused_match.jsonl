@@ -15,3 +15,844 @@
 {"ts":"2026-04-16T08:22:20.8695436Z","matched":4,"synthetic":91,"avgScore":0.212,"total":392,"topMatches":[{"score":0.289,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"0,31 76x5"},{"score":0.209,"uia":"\u003CText_ListViewSubItem\u003E 17:21:59","ccaType":"DyIcon","bounds":"460,256 138x24"},{"score":0.195,"uia":"\u003CHeaderItem\u003E \uC2DC  \uAC04","ccaType":"DyContainer","bounds":"202,122 398x76"},{"score":0.153,"uia":"\u003CText_ListViewSubItem\u003E 32","ccaType":"DyContainer","bounds":"202,252 398x32"}]}
 {"ts":"2026-04-16T08:33:04.4317144Z","matched":8,"synthetic":237,"avgScore":0.505,"total":538,"topMatches":[{"score":0.647,"uia":"\u003CButton_109\u003E \uD654\uBA74\uCC3E\uAE30","ccaType":"DyText","bounds":"275,106 38x56"},{"score":0.609,"uia":"\u003CPane_3011\u003E \uC885\uBAA9\uC218:37","ccaType":"DyText","bounds":"280,290 35x16"},{"score":0.569,"uia":"\u003CButton_3031\u003E K","ccaType":"DyText","bounds":"233,253 32x7"},{"score":0.561,"uia":"\u003CButton_3030\u003E \uC18C\uB9AC","ccaType":"DyNoise","bounds":"551,288 28x5"},{"score":0.557,"uia":"\u003CButton_3013\u003E \uC885\uBAA9\uC5F0\uB3D9","ccaType":"DyText","bounds":"480,280 32x30"}]}
 {"ts":"2026-04-16T08:33:17.7717643Z","matched":4,"synthetic":56,"avgScore":0.379,"total":357,"topMatches":[{"score":0.52,"uia":"\u003CPane_3011\u003E \uC885\uBAA9\uC218:37","ccaType":"DyText","bounds":"287,289 10x22"},{"score":0.341,"uia":"\u003CButton_1\u003E \uD655\uC778","ccaType":"DyText","bounds":"318,299 9x17"},{"score":0.331,"uia":"\u003CButton_3012\u003E \uC790\uB3D9\uC0AD\uC81C","ccaType":"DyText","bounds":"374,306 4x3"},{"score":0.323,"uia":"\u003CButton_109\u003E \uD654\uBA74\uCC3E\uAE30","ccaType":"DyContainer","bounds":"205,126 159x171"}]}
+{"ts":"2026-04-16T08:47:57.9930961Z","matched":1,"synthetic":188,"avgScore":0.337,"total":489,"topMatches":[{"score":0.337,"uia":"\u003CButton_4013\u003E \uB9E4\uB3C4","ccaType":"DyContainer","bounds":"0,0 600x271"}]}
+{"ts":"2026-04-16T08:48:09.4195800Z","matched":1,"synthetic":188,"avgScore":0.337,"total":489,"topMatches":[{"score":0.337,"uia":"\u003CButton_4013\u003E \uB9E4\uB3C4","ccaType":"DyContainer","bounds":"0,0 600x271"}]}
+{"ts":"2026-04-16T08:48:21.2641566Z","matched":1,"synthetic":211,"avgScore":0.337,"total":512,"topMatches":[{"score":0.337,"uia":"\u003CButton_4013\u003E \uB9E4\uB3C4","ccaType":"DyContainer","bounds":"0,0 600x268"}]}
+{"ts":"2026-04-16T08:48:35.2338003Z","matched":1,"synthetic":246,"avgScore":0.337,"total":547,"topMatches":[{"score":0.337,"uia":"\u003CButton_4013\u003E \uB9E4\uB3C4","ccaType":"DyContainer","bounds":"0,0 600x268"}]}
+{"ts":"2026-04-16T08:49:35.8196605Z","matched":0,"synthetic":1132,"avgScore":0,"total":1433,"topMatches":[]}
+{"ts":"2026-04-16T10:27:42.2614991Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:44.8902307Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:47.0232637Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:49.4464891Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:51.6761129Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:54.5289784Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:27:56.8755841Z","matched":1,"synthetic":749,"avgScore":0.449,"total":865,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"285,191 1x11"}]}
+{"ts":"2026-04-16T10:28:17.4577974Z","matched":1,"synthetic":763,"avgScore":0.435,"total":881,"topMatches":[{"score":0.435,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"450,192 1x7"}]}
+{"ts":"2026-04-16T10:28:19.7581390Z","matched":1,"synthetic":763,"avgScore":0.435,"total":882,"topMatches":[{"score":0.435,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"450,192 1x7"}]}
+{"ts":"2026-04-16T10:28:38.5438665Z","matched":1,"synthetic":759,"avgScore":0.434,"total":878,"topMatches":[{"score":0.434,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"133,194 3x10"}]}
+{"ts":"2026-04-16T10:36:42.0146702Z","matched":1,"synthetic":992,"avgScore":0.449,"total":1109,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"172,220 1x10"}]}
+{"ts":"2026-04-16T10:36:58.7401009Z","matched":2,"synthetic":991,"avgScore":0.389,"total":1108,"topMatches":[{"score":0.449,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"172,220 1x10"},{"score":0.329,"uia":"\u003CWindow\u003E A11yHackOverlay","ccaType":"DyContainer","bounds":"0,0 589x387"}]}
+{"ts":"2026-04-16T11:00:50.0711607Z","matched":1,"synthetic":149,"avgScore":0.445,"total":265,"topMatches":[{"score":0.445,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyIcon","bounds":"307,182 87x23"}]}
+{"ts":"2026-04-16T11:03:18.4580476Z","matched":1,"synthetic":71,"avgScore":0.444,"total":209,"topMatches":[{"score":0.444,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"0,8 59x23"}]}
+{"ts":"2026-04-16T11:03:25.7348661Z","matched":1,"synthetic":74,"avgScore":0.444,"total":194,"topMatches":[{"score":0.444,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"0,8 59x23"}]}
+{"ts":"2026-04-16T11:05:04.0073281Z","matched":1,"synthetic":93,"avgScore":0.342,"total":209,"topMatches":[{"score":0.342,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"0,0 74x16"}]}
+{"ts":"2026-04-16T11:12:50.2813836Z","matched":1,"synthetic":68,"avgScore":0.343,"total":184,"topMatches":[{"score":0.343,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyIcon","bounds":"0,14 93x27"}]}
+{"ts":"2026-04-16T11:22:05.1818098Z","matched":1,"synthetic":139,"avgScore":0.445,"total":255,"topMatches":[{"score":0.445,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyIcon","bounds":"307,182 87x23"}]}
+{"ts":"2026-04-16T11:29:18.9848790Z","matched":0,"synthetic":1537,"avgScore":0,"total":1656,"topMatches":[]}
+{"ts":"2026-04-16T11:29:25.5866400Z","matched":0,"synthetic":1537,"avgScore":0,"total":1656,"topMatches":[]}
+{"ts":"2026-04-16T11:32:10.0006178Z","matched":1,"synthetic":172,"avgScore":0.398,"total":289,"topMatches":[{"score":0.398,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"412,280 4x3"}]}
+{"ts":"2026-04-16T11:40:29.8243129Z","matched":0,"synthetic":2050,"avgScore":0,"total":2167,"topMatches":[]}
+{"ts":"2026-04-16T11:42:26.6851381Z","matched":0,"synthetic":470,"avgScore":0,"total":589,"topMatches":[]}
+{"ts":"2026-04-16T11:42:31.7475487Z","matched":0,"synthetic":715,"avgScore":0,"total":832,"topMatches":[]}
+{"ts":"2026-04-16T11:42:40.1797504Z","matched":0,"synthetic":715,"avgScore":0,"total":834,"topMatches":[]}
+{"ts":"2026-04-16T11:50:49.2890874Z","matched":1,"synthetic":524,"avgScore":0.324,"total":640,"topMatches":[{"score":0.324,"uia":"\u003CWindow\u003E A11yHackOverlay","ccaType":"DyText","bounds":"595,385 5x13"}]}
+{"ts":"2026-04-16T11:52:22.1874497Z","matched":0,"synthetic":196,"avgScore":0,"total":312,"topMatches":[]}
+{"ts":"2026-04-16T11:53:47.0789143Z","matched":0,"synthetic":155,"avgScore":0,"total":274,"topMatches":[]}
+{"ts":"2026-04-16T12:02:50.2447245Z","matched":0,"synthetic":491,"avgScore":0,"total":610,"topMatches":[]}
+{"ts":"2026-04-16T12:11:22.5333391Z","matched":0,"synthetic":186,"avgScore":0,"total":310,"topMatches":[]}
+{"ts":"2026-04-16T12:12:46.1932651Z","matched":1,"synthetic":193,"avgScore":0.39,"total":316,"topMatches":[{"score":0.39,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"285,63 7x5"}]}
+{"ts":"2026-04-16T12:26:51.0109228Z","matched":1,"synthetic":65,"avgScore":0.331,"total":181,"topMatches":[{"score":0.331,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"33,17 3x5"}]}
+{"ts":"2026-04-16T12:27:08.1315362Z","matched":7,"synthetic":202,"avgScore":0.536,"total":318,"topMatches":[{"score":0.695,"uia":"\u003CButton_Appid: Microsoft.VisualStudioCode\u003E Visual Studio Code - 2\uAC1C\uC758 \uC2E4\uD589 \uC911\uC778 \uCC3D \uACE0\uC815\uB428","ccaType":"DyText","bounds":"87,310 24x24"},{"score":0.695,"uia":"\u003CButton_Appid: OpenAI.ChatGPT\u003E ChatGPT \uACE0\uC815\uB428","ccaType":"DyText","bounds":"43,310 24x24"},{"score":0.643,"uia":"\u003CButton_Appid: Microsoft.OutlookforWindows_8wekyb3d8bbwe!Microsoft.OutlookforWindows\u003E Outlook \uACE0\uC815\uB428","ccaType":"DyText","bounds":"0,313 22x18"},{"score":0.64,"uia":"\u003CButton_Appid: remotedesktop.google.com\u003E Chrome \uC6D0\uACA9 \uB370\uC2A4\uD06C\uD1B1 - 1\uAC1C\uC758 \uC2E4\uD589 \uC911\uC778 \uCC3D \uACE0\uC815\uB428","ccaType":"DyContainer","bounds":"133,312 21x19"},{"score":0.573,"uia":"\u003CButton_Appid: NKRunLite.AppID.NoVersion\u003E NKRunLite - 1\uAC1C\uC758 \uC2E4\uD589 \uC911\uC778 \uCC3D \uACE0\uC815\uB428","ccaType":"DyText","bounds":"185,311 11x20"}]}
+{"ts":"2026-04-16T12:33:26.5528564Z","matched":20,"synthetic":100,"avgScore":0.458,"total":271,"topMatches":[{"score":0.576,"uia":"\u003CText\u003E Pane 1x11","ccaType":"DyText","bounds":"491,287 8x4"},{"score":0.576,"uia":"\u003CText\u003E Pane 1x11","ccaType":"DyText","bounds":"391,300 11x5"},{"score":0.569,"uia":"\u003CText\u003E Pane 2x11","ccaType":"DyNoise","bounds":"329,285 11x1"},{"score":0.529,"uia":"\u003CText\u003E AppBotChat - GitHub \uC5F0\uACB0 \uBC29...","ccaType":"DyContainer","bounds":"542,280 58x12"},{"score":0.529,"uia":"\u003CText\u003E Pane 1x13","ccaType":"DyText","bounds":"173,207 6x4"}]}
+{"ts":"2026-04-16T12:33:32.4860286Z","matched":1,"synthetic":119,"avgScore":0.267,"total":235,"topMatches":[{"score":0.267,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"582,280 11x7"}]}
+{"ts":"2026-04-16T12:33:38.2664915Z","matched":2,"synthetic":162,"avgScore":0.332,"total":281,"topMatches":[{"score":0.396,"uia":"\u003CPane\u003E AppBotChat - GitHub \uC5F0\uACB0 \uBC29\uBC95","ccaType":"DyNoise","bounds":"288,22 3x3"},{"score":0.267,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"582,280 11x7"}]}
+{"ts":"2026-04-16T13:04:02.7801069Z","matched":1,"synthetic":119,"avgScore":0.267,"total":235,"topMatches":[{"score":0.267,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"582,280 11x7"}]}
+{"ts":"2026-04-16T13:36:49.4022387Z","matched":1,"synthetic":627,"avgScore":0.442,"total":745,"topMatches":[{"score":0.442,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"449,270 22x25"}]}
+{"ts":"2026-04-16T13:49:13.8231648Z","matched":1,"synthetic":97,"avgScore":0.371,"total":215,"topMatches":[{"score":0.371,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"353,90 3x5"}]}
+{"ts":"2026-04-16T14:02:56.4571851Z","matched":8,"synthetic":110,"avgScore":0.508,"total":228,"topMatches":[{"score":0.607,"uia":"\u003CButton_SystemTrayIcon\u003E \uD798 \uBC30\uD130\uB9AC \uC0C1\uD0DC: \uC644\uC804\uD788 \uCDA9\uC804\uB428 100%","ccaType":"DyText","bounds":"548,373 20x10"},{"score":0.555,"uia":"\u003CButton_SystemTrayIcon\u003E \uBCFC\uB968 \uC2A4\uD53C\uCEE4(Realtek(R) Audio): 38%","ccaType":"DyNoise","bounds":"529,372 2x12"},{"score":0.554,"uia":"\u003CButton_SystemTrayIcon\u003E \uAC1C\uC778 \uC815\uBCF4 \uB9C8\uC774\uD06C \uC0AC\uC6A9 \uC911\u22EF","ccaType":"DyText","bounds":"438,378 12x8"},{"score":0.553,"uia":"\u003CButton_SystemTrayIcon\u003E \uC228\uACA8\uC9C4 \uC544\uC774\uCF58 \uD45C\uC2DC","ccaType":"DyText","bounds":"375,375 10x6"},{"score":0.552,"uia":"\u003CButton_SystemTrayIcon\u003E \uD2B8\uB808\uC774 \uC785\uB825 \uD45C\uC2DC\uAE30 \uD55C\uAD6D\uC5B4 \uC785\uB825 \uBAA8\uB4DC","ccaType":"DyText","bounds":"469,371 8x11"}]}
+{"ts":"2026-04-16T14:47:26.1892706Z","matched":7,"synthetic":78,"avgScore":0.394,"total":196,"topMatches":[{"score":0.616,"uia":"\u003CText\u003E NOISE","ccaType":"DyText","bounds":"50,54 6x5"},{"score":0.451,"uia":"\u003CText\u003E 23:47:24","ccaType":"DyText","bounds":"34,96 7x8"},{"score":0.392,"uia":"\u003CText\u003E -361-532-365-362 625-625","ccaType":"DyIcon","bounds":"0,17 162x110"},{"score":0.377,"uia":"\u003CText\u003E global","ccaType":"DyIcon","bounds":"163,0 318x190"},{"score":0.358,"uia":"\u003CText\u003E 6-321-362-136-326-321-235-326-362-231-236-326-361-623-362-326-276-326-326-631-367-362-321 267-631-316-625-321-326-235-267-653-362 263 326-362 315-361-532-365-362 625-625","ccaType":"DyNoise","bounds":"460,160 1x7"}]}
+{"ts":"2026-04-16T15:09:39.6674237Z","matched":0,"synthetic":50,"avgScore":0,"total":169,"topMatches":[]}
+{"ts":"2026-04-16T15:09:59.1937561Z","matched":0,"synthetic":56,"avgScore":0,"total":177,"topMatches":[]}
+{"ts":"2026-04-16T15:10:05.3089504Z","matched":0,"synthetic":174,"avgScore":0,"total":295,"topMatches":[]}
+{"ts":"2026-04-16T15:10:10.9861159Z","matched":0,"synthetic":58,"avgScore":0,"total":179,"topMatches":[]}
+{"ts":"2026-04-16T15:11:15.6996171Z","matched":0,"synthetic":14,"avgScore":0,"total":133,"topMatches":[]}
+{"ts":"2026-04-16T15:13:51.8267999Z","matched":1,"synthetic":378,"avgScore":0.326,"total":497,"topMatches":[{"score":0.326,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"471,124 2x151"}]}
+{"ts":"2026-04-16T15:13:56.1725366Z","matched":1,"synthetic":372,"avgScore":0.326,"total":551,"topMatches":[{"score":0.326,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"471,124 2x151"}]}
+{"ts":"2026-04-16T15:13:59.0778811Z","matched":1,"synthetic":372,"avgScore":0.326,"total":493,"topMatches":[{"score":0.326,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"471,124 2x151"}]}
+{"ts":"2026-04-16T15:15:19.5133781Z","matched":0,"synthetic":31,"avgScore":0,"total":190,"topMatches":[]}
+{"ts":"2026-04-16T15:15:24.9201689Z","matched":0,"synthetic":30,"avgScore":0,"total":151,"topMatches":[]}
+{"ts":"2026-04-16T15:15:30.3244311Z","matched":0,"synthetic":42,"avgScore":0,"total":163,"topMatches":[]}
+{"ts":"2026-04-16T15:15:36.0072776Z","matched":0,"synthetic":31,"avgScore":0,"total":152,"topMatches":[]}
+{"ts":"2026-04-16T15:15:41.7869869Z","matched":4,"synthetic":38,"avgScore":0.365,"total":205,"topMatches":[{"score":0.433,"uia":"\u003CText\u003E Window 169x47","ccaType":"DyText","bounds":"0,297 6x10"},{"score":0.402,"uia":"\u003CText\u003E WKAppBot ScreenSaver #1","ccaType":"DyText","bounds":"4,288 34x23"},{"score":0.327,"uia":"\u003CText\u003E Window 741x427","ccaType":"DyText","bounds":"20,335 11x14"},{"score":0.297,"uia":"\u003CText\u003E WKAppBot ScreenSaver #1","ccaType":"DyText","bounds":"29,316 6x4"}]}
+{"ts":"2026-04-16T15:15:48.2398459Z","matched":0,"synthetic":49,"avgScore":0,"total":170,"topMatches":[]}
+{"ts":"2026-04-16T15:15:57.6317554Z","matched":0,"synthetic":48,"avgScore":0,"total":169,"topMatches":[]}
+{"ts":"2026-04-16T15:16:34.7970642Z","matched":0,"synthetic":46,"avgScore":0,"total":167,"topMatches":[]}
+{"ts":"2026-04-16T15:16:41.0951665Z","matched":0,"synthetic":48,"avgScore":0,"total":291,"topMatches":[]}
+{"ts":"2026-04-16T15:16:47.0477537Z","matched":0,"synthetic":48,"avgScore":0,"total":236,"topMatches":[]}
+{"ts":"2026-04-16T15:16:53.7430831Z","matched":0,"synthetic":46,"avgScore":0,"total":315,"topMatches":[]}
+{"ts":"2026-04-16T15:17:00.0332060Z","matched":0,"synthetic":46,"avgScore":0,"total":235,"topMatches":[]}
+{"ts":"2026-04-16T15:17:05.8203315Z","matched":0,"synthetic":48,"avgScore":0,"total":169,"topMatches":[]}
+{"ts":"2026-04-16T15:17:47.8497829Z","matched":0,"synthetic":76,"avgScore":0,"total":197,"topMatches":[]}
+{"ts":"2026-04-16T15:17:53.3143919Z","matched":0,"synthetic":121,"avgScore":0,"total":242,"topMatches":[]}
+{"ts":"2026-04-16T15:17:59.0411157Z","matched":0,"synthetic":102,"avgScore":0,"total":223,"topMatches":[]}
+{"ts":"2026-04-16T15:18:04.0797655Z","matched":0,"synthetic":71,"avgScore":0,"total":192,"topMatches":[]}
+{"ts":"2026-04-16T15:18:10.0565885Z","matched":0,"synthetic":52,"avgScore":0,"total":173,"topMatches":[]}
+{"ts":"2026-04-16T15:18:34.6245249Z","matched":0,"synthetic":54,"avgScore":0,"total":175,"topMatches":[]}
+{"ts":"2026-04-16T15:18:41.5393083Z","matched":0,"synthetic":135,"avgScore":0,"total":256,"topMatches":[]}
+{"ts":"2026-04-16T15:18:48.3864232Z","matched":0,"synthetic":135,"avgScore":0,"total":257,"topMatches":[]}
+{"ts":"2026-04-16T15:18:55.6751034Z","matched":0,"synthetic":84,"avgScore":0,"total":206,"topMatches":[]}
+{"ts":"2026-04-16T15:19:03.8234166Z","matched":0,"synthetic":79,"avgScore":0,"total":200,"topMatches":[]}
+{"ts":"2026-04-16T15:19:11.3770354Z","matched":0,"synthetic":51,"avgScore":0,"total":115,"topMatches":[]}
+{"ts":"2026-04-16T15:22:37.4779203Z","matched":1,"synthetic":426,"avgScore":0.326,"total":544,"topMatches":[{"score":0.326,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"590,251 10x4"}]}
+{"ts":"2026-04-16T15:22:42.6400615Z","matched":1,"synthetic":514,"avgScore":0.325,"total":632,"topMatches":[{"score":0.325,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"569,264 2x76"}]}
+{"ts":"2026-04-16T15:24:09.9739652Z","matched":115,"synthetic":336,"avgScore":0.461,"total":588,"topMatches":[{"score":0.729,"uia":"\u003CText\u003E \uC601\uC6C5\uBB38Global","ccaType":"DyContainer","bounds":"337,41 70x20"},{"score":0.656,"uia":"\u003CText\u003E Window 84x20","ccaType":"DyContainer","bounds":"252,41 84x20"},{"score":0.643,"uia":"\u003CText\u003E \uC601\uC6C5\uBB38Global","ccaType":"DyContainer","bounds":"425,65 68x20"},{"score":0.614,"uia":"\u003CText\u003E \uC601\uC6C5\uBB38Global","ccaType":"DyContainer","bounds":"140,65 145x20"},{"score":0.589,"uia":"\u003CText\u003E Window 1x11","ccaType":"DyNoise","bounds":"106,173 10x1"}]}
+{"ts":"2026-04-16T15:28:43.6772694Z","matched":1,"synthetic":105,"avgScore":0.331,"total":224,"topMatches":[{"score":0.331,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"0,92 104x2"}]}
+{"ts":"2026-04-16T15:37:50.6751202Z","matched":1,"synthetic":320,"avgScore":0.34,"total":451,"topMatches":[{"score":0.34,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"510,256 3x6"}]}
+{"ts":"2026-04-16T15:38:23.1626864Z","matched":1,"synthetic":157,"avgScore":0.382,"total":290,"topMatches":[{"score":0.382,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"482,159 7x4"}]}
+{"ts":"2026-04-16T15:44:37.2445597Z","matched":7,"synthetic":137,"avgScore":0.497,"total":270,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"71,121 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"170,121 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"269,121 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"368,121 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"467,121 24x22"}]}
+{"ts":"2026-04-16T15:46:19.8107323Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:47:30.7846379Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:47:38.5893979Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:47:46.5297600Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:47:53.7155672Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:48:00.7815575Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T15:55:48.9959845Z","matched":7,"synthetic":133,"avgScore":0.485,"total":266,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBC31\uC5C5","ccaType":"DyText","bounds":"36,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"135,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"234,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"333,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"432,137 24x22"}]}
+{"ts":"2026-04-16T15:55:54.9609832Z","matched":7,"synthetic":123,"avgScore":0.485,"total":256,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBC31\uC5C5","ccaType":"DyText","bounds":"36,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"135,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"234,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"333,137 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"432,137 24x22"}]}
+{"ts":"2026-04-16T15:57:45.0506085Z","matched":1,"synthetic":314,"avgScore":0.343,"total":445,"topMatches":[{"score":0.343,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"534,259 1x9"}]}
+{"ts":"2026-04-16T15:57:52.6739539Z","matched":1,"synthetic":281,"avgScore":0.391,"total":412,"topMatches":[{"score":0.391,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"17,209 4x9"}]}
+{"ts":"2026-04-16T15:58:07.6330935Z","matched":1,"synthetic":798,"avgScore":0.373,"total":929,"topMatches":[{"score":0.373,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"404,389 8x9"}]}
+{"ts":"2026-04-16T15:58:11.0598316Z","matched":1,"synthetic":797,"avgScore":0.373,"total":928,"topMatches":[{"score":0.373,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"404,389 8x9"}]}
+{"ts":"2026-04-16T15:58:15.0090266Z","matched":1,"synthetic":797,"avgScore":0.373,"total":928,"topMatches":[{"score":0.373,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"404,389 8x9"}]}
+{"ts":"2026-04-16T15:58:18.2993291Z","matched":1,"synthetic":797,"avgScore":0.373,"total":928,"topMatches":[{"score":0.373,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"404,389 8x9"}]}
+{"ts":"2026-04-16T15:59:33.6444049Z","matched":1,"synthetic":656,"avgScore":0.368,"total":787,"topMatches":[{"score":0.368,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"433,393 1x7"}]}
+{"ts":"2026-04-16T15:59:42.3971211Z","matched":1,"synthetic":655,"avgScore":0.368,"total":787,"topMatches":[{"score":0.368,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"433,393 1x7"}]}
+{"ts":"2026-04-16T16:05:40.2298645Z","matched":1,"synthetic":418,"avgScore":0.45,"total":547,"topMatches":[{"score":0.45,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"82,193 8x5"}]}
+{"ts":"2026-04-16T16:08:49.4988292Z","matched":1,"synthetic":599,"avgScore":0.45,"total":727,"topMatches":[{"score":0.45,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"529,379 8x5"}]}
+{"ts":"2026-04-16T16:12:03.2757093Z","matched":1,"synthetic":347,"avgScore":0.45,"total":475,"topMatches":[{"score":0.45,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"98,88 8x5"}]}
+{"ts":"2026-04-16T16:12:54.0785266Z","matched":1,"synthetic":436,"avgScore":0.43,"total":564,"topMatches":[{"score":0.43,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"572,220 7x4"}]}
+{"ts":"2026-04-16T16:15:33.5753586Z","matched":0,"synthetic":115,"avgScore":0,"total":244,"topMatches":[]}
+{"ts":"2026-04-16T16:22:26.2839095Z","matched":0,"synthetic":8,"avgScore":0,"total":139,"topMatches":[]}
+{"ts":"2026-04-16T16:23:58.9796726Z","matched":0,"synthetic":395,"avgScore":0,"total":526,"topMatches":[]}
+{"ts":"2026-04-16T16:25:10.0028339Z","matched":2,"synthetic":517,"avgScore":0.429,"total":647,"topMatches":[{"score":0.45,"uia":"\u003CWindow\u003E A11yHackOverlay","ccaType":"DyText","bounds":"596,19 3x10"},{"score":0.409,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyContainer","bounds":"81,143 519x204"}]}
+{"ts":"2026-04-16T16:41:08.1147225Z","matched":0,"synthetic":4,"avgScore":0,"total":135,"topMatches":[]}
+{"ts":"2026-04-16T17:08:42.3201743Z","matched":0,"synthetic":67,"avgScore":0,"total":198,"topMatches":[]}
+{"ts":"2026-04-16T17:10:22.3889929Z","matched":0,"synthetic":80,"avgScore":0,"total":211,"topMatches":[]}
+{"ts":"2026-04-16T17:11:01.3430493Z","matched":0,"synthetic":127,"avgScore":0,"total":256,"topMatches":[]}
+{"ts":"2026-04-16T17:11:34.0441333Z","matched":0,"synthetic":264,"avgScore":0,"total":395,"topMatches":[]}
+{"ts":"2026-04-16T17:12:57.9233056Z","matched":0,"synthetic":229,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-16T17:24:54.4950094Z","matched":0,"synthetic":298,"avgScore":0,"total":427,"topMatches":[]}
+{"ts":"2026-04-16T17:25:02.5668340Z","matched":0,"synthetic":90,"avgScore":0,"total":220,"topMatches":[]}
+{"ts":"2026-04-16T17:25:10.0284261Z","matched":0,"synthetic":125,"avgScore":0,"total":256,"topMatches":[]}
+{"ts":"2026-04-16T17:25:15.2858498Z","matched":0,"synthetic":179,"avgScore":0,"total":310,"topMatches":[]}
+{"ts":"2026-04-16T17:25:22.7016274Z","matched":0,"synthetic":156,"avgScore":0,"total":287,"topMatches":[]}
+{"ts":"2026-04-16T17:25:27.8627088Z","matched":0,"synthetic":1,"avgScore":0,"total":132,"topMatches":[]}
+{"ts":"2026-04-16T17:25:32.4327680Z","matched":0,"synthetic":9,"avgScore":0,"total":140,"topMatches":[]}
+{"ts":"2026-04-16T17:25:37.5213207Z","matched":0,"synthetic":19,"avgScore":0,"total":150,"topMatches":[]}
+{"ts":"2026-04-16T17:25:44.4703786Z","matched":0,"synthetic":42,"avgScore":0,"total":173,"topMatches":[]}
+{"ts":"2026-04-16T17:25:49.0450438Z","matched":0,"synthetic":137,"avgScore":0,"total":268,"topMatches":[]}
+{"ts":"2026-04-16T17:25:54.2619655Z","matched":0,"synthetic":347,"avgScore":0,"total":478,"topMatches":[]}
+{"ts":"2026-04-16T17:25:59.3882725Z","matched":0,"synthetic":22,"avgScore":0,"total":153,"topMatches":[]}
+{"ts":"2026-04-16T17:26:04.4106964Z","matched":0,"synthetic":3,"avgScore":0,"total":134,"topMatches":[]}
+{"ts":"2026-04-16T17:26:11.5789478Z","matched":0,"synthetic":2,"avgScore":0,"total":133,"topMatches":[]}
+{"ts":"2026-04-16T17:26:17.1443178Z","matched":0,"synthetic":20,"avgScore":0,"total":151,"topMatches":[]}
+{"ts":"2026-04-16T17:26:24.0012457Z","matched":0,"synthetic":2,"avgScore":0,"total":133,"topMatches":[]}
+{"ts":"2026-04-16T17:26:29.4335583Z","matched":0,"synthetic":5,"avgScore":0,"total":136,"topMatches":[]}
+{"ts":"2026-04-16T17:26:34.1127592Z","matched":0,"synthetic":102,"avgScore":0,"total":233,"topMatches":[]}
+{"ts":"2026-04-16T17:26:38.7870132Z","matched":0,"synthetic":5,"avgScore":0,"total":136,"topMatches":[]}
+{"ts":"2026-04-16T17:26:44.2358963Z","matched":5,"synthetic":74,"avgScore":0.512,"total":203,"topMatches":[{"score":0.707,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"573,86 24x24"},{"score":0.484,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"84,91 11x13"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"239,95 8x9"},{"score":0.464,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"444,95 8x9"},{"score":0.433,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"4,89 9x11"}]}
+{"ts":"2026-04-16T17:27:34.8537624Z","matched":0,"synthetic":30,"avgScore":0,"total":162,"topMatches":[]}
+{"ts":"2026-04-16T17:27:40.4613923Z","matched":0,"synthetic":162,"avgScore":0,"total":293,"topMatches":[]}
+{"ts":"2026-04-16T17:27:46.0423630Z","matched":0,"synthetic":34,"avgScore":0,"total":166,"topMatches":[]}
+{"ts":"2026-04-16T17:27:51.3817779Z","matched":0,"synthetic":77,"avgScore":0,"total":207,"topMatches":[]}
+{"ts":"2026-04-16T17:42:24.3220620Z","matched":1,"synthetic":572,"avgScore":0.366,"total":703,"topMatches":[{"score":0.366,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"101,319 8x4"}]}
+{"ts":"2026-04-16T17:42:32.4889156Z","matched":1,"synthetic":542,"avgScore":0.366,"total":671,"topMatches":[{"score":0.366,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"101,319 8x4"}]}
+{"ts":"2026-04-16T18:26:19.5648278Z","matched":1,"synthetic":237,"avgScore":0.608,"total":369,"topMatches":[{"score":0.608,"uia":"\u003CText\u003E DyDyText 1550x872","ccaType":"DyIcon","bounds":"322,34 144x41"}]}
+{"ts":"2026-04-16T18:26:28.9022187Z","matched":0,"synthetic":163,"avgScore":0,"total":294,"topMatches":[]}
+{"ts":"2026-04-16T18:26:39.4230868Z","matched":0,"synthetic":168,"avgScore":0,"total":299,"topMatches":[]}
+{"ts":"2026-04-16T18:26:52.0184499Z","matched":0,"synthetic":351,"avgScore":0,"total":482,"topMatches":[]}
+{"ts":"2026-04-16T18:27:01.2153236Z","matched":0,"synthetic":168,"avgScore":0,"total":299,"topMatches":[]}
+{"ts":"2026-04-16T18:28:27.2360430Z","matched":0,"synthetic":345,"avgScore":0,"total":476,"topMatches":[]}
+{"ts":"2026-04-16T18:28:35.1123472Z","matched":0,"synthetic":59,"avgScore":0,"total":189,"topMatches":[]}
+{"ts":"2026-04-16T18:29:41.3345441Z","matched":0,"synthetic":798,"avgScore":0,"total":929,"topMatches":[]}
+{"ts":"2026-04-16T18:29:49.4475471Z","matched":0,"synthetic":104,"avgScore":0,"total":235,"topMatches":[]}
+{"ts":"2026-04-16T18:29:57.9829508Z","matched":0,"synthetic":156,"avgScore":0,"total":287,"topMatches":[]}
+{"ts":"2026-04-16T18:30:06.8731904Z","matched":0,"synthetic":233,"avgScore":0,"total":364,"topMatches":[]}
+{"ts":"2026-04-16T18:30:14.6089366Z","matched":0,"synthetic":37,"avgScore":0,"total":168,"topMatches":[]}
+{"ts":"2026-04-16T18:31:22.1296550Z","matched":0,"synthetic":214,"avgScore":0,"total":345,"topMatches":[]}
+{"ts":"2026-04-16T18:31:30.9523797Z","matched":0,"synthetic":566,"avgScore":0,"total":698,"topMatches":[]}
+{"ts":"2026-04-16T18:31:43.2322086Z","matched":0,"synthetic":178,"avgScore":0,"total":310,"topMatches":[]}
+{"ts":"2026-04-16T18:32:12.5054169Z","matched":1,"synthetic":150,"avgScore":0.332,"total":279,"topMatches":[{"score":0.332,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"0,79 113x2"}]}
+{"ts":"2026-04-16T18:36:25.0811641Z","matched":0,"synthetic":63,"avgScore":0,"total":195,"topMatches":[]}
+{"ts":"2026-04-16T18:36:34.8839937Z","matched":0,"synthetic":56,"avgScore":0,"total":188,"topMatches":[]}
+{"ts":"2026-04-16T18:36:44.8586335Z","matched":0,"synthetic":63,"avgScore":0,"total":195,"topMatches":[]}
+{"ts":"2026-04-16T18:36:53.0078536Z","matched":0,"synthetic":51,"avgScore":0,"total":182,"topMatches":[]}
+{"ts":"2026-04-16T18:37:00.9714080Z","matched":0,"synthetic":44,"avgScore":0,"total":175,"topMatches":[]}
+{"ts":"2026-04-16T18:37:09.2087875Z","matched":0,"synthetic":134,"avgScore":0,"total":265,"topMatches":[]}
+{"ts":"2026-04-16T18:37:18.4701306Z","matched":0,"synthetic":79,"avgScore":0,"total":210,"topMatches":[]}
+{"ts":"2026-04-16T18:37:27.2389541Z","matched":0,"synthetic":70,"avgScore":0,"total":201,"topMatches":[]}
+{"ts":"2026-04-16T18:37:35.4494356Z","matched":0,"synthetic":65,"avgScore":0,"total":197,"topMatches":[]}
+{"ts":"2026-04-16T18:37:44.3113914Z","matched":0,"synthetic":134,"avgScore":0,"total":266,"topMatches":[]}
+{"ts":"2026-04-16T18:38:33.1068080Z","matched":6,"synthetic":78,"avgScore":0.476,"total":228,"topMatches":[{"score":0.631,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"429,0 24x16"},{"score":0.474,"uia":"\u003CListItem_view_1048\u003E WebFPS","ccaType":"DyText","bounds":"530,1 8x9"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"95,1 8x9"},{"score":0.465,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"299,1 9x9"},{"score":0.453,"uia":"\u003CToolBar_view_1045\u003E \uC990\uACA8\uCC3E\uAE30 \uBAA8\uC74C","ccaType":"DyText","bounds":"201,0 24x16"}]}
+{"ts":"2026-04-16T18:39:06.3328273Z","matched":0,"synthetic":172,"avgScore":0,"total":303,"topMatches":[]}
+{"ts":"2026-04-16T18:39:14.2474241Z","matched":0,"synthetic":165,"avgScore":0,"total":296,"topMatches":[]}
+{"ts":"2026-04-16T18:39:21.9830835Z","matched":0,"synthetic":176,"avgScore":0,"total":307,"topMatches":[]}
+{"ts":"2026-04-16T18:39:30.3113203Z","matched":1,"synthetic":118,"avgScore":0.256,"total":250,"topMatches":[{"score":0.256,"uia":"\u003CText\u003E DyDyText 1550x821","ccaType":"DyNoise","bounds":"0,17 451x383"}]}
+{"ts":"2026-04-16T18:40:32.2416322Z","matched":5,"synthetic":169,"avgScore":0.489,"total":300,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.465,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"457,1 9x9"}]}
+{"ts":"2026-04-16T18:40:39.9981307Z","matched":5,"synthetic":151,"avgScore":0.489,"total":282,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.465,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"457,1 9x9"}]}
+{"ts":"2026-04-16T18:40:47.4404880Z","matched":5,"synthetic":93,"avgScore":0.489,"total":224,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.464,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"458,1 8x9"}]}
+{"ts":"2026-04-16T18:40:55.7377745Z","matched":5,"synthetic":74,"avgScore":0.489,"total":205,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.464,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"458,1 8x9"}]}
+{"ts":"2026-04-16T18:41:03.9931974Z","matched":5,"synthetic":66,"avgScore":0.489,"total":197,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.464,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"458,1 8x9"}]}
+{"ts":"2026-04-16T18:41:11.9961120Z","matched":5,"synthetic":175,"avgScore":0.489,"total":306,"topMatches":[{"score":0.557,"uia":"\u003CListItem_view_1048\u003E https://www.youtube.com/watch?v=21g8rgLqLc4\u0026pp=0gcJCdMKAYcqIYzv\uC744(\uB97C) \uC704\uD55C \uC774\uB984 \uC5C6\uB294 \uBD81\uB9C8\uD06C","ccaType":"DyText","bounds":"587,0 13x16"},{"score":0.477,"uia":"\u003CListItem_view_1048\u003E \uBB34\uBE44","ccaType":"DyText","bounds":"0,4 15x7"},{"score":0.476,"uia":"\u003CListItem_view_1048\u003E NAVER","ccaType":"DyText","bounds":"101,0 8x10"},{"score":0.47,"uia":"\u003CListItem_view_1048\u003E WkAutoQuant","ccaType":"DyText","bounds":"253,1 8x9"},{"score":0.465,"uia":"\u003CListItem_view_1048\u003E BitwiseSets | bitwise-sets","ccaType":"DyText","bounds":"457,1 9x9"}]}
+{"ts":"2026-04-16T18:41:40.0169147Z","matched":0,"synthetic":109,"avgScore":0,"total":240,"topMatches":[]}
+{"ts":"2026-04-16T18:42:13.5301364Z","matched":3,"synthetic":226,"avgScore":0.312,"total":376,"topMatches":[{"score":0.38,"uia":"\u003CPane\u003E (5088) [\uC655\uC0AC\uB0A8] \uB300\uD55C\uBBFC\uAD6D\uC744 \uD1B5\uACE1\uC758 \uBC14\uB2E4\uB85C \uB9CC\uB4E0 \u0027\uC655\uC0AC\uB0A8\u0027 \uB208\uBB3C \uBA85\uC7A5\uBA74 TOP 5... #\uB2E8\uC885 #\uC655\uACFC\uC0AC\uB294\uB0A8\uC790 #\uD55C\uAD6D\uC0AC\uC2A4\uD1A0\uB9AC #\uC2DC\uB2C8\uC5B4 - YouTube - \uC624\uB514\uC624 \uC7AC\uC0DD - Microsoft Edge","ccaType":"DyText","bounds":"520,363 3x5"},{"score":0.279,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyText","bounds":"156,1 16x7"},{"score":0.279,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyIcon","bounds":"83,0 184x19"}]}
+{"ts":"2026-04-16T18:43:49.9031186Z","matched":0,"synthetic":121,"avgScore":0,"total":250,"topMatches":[]}
+{"ts":"2026-04-16T18:44:37.8098263Z","matched":0,"synthetic":55,"avgScore":0,"total":186,"topMatches":[]}
+{"ts":"2026-04-16T18:44:45.5776702Z","matched":0,"synthetic":24,"avgScore":0,"total":155,"topMatches":[]}
+{"ts":"2026-04-16T18:44:53.5566586Z","matched":0,"synthetic":59,"avgScore":0,"total":190,"topMatches":[]}
+{"ts":"2026-04-16T18:45:01.3629477Z","matched":0,"synthetic":39,"avgScore":0,"total":170,"topMatches":[]}
+{"ts":"2026-04-16T18:45:14.1342513Z","matched":0,"synthetic":96,"avgScore":0,"total":227,"topMatches":[]}
+{"ts":"2026-04-16T18:45:22.3949032Z","matched":0,"synthetic":82,"avgScore":0,"total":213,"topMatches":[]}
+{"ts":"2026-04-16T18:45:29.5659139Z","matched":0,"synthetic":40,"avgScore":0,"total":41,"topMatches":[]}
+{"ts":"2026-04-16T18:45:38.0893657Z","matched":0,"synthetic":14,"avgScore":0,"total":145,"topMatches":[]}
+{"ts":"2026-04-16T18:46:52.9656870Z","matched":0,"synthetic":94,"avgScore":0,"total":225,"topMatches":[]}
+{"ts":"2026-04-16T18:47:00.7581721Z","matched":0,"synthetic":73,"avgScore":0,"total":204,"topMatches":[]}
+{"ts":"2026-04-16T18:47:08.8767387Z","matched":0,"synthetic":93,"avgScore":0,"total":224,"topMatches":[]}
+{"ts":"2026-04-16T18:47:17.5232493Z","matched":0,"synthetic":271,"avgScore":0,"total":402,"topMatches":[]}
+{"ts":"2026-04-16T18:47:25.2981680Z","matched":0,"synthetic":104,"avgScore":0,"total":235,"topMatches":[]}
+{"ts":"2026-04-16T18:47:36.5052297Z","matched":0,"synthetic":155,"avgScore":0,"total":287,"topMatches":[]}
+{"ts":"2026-04-16T18:47:44.5728544Z","matched":0,"synthetic":76,"avgScore":0,"total":207,"topMatches":[]}
+{"ts":"2026-04-16T18:49:39.8831972Z","matched":0,"synthetic":156,"avgScore":0,"total":287,"topMatches":[]}
+{"ts":"2026-04-16T18:49:48.7032513Z","matched":0,"synthetic":178,"avgScore":0,"total":309,"topMatches":[]}
+{"ts":"2026-04-16T18:49:56.7664506Z","matched":0,"synthetic":169,"avgScore":0,"total":300,"topMatches":[]}
+{"ts":"2026-04-16T18:50:04.6128060Z","matched":0,"synthetic":189,"avgScore":0,"total":320,"topMatches":[]}
+{"ts":"2026-04-16T18:53:23.8363662Z","matched":7,"synthetic":198,"avgScore":0.491,"total":329,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBC31\uC5C5","ccaType":"DyText","bounds":"58,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"157,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"256,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"355,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"454,88 24x22"}]}
+{"ts":"2026-04-16T18:53:43.0335818Z","matched":7,"synthetic":103,"avgScore":0.491,"total":234,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBC31\uC5C5","ccaType":"DyText","bounds":"58,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"157,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"256,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"355,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"454,88 24x22"}]}
+{"ts":"2026-04-16T18:53:50.2749159Z","matched":7,"synthetic":93,"avgScore":0.491,"total":224,"topMatches":[{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uBC31\uC5C5","ccaType":"DyText","bounds":"58,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC575\uBC8C","ccaType":"DyText","bounds":"157,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC5D4\uD130","ccaType":"DyText","bounds":"256,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uAD50\uC591","ccaType":"DyText","bounds":"355,88 24x22"},{"score":0.506,"uia":"\u003CListItem_view_1048\u003E \uC720\uD2F8","ccaType":"DyText","bounds":"454,88 24x22"}]}
+{"ts":"2026-04-16T18:54:30.0141530Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:54:41.3474867Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:54:49.3238652Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:55:00.9769245Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:55:13.3716410Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:55:22.5139448Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-16T18:55:50.4373054Z","matched":0,"synthetic":4,"avgScore":0,"total":135,"topMatches":[]}
+{"ts":"2026-04-16T18:56:02.9696460Z","matched":0,"synthetic":4,"avgScore":0,"total":135,"topMatches":[]}
+{"ts":"2026-04-16T18:56:14.8929731Z","matched":0,"synthetic":4,"avgScore":0,"total":135,"topMatches":[]}
+{"ts":"2026-04-16T18:57:18.3123641Z","matched":0,"synthetic":77,"avgScore":0,"total":208,"topMatches":[]}
+{"ts":"2026-04-16T18:57:49.1235596Z","matched":0,"synthetic":39,"avgScore":0,"total":170,"topMatches":[]}
+{"ts":"2026-04-16T18:58:03.5364458Z","matched":0,"synthetic":25,"avgScore":0,"total":156,"topMatches":[]}
+{"ts":"2026-04-16T18:58:11.1823366Z","matched":0,"synthetic":144,"avgScore":0,"total":275,"topMatches":[]}
+{"ts":"2026-04-16T18:58:18.7194194Z","matched":0,"synthetic":228,"avgScore":0,"total":359,"topMatches":[]}
+{"ts":"2026-04-16T18:58:29.6212472Z","matched":0,"synthetic":27,"avgScore":0,"total":158,"topMatches":[]}
+{"ts":"2026-04-16T18:58:37.2987999Z","matched":0,"synthetic":16,"avgScore":0,"total":147,"topMatches":[]}
+{"ts":"2026-04-16T18:58:45.2673501Z","matched":0,"synthetic":31,"avgScore":0,"total":162,"topMatches":[]}
+{"ts":"2026-04-16T18:58:53.2374525Z","matched":0,"synthetic":26,"avgScore":0,"total":158,"topMatches":[]}
+{"ts":"2026-04-16T18:59:01.7296739Z","matched":0,"synthetic":107,"avgScore":0,"total":239,"topMatches":[]}
+{"ts":"2026-04-16T18:59:10.2932979Z","matched":0,"synthetic":144,"avgScore":0,"total":275,"topMatches":[]}
+{"ts":"2026-04-16T18:59:18.9549619Z","matched":0,"synthetic":33,"avgScore":0,"total":165,"topMatches":[]}
+{"ts":"2026-04-16T18:59:27.4746730Z","matched":0,"synthetic":3,"avgScore":0,"total":134,"topMatches":[]}
+{"ts":"2026-04-16T19:00:22.9331040Z","matched":0,"synthetic":146,"avgScore":0,"total":277,"topMatches":[]}
+{"ts":"2026-04-16T19:00:32.1254936Z","matched":5,"synthetic":178,"avgScore":0.424,"total":328,"topMatches":[{"score":0.447,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyText","bounds":"0,7 4x8"},{"score":0.445,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyText","bounds":"2,0 5x6"},{"score":0.432,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyText","bounds":"10,3 7x7"},{"score":0.418,"uia":"\u003CButton\u003E \uB3D9\uC601\uC0C1 \uC694\uC57D","ccaType":"DyText","bounds":"21,0 5x15"},{"score":0.377,"uia":"\u003CPane\u003E (5089) \uC640.. \uC9C4\uC9DC \uCC9C\uB9CC \uCC0D\uB0D0..? \u300A\uC655\uACFC \uC0AC\uB294 \uB0A8\uC790\u300B \uC560\uB4DC\uB9BD \uBC0F \uC0AD\uC81C\uC52C \uBE44\uD558\uC778\uB4DC 2\uD0C4\uD83D\uDCA5 - YouTube - \uC624\uB514\uC624 \uC7AC\uC0DD - Microsoft Edge","ccaType":"DyIcon","bounds":"285,324 12x68"}]}
+{"ts":"2026-04-16T19:01:33.8722530Z","matched":0,"synthetic":380,"avgScore":0,"total":512,"topMatches":[]}
+{"ts":"2026-04-16T19:01:42.6758664Z","matched":0,"synthetic":415,"avgScore":0,"total":547,"topMatches":[]}
+{"ts":"2026-04-16T19:01:51.2914575Z","matched":0,"synthetic":428,"avgScore":0,"total":560,"topMatches":[]}
+{"ts":"2026-04-16T19:01:59.4305682Z","matched":0,"synthetic":446,"avgScore":0,"total":578,"topMatches":[]}
+{"ts":"2026-04-17T00:21:49.9208178Z","matched":1,"synthetic":760,"avgScore":0.332,"total":907,"topMatches":[{"score":0.332,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyNoise","bounds":"2,0 1x7"}]}
+{"ts":"2026-04-17T01:08:54.5069521Z","matched":0,"synthetic":695,"avgScore":0,"total":825,"topMatches":[]}
+{"ts":"2026-04-17T01:09:05.6820943Z","matched":0,"synthetic":0,"avgScore":0,"total":0,"topMatches":[]}
+{"ts":"2026-04-17T01:09:19.2329216Z","matched":0,"synthetic":219,"avgScore":0,"total":349,"topMatches":[]}
+{"ts":"2026-04-17T01:09:57.8585721Z","matched":0,"synthetic":86,"avgScore":0,"total":198,"topMatches":[]}
+{"ts":"2026-04-17T01:10:01.1839329Z","matched":0,"synthetic":86,"avgScore":0,"total":198,"topMatches":[]}
+{"ts":"2026-04-17T01:10:05.6617098Z","matched":0,"synthetic":88,"avgScore":0,"total":200,"topMatches":[]}
+{"ts":"2026-04-17T01:10:08.9627706Z","matched":0,"synthetic":89,"avgScore":0,"total":201,"topMatches":[]}
+{"ts":"2026-04-17T01:10:12.4367381Z","matched":0,"synthetic":90,"avgScore":0,"total":202,"topMatches":[]}
+{"ts":"2026-04-17T01:10:19.1851162Z","matched":0,"synthetic":87,"avgScore":0,"total":199,"topMatches":[]}
+{"ts":"2026-04-17T01:10:25.0995276Z","matched":0,"synthetic":88,"avgScore":0,"total":200,"topMatches":[]}
+{"ts":"2026-04-17T01:10:31.0550422Z","matched":0,"synthetic":92,"avgScore":0,"total":204,"topMatches":[]}
+{"ts":"2026-04-17T01:10:37.2225283Z","matched":0,"synthetic":93,"avgScore":0,"total":206,"topMatches":[]}
+{"ts":"2026-04-17T01:10:43.5669737Z","matched":0,"synthetic":98,"avgScore":0,"total":210,"topMatches":[]}
+{"ts":"2026-04-17T01:10:49.1884499Z","matched":0,"synthetic":98,"avgScore":0,"total":211,"topMatches":[]}
+{"ts":"2026-04-17T01:10:55.8172830Z","matched":0,"synthetic":101,"avgScore":0,"total":213,"topMatches":[]}
+{"ts":"2026-04-17T01:11:05.5294285Z","matched":0,"synthetic":106,"avgScore":0,"total":218,"topMatches":[]}
+{"ts":"2026-04-17T01:11:12.3281225Z","matched":0,"synthetic":109,"avgScore":0,"total":221,"topMatches":[]}
+{"ts":"2026-04-17T01:11:18.5215048Z","matched":0,"synthetic":118,"avgScore":0,"total":230,"topMatches":[]}
+{"ts":"2026-04-17T01:11:24.9487194Z","matched":0,"synthetic":115,"avgScore":0,"total":227,"topMatches":[]}
+{"ts":"2026-04-17T01:11:31.1661846Z","matched":0,"synthetic":114,"avgScore":0,"total":226,"topMatches":[]}
+{"ts":"2026-04-17T01:11:37.4366418Z","matched":0,"synthetic":115,"avgScore":0,"total":227,"topMatches":[]}
+{"ts":"2026-04-17T01:11:43.5679527Z","matched":0,"synthetic":104,"avgScore":0,"total":216,"topMatches":[]}
+{"ts":"2026-04-17T01:11:53.7702457Z","matched":0,"synthetic":100,"avgScore":0,"total":212,"topMatches":[]}
+{"ts":"2026-04-17T01:12:00.3689514Z","matched":0,"synthetic":110,"avgScore":0,"total":222,"topMatches":[]}
+{"ts":"2026-04-17T01:12:06.4163870Z","matched":0,"synthetic":64,"avgScore":0,"total":176,"topMatches":[]}
+{"ts":"2026-04-17T01:12:12.6642015Z","matched":0,"synthetic":60,"avgScore":0,"total":172,"topMatches":[]}
+{"ts":"2026-04-17T01:12:19.3705084Z","matched":0,"synthetic":69,"avgScore":0,"total":181,"topMatches":[]}
+{"ts":"2026-04-17T01:12:29.9729726Z","matched":0,"synthetic":120,"avgScore":0,"total":232,"topMatches":[]}
+{"ts":"2026-04-17T01:12:39.7216872Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:12:49.3738955Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:12:58.4495524Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:13:09.0100428Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:13:18.5410650Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:13:28.8171115Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:13:38.1172307Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:13:47.9294746Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:13:57.8269673Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:14:10.3690520Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:14:22.8453749Z","matched":0,"synthetic":401,"avgScore":0,"total":525,"topMatches":[]}
+{"ts":"2026-04-17T01:14:36.9796191Z","matched":0,"synthetic":402,"avgScore":0,"total":526,"topMatches":[]}
+{"ts":"2026-04-17T01:14:48.5102447Z","matched":0,"synthetic":401,"avgScore":0,"total":525,"topMatches":[]}
+{"ts":"2026-04-17T01:15:00.6554883Z","matched":0,"synthetic":401,"avgScore":0,"total":526,"topMatches":[]}
+{"ts":"2026-04-17T01:15:12.2062659Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:15:23.6338942Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:15:34.5408024Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:15:46.1303703Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:15:57.3785999Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:07.3972283Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:18.2664661Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:28.6151690Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:38.2252456Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:49.0342376Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:16:58.6671449Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:17:08.8651241Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:17:19.4744364Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:17:29.8903063Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:17:39.7529614Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:17:50.7581092Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:18:00.2808031Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:18:11.4228860Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:18:22.2325958Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:18:32.8896105Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:18:43.5531993Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:18:53.3326761Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:03.1356729Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:13.5568764Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:23.5724456Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:33.6001891Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:43.2819335Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:19:53.4065017Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:03.8222246Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:13.8127264Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:24.4097836Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:34.9524898Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:45.6464923Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:20:55.9164261Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:21:06.0101365Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:21:16.3709285Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:21:26.2170149Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:21:36.4988256Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:21:48.2478835Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:21:59.3956627Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:22:09.7986199Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:22:19.3534544Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:22:30.4666502Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:22:40.3057736Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:22:51.1022446Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:00.7235224Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:11.7454888Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:22.0603884Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:32.4605712Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:41.8639056Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:23:52.9212787Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:24:03.4046779Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:24:15.7575761Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:24:28.3662760Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:24:39.9871562Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:24:50.1238219Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:25:00.0719512Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:25:10.0268748Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:25:19.0850061Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:25:30.4825466Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:25:42.2242616Z","matched":0,"synthetic":404,"avgScore":0,"total":516,"topMatches":[]}
+{"ts":"2026-04-17T01:25:53.8510683Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:04.4972317Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:13.7307575Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:24.8182051Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:35.1976775Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:46.3761024Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:26:56.5855657Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:27:06.6065495Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:27:16.9067476Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:27:26.9945759Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:27:37.7436151Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:27:48.6021936Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:27:58.7014072Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:28:09.6334447Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:28:20.7372257Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:28:30.3410109Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:28:41.0296246Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:28:51.2987863Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:01.6578166Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:11.4747936Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:23.0292742Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:32.8326572Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:43.4537607Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:29:54.0691392Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:04.2967830Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:13.9583759Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:23.5463148Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:34.1896097Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:44.3758533Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:30:54.8161749Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:05.3093150Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:15.9669871Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:25.6858513Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:35.8303953Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:46.0801594Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:31:56.5253023Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:05.8925041Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:16.3989060Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:25.7172437Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:36.1026370Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:46.0758037Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:32:56.9454432Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:08.1479817Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:17.5819626Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:28.4522359Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:38.9901129Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:49.2890015Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:33:59.9886399Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:34:13.3101109Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:34:26.0785749Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T01:34:37.4085428Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:34:49.0532883Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:35:00.8821977Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:35:13.1439503Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:35:23.9410855Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:35:34.2593883Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:35:43.3597415Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:35:52.9631939Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:03.5661396Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:12.5573424Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:21.8757395Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:30.8671410Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:41.2823655Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:36:50.8806896Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:01.2965704Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:11.6325128Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:21.7998307Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:31.1720630Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:42.3812336Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:37:53.0445435Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:03.4779485Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:13.5133895Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:23.5148722Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:33.9840544Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:43.4182288Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:38:52.7189244Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:03.1649970Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:14.0234658Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:23.2622770Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:34.0591323Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:43.3348714Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:39:52.4107722Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:03.1478040Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:12.9508335Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:22.0998191Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:31.2193472Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:42.5251382Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:40:52.1032916Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:02.9793239Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:14.3288634Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:24.2763388Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:33.9043897Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:43.0770680Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:41:54.0260608Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:42:04.6585201Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:42:14.3228232Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:42:25.1683820Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:42:36.7472342Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:42:46.6964559Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:42:57.3714302Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:08.6108619Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:18.2692065Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:28.8415144Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:38.5173736Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:48.9855135Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:43:59.5607409Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:44:11.9758320Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:44:22.7602838Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:44:35.5021548Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:44:46.6575207Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:44:58.2654050Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:45:09.7776515Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T01:45:21.9194554Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:45:32.6919169Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:45:42.0777815Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:45:52.0987202Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:02.3868796Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:12.7954069Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:21.6369101Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:30.9724778Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:39.9578756Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:46:49.8093650Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:00.5827824Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:11.3500474Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:20.6453040Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:30.1865064Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:40.3591674Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:47:50.1154841Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:00.2021608Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:09.8000710Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:19.4942923Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:29.9701331Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:39.7003507Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:50.4972542Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:48:59.5673381Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:49:09.7525144Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:49:19.8709712Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:49:29.3654606Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:49:39.0597174Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:49:49.2562893Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:49:58.5086465Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:50:09.0756143Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:50:19.5331360Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:50:28.5002228Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:50:38.0124064Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:50:48.0220285Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:50:57.6254379Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:07.2048307Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:17.7474850Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:27.4659883Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:37.7234962Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:46.9395099Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:51:57.1544810Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:07.3336241Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:16.4093702Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:25.9095178Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:36.5855536Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:45.6501626Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:52:55.9696040Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:06.3771078Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:15.1995528Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:24.7660775Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:33.8965114Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:43.4343903Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:53:54.1826020Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:54:03.5192317Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:54:16.2431043Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:54:28.3788669Z","matched":0,"synthetic":401,"avgScore":0,"total":525,"topMatches":[]}
+{"ts":"2026-04-17T01:54:40.4973292Z","matched":0,"synthetic":401,"avgScore":0,"total":525,"topMatches":[]}
+{"ts":"2026-04-17T01:54:52.3781178Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:55:03.0853361Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:55:12.6513185Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:55:21.6494547Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:55:30.6645029Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:55:39.8441042Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:55:50.1378398Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:55:59.4197058Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:56:08.7989488Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:56:18.6579155Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:56:28.4725581Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:56:38.1185129Z","matched":0,"synthetic":403,"avgScore":0,"total":515,"topMatches":[]}
+{"ts":"2026-04-17T01:56:47.2669498Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:56:56.3673650Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:57:05.5468669Z","matched":0,"synthetic":401,"avgScore":0,"total":513,"topMatches":[]}
+{"ts":"2026-04-17T01:57:16.6838813Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:57:27.6072520Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:57:37.4893169Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:57:48.2076633Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:57:57.5456288Z","matched":0,"synthetic":402,"avgScore":0,"total":514,"topMatches":[]}
+{"ts":"2026-04-17T01:58:07.9968396Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:58:16.9211164Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:58:26.9312259Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:58:37.1581121Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:58:47.4282723Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:58:57.8088132Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:07.1497884Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:18.1103175Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:27.2042310Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:36.9893984Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:47.5574154Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T01:59:56.6687403Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:08.2155437Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:18.1659679Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:28.5209703Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:39.4457420Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:48.6725226Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:00:58.2331608Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:08.7637110Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:17.8463952Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:26.9772138Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:36.1317496Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:45.5899689Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:01:55.3207569Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:04.1120409Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:13.8487077Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:24.2763316Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:34.1644356Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:44.2765146Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:02:53.4800292Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:03.4044350Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:13.7773338Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:23.4655571Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:33.7895817Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:42.9506918Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:03:53.4022922Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:04:03.7756869Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:04:17.9797751Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:04:29.8735149Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:04:41.9425276Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:04:53.7330079Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:05:04.8014673Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:05:17.4055557Z","matched":0,"synthetic":396,"avgScore":0,"total":521,"topMatches":[]}
+{"ts":"2026-04-17T02:05:28.3887450Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:05:38.5553557Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:05:48.6616180Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:05:57.9557165Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:09.3418556Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:19.7197590Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:30.0435730Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:39.7816256Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:49.9046054Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:06:59.2356503Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:10.2760310Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:19.4361950Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:30.4816124Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:41.0077961Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:50.3849039Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:07:59.5277740Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:09.1613257Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:18.5657178Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:27.8291089Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:37.1542851Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:46.5570997Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:08:57.0328639Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:07.3212290Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:16.3068380Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:26.6992676Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:36.3314656Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:46.4257755Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:09:56.5682212Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:07.3106413Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:17.2231307Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:26.8026894Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:37.8852923Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:47.5781305Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:10:59.5085038Z","matched":0,"synthetic":396,"avgScore":0,"total":524,"topMatches":[]}
+{"ts":"2026-04-17T02:11:11.5540329Z","matched":0,"synthetic":396,"avgScore":0,"total":524,"topMatches":[]}
+{"ts":"2026-04-17T02:11:23.4591211Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:11:37.3715812Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:11:56.8699701Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:12:12.7300642Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:12:23.8237441Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:12:33.7426685Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:12:43.7638531Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:12:53.3246195Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:03.7405780Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:12.8585542Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:22.0131899Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:32.2494022Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:42.6382395Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:13:52.3509668Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:14:02.9306906Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:14:16.3512220Z","matched":0,"synthetic":396,"avgScore":0,"total":524,"topMatches":[]}
+{"ts":"2026-04-17T02:14:29.1120775Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:14:41.1556591Z","matched":0,"synthetic":396,"avgScore":0,"total":520,"topMatches":[]}
+{"ts":"2026-04-17T02:14:52.6692918Z","matched":0,"synthetic":401,"avgScore":0,"total":525,"topMatches":[]}
+{"ts":"2026-04-17T02:15:04.8882501Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:15:14.6976233Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:15:25.1248582Z","matched":0,"synthetic":396,"avgScore":0,"total":519,"topMatches":[]}
+{"ts":"2026-04-17T02:15:35.7468796Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:15:45.4832572Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:15:56.0438171Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:16:06.6223860Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:16:17.9888359Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:16:30.2036222Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:16:45.6298044Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:16:56.3363519Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:17:05.7148649Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:17:14.9002734Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:17:24.5583554Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:17:34.8700958Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:17:45.8749617Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:17:56.4461164Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:06.4010007Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:15.5921870Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:25.0076217Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:35.0417835Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:44.9539563Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:18:53.8785468Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:02.9497333Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:11.9703115Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:21.1076142Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:29.9530844Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:40.3564715Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:49.5845674Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:19:58.7334027Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:08.1727227Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:18.4007010Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:27.7922029Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:38.1768570Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:47.8412567Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:20:58.4014453Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:21:08.1264878Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:21:18.7718697Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:21:29.8293914Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:21:40.4686106Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:21:49.7201895Z","matched":0,"synthetic":396,"avgScore":0,"total":519,"topMatches":[]}
+{"ts":"2026-04-17T02:21:58.9802985Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:22:11.0242038Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:22:37.6296542Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:22:57.2059396Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:06.0626006Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:15.3273458Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:24.5603089Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:35.0124039Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:44.3793780Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:23:55.5165580Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:24:06.1926082Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:24:17.7405219Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:24:28.9303609Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:24:39.7100495Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:24:49.4398248Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:24:58.4506565Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:25:08.2293055Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:25:19.2203330Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:25:29.6709961Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:25:39.8689838Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:25:49.6837412Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:01.1238775Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:11.0592908Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:21.1296122Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:31.3694529Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:41.0033467Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:26:51.5822725Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:01.2097280Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:10.6975280Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:21.7009364Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:32.6428201Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:42.8212480Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:27:52.7644905Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:28:03.1677888Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:28:14.8437617Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:28:24.8169895Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:28:35.1903363Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:28:45.7806638Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:28:55.2505781Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:06.2112328Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:15.5909427Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:25.9332948Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:35.6519722Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:46.3640532Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:29:57.2461020Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:06.7701157Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:17.9241156Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:27.7159788Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:38.0588237Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:47.5581412Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:30:58.3307878Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:08.1464954Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:18.4717817Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:29.4613622Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:39.0349466Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:50.5165404Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:31:59.5265635Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:32:09.2566151Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:32:19.6370865Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:32:28.5906257Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:32:38.8065443Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:32:48.1367911Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:32:57.4497922Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:33:08.3617064Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:33:21.3699273Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:33:35.5118801Z","matched":0,"synthetic":396,"avgScore":0,"total":519,"topMatches":[]}
+{"ts":"2026-04-17T02:33:46.9083161Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:33:57.6574051Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:34:08.3629538Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:34:21.0627298Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:34:32.3506841Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:34:41.7305348Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:34:51.9572668Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:01.7418886Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:11.9569474Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:23.1853023Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:33.4360996Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:43.6574237Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:35:53.6369521Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:36:03.8337184Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:36:13.6674541Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:36:24.6524012Z","matched":0,"synthetic":396,"avgScore":0,"total":518,"topMatches":[]}
+{"ts":"2026-04-17T02:36:35.1767852Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:36:45.0157183Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:36:54.7649631Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:05.4222366Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:14.3714866Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:24.6844152Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:33.7483914Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:42.6303710Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:37:51.8883952Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:01.3403299Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:10.7677212Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:19.4503442Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:28.9324413Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:39.3591445Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:49.4906589Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:38:59.2695574Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:08.7454681Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:18.9550152Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:29.3581640Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:39.6219510Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:50.0068844Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:39:59.9679751Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:10.0075323Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:19.4953278Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:28.8217989Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:38.2979348Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:48.6635468Z","matched":0,"synthetic":396,"avgScore":0,"total":508,"topMatches":[]}
+{"ts":"2026-04-17T02:40:59.5461217Z","matched":0,"synthetic":396,"avgScore":0,"total":522,"topMatches":[]}
+{"ts":"2026-04-17T02:41:51.6390201Z","matched":0,"synthetic":10,"avgScore":0,"total":151,"topMatches":[]}
+{"ts":"2026-04-17T02:44:43.6940743Z","matched":0,"synthetic":198,"avgScore":0,"total":336,"topMatches":[]}
+{"ts":"2026-04-17T02:44:49.9305123Z","matched":0,"synthetic":199,"avgScore":0,"total":337,"topMatches":[]}
+{"ts":"2026-04-17T02:44:58.2924449Z","matched":0,"synthetic":200,"avgScore":0,"total":338,"topMatches":[]}
+{"ts":"2026-04-17T02:45:06.3735340Z","matched":0,"synthetic":197,"avgScore":0,"total":335,"topMatches":[]}
+{"ts":"2026-04-17T02:45:15.0135406Z","matched":0,"synthetic":197,"avgScore":0,"total":335,"topMatches":[]}
+{"ts":"2026-04-17T02:45:23.2353462Z","matched":0,"synthetic":203,"avgScore":0,"total":341,"topMatches":[]}
+{"ts":"2026-04-17T02:45:29.3561661Z","matched":0,"synthetic":201,"avgScore":0,"total":339,"topMatches":[]}
+{"ts":"2026-04-17T02:45:38.7187935Z","matched":0,"synthetic":208,"avgScore":0,"total":346,"topMatches":[]}
+{"ts":"2026-04-17T02:45:46.8167857Z","matched":0,"synthetic":213,"avgScore":0,"total":351,"topMatches":[]}
+{"ts":"2026-04-17T02:45:56.0139384Z","matched":0,"synthetic":222,"avgScore":0,"total":360,"topMatches":[]}
+{"ts":"2026-04-17T02:46:04.4541233Z","matched":0,"synthetic":224,"avgScore":0,"total":363,"topMatches":[]}
+{"ts":"2026-04-17T02:46:13.6757907Z","matched":0,"synthetic":236,"avgScore":0,"total":374,"topMatches":[]}
+{"ts":"2026-04-17T02:46:21.5651793Z","matched":0,"synthetic":254,"avgScore":0,"total":392,"topMatches":[]}
+{"ts":"2026-04-17T02:46:29.4233743Z","matched":0,"synthetic":278,"avgScore":0,"total":416,"topMatches":[]}
+{"ts":"2026-04-17T02:46:37.3237556Z","matched":0,"synthetic":318,"avgScore":0,"total":456,"topMatches":[]}
+{"ts":"2026-04-17T02:46:45.3036405Z","matched":0,"synthetic":341,"avgScore":0,"total":479,"topMatches":[]}
+{"ts":"2026-04-17T02:46:53.3968909Z","matched":0,"synthetic":397,"avgScore":0,"total":535,"topMatches":[]}
+{"ts":"2026-04-17T02:47:02.1899357Z","matched":0,"synthetic":541,"avgScore":0,"total":679,"topMatches":[]}
+{"ts":"2026-04-17T02:47:10.8064745Z","matched":0,"synthetic":1052,"avgScore":0,"total":1190,"topMatches":[]}
+{"ts":"2026-04-17T02:47:18.3922223Z","matched":0,"synthetic":1204,"avgScore":0,"total":1342,"topMatches":[]}
+{"ts":"2026-04-17T02:47:26.4259779Z","matched":0,"synthetic":1204,"avgScore":0,"total":1342,"topMatches":[]}
+{"ts":"2026-04-17T02:47:34.4361510Z","matched":0,"synthetic":1204,"avgScore":0,"total":1342,"topMatches":[]}
+{"ts":"2026-04-17T02:47:42.8210628Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:47:50.6133338Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:47:57.9264420Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:05.2697063Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:12.4205396Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:20.0296077Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:28.0755527Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:35.1710123Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:42.5696635Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:50.4896594Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:48:58.3551781Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:06.1925646Z","matched":0,"synthetic":1204,"avgScore":0,"total":1333,"topMatches":[]}
+{"ts":"2026-04-17T02:49:13.4028156Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:21.2096191Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:28.6194150Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:36.7495720Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:44.6303516Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:49:52.0589616Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:00.0798664Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:07.3024505Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:14.8898374Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:22.5002387Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:30.0784092Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:37.2338533Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:44.7162937Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:52.2742922Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:50:59.5730534Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:07.3855764Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:14.8439532Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:22.2694085Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:29.6549148Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:36.9076836Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:44.1167285Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:51.3465582Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:51:59.2472565Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:06.5969483Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:13.9520069Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:21.4900081Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:28.9365352Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:36.2185318Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:43.4527892Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:50.8754479Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:52:58.6245846Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:53:06.2640526Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:53:13.9664533Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}
+{"ts":"2026-04-17T02:53:21.6983096Z","matched":0,"synthetic":1204,"avgScore":0,"total":1332,"topMatches":[]}

@@ -1,0 +1,3 @@
+{"ts":"2026-04-16T17:19:39.4908914Z","matched":1,"synthetic":139,"avgScore":0.366,"total":269,"topMatches":[{"score":0.366,"uia":"\u003CPane\u003E NVIDIA GeForce Overlay","ccaType":"DyText","bounds":"192,0 15x8"}]}
+{"ts":"2026-04-16T17:19:39.6633723Z","matched":1,"synthetic":139,"avgScore":0.366,"total":140,"topMatches":[{"score":0.366,"uia":"\u003CWindow\u003E WKAppBot ScreenSaver #0","ccaType":"DyText","bounds":"192,0 15x8"}]}
+{"ts":"2026-04-16T17:19:39.8065243Z","matched":1,"synthetic":145,"avgScore":0.366,"total":146,"topMatches":[{"score":0.366,"uia":"\u003CWindow\u003E WKAppBot ScreenSaver #0","ccaType":"DyText","bounds":"192,0 15x8"}]}

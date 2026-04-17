@@ -1,0 +1,127 @@
+=== Segment Map ===
+  1: 0ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\571-751-571-576-751-715-175-751-157-715-175-571-357-157-175-217-175-517-751-715-715-157-175-751-751-753_W.mp3
+  2: 1576ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\602-260-206-301-310-126-321-236-326-321-132-107-320-263-103-134-103-674-310-236-106-134-603-260-310-263-326-265-654-130-105-301-213-321-213-620-103-103-321-261-130-1_V.mp3
+  3: 3152ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\571-571-105-135-301-102-725-275-130-120-150-175-150-315-157-150-157-517-501-517-570-531-517-150-513-571-571-531-157-571-517-150-753 574-571-547-547-574-574-574-574 5_W.mp3
+  4: 4728ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\517 153-107-103-105-175-157-357-153-105-105-507-173-157-175-570-107-135-170-150-571-157-517-150-105-105-135-105-105-130 541-547 105-103-107-103-103-103-107-105-150-1_W.mp3
+  5: 6304ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\613-631-631-601-617-610-601-670-601-675-601-640-630-640-610-601-160-610-657-623-632-670-361-312-120-670-361-261-621-620-623-610-601-630-601-620-263-621-621-236-612-6_W.mp3
+  6: 7880ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\670-206-123-261-607-132-263-231-321-543-123-620-620-621-261-236-630-231-320-201-260-263-215-216-213-306-231-123-612-602-231-310-103-263-632-630-302-130-321-261-345-6_W.mp3
+  7: 9456ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\130-503-301-310-320-604-521-256-156-547-351-310-154-547-547-125-130-310-621-162-612-316-612-612-160-105-105-104-652-356-316-325-536-635-615-652-316-103-310-321-326-2_W.mp3
+  8: 11032ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\615-150-172-157-157-150-105-150-105-105-105-150-517 571-105-157-107-570-170-715-137-153-172-751-173-150-517-157-150-105-157-105-105-105-105-150 157-615-516-156-157-1_W.mp3
+  9: 12608ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\236-312-316-236-316-632-326-267-132-312-367-361-326-316-263-231-362-326-362-326-362-326-362-623-326-317-267-362-136-362-627-326-326-216-362-361-362-326-326-326-326-2_W.mp3
+  10: 14184ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\310-315-675-306-106-310-657-641-321-316-361-316-136-310-301-103-103-102-102-103-102-120-320-132-230-321-312-316-231-312 325-312-321-321-320-210-120-321-123-230-123-3_V.mp3
+  11: 15760ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\571-537-517-537-531-517-513-537-537-531-537-574_W.mp3
+  12: 17336ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\236 756 754-176-130-310-307 354-534-103-130-632-625-360-310-306-175-362-301-312-326-627-620-362-306-301-136-306-310-317-351-357-351-351-106-176-165-106-601-617-610-3_V.mp3
+  13: 18912ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\130-123-125-103-130-213-324-103-670-103-301-130-103-103-254-574-314-621-261-361-310-124-105-104-130-132-310-570-765-753-354-132-201-103-310-231-617-126-754-107-310-1_V.mp3
+  14: 20488ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\362-263-362-623-362-326-263-263-261-362-621-236-326-236-362-326-236-263-623-326-362-326-623-263-362-236-326-326-632-263-632-326-362-326-326-263-632-362-236-362-263-3_W.mp3
+  15: 22064ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\326-621-326-362-621-261-621-261-623-261-621-621-621-261-621-621-623-621-326-621-621-621-261-261-326-261-623-263-623-261-263-362-261-362-632-263-261-621-261-261-261-3_W.mp3
+  16: 23640ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\105-157-105-103-103-105-103-106-103-103-136-103-175-167-137-103-103-137-130-105-105-105 103-106-135-165-165-130-103-130 134-103-137-752-127-715-710-720-754-705 157-1_V.mp3
+  17: 25216ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\715-175-715-157-172-170-172-175-751-170-172-172-715-751-752-137-312-715-157-574-157-715-715-761-237-326-362-326-362-312-326-362-362-362-621-263-326-326-263-326-362-3_W.mp3
+  18: 26792ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\631-236-326-326-326-261-362-321-263-321-261-362-263-261-632-216-123-261-312-326-236-326-326-325-236-326-326-236-321-236-261-362-362-362-326-236-362-263-621-367-632-6_W.mp3
+  19: 28368ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\735-751-756-136-167-136-136-136-136-136-137-137-173-571-571-576-573-576-574-756-754-576-574-574-574-571-574-754-571-574_W.mp3
+  20: 29944ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\123-467-461-137-345-574-175-157-571-574-753-517-153-753-756-751-357-517-537-157-152-567-517-715_W.mp3
+  21: 31520ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\543-534-534-541-457-547-547-547-571-542-532-547-534 573-573-517 503-502-503-507-574-350-503-501-501-510-501-513-150-150-150-510-170-150-501-507-507-570 504-534-504-5_W.mp3
+  22: 33096ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\756-750-763-753-735-735-750-625-625-625-625-526-521-154-517-514-517-534-514-514-154-351-534-157-154-517-514-514-153 750-735-750-750-576-567-756-756-756-675-675-725-7_W.mp3
+  23: 34672ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\315-132-312-132-132-312-312-312_W.mp3
+  24: 36248ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\572-573-750-750-750-170-107-170-170-750-175-751-751-705-752-705-705-705-107-157-150-157-156-156_V.mp3
+  25: 37824ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\630-602-632-601-632-613-640-635-650-362-601-623-360-630-617-601-613-612-360-610-362-670-650-362-360-615-632-602-364-601-635-671-640-635-673-614-634-670-630-605-624-6_W.mp3
+  26: 39400ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\753-573-752-753-752-752-752-572-752-756-572-573-571 752-527-572-752-572-357-752-576-751-572-572-572-753-375-756-571_W.mp3
+  27: 40976ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\173-715-751-716-750-716-756-571-751-537-173-715-157-615-157-561-547-547-547-751-574-157-157-571-157-153-165-176-165-136 571-715-756-176 715-175-571-107-175_W.mp3
+  28: 42552ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\357-564-654-135-135-315-135-316-374-564-364-463-645-465-651-614-625-352-456-314-546-346-645-365-356-364-635-642-634-601_W.mp3
+  29: 44128ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\517-517-153-157-157-175-715-312-310-130-103-130-137-312-317-736-375-571-573-573-751-753-751-317-137-153-135-371-157-517-157-543-154-351-157-135-105-107-170-105-512-5_W.mp3
+  30: 45704ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\751-157-157-175-571-514-715-715-175-351-157-157-517-157-571-547-547-517-175-574 571-157-150-157-175-715-137-157-132-170-175-173-135-175-135-157-571-173-137-173-175-5_W.mp3
+  31: 47280ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\153-157-157-132-571-517-547-150-510-105-105-154-154-157-150-154 570-152-173-152-123-137-157-574-547-507-570-154-547-517-514-150-514-571-514-570 574-510-715-157-172-1_W.mp3
+  32: 48856ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\201-103-415-261-260-106-310-301-130-162-103-130-103-132-302-320-354-351-102-540-312-132-543-103 213-214-302-103-102-145-104-103-130-203-234-230-120-210-130-102-132-2_V.mp3
+  33: 50432ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\362-123-120-127-163-127-632-154-371-316-574-136-321-321-547-126-657-103-106-310-134-317-713-574-546-130-231-132-143-213-312-132-547-653-104-132-542-574-301-310-123-3_V.mp3
+  34: 52008ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\634-314-645-504 506 627 531 564-514-513 354-352-354-312_W.mp3
+  35: 53584ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\572-754-751-175-715-735-750-705-750-750-750-571-750-715-571-750-751-715-715-715-715-753-750-715-527 570-570-517-537-571-570-157-157-570-517-530-570-517-570 574-574-5_W.mp3
+  36: 55160ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\173-170-102-126-103-105-105-167-176-671-617-675-675-576-573-571-753_W.mp3
+  37: 56736ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\735-705-375-527 732-753-370-756-756-756-375-753-754-754-754-756-752-754-753-741-752-751-735-375-752-751-751-752-375-751-735-751-752-135-712-756-716-713-713-751-756-7_W.mp3
+  38: 58312ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\157 526-157-513-524-531-513-157-153-135-153-315-135-150_W.mp3
+  39: 59888ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\137-150-157-315-135-135-137-130-137-107-130_V.mp3
+  40: 61464ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\623-631-613-612-612-637-653-640-637-362-653-637-650-627-657-617-675-615-675-625-617-265-637-654-673-625-610-657-632-674-627-657-357-675-765-635-763-576-756-763-657-7_W.mp3
+  41: 63040ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\157-157-103-175 513-512-157-157-156-571-571-157-157-571-157-571-157-315_W.mp3
+  42: 64616ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\203-263-260-132-456-102-326-143 326-137-103-236-230-203-613-360-136-310 162-103-132-263-260-301-123-307-320-617-103-567-201-321-267-260-206-320-320-620-542-325-102-1_V.mp3
+  43: 66192ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\130-136-136-316-317-137-167-176-137-137 715-735 735-735-175-763-751-731_W.mp3
+  44: 67768ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\102 764-745-754-576-573-751-756-756-753-756-754-754-754-754-751-756-754-751-754-574-754-751-754-574-571-573-571-574-456-543-654-574-453-457-354-547-546-157-571-157-1_W.mp3
+  45: 69344ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\465-607-260-264-260-206-320-260-657-260-260-123-103-320-450-312-103-102-106-260-260-260-267-230-130-306-301-132-310-260-267-326-310-456-645-546-547-506-564-326-120-3_V.mp3
+  46: 70920ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\617-632-612-657-627-621-367-625-631-610-621-637-634-620-620-621-637-623-637-632-621-610-670-635-627-601-621-610-617-640-635-601-620-651-624-621-624-617-621-623-632-6_W.mp3
+  47: 72496ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\175-713-173-571-715-157-175-751-715-137-175-175-170-170-173-105-107-175-170-170-107-715-173-175 715-175-715-157-715-175-751-175-137-107-137-175-175-170-175-173-173-1_W.mp3
+  48: 74072ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\175-705-705-705-701-751-107-175-715-170-715-750-701-750-170-710-175-751_V.mp3
+  49: 75648ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\547-547-154-517-514-541-567-657-504-514-517-501-507-105-510-150-105-751-571-571-751-571-751-751-751-752-751-715-175-157-157-517-157-517-157-157-157-153-153-157-517-1_W.mp3
+  50: 77224ms, 576ms, D:\GitHub\WKAppBot\bin\wkappbot.hq\profiles\whisper_exp\wav\_unknown\107-203-206-310-320-310-103-103-103-103-103-321-413-625-654-312-103-317-132-613-213-126-130-310-164-312-341-362-310-130-132-310-120-102-103-123-201-123-123-132-126-1_V.mp3
+
+=== Raw Response ===
+[
+{
+"segment": 1,
+"transcript": "안녕 오늘 날씨가 참 좋다",
+"speaker": "speaker_1",
+"confidence": 0.98,
+"language": "ko",
+"silence_before_ms": 40,
+"audio_type": "speech",
+"words": [
+{"word": "안녕", "start_ms": 40, "dur_ms": 120, "phase_lr_deg": 0.0},
+{"word": "오늘", "start_ms": 180, "dur_ms": 110, "phase_lr_deg": 0.0},
+{"word": "날씨가", "start_ms": 300, "dur_ms": 130, "phase_lr_deg": 0.0},
+{"word": "참", "start_ms": 440, "dur_ms": 60, "phase_lr_deg": 0.0},
+{"word": "좋다", "start_ms": 510, "dur_ms": 66, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 2,
+"transcript": "What is your name?",
+"speaker": "speaker_2",
+"confidence": 0.97,
+"language": "en",
+"silence_before_ms": 60,
+"audio_type": "speech",
+"words": [
+{"word": "What", "start_ms": 60, "dur_ms": 100, "phase_lr_deg": -5.0},
+{"word": "is", "start_ms": 170, "dur_ms": 80, "phase_lr_deg": -5.0},
+{"word": "your", "start_ms": 260, "dur_ms": 120, "phase_lr_deg": -5.0},
+{"word": "name?", "start_ms": 390, "dur_ms": 186, "phase_lr_deg": -5.0}
+]
+},
+{
+"segment": 3,
+"transcript": "만나서 반가워요",
+"speaker": "speaker_1",
+"confidence": 0.96,
+"language": "ko",
+"silence_before_ms": 55,
+"audio_type": "speech",
+"words": [
+{"word": "만나서", "start_ms": 55, "dur_ms": 220, "phase_lr_deg": 0.0},
+{"word": "반가워요", "start_ms": 290, "dur_ms": 286, "phase_lr_deg": 0.0}
+]
+},
+{
+"segment": 4,
+"transcript": "It is a beautiful day.",
+"speaker": "speaker_2",
+"confidence": 0.98,
+"language": "en",
+"silence_before_ms": 45,
+"audio_type": "speech",
+"words": [
+{"word": "It", "start_ms": 45, "dur_ms": 60, "phase_lr_deg": -5.0},
+{"word": "is", "start_ms": 115, "dur_ms": 70, "phase_lr_deg": -5.0},
+{"word": "a", "start_ms": 195, "dur_ms": 40, "phase_lr_deg": -5.0},
+{"word": "beautiful", "start_ms": 245, "dur_ms": 210, "phase_lr_deg": -5.0},
+{"word": "day.", "start_ms": 465, "dur_ms": 111, "phase_lr_deg": -5.0}
+]
+},
+{
+"segment": 5,
+"transcript": "한국어 공부를 시작해요",
+"speaker": "speaker_1",
+"confidence": 0.95,
+"language": "ko",
+"silence_before_ms": 70,
+"audio_type": "speech",
+"words": [
+{"word": "한국어", "start_ms": 70, "dur_ms": 180, "phase_lr_deg": 0.0},
+{"word": "공부를", "start_ms": 260, "dur_ms": 140, "phase_lr_deg": 0.0},
+{"word": "시작해요", "start_ms": 410, "dur_ms": 166, "phase_lr_deg": 0.0}
+]대답이 중지되었습니다.
