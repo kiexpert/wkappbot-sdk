@@ -28,7 +28,11 @@ bin/wkappbot.hq/sessions/
 bin/wkappbot.hq/skills/
 !bin/wkappbot.hq/skills/
 bin/wkappbot.hq/handlers/
-!bin/wkappbot.hq/experience/
+# experience/: Eye writes continuously (CCA+UIA fused match learning).
+# Causes git rebase/push races. Use `git add -f bin/wkappbot.hq/experience/` for periodic snapshot.
+bin/wkappbot.hq/experience/
+!bin/wkappbot.hq/experience/tests/
+!bin/wkappbot.hq/experience/tests/**
 !bin/wkappbot.hq/suggestions.jsonl
 !bin/wkappbot.hq/profiles/
 bin/wkappbot.hq/profiles/*/wav/
