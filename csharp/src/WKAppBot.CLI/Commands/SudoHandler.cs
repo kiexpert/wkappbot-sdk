@@ -36,9 +36,17 @@ internal static class SudoHandler
         if (ElevatedEyeClient.Ping(100))
         {
             PulseStep.Line("SudoHandler: admin Eye alive -- reuse, no hot-swap, no spawn");
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine("[SUDO] admin Eye alive -- reusing existing instance");
-            Console.ResetColor();
+            // Print "reusing" line only when --sudo was typed explicitly by the user,
+            // not when Launcher auto-inherited it. Auto-inherit sets WKAPPBOT_SUDO_AUTO=1.
+            // This keeps `wkappbot chat --help` etc. quiet while still giving feedback
+            // to intentional `wkappbot <cmd> --sudo` invocations.
+            bool explicitSudo = Environment.GetEnvironmentVariable("WKAPPBOT_SUDO_AUTO") != "1";
+            if (explicitSudo)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Error.WriteLine("[SUDO] admin Eye alive -- reusing existing instance");
+                Console.ResetColor();
+            }
             return true;
         }
 

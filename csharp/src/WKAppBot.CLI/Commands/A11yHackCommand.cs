@@ -60,6 +60,10 @@ internal partial class Program
         var hackLog = Console.Error;
         PulseStep.Init("a11y-hack");
 
+        // Snapshot foreground window BEFORE any UIA/capture work -- hack must be focusless;
+        // if any step accidentally steals foreground, we restore at exit.
+        var prevFgHack = NativeMethods.GetForegroundWindow();
+
         // Parse grap#scope
         var grapFull = string.Join(" ", args.TakeWhile(a => !a.StartsWith("--")));
         var hashIdx = grapFull.IndexOf('#');
@@ -75,9 +79,20 @@ internal partial class Program
             hackLog.WriteLine($"[HACK] No window found: \"{grap}\"");
             return 1;
         }
-        var win = targets.First();
+        // Ambiguity: if grap alone matches multiple windows and no explicit scope/rect narrows it down,
+        // delegate to a11y find output so the caller sees the candidates (same pattern as a11y close etc).
+        var targetList = targets.ToList();
+        if (targetList.Count > 1 && !hasExplicitScope && atRect == null && atX == null)
+        {
+            hackLog.WriteLine($"[HACK] Ambiguous grap \"{grap}\" matched {targetList.Count} windows -- delegating to a11y find:");
+            foreach (var t in targetList.Take(10))
+                hackLog.WriteLine($"  0x{t.Handle.ToInt64():X8}  \"{t.Title}\"");
+            hackLog.WriteLine($"[HACK] Narrow with #scope or --ltrb/--at. Aborting focusless (no capture, no UIA drill).");
+            return 2;
+        }
+        var win = targetList.First();
         var hwnd = win.Handle;
-        hackLog.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\"");
+        hackLog.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\" grap=\"{grapFull}\"");
         PulseStep.Mark("target-found");
 
         // If #scope specified, find UIA element and use its BoundingRectangle
@@ -520,6 +535,23 @@ internal partial class Program
 
         bmp.Dispose();
         if (!_hackHoverAnalyzing) liveOverlay?.Hide();
+
+        // Focus-steal recovery: if anything along the UIA/capture path activated a window,
+        // restore the original foreground. Hack is contractually focusless.
+        try
+        {
+            if (prevFgHack != IntPtr.Zero)
+            {
+                var curFg = NativeMethods.GetForegroundWindow();
+                if (curFg != prevFgHack)
+                {
+                    Console.Error.WriteLine($"[HACK] Focus steal detected: was=0x{prevFgHack.ToInt64():X8} now=0x{curFg.ToInt64():X8} -- restoring");
+                    NativeMethods.ForceForegroundWindow(prevFgHack);
+                }
+            }
+        }
+        catch { }
+
         PulseStep.Done();
         return 0;
     }
