@@ -1140,6 +1140,19 @@ public sealed class ActionExecutor : IDisposable
 
         if (success)
         {
+            // Close: check if process still alive after 500ms — modal dialog may have blocked close
+            if (action == "close")
+            {
+                Thread.Sleep(500);
+                var dialogInfo = DetectModalDialogAfterClose(element);
+                if (dialogInfo != null)
+                {
+                    result.Status = StepStatus.Fail;
+                    result.Message = dialogInfo;
+                    Log($"  [CLOSE-GUARD] {dialogInfo}");
+                    return;
+                }
+            }
             result.ActionDetail = $"Window {action} {elemDesc} ({method}, focusless)";
             Log($"  Window {action} via UIA ({method}, focusless)");
             return;
@@ -1150,12 +1163,74 @@ public sealed class ActionExecutor : IDisposable
         {
             EnsureFocus();
             KeyboardInput.Hotkey(new[] { "alt", "F4" });
+            Thread.Sleep(500);
+            var dialogInfo = DetectModalDialogAfterClose(element);
+            if (dialogInfo != null)
+            {
+                result.Status = StepStatus.Fail;
+                result.Message = dialogInfo;
+                Log($"  [CLOSE-GUARD] {dialogInfo}");
+                return;
+            }
             result.ActionDetail = $"Window close {elemDesc} (Alt+F4 fallback)";
             Log($"  Window close via Alt+F4 fallback");
             return;
         }
 
         throw new InvalidOperationException($"Window {action} failed for {elemDesc}");
+    }
+
+    /// <summary>
+    /// After window_close, check if the process is still alive (modal dialog blocking close).
+    /// If alive, scan for dialog UIA children (buttons) and return a descriptive error
+    /// so the caller/AI can decide which button to invoke.
+    /// Returns null if process exited cleanly; error string if dialog detected.
+    /// </summary>
+    private string? DetectModalDialogAfterClose(AutomationElement closedElement)
+    {
+        try
+        {
+            // Check if the element's window still exists
+            var hwnd = closedElement.Properties.NativeWindowHandle.ValueOrDefault;
+            if (hwnd == IntPtr.Zero) return null;
+            if (!NativeMethods.IsWindow(hwnd)) return null; // window gone — clean close
+
+            // Window still present → likely a modal dialog appeared
+            // Walk UIA children to find dialog + its buttons
+            var buttons = new List<string>();
+            try
+            {
+                var walker = closedElement.Automation.TreeWalkerFactory.GetControlViewWalker();
+                void ScanForButtons(AutomationElement parent, int depth)
+                {
+                    if (depth > 4) return;
+                    var child = walker.GetFirstChild(parent);
+                    while (child != null)
+                    {
+                        try
+                        {
+                            var ct = child.Properties.ControlType.ValueOrDefault;
+                            var name = child.Properties.Name.ValueOrDefault ?? "";
+                            if (ct == FlaUI.Core.Definitions.ControlType.Button && !string.IsNullOrEmpty(name))
+                                buttons.Add(name);
+                            ScanForButtons(child, depth + 1);
+                        }
+                        catch { }
+                        try { child = walker.GetNextSibling(child); } catch { break; }
+                    }
+                }
+                ScanForButtons(closedElement, 0);
+            }
+            catch { }
+
+            if (buttons.Count > 0)
+            {
+                var btnList = string.Join("] [", buttons);
+                return $"Modal dialog blocking close — buttons: [{btnList}]. Use: a11y invoke \"*{buttons[0]}*\" to dismiss.";
+            }
+            return "Window still alive after close — possible modal dialog (no buttons found via UIA)";
+        }
+        catch { return null; }
     }
 
     // ── Element location (5-tier chain) ────────────────────────
