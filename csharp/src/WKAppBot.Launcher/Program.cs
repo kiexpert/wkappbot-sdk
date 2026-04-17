@@ -441,7 +441,10 @@ partial class Program
                 probePipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
                 if (probePipe.IsConnected)
                 {
-                    Console.Error.WriteLine("[LAUNCHER:SESSION] admin Eye alive -- auto-inheriting --sudo");
+                    // Silent auto-inherit (no stderr line) -- reduces noise on common commands.
+                    // Explicit `wkappbot ... --sudo` still prints "[SUDO] admin Eye alive -- reusing..."
+                    // from Core; auto-inherit path sets WKAPPBOT_SUDO_AUTO=1 to suppress that too.
+                    Environment.SetEnvironmentVariable("WKAPPBOT_SUDO_AUTO", "1");
                     forwardArgs = forwardArgs.Append("--sudo").ToArray();
                     relayArgs = forwardArgs;
                 }
