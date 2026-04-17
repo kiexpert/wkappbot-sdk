@@ -148,6 +148,27 @@ internal partial class Program
                 Console.Error.WriteLine($"[ASK:FOCUS] still retrying @ {step} attempt={attempt} elapsed={sw.ElapsedMilliseconds}ms");
         }
 
+        // Last-resort: if Chrome keeps re-stealing, minimize it so Windows hands foreground
+        // to the next Z-order window (usually prevFg). User-visible but reliable.
+        if (!restored && cdp != null)
+        {
+            try
+            {
+                var chromeHwnd = cdp.GetChromeWindowHandle();
+                var stuckFg = NativeMethods.GetForegroundWindow();
+                if (chromeHwnd != IntPtr.Zero && stuckFg == chromeHwnd)
+                {
+                    Console.Error.WriteLine($"[ASK:FOCUS] last-resort: minimizing Chrome to release foreground");
+                    cdp.MinimizeChrome();
+                    await Task.Delay(100);
+                    NativeMethods.ForceForegroundWindow(prevFg);
+                    await Task.Delay(100);
+                    restored = NativeMethods.GetForegroundWindow() == prevFg;
+                }
+            }
+            catch (Exception ex) { Console.Error.WriteLine($"[ASK:FOCUS] last-resort error: {ex.Message}"); }
+        }
+
         if (restored)
         {
             Console.ForegroundColor = ConsoleColor.Green;
