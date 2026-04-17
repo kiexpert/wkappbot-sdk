@@ -386,9 +386,13 @@ partial class Program
         // without the user having to re-type --sudo. To end the session, kill admin Eye
         // (wkappbot a11y kill …). Matches shell sudo semantics.
         //
-        // Skip auto-inherit for Eye daemon itself (would re-entrantly hit admin path) and
-        // for commands already carrying --sudo (nothing to add).
-        if (!forwardArgs.Any(a => a == "--sudo") && !isEyeDaemon)
+        // Skip auto-inherit for:
+        //   - Eye daemon (re-entrant admin path)
+        //   - Already --sudo
+        //   - CDP-dependent commands (ask, web, agent, newchat) — these need local Chrome
+        //     access which admin Eye's subprocess context cannot provide
+        var isCdpCommand = cmd is "ask" or "web" or "agent" or "newchat";
+        if (!forwardArgs.Any(a => a == "--sudo") && !isEyeDaemon && !isCdpCommand)
         {
             try
             {
