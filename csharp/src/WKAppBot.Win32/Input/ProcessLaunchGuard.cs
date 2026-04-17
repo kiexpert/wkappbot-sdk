@@ -96,23 +96,37 @@ public static class ProcessLaunchGuard
         {
             // 포커스 강탈 감지!
             _knownFocusStealers.Add(exeName);
+            var targetHwnd = fgAfter; // the launched window that stole focus
 
             Console.Error.WriteLine(
                 $"[LAUNCH-GUARD:{tag}] ✖ '{exeName}' 이 포커스를 강탈했습니다!");
             Console.Error.WriteLine(
                 $"  before=0x{fgBefore:X8}, after=0x{fgAfter:X8}");
             Console.Error.WriteLine(
-                $"  → 이 프로그램은 포커스 강탈자로 등록됩니다. 다음 실행 시 사전 경고합니다.");
-            Console.Error.WriteLine(
-                $"  → 포커스 복원 중...");
+                $"  → 포커스 강탈자로 등록. 포커스 복원 + 뒤배치 중...");
 
-            // 원래 포커스 복원 (raw SetForegroundWindow — 복원이라 guard 우회 허용)
+            // Restore: user fg back on top, launched window placed right behind it.
+            // SetWindowPos(target, fgBefore, ...) positions target AFTER fgBefore in Z-order.
+            // SWP_NOACTIVATE ensures no focus flip-flop during repositioning.
             if (fgBefore != IntPtr.Zero)
+            {
                 NativeMethods.SetForegroundWindow(fgBefore);
+                PlaceBehind(targetHwnd, fgBefore, tag);
+            }
         }
         else
         {
-            Console.WriteLine($"[LAUNCH-GUARD:{tag}] '{exeName}' 포커스 변화 없음 ✓");
+            // No focus steal — but still position launched window behind user fg
+            // for consistency (focusless-first: launched app visible but not intrusive)
+            if (proc.MainWindowHandle != IntPtr.Zero && fgBefore != IntPtr.Zero)
+            {
+                PlaceBehind(proc.MainWindowHandle, fgBefore, tag);
+                Console.WriteLine($"[LAUNCH-GUARD:{tag}] '{exeName}' 포커스 변화 없음 ✓ (뒤배치 완료)");
+            }
+            else
+            {
+                Console.WriteLine($"[LAUNCH-GUARD:{tag}] '{exeName}' 포커스 변화 없음 ✓");
+            }
         }
 
         return proc;
@@ -128,4 +142,24 @@ public static class ProcessLaunchGuard
     /// </summary>
     public static void RegisterKnownStealer(string exeName) =>
         _knownFocusStealers.Add(exeName);
+
+    /// <summary>
+    /// Place a window right behind another in Z-order without activating.
+    /// User keeps their focus; target is visible but non-intrusive.
+    /// </summary>
+    private static void PlaceBehind(IntPtr targetHwnd, IntPtr inFrontHwnd, string tag)
+    {
+        try
+        {
+            // SetWindowPos insertAfter=inFrontHwnd positions target BELOW inFrontHwnd in Z-order.
+            NativeMethods.SetWindowPos(targetHwnd, inFrontHwnd,
+                0, 0, 0, 0,
+                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE);
+            Console.Error.WriteLine($"[LAUNCH-GUARD:{tag}] 유저 창 뒤에 배치 완료 (0x{targetHwnd:X8} behind 0x{inFrontHwnd:X8})");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[LAUNCH-GUARD:{tag}] PlaceBehind failed: {ex.Message}");
+        }
+    }
 }
