@@ -44,6 +44,9 @@ partial class Program
             try
             {
                 // [FOCUS-GUARD] Capture foreground before wt.exe launch; restore if stolen.
+                // Direct Process.Start (not AppBotPipe) because UseShellExecute=true is required
+                // for Windows Terminal to attach to the existing WT process / open a new tab.
+                // AppBotPipe.StartTracked explicitly blocks UseShellExecute=true without Verb.
                 var fgBeforeWt = FocusGuard.GetForegroundWindow();
                 Process.Start(new ProcessStartInfo
                 {
