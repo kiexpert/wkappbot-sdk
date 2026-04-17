@@ -468,12 +468,43 @@ internal partial class Program
                     bool justHitRateLimit = false;
                     if (claudeStatus.Item1 == "rate_limit")
                     {
-                        justHitRateLimit = !state.WasRateLimited;
-                        state.WasRateLimited = true;
-                        if (state.RateLimitDetectedAt == null)
-                            state.RateLimitDetectedAt = DateTime.Now;
+                        // Stale-UI guard: Claude Desktop often keeps the "한도 초과 -- HH:mm에
+                        // 리셋" banner visible well after the reset time has passed, so the
+                        // detector keeps returning rate_limit. Re-alerting on that stale text
+                        // spams Slack long after the actual limit cleared. If the parsed reset
+                        // time is already in the past, treat it as stale and skip alerting.
                         var resetDt = GetResetTimeFromDisplayText(claudeStatus.Item2);
-                        if (resetDt != null) state.RateLimitResetTime = resetDt;
+                        bool stale = resetDt != null && DateTime.Now >= resetDt.Value;
+                        if (stale)
+                        {
+                            // Quietly clear any in-flight alert; do NOT fire a new one.
+                            if (state.WasRateLimited)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.Error.WriteLine($"[EYE] {label}Rate limit banner stale (reset {resetDt:HH:mm} already passed) -- clearing state");
+                                Console.ResetColor();
+                                state.WasRateLimited = false;
+                                state.RateLimitDetectedAt = null;
+                                state.RateLimitResetTime = null;
+                                if (state.RateLimitAlertMsgTs != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
+                                {
+                                    try { Task.Run(async () => await SlackDeleteMessageAsync(slackBotToken!, slackChannel!, state.RateLimitAlertMsgTs!, guardThreadStarter: true)).Wait(3000); }
+                                    catch { }
+                                    state.RateLimitAlertMsgTs = null;
+                                }
+                            }
+                            // Do not set WasRateLimited back to true here -- leave state cleared
+                            // so downstream logic treats this tick as "cleared". justHitRateLimit
+                            // stays false so no alert fires.
+                        }
+                        else
+                        {
+                            justHitRateLimit = !state.WasRateLimited;
+                            state.WasRateLimited = true;
+                            if (state.RateLimitDetectedAt == null)
+                                state.RateLimitDetectedAt = DateTime.Now;
+                            if (resetDt != null) state.RateLimitResetTime = resetDt;
+                        }
                     }
                     else if (state.WasRateLimited)
                     {
