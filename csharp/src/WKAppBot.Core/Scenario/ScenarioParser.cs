@@ -143,11 +143,25 @@ public static class ScenarioParser
                 // direction and amount optional
                 break;
 
+            // UIA pattern actions (all focusless — no SendInput needed)
+            case "toggle":
+            case "expand":
+            case "collapse":
+            case "select":
+            case "set_range":
+            case "invoke":
+            case "set_value":
+            case "window_close":
+            case "window_minimize":
+            case "window_maximize":
+                break;
+
             default:
                 throw new ScenarioParseException(
                     $"steps[{index}]: unknown action '{step.Action}'. " +
                     "Valid: click, double_click, right_click, type_text, press_key, hotkey, " +
-                    "wait, screenshot, assert, scroll");
+                    "wait, screenshot, assert, scroll, toggle, expand, collapse, select, " +
+                    "set_range, invoke, set_value, window_close, window_minimize, window_maximize");
         }
     }
 }
