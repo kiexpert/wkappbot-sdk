@@ -5,6 +5,16 @@
 // ALL process creation MUST go through this class:
 //   Low-level:  AppBotPipe.CreateProcess(...)   -- raw CreateProcessW with null-CWD guard
 //   High-level: AppBotPipe.Spawn(...)           -- Process.Start replacement, also uses CreateProcessW guard
+//   .NET API:   AppBotPipe.StartTracked(psi)    -- Process.Start wrapper with CWD + focus guard
+//
+// Partial-class siblings (same static class, separate files):
+//   AppBotPipe.Admin.cs    -- IsElevated (cached), AdminPing, AdminExecute, EnsureAdmin
+//   AppBotPipe.HotSwap.cs  -- PromoteNewExeIfPending, TryRenameSwap
+//
+// Admin token inheritance: CreateProcessW without explicit token creation inherits
+// the caller's primary token, which means an elevated parent spawns elevated
+// children by default. All three entry points above rely on this. No special
+// code is needed to "propagate admin" -- it is the Windows default.
 
 using System.Runtime.InteropServices;
 
@@ -12,7 +22,7 @@ using System.Runtime.InteropServices;
 /// Guarded CreateProcessW + high-level Spawn().
 /// Null CWD guard: DETACHED_PROCESS with null lpCurrentDirectory defaults to C:\Windows\System32.
 /// </summary>
-internal static class AppBotPipe
+internal static partial class AppBotPipe
 {
     // Verbose: show CreateProcessW diagnostics only when explicitly requested.
     // Normal tool runs should stay quiet; failures still surface below.

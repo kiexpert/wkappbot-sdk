@@ -32,16 +32,8 @@ internal partial class Program
         EyeCmdPipeServer.DispatchBg(["suggest", bugText]);
     }
     internal static bool ReadOnlyMode = false;
-    internal static bool IsElevated()
-    {
-        try
-        {
-            using var id = System.Security.Principal.WindowsIdentity.GetCurrent();
-            return new System.Security.Principal.WindowsPrincipal(id)
-                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
-        }
-        catch { return false; }
-    }
+    // Delegates to AppBotPipe.IsElevated() which caches per-process.
+    internal static bool IsElevated() => AppBotPipe.IsElevated();
     internal static string? RelayFilePath = null;
     static string? _exitFilePath = null;
     static string? _exitEventName = null;
@@ -83,6 +75,15 @@ internal partial class Program
         bool _profiling = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
         Action<string> prof = _profiling ? (label => { try { Console.Error.WriteLine($"[PROFILE] {_mainStarted.ElapsedMilliseconds}ms {label}"); } catch { } }) : (_ => { });
         prof("Main() entered");
+
+        // Register Core's admin implementation so AppBotPipe.AdminPing / AdminExecute /
+        // EnsureAdmin route to the full Core logic (SudoHandler + ElevatedEyeClient).
+        // Launcher does not install impl -- AppBotPipe.AdminPing there falls back to
+        // a bare named-pipe probe (no UAC / no proxy execution).
+        AppBotPipe.SetAdminImpl(
+            adminPing: ElevatedEyeClient.Ping,
+            adminExecute: ElevatedEyeClient.ExecuteViaProxy,
+            ensureAdmin: SudoHandler.EnsureAdminForSudo);
         {
             if (args.Length >= 2 && args[0].ToLowerInvariant() == "grap" && args[1].ToLowerInvariant() is "save" or "list" or "show" or "remove" or "rm" or "delete" or "del" or "verify")
             {
