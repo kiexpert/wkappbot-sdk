@@ -10,11 +10,11 @@ namespace WKAppBot.Win32.Input;
 /// (MouseInput, KeyboardInput, SmartSetForegroundWindow) so no caller can bypass them.
 ///
 /// Usage:
-///   FocuslessGuard.Enabled = true;  // CLI에서 --force-focusless 파싱 시
+///   NativeHookFocusless.Enabled = true;  // CLI에서 --force-focusless 파싱 시
 ///   MouseInput.Click(x, y);         // -> FocuslessViolationException!
 ///   UiaLocator.TryInvoke(el);       // -> OK (UIA Invoke는 focusless)
 /// </summary>
-public static class FocuslessGuard
+public static class NativeHookFocusless
 {
     private static volatile bool _enabled;
 

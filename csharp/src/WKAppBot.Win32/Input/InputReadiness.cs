@@ -1074,17 +1074,17 @@ public sealed class InputReadiness
     private static void ProbeSendInput(bool targetElevated, bool weAreElevated, List<InputMethod> methods)
     {
         bool elevOk = !targetElevated || weAreElevated;
-        bool focuslessBlocked = FocuslessGuard.Enabled;
+        bool focuslessBlocked = NativeHookFocusless.Enabled;
 
         // Mouse click via SendInput
         methods.Add(new InputMethod("SendInput.Mouse", InputMethodCategory.SendInput, false,
             elevOk && !focuslessBlocked,
-            !elevOk ? "Elevation mismatch" : focuslessBlocked ? "FocuslessGuard active" : null));
+            !elevOk ? "Elevation mismatch" : focuslessBlocked ? "NativeHookFocusless active" : null));
 
         // Keyboard via SendInput
         methods.Add(new InputMethod("SendInput.Keyboard", InputMethodCategory.SendInput, false,
             elevOk && !focuslessBlocked,
-            !elevOk ? "Elevation mismatch" : focuslessBlocked ? "FocuslessGuard active" : null));
+            !elevOk ? "Elevation mismatch" : focuslessBlocked ? "NativeHookFocusless active" : null));
     }
 
     // -- Private: 액션별 포커스 필요 판단 --------------------------

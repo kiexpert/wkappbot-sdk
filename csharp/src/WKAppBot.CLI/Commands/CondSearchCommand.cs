@@ -69,7 +69,7 @@ internal partial class Program
         // --force-focusless: globally block all focus-stealing operations
         if (forceFocusless)
         {
-            FocuslessGuard.Enabled = true;
+            NativeHookFocusless.Enabled = true;
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("[FOCUSLESS] Guard enabled -- SetCursorPos/SendInput/SetForeground blocked");
             Console.ResetColor();
@@ -663,8 +663,8 @@ internal partial class Program
         // === Approach 1: SetCursorPos + WM_SETFOCUS + PostMessage ===
         Console.WriteLine("  [Approach 1] SetCursorPos + WM_SETFOCUS + PostMessage dblclk...");
 
-        // FocuslessGuard check
-        if (FocuslessGuard.IsBlocked("SetCursorPos (MFC tree GetCursorPos)"))
+        // NativeHookFocusless check
+        if (NativeHookFocusless.IsBlocked("SetCursorPos (MFC tree GetCursorPos)"))
             return false;
 
         // Save + move physical cursor (MFC checks GetCursorPos!)
@@ -1042,8 +1042,8 @@ internal partial class Program
         NativeMethods.ClientToScreen(hWnd, ref pt);
         Console.WriteLine($"  Screen: ({pt.X},{pt.Y})");
 
-        // FocuslessGuard: SetCursorPos is required for this control
-        if (FocuslessGuard.IsBlocked("SetCursorPos (MFC owner-drawn control requires physical cursor)"))
+        // NativeHookFocusless: SetCursorPos is required for this control
+        if (NativeHookFocusless.IsBlocked("SetCursorPos (MFC owner-drawn control requires physical cursor)"))
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("  This MFC control calls GetCursorPos() -- cannot operate without physical cursor.");

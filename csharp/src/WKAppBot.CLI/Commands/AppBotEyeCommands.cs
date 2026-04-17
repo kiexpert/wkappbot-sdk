@@ -777,7 +777,7 @@ internal partial class Program
         // _eyeAliveMutex is static ??held for process lifetime, GC will never collect it
 
         try { Console.Title = "AppBotEye"; } catch { } // for a11y close targeting (safe: no console in DETACHED)
-        WKAppBot.Win32.Input.ProcessLaunchGuard.IsEyeProcess = true; // Eye daemon ??skip focus guard
+        WKAppBot.Win32.Input.NativeHookLaunch.IsEyeProcess = true; // Eye daemon ??skip focus guard
 
         // Elevated proxy mode: if running as admin, start Named Pipe server alongside Eye
         bool elevated = args.Any(a => a == "--elevated") || ElevationHelper.IsElevated();

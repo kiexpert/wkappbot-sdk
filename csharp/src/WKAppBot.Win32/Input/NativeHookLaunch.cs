@@ -22,7 +22,7 @@ namespace WKAppBot.Win32.Input;
 /// ! 외부 프로그램 실행 코드 -> 반드시 Process.Start() 대신 GuardedStart() 사용!
 /// ----------------------------------------------------------------------------─
 /// </summary>
-public static class ProcessLaunchGuard
+public static class NativeHookLaunch
 {
     /// <summary>
     /// Set to true when this process IS the Eye daemon.

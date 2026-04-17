@@ -227,8 +227,8 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard -- verify focus after SetFocus
-                var guard1 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
+                // NativeHookInputFocus -- verify focus after SetFocus
+                var guard1 = new NativeHookInputFocus(targetHwnd, win.Handle, maxRetries: 3);
 
                 // Bring parent window to foreground
                 NativeMethods.SmartSetForegroundWindow(win.Handle);
