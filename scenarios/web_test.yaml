@@ -24,7 +24,7 @@ steps:
       automation_id: "result"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Hello from WKAppBot"
 
   # ── 2. Counter (3x click) ──
@@ -74,7 +74,7 @@ steps:
       automation_id: "result"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Hello AppBot"
 
   # ── 4. Progress bar ──
@@ -120,7 +120,7 @@ steps:
       automation_id: "result"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "x 2 ="
 
   # ── 7. Reset ──
@@ -134,5 +134,5 @@ steps:
       automation_id: "result"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "Ready"

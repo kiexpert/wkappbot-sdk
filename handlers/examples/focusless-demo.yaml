@@ -25,7 +25,7 @@ steps:
       control_type: "Edit"
     params: { text: "This text was typed WITHOUT stealing your focus.\nYou can keep working in your editor.\nWKAppBot uses UIA COM ValuePattern — not SendInput." }
     expect:
-      condition: text_contains
+      condition: value_contains
       target:
         control_type: "Edit"
         description: "Notepad editor"
@@ -43,7 +43,7 @@ steps:
       name: "텍스트 편집기;Text editor"
       control_type: "Edit"
     params:
-      type: text_contains
+      type: value_contains
       expected: "WITHOUT stealing"
 
   # Step 3: Focusless window close — UIA WindowPattern.Close(), no Alt+F4 needed

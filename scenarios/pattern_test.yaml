@@ -50,7 +50,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "42"
 
   # ── ExpandCollapse pattern: open nav menu (focusless!) ──
@@ -81,7 +81,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "42"
 
   # ── Window close via Invoke on Close button (focusless!) ──

@@ -57,7 +57,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "42"
 
   - name: "[Addition] Screenshot"
@@ -104,7 +104,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "63"
 
   - name: "[Subtraction] Screenshot"
@@ -151,7 +151,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "96"
 
   - name: "[Multiplication] Screenshot"
@@ -198,7 +198,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: text_contains
+      type: value_contains
       expected: "12"
 
   - name: "[Division] Screenshot"

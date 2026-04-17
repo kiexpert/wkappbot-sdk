@@ -76,7 +76,7 @@ steps:
       automation_id: "CalculatorResults"
     action: assert
     params:
-      type: "text_contains"
+      type: "value_contains"
       expected: "${expected}"
 
   - name: "Capture result screenshot"
