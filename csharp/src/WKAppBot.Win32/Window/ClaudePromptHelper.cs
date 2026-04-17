@@ -131,30 +131,19 @@ public sealed partial class ClaudePromptHelper : IDisposable
             string? occludedBy = null;
             if (promptVisible)
             {
-                if (NativeMethods.TryGetCurrentCursorRect(out var cursorRect))
+                var cx = promptRect.Left + (promptRect.Width / 2);
+                var cy = promptRect.Top + (promptRect.Height / 2);
+                var pt = new POINT { X = cx, Y = cy };
+                var leaf = NativeMethods.WindowFromPoint(pt);
+                if (leaf != IntPtr.Zero)
                 {
-                    var fullyContainsCursor = promptRect.Contains(cursorRect);
-                    if (!fullyContainsCursor)
+                    var top = NativeMethods.GetAncestor(leaf, NativeMethods.GA_ROOT);
+                    if (top == IntPtr.Zero) top = leaf;
+                    if (top != IntPtr.Zero && top != pi.WindowHandle)
                     {
-                        occludedBy = $"cursor-rect 0x{cursorRect.X:X},{cursorRect.Y:X},{cursorRect.Width}x{cursorRect.Height}";
-                    }
-                    else
-                    {
-                        var cx = cursorRect.Left + (cursorRect.Width / 2);
-                        var cy = cursorRect.Top + (cursorRect.Height / 2);
-                        var pt = new POINT { X = cx, Y = cy };
-                        var leaf = NativeMethods.WindowFromPoint(pt);
-                        if (leaf != IntPtr.Zero)
-                        {
-                            var top = NativeMethods.GetAncestor(leaf, NativeMethods.GA_ROOT);
-                            if (top == IntPtr.Zero) top = leaf;
-                            if (top != IntPtr.Zero && top != pi.WindowHandle)
-                            {
-                                var cls = WindowFinder.GetClassName(top);
-                                var title = WindowFinder.GetWindowText(top);
-                                occludedBy = $"0x{top:X} {cls} \"{TrimForLog(title, 80)}\"";
-                            }
-                        }
+                        var cls = WindowFinder.GetClassName(top);
+                        var title = WindowFinder.GetWindowText(top);
+                        occludedBy = $"0x{top:X} {cls} \"{TrimForLog(title, 80)}\"";
                     }
                 }
             }
