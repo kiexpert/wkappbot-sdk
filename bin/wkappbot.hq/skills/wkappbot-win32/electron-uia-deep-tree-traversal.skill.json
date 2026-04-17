@@ -1,0 +1,22 @@
+﻿{
+    "id":  "electron-uia-deep-tree-traversal",
+    "app":  "wkappbot-win32",
+    "title":  "Electron UIA deep tree traversal",
+    "desc":  "FindAllDescendants() misses nodes in deep Electron UIA trees (depth ~18-20). Use recursive FindAllChildren walk with max depth 25 instead.",
+    "steps":  [
+                  "Use recursive Walk(root, depth=0, maxDepth=25)",
+                  "Call FindAllChildren at each node, recurse",
+                  "Do NOT use FindAllDescendants() for Electron targets"
+              ],
+    "tags":  [
+                 "uia",
+                 "electron",
+                 "chrome",
+                 "vscode",
+                 "depth",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:02:14.5895696Z",
+    "version":  "1.2"
+}

@@ -1,0 +1,77 @@
+﻿{
+    "id":  "grap-target",
+    "app":  "wkappbot",
+    "title":  "grap-target",
+    "desc":  "Shell-safe output contract for a11y find. Use when you need a paste-ready grap target that survives shell copy/paste, re-run verification, and code-review/debug workflows. Keep # FOCUS for the currently focused leaf path when interaction side effects matter, and keep # TARGET as the primary hwnd:0x... token with high-signal context for both Claude and Codex. Favor minimal operator options such as verify, review, and dry-run only when they improve safety or ambiguity.",
+    "steps":  [
+                  "Treat a11y find as a contract for both humans and Codex: the output must be paste-ready, shell-safe, and verifiable.",
+                  "Emit one shared # FOCUS line when the focused leaf may affect interaction, including modal/error popups; keep it as a full grap string in quotes.",
+                  "Emit one # TARGET block per match; use {..} with hwnd first, then pid/proc, then the matching field/snippet, and quote the full grap expression so it can be pasted as one argument.",
+                  "Include the matching field/snippet in a compact {match:"
+              ],
+    "tags":  [
+                 "grap",
+                 "find",
+                 "target",
+                 "window",
+                 "bash",
+                 "focus",
+                 "shell-safe",
+                 "verify",
+                 "codex",
+                 "code-review",
+                 "review",
+                 "dry-run",
+                 "operator",
+                 "project"
+             ],
+    "source_refs":  [
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yActions.Output.cs",
+                            "line":  15,
+                            "pattern":  "## FOCUS",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  569,
+                            "pattern":  "# TARGET",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  44,
+                            "pattern":  "BuildTargetGrapWithFocusPath",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.cs",
+                            "line":  140,
+                            "pattern":  "UiaLocator.QuickSearch",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+                            "line":  292,
+                            "pattern":  "foreground host",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+                            "line":  1168,
+                            "pattern":  "vscode-app",
+                            "note":  null
+                        },
+                        {
+                            "file":  "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+                            "line":  23,
+                            "pattern":  "Focus Hot-Chain",
+                            "note":  null
+                        }
+                    ],
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-08T07:01:01.1192756Z",
+    "updated":  "2026-04-08T16:48:52.229657Z",
+    "version":  "1.26"
+}

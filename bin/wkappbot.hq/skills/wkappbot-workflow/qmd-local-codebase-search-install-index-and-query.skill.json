@@ -1,0 +1,37 @@
+﻿{
+  "id": "qmd-local-codebase-search-install-index-and-query",
+  "app": "wkappbot-workflow",
+  "title": "QMD Local Codebase Search \u2014 Install, Index, and Query",
+  "desc": "QMD: BM25 \u002B vector semantic \u002B optional LLM reranking local search engine. Pre-indexes C# source, skill JSONs, and docs. Claude resolves qmd://collection/file.cs:42 references directly to file\u002Bline, cutting exploration tokens by 91%. MCP server exposes search as mcp__qmd__* tools.",
+  "steps": [
+    "[WHAT] QMD is a local search engine (BM25 \u002B vector embeddings) that pre-indexes your codebase. Claude uses it to jump directly to the right file:line instead of globbing and grepping the entire repo.",
+    "[INSTALL] Install via bun: bun install -g @tobilu/qmd. On Windows, create a wrapper: D:/SDK/bin/qmd.cmd pointing to bun.exe \u002B dist/cli/qmd.js %* . npm install also works but creates shell script wrappers that fail on Windows.",
+    "[COLLECTIONS] Add collections from the project root: qmd collection add wkappbot-src --mask **/*.cs , qmd collection add wkappbot-skills --mask **/*.skill.json , qmd collection add wkappbot-docs --mask **/*.md . Use --mask (not --glob) for glob patterns.",
+    "[CONTEXT] Add human descriptions to help Claude understand each collection: qmd context add \u0027WKAppBot C# source...\u0027 -- qmd://wkappbot-src/ . This description appears in every search result.",
+    "[EMBED] Generate vector embeddings: qmd embed . Downloads 329MB embedding model on first run (embeddinggemma-300M-Q8_0.gguf). Subsequent runs are incremental. Run after adding new files.",
+    "[SEARCH-MODES] (1) qmd search TEXT -- BM25 keyword search. Fast, no extra models. Best for identifiers, function names, exact terms. (2) qmd vsearch TEXT -- vector semantic search. Best for concept queries. Needs embedding model. (3) qmd query TEXT -- hybrid \u002B LLM expansion \u002B reranking. Best quality but downloads 2GB extra models on first run. Avoid in daily use.",
+    "[MCP] Register in .mcp.json: add \u0027qmd\u0027 server with command=bun.exe and args=[qmd.js, mcp]. Tools become available as mcp__qmd__* in Claude Code. Claude can call search/vsearch/get directly.",
+    "[CLAUDE-MD-RULE] Add to CLAUDE.md Token Efficiency section: \u0027Use qmd search before reading files -- BM25\u002Bvector pre-index of all C# \u002B skills \u002B docs (MCP: qmd)\u0027. This prevents blind globbing on every question.",
+    "[RESULTS] Result format: qmd://collection/path/file.cs:LINE -- score% -- code snippet. Pass the qmd:// URI to qmd get to see more context. Claude Code resolves these URIs to read exact file sections.",
+    "[DAILY-USE] For identifiers/function names: qmd search FunctionName . For concept queries: qmd vsearch \u0027how does hot swap work\u0027 . For multi-collection: omit --collection (searches all). Re-index after bulk edits: qmd update.",
+    "[LIMITS] qmd search may return no results for natural language full sentences -- use vsearch instead. qmd query first run is slow (2GB model download). Windows path separator in collection mask must use forward slashes."
+  ],
+  "tags": [
+    "qmd",
+    "search",
+    "pre-index",
+    "token",
+    "optimization",
+    "mcp",
+    "vector",
+    "bm25",
+    "install",
+    "workflow"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-09T04:21:53.2745818Z",
+  "updated": "2026-04-09T04:21:53.2746101Z",
+  "version": "1.0"
+}

@@ -1,0 +1,24 @@
+﻿{
+    "id":  "mts",
+    "app":  "hts-kiwoom-mts",
+    "title":  "영웅문 MTS 전체메뉴 탐색",
+    "desc":  "전체메뉴는 사이드바(ScrollView 11개 대분류)+우측 서브메뉴(ScrollView) 구조. 하단 카테고리는 스크롤 후 클릭 필요.",
+    "steps":  [
+                  "열기: a11y click \u0027adb://*heromts*#전체메뉴\u0027",
+                  "닫기: a11y click \u0027adb://*heromts*#닫기\u0027 or #뒤로가기",
+                  "사이드바 스크롤 영역: [0,230][261,1800] — swipe (130,1200)→(130,600)",
+                  "금융상품 이후 대분류는 스크롤 필수",
+                  "우측 서브메뉴도 ScrollView — 항목 많으면 스크롤"
+              ],
+    "tags":  [
+                 "android",
+                 "adb",
+                 "heromts",
+                 "navigation",
+                 "scroll",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:06:33.9531638Z",
+    "version":  "1.2"
+}

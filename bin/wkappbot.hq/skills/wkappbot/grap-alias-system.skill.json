@@ -1,0 +1,29 @@
+﻿{
+    "id":  "grap-alias-system",
+    "app":  "wkappbot",
+    "title":  "GRAP Alias System",
+    "desc":  "Named shortcuts for GRAP patterns. Save/expand @name aliases with self-healing stale hwnd. Use anywhere a grap is accepted.",
+    "steps":  [
+                  "Save alias: grap save @chatgpt {domain:\u0027chatgpt.com\u0027}",
+                  "Save by resolving window: grap save @notepad --find Notepad",
+                  "List all aliases: grap list",
+                  "Show full grap: grap show @chatgpt",
+                  "Verify all aliases (stale hwnd auto-stripped): grap verify",
+                  "Use in a11y: a11y find @chatgpt",
+                  "Suffix appended after expansion: a11y click @chatgpt#Submit",
+                  "Remove alias: grap remove @chatgpt",
+                  "Storage: wkappbot.hq/profiles/grap_aliases.json",
+                  "Self-healing: stale hwnd is stripped on expand, re-resolved via domain/proc"
+              ],
+    "tags":  [
+                 "grap",
+                 "alias",
+                 "shortcut",
+                 "project"
+             ],
+    "source_refs":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T19:10:12.8638189Z",
+    "updated":  "2026-04-07T19:10:12.8638291Z",
+    "version":  "1.1"
+}
