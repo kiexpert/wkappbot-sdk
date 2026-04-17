@@ -93,19 +93,41 @@ partial class Program
             _needsTranscode = !isUtf8Term;
             if (isUtf8Term) _consoleCodePage = 65001;
 
-            // Launcher's own Console.Out/Error writers must encode strings to the console's CP.
-            // Without this, .NET writes UTF-8 bytes by default (on CP949 conhost) -> `?` for any
-            // non-ASCII char in Launcher-emitted messages. `?` fallback keeps CP949 conhost stable
-            // and preserves Korean text (which CP949 supports natively).
+            // Launcher output encoding -- three modes:
+            //   1) stdout/stderr redirected (pipe/file/capture) -> UTF-8 (inter-process standard)
+            //   2) Interactive UTF-8 terminal (MSYS/TERM/CP65001)  -> UTF-8
+            //   3) Interactive non-UTF8 conhost (CP949 CMD)        -> CP949 with '?' fallback
+            // Korean chars survive all three (UTF-8 passthrough OR CP949 multi-byte).
+            // Chars missing from CP949 (em-dash, box drawing) degrade to '?' -- source is already
+            // ASCII-only, so this is a safety net rather than a visible behavior.
             try
             {
-                var consoleEnc = isUtf8Term
-                    ? System.Text.Encoding.UTF8
+                bool outRedir = Console.IsOutputRedirected;
+                bool errRedir = Console.IsErrorRedirected;
+                var utf8 = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+                var cpEnc = isUtf8Term
+                    ? (System.Text.Encoding)utf8
                     : System.Text.Encoding.GetEncoding(_consoleCodePage,
                         System.Text.EncoderFallback.ReplacementFallback,
                         System.Text.DecoderFallback.ReplacementFallback);
-                Console.OutputEncoding = consoleEnc;
-                try { if (!Console.IsInputRedirected) Console.InputEncoding = consoleEnc; } catch { }
+
+                // Console.OutputEncoding applies to both Console.Out and Console.Error writers
+                // when neither is redirected. When redirected, .NET opens pipe/file writers
+                // independently using OS ACP by default -- override via explicit StreamWriter.
+                if (outRedir)
+                {
+                    var sw = new System.IO.StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true };
+                    Console.SetOut(sw);
+                }
+                if (errRedir)
+                {
+                    var sw = new System.IO.StreamWriter(Console.OpenStandardError(), utf8) { AutoFlush = true };
+                    Console.SetError(sw);
+                }
+                // Interactive console writers: pick CP matching conhost (Korean via CP949 multi-byte).
+                if (!outRedir || !errRedir)
+                    Console.OutputEncoding = cpEnc;
+                try { if (!Console.IsInputRedirected) Console.InputEncoding = cpEnc; } catch { }
             }
             catch { /* best-effort: leave default if unsupported CP */ }
         }
