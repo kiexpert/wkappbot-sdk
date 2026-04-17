@@ -4,10 +4,10 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── 선배 클롣 경험 노하우 자동 방송 ──
-    // 1. knowhow.md (앱 특성 개요) — 있으면 방송, 없으면 경로 안내
-    // 2. knowhow-{action}.md (액션별) — 있으면 방송, 없으면 경로 안내
-    // 3. knowhow-failed-actions.md — 실패 시 방송 or 안내
+    // -- 선배 클롣 경험 노하우 자동 방송 --
+    // 1. knowhow.md (앱 특성 개요) -- 있으면 방송, 없으면 경로 안내
+    // 2. knowhow-{action}.md (액션별) -- 있으면 방송, 없으면 경로 안내
+    // 3. knowhow-failed-actions.md -- 실패 시 방송 or 안내
     static void BroadcastActionKnowhow(IntPtr hwnd, string action, bool success)
     {
         try
@@ -58,17 +58,17 @@ internal partial class Program
     static void ShowKnowhowHint(string path, string hint)
     {
         Console.ForegroundColor = ConsoleColor.DarkYellow;
-        Console.Error.WriteLine($"  [KNOWHOW:OS] 💌 No knowhow yet — {hint}");
+        Console.Error.WriteLine($"  [KNOWHOW:OS] 💌 No knowhow yet -- {hint}");
         Console.ForegroundColor = ConsoleColor.Gray;
-        Console.Error.WriteLine("     → Your expertise here saves future Claudes hours of trial-and-error. 🙏");
-        Console.Error.WriteLine("     → Please write what you just learned about this app/action:");
+        Console.Error.WriteLine("     -> Your expertise here saves future Claudes hours of trial-and-error. 🙏");
+        Console.Error.WriteLine("     -> Please write what you just learned about this app/action:");
         Console.ResetColor();
         Console.ForegroundColor = ConsoleColor.DarkCyan;
         Console.Error.WriteLine($"        a11y file-write \"{path}\" --text \"## Knowhow\\n- your note here\"");
         Console.ResetColor();
     }
 
-    // ── FocusStealer Knowhow Auto-Record ──
+    // -- FocusStealer Knowhow Auto-Record --
     // Called via ActionApi.OnFocusStealer when a nominally-focusless UIA action steals focus.
     // Appends a dated entry to knowhow-{action}.md for both:
     //   (window) experience/{proc}/{class}/knowhow-{action}.md
@@ -105,14 +105,14 @@ internal partial class Program
             var actionKnowhowPath = Path.Combine(expDir, $"knowhow-{action}.md");
             File.AppendAllText(actionKnowhowPath, note);
 
-            // App-level node: experience/{proc}/knowhow.md — add section only once per run
+            // App-level node: experience/{proc}/knowhow.md -- add section only once per run
             var appKnowhowPath = Path.Combine(DataDir, "experience", safeProc, "knowhow.md");
             var appNote = $"\n## FocusStealer ({action}) @ {date}\n" +
                           $"- [{className}] `{action}` steals focus. See: {actionKnowhowPath}\n";
             File.AppendAllText(appKnowhowPath, appNote);
 
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            Console.Error.WriteLine($"  [FOCUSSTEALER] Knowhow recorded → {actionKnowhowPath}");
+            Console.Error.WriteLine($"  [FOCUSSTEALER] Knowhow recorded -> {actionKnowhowPath}");
             Console.ResetColor();
         }
         catch { /* best effort */ }
@@ -127,15 +127,15 @@ internal partial class Program
         return false;
     }
 
-    // ── form_uia experience DB fallback ──
+    // -- form_uia experience DB fallback --
     // Looks up Dy-tagged elements from UIA scan saved by hack-hover.
     // Returns true=success, false=fail, null=not found (caller tries next tier).
 
-    // File-level cache: formPath → (mtime, FormExperience)
+    // File-level cache: formPath -> (mtime, FormExperience)
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime mtime, WKAppBot.Win32.Window.FormExperience form)>
         _formUiaFileCache = new(StringComparer.OrdinalIgnoreCase);
 
-    // Last-hit cache: (hwnd, uiaPath) → ControlExperience (invalidated on hwnd rect change)
+    // Last-hit cache: (hwnd, uiaPath) -> ControlExperience (invalidated on hwnd rect change)
     static (IntPtr hwnd, string uiaPath, System.Drawing.Rectangle rect, WKAppBot.Win32.Window.ControlExperience ctrl)
         _formUiaLastHit;
 
@@ -143,7 +143,7 @@ internal partial class Program
     {
         try
         {
-            // ── Last-hit fast path ──
+            // -- Last-hit fast path --
             var lh = _formUiaLastHit;
             if (lh.hwnd == hwnd && lh.uiaPath == uiaPath && lh.ctrl != null)
             {
@@ -156,7 +156,7 @@ internal partial class Program
                     int cy2 = wrFast.Top  + (int)(lh.ctrl.RelativeY * winH2) + lh.ctrl.Height / 2;
                     var lhLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
                         lh.ctrl.ClassName ?? "Node", lh.ctrl.Role, lh.ctrl.ControlId, isDynamic: true);
-                    Console.Error.WriteLine($"[A11Y] form_uia cache: \"{uiaPath}\" → {lhLabel} ({cx2},{cy2})");
+                    Console.Error.WriteLine($"[A11Y] form_uia cache: \"{uiaPath}\" -> {lhLabel} ({cx2},{cy2})");
                     return DispatchFormUiaAction(action, lhLabel, lh.ctrl, cx2, cy2);
                 }
             }
@@ -175,7 +175,7 @@ internal partial class Program
                 $"form_uia_{winCls.Replace(" ", "_")}.json");
             if (!File.Exists(formPath)) return null;
 
-            // ── File cache (mtime-invalidated) ──
+            // -- File cache (mtime-invalidated) --
             WKAppBot.Win32.Window.FormExperience? form = null;
             try
             {
@@ -224,7 +224,7 @@ internal partial class Program
 
             var dyLabel = WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(
                 best.ClassName ?? "Node", best.Role, best.ControlId, isDynamic: true);
-            Console.Error.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" → {dyLabel} ({cx},{cy})");
+            Console.Error.WriteLine($"[A11Y] form_uia hit: \"{uiaPath}\" -> {dyLabel} ({cx},{cy})");
             return DispatchFormUiaAction(action, dyLabel, best, cx, cy);
         }
         catch { return null; }

@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
-// wkappbot whisper slice — cut STT-tagged segments into per-word MP3 slices
+// wkappbot whisper slice -- cut STT-tagged segments into per-word MP3 slices
 // Reads stt_*.jsonl, extracts word timestamps, cuts with ffmpeg.
 //
 // Usage:
@@ -116,18 +116,18 @@ internal partial class Program
                     if (result == 0)
                     {
                         sliced++;
-                        Console.Error.WriteLine($"[SLICE] [{seq - 1:D4}] {word} ({durMs}ms) → {Path.GetFileName(outFile)}");
+                        Console.Error.WriteLine($"[SLICE] [{seq - 1:D4}] {word} ({durMs}ms) -> {Path.GetFileName(outFile)}");
                     }
                     else
                     {
                         errors++;
-                        Console.Error.WriteLine($"[SLICE] FAIL [{seq - 1:D4}] {word} — ffmpeg exit={result}");
+                        Console.Error.WriteLine($"[SLICE] FAIL [{seq - 1:D4}] {word} -- ffmpeg exit={result}");
                     }
                 }
             }
         }
 
-        Console.WriteLine($"\n[SLICE] Done — sliced={sliced} skipped={skipped} errors={errors} total_words={totalWords}");
+        Console.WriteLine($"\n[SLICE] Done -- sliced={sliced} skipped={skipped} errors={errors} total_words={totalWords}");
         Console.Error.WriteLine($"[SLICE] Output: {outDir}");
         return errors > 0 ? 1 : 0;
     }

@@ -95,14 +95,14 @@ internal partial class Program
                 if (File.Exists(EyeTicksPath))
                 {
                     var lines = ReadTailBytes(EyeTicksPath, 8192);
-                    // Scan in reverse — most recent first
+                    // Scan in reverse -- most recent first
                     for (int i = lines.Length - 1; i >= 0; i--)
                     {
                         if (string.IsNullOrWhiteSpace(lines[i])) continue;
                         var t = JsonSerializer.Deserialize<EyeTick>(lines[i]);
                         if (t?.HostPid > 0 && !string.IsNullOrWhiteSpace(t.HostTitle))
                         {
-                            // Found a tick with a real host (e.g. claude, Code) — adopt it
+                            // Found a tick with a real host (e.g. claude, Code) -- adopt it
                             hostPid = t.HostPid;
                             hostName = t.HostName ?? "";
                             hostTitle = t.HostTitle ?? "";
@@ -155,7 +155,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Safe wrapper for Process.MainWindowTitle — times out after <paramref name="timeoutMs"/> ms.
+    /// Safe wrapper for Process.MainWindowTitle -- times out after <paramref name="timeoutMs"/> ms.
     /// Process.MainWindowTitle calls GetWindowText (Win32) which sends WM_GETTEXT via SendMessage.
     /// For hung/not-responding windows this blocks for up to 30 seconds. This wrapper avoids that.
     /// </summary>

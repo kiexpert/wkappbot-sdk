@@ -10,17 +10,17 @@ using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Eye MCP Client — routes a11y operations to a persistent wkappbot-core.exe mcp subprocess.
+/// Eye MCP Client -- routes a11y operations to a persistent wkappbot-core.exe mcp subprocess.
 /// All UIA/Win32 memory stays in the subprocess; Eye stays lean.
 ///
 /// Protocol: JSON-RPC 2.0 over stdin/stdout pipes (same as McpCommand server).
 /// Uses "wkappbot_cli" tool with argv array for maximum flexibility.
 ///
 /// Subprocess is spawned with DETACHED_PROCESS flag (CreateProcessW) to avoid
-/// ConPTY/LPC deadlock in UIA calls — same pattern as Launcher.RunCoreDetachedNormal().
+/// ConPTY/LPC deadlock in UIA calls -- same pattern as Launcher.RunCoreDetachedNormal().
 ///
 /// Thread-safe: multiple Eye tasks can call concurrently.
-/// Auto-restart: subprocess crash → restart (max 5 within 5min).
+/// Auto-restart: subprocess crash -> restart (max 5 within 5min).
 /// </summary>
 internal static class EyeMcpClient
 {
@@ -75,7 +75,7 @@ internal static class EyeMcpClient
     /// Call a CLI command through MCP and wait for the result.
     /// argv: e.g. ["a11y","invoke","*Button*"] or ["prompt","send","name","text"]
     /// </summary>
-    /// <summary>Per-call caller context — set by EyeCmdPipeServer before CallAsync.</summary>
+    /// <summary>Per-call caller context -- set by EyeCmdPipeServer before CallAsync.</summary>
     internal static string? CurrentCallerCwd;
     internal static string? CurrentCallerHwnd;
 
@@ -126,7 +126,7 @@ internal static class EyeMcpClient
         }
         catch (OperationCanceledException)
         {
-            Console.Error.WriteLine($"[TIP] MCP timeout — command may have succeeded. Rerun or check target to confirm.");
+            Console.Error.WriteLine($"[TIP] MCP timeout -- command may have succeeded. Rerun or check target to confirm.");
             return ($"[EYE-MCP] Timeout after {timeoutMs}ms: {string.Join(" ", argv)}", 1);
         }
         catch (Exception ex)
@@ -134,7 +134,7 @@ internal static class EyeMcpClient
             // Auto-restart MCP worker on pipe errors (hot-swap, process crash)
             if (ex is IOException or ObjectDisposedException)
             {
-                Console.Error.WriteLine($"[EYE-MCP] Pipe broken ({ex.GetType().Name}) — restarting MCP worker");
+                Console.Error.WriteLine($"[EYE-MCP] Pipe broken ({ex.GetType().Name}) -- restarting MCP worker");
                 try { _process?.Kill(); } catch { }
                 _process = null; _stdin = null;
                 EnsureStarted(); // respawn
@@ -184,7 +184,7 @@ internal static class EyeMcpClient
         });
     }
 
-    // ── P/Invoke for DETACHED_PROCESS spawn ─────────────────
+    // -- P/Invoke for DETACHED_PROCESS spawn ----------------─
     // Structs + guard: AppBotPipe.cs (shared between Launcher and Core)
 
     const uint DETACHED_PROCESS = AppBotPipe.DETACHED_PROCESS;
@@ -207,7 +207,7 @@ internal static class EyeMcpClient
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool CloseHandle(IntPtr hObject);
 
-    // ── Private ──────────────────────────────────────────────
+    // -- Private ----------------------------------------------
 
     private static void EnsureStarted()
     {
@@ -235,7 +235,7 @@ internal static class EyeMcpClient
         }
         if (_restartCount >= 5)
         {
-            Console.Error.WriteLine("[EYE-MCP] Max restarts (5/5min) exceeded — MCP disabled");
+            Console.Error.WriteLine("[EYE-MCP] Max restarts (5/5min) exceeded -- MCP disabled");
             return;
         }
 
@@ -264,7 +264,7 @@ internal static class EyeMcpClient
             _stdin = new StreamWriter(stdinStream!, new UTF8Encoding(false)) { AutoFlush = true };
             _stdout = new StreamReader(stdoutStream!, Encoding.UTF8);
 
-            // Pump stderr (prefixed) — write raw UTF-8 bytes to preserve Korean and ANSI codes.
+            // Pump stderr (prefixed) -- write raw UTF-8 bytes to preserve Korean and ANSI codes.
             // Console.Error.WriteLine() may transcode through CP949 on Windows, garbling UTF-8 output.
             var stderrReader = new StreamReader(stderrStream!, Encoding.UTF8);
             var stderrRawOut = Console.OpenStandardError();
@@ -396,7 +396,7 @@ internal static class EyeMcpClient
 
         if (!_stopping)
         {
-            Console.Error.WriteLine("[EYE-MCP] Subprocess exited — completing pending calls with error");
+            Console.Error.WriteLine("[EYE-MCP] Subprocess exited -- completing pending calls with error");
             foreach (var kv in _pending)
             {
                 kv.Value.TrySetException(new Exception("MCP subprocess exited"));

@@ -1,16 +1,16 @@
-// SudoHandler.cs — Core-side --sudo request pipeline (v5.14.7).
+// SudoHandler.cs -- Core-side --sudo request pipeline (v5.14.7).
 //
 // Design principle: hot-swap (file rename) and Eye spawn are SEPARATE concerns.
 // This handler orchestrates them with a clean precondition-first ordering so that
-// in the common case (admin Eye alive) we never touch the filesystem at all —
+// in the common case (admin Eye alive) we never touch the filesystem at all --
 // preventing FSW cascades in other wkappbot processes.
 //
 // Flow:
-//   1. Pre-check — Ping admin Eye 100ms. Alive → reuse, return true, done.
+//   1. Pre-check -- Ping admin Eye 100ms. Alive -> reuse, return true, done.
 //   2. Need to spawn:
 //      2a. Promote pending .new.exe (rename only, NEVER launches Eye).
 //      2b. UAC + runas StartTracked (Core's request shows UAC dialog to user).
-//      2c. Post-UAC 100ms handshake — pre-booting admin Eye may have completed
+//      2c. Post-UAC 100ms handshake -- pre-booting admin Eye may have completed
 //          during the UAC wait; if responsive, reuse it instead of our spawn.
 //      2d. Poll up to 10s for our spawned admin Eye's pipe to appear.
 //
@@ -27,7 +27,7 @@ internal static class SudoHandler
     /// <summary>
     /// Ensure an admin Eye is alive and responsive for a --sudo request.
     /// Returns true if we can proceed with ExecuteViaProxy on <see cref="ElevatedEyeClient"/>.
-    /// Returns false if UAC was cancelled or spawn failed — caller should fall through
+    /// Returns false if UAC was cancelled or spawn failed -- caller should fall through
     /// to non-admin execution with a FALLBACK marker.
     /// </summary>
     public static bool EnsureAdminForSudo(string reason = "--sudo request")
@@ -35,14 +35,14 @@ internal static class SudoHandler
         PulseStep.Line("SudoHandler: pre-check Ping(100)");
         if (ElevatedEyeClient.Ping(100))
         {
-            PulseStep.Line("SudoHandler: admin Eye alive — reuse, no hot-swap, no spawn");
+            PulseStep.Line("SudoHandler: admin Eye alive -- reuse, no hot-swap, no spawn");
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine("[SUDO] admin Eye alive — reusing existing instance");
+            Console.Error.WriteLine("[SUDO] admin Eye alive -- reusing existing instance");
             Console.ResetColor();
             return true;
         }
 
-        PulseStep.Line("SudoHandler: admin Eye unresponsive — need spawn path");
+        PulseStep.Line("SudoHandler: admin Eye unresponsive -- need spawn path");
 
         // Step 2a: hot-swap pending .new.exe (file rename only, NO Eye launch)
         PromoteNewExeIfPending();
@@ -54,7 +54,7 @@ internal static class SudoHandler
     /// <summary>
     /// Rename-only hot-swap: if wkappbot-core.new.exe is pending, promote it to
     /// wkappbot-core.exe so the admin Eye we are about to spawn runs the latest
-    /// code. This is the ONLY thing this function does — it never spawns any
+    /// code. This is the ONLY thing this function does -- it never spawns any
     /// process. Windows permits renaming a running exe; deletion is disallowed,
     /// which is why we use rename + backup timestamp.
     /// </summary>
@@ -72,11 +72,11 @@ internal static class SudoHandler
             var backupPath = Path.Combine(exeDir,
                 $"wkappbot-core.old-sudo-{DateTime.Now:yyyyMMdd-HHmmss}.exe");
 
-            Console.Error.WriteLine("[SUDO:HOT-SWAP] pending .new.exe detected — promoting before spawn");
+            Console.Error.WriteLine("[SUDO:HOT-SWAP] pending .new.exe detected -- promoting before spawn");
             try { File.Move(exePath, backupPath); }
-            catch { /* already renamed by parallel promoter — non-fatal */ }
+            catch { /* already renamed by parallel promoter -- non-fatal */ }
             File.Move(newExePath, exePath);
-            Console.Error.WriteLine("[SUDO:HOT-SWAP] promoted — next admin Eye will run latest core");
+            Console.Error.WriteLine("[SUDO:HOT-SWAP] promoted -- next admin Eye will run latest core");
         }
         catch (Exception ex)
         {
@@ -110,9 +110,9 @@ internal static class SudoHandler
         var trail = PulseStep.GetRecentTrail(5);
         if (trail.Count > 0)
         {
-            Console.Error.WriteLine("[SUDO] ── recent step trail ──");
+            Console.Error.WriteLine("[SUDO] -- recent step trail --");
             foreach (var line in trail) Console.Error.WriteLine($"[SUDO]   {line}");
-            Console.Error.WriteLine("[SUDO] ──────────────────────");
+            Console.Error.WriteLine("[SUDO] ----------------------");
         }
         Console.ResetColor();
 
@@ -131,18 +131,18 @@ internal static class SudoHandler
             PulseStep.Line($"SudoHandler: UAC cancelled err={ex.NativeErrorCode}");
         }
 
-        // Prominent UAC outcome marker — not just PulseStep ring buffer
+        // Prominent UAC outcome marker -- not just PulseStep ring buffer
         Console.ForegroundColor = uacApproved ? ConsoleColor.Green : ConsoleColor.DarkYellow;
         Console.Error.WriteLine($"[SUDO:UAC] approved={(uacApproved ? "YES" : "NO")}"
             + (uacEx != null ? $" (err={uacEx.NativeErrorCode})" : ""));
         Console.ResetColor();
 
-        // Post-UAC 100ms handshake — pre-booting admin Eye may have finished
+        // Post-UAC 100ms handshake -- pre-booting admin Eye may have finished
         // during the UAC dialog wait.
         if (ElevatedEyeClient.Ping(100))
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine("[SUDO] admin Eye responsive post-UAC — reusing (skipping our spawn)");
+            Console.Error.WriteLine("[SUDO] admin Eye responsive post-UAC -- reusing (skipping our spawn)");
             Console.ResetColor();
             VerifyAndReportAdminIntegrity();
             return true;
@@ -151,19 +151,19 @@ internal static class SudoHandler
         if (!uacApproved)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.Error.WriteLine($"[SUDO] UAC cancelled (err={uacEx?.NativeErrorCode}) — no admin Eye available");
+            Console.Error.WriteLine($"[SUDO] UAC cancelled (err={uacEx?.NativeErrorCode}) -- no admin Eye available");
             Console.ResetColor();
             return false;
         }
 
-        // UAC approved + our spawn in progress — poll for pipe readiness up to 10s
+        // UAC approved + our spawn in progress -- poll for pipe readiness up to 10s
         for (int i = 0; i < 40; i++)
         {
             Thread.Sleep(250);
             if (ElevatedEyeClient.Ping(100))
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Error.WriteLine("[SUDO] admin Eye pipe up — handshake OK");
+                Console.Error.WriteLine("[SUDO] admin Eye pipe up -- handshake OK");
                 Console.ResetColor();
                 VerifyAndReportAdminIntegrity();
                 return true;

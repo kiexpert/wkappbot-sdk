@@ -143,7 +143,7 @@ public static class ScenarioParser
                 // direction and amount optional
                 break;
 
-            // UIA pattern actions (all focusless — no SendInput needed)
+            // UIA pattern actions (all focusless -- no SendInput needed)
             case "toggle":
             case "expand":
             case "collapse":

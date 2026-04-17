@@ -17,7 +17,7 @@ internal partial class Program
         {
             var swSlack = Stopwatch.StartNew();
 
-            // ── Slack Step 1: Load config ──
+            // -- Slack Step 1: Load config --
             var swStep = Stopwatch.StartNew();
             var configPath = Path.Combine(DataDir, "profiles", "slack_exp", "webhook.json");
             if (!File.Exists(configPath))
@@ -40,14 +40,14 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF:SLACK] LoadConfig={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
-            // ── Slack Step 2: auth.test (get bot user ID) — HTTP call ──
+            // -- Slack Step 2: auth.test (get bot user ID) -- HTTP call --
             swStep.Restart();
             var botUserId = SlackGetBotUserId(botToken);
             swStep.Stop();
             Console.Error.WriteLine($"[PROF:SLACK] auth.test={swStep.ElapsedMilliseconds}ms (botUserId={botUserId ?? "null"})");
             Console.Out.Flush();
 
-            // ── Slack Step 3: LoadLastTs ──
+            // -- Slack Step 3: LoadLastTs --
             swStep.Restart();
             var lastTs = LoadLastTs(channel);
             var lastTsDouble = 0.0;
@@ -58,7 +58,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF:SLACK] LoadLastTs={swStep.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
-            // ── Slack Step 4: conversations.history — HTTP call ──
+            // -- Slack Step 4: conversations.history -- HTTP call --
             swStep.Restart();
             var messages = SlackFetchHistoryAsync(botToken, channel, limit: 20)
                 .GetAwaiter().GetResult();
@@ -73,18 +73,18 @@ internal partial class Program
                 return;
             }
 
-            // ── Slack Step 5: Screen reader broadcast + UIA init ──
+            // -- Slack Step 5: Screen reader broadcast + UIA init --
             swStep.Restart();
             WKAppBot.Win32.Native.ScreenReaderMode.Enable();
             swStep.Stop();
             Console.Error.WriteLine($"[PROF:SLACK] ScreenReaderBroadcast={swStep.ElapsedMilliseconds}ms (enabled={WKAppBot.Win32.Native.ScreenReaderMode.IsEnabled})");
             Console.Out.Flush();
 
-            // ClaudePromptHelper removed — all UIA goes through MCP subprocess
+            // ClaudePromptHelper removed -- all UIA goes through MCP subprocess
             swStep.Stop();
             Console.Out.Flush();
 
-            // ── Slack Step 6: Filter messages ──
+            // -- Slack Step 6: Filter messages --
             swStep.Restart();
             string? contextLine = null;
             var newMsgs = new List<(string user, string text, string ts)>();
@@ -131,10 +131,10 @@ internal partial class Program
             }
 
             newMsgs.Reverse();
-            Console.Error.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) — forwarding to AI prompt...");
+            Console.Error.WriteLine($"[EYE_TICK] slack={newMsgs.Count} new message(s) -- forwarding to AI prompt...");
             Console.Out.Flush();
 
-            // ── Slack Step 7: FindPrompt (UIA tree walk) ──
+            // -- Slack Step 7: FindPrompt (UIA tree walk) --
             swStep.Restart();
             var promptInfo = FindSlackPreferredPromptViaMcp();
             swStep.Stop();
@@ -142,12 +142,12 @@ internal partial class Program
             Console.Out.Flush();
             if (promptInfo == null)
             {
-                Console.WriteLine("[EYE_TICK] WARNING: AI prompt not found — will retry next tick");
+                Console.WriteLine("[EYE_TICK] WARNING: AI prompt not found -- will retry next tick");
                 Console.Out.Flush();
                 return;
             }
 
-            // ── Slack Step 8: Forward messages ──
+            // -- Slack Step 8: Forward messages --
             int forwarded = 0;
             string? latestTs = null;
             foreach (var (user, text, msgTs) in newMsgs)
@@ -165,12 +165,12 @@ internal partial class Program
                 Console.Out.Flush();
                 if (fresh == null)
                 {
-                    Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping forward");
+                    Console.WriteLine("[EYE_TICK] WARNING: Lost prompt -- stopping forward");
                     Console.Out.Flush();
                     break;
                 }
 
-                Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} → {fresh.HostType} prompt");
+                Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Slack @{user} -> {fresh.HostType} prompt");
                 Console.Out.Flush();
                 swStep.Restart();
                 var ok = TypeAndSubmitViaMcp(fresh, promptText);
@@ -210,10 +210,10 @@ internal partial class Program
             if (latestTs != null)
             {
                 SaveLastTs(channel, latestTs);
-                Console.Error.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} — lastTs updated");
+                Console.Error.WriteLine($"[EYE_TICK] slack forwarded={forwarded}/{newMsgs.Count} -- lastTs updated");
             }
 
-            // ── Thread reply detection ──
+            // -- Thread reply detection --
             swStep.Restart();
             EyeTickCheckThreadReplies(messages, botToken, channel, botUserId);
             swStep.Stop();
@@ -230,7 +230,7 @@ internal partial class Program
 
     /// <summary>
     /// Check recent bot messages for new thread replies from users.
-    /// Responds when: (1) parent is from bot (클롣) → any user reply, or (2) @mention in reply.
+    /// Responds when: (1) parent is from bot (클롣) -> any user reply, or (2) @mention in reply.
     /// </summary>
     static void EyeTickCheckThreadReplies(List<JsonNode> channelMessages,
         string botToken, string channel, string? botUserId)
@@ -250,7 +250,7 @@ internal partial class Program
 
                 if (replyCount <= 0) continue;
 
-                // Skip threads older than 1 hour — prevents old message flood on Eye restart
+                // Skip threads older than 1 hour -- prevents old message flood on Eye restart
                 if (!string.IsNullOrEmpty(ts))
                 {
                     if (double.TryParse(ts, System.Globalization.NumberStyles.Float,
@@ -259,7 +259,7 @@ internal partial class Program
                         var ageSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - tsEpoch;
                         if (ageSeconds > 3600)
                         {
-                            // Silently skip — old thread, no need to scan replies
+                            // Silently skip -- old thread, no need to scan replies
                             continue;
                         }
                     }
@@ -313,11 +313,11 @@ internal partial class Program
                         System.Globalization.CultureInfo.InvariantCulture, out var rTsDouble);
                     if (lastReplyTsDouble > 0 && rTsDouble <= lastReplyTsDouble) continue;
 
-                    // Check: @mention tag → always respond
+                    // Check: @mention tag -> always respond
                     bool hasMention = !string.IsNullOrEmpty(botUserId) && rText.Contains($"<@{botUserId}>");
 
                     // For non-mention replies, parent must be from bot (already filtered above)
-                    // Both cases pass — bot thread reply OR @mention
+                    // Both cases pass -- bot thread reply OR @mention
 
                     // Clean text
                     var cleanReply = System.Text.RegularExpressions.Regex.Replace(rText, @"<@[A-Z0-9]+>\s*", "").Trim();
@@ -325,18 +325,18 @@ internal partial class Program
 
                     // Build context: bot's original message (truncated)
                     var cleanParent = System.Text.RegularExpressions.Regex.Replace(parentText, @"<@[A-Z0-9]+>\s*", "").Trim();
-                    if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "…";
+                    if (cleanParent.Length > 80) cleanParent = cleanParent[..80] + "...";
 
                     var promptText = $"[쓰레드 시작] {cleanParent}\n\n{cleanReply}\n\n{SlackReplySuffix(rUser, threadTs, "thread reply")}";
 
                     var fresh = FindSlackPreferredPromptViaMcp();
                     if (fresh == null)
                     {
-                        Console.WriteLine("[EYE_TICK] WARNING: Lost prompt — stopping thread reply forward");
+                        Console.WriteLine("[EYE_TICK] WARNING: Lost prompt -- stopping thread reply forward");
                         return;
                     }
 
-                    Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} → {fresh.HostType} prompt");
+                    Console.Error.WriteLine($"[EYE_TICK] [FORWARD] Thread @{rUser} -> {fresh.HostType} prompt");
                     var ok = TypeAndSubmitViaMcp(fresh, promptText);
                     if (ok)
                     {
@@ -344,7 +344,7 @@ internal partial class Program
                         latestReplyTs = rTs;
                         Console.Error.WriteLine($"[EYE_TICK] [DELIVERED] Thread @{rUser}: {cleanReply}");
 
-                        // Send "전달했습니다" ack — deleted when slack reply is sent
+                        // Send "전달했습니다" ack -- deleted when slack reply is sent
                         try
                         {
                             var ackText = $"전달했습니다! (thread={threadTs})";
@@ -373,14 +373,14 @@ internal partial class Program
         }
     }
 
-    /// <summary>MCP-routed FindSlackPreferredPrompt — finds first available prompt via MCP.</summary>
+    /// <summary>MCP-routed FindSlackPreferredPrompt -- finds first available prompt via MCP.</summary>
     static ClaudePromptHelper.PromptInfo? FindSlackPreferredPromptViaMcp()
     {
         var all = FindAllPromptsViaMcp();
         return all.FirstOrDefault();
     }
 
-    /// <summary>MCP-routed TypeAndSubmit — sends text to prompt via MCP subprocess.</summary>
+    /// <summary>MCP-routed TypeAndSubmit -- sends text to prompt via MCP subprocess.</summary>
     static bool TypeAndSubmitViaMcp(ClaudePromptHelper.PromptInfo prompt, string text)
     {
         try

@@ -136,7 +136,7 @@ public sealed partial class CdpClient
             Console.Error.WriteLine($"[TAB:GROWTH] close failed for {targetId}: {ex.Message}");
         }
     }
-    // ── Static: CDP port detection from process ─────────────────
+    // -- Static: CDP port detection from process ----------------─
 
     /// <summary>
     /// Detect CDP debugging port from a process's command line arguments.
@@ -148,7 +148,7 @@ public sealed partial class CdpClient
 
     /// <summary>
     /// Returns true if the given PID belongs to a known browser process.
-    /// Prevents Electron apps (VS Code, Slack…) from being treated as browsers
+    /// Prevents Electron apps (VS Code, Slack...) from being treated as browsers
     /// even when they expose a CDP endpoint (DevTools).
     /// </summary>
     public static bool IsBrowserProcess(int pid)
@@ -167,7 +167,7 @@ public sealed partial class CdpClient
 
     public static int DetectCdpPort(int processId)
     {
-        // Strategy: check known ports via netstat → match to target PID
+        // Strategy: check known ports via netstat -> match to target PID
         try
         {
             var psi = new ProcessStartInfo
@@ -308,7 +308,7 @@ public sealed partial class CdpClient
 
     /// <summary>
     /// Find a tab by URL/title pattern (wildcard * supported).
-    /// Returns null if no match found — never opens a new tab.
+    /// Returns null if no match found -- never opens a new tab.
     /// </summary>
     public async Task<TabInfo?> FindTabByPatternAsync(int port, string pattern)
     {
@@ -348,7 +348,7 @@ public sealed partial class CdpClient
             if (tab.Id == TargetId) return true;
             return await SwitchToTargetAsync(tab.Id, port);
         }
-        // Multiple matches → show disambiguation list
+        // Multiple matches -> show disambiguation list
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine($"[WEB] \"{pattern}\" -> {allMatches.Count}개 탭 매칭. 정확한 URL을 지정하세요:");
         Console.ResetColor();
@@ -392,11 +392,11 @@ public sealed partial class CdpClient
     /// <summary>
     /// Switch this CdpClient to a different page target (disconnect + reconnect).
     /// The port is needed to look up the new target's WebSocket URL from /json.
-    /// skipMinimize: true for read-only actions (read/find/inspect) — avoids minimizing the browser window.
+    /// skipMinimize: true for read-only actions (read/find/inspect) -- avoids minimizing the browser window.
     /// </summary>
     public async Task<bool> SwitchToTargetAsync(string targetId, int port, bool skipMinimize = false)
     {
-        // Minimize Chrome before switching tab — prevents OS focus fight during tab switch.
+        // Minimize Chrome before switching tab -- prevents OS focus fight during tab switch.
         // Chrome processes tab changes internally fine while minimized.
         // Poll windowState=minimized instead of fixed 80ms delay.
         // Skip for read-only operations (no focus steal risk).
@@ -465,10 +465,10 @@ public sealed partial class CdpClient
         }
         catch { }
 
-        // Proactive focusless measures — best-effort, non-fatal
+        // Proactive focusless measures -- best-effort, non-fatal
         await EmulateActiveTabAsync();
 
-        // Restore Chrome to visible after tab switch — poll windowState=normal instead of fixed 200ms
+        // Restore Chrome to visible after tab switch -- poll windowState=normal instead of fixed 200ms
         RestoreChromeNoActivate();
         var postWb = await GetWindowForTargetAsync(targetId);
         if (postWb != null)
@@ -480,9 +480,9 @@ public sealed partial class CdpClient
     /// <summary>
     /// Emulate active/focused tab without OS SetForegroundWindow.
     /// Applies three layers:
-    ///   1. Emulation.setFocusEmulationEnabled — Chrome accepts input events as if focused
-    ///   2. Page.setWebLifecycleState("active") — unthrottle timers/RAF in background
-    ///   3. JS visibility fake — visibilityState="visible" so page JS doesn't pause streaming
+    ///   1. Emulation.setFocusEmulationEnabled -- Chrome accepts input events as if focused
+    ///   2. Page.setWebLifecycleState("active") -- unthrottle timers/RAF in background
+    ///   3. JS visibility fake -- visibilityState="visible" so page JS doesn't pause streaming
     /// All best-effort; failures are silently ignored.
     /// </summary>
     public async Task EmulateActiveTabAsync()
@@ -556,7 +556,7 @@ public sealed partial class CdpClient
         if (blanksClosed > 0)
             Console.WriteLine($"[WEB] Closed {blanksClosed} about:blank tab(s) on sight");
 
-        // Step 1: Try saved target ID (from AskTargetRegistry — survives across CLI invocations)
+        // Step 1: Try saved target ID (from AskTargetRegistry -- survives across CLI invocations)
         if (!string.IsNullOrWhiteSpace(savedTargetId))
         {
             foreach (var target in allTargets)
@@ -565,17 +565,17 @@ public sealed partial class CdpClient
                 var tid = target?["id"]?.GetValue<string>();
                 if (tid == savedTargetId)
                 {
-                    // Saved target still alive — check browser window position + tab health
+                    // Saved target still alive -- check browser window position + tab health
                     if (tid != TargetId)
                         await SwitchToTargetAsync(tid, port);
 
-                    // Position check: log only — saved target tab is always reused regardless of position
+                    // Position check: log only -- saved target tab is always reused regardless of position
                     // (window may have been moved by user, but we still want to reuse this tab)
                     var wb = await GetWindowForTargetAsync(tid);
                     if (wb != null)
                         Console.WriteLine($"[ASK] Window at ({wb.Value.left},{wb.Value.top},{wb.Value.width},{wb.Value.height})");
                     else
-                        Console.WriteLine("[ASK] Cannot get window bounds (OK — reusing tab anyway)");
+                        Console.WriteLine("[ASK] Cannot get window bounds (OK -- reusing tab anyway)");
 
                     Console.WriteLine($"[CDP:TARGET] reused saved target={tid} name={targetName}");
                     if (minimizeAfter)
@@ -583,7 +583,7 @@ public sealed partial class CdpClient
                     return tid;
                 }
             }
-            Console.WriteLine($"[CDP:TARGET] saved target {savedTargetId} not found — scanning");
+            Console.WriteLine($"[CDP:TARGET] saved target {savedTargetId} not found -- scanning");
         }
 
         // Step 2: Scan by URL fragment (legacy / backup)
@@ -604,7 +604,7 @@ public sealed partial class CdpClient
             return tid;
         }
 
-        // Step 2b: Exact URL match — reuse existing tab without navigating (prevents tab duplication)
+        // Step 2b: Exact URL match -- reuse existing tab without navigating (prevents tab duplication)
         if (!string.IsNullOrWhiteSpace(navigateUrl))
         {
             foreach (var target in allTargets)
@@ -650,7 +650,7 @@ public sealed partial class CdpClient
             {
                 var twb = await GetWindowForTargetAsync(tid);
                 if (twb != null && !IsAtExpectedBounds(twb.Value, expX, expY, expW, expH))
-                    continue; // blank tab in wrong window — skip
+                    continue; // blank tab in wrong window -- skip
 
                 // Navigate blank to requested URL
                 if (!string.IsNullOrWhiteSpace(navigateUrl))
@@ -659,19 +659,19 @@ public sealed partial class CdpClient
                     catch { }
                 }
             }
-            // matchesHost: already on correct site — no need to navigate
+            // matchesHost: already on correct site -- no need to navigate
 
             if (minimizeAfter)
                 await MinimizeWindowAsync(tid);
             return tid;
         }
 
-        // Step 4: Create new tab — prefer existing correctly-positioned window, else new window
-        // IMPORTANT: Never create about:blank tabs — they persist and waste resources.
+        // Step 4: Create new tab -- prefer existing correctly-positioned window, else new window
+        // IMPORTANT: Never create about:blank tabs -- they persist and waste resources.
         // If no navigateUrl, just return whatever tab we're currently on.
         if (string.IsNullOrWhiteSpace(navigateUrl))
         {
-            Console.WriteLine("[WEB] No navigateUrl — reusing current tab (avoiding about:blank)");
+            Console.WriteLine("[WEB] No navigateUrl -- reusing current tab (avoiding about:blank)");
             return TargetId;
         }
 
@@ -693,7 +693,7 @@ public sealed partial class CdpClient
                 var existingWb = await GetWindowForTargetAsync(existingTid);
                 if (existingWb != null && IsAtExpectedBounds(existingWb.Value, expX, expY, expW, expH))
                 {
-                    // Minimize Chrome BEFORE creating tab — Chrome may activate window on tab create.
+                    // Minimize Chrome BEFORE creating tab -- Chrome may activate window on tab create.
                     // Poll windowState=minimized instead of fixed 100ms delay.
                     MinimizeChrome();
                     await WaitForWindowStateAsync(existingWb.Value.windowId, "minimized", timeoutMs: 1000);
@@ -709,7 +709,7 @@ public sealed partial class CdpClient
             catch { }
         }
 
-        // No correctly-positioned window found — create new window
+        // No correctly-positioned window found -- create new window
         if (newTargetId == null)
         {
             // Ensure minimized BEFORE tab creation (prevent focus theft)
@@ -732,7 +732,7 @@ public sealed partial class CdpClient
                 if (newTargetId == null) return TargetId;
             }
 
-            // Position new window at expected bounds (restore → resize → re-minimize)
+            // Position new window at expected bounds (restore -> resize -> re-minimize)
             var newWb = await GetWindowForTargetAsync(newTargetId);
             if (newWb != null)
             {

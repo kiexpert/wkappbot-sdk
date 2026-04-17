@@ -21,7 +21,7 @@ public class UiaActionTarget : IActionTarget
     /// <summary>Underlying FlaUI element for platform-specific operations</summary>
     public AutomationElement Element => _element;
 
-    // ── Identity ──
+    // -- Identity --
 
     public string DisplayName => SafeGet(() => _element.Properties.Name.ValueOrDefault) ?? "";
 
@@ -54,7 +54,7 @@ public class UiaActionTarget : IActionTarget
         }
     }
 
-    // ── Bounds ──
+    // -- Bounds --
 
     public (int Left, int Top, int Right, int Bottom) BoundingRect
     {
@@ -67,7 +67,7 @@ public class UiaActionTarget : IActionTarget
         }
     }
 
-    // ── State ──
+    // -- State --
 
     public bool Focused => SafeGet(() => _element.Properties.HasKeyboardFocus.ValueOrDefault);
 
@@ -119,7 +119,7 @@ public class UiaActionTarget : IActionTarget
         }
     }
 
-    // ── Hierarchy ──
+    // -- Hierarchy --
 
     public IActionTarget? Parent
     {
@@ -147,7 +147,7 @@ public class UiaActionTarget : IActionTarget
         }
     }
 
-    // ── Equality (reference-based for retarget comparison) ──
+    // -- Equality (reference-based for retarget comparison) --
 
     public override bool Equals(object? obj)
     {
@@ -176,7 +176,7 @@ public class UiaActionTarget : IActionTarget
     public override string ToString()
         => $"[UIA] {ClassName} \"{DisplayName}\" (aid={Identifier})";
 
-    // ── Safe COM access ──
+    // -- Safe COM access --
 
     private static T? SafeGet<T>(Func<T> getter, T? fallback = default)
     {

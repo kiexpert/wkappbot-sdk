@@ -12,9 +12,9 @@ namespace WKAppBot.Win32.Window;
 /// Strategy:
 ///   1. Find the parent process of wkappbot.exe (claude.exe or code.exe)
 ///   2. Walk up to the main window of that process
-///   3. Find the prompt input via UIA: aid="turn-form" → child Group "입력하세요"
+///   3. Find the prompt input via UIA: aid="turn-form" -> child Group "입력하세요"
 ///   4. Insert text via MSAA put_accValue (focusless!)
-///   5. Submit via UIA Invoke on "제출" button (focusless!) — NO focus steal needed!
+///   5. Submit via UIA Invoke on "제출" button (focusless!) -- NO focus steal needed!
 ///
 /// Key Discoveries (2026-02-26):
 ///   1. Direct MSAA vtable put_accValue() on the contentEditable's parent MSAA element
@@ -23,7 +23,7 @@ namespace WKAppBot.Win32.Window;
 ///      The difference: direct MSAA vtable call bypasses the UIA-to-MSAA proxy bridge.
 ///   2. The submit button in Claude Desktop is named "제출" (Korean for "submit") with
 ///      UIA Invoke pattern. accDoDefaultAction("활성화") on contentEditable is a false positive
-///      — it only activates/focuses the element, doesn't submit.
+///      -- it only activates/focuses the element, doesn't submit.
 ///   3. MSAA tree walk pitfall: GROUPING(role=20) with action "상위 개체 클릭" is NOT a button!
 /// </summary>
 public sealed partial class ClaudePromptHelper : IDisposable
@@ -37,26 +37,26 @@ public sealed partial class ClaudePromptHelper : IDisposable
     /// <summary>
     /// Global toggle: when true, only focusless strategies are allowed.
     /// When true, allows focus-stealing as a fallback after focusless input fails.
-    /// Default = false → pure focusless mode (all focus-stealing paths blocked).
+    /// Default = false -> pure focusless mode (all focus-stealing paths blocked).
     /// Set true for critical actions like handoff nudges where delivery matters.
     /// Focus-stealing goes through normal InputReadiness path (overlay + sound + zoom).
     /// </summary>
     public static bool AllowFocusSteal { get; set; }
 
     // Per-hwnd turn-form cache: once found, reuse until window is gone.
-    // UIA tree scan (FindFirstDescendant) reads all conversation content — very slow for long sessions.
+    // UIA tree scan (FindFirstDescendant) reads all conversation content -- very slow for long sessions.
     // Cache key = hwnd, invalidated when IsWindow() returns false or hwnd disappears from EnumWindows.
     // Only positive finds are cached (null = "not found yet, retry next time").
     private static readonly Dictionary<IntPtr, PromptInfo> _turnFormCache = new();
 
-    // Negative cache: hwnd → expiry. Suppresses repeated UIA scans for windows confirmed to have no turn-form.
+    // Negative cache: hwnd -> expiry. Suppresses repeated UIA scans for windows confirmed to have no turn-form.
     // TTL = 1s (asymmetric: negative shorter than positive to recover quickly if prompt appears).
     private static readonly Dictionary<IntPtr, DateTime> _negativeCache = new();
     private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Return all currently cached prompt infos (windows already confirmed to have turn-form).
-    /// Instant — no UIA scan. Used by Eye loop for per-instance status streaming.
+    /// Instant -- no UIA scan. Used by Eye loop for per-instance status streaming.
     /// </summary>
     public static IReadOnlyList<PromptInfo> GetAllCachedPrompts()
         => _turnFormCache.Values.ToList();

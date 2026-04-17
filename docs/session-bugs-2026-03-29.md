@@ -1,4 +1,4 @@
-﻿# Session Bugs & Issues — 2026-03-29
+﻿# Session Bugs & Issues -- 2026-03-29
 
 Bugs and friction points discovered during Eye Card System implementation
 and Slack workspace migration session.
@@ -7,7 +7,7 @@ and Slack workspace migration session.
 
 **Symptom**: Screen goes completely black, topmost refreshed every ~1s, user cannot interact with anything. Forced reboot required.
 
-**Root Cause**: CDP automation (ask triad, web read, etc.) generates no keyboard/mouse input → `GetUserIdleMs()` returns high values → screensaver activates → WPF window covers all monitors with HWND_TOPMOST.
+**Root Cause**: CDP automation (ask triad, web read, etc.) generates no keyboard/mouse input -> `GetUserIdleMs()` returns high values -> screensaver activates -> WPF window covers all monitors with HWND_TOPMOST.
 
 **Fix Applied** (commits 09c7c4c, fb36421, 3e81105):
 - Per-window guard threads (SS-Guard-N): independent Win32 hide per monitor
@@ -18,13 +18,13 @@ and Slack workspace migration session.
 
 **Remaining Risk**: Eye's forced 5s kill cycle is a band-aid. Proper fix: suppress screensaver while Eye has active CDP/MCP commands.
 
-**Suggest**: Add `EyeActiveCommandCount` check in screensaver — if Eye is executing commands, skip screensaver entirely.
+**Suggest**: Add `EyeActiveCommandCount` check in screensaver -- if Eye is executing commands, skip screensaver entirely.
 
 ---
 
 ## CRITICAL: Garbled BeginInvoke Block in ScreenSaverOverlay.cs
 
-**Symptom**: ScreenSaver code was syntactically valid but logically broken — `BeginInvoke` block was empty, UI operations ran outside WPF thread.
+**Symptom**: ScreenSaver code was syntactically valid but logically broken -- `BeginInvoke` block was empty, UI operations ran outside WPF thread.
 
 **Root Cause**: Previous edit session corrupted the code structure. Lines 297-308 had:
 ```csharp
@@ -32,9 +32,9 @@ _dispatcher.BeginInvoke(() =>
 {
     foreach (var mwin in _monitors)
     {
-});  // ← BeginInvoke closes here (empty!)
+});  // <- BeginInvoke closes here (empty!)
 Console.WriteLine("[EYE] ScreenSaver fade start (user
-        mwin.Window.Opacity = 0;  // ← runs OUTSIDE BeginInvoke
+        mwin.Window.Opacity = 0;  // <- runs OUTSIDE BeginInvoke
 ```
 
 **Fix Applied**: Reconstructed the entire `Tick()` method with correct block structure.
@@ -45,7 +45,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 ## HIGH: .wkappbot Marker File Blocks Directory Creation
 
-**Symptom**: `.wkappbot/ask/` folder creation fails silently — `Directory.CreateDirectory` can't create a subdirectory when a FILE with the same name exists at the parent path.
+**Symptom**: `.wkappbot/ask/` folder creation fails silently -- `Directory.CreateDirectory` can't create a subdirectory when a FILE with the same name exists at the parent path.
 
 **Root Cause**: Commit 5a3be25 added `.wkappbot` as a marker FILE for workspace root detection. Later code (AskCommands.MdWriter, AskCommands.Triad) tried to create `.wkappbot/ask/` DIRECTORY.
 
@@ -59,7 +59,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 **Symptom**: `[CDP:JS-ERR] SyntaxError: Unexpected token '}'` on all three AI tabs (GPT, Claude, Gemini) during triad ask.
 
-**Root Cause**: `GetElementRectAsync` called immediately after tab creation — execution context not yet ready. The IIFE `(()=>{...})()` is valid JS but fails when context is in transitional state.
+**Root Cause**: `GetElementRectAsync` called immediately after tab creation -- execution context not yet ready. The IIFE `(()=>{...})()` is valid JS but fails when context is in transitional state.
 
 **Fix Applied** (commit c6c033d): `BeginCdpZoom` catches eval failure and falls back to Chrome window client area rect (`GetClientRect`).
 
@@ -85,7 +85,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 **Symptom**: find-prompts, screensaver, whisper-ring, analyze-hack, slack-route appear as separate cards in Eye tick display.
 
-**Root Cause**: Eye spawns child processes that have `RunningInEye=false` → they emit ticks → Eye creates cards for them.
+**Root Cause**: Eye spawns child processes that have `RunningInEye=false` -> they emit ticks -> Eye creates cards for them.
 
 **Fix Applied** (commit 41cbd0f): `WKAPPBOT_WORKER=1` environment variable suppresses ticks for all Eye child spawns (6 call sites).
 
@@ -107,7 +107,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 **Symptom**: `--remote-debugging-port=9222` silently ignored when Chrome launched with default user-data-dir. `DevTools remote debugging requires a non-default data directory.`
 
-**Root Cause**: Chrome security policy — default profile rejects remote debugging. WKAppBot's `ChromeLauncher` uses a separate user-data-dir, but manual `start chrome --remote-debugging-port=9222` doesn't.
+**Root Cause**: Chrome security policy -- default profile rejects remote debugging. WKAppBot's `ChromeLauncher` uses a separate user-data-dir, but manual `start chrome --remote-debugging-port=9222` doesn't.
 
 **Suggest**: Document this in CLAUDE.md or ChromeLauncher comments. Always use `wkappbot web open` to launch CDP-capable Chrome.
 
@@ -119,7 +119,7 @@ Console.WriteLine("[EYE] ScreenSaver fade start (user
 
 **Root Cause**: React's synthetic event system requires trusted events or specific event types (PointerEvent > MouseEvent > click). Some Slack buttons (Generate Token) only respond to PointerEvent with `pointerId` and `pointerType`.
 
-**Workaround**: Use full PointerEvent sequence: `pointerdown → mousedown → pointerup → mouseup → click`. For form submission, `form.submit()` bypasses React entirely.
+**Workaround**: Use full PointerEvent sequence: `pointerdown -> mousedown -> pointerup -> mouseup -> click`. For form submission, `form.submit()` bypasses React entirely.
 
 ---
 

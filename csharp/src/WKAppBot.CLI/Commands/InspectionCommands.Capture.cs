@@ -118,7 +118,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── ocr ────────────────────────────────────────────────────
+    // -- ocr ----------------------------------------------------
 
     static int OcrCommand(string[] args)
     {
@@ -157,14 +157,14 @@ internal partial class Program
 
         using (screenshot)
         {
-            Console.WriteLine($"Image: {screenshot.Width}x{screenshot.Height} — {sourceDesc}");
+            Console.WriteLine($"Image: {screenshot.Width}x{screenshot.Height} -- {sourceDesc}");
             Console.WriteLine();
 
             // Run OCR
             var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
             var result = ocr.RecognizeAll(screenshot).GetAwaiter().GetResult();
 
-            Console.WriteLine($"── OCR Results ({result.Words.Count} words) ──────────────────────");
+            Console.WriteLine($"-- OCR Results ({result.Words.Count} words) ----------------------");
             Console.WriteLine();
 
             // Print full text first
@@ -181,7 +181,7 @@ internal partial class Program
                 Console.WriteLine();
             }
 
-            // Print words with coordinates (grouped by Y position → lines)
+            // Print words with coordinates (grouped by Y position -> lines)
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("[Words with Coordinates]");
             Console.ResetColor();
@@ -239,7 +239,7 @@ internal partial class Program
         Console.WriteLine($"  ({words.Count} words, x={firstWord.X}..{words.Last().X + words.Last().Width})");
     }
 
-    // ── windows — list all top-level windows ────────────────────
+    // -- windows -- list all top-level windows --------------------
     // Usage: wkappbot windows [--filter <pattern>] [--process <name>] [--class <name>]
 
 }

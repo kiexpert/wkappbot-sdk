@@ -139,7 +139,7 @@ public sealed class ControlMap
             }
         }
 
-        // 4. Register experience DB controls (OCR-learned — highest priority)
+        // 4. Register experience DB controls (OCR-learned -- highest priority)
         if (expDb != null)
         {
             foreach (var (formId, formExp) in expDb.GetAllForms())
@@ -151,7 +151,7 @@ public sealed class ControlMap
                     var role = ctrl.Role ?? "control";
                     var desc = ctrl.OcrText ?? $"[{formId}] cid={ctrl.ControlId}";
 
-                    // Experience DB entries are cid-specific → always register with cid
+                    // Experience DB entries are cid-specific -> always register with cid
                     map.Register(ctrl.ClassName, ctrl.ControlId, role, desc);
                 }
             }

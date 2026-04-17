@@ -14,7 +14,7 @@ internal partial class Program
 {
     /// <summary>
     /// Condition search automation for [0150] form.
-    /// Focusless workflow: tab-switch → search → double-click → add indicator.
+    /// Focusless workflow: tab-switch -> search -> double-click -> add indicator.
     ///
     /// Usage:
     ///   wkappbot cond-add "영웅문4" "시가총액"
@@ -71,11 +71,11 @@ internal partial class Program
         {
             FocuslessGuard.Enabled = true;
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("[FOCUSLESS] Guard enabled — SetCursorPos/SendInput/SetForeground blocked");
+            Console.WriteLine("[FOCUSLESS] Guard enabled -- SetCursorPos/SendInput/SetForeground blocked");
             Console.ResetColor();
         }
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        // Resolve grap: "window/child#uiaScope" -- '/' and '#' are equivalent separators
         var automation = new UIA3Automation();
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
@@ -162,7 +162,7 @@ internal partial class Program
         if (!invoked) return Error("Failed to invoke 조건식 새로작성");
         Thread.Sleep(500);
 
-        // Set name in the condition name field (aid=4025 → Pane, need to find its child or use WM_SETTEXT)
+        // Set name in the condition name field (aid=4025 -> Pane, need to find its child or use WM_SETTEXT)
         // aid=4029 has a Document(aid=1) child for name editing
         var namePane = FindByAid(form, "4029");
         if (namePane != null)
@@ -414,7 +414,7 @@ internal partial class Program
 
         var treeRect = treePaneEl.BoundingRectangle;
 
-        // Get tree hWnd (IMPORTANT: must get FRESH hWnd after tab switch — MFC recreates children!)
+        // Get tree hWnd (IMPORTANT: must get FRESH hWnd after tab switch -- MFC recreates children!)
         IntPtr treeHwnd = IntPtr.Zero;
         try
         {
@@ -442,7 +442,7 @@ internal partial class Program
         var (clickX, clickY) = FindItemCoordsByOcr(treeHwnd, treeRect, keyword);
         if (clickX < 0)
         {
-            // OCR couldn't find exact position — use heuristic: center-x, top area
+            // OCR couldn't find exact position -- use heuristic: center-x, top area
             clickX = treeRect.Width / 3;  // ~1/3 from left (past icons)
             clickY = 16;  // near top, first visible item
             Console.WriteLine($"  OCR: keyword not found precisely, using heuristic ({clickX},{clickY})");
@@ -463,12 +463,12 @@ internal partial class Program
             readiness.TryDismissBlocker(mainHwnd, blocker);
             Thread.Sleep(500);
         }
-        // User insight: tree selection (no dblclk) shows params → click + button to add
-        Console.WriteLine("  [Approach 0A] Keyboard select → UIA + button (aid=4009)...");
+        // User insight: tree selection (no dblclk) shows params -> click + button to add
+        Console.WriteLine("  [Approach 0A] Keyboard select -> UIA + button (aid=4009)...");
         TryKeyboardSelect(treeHwnd);
         Thread.Sleep(500);
 
-        // Click + button (aid=4009) via UIA Invoke — fully focusless
+        // Click + button (aid=4009) via UIA Invoke -- fully focusless
         var addBtn = FindByAid(form, "4009");
         if (addBtn != null)
         {
@@ -484,7 +484,7 @@ internal partial class Program
                     bool added0a = CheckIndicatorAdded(form, keyword);
                     if (added0a)
                     {
-                        Console.WriteLine($"\n  ✓ Indicator \"{keyword}\" added via select+add! (FULLY FOCUSLESS!)");
+                        Console.WriteLine($"\n  v Indicator \"{keyword}\" added via select+add! (FULLY FOCUSLESS!)");
                         return 0;
                     }
                     Console.WriteLine("  Approach 0A: + button clicked but indicator not detected.");
@@ -514,7 +514,7 @@ internal partial class Program
         bool added = CheckIndicatorAdded(form, keyword);
         if (added)
         {
-            Console.WriteLine($"\n  ✓ Indicator \"{keyword}\" added via keyboard RETURN! (FULLY FOCUSLESS!)");
+            Console.WriteLine($"\n  v Indicator \"{keyword}\" added via keyboard RETURN! (FULLY FOCUSLESS!)");
             return 0;
         }
         Console.WriteLine("  Approach 0B (keyboard RETURN) didn't work.");
@@ -535,7 +535,7 @@ internal partial class Program
         added = CheckIndicatorAdded(form, keyword);
         if (added)
         {
-            Console.WriteLine($"\n  ✓ Indicator \"{keyword}\" added successfully!");
+            Console.WriteLine($"\n  v Indicator \"{keyword}\" added successfully!");
             return 0;
         }
 
@@ -566,7 +566,7 @@ internal partial class Program
         added = CheckIndicatorAdded(form, keyword);
         if (added)
         {
-            Console.WriteLine($"\n  ✓ Indicator \"{keyword}\" added via VK_RETURN!");
+            Console.WriteLine($"\n  v Indicator \"{keyword}\" added via VK_RETURN!");
             return 0;
         }
         Console.WriteLine("  Approach 2 didn't add the indicator.");
@@ -588,11 +588,11 @@ internal partial class Program
         added = CheckIndicatorAdded(form, keyword);
         if (added)
         {
-            Console.WriteLine($"\n  ✓ Indicator \"{keyword}\" added via SendInput!");
+            Console.WriteLine($"\n  v Indicator \"{keyword}\" added via SendInput!");
             return 0;
         }
 
-        Console.WriteLine($"\n  ✗ All approaches failed. Capturing form for diagnosis...");
+        Console.WriteLine($"\n  X All approaches failed. Capturing form for diagnosis...");
         CaptureAndOcrTreeArea(form, mainHwnd);
 
         return 0;
@@ -601,10 +601,10 @@ internal partial class Program
     /// <summary>
     /// Keyboard-only tree selection (fully focusless!).
     /// After search filters the tree, send keyboard messages to SELECT first item.
-    /// Selection shows parameters in right panel — then + button (aid=4009) adds it.
+    /// Selection shows parameters in right panel -- then + button (aid=4009) adds it.
     ///
-    /// Sequence: WM_SETFOCUS → VK_HOME (first item) → VK_DOWN (skip header if needed)
-    /// All via PostMessage — no cursor movement, no foreground change.
+    /// Sequence: WM_SETFOCUS -> VK_HOME (first item) -> VK_DOWN (skip header if needed)
+    /// All via PostMessage -- no cursor movement, no foreground change.
     /// </summary>
     static bool TryKeyboardSelect(IntPtr treeHwnd)
     {
@@ -616,15 +616,15 @@ internal partial class Program
         NativeMethods.SendMessageW(treeHwnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(50);
 
-        // 2. VK_HOME → jump to first item in tree
+        // 2. VK_HOME -> jump to first item in tree
         PostKey(treeHwnd, VK_HOME);
         Thread.Sleep(100);
 
-        // 3. VK_DOWN → move to first child/result item (in case HOME lands on category header)
+        // 3. VK_DOWN -> move to first child/result item (in case HOME lands on category header)
         PostKey(treeHwnd, VK_DOWN);
         Thread.Sleep(100);
 
-        Console.WriteLine($"  Sent: FOCUS→HOME→DOWN to {treeHwnd:X8} (select only, no cursor move!)");
+        Console.WriteLine($"  Sent: FOCUS->HOME->DOWN to {treeHwnd:X8} (select only, no cursor move!)");
         return true;
     }
 
@@ -673,7 +673,7 @@ internal partial class Program
         Thread.Sleep(30);
 
         // Send WM_SETFOCUS so control thinks it has internal focus
-        // (doesn't steal foreground window — just internal MFC focus)
+        // (doesn't steal foreground window -- just internal MFC focus)
         NativeMethods.SendMessageW(hWnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(30);
 
@@ -694,7 +694,7 @@ internal partial class Program
 
         // Restore cursor
         NativeMethods.SetCursorPos(savedCursor.X, savedCursor.Y);
-        Console.WriteLine($"  Sent: MOVE→FOCUS→DOWN→UP→DBLCLK→UP at ({clientX},{clientY}) (cursor restored)");
+        Console.WriteLine($"  Sent: MOVE->FOCUS->DOWN->UP->DBLCLK->UP at ({clientX},{clientY}) (cursor restored)");
         return true;
     }
 
@@ -740,8 +740,8 @@ internal partial class Program
             var ocrResult = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
             if (ocrResult == null) return (-1, -1);
 
-            // Search for keyword in OCR words — multi-tier matching
-            // MFC bitmap font OCR is imprecise (총→출, 액→팩, etc.)
+            // Search for keyword in OCR words -- multi-tier matching
+            // MFC bitmap font OCR is imprecise (총->출, 액->팩, etc.)
             // Tier 1: exact/contains match
             foreach (var word in ocrResult.Words)
             {
@@ -755,7 +755,7 @@ internal partial class Program
                 }
             }
 
-            // Tier 2: Korean prefix match (first 2 chars — usually reliable)
+            // Tier 2: Korean prefix match (first 2 chars -- usually reliable)
             string keyPrefix = keyword.Length >= 2 ? keyword.Substring(0, 2) : keyword;
             foreach (var word in ocrResult.Words)
             {
@@ -942,7 +942,7 @@ internal partial class Program
 
     /// <summary>
     /// Select condition row (A/B/C...) by clicking in the condition table.
-    /// The table (aid=4015) is owner-drawn — no UIA children per row.
+    /// The table (aid=4015) is owner-drawn -- no UIA children per row.
     /// Each row is ~20px tall, starting from top. A=row0, B=row1, C=row2...
     /// Uses PostMessage WM_LBUTTONDOWN/UP for focusless click.
     /// </summary>
@@ -1009,7 +1009,7 @@ internal partial class Program
             Console.WriteLine($"  OCR fallback: estimated clickY={clickY}");
         }
 
-        // DPI FIX: bitmap coords (physical) → MFC logical client coords (for PostMessage)
+        // DPI FIX: bitmap coords (physical) -> MFC logical client coords (for PostMessage)
         var (dpiScale, mfcClientW, mfcClientH) = NativeMethods.GetDpiScaleForMfc(hWnd);
         NativeMethods.GetClientRect(hWnd, out var clientRect);
         int physClientW = clientRect.Right - clientRect.Left;
@@ -1034,7 +1034,7 @@ internal partial class Program
         }
         catch { physX = clickX; physY = clickY; mfcX = clickX; mfcY = clickY; }
 
-        Console.WriteLine($"Selecting row {rowLabel}: bitmap({clickX},{clickY}) → mfc({mfcX},{mfcY}) [dpi={dpiScale:F2}, physClient={physClientW}x{physClientH}, mfcClient={mfcClientW}x{mfcClientH}]");
+        Console.WriteLine($"Selecting row {rowLabel}: bitmap({clickX},{clickY}) -> mfc({mfcX},{mfcY}) [dpi={dpiScale:F2}, physClient={physClientW}x{physClientH}, mfcClient={mfcClientW}x{mfcClientH}]");
 
         // MFC owner-drawn controls call GetCursorPos() internally!
         // SetCursorPos: uses physical screen coords (C# DPI-aware ClientToScreen is correct)
@@ -1046,7 +1046,7 @@ internal partial class Program
         if (FocuslessGuard.IsBlocked("SetCursorPos (MFC owner-drawn control requires physical cursor)"))
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("  This MFC control calls GetCursorPos() — cannot operate without physical cursor.");
+            Console.WriteLine("  This MFC control calls GetCursorPos() -- cannot operate without physical cursor.");
             Console.WriteLine("  Remove --force-focusless to allow cursor movement (will be restored after).");
             Console.ResetColor();
             return 1;
@@ -1059,7 +1059,7 @@ internal partial class Program
         NativeMethods.SetCursorPos(pt.X, pt.Y);
         Thread.Sleep(30);
 
-        // WM_SETFOCUS — internal MFC focus, doesn't steal foreground window
+        // WM_SETFOCUS -- internal MFC focus, doesn't steal foreground window
         const uint WM_SETFOCUS = 0x0007;
         NativeMethods.SendMessageW(hWnd, WM_SETFOCUS, IntPtr.Zero, IntPtr.Zero);
         Thread.Sleep(30);
@@ -1075,7 +1075,7 @@ internal partial class Program
         NativeMethods.SetCursorPos(savedCursor.X, savedCursor.Y);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"  ✓ Row {rowLabel} selected (cursor restored)");
+        Console.WriteLine($"  v Row {rowLabel} selected (cursor restored)");
         Console.ResetColor();
 
         return 0;
@@ -1083,13 +1083,13 @@ internal partial class Program
 
     /// <summary>
     /// Delete condition row from the owner-drawn table (aid=4015).
-    /// STATUS: UNSOLVED — see knowhow.md "[2026-03-02] 조건 행 삭제 (del-row)"
+    /// STATUS: UNSOLVED -- see knowhow.md "[2026-03-02] 조건 행 삭제 (del-row)"
     ///
     /// All tested strategies failed:
-    ///   1. PostMessage WM_LBUTTONDOWN at 삭제 column (X=440~480) — row selects but X button doesn't trigger
-    ///   2. UIA Invoke aid=4022 (toolbar X) — requires formula text selection, not table row
-    ///   3. PostMessage VK_DELETE key — no effect
-    ///   4. SendInput ABSOLUTE + MOUSEEVENTF_MOVE — cursor lands correctly but X button doesn't respond
+    ///   1. PostMessage WM_LBUTTONDOWN at 삭제 column (X=440~480) -- row selects but X button doesn't trigger
+    ///   2. UIA Invoke aid=4022 (toolbar X) -- requires formula text selection, not table row
+    ///   3. PostMessage VK_DELETE key -- no effect
+    ///   4. SendInput ABSOLUTE + MOUSEEVENTF_MOVE -- cursor lands correctly but X button doesn't respond
     ///
     /// Potential future approaches:
     ///   A. Edit formula text directly via EM_SETSEL/EM_REPLACESEL (CondClickDelete pattern)
@@ -1102,14 +1102,14 @@ internal partial class Program
             return Error($"Invalid row label: {rowLabel}. Use A, B, C, ..., Z");
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine($"[del-row] Not yet implemented — owner-drawn X button doesn't respond to PostMessage/SendInput.");
+        Console.Error.WriteLine($"[del-row] Not yet implemented -- owner-drawn X button doesn't respond to PostMessage/SendInput.");
         Console.WriteLine($"  See: knowhow.md \"[2026-03-02] 조건 행 삭제 (del-row)\"");
         Console.WriteLine($"  Workaround: use formula text editing (EM_SETSEL + EM_REPLACESEL) or manual deletion.");
         Console.ResetColor();
         return 1;
     }
 
-    /// <summary>Click 수정 button (aid=4046) via UIA Invoke — focusless!</summary>
+    /// <summary>Click 수정 button (aid=4046) via UIA Invoke -- focusless!</summary>
     static int CondClickModify(AutomationElement form)
     {
         var btn = FindByAid(form, "4046");
@@ -1126,7 +1126,7 @@ internal partial class Program
     /// <summary>
     /// Delete the LAST condition from the formula via EM_REPLACESEL + save.
     /// The toolbar X (aid=4022) requires internal MFC selection state that cannot be set externally
-    /// (tested: SendInput click, EM_SETSEL, PostMessage, UIA Invoke — all produce "선택영역을 확인하십시요" popup).
+    /// (tested: SendInput click, EM_SETSEL, PostMessage, UIA Invoke -- all produce "선택영역을 확인하십시요" popup).
     /// Workaround: directly edit the formula text and save. Table rows persist but aren't in the formula.
     /// </summary>
     static int CondClickDelete(AutomationElement form)
@@ -1167,12 +1167,12 @@ internal partial class Program
         }
         else
         {
-            // First/only condition — check if followed by " and "
+            // First/only condition -- check if followed by " and "
             int afterLabel = labelPos + lastLabel.Length;
             if (afterLabel < formula.Length && formula.Substring(afterLabel).StartsWith(" and "))
             {
                 selStart = labelPos;
-                selEnd = afterLabel + 5; // "E and " — remove label + trailing " and "
+                selEnd = afterLabel + 5; // "E and " -- remove label + trailing " and "
             }
             else
             {
@@ -1181,7 +1181,7 @@ internal partial class Program
             }
         }
 
-        Console.Write($"Removing '{lastLabel}': EM_SETSEL({selStart},{selEnd}) → ");
+        Console.Write($"Removing '{lastLabel}': EM_SETSEL({selStart},{selEnd}) -> ");
 
         // Edit formula via EM_REPLACESEL
         NativeMethods.SetFocus(formulaHwnd);
@@ -1203,7 +1203,7 @@ internal partial class Program
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"✓ \"{newFormula}\"");
+        Console.WriteLine($"v \"{newFormula}\"");
         Console.ResetColor();
 
         // Auto-save via UIA Invoke on "내조건식 저장" (aid=4030)
@@ -1218,7 +1218,7 @@ internal partial class Program
             if (saved)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✓ Saved");
+                Console.WriteLine("v Saved");
             }
             else
             {
@@ -1230,7 +1230,7 @@ internal partial class Program
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("  Save button (aid=4030) not found — save manually!");
+            Console.WriteLine("  Save button (aid=4030) not found -- save manually!");
             Console.ResetColor();
         }
 
@@ -1333,7 +1333,7 @@ internal partial class Program
 
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("── Condition Items (OCR) ──");
+        Console.WriteLine("-- Condition Items (OCR) --");
         Console.ResetColor();
 
         // Group words by Y coordinate (±5px tolerance)
@@ -1347,7 +1347,7 @@ internal partial class Program
         }
 
         // Dump raw OCR words with positions (for debugging delete X button)
-        Console.WriteLine("\n── Raw OCR Words ──");
+        Console.WriteLine("\n-- Raw OCR Words --");
         foreach (var w in ocrResult.Words.OrderBy(w => w.Y).ThenBy(w => w.X))
         {
             Console.WriteLine($"  ({w.X,4},{w.Y,4}) {w.Width,3}x{w.Height,3} \"{w.Text}\"");

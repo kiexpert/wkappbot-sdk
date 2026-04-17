@@ -1,4 +1,4 @@
-// PipeServer.cs — Named Pipe server for KiwoomProxy.
+// PipeServer.cs -- Named Pipe server for KiwoomProxy.
 // Listens on \\.\pipe\wkappbot_kiwoom for JSON-RPC requests from 64-bit CLI.
 // Supports bidirectional communication: requests from CLI, events pushed to CLI.
 

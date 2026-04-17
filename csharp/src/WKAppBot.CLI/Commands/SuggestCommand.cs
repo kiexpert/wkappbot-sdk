@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot suggest "건의 내용" [file.png] — slack send to current channel
+// partial class: wkappbot suggest "건의 내용" [file.png] -- slack send to current channel
 internal partial class Program
 {
 
@@ -24,8 +24,8 @@ internal partial class Program
         if (args.Length > 0 && args[0] is "show" or "get" or "view")
             return SuggestShowCommand(args[1..]);
 
-        // Guard: single lowercase word that looks like an unrecognized subcommand → error instead of saving as text.
-        // Prevents accidental "suggest show 19" → garbage JSONL entry.
+        // Guard: single lowercase word that looks like an unrecognized subcommand -> error instead of saving as text.
+        // Prevents accidental "suggest show 19" -> garbage JSONL entry.
         if (args.Length > 0 && args[0].All(ch => char.IsLower(ch) || ch == '-') && args[0].Length <= 12
             && !args[0].StartsWith('-'))
         {
@@ -44,7 +44,7 @@ internal partial class Program
             Console.WriteLine("  Also saves to wkappbot.hq/suggestions.jsonl for local record.");
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("  ⚠ Write in ENGLISH to save tokens (Korean = 2-3x token cost).");
+            Console.WriteLine("  ! Write in ENGLISH to save tokens (Korean = 2-3x token cost).");
             Console.WriteLine("     Short & precise wins. Senior Claudes will thank you. 🙏");
             Console.ResetColor();
             Console.WriteLine();
@@ -109,7 +109,7 @@ internal partial class Program
 
         Console.Error.WriteLine($"[SUGGEST] from [{cwdTag}]");
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("  ⚠ Tip: write suggestions in ENGLISH — Korean = 2-3x token cost.");
+        Console.WriteLine("  ! Tip: write suggestions in ENGLISH -- Korean = 2-3x token cost.");
         Console.ResetColor();
         Console.Error.WriteLine($"[SUGGEST] {text}");
         if (files.Count > 0)
@@ -125,7 +125,7 @@ internal partial class Program
 
         string? messageTs = null;
 
-        // Send via normal slack send channel (LoadSlackConfig — same as 'wkappbot slack send')
+        // Send via normal slack send channel (LoadSlackConfig -- same as 'wkappbot slack send')
         var config = LoadSlackConfig();
         var botToken = config?["bot_token"]?.GetValue<string>();
         var channel  = config?["channel"]?.GetValue<string>();
@@ -151,7 +151,7 @@ internal partial class Program
         }
         else
         {
-            Console.Error.WriteLine("[SUGGEST] No Slack config found — saved locally only (run 'wkappbot slack setup' to configure)");
+            Console.Error.WriteLine("[SUGGEST] No Slack config found -- saved locally only (run 'wkappbot slack setup' to configure)");
         }
 
         // Save to HQ suggestions.jsonl
@@ -181,7 +181,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>suggest list — show pending suggestions in a pretty format. Auto-syncs slack_ts from Slack.</summary>
+    /// <summary>suggest list -- show pending suggestions in a pretty format. Auto-syncs slack_ts from Slack.</summary>
     static int SuggestListCommand(string[] args)
     {
         var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
@@ -200,7 +200,7 @@ internal partial class Program
             return 0;
         }
 
-        // ── Auto-sync slack_ts: fetch Slack messages since latest HQ entry ──
+        // -- Auto-sync slack_ts: fetch Slack messages since latest HQ entry --
         var entries = lines
             .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
             .Where(e => e["review_status"]?.GetValue<string>() != "done"   // skip resolved
@@ -220,7 +220,7 @@ internal partial class Program
             var syncChannel = syncCfg?["channel"]?.GetValue<string>();
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(syncChannel))
             {
-                // Use HQ file mtime as oldest — only fetch Slack messages since last local update
+                // Use HQ file mtime as oldest -- only fetch Slack messages since last local update
                 var fileMtime = File.GetLastWriteTimeUtc(jsonlPath);
                 var oldestUnix = ((DateTimeOffset)fileMtime).AddMinutes(-5).ToUnixTimeSeconds(); // -5min buffer
                 Console.Error.WriteLine($"[SUGGEST] Syncing slack_ts from Slack (since {fileMtime.ToLocalTime():MM-dd HH:mm})...");
@@ -271,7 +271,7 @@ internal partial class Program
                         if (changed)
                             File.WriteAllLines(jsonlPath, lines);
                         if (synced > 0)
-                            Console.Error.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack ✓");
+                            Console.Error.WriteLine($"[SUGGEST] Synced {synced} slack_ts from Slack v");
                         else
                             Console.Error.WriteLine($"[SUGGEST] No new matches found in Slack.");
                     }
@@ -297,7 +297,7 @@ internal partial class Program
                 var entryType = d?["type"]?.GetValue<string>()    ?? "";
                 var slackMark = slackTs != null ? " 🔗" : "   ";
 
-                // Date: ISO → MM-dd HH:mm
+                // Date: ISO -> MM-dd HH:mm
                 string dateStr = ts;
                 if (DateTime.TryParse(ts, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
                     dateStr = dt.ToLocalTime().ToString("MM-dd HH:mm");
@@ -306,7 +306,7 @@ internal partial class Program
 
                 if (entryType == "merge")
                 {
-                    // ── Merge record display ──────────────────────────────────────────
+                    // -- Merge record display ------------------------------------------
                     var mergeTitle   = d?["title"]?.GetValue<string>()       ?? "?";
                     var rootCause    = d?["rootCause"]?.GetValue<string>();
                     var count        = d?["count"]?.GetValue<int>()           ?? 0;
@@ -335,7 +335,7 @@ internal partial class Program
                     Console.WriteLine();
 
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"      {(mergeTitle.Length > 72 ? mergeTitle[..72] + "…" : mergeTitle)}");
+                    Console.WriteLine($"      {(mergeTitle.Length > 72 ? mergeTitle[..72] + "..." : mergeTitle)}");
                     Console.ResetColor();
 
                     // Priority + risk + freq row
@@ -352,7 +352,7 @@ internal partial class Program
                     if (rootCause != null)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"      root: {(rootCause.Length > 90 ? rootCause[..90] + "…" : rootCause)}");
+                        Console.WriteLine($"      root: {(rootCause.Length > 90 ? rootCause[..90] + "..." : rootCause)}");
                         Console.ResetColor();
                     }
                     if (errPat != null)
@@ -376,21 +376,21 @@ internal partial class Program
                     if (healScript != null)
                     {
                         Console.ForegroundColor = healResult != null ? ConsoleColor.Green : ConsoleColor.DarkYellow;
-                        Console.WriteLine($"      heal: {healScript}{(healResult != null ? $" → {healResult}" : " (pending)")}");
+                        Console.WriteLine($"      heal: {healScript}{(healResult != null ? $" -> {healResult}" : " (pending)")}");
                         Console.ResetColor();
                     }
                 }
                 else
                 {
-                    // ── Regular suggestion display ────────────────────────────────────
+                    // -- Regular suggestion display ------------------------------------
                     var text  = d?["text"]?.GetValue<string>()  ?? "";
                     var files = d?["files"]?.AsArray();
 
                     var textLines = text.Split('\n');
                     var title = textLines[0];
                     var body  = textLines.Length > 1 ? string.Join(" ", textLines[1..].Where(l => l.Trim().Length > 0)) : "";
-                    if (title.Length > 70) title = title[..70] + "…";
-                    if (body.Length > 80)  body  = body[..80]  + "…";
+                    if (title.Length > 70) title = title[..70] + "...";
+                    if (body.Length > 80)  body  = body[..80]  + "...";
 
                     Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.Write($"  {i + 1,2}.");
@@ -437,7 +437,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>suggest show &lt;n|ts&gt; — show full content of suggestion by list number or ts prefix.</summary>
+    /// <summary>suggest show &lt;n|ts&gt; -- show full content of suggestion by list number or ts prefix.</summary>
     static int SuggestShowCommand(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
@@ -494,7 +494,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>suggest repost [ts] — re-post entries missing slack_ts and write the new ID back.</summary>
+    /// <summary>suggest repost [ts] -- re-post entries missing slack_ts and write the new ID back.</summary>
     static int SuggestRepostCommand(string[] args)
     {
         var tsPrefix = args.Length > 0 ? args[0] : null;
@@ -513,7 +513,7 @@ internal partial class Program
         var channel  = repostCfg?["channel"]?.GetValue<string>();
         if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
         {
-            Console.Error.WriteLine("[REPOST] No Slack config — cannot send to Slack");
+            Console.Error.WriteLine("[REPOST] No Slack config -- cannot send to Slack");
             return 1;
         }
 
@@ -541,7 +541,7 @@ internal partial class Program
             var text = node["text"]?.GetValue<string>() ?? "";
             var from = node["from"]?.GetValue<string>() ?? "unknown";
             var preview = text.Split('\n')[0];
-            if (preview.Length > 60) preview = preview[..60] + "…";
+            if (preview.Length > 60) preview = preview[..60] + "...";
             Console.Error.WriteLine($"[REPOST] {entryTs[..16]} [{from}] {preview}");
 
             var msgLines = new List<string> { $":memo: *[건의]* from `{from}`" };
@@ -565,7 +565,7 @@ internal partial class Program
                     SlackSendViaApi(botToken, channel, chunk, threadTs: newTs, username: senderName).GetAwaiter().GetResult();
             }
 
-            Console.Error.WriteLine($"[REPOST] Sent → slack_ts={newTs}");
+            Console.Error.WriteLine($"[REPOST] Sent -> slack_ts={newTs}");
 
             // Write slack_ts back into the line
             var obj = JsonSerializer.Deserialize<Dictionary<string, object?>>(lines[i])!;
@@ -582,7 +582,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Encoding Risk Guard ────────────────────────────────────────────────────
+    // -- Encoding Risk Guard ----------------------------------------------------
     // Returns true (and prints error) if text contains >0.1% Korean/emoji chars.
     // Korean in AI-facing text costs 2-3x tokens; emojis corrupt in CP949 builds.
     internal static bool HasEncodingRisk(string text, string context)

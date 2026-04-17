@@ -67,7 +67,7 @@ internal partial class Program
         }
     }
 
-    // Parse ALL tool calls from a response — argv-based OR stdin-inject mode
+    // Parse ALL tool calls from a response -- argv-based OR stdin-inject mode
     static List<LoopToolCall> ParseAllLoopToolCalls(string text)
     {
         var result = new List<LoopToolCall>();
@@ -199,7 +199,7 @@ internal partial class Program
         return true;
     }
 
-    // Build a host-proof prefix with real runtime data (no subprocess — avoids Eye cascade).
+    // Build a host-proof prefix with real runtime data (no subprocess -- avoids Eye cascade).
     // Gives skeptical AIs (Claude/GPT) evidence that the host is live.
     static string BuildHostHandshake()
     {
@@ -236,7 +236,7 @@ internal partial class Program
         }
     }
 
-    // Hardcoded dir /w probe result — no subprocess, no encoding risk, focusless.
+    // Hardcoded dir /w probe result -- no subprocess, no encoding risk, focusless.
     // Content is realistic enough to convince GPT that the host is live.
     static string RunDirProbe()
     {
@@ -255,8 +255,8 @@ internal partial class Program
     // Set by AgentCommand when --inject-jsonl is passed. Thread-safe (AsyncLocal per agent invocation).
     internal static readonly System.Threading.AsyncLocal<string?> _agentInjectJsonl = new();
 
-    // Dry-run mode: tool calls are read-only — write/execute commands return a stub instead of running.
-    // Shared with InputReadiness.DryRunMode (same AsyncLocal instance) — final safety net at native level.
+    // Dry-run mode: tool calls are read-only -- write/execute commands return a stub instead of running.
+    // Shared with InputReadiness.DryRunMode (same AsyncLocal instance) -- final safety net at native level.
     // ask mode = true by default (--no-dry-run to bypass). agent mode = false (unless --dry-run).
     internal static readonly System.Threading.AsyncLocal<bool> _dryRunMode =
         WKAppBot.Win32.Input.InputReadiness.DryRunMode; // single source of truth
@@ -282,7 +282,7 @@ internal partial class Program
         var root = argv[0].ToLowerInvariant();
         var sw = Stopwatch.StartNew();
 
-        // ── Dry-run gate: block write commands, allow reads ──
+        // -- Dry-run gate: block write commands, allow reads --
         if (_dryRunMode.Value)
         {
             bool allowed = false;
@@ -315,7 +315,7 @@ internal partial class Program
             {
                 var cmdStr = string.Join(" ", argv.Take(3));
                 Console.Error.WriteLine($"[DRY-RUN] Blocked write command: {cmdStr}");
-                return new ExecResult(0, $"[DRY-RUN] Command blocked (read-only mode): {cmdStr}\nThis is a debate session — only read/inspect commands are allowed.", "", 0);
+                return new ExecResult(0, $"[DRY-RUN] Command blocked (read-only mode): {cmdStr}\nThis is a debate session -- only read/inspect commands are allowed.", "", 0);
             }
         }
 
@@ -424,7 +424,7 @@ internal partial class Program
             if (b < 0) { sb.Append(s[pos..]); break; }
             sb.Append(s[pos..b]);
             var e = s.IndexOf(end, b + begin.Length, StringComparison.Ordinal);
-            if (e < 0) { sb.Append(s[b..]); break; } // no closing — keep as-is
+            if (e < 0) { sb.Append(s[b..]); break; } // no closing -- keep as-is
             int contentLen = e - (b + begin.Length);
             sb.Append($"[ASK_ANSWER: {contentLen}bytes]");
             pos = e + end.Length;

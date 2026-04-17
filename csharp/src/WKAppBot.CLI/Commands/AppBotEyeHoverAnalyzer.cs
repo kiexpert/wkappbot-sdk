@@ -11,11 +11,11 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Mouse CCA live analysis (1s interval, change-based Slack thread reply) ──
+    // -- Mouse CCA live analysis (1s interval, change-based Slack thread reply) --
     static string? _mouseCcaReplyTs;            // Slack thread ts for CCA result
     static string _lastMouseCcaResult = "";      // change detection
 
-    // ── Auto a11y hack on InputReadiness (single worker, no parallel) ──
+    // -- Auto a11y hack on InputReadiness (single worker, no parallel) --
     static readonly SemaphoreSlim _autoHackSemaphore = new(1, 1);
     static readonly object _liveHackLock = new();
     static AppBotPipe.SpawnResult? _liveHackProcess;
@@ -172,7 +172,7 @@ internal partial class Program
         HackLog("[AUTO-HACK] Subscribed to InputReadiness.OnProbeSuccess (via analyze-hack server)");
     }
 
-    // ── Analyze-hack server process ──
+    // -- Analyze-hack server process --
     static AppBotPipe.SpawnResult? _hackServerProcess;
     static StreamWriter? _hackServerStdin;
 #pragma warning disable CS0414
@@ -222,7 +222,7 @@ internal partial class Program
         CancellationTokenSource? oldCts = null;
         lock (_liveHackLock)
         {
-            // Same target + debounce already running → don't restart (typing won't reset timer)
+            // Same target + debounce already running -> don't restart (typing won't reset timer)
             bool sameTarget = grapPath == _pendingLiveHackGrap;
             if (sameTarget && _liveHackDebounceCts != null && !_liveHackDebounceCts.IsCancellationRequested)
                 return; // let existing debounce continue
@@ -238,10 +238,10 @@ internal partial class Program
         try { oldCts?.Cancel(); } catch { }
         try { oldCts?.Dispose(); } catch { }
 
-        // Immediately hide session overlay (clear stale content) — don't create new
+        // Immediately hide session overlay (clear stale content) -- don't create new
         A11yHackOverlayHost.TryGetSlot(OverlaySlot.Session)?.Hide();
 
-        // Snapshot cursor position (ignore pixel content — cursor blink causes false positives)
+        // Snapshot cursor position (ignore pixel content -- cursor blink causes false positives)
         WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var curPt);
         int baselineX = curPt.X, baselineY = curPt.Y;
 
@@ -250,7 +250,7 @@ internal partial class Program
         {
             try
             {
-                // 1s debounce — abort only if cursor moved significantly (>5px)
+                // 1s debounce -- abort only if cursor moved significantly (>5px)
                 await Task.Delay(1000, debounceCts.Token);
                 WKAppBot.Win32.Native.NativeMethods.GetCursorPos(out var pt);
                 int dx = Math.Abs(pt.X - baselineX), dy = Math.Abs(pt.Y - baselineY);
@@ -287,7 +287,7 @@ internal partial class Program
 
                 _lastLiveHackGrap = currentGrap;
 
-                // Spawn hack as separate process — avoid loading Vision/CCA DLLs into Eye (memory leak)
+                // Spawn hack as separate process -- avoid loading Vision/CCA DLLs into Eye (memory leak)
                 lock (_liveHackLock)
                 {
                     if (debounceCts != _liveHackDebounceCts) return;
@@ -350,7 +350,7 @@ internal partial class Program
         AppendEyeAnalysisTrace("analysis-loop-started", new { worker = "mouse+focus" });
         bool firstRun = true;
 
-        // Wait for Eye startup Slack message (skip if standalone worker — no Eye)
+        // Wait for Eye startup Slack message (skip if standalone worker -- no Eye)
         bool isStandalone = !RunningInEye;
         if (!isStandalone)
         {
@@ -398,7 +398,7 @@ internal partial class Program
                 var hwnd = NativeMethods.WindowFromPoint(pt);
                 var nodeKey = hwnd != IntPtr.Zero ? $"{hwnd:X8}:{pt.X},{pt.Y}" : "";
                 var idleMs = NativeMethods.GetUserIdleMs();
-                // Skip own overlay windows (ScreenSaver, WhisperRing) — fall through to window underneath
+                // Skip own overlay windows (ScreenSaver, WhisperRing) -- fall through to window underneath
                 bool isOwnWindow = hwnd != IntPtr.Zero && IsWkappbotCoreWindow(hwnd);
                 if (isOwnWindow)
                 {
@@ -417,7 +417,7 @@ internal partial class Program
                 EnsureHackServer();
                 if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null) continue;
 
-                // ── Mouse CCA (only if node changed) ──
+                // -- Mouse CCA (only if node changed) --
                 if (doMouse)
                 {
                 AppendEyeAnalysisTrace("mouse-analyze", new
@@ -528,7 +528,7 @@ internal partial class Program
                 TryLaunchLiveA11yHack(grapPath, "mouse", serverResult.Split('\n')[0]);
                 } // end if (doMouse)
 
-                // ── Keyboard focus chain (console output only, no Slack) ──
+                // -- Keyboard focus chain (console output only, no Slack) --
                 try
                 {
                     _hackServerStdin!.WriteLine("{\"type\":\"focus\"}");
@@ -599,7 +599,7 @@ internal partial class Program
             if (pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom)
             {
                 found = hWnd;
-                return false; // stop — EnumWindows is top-to-bottom z-order
+                return false; // stop -- EnumWindows is top-to-bottom z-order
             }
             return true;
         }, IntPtr.Zero);
@@ -614,7 +614,7 @@ internal partial class Program
         if (mouseTs != null) { _mouseCcaReplyTs = mouseTs; Console.Error.WriteLine($"[EYE] Restored mouse CCA reply ts={mouseTs}"); }
     }
 
-    // Track uploaded snippet message ts for delete→reupload cycle
+    // Track uploaded snippet message ts for delete->reupload cycle
 #pragma warning disable CS0169
     static string? _mouseCcaSnippetMsgTs;
 #pragma warning restore CS0169

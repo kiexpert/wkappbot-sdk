@@ -1,4 +1,4 @@
-﻿// SuggestCommand.Resolve.cs — suggest resolve + regression tests + recovery + AutoRegisterBug
+﻿// SuggestCommand.Resolve.cs -- suggest resolve + regression tests + recovery + AutoRegisterBug
 // Split from SuggestCommand.cs for maintainability (~810 lines)
 
 using System.Text;
@@ -184,7 +184,7 @@ internal partial class Program
             }
 
             // Option validation: filename segments after cmd-subcmd that look like options (e.g. "eval-js")
-            // test-a11y-click-eval-js.sh → must contain "--eval-js" in script
+            // test-a11y-click-eval-js.sh -> must contain "--eval-js" in script
             for (int pi = 3; pi < evidenceParts.Length; pi++)
             {
                 var seg = evidenceParts[pi];
@@ -192,11 +192,11 @@ internal partial class Program
                 if (seg.Length < 2) continue;
                 var optionFlag = $"--{seg}";
                 if (scriptContent.Contains(optionFlag, StringComparison.OrdinalIgnoreCase))
-                    continue; // option found in script — OK
+                    continue; // option found in script -- OK
                 // Check if it's a known CLI option (heuristic: contains hyphen = likely option)
                 if (seg.Contains('-') || seg.All(c => char.IsLetter(c) || c == '-'))
                 {
-                    // Only warn, don't block — description segments may not be options
+                    // Only warn, don't block -- description segments may not be options
                     if (seg.Contains('-')) // multi-word segments like "eval-js" are definitely options
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
@@ -308,7 +308,7 @@ internal partial class Program
                 string? expectedCmdPattern = null;
                 if (mergeAffectedCmds != null && mergeAffectedCmds.Length > 0)
                 {
-                    // Use merge's affectedCommands — any one matching is sufficient
+                    // Use merge's affectedCommands -- any one matching is sufficient
                     expectedCmdPattern = string.Join("|", mergeAffectedCmds);
                 }
                 else if (scriptParts.Length >= 3 && ShouldEnforceEvidenceCommandCoupling(scriptParts[1], scriptParts[2]))
@@ -339,8 +339,8 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("  CMD execution guard FAILED: no [CMD] entries in debug output.");
-                    Console.WriteLine("  → evidence 스크립트 안에서 핵심 wkappbot 명령을 실제로 실행해야 합니다.");
-                    Console.WriteLine("  → 예: WKAPPBOT_WORKER=1 timeout 8 D:/SDK/bin/wkappbot.exe a11y click \"*App*\" --eval-js \"...\"");
+                    Console.WriteLine("  -> evidence 스크립트 안에서 핵심 wkappbot 명령을 실제로 실행해야 합니다.");
+                    Console.WriteLine("  -> 예: WKAPPBOT_WORKER=1 timeout 8 D:/SDK/bin/wkappbot.exe a11y click \"*App*\" --eval-js \"...\"");
                     Console.WriteLine();
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine("  핵심 명령줄이 무엇인지 evidence 파일명 또는 스크립트에 포함시키세요:");
@@ -355,12 +355,12 @@ internal partial class Program
                     if (mergeAffectedCmds != null)
                     {
                         Console.WriteLine($"  CMD execution guard FAILED: none of merge affectedCommands [{string.Join(", ", mergeAffectedCmds)}] found in debug output.");
-                        Console.WriteLine($"  → evidence에서 [{string.Join(" 또는 ", mergeAffectedCmds)}] 명령을 실행하세요.");
+                        Console.WriteLine($"  -> evidence에서 [{string.Join(" 또는 ", mergeAffectedCmds)}] 명령을 실행하세요.");
                     }
                     else
                     {
                         Console.WriteLine($"  CMD execution guard FAILED: expected '{expectedCmdPattern}' command not found.");
-                        Console.WriteLine($"  → evidence에서 'wkappbot {expectedCmdPattern} ...' 명령을 실행하세요.");
+                        Console.WriteLine($"  -> evidence에서 'wkappbot {expectedCmdPattern} ...' 명령을 실행하세요.");
                     }
                     Console.ResetColor();
                     return 1;
@@ -381,8 +381,8 @@ internal partial class Program
                         {
                             Console.ForegroundColor = ConsoleColor.Red;
                             Console.WriteLine($"  RESOLVE BLOCKED: command \"{cmdWord}\" is not in CommandHelpMap.");
-                            Console.WriteLine($"  → CommandHelp.cs의 CommandHelpMap에 \"{cmdWord}\" help 텍스트를 먼저 추가하세요.");
-                            Console.WriteLine($"  → 그래야 --help 자동 지원 + regression 테스트 카테고리가 올바르게 동작합니다.");
+                            Console.WriteLine($"  -> CommandHelp.cs의 CommandHelpMap에 \"{cmdWord}\" help 텍스트를 먼저 추가하세요.");
+                            Console.WriteLine($"  -> 그래야 --help 자동 지원 + regression 테스트 카테고리가 올바르게 동작합니다.");
                             Console.ResetColor();
                             return 1;
                         }
@@ -393,7 +393,7 @@ internal partial class Program
                             if (helpLen < 30)
                             {
                                 Console.ForegroundColor = ConsoleColor.Yellow;
-                                Console.WriteLine($"  [WARN] \"{cmdWord}\" help is too short ({helpLen} chars) — consider adding usage examples");
+                                Console.WriteLine($"  [WARN] \"{cmdWord}\" help is too short ({helpLen} chars) -- consider adding usage examples");
                                 Console.ResetColor();
                             }
                         }

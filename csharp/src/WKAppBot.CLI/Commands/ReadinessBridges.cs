@@ -6,11 +6,11 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: InputReadiness bridge methods — expose internal helpers to adapters.
+// partial class: InputReadiness bridge methods -- expose internal helpers to adapters.
 // Tag: [READINESS]
 internal partial class Program
 {
-    // ── 팩토리: InputReadiness 생성 + 모든 어댑터 연결 ──
+    // -- 팩토리: InputReadiness 생성 + 모든 어댑터 연결 --
 
     /// <summary>
     /// Create a fully-wired InputReadiness instance with blocker handler, knowhow broadcaster, and zoom factory.
@@ -20,7 +20,7 @@ internal partial class Program
         handlersDir ??= Path.Combine(DataDir, "handlers");
         var handlerMgr = Directory.Exists(handlersDir) ? new DialogHandlerManager(handlersDir) : null;
 
-        // [FOCUS-GUARD] 전역 ActiveGuardYieldCallback 설정 — CheckActiveGuard 차단 시 팝업 표시
+        // [FOCUS-GUARD] 전역 ActiveGuardYieldCallback 설정 -- CheckActiveGuard 차단 시 팝업 표시
         // 앱 전역에 하나의 UserInputWaitAdapter 공유 (팝업 중복 방지)
         InputReadiness.ActiveGuardYieldCallback ??= new UserInputWaitAdapter();
 
@@ -34,7 +34,7 @@ internal partial class Program
         };
     }
 
-    // ── 팩토리: ActionReadiness (AAR) 생성 ──
+    // -- 팩토리: ActionReadiness (AAR) 생성 --
 
     /// <summary>
     /// Create an ActionReadiness (AAR) instance wrapping the given InputReadiness.
@@ -42,10 +42,10 @@ internal partial class Program
     internal static ActionReadiness CreateActionReadiness(InputReadiness readiness)
         => new(readiness);
 
-    // ── 공용 입력위치확보: iconic zoom + focusless restore + blocker dismiss ──
+    // -- 공용 입력위치확보: iconic zoom + focusless restore + blocker dismiss --
 
     /// <summary>
-    /// Shared input readiness pipeline for any window: iconic zoom → focusless restore → blocker dismiss.
+    /// Shared input readiness pipeline for any window: iconic zoom -> focusless restore -> blocker dismiss.
     /// Used by A11yCommand, AskCommands, and any command that needs a window ready for interaction.
     /// Returns true if the window was restored from iconic state.
     /// </summary>
@@ -53,11 +53,11 @@ internal partial class Program
     {
         bool wasIconic = false;
 
-        // Step 1: Iconic → focusless restore with zoom
+        // Step 1: Iconic -> focusless restore with zoom
         if (NativeMethods.IsIconic(hwnd))
         {
             wasIconic = true;
-            Console.Error.WriteLine($"[A11Y] 0x{hwnd.ToInt64():X} \"{title}\" minimized — restoring (focusless)");
+            Console.Error.WriteLine($"[A11Y] 0x{hwnd.ToInt64():X} \"{title}\" minimized -- restoring (focusless)");
             using var iconicZoom = ClickZoomHelper.BeginForIconic(hwnd, actionLabel, $"\"{title}\"");
             var prevFg = NativeMethods.GetForegroundWindow();
             NativeMethods.ShowWindow(hwnd, 9); // SW_RESTORE
@@ -79,8 +79,8 @@ internal partial class Program
                 if (blocker == null) break;
 
                 Console.WriteLine(chain == 0
-                    ? $"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" — dismissing"
-                    : $"[A11Y] chain blocker #{chain + 1}: {blocker.ClassName} \"{blocker.Title}\" — dismissing");
+                    ? $"[A11Y] blocker: {blocker.ClassName} \"{blocker.Title}\" -- dismissing"
+                    : $"[A11Y] chain blocker #{chain + 1}: {blocker.ClassName} \"{blocker.Title}\" -- dismissing");
                 var (handled, _) = readiness.BlockerHandler?.TryHandle(hwnd, blocker) ?? (false, false);
                 if (!handled)
                 {
@@ -94,7 +94,7 @@ internal partial class Program
         return wasIconic;
     }
 
-    // ── Bridge: TryHandleBlocker → adapter ──
+    // -- Bridge: TryHandleBlocker -> adapter --
 
     /// <summary>
     /// Bridge for BlockerHandlerAdapter: delegates to existing TryHandleBlocker.
@@ -105,7 +105,7 @@ internal partial class Program
         return TryHandleBlocker(mainHwnd, handlerMgr);
     }
 
-    // ── Bridge: Knowhow broadcast → adapter ──
+    // -- Bridge: Knowhow broadcast -> adapter --
 
     /// <summary>
     /// Bridge for KnowhowBroadcasterAdapter: delegates to BroadcastInspectKnowhow.
@@ -162,7 +162,7 @@ internal partial class Program
             else
             {
                 var sb = new System.Text.StringBuilder();
-                sb.AppendLine($"## [{formId}] {action}/{method} → {result}");
+                sb.AppendLine($"## [{formId}] {action}/{method} -> {result}");
                 sb.AppendLine(entry);
                 File.WriteAllText(khPath, sb.ToString());
             }
@@ -172,29 +172,29 @@ internal partial class Program
 
     /// <summary>
     /// Shorten MFC Afx class names for readable knowhow filenames.
-    /// "Afx:009C0000:8:00010005:00000000:00000000" → "Afx"
-    /// "AfxWnd140" → "AfxWnd"
-    /// "Edit" → "Edit" (unchanged)
-    /// "#32770" → "Dlg32770"
+    /// "Afx:009C0000:8:00010005:00000000:00000000" -> "Afx"
+    /// "AfxWnd140" -> "AfxWnd"
+    /// "Edit" -> "Edit" (unchanged)
+    /// "#32770" -> "Dlg32770"
     /// </summary>
     internal static string ShortenClassName(string className)
     {
         if (string.IsNullOrEmpty(className)) return "unknown";
 
-        // Afx:HEX:HEX:... → "Afx" (MFC auto-registered class)
+        // Afx:HEX:HEX:... -> "Afx" (MFC auto-registered class)
         if (className.StartsWith("Afx:", StringComparison.OrdinalIgnoreCase) ||
             className.StartsWith("Afx_", StringComparison.OrdinalIgnoreCase))
             return "Afx";
 
-        // AfxWnd140, AfxWnd110s → "AfxWnd"
+        // AfxWnd140, AfxWnd110s -> "AfxWnd"
         if (className.StartsWith("AfxWnd", StringComparison.OrdinalIgnoreCase))
             return "AfxWnd";
 
-        // #32770 → "Dlg32770"
+        // #32770 -> "Dlg32770"
         if (className.StartsWith("#"))
             return "Dlg" + className.Substring(1);
 
-        // Remove version numbers: "ToolbarWindow32" → "ToolbarWindow"
+        // Remove version numbers: "ToolbarWindow32" -> "ToolbarWindow"
         // But keep short names as-is: "Edit", "Button", "Static"
         var sanitized = className.Replace(":", "_").Replace(" ", "");
 

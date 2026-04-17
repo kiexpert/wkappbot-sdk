@@ -43,8 +43,8 @@ internal partial class Program
         }
 
         // Search for backups in two formats:
-        // 1. New: .bak/ subfolder — {dir}/.bak/{filename}.bak-{yyyyMMdd-HHmmss.fff}.txt
-        // 2. Legacy: sibling files — {original}.bak-{timestamp}.txt
+        // 1. New: .bak/ subfolder -- {dir}/.bak/{filename}.bak-{yyyyMMdd-HHmmss.fff}.txt
+        // 2. Legacy: sibling files -- {original}.bak-{timestamp}.txt
         var restorePairs = new List<(string backup, string original)>();
 
         // New format: search .bak/ folders recursively
@@ -106,9 +106,9 @@ internal partial class Program
             var bakName = Path.GetFileName(bak);
             var origRel = Path.GetRelativePath(baseDir, orig);
             if (listOnly || dryRun)
-                Console.WriteLine($"  {bakName} → {origRel}");
+                Console.WriteLine($"  {bakName} -> {origRel}");
             else
-                Console.WriteLine($"  → {origRel}");
+                Console.WriteLine($"  -> {origRel}");
         }
 
         if (listOnly) return 0;
@@ -118,14 +118,14 @@ internal partial class Program
             return 0;
         }
 
-        // Restore: backup current → copy bak → original
+        // Restore: backup current -> copy bak -> original
         int restored = 0;
         int errors = 0;
         foreach (var (bak, orig) in restorePairs)
         {
             try
             {
-                // Save current file before undo (undo-of-undo safety net) → .bak/ subfolder
+                // Save current file before undo (undo-of-undo safety net) -> .bak/ subfolder
                 if (File.Exists(orig))
                 {
                     var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
@@ -155,12 +155,12 @@ internal partial class Program
         else Console.Error.WriteLine(msg);
     }
 
-    // ── file edit ──────────────────────────────────────────────────────────
+    // -- file edit ----------------------------------------------------------
     /// <summary>
     /// file edit &lt;old_string&gt; &lt;new_string&gt; &lt;path&gt;... [--replace-all] [--regex] [--i-really-want-lossy-encoding] [--encoding N] [--context N]
     /// Also accepts option-style aliases for tool compatibility:
     ///   --old-string/--text/--new-string/--path/--dry-run
-    /// Same interface as Claude Code Edit tool. Auto-detects encoding (BOM → system ANSI/CP949).
+    /// Same interface as Claude Code Edit tool. Auto-detects encoding (BOM -> system ANSI/CP949).
     /// Fails if old_string not found (exact match). Preserves original encoding on save.
     /// </summary>
     static int FileEditCommand(string[] args)
@@ -242,7 +242,7 @@ internal partial class Program
             return 1;
         }
 
-        // C-style escape: \n \t \r \\ → actual characters (unless --old-file mode)
+        // C-style escape: \n \t \r \\ -> actual characters (unless --old-file mode)
         string oldStr = UnescapeCString(positional[0]);
         string newStr = UnescapeCString(positional[1]);
         bool fromFile = oldFile != null; // track for line-ending normalization in validate
@@ -303,14 +303,14 @@ internal partial class Program
                     return 1;
                 }
 
-                // Safety: backup current file before undo (undo-of-undo) → .bak/ subfolder
+                // Safety: backup current file before undo (undo-of-undo) -> .bak/ subfolder
                 if (File.Exists(path))
                 {
                     var undoTs = DateTime.Now.ToString("yyyyMMdd-HHmmss.fff");
                     var undoBakDir = Path.Combine(Path.GetDirectoryName(path)!, ".bak");
                     var undoBak = Path.Combine(undoBakDir, $"{Path.GetFileName(path)}.bak-{undoTs}-undo.txt");
                     try { Directory.CreateDirectory(undoBakDir); File.Copy(path, undoBak); } catch { }
-                    Console.Error.WriteLine($"[file edit --undo] safety backup → {Path.GetFileName(undoBak)}");
+                    Console.Error.WriteLine($"[file edit --undo] safety backup -> {Path.GetFileName(undoBak)}");
                 }
 
                 File.Copy(bakFile, path, overwrite: true);
@@ -321,7 +321,7 @@ internal partial class Program
         }
 
         // All-or-nothing for multi-file edits: validate ALL files first, then write all.
-        // Phase 1: validate (dry-run) — produces edited content for each file but does not write
+        // Phase 1: validate (dry-run) -- produces edited content for each file but does not write
         var pending = new List<FileEditPlan>();
         foreach (var path in paths)
         {
@@ -339,7 +339,7 @@ internal partial class Program
                 }
             }
             var (ok, plan, errMsg) = FileEditValidate(path, effOld, effNew, replaceAll, useRegex, force, encoding);
-            if (!ok) { ErrOut(errMsg); if (multi) return Error("[file edit] validation failed — no files written"); else return 1; }
+            if (!ok) { ErrOut(errMsg); if (multi) return Error("[file edit] validation failed -- no files written"); else return 1; }
             pending.Add(plan!);
         }
 
@@ -358,7 +358,7 @@ internal partial class Program
         List<int> MatchPositions, string OrigText, string Result, string OldStr, string NewStr,
         bool HasUnmappable);
 
-    /// <summary>Validate a file edit without writing — returns plan on success or error message.</summary>
+    /// <summary>Validate a file edit without writing -- returns plan on success or error message.</summary>
     static (bool ok, FileEditPlan? plan, string? errMsg) FileEditValidate(
         string path, string oldStr, string newStr, bool replaceAll, bool useRegex, bool force, int? encoding)
     {
@@ -394,10 +394,10 @@ internal partial class Program
             bool hasBadBytes = oldStr.Any(c => c == 0xFFFD || (c >= 0x80 && c < 0xA0)); // replacement char or high bytes
             if (hasKorean || hasBadBytes)
             {
-                msg += $"\n  ⚠ Encoding mismatch? File={enc.WebName}";
+                msg += $"\n  ! Encoding mismatch? File={enc.WebName}";
                 if (hasBadBytes)
                     msg += ", old_string contains corrupted bytes (U+FFFD or high-byte)";
-                msg += "\n  💡 bash corrupts Korean CLI args — use --old-file instead:";
+                msg += "\n  💡 bash corrupts Korean CLI args -- use --old-file instead:";
                 msg += "\n     echo '원본텍스트' > /tmp/old.txt && wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt <path>";
                 msg += "\n  💡 dry-run (search only): wkappbot file edit '같은텍스트' '같은텍스트' <path>";
             }
@@ -412,7 +412,7 @@ internal partial class Program
             var matches = rx.Matches(text);
             count = matches.Count;
             if (count == 0) return (false, null, $"[file edit] regex pattern not found in {Path.GetFileName(path)}");
-            if (!replaceAll && count > 1) return (false, null, $"[file edit] regex matches {count} locations — use --replace-all or narrow the pattern");
+            if (!replaceAll && count > 1) return (false, null, $"[file edit] regex matches {count} locations -- use --replace-all or narrow the pattern");
             foreach (Match m in matches) matchPositions.Add(m.Index);
             result = rx.Replace(text, newStr);
         }
@@ -429,14 +429,14 @@ internal partial class Program
             int idx = text.IndexOf(oldStr, StringComparison.Ordinal);
             if (idx < 0) return (false, null, NotFoundError(Path.GetFileName(path)));
             int second = text.IndexOf(oldStr, idx + oldStr.Length, StringComparison.Ordinal);
-            if (second >= 0) return (false, null, $"[file edit] old_string matches multiple locations — use --replace-all or provide more context");
+            if (second >= 0) return (false, null, $"[file edit] old_string matches multiple locations -- use --replace-all or provide more context");
             matchPositions.Add(idx);
             result = text[..idx] + newStr + text[(idx + oldStr.Length)..];
             count = 1;
         }
 
         // Check for unmappable characters via roundtrip.
-        // Use '?' (ASCII 0x3F) as fallback — always encodable in any codepage.
+        // Use '?' (ASCII 0x3F) as fallback -- always encodable in any codepage.
         // U+FFFD would recurse if CP949 itself can't encode it.
         var safeEnc = Encoding.GetEncoding(enc.CodePage,
             new EncoderReplacementFallback("?"), DecoderFallback.ReplacementFallback);
@@ -446,7 +446,7 @@ internal partial class Program
         for (int ci = 0; ci < result.Length; ci++)
             if (ci < roundtrip.Length && roundtrip[ci] == '?' && result[ci] != '?') unmappable++;
         if (unmappable > 0 && !force)
-            return (false, null, $"[file edit] {unmappable} character(s) in new_string cannot be encoded in {enc.WebName} — file NOT written. Use --i-really-want-lossy-encoding to allow '?' substitution, or --encoding to target a different charset.");
+            return (false, null, $"[file edit] {unmappable} character(s) in new_string cannot be encoded in {enc.WebName} -- file NOT written. Use --i-really-want-lossy-encoding to allow '?' substitution, or --encoding to target a different charset.");
 
         return (true, new FileEditPlan(path, outBytes, enc, count, matchPositions, text, result, oldStr, newStr, unmappable > 0), null);
     }
@@ -455,20 +455,20 @@ internal partial class Program
     static int FileEditWrite(FileEditPlan plan, bool backup, int context, bool multi, int tabSize = 4, int indentContext = 7)
     {
         if (plan.HasUnmappable)
-            ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} — data loss accepted");
+            ErrOut($"[file edit] WARNING(--i-really-want-lossy-encoding): character(s) replaced with '?' in {plan.Enc.WebName} -- data loss accepted");
 
         // Print file path first so AI always sees which file is being edited
         Console.Error.WriteLine($"[file edit] {plan.Path}");
 
-        // No actual change → skip backup + write, show context only (search mode)
+        // No actual change -> skip backup + write, show context only (search mode)
         bool noChange = plan.OldStr == plan.NewStr;
         if (noChange)
         {
-            Console.Error.WriteLine($"[file edit] {plan.Count} match(es), no change — skip backup & write (search only)");
+            Console.Error.WriteLine($"[file edit] {plan.Count} match(es), no change -- skip backup & write (search only)");
         }
         else if (backup)
         {
-            // Timestamp in backup name = original file's LastWriteTime (ms precision) — "파일타임표준"
+            // Timestamp in backup name = original file's LastWriteTime (ms precision) -- "파일타임표준"
             // Backup goes to .bak/ subfolder to keep source directories clean
             var origMtime = File.GetLastWriteTime(plan.Path);
             var ts = origMtime.ToString("yyyyMMdd-HHmmss.fff");
@@ -481,14 +481,14 @@ internal partial class Program
                 File.Copy(plan.Path, bakPath, overwrite: true);
                 File.SetCreationTime(bakPath, File.GetCreationTime(plan.Path));
                 File.SetLastWriteTime(bakPath, File.GetLastWriteTime(plan.Path));
-                Console.Error.WriteLine($"[file edit] backup → {bakPath}");
+                Console.Error.WriteLine($"[file edit] backup -> {bakPath}");
 
                 // Auto-migrate legacy sibling .bak-*.txt files into .bak/ subfolder
                 MigrateLegacyBackups(Path.GetDirectoryName(plan.Path)!, bakDir);
             }
             catch (Exception ex)
             {
-                return Error($"[file edit] backup failed ({ex.Message}) — file NOT written. Use --i-really-want-no-backup to skip backup.");
+                return Error($"[file edit] backup failed ({ex.Message}) -- file NOT written. Use --i-really-want-no-backup to skip backup.");
             }
         }
 
@@ -506,13 +506,13 @@ internal partial class Program
                 {
                     Directory.CreateDirectory(dryBakDir);
                     File.WriteAllBytes(backupPath, plan.OutBytes);
-                    Console.Error.WriteLine("[DRY-RUN] ⚠ Your edit has been PROPOSED. The original file was NOT modified.");
-                    Console.Error.WriteLine($"[file edit] backup → {backupPath}");
+                    Console.Error.WriteLine("[DRY-RUN] ! Your edit has been PROPOSED. The original file was NOT modified.");
+                    Console.Error.WriteLine($"[file edit] backup -> {backupPath}");
                 }
                 catch (Exception ex)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Error.WriteLine($"[DRY-RUN] file edit: {plan.Count} replacement(s) — backup failed ({ex.Message})");
+                    Console.Error.WriteLine($"[DRY-RUN] file edit: {plan.Count} replacement(s) -- backup failed ({ex.Message})");
                     Console.ResetColor();
                 }
                 return 0;
@@ -522,9 +522,9 @@ internal partial class Program
             var verifyEnc = DetectFileEncoding(plan.OutBytes, null);
             bool encodingChanged = verifyEnc.CodePage != plan.Enc.CodePage;
             if (encodingChanged)
-                Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} → {verifyEnc.WebName} — possible corruption");
+                Console.Error.WriteLine($"[file edit] WARNING: output encoding changed! {plan.Enc.WebName} -> {verifyEnc.WebName} -- possible corruption");
 
-            // Corruption check: look for U+FFFD replacement chars (indicates CP949→UTF-8 mojibake)
+            // Corruption check: look for U+FFFD replacement chars (indicates CP949->UTF-8 mojibake)
             // U+FFFD in UTF-8 = 0xEF 0xBF 0xBD
             bool hasReplacement = false;
             if (plan.Enc.CodePage != 65001 /* non-UTF-8 original */ || encodingChanged)
@@ -535,7 +535,7 @@ internal partial class Program
             if (hasReplacement)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine($"[file edit] ⚠ ENCODING CORRUPTION: U+FFFD found in output — Korean/CJK chars may be mojibake!");
+                Console.Error.WriteLine($"[file edit] ! ENCODING CORRUPTION: U+FFFD found in output -- Korean/CJK chars may be mojibake!");
                 Console.Error.WriteLine($"  File: {plan.Path}");
                 Console.Error.WriteLine($"  Original encoding: {plan.Enc.WebName} (CP{plan.Enc.CodePage})");
                 Console.Error.WriteLine($"  Restore with: wkappbot file edit --undo {DateTime.Now:yyyyMMdd-HHmmss} \"{plan.Path}\"");
@@ -543,7 +543,7 @@ internal partial class Program
                 // Send Slack alert via Eye pipe if available
                 try
                 {
-                    var alertMsg = $":warning: *[인코딩 오염]* `{Path.GetFileName(plan.Path)}`\n원본 인코딩: {plan.Enc.WebName} → U+FFFD 발견. 한글 깨짐 가능성!\n`{plan.Path}`";
+                    var alertMsg = $":warning: *[인코딩 오염]* `{Path.GetFileName(plan.Path)}`\n원본 인코딩: {plan.Enc.WebName} -> U+FFFD 발견. 한글 깨짐 가능성!\n`{plan.Path}`";
                     var slackCfg = LoadSlackConfig();
                     var tok = slackCfg?["bot_token"]?.GetValue<string>();
                     var ch  = slackCfg?["channel"]?.GetValue<string>();
@@ -553,12 +553,12 @@ internal partial class Program
                 catch { /* Slack alert is best-effort */ }
             }
 
-            // WriteAllBytes uses FileMode.Create (truncate-in-place) — no delete event fired
+            // WriteAllBytes uses FileMode.Create (truncate-in-place) -- no delete event fired
             File.WriteAllBytes(plan.Path, plan.OutBytes);
-            Console.Error.WriteLine($"[file edit] {plan.Count} replacement(s) — encoding={plan.Enc.WebName}{(hasReplacement ? " ⚠CORRUPTION" : "")}");
+            Console.Error.WriteLine($"[file edit] {plan.Count} replacement(s) -- encoding={plan.Enc.WebName}{(hasReplacement ? " !CORRUPTION" : "")}");
         }
 
-        // ── Context output: indent-based block expansion + N extra lines ──
+        // -- Context output: indent-based block expansion + N extra lines --
         // context = N means: expand to indent boundary, then show N more lines beyond.
         // Default (context=1): show enclosing block + 1 line outside (method signature, etc.)
         if (plan.MatchPositions.Count > 0)
@@ -616,7 +616,7 @@ internal partial class Program
             }
 
             var changedSet = new HashSet<int>(changedRanges.SelectMany(r => Enumerable.Range(r.start, r.end - r.start + 1)));
-            // Build old lines for "before" display (← marker)
+            // Build old lines for "before" display (<- marker)
             var origLines = plan.OrigText.ReplaceLineEndings("\n").Split('\n');
             var oldLineRanges = new List<(int origStart, int origEnd)>();
             {
@@ -637,7 +637,7 @@ internal partial class Program
                 if (prev.HasValue && li > prev + 1) Console.WriteLine("   ...");
                 bool changed = changedSet.Contains(li);
 
-                // Show old lines (← marker) before the first changed line of each range
+                // Show old lines (<- marker) before the first changed line of each range
                 if (changed && rangeIdx < changedRanges.Count && li == changedRanges[rangeIdx].start)
                 {
                     var (origStart, origEnd) = oldLineRanges[rangeIdx];
@@ -658,13 +658,13 @@ internal partial class Program
 
     /// <summary>
     /// Migrate all legacy backup formats into current format (.bak/{original}.bak-{ts}.txt).
-    /// Phase 1: sibling .bak-*.txt files → move into .bak/ subfolder
-    /// Phase 2: .bak/ files without .txt extension (intermediate format) → rename to add .txt
+    /// Phase 1: sibling .bak-*.txt files -> move into .bak/ subfolder
+    /// Phase 2: .bak/ files without .txt extension (intermediate format) -> rename to add .txt
     /// Called once per file-edit, walks up from sourceDir to git/svn root to catch all dirs.
     /// </summary>
     static void MigrateLegacyBackups(string sourceDir, string bakDir)
     {
-        // Walk up to project root (git/.svn/.wkappbot marker) — migrate all dirs en route
+        // Walk up to project root (git/.svn/.wkappbot marker) -- migrate all dirs en route
         var dirs = new List<string>();
         var cur = sourceDir;
         while (!string.IsNullOrEmpty(cur))
@@ -683,7 +683,7 @@ internal partial class Program
         {
             try
             {
-                // Phase 1: sibling .bak-*.txt → .bak/ subfolder
+                // Phase 1: sibling .bak-*.txt -> .bak/ subfolder
                 var legacyFiles = Directory.EnumerateFiles(dir, "*.bak-*.txt", SearchOption.TopDirectoryOnly).ToList();
                 var targetBakDir = Path.Combine(dir, ".bak");
                 foreach (var legacy in legacyFiles)
@@ -704,7 +704,7 @@ internal partial class Program
                     catch { }
                 }
 
-                // Phase 2: .bak/ files missing .txt extension → rename
+                // Phase 2: .bak/ files missing .txt extension -> rename
                 if (Directory.Exists(targetBakDir))
                 {
                     foreach (var f in Directory.EnumerateFiles(targetBakDir, "*", SearchOption.TopDirectoryOnly))
@@ -718,8 +718,8 @@ internal partial class Program
                     }
                 }
 
-                // Phase 3: sibling .undo-*.txt files (old undo-of-undo format) → .bak/ subfolder
-                // Old: {file}.undo-{ts}.txt  →  New: .bak/{file}.bak-{ts}-undo.txt
+                // Phase 3: sibling .undo-*.txt files (old undo-of-undo format) -> .bak/ subfolder
+                // Old: {file}.undo-{ts}.txt  ->  New: .bak/{file}.bak-{ts}-undo.txt
                 var undoFiles = Directory.EnumerateFiles(dir, "*.undo-*.txt", SearchOption.TopDirectoryOnly).ToList();
                 foreach (var undoFile in undoFiles)
                 {
@@ -759,7 +759,7 @@ internal partial class Program
         return leading.Count(c => c == '\t');
     }
 
-    /// <summary>C-style escape: \n \t \r \\ \" \0 → actual characters.</summary>
+    /// <summary>C-style escape: \n \t \r \\ \" \0 -> actual characters.</summary>
     static string UnescapeCString(string s)
     {
         var sb = new System.Text.StringBuilder(s.Length);
@@ -775,7 +775,7 @@ internal partial class Program
                     case '\\': sb.Append('\\'); i++; break;
                     case '"': sb.Append('"'); i++; break;
                     case '0': sb.Append('\0'); i++; break;
-                    default: sb.Append(s[i]); break; // unknown escape → keep as-is
+                    default: sb.Append(s[i]); break; // unknown escape -> keep as-is
                 }
             }
             else sb.Append(s[i]);
@@ -783,11 +783,11 @@ internal partial class Program
         return sb.ToString();
     }
 
-    // ── usage ──────────────────────────────────────────────────────────────
+    // -- usage --------------------------------------------------------------
     static int FileToolUsage()
     {
         Console.WriteLine(@"
-wkappbot file — filesystem tools (read + write + edit + PDF)
+wkappbot file -- filesystem tools (read + write + edit + PDF)
 
 Usage:
   wkappbot file read <path> [--offset N] [--limit N] [--encoding N]
@@ -805,7 +805,7 @@ Usage:
       Without --replace-all: fails if old_string not found or matches multiple locations.
       --regex: old_string is a .NET regex; new_string may use $1/$2 capture groups.
       --i-really-want-lossy-encoding: allow '?' substitution for chars not encodable in target charset.
-      --i-really-want-no-backup: skip backup (default: backup ON — saves .bak/<file>.bak-yyyyMMdd-HHmmss.fff.txt).
+      --i-really-want-no-backup: skip backup (default: backup ON -- saves .bak/<file>.bak-yyyyMMdd-HHmmss.fff.txt).
       --context N: lines of context around changes (default 1; 0 = header only).
 
   wkappbot file write <path> [--encoding N] (--stdin | --text ""..."" | --file <src>) [--append]

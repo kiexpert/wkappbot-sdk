@@ -7,24 +7,24 @@ using WKAppBot.Win32.Native;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Global action API — wraps UIA/physical actions with auto-zoom policy.
+/// Global action API -- wraps UIA/physical actions with auto-zoom policy.
 /// Every UI action (focusless UIA + physical click) shows a zoom overlay
 /// so the user can see what the bot is touching.
 ///
 /// Pattern:
 ///   var ok = ActionApi.Select(tabItem, hwnd, "잔고(15단)");
-///   // = zoom appears → UiaLocator.TrySelect() → zoom shows pass/fail → auto-fade
+///   // = zoom appears -> UiaLocator.TrySelect() -> zoom shows pass/fail -> auto-fade
 ///
 /// Modeled after FocuslessGuard: global static class, policy at API boundary.
 /// Tag: [ZOOM]
-/// Tag: [FOCUSSTEALER] — marks windows that steal focus during nominally-focusless UIA actions.
+/// Tag: [FOCUSSTEALER] -- marks windows that steal focus during nominally-focusless UIA actions.
 /// </summary>
 public static class ActionApi
 {
     /// <summary>Master switch for zoom overlays. Default = true.</summary>
     public static bool ZoomEnabled { get; set; } = true;
 
-    // ── FocusStealer Win32 prop ──
+    // -- FocusStealer Win32 prop --
     // If a nominally-focusless UIA action (invoke/toggle/select/expand/collapse) steals focus,
     // we stamp the root hwnd with "WKAppBot_FocusStealer-{action}" = 1.
     // Next time InputReadiness.Probe() runs on the same hwnd, it forces the yield popup.
@@ -40,8 +40,8 @@ public static class ActionApi
     /// Receiver should write to knowhow so future sessions know to skip UIA Invoke.</summary>
     public static Action<IntPtr, string>? OnInvokeHollow;
 
-    // ── UIA Focusless Actions ──
-    // Zoom runs in parallel with the UIA action — ~334ms → ~0ms blocking. [PROF]
+    // -- UIA Focusless Actions --
+    // Zoom runs in parallel with the UIA action -- ~334ms -> ~0ms blocking. [PROF]
     // BoundingRect is captured on the calling thread (COM-safe), then WPF window
     // creation runs on Task.Run so it doesn't block the UIA call.
 
@@ -105,7 +105,7 @@ public static class ActionApi
         return ok;
     }
 
-    // ── Physical Actions (focus-stealing) ──
+    // -- Physical Actions (focus-stealing) --
 
     public static void Click(int screenX, int screenY, IntPtr hwnd, string label)
     {
@@ -128,10 +128,10 @@ public static class ActionApi
         zoomTask.GetAwaiter().GetResult()?.ShowPass($"RightClick {label}");
     }
 
-    // ── Zoom Helpers ──
+    // -- Zoom Helpers --
 
     /// <summary>
-    /// Begin zoom overlay for a UIA element — async so it runs in parallel with the UIA action.
+    /// Begin zoom overlay for a UIA element -- async so it runs in parallel with the UIA action.
     /// BoundingRect is captured on the calling thread (COM-safe); WPF window creation is offloaded.
     /// </summary>
     private static Task<ClickZoomHelper?> BeginZoomForElementAsync(
@@ -140,7 +140,7 @@ public static class ActionApi
         if (!ZoomEnabled) return Task.FromResult<ClickZoomHelper?>(null);
         try
         {
-            var br = el.BoundingRectangle; // COM call — must stay on calling thread
+            var br = el.BoundingRectangle; // COM call -- must stay on calling thread
             if (br.Width <= 0 || br.Height <= 0) return Task.FromResult<ClickZoomHelper?>(null);
             var rect = new Rectangle((int)br.X, (int)br.Y, (int)br.Width, (int)br.Height);
             return Task.Run(() => ClickZoomHelper.BeginFromRect(rect, hwnd, source, label));
@@ -149,7 +149,7 @@ public static class ActionApi
     }
 
     /// <summary>
-    /// Begin zoom overlay for a screen point — async so it runs in parallel with the physical click.
+    /// Begin zoom overlay for a screen point -- async so it runs in parallel with the physical click.
     /// </summary>
     private static Task<ClickZoomHelper?> BeginZoomForPointAsync(
         int screenX, int screenY, IntPtr hwnd, string source, string label)
@@ -176,13 +176,13 @@ public static class ActionApi
             zoom.ShowFail($"{verb} failed: {label}");
     }
 
-    // ── FocusStealer / MouseStealer Detection ──
+    // -- FocusStealer / MouseStealer Detection --
     // Nominally-focusless UIA actions (invoke/toggle/select/expand/collapse) should not
     // change foreground window OR move the mouse cursor. If they do, we:
     //   1. Restore the stolen resource immediately (focus / cursor)
     //   2. Stamp a Win32 prop on the root hwnd (auto-cleaned when window closes)
     //   3. Fire OnFocusStealer callback (knowhow writer, warning overlay)
-    //   4. Next InputReadiness.Probe() detects the prop → forces yield popup
+    //   4. Next InputReadiness.Probe() detects the prop -> forces yield popup
 
     public const string MouseStealerPropPrefix  = "WKAppBot_MouseStealer-";
     private const int   CursorMoveThresholdPx   = 4; // ignore sub-pixel jitter
@@ -200,8 +200,8 @@ public static class ActionApi
 
     /// <summary>
     /// After a nominally-focusless UIA action:
-    ///   — If foreground changed → restore, stamp prop, fire callback.
-    ///   — If cursor moved significantly → restore, stamp prop, fire callback.
+    ///   -- If foreground changed -> restore, stamp prop, fire callback.
+    ///   -- If cursor moved significantly -> restore, stamp prop, fire callback.
     /// </summary>
     private static void CheckSideEffects(IntPtr hwnd, string action,
         (IntPtr prevFg, int px, int py) snap)
@@ -211,7 +211,7 @@ public static class ActionApi
             var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeMethods.GA_ROOT);
             if (rootHwnd == IntPtr.Zero) rootHwnd = hwnd;
 
-            // ── Focus theft ──
+            // -- Focus theft --
             var curFg = NativeMethods.GetForegroundWindow();
             if (snap.prevFg != IntPtr.Zero && curFg != snap.prevFg)
             {
@@ -221,14 +221,14 @@ public static class ActionApi
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(
-                    $"[FOCUSSTEALER] ⚠ {action} stole focus " +
-                    $"(was 0x{snap.prevFg:X}, now 0x{curFg:X}) — restored + marked");
+                    $"[FOCUSSTEALER] ! {action} stole focus " +
+                    $"(was 0x{snap.prevFg:X}, now 0x{curFg:X}) -- restored + marked");
                 Console.ResetColor();
 
                 OnFocusStealer?.Invoke(rootHwnd, action);
             }
 
-            // ── Mouse cursor theft ──
+            // -- Mouse cursor theft --
             NativeMethods.GetCursorPos(out var curPt);
             int dx = Math.Abs(curPt.X - snap.px);
             int dy = Math.Abs(curPt.Y - snap.py);
@@ -239,8 +239,8 @@ public static class ActionApi
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine(
-                    $"[MOUSESTEALER] ⚠ {action} moved cursor " +
-                    $"({snap.px},{snap.py}) → ({curPt.X},{curPt.Y}), Δ({dx},{dy}) — restored + marked");
+                    $"[MOUSESTEALER] ! {action} moved cursor " +
+                    $"({snap.px},{snap.py}) -> ({curPt.X},{curPt.Y}), Δ({dx},{dy}) -- restored + marked");
                 Console.ResetColor();
 
                 // Reuse same callback (args: rootHwnd, "mouse-{action}" distinguishes in knowhow)

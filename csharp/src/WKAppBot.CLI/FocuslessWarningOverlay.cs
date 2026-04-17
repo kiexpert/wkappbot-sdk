@@ -14,11 +14,11 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// 포커스리스 클릭 시도 후 전경이 의도치 않게 변경됐을 때 알림.
-/// 타겟 윈도우 소유 WPF 오버레이 — ShowActivated=false + WS_EX_NOACTIVATE.
-/// "다시 알림" 체크박스(기본 체크) — 언체크 후 확인 → 해당 프로세스 알림 억제.
+/// 타겟 윈도우 소유 WPF 오버레이 -- ShowActivated=false + WS_EX_NOACTIVATE.
+/// "다시 알림" 체크박스(기본 체크) -- 언체크 후 확인 -> 해당 프로세스 알림 억제.
 /// 확인 안 누르면 5초 후 자동 닫힘 (알림 계속).
 ///
-/// Design: "⚠ 포커스리스 시도했으나 의도치 않게 포커스됨"
+/// Design: "! 포커스리스 시도했으나 의도치 않게 포커스됨"
 /// Tag: [FL] [READINESS]
 /// </summary>
 internal sealed class FocuslessWarningWindow : Window
@@ -47,7 +47,7 @@ internal sealed class FocuslessWarningWindow : Window
         ShowActivated = false; // CRITICAL: never steal focus
         ResizeMode = ResizeMode.NoResize;
 
-        // ── Visual tree ──
+        // -- Visual tree --
         var outerBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xF0, 0x2D, 0x1A, 0x00)),
@@ -62,7 +62,7 @@ internal sealed class FocuslessWarningWindow : Window
         // Header
         stack.Children.Add(new TextBlock
         {
-            Text = "[FL] ⚠ 의도치 않은 포커스 변경",
+            Text = "[FL] ! 의도치 않은 포커스 변경",
             Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07)),
             FontFamily = new FontFamily("Consolas"),
             FontSize = 12,
@@ -73,7 +73,7 @@ internal sealed class FocuslessWarningWindow : Window
         // Detail message
         stack.Children.Add(new TextBlock
         {
-            Text = $"포커스리스 클릭 성공, 그러나 앱({processName})이 전경으로 올라옴\n→ {detail}",
+            Text = $"포커스리스 클릭 성공, 그러나 앱({processName})이 전경으로 올라옴\n-> {detail}",
             Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0xB2)),
             FontFamily = new FontFamily("맑은 고딕"),
             FontSize = 11,
@@ -131,7 +131,7 @@ internal sealed class FocuslessWarningWindow : Window
         Loaded += (_, _) => PlayWarningTone();
     }
 
-    // ── Warning tone: 짧은 하행 2음 경고 (G5→D5, ~200ms) ──
+    // -- Warning tone: 짧은 하행 2음 경고 (G5->D5, ~200ms) --
     private static void PlayWarningTone()
     {
         ThreadPool.QueueUserWorkItem(_ =>
@@ -141,8 +141,8 @@ internal sealed class FocuslessWarningWindow : Window
                 const int rate = 22050;
                 (double hz, int ms)[] melody =
                 {
-                    (783.99, 90),   // G5 — 높은 경고음
-                    (587.33, 130),  // D5 — 하행 (단3도 아래, 긴장감)
+                    (783.99, 90),   // G5 -- 높은 경고음
+                    (587.33, 130),  // D5 -- 하행 (단3도 아래, 긴장감)
                 };
 
                 var pcm = new System.Collections.Generic.List<short>();
@@ -189,7 +189,7 @@ internal sealed class FocuslessWarningWindow : Window
 
     private void OnDismiss()
     {
-        // "Don't show again" 체크됨 → suppress=true (alertAgain=false)
+        // "Don't show again" 체크됨 -> suppress=true (alertAgain=false)
         bool dontShowAgain = _alertCheck.IsChecked == true;
         Dismissed?.Invoke(!dontShowAgain); // true=계속알림, false=억제
         Dispatcher.InvokeShutdown();
@@ -209,13 +209,13 @@ internal sealed class FocuslessWarningWindow : Window
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE));
 
-        // Re-apply physical position AFTER owner set — GWL_HWNDPARENT may reposition
+        // Re-apply physical position AFTER owner set -- GWL_HWNDPARENT may reposition
         if (_physX != int.MinValue)
             SetWindowPos(helper.Handle, IntPtr.Zero, _physX, _physY, 0, 0,
                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE_F);
     }
 
-    // ── Win32 P/Invoke ──
+    // -- Win32 P/Invoke --
     private const int GWL_EXSTYLE = -20;
     private const int GWL_HWNDPARENT = -8;
     private const int WS_EX_NOACTIVATE = 0x08000000;
@@ -243,7 +243,7 @@ internal static class FocuslessWarningOverlay
 {
     // 프로세스별 알림 억제 Set (언체크+확인 시 추가)
     private static readonly ConcurrentDictionary<string, bool> _suppressed = new();
-    // 현재 표시 중인 프로세스별 창 추적 — 중복 창 방지
+    // 현재 표시 중인 프로세스별 창 추적 -- 중복 창 방지
     private static readonly ConcurrentDictionary<string, bool> _active = new();
 
     /// <summary>
@@ -268,7 +268,7 @@ internal static class FocuslessWarningOverlay
         if (!_active.TryAdd(procName, true))
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  [FL] Warning already showing for {procName} — skipped duplicate");
+            Console.WriteLine($"  [FL] Warning already showing for {procName} -- skipped duplicate");
             Console.ResetColor();
             return;
         }
@@ -292,7 +292,7 @@ internal static class FocuslessWarningOverlay
                 }
             };
 
-            // Position via SetPhysicalPosition (physical pixels) → SetWindowPos in OnSourceInitialized
+            // Position via SetPhysicalPosition (physical pixels) -> SetWindowPos in OnSourceInitialized
             try
             {
                 int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
@@ -346,7 +346,7 @@ internal static class FocuslessWarningOverlay
             }
             finally
             {
-                // 창 닫힘 → 다음 경고 허용
+                // 창 닫힘 -> 다음 경고 허용
                 _active.TryRemove(procName, out _);
             }
         });

@@ -12,10 +12,10 @@ internal partial class Program
     ///
     /// Flow:
     ///   1. Read bin/build_info.json for installed run_id
-    ///   2. gh run list → latest successful build.yml run
-    ///   3. gh run download → temp dir
-    ///   4. Stage wkappbot-core.exe.new  → Eye picks up and hot-swaps
-    ///   5. Stage wkappbot.exe.new        → TryRenameSwap at end (self-swap)
+    ///   2. gh run list -> latest successful build.yml run
+    ///   3. gh run download -> temp dir
+    ///   4. Stage wkappbot-core.exe.new  -> Eye picks up and hot-swaps
+    ///   5. Stage wkappbot.exe.new        -> TryRenameSwap at end (self-swap)
     ///   6. Copy wkappbot.hq/ assets + DLLs
     ///   7. Write updated build_info.json
     /// </summary>
@@ -91,7 +91,7 @@ internal partial class Program
         }
         if (checkOnly)
         {
-            Console.WriteLine($"[UPDATE] Update available: {currentRunId ?? "unknown"} → {latestRunId}");
+            Console.WriteLine($"[UPDATE] Update available: {currentRunId ?? "unknown"} -> {latestRunId}");
             return 0;
         }
 
@@ -107,7 +107,7 @@ internal partial class Program
         if (!downloaded)
         {
             // Fallback: download all artifacts for the run (picks up whichever bin artifact exists)
-            Console.Error.WriteLine($"[UPDATE] Artifact '{artifactName}' not found — retrying without name filter...");
+            Console.Error.WriteLine($"[UPDATE] Artifact '{artifactName}' not found -- retrying without name filter...");
             downloaded = TryRunGh(["run", "download", latestRunId!, "--repo", repo, "--dir", tmpDir], out _);
         }
         if (!downloaded)
@@ -127,16 +127,16 @@ internal partial class Program
         }
         Console.Error.WriteLine($"[UPDATE] Artifact extracted to: {downloadedBinDir}");
 
-        // Stage wkappbot-core.exe as .new.exe — Eye hot-swaps automatically
+        // Stage wkappbot-core.exe as .new.exe -- Eye hot-swaps automatically
         var srcCore = Path.Combine(downloadedBinDir, "wkappbot-core.exe");
         if (File.Exists(srcCore))
         {
             var stageCore = Path.Combine(binDir, "wkappbot-core.exe.new");
             File.Copy(srcCore, stageCore, overwrite: true);
-            Console.Error.WriteLine("[UPDATE] wkappbot-core.exe.new staged — Eye will hot-swap.");
+            Console.Error.WriteLine("[UPDATE] wkappbot-core.exe.new staged -- Eye will hot-swap.");
         }
 
-        // Stage wkappbot.exe as .new.exe — self-swapped at end of this command
+        // Stage wkappbot.exe as .new.exe -- self-swapped at end of this command
         var srcLauncher = Path.Combine(downloadedBinDir, "wkappbot.exe");
         if (File.Exists(srcLauncher))
         {
@@ -170,12 +170,12 @@ internal partial class Program
         });
         File.WriteAllText(buildInfoPath, newInfo);
 
-        Console.WriteLine($"[UPDATE] Done: {currentRunId ?? "unknown"} → {latestRunId}");
+        Console.WriteLine($"[UPDATE] Done: {currentRunId ?? "unknown"} -> {latestRunId}");
 
         // Cleanup temp
         try { Directory.Delete(tmpDir, true); } catch { }
 
-        // Self-swap wkappbot.exe — must be the last operation (renames the running process)
+        // Self-swap wkappbot.exe -- must be the last operation (renames the running process)
         var selfPath = Environment.ProcessPath;
         var stagedSelf = Path.Combine(binDir, "wkappbot.exe.new");
         if (!string.IsNullOrEmpty(selfPath) && File.Exists(stagedSelf))
@@ -183,7 +183,7 @@ internal partial class Program
             Console.WriteLine("[UPDATE] Applying wkappbot.exe self-swap...");
             var swapResult = TryRenameSwap(selfPath, "UPDATE");
             Console.WriteLine(swapResult == HotSwapResult.Swapped
-                ? "[UPDATE] wkappbot.exe updated — new binary active on next run."
+                ? "[UPDATE] wkappbot.exe updated -- new binary active on next run."
                 : $"[UPDATE] wkappbot.exe self-swap result: {swapResult}");
         }
 
@@ -224,7 +224,7 @@ internal partial class Program
         return null;
     }
 
-    /// <summary>Recursively copy src → dest, overwriting existing files.</summary>
+    /// <summary>Recursively copy src -> dest, overwriting existing files.</summary>
     static void UpdateCopyDirectory(string src, string dest)
     {
         Directory.CreateDirectory(dest);

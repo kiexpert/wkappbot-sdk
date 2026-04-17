@@ -30,7 +30,7 @@ internal sealed class TriadSharedContext
     private readonly ConcurrentDictionary<string, object> _fileLocks =
         new(StringComparer.OrdinalIgnoreCase);
 
-    // ── Real-time cross-prompting: streaming chunks shared between AIs ──
+    // -- Real-time cross-prompting: streaming chunks shared between AIs --
     // When AI-A produces a chunk, other AIs get it as context.
     private readonly ConcurrentDictionary<string, string> _latestChunks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _chunkVersions = new(StringComparer.OrdinalIgnoreCase);
@@ -68,7 +68,7 @@ internal sealed class TriadSharedContext
     /// <summary>The original user question ??used by moderator redirect when debaters go off-topic.</summary>
     public string OriginalQuestion => _question;
 
-    // ── Live MD minutes: real-time debate transcript (APPEND mode) ──
+    // -- Live MD minutes: real-time debate transcript (APPEND mode) --
     private string? _mdPath;
     private readonly object _mdLock = new();
 #pragma warning disable CS0414
@@ -147,7 +147,7 @@ internal sealed class TriadSharedContext
         AppendMd($"\n### {label} ({DateTime.Now:HH:mm})\n\n{newText.Trim()}\n");
     }
 
-    // ── EEP: Evidence Escalation Protocol ??track claims per AI per round ──
+    // -- EEP: Evidence Escalation Protocol ??track claims per AI per round --
     internal readonly ConcurrentDictionary<string, List<string>> _priorClaims = new(StringComparer.OrdinalIgnoreCase);
     internal readonly ConcurrentDictionary<string, int> _restatementCount = new(StringComparer.OrdinalIgnoreCase);
 
@@ -173,7 +173,7 @@ internal sealed class TriadSharedContext
     public int IncrementRestatement(string ai)
         => _restatementCount.AddOrUpdate(ai, 1, (_, v) => v + 1);
 
-    // ── Tool Discovery Sharing (tool-sharing (cross-AI sharing)) ──
+    // -- Tool Discovery Sharing (tool-sharing (cross-AI sharing)) --
     private readonly ConcurrentDictionary<string, ConcurrentQueue<string>> _toolDiscoveryQueues =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -585,7 +585,7 @@ internal partial class Program
             {
                 var status = result == 0
                     ? $"✅ *[복구 성공]* `{AiDisplayName(ai)}` 응답 완료"
-                    : $"❌ *[복구 실패]* `{AiDisplayName(ai)}` — 두 번째 시도도 실패";
+                    : $"❌ *[복구 실패]* `{AiDisplayName(ai)}` -- 두 번째 시도도 실패";
                 SlackPostToThread(status, AiDisplayName(ai));
             }
         }

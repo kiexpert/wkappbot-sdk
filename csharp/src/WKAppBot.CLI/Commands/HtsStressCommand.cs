@@ -9,7 +9,7 @@ namespace WKAppBot.CLI;
 // partial class: hts-stress command
 internal partial class Program
 {
-    // ── hts-stress ─────────────────────────────────────────────
+    // -- hts-stress --------------------------------------------─
 
     static int HtsStressCommand(string[] args)
     {
@@ -75,16 +75,16 @@ Options:
         // Verify COPYDATASTRUCT SendMessage support
         var hMdi = NativeMethods.FindWindowExW(hMain, IntPtr.Zero, "MDIClient", null);
         if (hMdi == IntPtr.Zero)
-            return Error("MDIClient child not found — is this an MDI application?");
+            return Error("MDIClient child not found -- is this an MDI application?");
 
         var baseMdi = WindowFinder.CountMDIChildren(hMain);
         var baseMem = HtsInterop.TakeMemorySnapshot(proc);
 
-        // ── Banner ──
+        // -- Banner --
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════╗");
-        Console.WriteLine($"║  WKAppBot HTS Stress — {pattern.ToUpper(),-10}                          ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+==========================================================+");
+        Console.WriteLine($"|  WKAppBot HTS Stress -- {pattern.ToUpper(),-10}                          |");
+        Console.WriteLine("+==========================================================+");
         Console.ResetColor();
         Console.WriteLine($"  Target   : {processName} (PID:{proc.Id}) MDI 0x{hMain:X8}");
         Console.WriteLine($"  Form     : {Path.GetFileName(formPath)}");
@@ -92,7 +92,7 @@ Options:
         Console.WriteLine($"  Baseline : WS={baseMem.WorkingSetMB}MB  Priv={baseMem.PrivateMemMB}MB  MDI={baseMdi}");
         Console.WriteLine();
 
-        // ── Initialize Simple OCR (free, offline) ──
+        // -- Initialize Simple OCR (free, offline) --
         SimpleOcrAnalyzer? simpleOcr = null;
         try
         {
@@ -100,9 +100,9 @@ Options:
             var primaryLang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
             simpleOcr = new SimpleOcrAnalyzer(primaryLanguage: primaryLang, confidenceThreshold: 0.7f);
         }
-        catch { /* OCR not available — continue without it */ }
+        catch { /* OCR not available -- continue without it */ }
 
-        // ── Start background watcher (optional) ──
+        // -- Start background watcher (optional) --
         BackgroundWatcher? watcher = null;
         var ctx = new RuntimeContext { MainWindowHandle = hMain, AppTitle = processName };
         object consoleLock = new();
@@ -120,21 +120,21 @@ Options:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write("[WATCH] ");
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"Started — tracking MDI form changes{ocrTag}");
+                Console.WriteLine($"Started -- tracking MDI form changes{ocrTag}");
                 Console.ResetColor();
             }
         }
 
-        // ── Memory table header ──
+        // -- Memory table header --
         lock (consoleLock)
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine($"  {"#",-6} {"WS(MB)",-9} {"Priv(MB)",-10} {"WS_Chg",-9} {"Priv_Chg",-10} {"MDI",-5} Phase");
-            Console.WriteLine($"  {"─────",-6} {"───────",-9} {"────────",-10} {"──────",-9} {"────────",-10} {"───",-5} ─────");
+            Console.WriteLine($"  {"----─",-6} {"------─",-9} {"--------",-10} {"------",-9} {"--------",-10} {"--─",-5} ----─");
             Console.ResetColor();
         }
 
-        // ── Cycle event handler (all 3 patterns share this) ──
+        // -- Cycle event handler (all 3 patterns share this) --
         int lastNudgeCycle = -1;
         void OnCycle(StressCycleEvent evt)
         {
@@ -195,7 +195,7 @@ Options:
             }
         }
 
-        // ── Run the selected pattern ──
+        // -- Run the selected pattern --
         using var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
@@ -228,17 +228,17 @@ Options:
             return 0;
         }
 
-        // ── Stop watcher ──
+        // -- Stop watcher --
         watcher?.Stop(printSummary: true);
         watcher?.Dispose();
         simpleOcr?.Dispose();
 
-        // ── Results summary ──
+        // -- Results summary --
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════╗");
-        Console.WriteLine($"║  Results ({result.Elapsed:hh\\:mm\\:ss})                                       ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+==========================================================+");
+        Console.WriteLine($"|  Results ({result.Elapsed:hh\\:mm\\:ss})                                       |");
+        Console.WriteLine("+==========================================================+");
         Console.ResetColor();
         Console.WriteLine($"  Pattern    : {result.Pattern}");
         Console.WriteLine($"  Iterations : {result.Iterations}");
@@ -269,7 +269,7 @@ Options:
         }
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("══════════════════════════════════════════════════════════");
+        Console.WriteLine("==========================================================");
         Console.ResetColor();
 
         return 0;

@@ -14,7 +14,7 @@ namespace WKAppBot.Vision;
 /// <summary>
 /// Phase B: Tooltip-based Y-axis recalibration for ChartAnalyzer.
 ///
-/// ── Design Intent ──
+/// -- Design Intent --
 /// ChartAnalyzer v11 calibrates Y-axis using OCR on the right-side price labels.
 /// Problem: OCR labels only cover a subset of the price range (e.g., 20,000~80,000),
 /// so candles outside this range get clamped to priceFloor/priceCeil.
@@ -23,8 +23,8 @@ namespace WKAppBot.Vision;
 /// read the HTS tooltip that appears (tooltips_class32 window), OCR the OHLC values,
 /// and use those as additional calibration points to extend the Y-axis mapping.
 ///
-/// ── HTS Tooltip Format (observed) ──
-/// Line order is fixed (critical for parsing — OCR may garble label text):
+/// -- HTS Tooltip Format (observed) --
+/// Line order is fixed (critical for parsing -- OCR may garble label text):
 ///   일자     : 2026/02/04
 ///   시간     : 14:51:00         (분봉 only)
 ///   종목명(코드)
@@ -37,15 +37,15 @@ namespace WKAppBot.Vision;
 ///
 /// Parsing strategy: Find lines with price-like numbers (\d{1,3}(,\d{3})*),
 /// use line ORDER (not label text) to identify OHLC, since OCR often garbles
-/// Korean labels (e.g., "저가" → "•", "SK하이닉스" → "류하미닉스").
+/// Korean labels (e.g., "저가" -> "•", "SK하이닉스" -> "류하미닉스").
 ///
-/// ── Calibration Flow ──
+/// -- Calibration Flow --
 /// 1. SelectCalibrationCandles: Pick candles with extreme PixelHighY/PixelLowY
-/// 2. HoverAndReadTooltip: Move mouse → wait → find visible tooltips_class32 → screenshot → OCR
+/// 2. HoverAndReadTooltip: Move mouse -> wait -> find visible tooltips_class32 -> screenshot -> OCR
 /// 3. ParseTooltipOhlc: Extract OHLC prices from OCR text
 /// 4. RecalibrateAllCandles: Build new Y-axis from tooltip data, re-interpolate all candles
 ///
-/// ── Key Implementation Notes ──
+/// -- Key Implementation Notes --
 /// - Tooltip hWnd varies per form (not shared). EnumWindows to find visible tooltips_class32.
 /// - GetWindowText returns empty for HTS tooltips (owner-drawn). Must use screenshot+OCR.
 /// - The tooltip window position changes with mouse movement but content corresponds to
@@ -69,7 +69,7 @@ public sealed class TooltipCalibrator
     private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
     private const uint PW_RENDERFULLCONTENT = 0x02;
 
-    // ── Configuration ──
+    // -- Configuration --
 
     /// <summary>Delay after mouse move before reading tooltip (ms).</summary>
     public int TooltipWaitMs { get; set; } = 400;
@@ -80,7 +80,7 @@ public sealed class TooltipCalibrator
     /// <summary>Process ID of the HTS application (for EnumWindows filtering).</summary>
     public uint TargetProcessId { get; set; }
 
-    /// <summary>The chart window handle — for sending WM_MOUSEMOVE messages.</summary>
+    /// <summary>The chart window handle -- for sending WM_MOUSEMOVE messages.</summary>
     public IntPtr ChartWindowHandle { get; set; }
 
     /// <summary>Window offset: chart image (0,0) corresponds to this screen coordinate.</summary>
@@ -95,7 +95,7 @@ public sealed class TooltipCalibrator
     /// <summary>Debug output directory.</summary>
     public string DebugOutputDir { get; set; } = "";
 
-    // ── Public API ──
+    // -- Public API --
 
     /// <summary>
     /// Main entry point: hover over calibration candles, read tooltips, recalibrate Y-axis.
@@ -121,11 +121,11 @@ public sealed class TooltipCalibrator
         Console.WriteLine($"[TOOLTIP] Selected {probeTargets.Count} calibration candles for probing" +
             (backupTargets.Count > 0 ? $" (+{backupTargets.Count} backups)" : ""));
 
-        // Step 2: Activate chart — MFC tooltip only works when window has focus AND
+        // Step 2: Activate chart -- MFC tooltip only works when window has focus AND
         // mouse has entered the chart area. We do a "warm-up" by:
         // 1. Bring window to foreground
         // 2. Move mouse to chart center (triggers TrackMouseEvent in MFC)
-        // DO NOT click — clicking can change chart state (zoom/select/crosshair).
+        // DO NOT click -- clicking can change chart state (zoom/select/crosshair).
         if (ChartWindowHandle != IntPtr.Zero)
         {
             WKAppBot.Win32.Native.NativeMethods.SmartSetForegroundWindow(ChartWindowHandle);
@@ -164,7 +164,7 @@ public sealed class TooltipCalibrator
 
                 // PRIMARY hover: body center (safer than wick top for text overlay defense).
                 // Wick top was used before, but text annotations ("최고 903,000") extend
-                // wicks far above the real candle body → hovering there hits empty space.
+                // wicks far above the real candle body -> hovering there hits empty space.
                 int bodyCenter = (candle.PixelOpenY > 0 && candle.PixelCloseY > 0)
                     ? (candle.PixelOpenY + candle.PixelCloseY) / 2
                     : (candle.PixelHighY + candle.PixelLowY) / 2;
@@ -188,13 +188,13 @@ public sealed class TooltipCalibrator
                     }
                 }
 
-                // Still MISS → try backup candidates
+                // Still MISS -> try backup candidates
                 if (ohlcv == null)
                 {
                     while (backupIdx < backupTargets.Count)
                     {
                         var backup = backupTargets[backupIdx++];
-                        Console.Write($" MISS → backup x={backup.PixelX}...");
+                        Console.Write($" MISS -> backup x={backup.PixelX}...");
 
                         int bScreenX = WindowLeft + backup.PixelX;
                         int bBodyCenter = (backup.PixelOpenY > 0 && backup.PixelCloseY > 0)
@@ -234,7 +234,7 @@ public sealed class TooltipCalibrator
                 string volStr = ohlcv.Volume.HasValue ? $" V={ohlcv.Volume.Value:N0}" : "";
                 Console.WriteLine($" O={ohlcv.Open:N0} H={ohlcv.High:N0} L={ohlcv.Low:N0} C={ohlcv.Close:N0}{volStr}");
 
-                // Add calibration points: PixelHighY → tooltip High, PixelLowY → tooltip Low
+                // Add calibration points: PixelHighY -> tooltip High, PixelLowY -> tooltip Low
                 calibrationPoints.Add((candle.PixelHighY, ohlcv.High));
                 calibrationPoints.Add((candle.PixelLowY, ohlcv.Low));
 
@@ -244,7 +244,7 @@ public sealed class TooltipCalibrator
                 if (candle.PixelCloseY > 0)
                     calibrationPoints.Add((candle.PixelCloseY, ohlcv.Close));
 
-                // Collect volume calibration point (barTopY → absolute volume)
+                // Collect volume calibration point (barTopY -> absolute volume)
                 if (ohlcv.Volume.HasValue && candle.VolumeBarTopY > 0)
                     volumeCalibPoints.Add((candle.VolumeBarTopY, ohlcv.Volume.Value));
             }
@@ -259,7 +259,7 @@ public sealed class TooltipCalibrator
 
         if (calibrationPoints.Count < 2)
         {
-            Console.WriteLine($"[TOOLTIP] Only {calibrationPoints.Count} calibration points — need at least 2");
+            Console.WriteLine($"[TOOLTIP] Only {calibrationPoints.Count} calibration points -- need at least 2");
             return 0;
         }
 
@@ -278,20 +278,20 @@ public sealed class TooltipCalibrator
         return recalibrated;
     }
 
-    // ── Step 1: Select calibration candles ──
+    // -- Step 1: Select calibration candles --
 
     /// <summary>
     /// Pick candles for tooltip probing from 3 zones: high-price, mid-price, low-price.
     /// Returns ranked candidates per zone so MISS can be retried with next candidate.
     ///
     /// Strategy: Divide probes into 3 groups:
-    ///   - Top: candles with smallest PixelHighY (= highest price) — use BODY top, not wick
+    ///   - Top: candles with smallest PixelHighY (= highest price) -- use BODY top, not wick
     ///   - Mid: candles near the vertical center of the chart
-    ///   - Bottom: candles with largest PixelLowY (= lowest price) — use BODY bottom, not wick
+    ///   - Bottom: candles with largest PixelLowY (= lowest price) -- use BODY bottom, not wick
     ///
     /// TEXT OVERLAY DEFENSE: HTS charts overlay colored text annotations like
     /// "최고 903,000 (09:03)" or "배당락(0.00%)" that get detected as wicks.
-    /// A candle whose wick extends far beyond its body is suspicious — prefer
+    /// A candle whose wick extends far beyond its body is suspicious -- prefer
     /// candles where wick length is proportional to body size.
     /// We use body-center Y (not wick extremes) as the primary sort key.
     /// </summary>
@@ -328,7 +328,7 @@ public sealed class TooltipCalibrator
         }
 
         // Wick suspicion score: high wick-to-body ratio = text overlay suspect.
-        // body height 0 → treat as 1 to avoid div-by-zero
+        // body height 0 -> treat as 1 to avoid div-by-zero
         double WickSuspicion(CandleData c)
         {
             int bodyTop = Math.Min(c.PixelOpenY > 0 ? c.PixelOpenY : c.PixelHighY,
@@ -364,10 +364,10 @@ public sealed class TooltipCalibrator
         var selected = new List<CandleData>();
         var usedX = new HashSet<int>();
 
-        // Candidates per zone (generous — 3x the needed count for MISS retries)
+        // Candidates per zone (generous -- 3x the needed count for MISS retries)
         int perZone = Math.Max(2, maxProbes);
 
-        // TOP zone: highest price candles — sort by body-center Y ascending (smallest = highest price)
+        // TOP zone: highest price candles -- sort by body-center Y ascending (smallest = highest price)
         // Prefer low wick-suspicion as tiebreaker
         var topCandidates = cleanCandles
             .OrderBy(c => BodyCenterY(c))
@@ -375,7 +375,7 @@ public sealed class TooltipCalibrator
             .Take(perZone)
             .ToList();
 
-        // BOTTOM zone: lowest price candles — sort by body-center Y descending (largest = lowest price)
+        // BOTTOM zone: lowest price candles -- sort by body-center Y descending (largest = lowest price)
         var bottomCandidates = cleanCandles
             .OrderByDescending(c => BodyCenterY(c))
             .ThenBy(c => WickSuspicion(c))
@@ -430,7 +430,7 @@ public sealed class TooltipCalibrator
         return final;
     }
 
-    // ── Step 2: Hover and read tooltip ──
+    // -- Step 2: Hover and read tooltip --
 
     /// <summary>
     /// Move cursor to screen position, send WM_MOUSEMOVE, wait for tooltip, capture and OCR it.
@@ -443,7 +443,7 @@ public sealed class TooltipCalibrator
     internal TooltipOhlcv?
         HoverAndReadTooltip(int screenX, int screenY, int candlePixelX)
     {
-        // Use SendInput to physically move mouse — MFC chart requires real mouse
+        // Use SendInput to physically move mouse -- MFC chart requires real mouse
         // input queue events (not just SetCursorPos or WM_MOUSEMOVE message).
         // SendInput generates WM_MOUSEMOVE through the proper input pipeline.
         WKAppBot.Win32.Input.MouseInput.MoveTo(screenX, screenY);
@@ -574,7 +574,7 @@ public sealed class TooltipCalibrator
     /// <summary>
     /// Find the largest visible tooltips_class32 window belonging to the target process.
     /// HTS may have multiple tooltip windows (per form, per toolbar, etc.).
-    /// The chart tooltip is typically the largest one — pick by area.
+    /// The chart tooltip is typically the largest one -- pick by area.
     /// </summary>
     private IntPtr FindVisibleTooltip()
     {
@@ -593,7 +593,7 @@ public sealed class TooltipCalibrator
             if (!sb.ToString().Contains("tooltips_class", StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            // Check it has non-zero size — pick the largest tooltip
+            // Check it has non-zero size -- pick the largest tooltip
             WKAppBot.Win32.Native.NativeMethods.GetWindowRect(hWnd, out var r);
             int w = r.Right - r.Left;
             int h = r.Bottom - r.Top;
@@ -610,36 +610,36 @@ public sealed class TooltipCalibrator
         return bestHwnd;
     }
 
-    // ── Step 3: Parse tooltip OHLC ──
+    // -- Step 3: Parse tooltip OHLC --
 
     /// <summary>
     /// Parse OHLC from tooltip OCR text.
     ///
-    /// ── Tooltip format (fixed line order) ──
-    ///   일자 → 시간(분봉 only) → 종목명(코드) → 시가 → 고가 → 저가 → 종가 → 거래량
+    /// -- Tooltip format (fixed line order) --
+    ///   일자 -> 시간(분봉 only) -> 종목명(코드) -> 시가 -> 고가 -> 저가 -> 종가 -> 거래량
     ///
-    /// ── Key insight: OCR FullText often has NO line breaks ──
+    /// -- Key insight: OCR FullText often has NO line breaks --
     /// The entire tooltip is returned as one long string. Example:
     /// "일자 2026/02/09( ) 류하미닉스(000660) 시가 고가 거래량 • 880,000 (2.561) ..."
     ///
-    /// ── Parsing strategy (v2) ──
+    /// -- Parsing strategy (v2) --
     /// 1. Find stock code pattern "(\d{6})" to anchor OHLC start position
     /// 2. Extract ALL comma-formatted numbers (\d{1,3}(,\d{3})+) after stock code
     /// 3. Filter: val >= 1000 (skip percentages, small codes)
     /// 4. Take first 4 = Open, High, Low, Close (fixed order)
     ///
-    /// ── Known pitfalls (learned from testing) ──
-    /// - Stock code "(000660)" → OCR reads "660" as a number. Anchoring past code avoids this.
-    /// - Date "2026/02/09" → OCR may insert comma "2,026". Skipped by >= 1000 filter + position.
-    /// - DON'T truncate at "거래량" — OCR may merge "시가 고가 거래량" as one segment.
-    /// - "[거래량]" prefix = volume-only tooltip from volume panel → return null.
+    /// -- Known pitfalls (learned from testing) --
+    /// - Stock code "(000660)" -> OCR reads "660" as a number. Anchoring past code avoids this.
+    /// - Date "2026/02/09" -> OCR may insert comma "2,026". Skipped by >= 1000 filter + position.
+    /// - DON'T truncate at "거래량" -- OCR may merge "시가 고가 거래량" as one segment.
+    /// - "[거래량]" prefix = volume-only tooltip from volume panel -> return null.
     /// </summary>
     internal static TooltipOhlcv? ParseTooltipOhlc(string fullText)
     {
         if (string.IsNullOrWhiteSpace(fullText)) return null;
 
         // Check if this is a volume-only tooltip (거래량 tooltip from volume panel)
-        // These don't have OHLC data — detected by "[거래량]" at start
+        // These don't have OHLC data -- detected by "[거래량]" at start
         if (fullText.Contains("[거래량]") || fullText.Contains("[거래 량]"))
             return null;
 
@@ -649,7 +649,7 @@ public sealed class TooltipCalibrator
             ? fullText[(codeMatch.Index + codeMatch.Length)..]
             : fullText;
 
-        // DON'T truncate at "거래량" — OCR may merge "시가 고가 거래량" as one line
+        // DON'T truncate at "거래량" -- OCR may merge "시가 고가 거래량" as one line
         // because "저가 종가" labels get garbled. Instead, just extract first 4+ prices.
 
         // Extract all comma-formatted numbers (NNN,NNN pattern) after stock code
@@ -672,7 +672,7 @@ public sealed class TooltipCalibrator
         // Order: Open, High, Low, Close, [Volume]
         // Volume validation: The 5th number is volume ONLY if it's clearly different
         // from the OHLC price range. In 분봉 tooltips, OCR often captures a truncated
-        // price as the 5th number (e.g., "896,00" → 896,000) which is in the same
+        // price as the 5th number (e.g., "896,00" -> 896,000) which is in the same
         // magnitude as OHLC prices. Real volume is typically:
         //   - Much larger than price (e.g., price=886,000, volume=5,142,348)
         //   - Or much smaller (e.g., price=886,000, volume=1,430)
@@ -689,7 +689,7 @@ public sealed class TooltipCalibrator
             // (ratio < 0.5 means volume << price, ratio > 2.0 means volume >> price)
             if (ratio < 0.5 || ratio > 2.0)
                 volume = candidate;
-            // else: 5th number is too close to OHLC prices — likely a misread price fragment
+            // else: 5th number is too close to OHLC prices -- likely a misread price fragment
         }
 
         return new TooltipOhlcv(
@@ -712,7 +712,7 @@ public sealed class TooltipCalibrator
         return minIdx;
     }
 
-    // ── Step 4: Recalibrate all candles ──
+    // -- Step 4: Recalibrate all candles --
 
     /// <summary>
     /// Build a new Y-axis calibration from tooltip-derived points and recalculate
@@ -728,7 +728,7 @@ public sealed class TooltipCalibrator
         ChartAnalysisResult result,
         List<(int pixelY, double price)> calibrationPoints)
     {
-        // Deduplicate: same pixelY with very close price → keep one
+        // Deduplicate: same pixelY with very close price -> keep one
         var deduped = new Dictionary<int, double>();
         foreach (var (py, price) in calibrationPoints)
         {
@@ -750,8 +750,8 @@ public sealed class TooltipCalibrator
         if (newAxis.Count < 2)
             return 0;
 
-        // Verify monotonicity: pixel increases → price decreases (Y-axis inverted)
-        // If not monotonic, there's bad data — filter outliers
+        // Verify monotonicity: pixel increases -> price decreases (Y-axis inverted)
+        // If not monotonic, there's bad data -- filter outliers
         var filtered = new List<AxisPoint> { newAxis[0] };
         for (int i = 1; i < newAxis.Count; i++)
         {
@@ -762,7 +762,7 @@ public sealed class TooltipCalibrator
 
         if (filtered.Count < 2)
         {
-            Console.WriteLine("[TOOLTIP] WARNING: Calibration points are not monotonic — keeping original calibration");
+            Console.WriteLine("[TOOLTIP] WARNING: Calibration points are not monotonic -- keeping original calibration");
             return 0;
         }
 
@@ -787,7 +787,7 @@ public sealed class TooltipCalibrator
 
                 if (diff <= tolerance)
                 {
-                    // Consistent — add to merged axis
+                    // Consistent -- add to merged axis
                     if (!mergedAxis.Any(p => Math.Abs(p.Pixel - origPoint.Pixel) < 3))
                     {
                         mergedAxis.Add(origPoint);
@@ -800,7 +800,7 @@ public sealed class TooltipCalibrator
         mergedAxis = mergedAxis.OrderBy(p => p.Pixel).ToList();
 
         if (mergedFromOcr > 0)
-            Console.WriteLine($"[TOOLTIP] Merged {mergedFromOcr} consistent OCR axis points → {mergedAxis.Count} total");
+            Console.WriteLine($"[TOOLTIP] Merged {mergedFromOcr} consistent OCR axis points -> {mergedAxis.Count} total");
 
         // Update result's Y-axis
         result.YAxisPoints = mergedAxis;
@@ -825,13 +825,13 @@ public sealed class TooltipCalibrator
         return count;
     }
 
-    // ── Step 5: Volume calibration ──
+    // -- Step 5: Volume calibration --
 
     /// <summary>
     /// Convert relative volume (0.0~1.0) to absolute volume using tooltip reference points.
     ///
-    /// Strategy: Volume bars are linear — bar height is proportional to volume.
-    ///   barTopY → volume (from tooltip)  +  volumeBottom → 0
+    /// Strategy: Volume bars are linear -- bar height is proportional to volume.
+    ///   barTopY -> volume (from tooltip)  +  volumeBottom -> 0
     /// We use the simplest model: volume = barHeight * scale
     /// where scale = tooltipVolume / tooltipBarHeight
     ///

@@ -1,7 +1,7 @@
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// wkappbot grap save|list|show|remove|verify — named GRAP alias management.
+/// wkappbot grap save|list|show|remove|verify -- named GRAP alias management.
 /// Bare "grap &lt;pattern&gt;" is still routed to logcat (grep alias).
 /// </summary>
 internal partial class Program
@@ -22,12 +22,12 @@ internal partial class Program
         };
     }
 
-    // ── save ──────────────────────────────────────────────────────────────────
+    // -- save ------------------------------------------------------------------
 
     static int GrapAliasSave(string[] args)
     {
         // grap save <@name> <grap> [--title "desc"]
-        // grap save <@name> --find <pattern>  → resolve via a11y find then save
+        // grap save <@name> --find <pattern>  -> resolve via a11y find then save
         if (args.Length < 2)
         {
             Console.Error.WriteLine("Usage: grap save @<name> <grap-pattern> [--title \"desc\"]");
@@ -61,7 +61,7 @@ internal partial class Program
                 Console.Error.WriteLine($"[GRAP-ALIAS] Multiple matches for '{pattern}':");
                 foreach (var h in hits.Take(8))
                     Console.Error.WriteLine($"  {BuildTargetGrap(h.Handle)}");
-                return Error("Ambiguous match — narrow the pattern.");
+                return Error("Ambiguous match -- narrow the pattern.");
             }
             grap = BuildCompactWinGrap(hits[0].Handle);
             if (string.IsNullOrEmpty(title))
@@ -76,19 +76,19 @@ internal partial class Program
         }
 
         GrapAliasStore.Set(rawName, grap, title);
-        Console.WriteLine($"[GRAP-ALIAS] saved @{rawName} → {grap}");
+        Console.WriteLine($"[GRAP-ALIAS] saved @{rawName} -> {grap}");
         if (!string.IsNullOrEmpty(title)) Console.WriteLine($"  title: {title}");
         return 0;
     }
 
-    // ── list ──────────────────────────────────────────────────────────────────
+    // -- list ------------------------------------------------------------------
 
     static int GrapAliasList(string[] _)
     {
         var aliases = GrapAliasStore.LoadAll();
         if (aliases.Count == 0)
         {
-            Console.WriteLine("(no aliases — use: grap save @name <grap>)");
+            Console.WriteLine("(no aliases -- use: grap save @name <grap>)");
             return 0;
         }
         Console.WriteLine($"{"@name",-20} {"grap",-50} title");
@@ -98,11 +98,11 @@ internal partial class Program
             var g = a.Grap.Length > 48 ? a.Grap[..45] + "..." : a.Grap;
             Console.WriteLine($"@{a.Name,-19} {g,-50} {a.Title}");
         }
-        Console.WriteLine($"\n  {aliases.Count} alias(es)  — grap show @<name> for full grap");
+        Console.WriteLine($"\n  {aliases.Count} alias(es)  -- grap show @<name> for full grap");
         return 0;
     }
 
-    // ── show ──────────────────────────────────────────────────────────────────
+    // -- show ------------------------------------------------------------------
 
     static int GrapAliasShow(string[] args)
     {
@@ -117,7 +117,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── remove ────────────────────────────────────────────────────────────────
+    // -- remove ----------------------------------------------------------------
 
     static int GrapAliasRemove(string[] args)
     {
@@ -131,7 +131,7 @@ internal partial class Program
         return Error($"@{name} not found.");
     }
 
-    // ── verify ────────────────────────────────────────────────────────────────
+    // -- verify ----------------------------------------------------------------
 
     static int GrapAliasVerify(string[] args)
     {
@@ -158,23 +158,23 @@ internal partial class Program
             if (hits.Count > 0)
             {
                 ok++;
-                Console.WriteLine($"[OK]   @{a.Name} → {expanded} ({hits.Count} match, {sw.ElapsedMilliseconds}ms)");
+                Console.WriteLine($"[OK]   @{a.Name} -> {expanded} ({hits.Count} match, {sw.ElapsedMilliseconds}ms)");
             }
             else
             {
                 miss++;
-                Console.WriteLine($"[MISS] @{a.Name} → {expanded} (0 matches)");
+                Console.WriteLine($"[MISS] @{a.Name} -> {expanded} (0 matches)");
             }
         }
         Console.WriteLine($"\n  {ok} OK · {miss} MISS · {healed} healed");
         return miss > 0 ? 1 : 0;
     }
 
-    // ── help ──────────────────────────────────────────────────────────────────
+    // -- help ------------------------------------------------------------------
 
     static void PrintGrapAliasHelp()
     {
-        Console.WriteLine("grap alias management — named shortcuts for GRAP patterns");
+        Console.WriteLine("grap alias management -- named shortcuts for GRAP patterns");
         Console.WriteLine();
         Console.WriteLine("  grap save @<name> <grap>              Save alias");
         Console.WriteLine("  grap save @<name> --find <pattern>    Resolve window then save");

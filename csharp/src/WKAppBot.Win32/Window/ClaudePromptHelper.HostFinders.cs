@@ -12,7 +12,7 @@ public sealed partial class ClaudePromptHelper
 {
     /// <summary>
     /// Find prompt in Claude Desktop (Electron) window.
-    /// UIA path: Window → ... → Document "Claude" aid="RootWebArea" → Group aid="turn-form" → Group "입력하세요"
+    /// UIA path: Window -> ... -> Document "Claude" aid="RootWebArea" -> Group aid="turn-form" -> Group "입력하세요"
     /// </summary>
     private PromptInfo? FindClaudeDesktopPrompt(int processId)
     {
@@ -90,7 +90,7 @@ public sealed partial class ClaudePromptHelper
 
                 if (inputGroup == null)
                 {
-                    // Try finding by contentEditable behavior — the first child Group
+                    // Try finding by contentEditable behavior -- the first child Group
                     var children = turnForm.FindAllChildren();
                     inputGroup = children.FirstOrDefault(c =>
                         c.ControlType == ControlType.Group &&
@@ -163,7 +163,7 @@ public sealed partial class ClaudePromptHelper
                 var root = _automation.FromHandle(hWnd);
                 if (root == null) continue;
 
-                // VS Code Claude Code panel — look for turn-form or similar
+                // VS Code Claude Code panel -- look for turn-form or similar
                 var turnForm = root.FindFirstDescendant(
                     new PropertyCondition(
                         _automation.PropertyLibrary.Element.AutomationId,
@@ -226,7 +226,7 @@ public sealed partial class ClaudePromptHelper
     }
 
     /// <summary>
-    /// Get ancestor process chain: current → parent → grandparent → ...
+    /// Get ancestor process chain: current -> parent -> grandparent -> ...
     /// Stops when parent is not accessible or reaches PID 0/1.
     /// </summary>
     /// <summary>
@@ -267,7 +267,7 @@ public sealed partial class ClaudePromptHelper
                     if (root == null) continue;
                 }
 
-                // Fast-path: ElementFromPoint probes at bottom of window — prompt bar is always near bottom.
+                // Fast-path: ElementFromPoint probes at bottom of window -- prompt bar is always near bottom.
                 // O(1) vs O(N) for FindAllDescendants. Walk parent chain ≤4 levels to validate.
                 AutomationElement? fastMarker = null;
                 try
@@ -317,7 +317,7 @@ public sealed partial class ClaudePromptHelper
                     return new PromptInfo(hWnd, title, "codex", new Rectangle(fastX, fastY, fastW, fastH), HostCodexDesktop);
                 }
 
-                // Fallback: full tree scan (slow — FindAllDescendants on entire Codex tree).
+                // Fallback: full tree scan (slow -- FindAllDescendants on entire Codex tree).
                 var markers = root.FindAllDescendants()
                     .Where(e =>
                     {
@@ -860,7 +860,7 @@ public sealed partial class ClaudePromptHelper
             if (pid != (uint)processId) return true;
 
             // Root-only filter: skip child windows and owned popups.
-            // VS Code (Electron) creates many Chrome_WidgetWin_1 per process —
+            // VS Code (Electron) creates many Chrome_WidgetWin_1 per process --
             // tab renderers, sidebars, etc. GetAncestor(GA_ROOT) ensures we pick
             // the true top-level frame, not a renderer child.
             var root = NativeMethods.GetAncestor(hWnd, 2); // GA_ROOT = 2
@@ -874,7 +874,7 @@ public sealed partial class ClaudePromptHelper
             return true;
         }, IntPtr.Zero);
 
-        // Sort by area descending — main window is almost always the largest
+        // Sort by area descending -- main window is almost always the largest
         result.Sort((a, b) =>
         {
             NativeMethods.GetWindowRect(a, out var ra);

@@ -11,8 +11,8 @@ namespace WKAppBot.Win32.Input;
 ///
 /// Usage:
 ///   FocuslessGuard.Enabled = true;  // CLI에서 --force-focusless 파싱 시
-///   MouseInput.Click(x, y);         // → FocuslessViolationException!
-///   UiaLocator.TryInvoke(el);       // → OK (UIA Invoke는 focusless)
+///   MouseInput.Click(x, y);         // -> FocuslessViolationException!
+///   UiaLocator.TryInvoke(el);       // -> OK (UIA Invoke는 focusless)
 /// </summary>
 public static class FocuslessGuard
 {
@@ -42,13 +42,13 @@ public static class FocuslessGuard
 
     /// <summary>
     /// Returns true if the operation would be blocked (guard is enabled).
-    /// Use when throwing is not appropriate — check return value and handle gracefully.
+    /// Use when throwing is not appropriate -- check return value and handle gracefully.
     /// Prints [FOCUSLESS] BLOCKED message to stderr.
     /// </summary>
     public static bool IsBlocked(string operation)
     {
         if (!_enabled) return false;
-        Console.Error.WriteLine($"[FOCUSLESS] BLOCKED: {operation} — --force-focusless is active");
+        Console.Error.WriteLine($"[FOCUSLESS] BLOCKED: {operation} -- --force-focusless is active");
         return true;
     }
 }
@@ -62,7 +62,7 @@ public class FocuslessViolationException : InvalidOperationException
     public string Operation { get; }
 
     public FocuslessViolationException(string operation)
-        : base($"[FOCUSLESS] BLOCKED: {operation} — --force-focusless is active. " +
+        : base($"[FOCUSLESS] BLOCKED: {operation} -- --force-focusless is active. " +
                "This operation requires physical cursor/focus control which is prohibited in focusless mode.")
     {
         Operation = operation;

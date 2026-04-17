@@ -5,15 +5,15 @@ using WKAppBot.WebBot;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Unified CDP tab session manager — encapsulates tab sandbox policy.
+/// Unified CDP tab session manager -- encapsulates tab sandbox policy.
 ///
 /// Two modes:
 ///   1. Hwnd-scoped (ask gemini/gpt/claude): each Claude prompt hwnd gets its own tab
 ///      - Key: "{command}+{subcommand}+{promptHwnd:X8}"
-///      - Different Claude sessions → different tabs, even for same domain
+///      - Different Claude sessions -> different tabs, even for same domain
 ///
 ///   2. Non-scoped (web eval, a11y read --eval-js): target any matching tab
-///      - No per-session isolation — pattern/title matching
+///      - No per-session isolation -- pattern/title matching
 ///
 /// Usage:
 ///   using var session = CdpTabManager.CreateScoped("ask", "gemini", "gemini.google.com");
@@ -60,7 +60,7 @@ internal sealed class CdpTabSession : IDisposable
     {
         if (await ValidateAsync()) return true;
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[TAB] URL drift detected — recovering to {ExpectedHost}");
+        Console.WriteLine($"[TAB] URL drift detected -- recovering to {ExpectedHost}");
         Console.ResetColor();
         await Cdp.NavigateAsync($"https://{ExpectedHost}");
         await Task.Delay(1000);
@@ -110,7 +110,7 @@ internal static class CdpTabManager
 
     /// <summary>
     /// Create a non-scoped (shared) tab session.
-    /// Targets any existing tab matching the domain — no per-hwnd isolation.
+    /// Targets any existing tab matching the domain -- no per-hwnd isolation.
     /// </summary>
     public static CdpTabSession? CreateShared(string expectedHost, int port = 9222)
     {
@@ -137,7 +137,7 @@ internal static class CdpTabManager
         }
     }
 
-    // ── Internal: connect + sandbox tab resolution ──
+    // -- Internal: connect + sandbox tab resolution --
 
     private static CdpClient? ConnectAndResolveTab(int port, string key, string expectedHost)
     {
@@ -153,7 +153,7 @@ internal static class CdpTabManager
             var entry = AskTargetRegistry.GetEntry(key);
             if (entry != null)
             {
-                // Registry hit — validate
+                // Registry hit -- validate
                 var tabs = cdp.ListTabsAsync(detectedPort).GetAwaiter().GetResult();
                 var tab = tabs.FirstOrDefault(t => t.Id == entry.TargetId);
                 if (tab != null)
@@ -161,7 +161,7 @@ internal static class CdpTabManager
                     if (tab.Url.Contains(expectedHost, StringComparison.OrdinalIgnoreCase))
                     {
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"[TAB] ✓ Scoped hit: {key}");
+                        Console.WriteLine($"[TAB] v Scoped hit: {key}");
                         Console.ResetColor();
                         if (cdp.TargetId != entry.TargetId)
                             cdp.SwitchToTargetAsync(entry.TargetId, detectedPort).GetAwaiter().GetResult();
@@ -170,9 +170,9 @@ internal static class CdpTabManager
                     }
                     else
                     {
-                        // URL mismatch — invalidate + create new
+                        // URL mismatch -- invalidate + create new
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine($"[TAB] ✗ Drift: {key} (expected {expectedHost}, got {tab.Url[..Math.Min(60, tab.Url.Length)]})");
+                        Console.WriteLine($"[TAB] X Drift: {key} (expected {expectedHost}, got {tab.Url[..Math.Min(60, tab.Url.Length)]})");
                         Console.ResetColor();
                         driftedTargetId = entry.TargetId;
                         AskTargetRegistry.RemoveEntry(key);
@@ -181,14 +181,14 @@ internal static class CdpTabManager
                 else
                 {
                     // Tab gone
-                    Console.WriteLine($"[TAB] Stale: {key} — tab gone");
+                    Console.WriteLine($"[TAB] Stale: {key} -- tab gone");
                     AskTargetRegistry.RemoveEntry(key);
                 }
             }
 
-            // Registry miss or invalidated — create fresh tab
+            // Registry miss or invalidated -- create fresh tab
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"[TAB] Creating fresh tab: {key} → {expectedHost}");
+            Console.WriteLine($"[TAB] Creating fresh tab: {key} -> {expectedHost}");
             Console.ResetColor();
             var beforeTargets = JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonArray>(
                 new HttpClient().GetStringAsync($"http://localhost:{detectedPort}/json").GetAwaiter().GetResult());
@@ -204,7 +204,7 @@ internal static class CdpTabManager
                 if (!string.IsNullOrWhiteSpace(driftedTargetId))
                     cdp.TryCloseTabByIdAsync(detectedPort, driftedTargetId, "cdp-tab-manager-drift").GetAwaiter().GetResult();
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"[TAB] ✓ Fresh: {newId[..Math.Min(8, newId.Length)]}");
+                Console.WriteLine($"[TAB] v Fresh: {newId[..Math.Min(8, newId.Length)]}");
                 Console.ResetColor();
                 return cdp;
             }
@@ -223,7 +223,7 @@ internal static class CdpTabManager
 
     /// <summary>
     /// Close all sandbox tabs that have been idle longer than <paramref name="idleMinutes"/>.
-    /// Called by Eye once per minute. Best-effort — errors are logged, not thrown.
+    /// Called by Eye once per minute. Best-effort -- errors are logged, not thrown.
     /// </summary>
     internal static async Task PurgeIdleTabsAsync(int idleMinutes = 10)
     {

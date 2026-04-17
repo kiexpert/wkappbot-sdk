@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 namespace WKAppBot.WebBot;
 
 /// <summary>
-/// Lightweight Claude API chat client — text only, no vision.
+/// Lightweight Claude API chat client -- text only, no vision.
 /// Zero external dependencies. Uses ANTHROPIC_API_KEY env var.
 ///
 /// Usage:

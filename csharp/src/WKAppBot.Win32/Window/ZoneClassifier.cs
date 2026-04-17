@@ -4,7 +4,7 @@ namespace WKAppBot.Win32.Window;
 
 /// <summary>
 /// Auto-classifies top-level Win32 child windows into semantic zones.
-/// Heuristic engine — uses class name, size, visibility, title, and cid
+/// Heuristic engine -- uses class name, size, visibility, title, and cid
 /// to determine if a child is a toolbar, MDI container, status bar, form, etc.
 ///
 /// Designed to work with ANY MFC-based HTS app:
@@ -26,7 +26,7 @@ public static class ZoneClassifier
         var r = child.Rect;
         int parentW = parentRect.Width;
 
-        // Rule 1: MDIClient — universal MDI container (same cid=59648 across all HTS)
+        // Rule 1: MDIClient -- universal MDI container (same cid=59648 across all HTS)
         if (cls == "MDIClient")
             return new ZoneInfo(ZoneType.MdiContainer, "MDI 폼 컨테이너");
 
@@ -34,7 +34,7 @@ public static class ZoneClassifier
         if (cls == "ETK_CHILDFRAME_WINDOW")
             return new ZoneInfo(ZoneType.Form, TryExtractFormDesc(title));
 
-        // Rule 3: Form-like — title matches [NNNN] pattern (Kiwoom etc.)
+        // Rule 3: Form-like -- title matches [NNNN] pattern (Kiwoom etc.)
         if (!string.IsNullOrEmpty(title) && FormIdRegex.IsMatch(title))
             return new ZoneInfo(ZoneType.Form, TryExtractFormDesc(title));
 
@@ -42,7 +42,7 @@ public static class ZoneClassifier
         if (cls.StartsWith("Chrome_WidgetWin", StringComparison.Ordinal))
             return new ZoneInfo(ZoneType.WebView, title ?? "WebView");
 
-        // Rule 5: Zero-size or invisible → background service
+        // Rule 5: Zero-size or invisible -> background service
         if ((r.Width <= 0 && r.Height <= 0) || !child.IsVisible)
         {
             // Check if it has a meaningful service name
@@ -54,19 +54,19 @@ public static class ZoneClassifier
             return new ZoneInfo(ZoneType.Service, string.IsNullOrEmpty(title) ? $"cid={child.ControlId}" : title);
         }
 
-        // Rule 6: Edit control → input field
+        // Rule 6: Edit control -> input field
         if (cls == "Edit")
             return new ZoneInfo(ZoneType.Input, "텍스트 입력");
 
-        // Rule 7: ReBarWindow32 — Windows standard rebar (Kiwoom uses this for toolbars)
+        // Rule 7: ReBarWindow32 -- Windows standard rebar (Kiwoom uses this for toolbars)
         if (cls == "ReBarWindow32")
             return new ZoneInfo(ZoneType.Toolbar, title ?? "Rebar 툴바");
 
-        // Rule 8: ToolbarWindow32 — standard toolbar
+        // Rule 8: ToolbarWindow32 -- standard toolbar
         if (cls == "ToolbarWindow32")
             return new ZoneInfo(ZoneType.Toolbar, title ?? "툴바");
 
-        // Rule 9: AfxControlBar — MFC control bar (toolbar/status)
+        // Rule 9: AfxControlBar -- MFC control bar (toolbar/status)
         if (cls.StartsWith("AfxControlBar", StringComparison.Ordinal))
         {
             if (!string.IsNullOrEmpty(title))
@@ -74,7 +74,7 @@ public static class ZoneClassifier
             return new ZoneInfo(ZoneType.Toolbar, "컨트롤 바");
         }
 
-        // Rule 10: Full-width thin strip → bar (toolbar/menu/status)
+        // Rule 10: Full-width thin strip -> bar (toolbar/menu/status)
         if (parentW > 0 && r.Width >= parentW * 0.7 && r.Height > 0 && r.Height < 80)
         {
             // Heuristic: top area = toolbar/menu, bottom area = status bar
@@ -90,7 +90,7 @@ public static class ZoneClassifier
             string.IsNullOrEmpty(title) ? $"[{cls}] cid={child.ControlId}" : title);
     }
 
-    // ── Form title parsing ─────────────────────────────────────
+    // -- Form title parsing ------------------------------------─
 
     private static readonly Regex FormIdRegex = new(@"^\[(\d+)\]\s*(.+)$", RegexOptions.Compiled);
 

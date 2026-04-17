@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace WKAppBot.Vision;
 
 /// <summary>
-/// A single OCR-recognized text segment — one logical UI element from vision.
+/// A single OCR-recognized text segment -- one logical UI element from vision.
 ///
 /// Built from OcrEngine line results: each line becomes one segment.
 /// Can also be populated by Vision API for unreadable blobs.
@@ -52,7 +52,7 @@ public sealed class OcrSegment
 /// </summary>
 public sealed class OcrSegmentCacheEntry
 {
-    /// <summary>MD5 of 32x32 downscaled form screenshot — change = UI update</summary>
+    /// <summary>MD5 of 32x32 downscaled form screenshot -- change = UI update</summary>
     [JsonPropertyName("form_hash")]
     public string FormHash { get; set; } = "";
 
@@ -70,21 +70,21 @@ public sealed class OcrSegmentCacheEntry
 }
 
 /// <summary>
-/// Form-level OCR segment cache — the "dynamic a11y tree" generated from vision.
+/// Form-level OCR segment cache -- the "dynamic a11y tree" generated from vision.
 ///
 /// Core concept:
-///   Run RecognizeAll ONCE per form → build segment list → save to disk.
+///   Run RecognizeAll ONCE per form -> build segment list -> save to disk.
 ///   Next element lookup: text search in cached segments (no OCR re-run).
-///   Form hash mismatch → automatic cache invalidation + rebuild.
+///   Form hash mismatch -> automatic cache invalidation + rebuild.
 ///
 /// This is Tier 2.5 in the vision pipeline:
-///   UIA → VisionCache → OcrSegCache → (seg miss) → VisionAPI
+///   UIA -> VisionCache -> OcrSegCache -> (seg miss) -> VisionAPI
 ///
 /// Vision API results are also stored here (source="vision_api" | "gemini")
 /// so all elements of a form accumulate over time.
 ///
 /// Storage: {cacheDir}/ocr_segs/{classHash}_{winW}x{winH}.json
-/// TTL:     7 days (or form hash mismatch → immediate rebuild)
+/// TTL:     7 days (or form hash mismatch -> immediate rebuild)
 /// </summary>
 public sealed class OcrSegmentCache
 {
@@ -103,7 +103,7 @@ public sealed class OcrSegmentCache
         Directory.CreateDirectory(Path.Combine(cacheDir, "ocr_segs"));
     }
 
-    // ── Storage ─────────────────────────────────────────────────────────
+    // -- Storage --------------------------------------------------------─
 
     private string CachePath(string classPath, int winW, int winH)
     {
@@ -143,9 +143,9 @@ public sealed class OcrSegmentCache
     public void LearnSegment(string classPath, string formHash, int winW, int winH, OcrSegment seg)
     {
         var entry = Load(classPath, winW, winH);
-        if (entry == null || entry.FormHash != formHash) return;  // stale — don't pollute
+        if (entry == null || entry.FormHash != formHash) return;  // stale -- don't pollute
 
-        // Replace existing segment with same approximate position (update source→vision)
+        // Replace existing segment with same approximate position (update source->vision)
         var existing = entry.Segments.FirstOrDefault(s =>
             Math.Abs(s.RelX - seg.RelX) < 0.03 && Math.Abs(s.RelY - seg.RelY) < 0.03);
         if (existing != null)
@@ -154,21 +154,21 @@ public sealed class OcrSegmentCache
         Save(classPath, winW, winH, entry);
     }
 
-    // ── Query ────────────────────────────────────────────────────────────
+    // -- Query ------------------------------------------------------------
 
     /// <summary>
     /// Find the best matching element for a description in the cached segment list.
     ///
     /// Returns null if:
     ///   - No cache file exists
-    ///   - Form hash mismatch (UI changed since last build) — caller should rebuild
+    ///   - Form hash mismatch (UI changed since last build) -- caller should rebuild
     ///   - No segment matches the description above threshold
     /// </summary>
     public OcrSegment? FindElement(string classPath, string formHash, int winW, int winH, string description)
     {
         var entry = Load(classPath, winW, winH);
         if (entry == null) return null;
-        if (entry.FormHash != formHash) return null;  // stale → caller rebuilds
+        if (entry.FormHash != formHash) return null;  // stale -> caller rebuilds
 
         return BestMatch(entry.Segments, description);
     }
@@ -206,21 +206,21 @@ public sealed class OcrSegmentCache
         return best;
     }
 
-    // ── A11y JSON parsing ────────────────────────────────────────────────
+    // -- A11y JSON parsing ------------------------------------------------
 
     /// <summary>
-    /// Parse Gemini a11y JSON response → OcrSegment list.
+    /// Parse Gemini a11y JSON response -> OcrSegment list.
     ///
     /// Accepts both single object {"type":...} and array [{...},{...}].
     /// Strips markdown code fences if present (```json ... ```).
     /// Returns empty list on any parse failure (never throws).
     ///
     /// Standard a11y format:
-    ///   type   — UIA ControlType name (Button|Edit|Text|CheckBox|...)
-    ///   label  — visible Name/text
-    ///   x, y   — center position 0.0-1.0 relative to image
-    ///   w, h   — width/height 0.0-1.0 relative to image
-    ///   state  — "enabled"|"disabled"|"checked"|"unchecked" (optional)
+    ///   type   -- UIA ControlType name (Button|Edit|Text|CheckBox|...)
+    ///   label  -- visible Name/text
+    ///   x, y   -- center position 0.0-1.0 relative to image
+    ///   w, h   -- width/height 0.0-1.0 relative to image
+    ///   state  -- "enabled"|"disabled"|"checked"|"unchecked" (optional)
     /// </summary>
     public static List<OcrSegment> ParseA11yJson(string json)
     {
@@ -256,7 +256,7 @@ public sealed class OcrSegmentCache
                 TryParseElement(root, result);
             }
         }
-        catch { /* malformed JSON — return empty */ }
+        catch { /* malformed JSON -- return empty */ }
 
         return result;
     }
@@ -319,13 +319,13 @@ public sealed class OcrSegmentCache
         return "";
     }
 
-    // ── Blob image store ─────────────────────────────────────────────────
+    // -- Blob image store ------------------------------------------------─
 
     /// <summary>
     /// Look up a bitmap crop in the blob store by pixel hash.
     /// Returns the previously-identified label if found, null if unseen.
     ///
-    /// Same pixel pattern → same hash → instant label without any AI query.
+    /// Same pixel pattern -> same hash -> instant label without any AI query.
     /// Companion .txt (if exists) holds the full label when the filename was truncated.
     /// </summary>
     public string? LookupBlob(System.Drawing.Bitmap crop)
@@ -353,7 +353,7 @@ public sealed class OcrSegmentCache
 
     /// <summary>
     /// Save a Vision/Gemini-identified element crop as {pixelHash}={safeLabel}.png.
-    /// Filename acts as a lookup key: same pixel pattern → same hash → fast retrieval.
+    /// Filename acts as a lookup key: same pixel pattern -> same hash -> fast retrieval.
     ///
     /// If the label contains filename-unsafe chars or exceeds 60 chars,
     /// a companion {pixelHash}={safeLabel}.txt is saved with the full original label.
@@ -388,7 +388,7 @@ public sealed class OcrSegmentCache
         catch { return null; }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
+    // -- Helpers ----------------------------------------------------------
 
     private static string ClassHash(string classPath)
     {
@@ -397,8 +397,8 @@ public sealed class OcrSegmentCache
     }
 
     /// <summary>
-    /// Pixel hash of a bitmap — samples first 4 KB of raw pixel data for speed.
-    /// Identical visual blobs → same hash (fast lookup key).
+    /// Pixel hash of a bitmap -- samples first 4 KB of raw pixel data for speed.
+    /// Identical visual blobs -> same hash (fast lookup key).
     /// </summary>
     private static string ComputeBitmapHash(System.Drawing.Bitmap bmp)
     {
@@ -415,7 +415,7 @@ public sealed class OcrSegmentCache
 
     /// <summary>
     /// Sanitize a label for use as a filename component.
-    /// Invalid chars → '_', max 60 chars, companion .txt when truncated/changed.
+    /// Invalid chars -> '_', max 60 chars, companion .txt when truncated/changed.
     /// </summary>
     private static string MakeSafeLabel(string label)
     {

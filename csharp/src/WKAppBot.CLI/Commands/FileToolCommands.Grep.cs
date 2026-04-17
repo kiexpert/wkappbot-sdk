@@ -36,7 +36,7 @@ internal partial class Program
             return Error("Usage: file read <path> [--offset N] [--limit N] [--encoding N]");
         if (!File.Exists(path)) { var nfd = path.Normalize(NormalizationForm.FormD); if (File.Exists(nfd)) path = nfd; else return Error($"File not found: {path}"); }
 
-        // Auto-route: .pdf → read-pdf (PdfPig text extraction, not raw bytes)
+        // Auto-route: .pdf -> read-pdf (PdfPig text extraction, not raw bytes)
         if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
             return FileReadPdfCommand(new[] { path }.Concat(args.Where(a => a != path)).ToArray());
 
@@ -57,14 +57,14 @@ internal partial class Program
             }
 
             if (end < total)
-                Console.WriteLine($"... ({total - end} more lines — use --offset {end} to continue)");
+                Console.WriteLine($"... ({total - end} more lines -- use --offset {end} to continue)");
 
             return 0;
         }
         catch (Exception ex) { return Error($"Read failed: {ex.Message}"); }
     }
 
-    // ── file grep ──────────────────────────────────────────────────────────
+    // -- file grep ----------------------------------------------------------
     static int FileGrepCommand(string[] args)
     {
         string? pattern     = null;
@@ -104,7 +104,7 @@ internal partial class Program
 
         try
         {
-            // ';' in path segments = OR expansion: "D:/A;B/logs" → two roots
+            // ';' in path segments = OR expansion: "D:/A;B/logs" -> two roots
             var searchRoots = ExpandGlobSegments(searchRoot).ToList();
             IEnumerable<string> files;
             if (searchRoots.Count == 1 && File.Exists(searchRoots[0]))
@@ -178,7 +178,7 @@ internal partial class Program
         catch (Exception ex) { return Error($"Grep failed: {ex.Message}"); }
     }
 
-    // ── file json-grep ──────────────────────────────────────────────────────
+    // -- file json-grep ------------------------------------------------------
     /// <summary>
     /// Structural JSON/JSONL search: match objects where key matches key-regex AND value matches value-regex.
     /// Pattern: '{ "key_regex": "value_regex" }' or simple string pattern (matches any value).
@@ -194,8 +194,8 @@ internal partial class Program
             Console.WriteLine(@"Usage: wkappbot file json-grep <pattern> [files...] [--path dir] [--max N] [-i]
 
 Pattern formats:
-  Simple:     ""keyword""           — matches any JSON value containing keyword
-  Structural: '{ ""key"": ""val"" }'  — matches objects where key matches key-regex AND value matches val-regex
+  Simple:     ""keyword""           -- matches any JSON value containing keyword
+  Structural: '{ ""key"": ""val"" }'  -- matches objects where key matches key-regex AND value matches val-regex
               Multiple pairs: AND logic (all must match)
 
 Examples:
@@ -307,7 +307,7 @@ Examples:
                             if (node is System.Text.Json.Nodes.JsonObject obj)
                                 matched = MatchJsonObject(obj, kvPatterns);
                         }
-                        catch { } // not valid JSON — skip
+                        catch { } // not valid JSON -- skip
                     }
                     else
                     {
@@ -380,5 +380,5 @@ Examples:
         return pairs;
     }
 
-    // ── file glob ──────────────────────────────────────────────────────────
+    // -- file glob ----------------------------------------------------------
 }

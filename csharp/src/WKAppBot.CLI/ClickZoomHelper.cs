@@ -14,9 +14,9 @@ namespace WKAppBot.CLI;
 ///   zoom?.ShowPass("dialog closed");  // or ShowFail("no reaction")
 ///
 /// Three adaptive modes (same as InputZoom):
-///   Magnifier  — small controls (w&lt;200 &amp;&amp; h&lt;60): 3x enlarged overlay
-///   HighlightBox — large + foreground: cyan 3px border highlight
-///   Relay — large + obscured: 1:1 relay via PrintWindow
+///   Magnifier  -- small controls (w&lt;200 &amp;&amp; h&lt;60): 3x enlarged overlay
+///   HighlightBox -- large + foreground: cyan 3px border highlight
+///   Relay -- large + obscured: 1:1 relay via PrintWindow
 ///
 /// Tag: [ZOOM]
 /// </summary>
@@ -89,7 +89,7 @@ internal sealed class ClickZoomHelper : IDisposable
             if (isSmall)
             {
                 mode = ZoomMode.Magnifier;
-                // Auto-scale: fill up to MaxZoomW×MaxZoomH — tiny controls get higher zoom
+                // Auto-scale: fill up to MaxZoomW×MaxZoomH -- tiny controls get higher zoom
                 const int MaxZoomW = 480, MaxZoomH = 240, MaxScale = 8, MinScale = 2;
                 int scaleX = ctlRect.Width > 0 ? MaxZoomW / ctlRect.Width : MaxScale;
                 int scaleY = ctlRect.Height > 0 ? MaxZoomH / ctlRect.Height : MaxScale;
@@ -191,7 +191,7 @@ internal sealed class ClickZoomHelper : IDisposable
     }
 
     /// <summary>
-    /// Start zoom overlay for an iconic (minimized) window — shows zoom near its taskbar button.
+    /// Start zoom overlay for an iconic (minimized) window -- shows zoom near its taskbar button.
     /// Falls back to the window's restore position if taskbar button is not found.
     /// </summary>
     public static ClickZoomHelper? BeginForIconic(IntPtr hwnd, string source, string actionLabel)
@@ -226,7 +226,7 @@ internal sealed class ClickZoomHelper : IDisposable
                 // Capture the taskbar button area as the initial image
                 var capturePng = CaptureScreenRect(r);
                 if (capturePng != null) host.UpdateImage(capturePng);
-                host.UpdateStatus($"⬜ minimized — restoring...");
+                host.UpdateStatus($"⬜ minimized -- restoring...");
 
                 Console.Error.Write($"[ZOOM:ICON taskbar@({r.Left},{r.Top} {r.Width}x{r.Height})] ");
                 return new ClickZoomHelper(host, hwnd, hwnd);
@@ -244,7 +244,7 @@ internal sealed class ClickZoomHelper : IDisposable
                 var host = new InputZoomHost();
                 host.Start(cx - 170, cy - 120, 316, 230, ZoomMode.Magnifier);
                 host.UpdateHeader($"[ZOOM:ICON] {source} \"{actionLabel}\"");
-                host.UpdateStatus($"⬜ minimized — restoring...");
+                host.UpdateStatus($"⬜ minimized -- restoring...");
                 Console.Error.Write($"[ZOOM:ICON restore@({nr.Left},{nr.Top} {nr.Width}x{nr.Height})] ");
                 return new ClickZoomHelper(host, hwnd, hwnd);
             }
@@ -450,7 +450,7 @@ internal sealed class ClickZoomHelper : IDisposable
         // Capture _host locally to avoid race with _zombieTimer (which can set _host=null via Dispose)
         var host = _host;
         if (host?.IsAlive != true) return;
-        host.ShowResult(true, $"✓ {detail}");
+        host.ShowResult(true, $"v {detail}");
         var png = CaptureCurrentPng();
         if (png != null) host.UpdateImage(png);
         host.BeginFadeOut(1500, 400);
@@ -463,7 +463,7 @@ internal sealed class ClickZoomHelper : IDisposable
         // Capture _host locally to avoid race with _zombieTimer (which can set _host=null via Dispose)
         var host = _host;
         if (host?.IsAlive != true) return;
-        host.ShowResult(false, $"✗ {detail}");
+        host.ShowResult(false, $"X {detail}");
         var png = CaptureCurrentPng();
         if (png != null) host.UpdateImage(png);
         host.BeginFadeOut(2000, 500);
@@ -490,13 +490,13 @@ internal sealed class ClickZoomHelper : IDisposable
         _host = null;
     }
 
-    // ── Capture helpers ──
+    // -- Capture helpers --
 
     /// <summary>
     /// Capture a specific control for zoom overlay.
     /// Strategy 1: Full PrintWindow + CropRegion (safe, no viewport tricks)
     /// Strategy 2: CopyFromScreen for GPU-composited windows
-    /// NOTE: CaptureWindowRegion viewport trick skipped — Chrome/Electron ignores SetViewportOrgEx.
+    /// NOTE: CaptureWindowRegion viewport trick skipped -- Chrome/Electron ignores SetViewportOrgEx.
     /// </summary>
     internal static byte[]? CaptureControlPng(IntPtr formHandle, IntPtr controlHandle)
     {
@@ -524,7 +524,7 @@ internal sealed class ClickZoomHelper : IDisposable
                 }
             }
 
-            // Strategy 2: CopyFromScreen — for GPU-composited windows (Chrome/Electron)
+            // Strategy 2: CopyFromScreen -- for GPU-composited windows (Chrome/Electron)
             using var screenBmp = ScreenCapture.CaptureScreenRegion(cr.Left, cr.Top, cr.Width, cr.Height);
             if (screenBmp != null && !ScreenCapture.IsBlankBitmap(screenBmp))
                 return ScreenCapture.ToPngBytes(screenBmp);
@@ -536,8 +536,8 @@ internal sealed class ClickZoomHelper : IDisposable
 
     /// <summary>
     /// Capture a screen rect for zoom overlay.
-    /// If the window is in the foreground → CopyFromScreen first (handles GPU compositing).
-    /// If background → PrintWindow + CropRegion first (Z-order safe).
+    /// If the window is in the foreground -> CopyFromScreen first (handles GPU compositing).
+    /// If background -> PrintWindow + CropRegion first (Z-order safe).
     ///
     /// WHY: Chrome/Electron renders web content via GPU compositing, which is invisible to PrintWindow.
     /// PrintWindow only captures native elements (title bar, scrollbars). For foreground windows,

@@ -6,10 +6,10 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: win-click — ProbeAtPoint 입력확보 → UIA focusless (main) → physical click (fallback)
+// partial class: win-click -- ProbeAtPoint 입력확보 -> UIA focusless (main) -> physical click (fallback)
 // Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl]
 //
-// Flow: FindWindow → ProbeAtPoint (Z-order 전수조사 + 포커스리스 시도) → (fallback) Physical Click
+// Flow: FindWindow -> ProbeAtPoint (Z-order 전수조사 + 포커스리스 시도) -> (fallback) Physical Click
 // ProbeAtPoint: 좌표에 겹쳐있는 창들을 앞에서부터 포커스리스 시도, 방해꾼 dismiss, 타겟을 앞으로.
 // --fl: Force focusless only (no fallback to physical click)
 // --dbl/--right: Skip focusless attempt (UIA has no double-click/right-click concept)
@@ -45,7 +45,7 @@ internal partial class Program
                 return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y> or --x N --y N");
         }
 
-        // Resolve grap: "window/child" — '/' = Win32 child, '#' part ignored (coordinate-based click)
+        // Resolve grap: "window/child" -- '/' = Win32 child, '#' part ignored (coordinate-based click)
         var (win32Segments, _) = GrapHelper.SplitGrap(args[0]);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
@@ -72,7 +72,7 @@ internal partial class Program
         int screenY = wRect.Top + relY;
         string clickType = isDouble ? "DblClick" : isRight ? "RightClick" : "Click";
 
-        // ── 돋보기 최우선: 입력확보 전에 무조건 띄움 ──
+        // -- 돋보기 최우선: 입력확보 전에 무조건 띄움 --
         Rectangle zoomRect;
         string uiaLabel = "";
         string uiaInfo = "";
@@ -89,7 +89,7 @@ internal partial class Program
                 zoomRect = elemFitsZoom ? br : new Rectangle(screenX - 60, screenY - 20, 120, 40);
                 uiaLabel = string.IsNullOrEmpty(name) ? elem.ControlType : name;
                 uiaInfo = $" [{elem.ControlType}] {br.Width}x{br.Height}";
-                if (!elemFitsZoom) uiaInfo += $"(→click@{screenX},{screenY})";
+                if (!elemFitsZoom) uiaInfo += $"(->click@{screenX},{screenY})";
                 if (!string.IsNullOrEmpty(name)) uiaInfo += $" \"{name}\"";
                 if (!string.IsNullOrEmpty(elem.AutomationId)) uiaInfo += $" aid={elem.AutomationId}";
             }
@@ -107,7 +107,7 @@ internal partial class Program
         using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, hWnd, $"win_{clickType.ToLower()}", actionLabel);
         zoom?.UpdateStatus("입력확보 중...");
 
-        // ── Main path: ProbeAtPoint 좌표 기반 입력확보 ──
+        // -- Main path: ProbeAtPoint 좌표 기반 입력확보 --
         // Single left-click: 포커스리스 시도 (Z-order 전수조사 + 방해꾼 dismiss + 경로 정리)
         if (!isDouble && !isRight)
         {
@@ -126,14 +126,14 @@ internal partial class Program
                 // 이미 포커스리스 클릭 성공?
                 if (pointReport.FocuslessClicked)
                 {
-                    // 전경 도둑질 감지 → 알림 팝업 (타겟 소유, 다시알림 체크박스)
+                    // 전경 도둑질 감지 -> 알림 팝업 (타겟 소유, 다시알림 체크박스)
                     if (pointReport.ForegroundStolen)
                     {
-                        zoom?.ShowFail($"⚠fg {pointReport.ResolvedDetail}");
+                        zoom?.ShowFail($"!fg {pointReport.ResolvedDetail}");
 
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.Write("[WIN] ");
-                        Console.Write("FocuslessClick ⚠fg ");
+                        Console.Write("FocuslessClick !fg ");
                         Console.ResetColor();
 
                         string? procName = null;
@@ -159,7 +159,7 @@ internal partial class Program
                         Console.Write("FocuslessClick ");
                         Console.ResetColor();
                     }
-                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {pointReport.ResolvedDetail}");
+                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pointReport.ResolvedDetail}");
                     return 0;
                 }
 
@@ -173,14 +173,14 @@ internal partial class Program
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.Write("FocuslessFail ");
                     Console.ResetColor();
-                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) → {pointReport.ResolvedDetail}");
+                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pointReport.ResolvedDetail}");
                     return 1;
                 }
 
                 // Fall through to physical click
-                zoom?.UpdateStatus("포커스리스 불가 → 물리클릭...");
+                zoom?.UpdateStatus("포커스리스 불가 -> 물리클릭...");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Error.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) → fallback to physical click");
+                Console.Error.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) -> fallback to physical click");
                 Console.ResetColor();
             }
             catch (Exception ex)
@@ -190,14 +190,14 @@ internal partial class Program
                     zoom?.ShowFail(ex.Message);
                     return Error($"ProbeAtPoint failed: {ex.Message}");
                 }
-                zoom?.UpdateStatus($"ProbeAtPoint 오류 → 물리클릭...");
+                zoom?.UpdateStatus($"ProbeAtPoint 오류 -> 물리클릭...");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Error.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) → fallback to physical click");
+                Console.Error.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) -> fallback to physical click");
                 Console.ResetColor();
             }
         }
 
-        // ── Fallback: Foreground + Physical Click ──
+        // -- Fallback: Foreground + Physical Click --
         // Run input readiness (yield popup if user active; [IDLE] printed by SmartSetForegroundWindow)
         var physReadiness = CreateInputReadiness();
         var physReport = physReadiness.Probe(new InputReadinessRequest
@@ -221,7 +221,7 @@ internal partial class Program
         screenX = wRect.Left + relX;
         screenY = wRect.Top + relY;
 
-        Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) → screen ({screenX},{screenY}){uiaInfo}... ");
+        Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) -> screen ({screenX},{screenY}){uiaInfo}... ");
 
         // Physical click
         var swPhys = System.Diagnostics.Stopwatch.StartNew();

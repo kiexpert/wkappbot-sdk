@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Focus Watchdog: background loop monitors focus throughout a CDP ask operation ──
+    // -- Focus Watchdog: background loop monitors focus throughout a CDP ask operation --
     // Started before input, stopped when ask completes. Retries indefinitely until restored.
     static CancellationTokenSource? _focusWatchdogCts;
 
@@ -79,7 +79,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Restore focus with retry loop — keeps trying until GetForegroundWindow()==prevFg or timeout.
+    /// Restore focus with retry loop -- keeps trying until GetForegroundWindow()==prevFg or timeout.
     /// Shows focusless notification on first detection. IME + cursor also restored on success.
     /// </summary>
     static async Task<bool> RestoreFocusWithRetryAsync(IntPtr prevFg, string step, CdpClient? cdp,
@@ -195,7 +195,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Error.WriteLine($"[ASK:FOCUS] RESTORE FAILED @ {step} after {attempt} attempts ({timeoutMs}ms timeout)");
             Console.ResetColor();
-            // Unrecoverable: mechanical restore exhausted — report to Slack for human awareness
+            // Unrecoverable: mechanical restore exhausted -- report to Slack for human awareness
             AutoBugReport($"focus-steal unrecoverable @ {step}: prevFg=0x{prevFg:X8} stuck on 0x{NativeMethods.GetForegroundWindow():X8} after {attempt} attempts");
         }
 
@@ -211,7 +211,7 @@ internal partial class Program
         ClickZoomHelper? zoom = null;
         try
         {
-            // ── Mid-input check 1: if another Win32 session is typing, wait before proceeding ──
+            // -- Mid-input check 1: if another Win32 session is typing, wait before proceeding --
             if (KeyboardInput.IsInputLockedByOther())
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -229,12 +229,12 @@ internal partial class Program
                     Console.Error.WriteLine($"[ASK:FOCUS] Lock released after {waited}ms ??proceeding");
             }
 
-            // ── Mid-input check 2: overlay check for focus steals ──
+            // -- Mid-input check 2: overlay check for focus steals --
             // Condition A: before "send"/"type" + user typed within last 3s
             // Condition B: Chrome FocusStealer-ask prop detected (focus was stolen in prior run
             //          i.e. screen takeover -- user must yield before proceeding)
             // Overlay only when Chrome previously stole focus (FocusStealer-ask prop set).
-            // userIsActive check removed — SW_SHOWNOACTIVATE handles background tabs without stealing focus.
+            // userIsActive check removed -- SW_SHOWNOACTIVATE handles background tabs without stealing focus.
             if (action is "send" or "type" or "input-cdp")
             {
                 var chromeHwndEarly = cdp.GetChromeWindowHandle();
@@ -270,7 +270,7 @@ internal partial class Program
                 return (false, prevFg, null);
             }
 
-            // ── InputReadiness.Probe(): fires OnProbeSuccess (auto-hack/zoom), sets ReadinessCalled flag ──
+            // -- InputReadiness.Probe(): fires OnProbeSuccess (auto-hack/zoom), sets ReadinessCalled flag --
             // SkipBlockerCheck/SkipKnowhow/SkipZoom: Chrome is not a Win32 form; CDP zoom handled below.
             // AutoApproveYield: CDP actions are AI-initiated, no user yield required.
             // WaitForUserIfBusy=false: same reason. FocusStealer-ask prop check (above) handles the one
@@ -384,7 +384,7 @@ internal partial class Program
         return true;
     }
 
-    // ── CDP Zoom: show magnifier on CDP target element ──
+    // -- CDP Zoom: show magnifier on CDP target element --
     // Gets element's bounding rect (viewport coords) + Chrome window offset ??screen coords ??ClickZoomHelper.
 
     /// <summary>
@@ -406,7 +406,7 @@ internal partial class Program
                 rectStr = Task.Run(() => cdp.GetElementRectAsync(cssSelector))
                     .WaitAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();
             }
-            catch { } // Fresh tab or stale context — fall through to client area fallback
+            catch { } // Fresh tab or stale context -- fall through to client area fallback
 
             System.Drawing.Rectangle screenRect;
             if (!string.IsNullOrEmpty(rectStr)
@@ -422,7 +422,7 @@ internal partial class Program
             }
             else
             {
-                // Fallback: Chrome tab client area (JS eval failed — fresh tab or stale context)
+                // Fallback: Chrome tab client area (JS eval failed -- fresh tab or stale context)
                 NativeMethods.GetClientRect(chromeHwnd, out var cr);
                 var pt0 = new WKAppBot.Win32.Native.POINT(0, 0);
                 NativeMethods.ClientToScreen(chromeHwnd, ref pt0);
@@ -520,7 +520,7 @@ internal partial class Program
         or ".ts" or ".py" or ".java" or ".json" or ".yaml" or ".yml" or ".xml" or ".html"
         or ".htm" or ".csv" or ".css" or ".sql" or ".sh" or ".bat" or ".cfg" or ".ini";
 
-    // ── Response Image Detection & Download ──
+    // -- Response Image Detection & Download --
 
     /// <summary>
     /// Detect new images in AI response and download them.

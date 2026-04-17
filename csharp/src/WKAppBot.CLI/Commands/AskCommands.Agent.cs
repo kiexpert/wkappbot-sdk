@@ -1,13 +1,13 @@
 namespace WKAppBot.CLI;
 
-// wkappbot agent <ai> "task" — autonomous sub-agent execution
+// wkappbot agent <ai> "task" -- autonomous sub-agent execution
 // Wraps ask --loop with agent-optimized defaults and a separate tab namespace.
 //
 // Tab namespace: {ai}-agent-{sessionHash}  (separate from ask: {ai}-{sessionHash})
 // Defaults (triad-agreed): timeout=90s, max-steps=20, retry=2, parallel=4, loop=on
 // Extra options: --agent-id <name>  --fresh  --triad  --slack  --verify-delay <ms>
 //
-// ⚠ Do NOT call 'wkappbot agent' from inside an agent loop — infinite recursion!
+// ! Do NOT call 'wkappbot agent' from inside an agent loop -- infinite recursion!
 
 internal partial class Program
 {
@@ -154,7 +154,7 @@ internal partial class Program
         }
 
         // Agent mode: _dryRunMode already set by --dry-run flag above (default false).
-        // Agent calls AskGemini/AskChatGpt/AskClaude directly → bypasses AskCommand's dry-run gate.
+        // Agent calls AskGemini/AskChatGpt/AskClaude directly -> bypasses AskCommand's dry-run gate.
 
         var (questionParts, attachFiles) = ParseTextAndFilesWithMarkers(remaining.ToArray());
         var question = InlineTextFiles(questionParts, attachFiles);
@@ -200,7 +200,7 @@ internal partial class Program
         // triad agent: run all three in parallel with prefixes
         if (ai is "triad" or "all")
         {
-            Console.WriteLine("[AGENT] Triad mode — launching Gemini + GPT + Claude agents in parallel...");
+            Console.WriteLine("[AGENT] Triad mode -- launching Gemini + GPT + Claude agents in parallel...");
 
             // Pre-open a shared Slack thread so all 3 AI answers land in one thread
             EnsureSlackThread("Triad", question);
@@ -217,9 +217,9 @@ internal partial class Program
             };
             Task.WaitAll(tasks);
             var results = tasks.Select(t => t.Result).ToArray();
-            Console.Error.WriteLine($"[AGENT] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+            Console.Error.WriteLine($"[AGENT] R1 Done -- gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-            // ── 정반합 사회자 (--debate 시에만) ──
+            // -- 정반합 사회자 (--debate 시에만) --
             if (debateMode && results.Count(r => r == 0) >= 2)
             {
                 Console.WriteLine("[정반합] Agent debate: moderator loop with write tools...");
@@ -242,13 +242,13 @@ internal partial class Program
     static int AgentUsage()
     {
         Console.WriteLine(@"
-wkappbot agent — autonomous sub-agent (multi-step reasoning loop with tools)
-  vs ask:  ask = one-shot Q&A    agent = autonomous loop: plans → uses tools → verifies → repeats
+wkappbot agent -- autonomous sub-agent (multi-step reasoning loop with tools)
+  vs ask:  ask = one-shot Q&A    agent = autonomous loop: plans -> uses tools -> verifies -> repeats
 
 Usage:
   wkappbot agent gemini|gpt|claude|triad ""task"" [files...] [options]
 
-  triad / all  — run Gemini + GPT + Claude in parallel, each prefixed [gemini]/[gpt]/[claude]
+  triad / all  -- run Gemini + GPT + Claude in parallel, each prefixed [gemini]/[gpt]/[claude]
 
 Defaults (triad-agreed):
   --timeout      90     seconds total hard kill
@@ -260,7 +260,7 @@ Defaults (triad-agreed):
 Options:
   --intercept ""msg"" 훈수두기: post to running agent's Slack thread (no loop reset)
                       --agent-id 함께 쓰면 named agent 쓰레드로 전송
-  --agent-id <name>   Named persistent tab — reuses context across calls, survives restarts
+  --agent-id <name>   Named persistent tab -- reuses context across calls, survives restarts
                       Tab: '{ai}-agent-{name}'  (ask uses '{ai}-{session}')
   --fresh             Force new conversation + clear AgentFileTracker session
   --triad             Inject triad-planning hints into loop persona (multi-AI planning)
@@ -281,7 +281,7 @@ Sub-commands (session/checkpoint management):
 WARNING: Do NOT call 'wkappbot agent' from inside an agent loop!
   Agents calling agents = infinite recursion. For nested tasks use 'wkappbot ask --loop'.
 
-APSP v1 (WKAppBot MCP extension — beyond standard MCP spec):
+APSP v1 (WKAppBot MCP extension -- beyond standard MCP spec):
   MCP progress notifications carry extra fields: mem_mb, cpu_pct, threads, handles
   stdin/IO wait auto-detected by watchdog: status=wait_input|wait_lock|wait_ipc|wait_io|sleeping
   data field format: ""N> output line""  (N=progress counter, correlates console with MCP stream)

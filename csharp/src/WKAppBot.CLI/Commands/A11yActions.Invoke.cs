@@ -13,13 +13,13 @@ internal partial class Program
     {
         var elHwnd = GetElementHwnd(el);
 
-        // Tier 0: FLUTTERVIEW direct PostMessage — bypasses Win32 routing, focusless, ~0ms
+        // Tier 0: FLUTTERVIEW direct PostMessage -- bypasses Win32 routing, focusless, ~0ms
         if (elHwnd != IntPtr.Zero)
         {
             var flutterView = FindFlutterViewChild(elHwnd);
             if (flutterView != IntPtr.Zero)
             {
-                Console.WriteLine("[A11Y] invoke — Tier0 FLUTTERVIEW (focusless direct)");
+                Console.WriteLine("[A11Y] invoke -- Tier0 FLUTTERVIEW (focusless direct)");
                 if (PostClickToFlutterView(el, flutterView)) { RecordTierSuccess(elHwnd, el, "invoke", "FLUTTERVIEW WM_LBUTTON", KnowhowCategory.Focusless); return true; }
                 _autoHealTiers?.Add("FLUTTERVIEW Tier0: WM_LBUTTON sent, no UI response (pixel-diff < 2%)");
                 // Fall through to UIA Invoke
@@ -32,19 +32,19 @@ internal partial class Program
                           NativeMethods.GetPropW(elHwnd, ActionApi.InvokeHollowProp) != IntPtr.Zero;
         if (propHollow)
         {
-            Console.WriteLine("[A11Y] invoke — UIA Invoke skipped (prop=hollow) → next tier");
+            Console.WriteLine("[A11Y] invoke -- UIA Invoke skipped (prop=hollow) -> next tier");
         }
         else
         {
             // WM_NULL baseline: no-op roundtrip measures system responsiveness.
-            // If invoke ≈ null_ms → hollow stub. If null_ms ≥ 100ms → window is lagging, skip invoke entirely.
+            // If invoke ≈ null_ms -> hollow stub. If null_ms ≥ 100ms -> window is lagging, skip invoke entirely.
             long nullMs = 0;
             if (elHwnd != IntPtr.Zero)
             {
                 nullMs = GetNullMs(elHwnd); // cached from read/find, or measures now
                 if (nullMs >= 100)
                 {
-                    Console.WriteLine($"[A11Y] invoke — window lagging (WM_NULL={nullMs}ms) → skip UIA Invoke");
+                    Console.WriteLine($"[A11Y] invoke -- window lagging (WM_NULL={nullMs}ms) -> skip UIA Invoke");
                     goto tier2;
                 }
             }
@@ -62,22 +62,22 @@ internal partial class Program
                 if (curFg != prevFg && prevFg != IntPtr.Zero)
                 {
                     NativeMethods.SetForegroundWindowRaw(prevFg); // restore stolen fg after UIA Invoke
-                    Console.WriteLine($"[A11Y] invoke — UIA Invoke focus restored ({curFg:X8}→{prevFg:X8})");
+                    Console.WriteLine($"[A11Y] invoke -- UIA Invoke focus restored ({curFg:X8}->{prevFg:X8})");
                 }
 
                 if (invokeMs > 1000)
                 {
-                    Console.WriteLine($"[A11Y] invoke — UIA Invoke ⚠ BLOCKED ({invokeMs}ms, null={nullMs}ms)");
+                    Console.WriteLine($"[A11Y] invoke -- UIA Invoke ! BLOCKED ({invokeMs}ms, null={nullMs}ms)");
                     return true; // best effort
                 }
 
                 // Suspicious if invoke is no faster than a no-op WM_NULL (+2ms margin)
                 bool suspiciousTiming = invokeMs <= nullMs + 2;
-                Console.WriteLine($"[A11Y] invoke — UIA Invoke {invokeMs}ms (null={nullMs}ms){(suspiciousTiming ? " ⚠ suspicious" : "")}");
+                Console.WriteLine($"[A11Y] invoke -- UIA Invoke {invokeMs}ms (null={nullMs}ms){(suspiciousTiming ? " ! suspicious" : "")}");
 
                 if (suspiciousTiming)
                 {
-                    // Confirm via paint detection: ValidateRect → invoke → Sleep(50) → GetUpdateRect
+                    // Confirm via paint detection: ValidateRect -> invoke -> Sleep(50) -> GetUpdateRect
                     bool hollow = elHwnd != IntPtr.Zero && ConfirmHollow(elHwnd);
                     if (hollow)
                     {
@@ -85,12 +85,12 @@ internal partial class Program
                         var clsB = new System.Text.StringBuilder(64);
                         NativeMethods.GetClassNameW(elHwnd, clsB, clsB.Capacity);
                         ActionApi.OnInvokeHollow?.Invoke(elHwnd, clsB.ToString());
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✗ hollow confirmed (no paint) → prop stamped, trying next tier");
+                        Console.WriteLine($"[A11Y] invoke -- UIA Invoke X hollow confirmed (no paint) -> prop stamped, trying next tier");
                         _autoHealTiers?.Add($"UIA Invoke: hollow stub (invoke {invokeMs}ms ≈ null {nullMs}ms, no paint)");
                     }
                     else
                     {
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ✓ real (paint detected)");
+                        Console.WriteLine($"[A11Y] invoke -- UIA Invoke v real (paint detected)");
                         RecordTierSuccess(elHwnd, el, "invoke", "UIA Invoke", KnowhowCategory.MinFocus);
                         return true;
                     }
@@ -115,7 +115,7 @@ internal partial class Program
                     if (UiaLocator.TryInvoke(ancestor))
                     {
                         var aName = ancestor.Properties.Name.ValueOrDefault ?? "";
-                        Console.WriteLine($"[A11Y] invoke — UIA Invoke ancestor[+{lvl + 1}] '{aName}'");
+                        Console.WriteLine($"[A11Y] invoke -- UIA Invoke ancestor[+{lvl + 1}] '{aName}'");
                         RecordTierSuccess(elHwnd, el, "invoke", "UIA Invoke (ancestor)", KnowhowCategory.MinFocus);
                         return true;
                     }
@@ -128,13 +128,13 @@ internal partial class Program
         if (elHwnd != IntPtr.Zero)
         {
             NativeMethods.PostMessageW(elHwnd, 0x00F5 /* BM_CLICK */, IntPtr.Zero, IntPtr.Zero);
-            Console.WriteLine("[A11Y] invoke — Win32 BM_CLICK");
-            _autoHealTiers?.Add("BM_CLICK: sent (unverified — no response detection)");
+            Console.WriteLine("[A11Y] invoke -- Win32 BM_CLICK");
+            _autoHealTiers?.Add("BM_CLICK: sent (unverified -- no response detection)");
             return true;
         }
 
-        // Tier 3: WM_LBUTTON / SendInput (via A11yClick) — A11yClick populates _autoHealTiers itself
-        _autoHealTiers?.Add("Tier3: delegating to A11yClick (WM_LBUTTON → physical)");
+        // Tier 3: WM_LBUTTON / SendInput (via A11yClick) -- A11yClick populates _autoHealTiers itself
+        _autoHealTiers?.Add("Tier3: delegating to A11yClick (WM_LBUTTON -> physical)");
         return A11yClick(el, hwnd);
     }
 }

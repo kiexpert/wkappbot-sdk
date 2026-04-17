@@ -17,7 +17,7 @@ internal partial class Program
 {
     static async Task<bool> InsertTextContentEditable(CdpClient cdp, string selector, string text)
     {
-        // Delegates to CdpClient.InsertContentEditableAsync (3-tier: innerHTML → execCommand → Input.insertText)
+        // Delegates to CdpClient.InsertContentEditableAsync (3-tier: innerHTML -> execCommand -> Input.insertText)
         return await cdp.InsertContentEditableAsync(selector, text);
     }
 
@@ -40,7 +40,7 @@ internal partial class Program
             var nodeId = qResult?["nodeId"]?.GetValue<int>() ?? 0;
             if (nodeId == 0) return false;
 
-            // Step 2: DOM.focus — Chrome-internal focus, does NOT trigger OS SetForegroundWindow
+            // Step 2: DOM.focus -- Chrome-internal focus, does NOT trigger OS SetForegroundWindow
             await cdp.SendAsync("DOM.focus", new JsonObject { ["nodeId"] = nodeId });
             await Task.Delay(50);
 

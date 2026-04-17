@@ -8,8 +8,8 @@ using System.Text.Json.Nodes;
 namespace WKAppBot.WebBot;
 
 /// <summary>
-/// Slack Socket Mode client — receives events via WebSocket, sends messages via HTTP API.
-/// Zero external dependencies — same pattern as CdpClient.
+/// Slack Socket Mode client -- receives events via WebSocket, sends messages via HTTP API.
+/// Zero external dependencies -- same pattern as CdpClient.
 ///
 /// Usage:
 ///   var slack = new SlackSocketClient();
@@ -20,8 +20,8 @@ namespace WKAppBot.WebBot;
 ///   await slack.DisconnectAsync();
 ///
 /// Protocol:
-///   1. POST apps.connections.open (app token) → WebSocket URL
-///   2. Connect WebSocket → receive hello
+///   1. POST apps.connections.open (app token) -> WebSocket URL
+///   2. Connect WebSocket -> receive hello
 ///   3. Events arrive as JSON: { envelope_id, type, payload }
 ///   4. Acknowledge each event: { envelope_id }
 ///   5. Send messages via POST chat.postMessage (bot token)
@@ -221,7 +221,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
 
         Console.WriteLine($"[SLACK] Receive loop ended (ws.State={_ws?.State}, msgCount={_messageCount})");
 
-        // ── Auto-reconnect: if loop ended unexpectedly, try to reconnect ──
+        // -- Auto-reconnect: if loop ended unexpectedly, try to reconnect --
         if (_autoReconnect && !ct.IsCancellationRequested)
         {
             _ = Task.Run(async () =>
@@ -247,7 +247,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                     }
                 }
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[SLACK] Auto-reconnect exhausted — Slack offline until periodic health check");
+                Console.WriteLine("[SLACK] Auto-reconnect exhausted -- Slack offline until periodic health check");
                 Console.ResetColor();
             });
         }
@@ -273,11 +273,11 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             switch (type)
             {
                 case "hello":
-                    Console.WriteLine("[SLACK] Received hello — connection established");
+                    Console.WriteLine("[SLACK] Received hello -- connection established");
                     break;
 
                 case "disconnect":
-                    Console.WriteLine($"[SLACK] Disconnect requested: {json["reason"]} — will auto-reconnect");
+                    Console.WriteLine($"[SLACK] Disconnect requested: {json["reason"]} -- will auto-reconnect");
                     // Slack sends "disconnect" with reason "refresh_requested" periodically
                     // Must reconnect to maintain event delivery
                     if (_autoReconnect)
@@ -309,7 +309,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                     break;
 
                 default:
-                    // Unknown type — acknowledge anyway
+                    // Unknown type -- acknowledge anyway
                     AcknowledgeEnvelope(json);
                     break;
             }
@@ -323,7 +323,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Handle events_api envelope.</summary>
     private void HandleEventsApi(JsonNode envelope)
     {
-        // Must acknowledge within 3 seconds — returns false if duplicate
+        // Must acknowledge within 3 seconds -- returns false if duplicate
         if (!AcknowledgeEnvelope(envelope)) return;
 
         var payload = envelope["payload"];
@@ -347,7 +347,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         var threadTs = eventNode["thread_ts"]?.GetValue<string>();
         var botId = eventNode["bot_id"]?.GetValue<string>();
 
-        // ── Reaction events: completely different JSON shape → handle early and return ──
+        // -- Reaction events: completely different JSON shape -> handle early and return --
         // { "type": "reaction_added", "user": "U...", "reaction": "emoji", "item": { "type": "message", "channel": "C...", "ts": "..." } }
         if (eventType is "reaction_added" or "reaction_removed")
         {
@@ -373,7 +373,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             return;
         }
 
-        // Bot's own messages → fire OnSelfMessage for ack cleanup, then skip normal processing
+        // Bot's own messages -> fire OnSelfMessage for ack cleanup, then skip normal processing
         if (user == _botUserId || (subtype == "bot_message" && botId != null))
         {
             Console.WriteLine($"[SLACK] Skip self/bot msg: user={user} botId={botId} subtype={subtype} text={text?[..Math.Min(text?.Length ?? 0, 30)]}");
@@ -405,9 +405,9 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                 ts = innerMsg["ts"]?.GetValue<string>() ?? ts;
                 threadTs = innerMsg["thread_ts"]?.GetValue<string>() ?? threadTs;
                 botId = innerMsg["bot_id"]?.GetValue<string>();
-                subtype = innerMsg["subtype"]?.GetValue<string>(); // may be null now → passes through
+                subtype = innerMsg["subtype"]?.GetValue<string>(); // may be null now -> passes through
 
-                // Still a bot message after unwrap → skip
+                // Still a bot message after unwrap -> skip
                 if (user == _botUserId || (!string.IsNullOrEmpty(botId)))
                 {
                     Console.WriteLine($"[SLACK] Skip changed bot msg: user={user} botId={botId}");
@@ -416,11 +416,11 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
                 var isEdited = innerMsg["edited"] != null;
                 if (!isEdited)
                 {
-                    // URL unfurl (not user edit) → skip to avoid double-routing
+                    // URL unfurl (not user edit) -> skip to avoid double-routing
                     Console.WriteLine($"[SLACK] Skip message_changed (unfurl, not edit): user={user}");
                     return;
                 }
-                Console.WriteLine($"[SLACK] User edit detected → re-routing as new message: user={user} text={text?[..Math.Min(text?.Length ?? 0, 40)]}");
+                Console.WriteLine($"[SLACK] User edit detected -> re-routing as new message: user={user} text={text?[..Math.Min(text?.Length ?? 0, 40)]}");
             }
             else
             {
@@ -450,7 +450,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             BotId = botId
         };
 
-        // Dispatch events in background — prevents blocking the receive loop
+        // Dispatch events in background -- prevents blocking the receive loop
         // (handlers can take 30s+ for route spawn/MCP calls; ACK must happen within 3s)
         switch (eventType)
         {
@@ -469,7 +469,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
     /// <summary>Handle interactive envelope (Block Kit button clicks, etc.).</summary>
     private void HandleInteractive(JsonNode envelope)
     {
-        // Must acknowledge within 3 seconds — returns false if duplicate
+        // Must acknowledge within 3 seconds -- returns false if duplicate
         if (!AcknowledgeEnvelope(envelope)) return;
 
         var payload = envelope["payload"];
@@ -508,7 +508,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         }
     }
 
-    /// <summary>Envelope IDs already acked — prevents duplicate processing on Slack retransmit.</summary>
+    /// <summary>Envelope IDs already acked -- prevents duplicate processing on Slack retransmit.</summary>
     private readonly HashSet<string> _ackedEnvelopes = new();
     private readonly object _ackLock = new();
 
@@ -523,7 +523,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
         {
             if (!_ackedEnvelopes.Add(envelopeId))
             {
-                Console.WriteLine($"[SLACK] ACK DEDUP — already acked envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+                Console.WriteLine($"[SLACK] ACK DEDUP -- already acked envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
                 return false;
             }
             // Keep set bounded (max 500 entries)
@@ -536,8 +536,8 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
 
         if (_ws == null || _ws.State != WebSocketState.Open)
         {
-            Console.Error.WriteLine($"[SLACK] ACK FAILED — ws={_ws?.State} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
-            return true; // still return true — event is new, just can't ack
+            Console.Error.WriteLine($"[SLACK] ACK FAILED -- ws={_ws?.State} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+            return true; // still return true -- event is new, just can't ack
         }
 
         for (int retry = 0; retry < 2; retry++)
@@ -550,7 +550,7 @@ public sealed class SlackSocketClient : IAsyncDisposable, IDisposable
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[SLACK] ACK ERROR (attempt {retry + 1}/2) — {ex.Message} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
+                Console.Error.WriteLine($"[SLACK] ACK ERROR (attempt {retry + 1}/2) -- {ex.Message} envelope={envelopeId[..Math.Min(8, envelopeId.Length)]}");
                 if (retry == 0) Thread.Sleep(100); // brief retry delay
             }
         }

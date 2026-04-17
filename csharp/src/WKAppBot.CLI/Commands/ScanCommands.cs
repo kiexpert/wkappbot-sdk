@@ -9,7 +9,7 @@ namespace WKAppBot.CLI;
 // partial class: scan + form-dump commands
 internal partial class Program
 {
-    // ── scan ──────────────────────────────────────────────────
+    // -- scan --------------------------------------------------
 
     static int ScanCommand(string[] args)
     {
@@ -63,7 +63,7 @@ internal partial class Program
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("Profile: (new — use --save to create)");
+            Console.WriteLine("Profile: (new -- use --save to create)");
             Console.ResetColor();
         }
         Console.WriteLine();
@@ -88,12 +88,12 @@ internal partial class Program
             : null;
         ExperienceDb? expDb = expDir != null ? new ExperienceDb(expDir) : null;
 
-        // ── OCR learning pass (--ocr) ──
+        // -- OCR learning pass (--ocr) --
         if (useOcr && expDb != null)
         {
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("── OCR Learning ────────────────────────");
+            Console.WriteLine("-- OCR Learning ------------------------");
             Console.ResetColor();
 
             // Initialize Simple OCR
@@ -115,7 +115,7 @@ internal partial class Program
             {
                 try
                 {
-                    // Bridge: SimpleOcrAnalyzer.RecognizeAll → OcrWordInfo[]
+                    // Bridge: SimpleOcrAnalyzer.RecognizeAll -> OcrWordInfo[]
                     // (avoids WKAppBot.Vision dependency in Win32 project)
                     async Task<IReadOnlyList<OcrWordInfo>> OcrBridge(System.Drawing.Bitmap bmp)
                     {
@@ -153,12 +153,12 @@ internal partial class Program
                         Console.ResetColor();
                     }
 
-                    // ── Control Detail Cache (auto on first encounter, always on --detail) ──
+                    // -- Control Detail Cache (auto on first encounter, always on --detail) --
                     if (ocrResult.DetailScreenshots > 0)
                     {
                         Console.WriteLine();
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.WriteLine("── Control Detail Cache ────────────────");
+                        Console.WriteLine("-- Control Detail Cache ----------------");
                         Console.ResetColor();
 
                         // Per-form stats
@@ -174,7 +174,7 @@ internal partial class Program
                             {
                                 var cidDirs = Directory.GetDirectories(ctrlDir);
                                 Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine($"  [{fid}] {fExp.Controls.Count} controls → {cidDirs.Length} screenshots saved");
+                                Console.WriteLine($"  [{fid}] {fExp.Controls.Count} controls -> {cidDirs.Length} screenshots saved");
                                 Console.ResetColor();
                             }
                         }
@@ -184,10 +184,10 @@ internal partial class Program
                         Console.ResetColor();
                     }
 
-                    // ── Text Snapshot Collection (Puppet Pattern) ──
+                    // -- Text Snapshot Collection (Puppet Pattern) --
                     Console.WriteLine();
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine("── Text Snapshot (Puppet Pattern) ─────");
+                    Console.WriteLine("-- Text Snapshot (Puppet Pattern) ----─");
                     Console.ResetColor();
 
                     int snapshotCount = 0;
@@ -299,7 +299,7 @@ internal partial class Program
             }
         }
 
-        // ── Save profile ──
+        // -- Save profile --
         if (save)
         {
             AppProfile profile;
@@ -351,7 +351,7 @@ internal partial class Program
             Console.ResetColor();
         }
 
-        // ── ActionState IPC: share scan info with AppBotEye ──
+        // -- ActionState IPC: share scan info with AppBotEye --
         try
         {
             var formCount = scanResult.Forms.Count;
@@ -369,7 +369,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── form-dump ─────────────────────────────────────────────
+    // -- form-dump --------------------------------------------─
 
     static int FormDumpCommand(string[] args)
     {

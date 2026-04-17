@@ -4,10 +4,10 @@ namespace WKAppBot.Launcher;
 
 partial class Program
 {
-    // ── Encoding recovery ────────────────────────────────────────────────────
+    // -- Encoding recovery ----------------------------------------------------
     /// <summary>
     /// Recover Korean (and other multibyte) args corrupted by bash/MSYS2.
-    /// GetCommandLineA() → raw system-codepage bytes → decode with system encoding.
+    /// GetCommandLineA() -> raw system-codepage bytes -> decode with system encoding.
     /// Compare each arg: if Unicode version has replacement chars (U+FFFD) or
     /// differs from ANSI-decoded version, use the ANSI version.
     /// </summary>
@@ -26,7 +26,7 @@ partial class Program
             var ansiArgs = ParseCommandLineArgs(ansiStr);
             if (ansiArgs.Length == 0) return args;
 
-            // Skip argv[0] (exe path) — compare only actual args
+            // Skip argv[0] (exe path) -- compare only actual args
             var unicodeAll = Environment.GetCommandLineArgs();
             if (unicodeAll.Length <= 1) return args;
 
@@ -65,7 +65,7 @@ partial class Program
                 {
                     result[i] = aArg;
                     anyRecovered = true;
-                    Console.Error.WriteLine($"[ENCODING] Recovered arg[{i}]: \"{uArg}\" → \"{aArg}\" (system codepage)");
+                    Console.Error.WriteLine($"[ENCODING] Recovered arg[{i}]: \"{uArg}\" -> \"{aArg}\" (system codepage)");
                 }
             }
 
@@ -76,7 +76,7 @@ partial class Program
         }
         catch
         {
-            return args; // any failure → use original args
+            return args; // any failure -> use original args
         }
     }
 

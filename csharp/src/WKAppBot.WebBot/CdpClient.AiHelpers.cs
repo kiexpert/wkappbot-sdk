@@ -250,12 +250,12 @@ public sealed partial class CdpClient
                 "var cur=root.states[sel];if(!cur||cur.locked||cur.isSending)return;" +
                 "var el=document.querySelector(sel);if(!el)return;" +
                 "var txt=((el.value||el.innerText||el.textContent||'')).trim();" +
-                "if(!txt){cur.ticks=0;cur.lastHash=null;return;}" + // empty → reset
+                "if(!txt){cur.ticks=0;cur.lastHash=null;return;}" + // empty -> reset
                 "var h=root.hash(txt);" +
                 "if(h!==cur.lastHash){cur.ticks=0;cur.lastHash=h;" +
                     "console.debug('[PUMP] content changed len='+txt.length+' sel='+sel);" +
-                    "return;}" + // content changed → reset ticks
-                "cur.ticks++;" + // content stable → count up
+                    "return;}" + // content changed -> reset ticks
+                "cur.ticks++;" + // content stable -> count up
                 "console.debug('[PUMP] stable tick='+cur.ticks+' len='+txt.length+' sel='+sel);" +
                 "if(cur.ticks>=2){" + // 2 ticks × 500ms = 1s of STABLE content
                     "cur.lastResult=root.trySend(sel);" +
@@ -265,7 +265,7 @@ public sealed partial class CdpClient
             "}, 500);}" + // 500ms tick
             "return 'ARMED';" +
             "})()";
-        var result = await EvalAsync(armJs, timeoutMs: 20000); // heavy JS: allow 20s — Chrome may be throttled during streaming
+        var result = await EvalAsync(armJs, timeoutMs: 20000); // heavy JS: allow 20s -- Chrome may be throttled during streaming
         return result == "ARMED";
     }
 
@@ -405,7 +405,7 @@ public sealed partial class CdpClient
             "var sel='" + esc + "';" +
             "var root=window.__wkAskPump;if(!root||!root.states)return '0';" +
             "var st=root.states[sel];if(!st||!st.readyToSend)return '0';" +
-            "st.readyToSend=false;st.isSending=false;" + // clear both flags — C# has taken over
+            "st.readyToSend=false;st.isSending=false;" + // clear both flags -- C# has taken over
             "return '1';" +
             "})()");
         return result == "1";
@@ -795,7 +795,7 @@ public sealed partial class CdpClient
         return string.IsNullOrEmpty(lastText) ? (false, "") : (true, lastText.Trim());
     }
 
-    // ── Internal ──
+    // -- Internal --
     /// <summary>
     /// Ensure Chrome window is not minimized before DOM-dependent operations.
     /// ProseMirror, contenteditable, and some React components need rendering.

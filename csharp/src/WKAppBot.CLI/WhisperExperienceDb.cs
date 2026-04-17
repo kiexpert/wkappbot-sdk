@@ -7,16 +7,16 @@ using NAudio.Wave;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Whisper Experience DB — token JSONL logging + Windows STT auto-labeling.
+/// Whisper Experience DB -- token JSONL logging + Windows STT auto-labeling.
 /// Logs every non-silence frame with 32-bit token, mode, levels, and optional STT label.
 ///
 /// Architecture:
-///   WhisperEngine.OnFrame → WhisperExperienceDb.LogFrame()
-///   Windows STT (parallel) → recognized text tagged to recent token window
+///   WhisperEngine.OnFrame -> WhisperExperienceDb.LogFrame()
+///   Windows STT (parallel) -> recognized text tagged to recent token window
 ///
 /// Storage: wkappbot.hq/profiles/whisper_exp/
-///   tokens_{date}.jsonl  — per-frame token log
-///   stt_{date}.jsonl     — STT recognition results with token window
+///   tokens_{date}.jsonl  -- per-frame token log
+///   stt_{date}.jsonl     -- STT recognition results with token window
 /// </summary>
 internal sealed class WhisperExperienceDb : IDisposable
 {
@@ -26,7 +26,7 @@ internal sealed class WhisperExperienceDb : IDisposable
     private string _currentDate = "";
     private readonly object _writeLock = new();
 
-    // STT engine + WASAPI loopback (system audio → STT for learning)
+    // STT engine + WASAPI loopback (system audio -> STT for learning)
     private SpeechRecognitionEngine? _sttEngine;
     private Thread? _sttThread;
     private volatile bool _sttRunning;
@@ -41,7 +41,7 @@ internal sealed class WhisperExperienceDb : IDisposable
     private const int TokenWindowSize = 60; // ~2 seconds at 33fps
     private volatile string _currentMode = "QUIET"; // updated every LogFrame
 
-    // MP3 segment recording (voice activity → sentence-level MP3 files)
+    // MP3 segment recording (voice activity -> sentence-level MP3 files)
     private string? _wavDir;
     private LameMP3FileWriter? _mp3Writer;
     private string? _wavPath; // current segment file path
@@ -51,12 +51,12 @@ internal sealed class WhisperExperienceDb : IDisposable
     private int _whisperFrames; // WHSPR-mode frames in current segment (for post-hoc V/W tag)
     private float _segmentEnergy; // accumulated MaxEnergy for RMS gate
     private int _segmentDedupCount; // RLE-dedup token count (≈ filename length ÷ 4)
-    private const int MaxDedupCodes = 55; // ~220 chars → force-cut before MAX_PATH (~240)
+    private const int MaxDedupCodes = 55; // ~220 chars -> force-cut before MAX_PATH (~240)
     private const int PauseFrames = 33;      // ~330ms silence = ".." (comma, short breath)
-    private const int SentenceEndFrames = 99; // ~1s silence = "." (period, sentence end → cut)
-    private const int MinSegmentFrames  = 100; // ~3 seconds — skip tiny bursts for Gemini
-    private const int MinVoicedFrames   = 9;   // ~90ms  — fewer → discard file entirely
-    private const float MinAvgEnergy    = 0.008f; // RMS gate: avg energy below this → _noise/
+    private const int SentenceEndFrames = 99; // ~1s silence = "." (period, sentence end -> cut)
+    private const int MinSegmentFrames  = 100; // ~3 seconds -- skip tiny bursts for Gemini
+    private const int MinVoicedFrames   = 9;   // ~90ms  -- fewer -> discard file entirely
+    private const float MinAvgEnergy    = 0.008f; // RMS gate: avg energy below this -> _noise/
     private readonly object _wavLock = new();
     private volatile string? _segmentSttLabel; // STT draft label for current segment
 
@@ -98,14 +98,14 @@ internal sealed class WhisperExperienceDb : IDisposable
         EnsureWriter();
     }
 
-    /// <summary>Start Windows STT fed by WASAPI loopback (system audio → STT for learning).</summary>
+    /// <summary>Start Windows STT fed by WASAPI loopback (system audio -> STT for learning).</summary>
     public bool StartStt()
     {
         if (_sttRunning) return true;
 
         try
         {
-            // Prefer English recognizer (YouTube content) — Korean segments → _unknown/ → Gemini handles
+            // Prefer English recognizer (YouTube content) -- Korean segments -> _unknown/ -> Gemini handles
             var recognizers = SpeechRecognitionEngine.InstalledRecognizers();
             var chosen = recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("en"))
                       ?? recognizers.FirstOrDefault(r => r.Culture.Name.StartsWith("ko"))
@@ -115,14 +115,14 @@ internal sealed class WhisperExperienceDb : IDisposable
 
             _sttEngine.LoadGrammar(new DictationGrammar());
 
-            // WASAPI loopback → resample to 16kHz mono 16bit → pipe to STT
+            // WASAPI loopback -> resample to 16kHz mono 16bit -> pipe to STT
             _loopback = new WasapiLoopbackCapture();
             _sttPipe = new SttPipeStream();
             var srcFormat = _loopback.WaveFormat;
 
             _loopback.DataAvailable += (_, e) =>
             {
-                // Stereo resample (48kHz float → 16kHz 16bit stereo) for WAV recording
+                // Stereo resample (48kHz float -> 16kHz 16bit stereo) for WAV recording
                 var src1 = new RawSourceWaveStream(new MemoryStream(e.Buffer, 0, e.BytesRecorded), srcFormat);
                 using var stereoResampler = new MediaFoundationResampler(src1, new WaveFormat(16000, 16, 2))
                 {
@@ -133,7 +133,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                 if (stereoRead > 0)
                     WriteWavData(stereoBuf, stereoRead);
 
-                // Mono resample (48kHz float → 16kHz 16bit mono) for STT engine
+                // Mono resample (48kHz float -> 16kHz 16bit mono) for STT engine
                 var src2 = new RawSourceWaveStream(new MemoryStream(e.Buffer, 0, e.BytesRecorded), srcFormat);
                 using var monoResampler = new MediaFoundationResampler(src2, new WaveFormat(16000, 16, 1))
                 {
@@ -284,17 +284,17 @@ internal sealed class WhisperExperienceDb : IDisposable
     {
         _currentMode = frame.Mode;
 
-        // WAV segment recording: only VOICE/WHSPR are speech — everything else is silence
+        // WAV segment recording: only VOICE/WHSPR are speech -- everything else is silence
         bool isSpeech = frame.Mode == "VOICE" || frame.Mode == "WHSPR";
         if (!isSpeech)
         {
             if (_isRecording)
             {
                 _quietFrames++;
-                // ".." comma: short breath between syllables → insert pause marker (once)
+                // ".." comma: short breath between syllables -> insert pause marker (once)
                 if (_quietFrames == PauseFrames)
-                    _segmentSoundCodes.Add(0); // 0 = pause marker → "-0-" in filename
-                // "." period: long silence → sentence end → cut!
+                    _segmentSoundCodes.Add(0); // 0 = pause marker -> "-0-" in filename
+                // "." period: long silence -> sentence end -> cut!
                 if (_quietFrames >= SentenceEndFrames)
                 {
                     Console.WriteLine($"[WHISPER:.] speech={_segmentFrames}f({_segmentFrames * 10}ms) pause={_quietFrames}f mode={frame.Mode}");
@@ -320,12 +320,12 @@ internal sealed class WhisperExperienceDb : IDisposable
             // Force-cut when dedup code count hits filename limit (continuous speech with no silence)
             if (_isRecording && _segmentDedupCount >= MaxDedupCodes)
             {
-                Console.WriteLine($"[WHISPER:CUT] dedup={_segmentDedupCount}>={MaxDedupCodes} → force-cut");
+                Console.WriteLine($"[WHISPER:CUT] dedup={_segmentDedupCount}>={MaxDedupCodes} -> force-cut");
                 StopWavSegment();
                 _segmentFrames = 0;
             }
 
-            // Long sentence warning: 9s (~300 frames) → debug dump (once per sentence)
+            // Long sentence warning: 9s (~300 frames) -> debug dump (once per sentence)
             if (_segmentFrames == 300)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
@@ -435,12 +435,12 @@ internal sealed class WhisperExperienceDb : IDisposable
             try
             {
                 var waveFormat = new WaveFormat(16000, 16, 2); // stereo
-                _mp3Writer = new LameMP3FileWriter(_wavPath, waveFormat, 64); // 64kbps — good for speech
+                _mp3Writer = new LameMP3FileWriter(_wavPath, waveFormat, 64); // 64kbps -- good for speech
                 _isRecording = true;
             }
             catch { _mp3Writer = null; _wavPath = null; }
         }
-        _micVadGating = true; // open mic VAD window — mic segment starts only when mic energy > threshold
+        _micVadGating = true; // open mic VAD window -- mic segment starts only when mic energy > threshold
     }
 
     private void StopWavSegment()
@@ -461,14 +461,14 @@ internal sealed class WhisperExperienceDb : IDisposable
             try { _mp3Writer?.Dispose(); } catch { }
             _mp3Writer = null;
 
-            // Too short: < MinVoicedFrames → discard file entirely (incomplete phoneme)
+            // Too short: < MinVoicedFrames -> discard file entirely (incomplete phoneme)
             if (frames < MinVoicedFrames && _wavPath != null)
             {
                 try { File.Delete(_wavPath); } catch { }
                 _wavPath = null;
             }
 
-            // RMS energy gate: avg energy too low → background noise, move to _noise/
+            // RMS energy gate: avg energy too low -> background noise, move to _noise/
             float avgEnergy = frames > 0 ? _segmentEnergy / frames : 0f;
             if (_wavPath != null && avgEnergy < MinAvgEnergy)
             {
@@ -479,7 +479,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                     var noiseDest = Path.Combine(noiseDir, Path.GetFileName(_wavPath));
                     if (!File.Exists(noiseDest)) File.Move(_wavPath, noiseDest);
                     else File.Delete(_wavPath);
-                    Console.WriteLine($"[WHISPER:NOISE] avg_energy={avgEnergy:F4} < {MinAvgEnergy} → _noise/");
+                    Console.WriteLine($"[WHISPER:NOISE] avg_energy={avgEnergy:F4} < {MinAvgEnergy} -> _noise/");
                 }
                 catch { }
                 _wavPath = null;
@@ -493,9 +493,9 @@ internal sealed class WhisperExperienceDb : IDisposable
                     if (_segmentSoundCodes[i] != deduped[^1])
                         deduped.Add(_segmentSoundCodes[i]);
 
-                sampledForMic = deduped; // all deduped codes → MAX_PATH trim handles overflow
+                sampledForMic = deduped; // all deduped codes -> MAX_PATH trim handles overflow
 
-                // Post-hoc V/W reclassification: majority of frames are WHSPR → rename V.mp3 → W.mp3
+                // Post-hoc V/W reclassification: majority of frames are WHSPR -> rename V.mp3 -> W.mp3
                 if (_wavPath != null && _whisperFrames * 2 > frames)
                 {
                     var wPath = Path.Combine(Path.GetDirectoryName(_wavPath)!, "W.mp3");
@@ -503,7 +503,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                     catch { }
                 }
 
-                // Rename with sound code sequence → move to _unknown/ for study
+                // Rename with sound code sequence -> move to _unknown/ for study
                 if (_wavPath != null)
                 {
                     try
@@ -554,7 +554,7 @@ internal sealed class WhisperExperienceDb : IDisposable
             StopMicSegment(sampledForMic);
         else
         {
-            // Too short — discard mic segment silently
+            // Too short -- discard mic segment silently
             lock (_micWavLock)
             {
                 try { _micMp3Writer?.Dispose(); } catch { }
@@ -589,8 +589,8 @@ internal sealed class WhisperExperienceDb : IDisposable
     public void NotifyAutoStudyDone() => _autoStudyRunning = false;
 
     /// <summary>Format sound code as octal digits (no leading zeros). 0 = pause marker.
-    /// If band 0 (VxLip/성대음) is rank 1 → encode ranks 2,3,4 (>>3, leading "0" strips naturally).
-    /// Otherwise → encode ranks 1,2,3 (>>6).</summary>
+    /// If band 0 (VxLip/성대음) is rank 1 -> encode ranks 2,3,4 (>>3, leading "0" strips naturally).
+    /// Otherwise -> encode ranks 1,2,3 (>>6).</summary>
     private static string FormatSoundCode(ushort sc, bool forFile = false)
     {
         if (sc == 0) return forFile ? "0" : "..";
@@ -643,7 +643,7 @@ internal sealed class WhisperExperienceDb : IDisposable
 
     private static float ComputeRms(byte[] buffer, int count)
     {
-        // 16-bit signed PCM → RMS in [0, 1]
+        // 16-bit signed PCM -> RMS in [0, 1]
         double sum = 0;
         int samples = count / 2;
         for (int i = 0; i + 1 < count; i += 2)
@@ -690,7 +690,7 @@ internal sealed class WhisperExperienceDb : IDisposable
             _micMp3Path = null;
         }
 
-        // Rename: prepend sound codes — keep TAIL (recent syllables) if too long
+        // Rename: prepend sound codes -- keep TAIL (recent syllables) if too long
         if (completedPath != null && File.Exists(completedPath)
             && soundCodes != null && soundCodes.Count > 0)
         {
@@ -709,7 +709,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                 var scStr = sbCode.ToString().Trim();
 
                 // MAX_PATH safety: cut from HEAD to keep TAIL (most recent codes)
-                // final path = dir + "/" + scStr + ".mp3"  → scStr max = 235 - dir.Length
+                // final path = dir + "/" + scStr + ".mp3"  -> scStr max = 235 - dir.Length
                 var maxScLen = 235 - dir.Length;
                 if (maxScLen > 0 && scStr.Length > maxScLen)
                     scStr = scStr[^maxScLen..].TrimStart('-').TrimStart();
@@ -718,7 +718,7 @@ internal sealed class WhisperExperienceDb : IDisposable
                 {
                     // mic filename = sound codes only (no timestamp, no mic_ prefix)
                     var newPath = Path.Combine(dir, $"{scStr}.mp3");
-                    if (File.Exists(newPath)) File.Delete(completedPath); // duplicate → discard
+                    if (File.Exists(newPath)) File.Delete(completedPath); // duplicate -> discard
                     else { File.Move(completedPath, newPath); completedPath = newPath; }
                 }
             }
@@ -776,7 +776,7 @@ internal sealed class WhisperExperienceDb : IDisposable
     public (string? lastStt, long lastSttTicks, string lastSttMode, int windowSize) GetStatus()
         => (_lastSttResult, _lastSttTicks, _lastSttMode, _tokenWindow.Count);
 
-    // ── JSON models ──
+    // -- JSON models --
 
     private sealed class TokenEntry
     {

@@ -27,7 +27,7 @@ internal partial class Program
         return new JsonObject { ["type"] = type, ["description"] = description };
     }
 
-    // ── tools/call ──────────────────────────────────────────────
+    // -- tools/call ----------------------------------------------
 
     static JsonNode HandleToolsCall(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
     {
@@ -64,7 +64,7 @@ internal partial class Program
         try { _toolStartCpuMs = (long)System.Diagnostics.Process.GetCurrentProcess().TotalProcessorTime.TotalMilliseconds; } catch { }
 
         // Extract per-call caller context from _meta (set by EyeMcpClient)
-        // Fallback to _mcpDetectedCwd (VS Code parent process title → workspace folder)
+        // Fallback to _mcpDetectedCwd (VS Code parent process title -> workspace folder)
         var meta = @params?["_meta"] as JsonObject;
         var metaCwd = meta?["callerCwd"]?.GetValue<string>() ?? _mcpDetectedCwd;
         var metaHwnd = meta?["callerHwnd"]?.GetValue<string>();
@@ -112,7 +112,7 @@ internal partial class Program
                     _ => ($"Unknown tool: {toolName}", 1)
                 };
 
-            // Check if elevation was needed — signal Launcher via special error code
+            // Check if elevation was needed -- signal Launcher via special error code
             if (McpElevationRequired)
             {
                 McpElevationRequired = false;
@@ -168,7 +168,7 @@ internal partial class Program
         }
     }
 
-    // ── Argument builders ───────────────────────────────────────
+    // -- Argument builders --------------------------------------─
 
     static string[] BuildUnifiedArgs(JsonObject args)
     {
@@ -214,8 +214,8 @@ internal partial class Program
 
     /// <summary>
     /// Build logcat CLI args from MCP tool params.
-    /// grapCompat=true: grap tool (pattern first) — positional order is [fileFilter, pattern].
-    /// grapCompat=false: logcat tool (fileFilter first) — positional order is [fileFilter, pattern].
+    /// grapCompat=true: grap tool (pattern first) -- positional order is [fileFilter, pattern].
+    /// grapCompat=false: logcat tool (fileFilter first) -- positional order is [fileFilter, pattern].
     /// Both end up with same logcat positionals; difference is which param maps to which.
     /// </summary>
     static string[] BuildLogcatArgs(JsonObject args, bool grapCompat)
@@ -417,7 +417,7 @@ internal partial class Program
     static async Task HandleToolsCallAsync(JsonObject? @params, StreamWriter writer, JsonNode? requestId)
     {
         JsonObject? response = null;
-        // NO ErrorScope here — MCP worker is a piped process, stderr must pass through!
+        // NO ErrorScope here -- MCP worker is a piped process, stderr must pass through!
         // Extract APSP progressToken from _meta
         var progressToken = @params?["_meta"]?["progressToken"];
         var progressCounter = new int[1];
@@ -473,7 +473,7 @@ internal partial class Program
                 if (queued)
                     emitProgress($"[start] gate acquired after {waitSince.ElapsedMilliseconds}ms");
 
-                // 툴 출력 → MCP 세션 탭에 믹스 (별도 탭 없음)
+                // 툴 출력 -> MCP 세션 탭에 믹스 (별도 탭 없음)
                 var result = RunToolCore(@params, emitProgress) ?? new JsonObject
                 {
                     ["content"] = new JsonArray
@@ -585,7 +585,7 @@ internal partial class Program
         lock (McpWriteGate)
         {
             writer.WriteLine(json);
-            // Smart flush: complete line written → flush if >1s since last flush or if this is a response (has "id")
+            // Smart flush: complete line written -> flush if >1s since last flush or if this is a response (has "id")
             var now = Environment.TickCount64;
             bool isResponse = payload.ContainsKey("id");
             if (isResponse || now - Interlocked.Read(ref _lastFlushTicks) > 1000)
@@ -606,7 +606,7 @@ internal partial class Program
     }
 
     // APSP v1: emit standard MCP notifications/progress with APSP extended fields.
-    // progressToken: from _meta.progressToken in tools/call request (null → fallback to notifications/message)
+    // progressToken: from _meta.progressToken in tools/call request (null -> fallback to notifications/message)
     // progressCounter: shared int[1] incremented per notification (progress field)
     // sw: elapsed time since tool start
     static void EmitToolProgress(StreamWriter writer, JsonNode? progressToken, string line, int[] progressCounter, Stopwatch sw)
@@ -673,7 +673,7 @@ internal partial class Program
         }
     }
 
-    // ── CLI execution with output capture ───────────────────────
+    // -- CLI execution with output capture ----------------------─
 
     /// <summary>
     /// Run a wkappbot CLI command and capture its console output as a string.

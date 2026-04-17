@@ -1,8 +1,8 @@
 ﻿{
     "id":  "automating-legacy-mfc-apps-with-no-uia-hts-playbook",
     "app":  "wkappbot",
-    "title":  "Automating Legacy MFC Apps With No UIA — HTS Playbook",
-    "desc":  "MFC owner-drawn controls have almost no UIA patterns → Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL — double input). GetSupportedPatterns() on MFC = COM corruption — use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein ≤2 for bitmap OCR instability.",
+    "title":  "Automating Legacy MFC Apps With No UIA -- HTS Playbook",
+    "desc":  "MFC owner-drawn controls have almost no UIA patterns -> Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL -- double input). GetSupportedPatterns() on MFC = COM corruption -- use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein ≤2 for bitmap OCR instability.",
     "steps":  [
 
               ],

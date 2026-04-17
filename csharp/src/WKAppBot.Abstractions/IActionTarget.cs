@@ -6,13 +6,13 @@ namespace WKAppBot.Abstractions;
 /// before action execution across Windows UIA, Android ADB, and Chrome CDP.
 ///
 /// Return value convention for EnsureActionReady:
-///   null        → blocked (hard fail)
-///   == target   → success (proceed with original target)
-///   != target   → retarget (e.g. popup found above main window)
+///   null        -> blocked (hard fail)
+///   == target   -> success (proceed with original target)
+///   != target   -> retarget (e.g. popup found above main window)
 /// </summary>
 public interface IActionTarget
 {
-    // ── Identity ──
+    // -- Identity --
 
     /// <summary>Human-readable name (UIA Name / Android content-desc or text)</summary>
     string DisplayName { get; }
@@ -30,7 +30,7 @@ public interface IActionTarget
     /// IntPtr (hwnd) for Windows, AndroidNode for ADB, string (nodeId) for CDP.</summary>
     object? NativeHandle { get; }
 
-    // ── Bounds ──
+    // -- Bounds --
 
     /// <summary>Screen coordinates (Left, Top, Right, Bottom)</summary>
     (int Left, int Top, int Right, int Bottom) BoundingRect { get; }
@@ -47,7 +47,7 @@ public interface IActionTarget
     /// <summary>Height (derived from BoundingRect)</summary>
     int Height => BoundingRect.Bottom - BoundingRect.Top;
 
-    // ── State ──
+    // -- State --
 
     /// <summary>Has keyboard/input focus</summary>
     bool Focused { get; }
@@ -67,7 +67,7 @@ public interface IActionTarget
     /// <summary>Window visual state: "normal", "minimized", "maximized" (window-level only)</summary>
     string? WindowState { get; }
 
-    // ── Hierarchy ──
+    // -- Hierarchy --
 
     /// <summary>Parent element (null for root)</summary>
     IActionTarget? Parent { get; }
@@ -77,7 +77,7 @@ public interface IActionTarget
 }
 
 /// <summary>
-/// Context for readiness pipeline — carries platform-specific handles.
+/// Context for readiness pipeline -- carries platform-specific handles.
 /// </summary>
 public class ReadinessContext
 {

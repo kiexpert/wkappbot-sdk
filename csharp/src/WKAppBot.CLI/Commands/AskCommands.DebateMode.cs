@@ -6,7 +6,7 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Pure debate mode: ask triad --debate "question"
-/// COMPLETELY SEPARATE from tool loop — uses CDP directly.
+/// COMPLETELY SEPARATE from tool loop -- uses CDP directly.
 /// No AskCommand, no AskGemini, no loop persona, no APSP.
 /// </summary>
 internal partial class Program
@@ -39,9 +39,9 @@ internal partial class Program
             ["claude"] = new[] { "div.tiptap.ProseMirror", "[contenteditable='true']" }
         };
 
-        // ═══ R1: Independent positions (CDP direct) ═══
+        // === R1: Independent positions (CDP direct) ===
         Console.WriteLine("[정반합:R1] Independent positions...");
-        SlackPostToThread("═══ *R1: Independent Positions* ═══", "🦉 Moderator");
+        SlackPostToThread("=== *R1: Independent Positions* ===", "🦉 Moderator");
 
         var r1Results = new ConcurrentDictionary<string, string>();
         var r1Tasks = ais.Select(ai => Task.Run(async () =>
@@ -83,9 +83,9 @@ internal partial class Program
             return 1;
         }
 
-        // ═══ R2: Cross-critique ═══
+        // === R2: Cross-critique ===
         Console.WriteLine("[정반합:R2] Cross-critique...");
-        SlackPostToThread("═══ *R2: Cross-Critique* ═══", "🦉 Moderator");
+        SlackPostToThread("=== *R2: Cross-Critique* ===", "🦉 Moderator");
 
         var r2Results = new ConcurrentDictionary<string, string>();
         var r2Tasks = ais.Where(ai => r1Results.ContainsKey(ai)).Select(ai => Task.Run(async () =>
@@ -125,9 +125,9 @@ internal partial class Program
 
         WaitForNTasks(r2Tasks, Math.Min(r1Results.Count, 2), timeoutSec, "R2");
 
-        // ═══ R3: Synthesis + Korean conclusion ═══
+        // === R3: Synthesis + Korean conclusion ===
         Console.WriteLine("[정반합:R3] Synthesis...");
-        SlackPostToThread("═══ *R3: Final Synthesis* ═══", "🦉 Moderator");
+        SlackPostToThread("=== *R3: Final Synthesis* ===", "🦉 Moderator");
 
         var allPositions = new StringBuilder();
         foreach (var ai in ais)
@@ -175,8 +175,8 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine("[정반합] ═══ Complete ═══");
-        SlackPostToThread("═══ *정반합 토론 완료* ═══", "🦉 Moderator");
+        Console.WriteLine("[정반합] === Complete ===");
+        SlackPostToThread("=== *정반합 토론 완료* ===", "🦉 Moderator");
         return 0;
     }
 
@@ -328,7 +328,7 @@ internal partial class Program
         }
     }
 
-    /// <summary>Pure debate persona — no tool/APSP/loop instructions.</summary>
+    /// <summary>Pure debate persona -- no tool/APSP/loop instructions.</summary>
     static string BuildDebateOnlyPersona()
     {
         return """

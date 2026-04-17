@@ -1,4 +1,4 @@
-// ElevatedEyeProxy.cs — Elevated Eye Named Pipe proxy.
+// ElevatedEyeProxy.cs -- Elevated Eye Named Pipe proxy.
 // When Eye runs as admin, it listens on a Named Pipe for CLI commands.
 // CLI (normal user) sends commands to Eye (admin) for transparent execution.
 // Same pattern as KiwoomProxy (64-bit↔32-bit Named Pipe).
@@ -15,9 +15,9 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// ── Protocol ──
+// -- Protocol --
 
-/// <summary>Request from CLI → elevated Eye.</summary>
+/// <summary>Request from CLI -> elevated Eye.</summary>
 sealed class EyeProxyRequest
 {
     [JsonPropertyName("id")] public int Id { get; set; }
@@ -25,7 +25,7 @@ sealed class EyeProxyRequest
     [JsonPropertyName("args")] public string[] Args { get; set; } = [];
 }
 
-/// <summary>Response from elevated Eye → CLI.</summary>
+/// <summary>Response from elevated Eye -> CLI.</summary>
 sealed class EyeProxyResponse
 {
     [JsonPropertyName("id")] public int Id { get; set; }
@@ -35,7 +35,7 @@ sealed class EyeProxyResponse
     [JsonPropertyName("error")] public string? Error { get; set; }
 }
 
-// ── Wire: length-prefixed JSON (reuse KiwoomProxy pattern) ──
+// -- Wire: length-prefixed JSON (reuse KiwoomProxy pattern) --
 
 static class EyeProxyWire
 {
@@ -79,7 +79,7 @@ static class EyeProxyWire
     }
 }
 
-// ── Server (runs inside elevated Eye) ──
+// -- Server (runs inside elevated Eye) --
 
 /// <summary>
 /// Named Pipe server that runs inside elevated Eye process.
@@ -90,7 +90,7 @@ static class ElevatedEyeServer
 {
     public const string PipeName = "wkappbot_elevated";
 
-    /// <summary>True while at least one admin command is being executed — hot-swap must defer.</summary>
+    /// <summary>True while at least one admin command is being executed -- hot-swap must defer.</summary>
     public static bool IsBusy => _activeClients > 0;
     static volatile int _activeClients;
 
@@ -140,7 +140,7 @@ static class ElevatedEyeServer
                 pipe?.Dispose();
             }
 
-            // No delay on happy-path connections — next WaitForConnectionAsync starts immediately
+            // No delay on happy-path connections -- next WaitForConnectionAsync starts immediately
         }
 
         Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
@@ -229,26 +229,26 @@ static class ElevatedEyeServer
             {
                 bool stdoutDone = stdoutTask.IsCompleted;
                 bool stderrDone = stderrTask.IsCompleted;
-                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} TIMEOUT (30s) — stdoutDone={stdoutDone} stderrDone={stderrDone} — killing tree");
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} TIMEOUT (30s) -- stdoutDone={stdoutDone} stderrDone={stderrDone} -- killing tree");
                 try { proc.Kill(entireProcessTree: true); } catch { }
                 try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
                 return new EyeProxyResponse
                 {
                     Id = req.Id,
                     ExitCode = -1,
-                    Error = $"Subprocess timeout (30s) — stdoutDone={stdoutDone} stderrDone={stderrDone}",
+                    Error = $"Subprocess timeout (30s) -- stdoutDone={stdoutDone} stderrDone={stderrDone}",
                     Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
                     Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
                 };
             }
 
             // Child has exited. Reader tasks should complete quickly (pipe EOF on child close).
-            // But if a grandchild inherited stdout, these can hang — cap with a short timeout.
+            // But if a grandchild inherited stdout, these can hang -- cap with a short timeout.
             var readDeadline = Task.Delay(TimeSpan.FromSeconds(3));
             var readDone = Task.WhenAll(stdoutTask, stderrTask);
             if (await Task.WhenAny(readDone, readDeadline) == readDeadline)
             {
-                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} stdout/stderr drain TIMEOUT (3s after child exit) — grandchild may still hold pipe");
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} stdout/stderr drain TIMEOUT (3s after child exit) -- grandchild may still hold pipe");
                 return new EyeProxyResponse
                 {
                     Id = req.Id,
@@ -275,7 +275,7 @@ static class ElevatedEyeServer
     }
 }
 
-// ── Client (used by normal CLI to send commands to elevated Eye) ──
+// -- Client (used by normal CLI to send commands to elevated Eye) --
 
 /// <summary>
 /// Named Pipe client for sending commands to elevated Eye.
@@ -294,7 +294,7 @@ static class ElevatedEyeClient
     /// Stronger than IsAvailable (which only checks pipe file existence).
     /// Confirms a server is actually accepting connections.
     /// Returns true only if connect succeeded within the timeout.
-    /// Caller should use a hard ceiling (e.g. 200ms) — if admin Eye is in bad state,
+    /// Caller should use a hard ceiling (e.g. 200ms) -- if admin Eye is in bad state,
     /// fall through to LaunchElevatedEye (sudo protection path) for recovery.
     /// </summary>
     public static bool Ping(int connectMs = 200)
@@ -348,7 +348,7 @@ static class ElevatedEyeClient
     /// Execute a command via elevated Eye proxy, printing stdout/stderr transparently.
     /// Returns exit code, or -1 if proxy unavailable / timed out.
     /// timeoutMs governs total pipe-round-trip budget (default 5000).
-    /// Use short timeout (e.g. 1500ms) for fast-fail detection of hung admin Eye —
+    /// Use short timeout (e.g. 1500ms) for fast-fail detection of hung admin Eye --
     /// caller then falls through to LaunchElevatedEye for recovery.
     /// </summary>
     public static int ExecuteViaProxy(string command, string[] args, int timeoutMs = 5000)
@@ -371,7 +371,7 @@ static class ElevatedEyeClient
     }
 }
 
-// ── Helpers ──
+// -- Helpers --
 
 static class ElevationHelper
 {
@@ -402,7 +402,7 @@ static class ElevationHelper
             Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: target pid={mcpPid} elevated={mcpTargetElev} IsMcp={Program.IsMcpMode} InEye={Program.RunningInEye}");
             if (mcpTargetElev == true)
             {
-                // Use Ping (actual connect) not IsAvailable (file exists) — pipe path can
+                // Use Ping (actual connect) not IsAvailable (file exists) -- pipe path can
                 // outlive a crashed admin Eye briefly, giving false "alive" on dead daemon.
                 if (ElevatedEyeClient.Ping(100))
                 {
@@ -410,7 +410,7 @@ static class ElevationHelper
                     var exit = ElevatedEyeClient.ExecuteViaProxy(command, args);
                     Console.Error.WriteLine($"[ELEVATION] Proxy result: exit={exit}");
                     if (exit != -1) return (true, exit);
-                    Console.Error.WriteLine("[ELEVATION] Proxy failed — falling through");
+                    Console.Error.WriteLine("[ELEVATION] Proxy failed -- falling through");
                 }
                 else
                 {
@@ -423,7 +423,7 @@ static class ElevationHelper
                 }
                 else
                 {
-                    Console.Error.WriteLine("[ELEVATION:EYE] Cannot elevate in Eye worker — limited access");
+                    Console.Error.WriteLine("[ELEVATION:EYE] Cannot elevate in Eye worker -- limited access");
                 }
             }
             return (false, 0);
@@ -436,18 +436,18 @@ static class ElevationHelper
 
         // Avoid circular reference: don't delegate if target IS another wkappbot instance
         // (e.g., trying to close the Elevated Eye itself)
-        // Use window class name — Process.GetProcessById fails on admin processes from non-admin
+        // Use window class name -- Process.GetProcessById fails on admin processes from non-admin
         var className = WindowFinder.GetClassName(targetHwnd);
         if (className.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.Error.WriteLine($"[ELEVATION] Target is wkappbot process (class={className}) — skipping proxy delegation");
+            Console.Error.WriteLine($"[ELEVATION] Target is wkappbot process (class={className}) -- skipping proxy delegation");
             Console.ResetColor();
             return (false, 0);
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine($"[ELEVATION] Target (pid={pid}) is elevated — requires admin proxy");
+        Console.Error.WriteLine($"[ELEVATION] Target (pid={pid}) is elevated -- requires admin proxy");
         Console.ResetColor();
 
         // Strategy 1: try existing Elevated Eye proxy
@@ -457,7 +457,7 @@ static class ElevationHelper
             Console.WriteLine("[ELEVATION] Delegating via Elevated Eye proxy...");
             var exit1 = ElevatedEyeClient.ExecuteViaProxy(command, args);
             if (exit1 != -1) return (true, exit1);
-            // Proxy connection failed → fall through to Strategy 2
+            // Proxy connection failed -> fall through to Strategy 2
             Console.WriteLine("[ELEVATION] Existing proxy unreachable, launching new one...");
         }
 
@@ -468,9 +468,9 @@ static class ElevationHelper
             if (exit2 != -1) return (true, exit2);
         }
 
-        // Strategy 3: fall through — let caller proceed with limited access
+        // Strategy 3: fall through -- let caller proceed with limited access
         Console.ForegroundColor = ConsoleColor.DarkYellow;
-        Console.WriteLine("[ELEVATION] Proxy unavailable — continuing with limited access");
+        Console.WriteLine("[ELEVATION] Proxy unavailable -- continuing with limited access");
         Console.ResetColor();
         return (false, 0);
     }
@@ -483,21 +483,21 @@ static class ElevationHelper
     /// </summary>
     public static bool WaitForAdminServer()
     {
-        // Already available? Ping is the authoritative check — IsAvailable only tests
+        // Already available? Ping is the authoritative check -- IsAvailable only tests
         // for the pipe file in the namespace, which can persist briefly after crash.
         if (ElevatedEyeClient.Ping(100)) return true;
 
         if (Program.IsMcpMode)
         {
             // Signal Launcher to spawn admin Core
-            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: MCP mode — signaling Launcher");
+            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: MCP mode -- signaling Launcher");
             Program.McpElevationRequired = true;
             return false; // Launcher will re-route
         }
 
         if (Program.RunningInEye)
         {
-            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: Eye mode — proxy unavailable");
+            Console.Error.WriteLine("[ELEVATION] WaitForAdminServer: Eye mode -- proxy unavailable");
             return false;
         }
 
@@ -509,7 +509,7 @@ static class ElevationHelper
     /// Launch Eye as admin with --elevated flag.
     /// Returns true if UAC was approved and Eye started.
     /// </summary>
-    /// <summary>Alert user before elevation request — wkappbot speak (fire-and-forget).</summary>
+    /// <summary>Alert user before elevation request -- wkappbot speak (fire-and-forget).</summary>
     static void PlayElevationMelody()
     {
         _ = Task.Run(() =>
@@ -531,7 +531,7 @@ static class ElevationHelper
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
 
-            // ── Pre-spawn hot-swap: promote wkappbot-core.new.exe if pending ──
+            // -- Pre-spawn hot-swap: promote wkappbot-core.new.exe if pending --
             // Admin Eye starts from exePath; rename-swap latest before UAC so admin runs newest code.
             // Rename of running exe is permitted on Windows; delete/overwrite is not.
             try
@@ -543,16 +543,16 @@ static class ElevationHelper
                     if (System.IO.File.Exists(newExePath))
                     {
                         var backupPath = System.IO.Path.Combine(exeDir, $"wkappbot-core.old-sudo-{DateTime.Now:yyyyMMdd-HHmmss}.exe");
-                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] pending .new.exe detected — promoting before admin spawn");
+                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] pending .new.exe detected -- promoting before admin spawn");
                         try { System.IO.File.Move(exePath, backupPath); } catch { /* already renamed */ }
                         System.IO.File.Move(newExePath, exePath);
-                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] promoted — admin Eye will run latest core");
+                        Console.Error.WriteLine("[ELEVATION:HOT-SWAP] promoted -- admin Eye will run latest core");
                     }
                 }
             }
             catch (Exception hsEx)
             {
-                Console.Error.WriteLine($"[ELEVATION:HOT-SWAP] skipped: {hsEx.Message} — proceeding with current exe");
+                Console.Error.WriteLine($"[ELEVATION:HOT-SWAP] skipped: {hsEx.Message} -- proceeding with current exe");
             }
 
             var psi = new ProcessStartInfo
@@ -572,9 +572,9 @@ static class ElevationHelper
             var trail = WKAppBot.CLI.PulseStep.GetRecentTrail(5);
             if (trail.Count > 0)
             {
-                Console.Error.WriteLine("[ELEVATION] ── recent step trail ──");
+                Console.Error.WriteLine("[ELEVATION] -- recent step trail --");
                 foreach (var line in trail) Console.Error.WriteLine($"[ELEVATION]   {line}");
-                Console.Error.WriteLine("[ELEVATION] ──────────────────────");
+                Console.Error.WriteLine("[ELEVATION] ----------------------");
             }
             Console.ResetColor();
 
@@ -588,13 +588,13 @@ static class ElevationHelper
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
-                // UAC cancelled or runas denied. Don't exit yet — the UAC dialog time may
+                // UAC cancelled or runas denied. Don't exit yet -- the UAC dialog time may
                 // have overlapped with a pre-existing admin Eye still booting, so we still
                 // owe the caller one handshake chance below.
                 uacEx = ex;
             }
 
-            // ── Post-UAC handshake (100ms) ──
+            // -- Post-UAC handshake (100ms) --
             // Admin Eye boot time and UAC dialog time tend to overlap. A pre-existing Eye
             // that started booting just before this call may be ready NOW. Regardless of
             // UAC outcome, give it exactly one 100ms Ping chance before we commit to either
@@ -602,7 +602,7 @@ static class ElevationHelper
             if (ElevatedEyeClient.Ping(100))
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Error.WriteLine("[ELEVATION] admin Eye responsive after UAC wait — reusing existing instance");
+                Console.Error.WriteLine("[ELEVATION] admin Eye responsive after UAC wait -- reusing existing instance");
                 Console.ResetColor();
                 return true;
             }
@@ -610,12 +610,12 @@ static class ElevationHelper
             if (!uacApproved)
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.Error.WriteLine($"[ELEVATION] UAC cancelled ({uacEx?.NativeErrorCode}) — no admin Eye available");
+                Console.Error.WriteLine($"[ELEVATION] UAC cancelled ({uacEx?.NativeErrorCode}) -- no admin Eye available");
                 Console.ResetColor();
                 return false;
             }
 
-            // UAC approved + our admin Eye spawning. Poll for pipe readiness — up to 10s.
+            // UAC approved + our admin Eye spawning. Poll for pipe readiness -- up to 10s.
             // Use Ping (actual connect) over IsAvailable (file exists) for authoritative liveness.
             for (int i = 0; i < 40; i++)
             {
@@ -642,10 +642,10 @@ static class ElevationHelper
     }
 }
 
-// ── Eye IPC: eye tick queries running Eye loop for cached state ──
+// -- Eye IPC: eye tick queries running Eye loop for cached state --
 // Pipe name: wkappbot_eye_ipc  Request: {"cmd":"tick"}  Response: EyeIpcTickResponse JSON
 
-/// <summary>Response from running Eye loop → one-shot eye tick client.</summary>
+/// <summary>Response from running Eye loop -> one-shot eye tick client.</summary>
 sealed class EyeIpcTickResponse
 {
     [JsonPropertyName("summary")]          public string Summary { get; set; } = "";

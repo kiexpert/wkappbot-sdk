@@ -9,12 +9,12 @@ namespace WKAppBot.Win32.Input;
 /// 레거시 Win32 컨트롤의 단축키(&amp; 프리픽스)를 감지하여 포커스리스로 활성화.
 ///
 /// 동작 원리:
-///   - Static/Label: "&amp;검색" → 'ㄱ' or "&amp;S" → 'S' — 다음 탭스톱 컨트롤이 실제 입력 타겟
-///   - Button:       "&amp;확인" → BM_CLICK PostMessage (포커스 불필요)
-///   - Edit:         EM_SETSEL(0,-1) → 캐럿 배치 (포커스 불필요)
+///   - Static/Label: "&amp;검색" -> 'ㄱ' or "&amp;S" -> 'S' -- 다음 탭스톱 컨트롤이 실제 입력 타겟
+///   - Button:       "&amp;확인" -> BM_CLICK PostMessage (포커스 불필요)
+///   - Edit:         EM_SETSEL(0,-1) -> 캐럿 배치 (포커스 불필요)
 ///   - ComboBox:     CB_SETCURSEL 또는 WM_SETFOCUS 시도
 ///
-/// 레거시 Win32는 WM_COMMAND/BM_CLICK이 포커스 무관하게 동작 → 완전 포커스리스 가능.
+/// 레거시 Win32는 WM_COMMAND/BM_CLICK이 포커스 무관하게 동작 -> 완전 포커스리스 가능.
 /// Tag: [LEGACY] [FOCUSLESS]
 /// </summary>
 public static class Win32ShortcutActivator
@@ -24,11 +24,11 @@ public static class Win32ShortcutActivator
     private const uint WM_COMMAND  = 0x0111;
     private const int  BN_CLICKED  = 0;
 
-    // ── Shortcut extraction ──────────────────────────────────────
+    // -- Shortcut extraction --------------------------------------
 
     /// <summary>
     /// Window text에서 &amp; 프리픽스 단축키 문자 추출.
-    /// "&amp;저장" → 'S' (ASCII upper), "검색(&amp;S)" → 'S', "확인(&amp;O)" → 'O'
+    /// "&amp;저장" -> 'S' (ASCII upper), "검색(&amp;S)" -> 'S', "확인(&amp;O)" -> 'O'
     /// </summary>
     public static char? ExtractShortcutChar(string text)
     {
@@ -50,11 +50,11 @@ public static class Win32ShortcutActivator
         return ExtractShortcutChar(sb.ToString());
     }
 
-    // ── Shortcut map ─────────────────────────────────────────────
+    // -- Shortcut map --------------------------------------------─
 
     /// <summary>
     /// 부모 창의 모든 자식 컨트롤에서 단축키 맵 빌드.
-    /// 반환: char(대문자) → hwnd
+    /// 반환: char(대문자) -> hwnd
     /// </summary>
     public static Dictionary<char, IntPtr> BuildShortcutMap(IntPtr parentHwnd)
     {
@@ -70,8 +70,8 @@ public static class Win32ShortcutActivator
     }
 
     /// <summary>
-    /// 부모 창의 모든 자식 컨트롤에서 레이블 텍스트(& 제거) → hwnd 맵 빌드.
-    /// "&저장" → "저장", "검색(&S)" → "검색(S)"
+    /// 부모 창의 모든 자식 컨트롤에서 레이블 텍스트(& 제거) -> hwnd 맵 빌드.
+    /// "&저장" -> "저장", "검색(&S)" -> "검색(S)"
     /// 가장 긴 키부터 매칭해야 하므로 길이 내림차순 정렬된 리스트로 반환.
     /// </summary>
     public static List<(string Label, IntPtr Hwnd)> BuildTextMap(IntPtr parentHwnd)
@@ -94,7 +94,7 @@ public static class Win32ShortcutActivator
 
     /// <summary>
     /// Win32 창 텍스트에서 &amp; 단축키 마커 제거.
-    /// "&저장" → "저장", "검색(&S)" → "검색(S)", "&amp;&amp;" → "&"
+    /// "&저장" -> "저장", "검색(&S)" -> "검색(S)", "&amp;&amp;" -> "&"
     /// </summary>
     public static string StripShortcutMarkers(string text)
     {
@@ -105,8 +105,8 @@ public static class Win32ShortcutActivator
             if (text[i] == '&')
             {
                 if (i + 1 < text.Length && text[i + 1] == '&')
-                { sb.Append('&'); i++; } // && → literal &
-                // else: single & → skip (shortcut marker, hidden in display)
+                { sb.Append('&'); i++; } // && -> literal &
+                // else: single & -> skip (shortcut marker, hidden in display)
             }
             else
                 sb.Append(text[i]);
@@ -114,7 +114,7 @@ public static class Win32ShortcutActivator
         return sb.ToString();
     }
 
-    // ── Control type detection ────────────────────────────────────
+    // -- Control type detection ------------------------------------
 
     private static string GetClassName(IntPtr hwnd)
     {
@@ -135,7 +135,7 @@ public static class Win32ShortcutActivator
     private static bool IsComboBox(string cls) =>
         cls.Equals("ComboBox", StringComparison.OrdinalIgnoreCase);
 
-    // ── Linked control (Static label → next tabstop) ─────────────
+    // -- Linked control (Static label -> next tabstop) ------------─
 
     /// <summary>
     /// Static 라벨의 &amp; 단축키가 가리키는 실제 입력 컨트롤 찾기.
@@ -157,13 +157,13 @@ public static class Win32ShortcutActivator
         return IntPtr.Zero;
     }
 
-    // ── Focusless activation ──────────────────────────────────────
+    // -- Focusless activation --------------------------------------
 
     /// <summary>
     /// 컨트롤 타입에 따라 포커스리스 활성화.
-    /// Button  → BM_CLICK PostMessage
-    /// Edit    → EM_SETSEL(0,-1) (캐럿 끝으로)
-    /// Static  → FindLinkedControl → 재귀 호출
+    /// Button  -> BM_CLICK PostMessage
+    /// Edit    -> EM_SETSEL(0,-1) (캐럿 끝으로)
+    /// Static  -> FindLinkedControl -> 재귀 호출
     /// </summary>
     public static bool ActivateFocusless(IntPtr ctrlHwnd, IntPtr parentHwnd = default)
     {
@@ -177,7 +177,7 @@ public static class Win32ShortcutActivator
         if (IsButton(cls))
         {
             NativeMethods.PostMessageW(ctrlHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
-            Console.WriteLine($"  [WIN32-SC] BM_CLICK → 0x{ctrlHwnd:X8} \"{GetWindowText(ctrlHwnd)}\"");
+            Console.WriteLine($"  [WIN32-SC] BM_CLICK -> 0x{ctrlHwnd:X8} \"{GetWindowText(ctrlHwnd)}\"");
             return true;
         }
 
@@ -185,17 +185,17 @@ public static class Win32ShortcutActivator
         {
             // EM_SETSEL(0, -1): 전체 선택 + 캐럿 배치 (포커스 불필요)
             NativeMethods.PostMessageW(ctrlHwnd, EM_SETSEL, IntPtr.Zero, (IntPtr)(-1));
-            Console.WriteLine($"  [WIN32-SC] EM_SETSEL(0,-1) → Edit 0x{ctrlHwnd:X8}");
+            Console.WriteLine($"  [WIN32-SC] EM_SETSEL(0,-1) -> Edit 0x{ctrlHwnd:X8}");
             return true;
         }
 
         if (IsStatic(cls))
         {
-            // 라벨 → 다음 탭스톱 컨트롤이 실제 타겟
+            // 라벨 -> 다음 탭스톱 컨트롤이 실제 타겟
             var linked = FindLinkedControl(ctrlHwnd);
             if (linked != IntPtr.Zero)
             {
-                Console.WriteLine($"  [WIN32-SC] Static label → linked 0x{linked:X8}");
+                Console.WriteLine($"  [WIN32-SC] Static label -> linked 0x{linked:X8}");
                 return ActivateFocusless(linked, parentHwnd);
             }
             return false;
@@ -210,11 +210,11 @@ public static class Win32ShortcutActivator
                 var wParam = (IntPtr)((1 << 16) | (ctrlId & 0xFFFF)); // CBN_SETFOCUS=1
                 NativeMethods.PostMessageW(parentHwnd, WM_COMMAND, wParam, ctrlHwnd);
             }
-            Console.WriteLine($"  [WIN32-SC] ComboBox focus notify → 0x{ctrlHwnd:X8}");
+            Console.WriteLine($"  [WIN32-SC] ComboBox focus notify -> 0x{ctrlHwnd:X8}");
             return true;
         }
 
-        Console.WriteLine($"  [WIN32-SC] Unknown class '{cls}' — skip");
+        Console.WriteLine($"  [WIN32-SC] Unknown class '{cls}' -- skip");
         return false;
     }
 
@@ -230,7 +230,7 @@ public static class Win32ShortcutActivator
             Console.WriteLine($"  [WIN32-SC] Shortcut '{upper}' not found in 0x{parentHwnd:X8}");
             return false;
         }
-        Console.WriteLine($"  [WIN32-SC] Shortcut '{upper}' → 0x{ctrlHwnd:X8}");
+        Console.WriteLine($"  [WIN32-SC] Shortcut '{upper}' -> 0x{ctrlHwnd:X8}");
         return ActivateFocusless(ctrlHwnd, parentHwnd);
     }
 
@@ -245,10 +245,10 @@ public static class Win32ShortcutActivator
         return ActivateFocusless(targetHwnd, parent);
     }
 
-    // ── Menu dispatch ─────────────────────────────────────────────
+    // -- Menu dispatch --------------------------------------------─
 
     /// <summary>
-    /// 창의 메뉴바를 재귀 탐색하여 레이블 텍스트(& 제거) → 메뉴 아이템 ID 맵 빌드.
+    /// 창의 메뉴바를 재귀 탐색하여 레이블 텍스트(& 제거) -> 메뉴 아이템 ID 맵 빌드.
     /// 팝업 서브메뉴는 재귀 탐색, 실제 명령 아이템만 수집.
     /// WM_COMMAND(wParam=itemId) 발동용.
     /// 길이 내림차순 정렬.
@@ -272,7 +272,7 @@ public static class Win32ShortcutActivator
             var sub = NativeMethods.GetSubMenu(hMenu, i);
             if (sub != IntPtr.Zero)
             {
-                // 팝업 서브메뉴 → 재귀
+                // 팝업 서브메뉴 -> 재귀
                 CollectMenuItems(sub, list, seen);
                 continue;
             }
@@ -286,10 +286,10 @@ public static class Win32ShortcutActivator
         }
     }
 
-    // ── Multi-language menu resource scan ────────────────────────
+    // -- Multi-language menu resource scan ------------------------
 
     /// <summary>
-    /// 라이브 HMENU(현재 표시 언어)만 수집 — 빠름 (~1ms).
+    /// 라이브 HMENU(현재 표시 언어)만 수집 -- 빠름 (~1ms).
     /// ScanAndMerge 동기 단계에서 사용. 다국어 리소스는 BuildMenuResourceAllLangs로 별도 수집.
     /// </summary>
     public static List<(string Label, uint ItemId)> BuildMenuTextMapLive(IntPtr hwnd)
@@ -303,7 +303,7 @@ public static class Win32ShortcutActivator
     }
 
     /// <summary>
-    /// 앱 모듈 RT_MENU 리소스(모든 LANGID) 파싱 — 느림 (LoadLibraryExW).
+    /// 앱 모듈 RT_MENU 리소스(모든 LANGID) 파싱 -- 느림 (LoadLibraryExW).
     /// ScanAndMerge 백그라운드 단계에서 사용.
     /// </summary>
     public static List<(string Label, uint ItemId)> BuildMenuResourceAllLangs(IntPtr hwnd)
@@ -357,11 +357,11 @@ public static class Win32ShortcutActivator
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var list = new List<(string Label, uint ItemId)>();
 
-        // 1. 라이브 HMENU — 현재 표시 언어
+        // 1. 라이브 HMENU -- 현재 표시 언어
         var hMenu = NativeMethods.GetMenu(hwnd);
         if (hMenu != IntPtr.Zero) CollectMenuItems(hMenu, list, seen);
 
-        // 2. 모듈 리소스 — 모든 LANGID의 RT_MENU 파싱
+        // 2. 모듈 리소스 -- 모든 LANGID의 RT_MENU 파싱
         var sb = new StringBuilder(512);
         if (NativeMethods.GetWindowModuleFileNameW(hwnd, sb, (uint)sb.Capacity) == 0) goto Done;
         var modulePath = sb.ToString();
@@ -400,7 +400,7 @@ public static class Win32ShortcutActivator
         return list;
     }
 
-    // RT_MENU 바이너리 파싱 — MENUTEMPLATE(v0) + MENUEX_TEMPLATE(v1) 지원
+    // RT_MENU 바이너리 파싱 -- MENUTEMPLATE(v0) + MENUEX_TEMPLATE(v1) 지원
     private static void ParseMenuResource(IntPtr ptr, List<(string Label, uint ItemId)> list, HashSet<string> seen)
     {
         try
@@ -413,12 +413,12 @@ public static class Win32ShortcutActivator
                 pos += cbOffset; // dwHelpId 등 헤더 확장 스킵
                 ParseMenuExItems(ptr, ref pos, list, seen);
             }
-            else // MENUTEMPLATE (v0) — MFC/레거시
+            else // MENUTEMPLATE (v0) -- MFC/레거시
             {
                 ParseMenuItems(ptr, ref pos, list, seen);
             }
         }
-        catch { /* 파싱 오류는 무시 — 이미 라이브 HMENU로 수집됨 */ }
+        catch { /* 파싱 오류는 무시 -- 이미 라이브 HMENU로 수집됨 */ }
     }
 
     // MENUTEMPLATE 아이템 파싱
@@ -481,13 +481,13 @@ public static class Win32ShortcutActivator
         return chars.ToString();
     }
 
-    // ── Menu path resolution ──────────────────────────────────────
+    // -- Menu path resolution --------------------------------------
 
     /// <summary>
     /// 메뉴 경로로 아이템 ID 탐색. 각 세그먼트는 PatternMatcher grap 패턴 지원.
-    /// path = ["파일", "모두저장"]  → 정확 경로
-    /// path = ["파일", "*저장*"]    → 와일드카드 (glob)
-    /// path = ["*", "regex:저장.*"] → 정규식
+    /// path = ["파일", "모두저장"]  -> 정확 경로
+    /// path = ["파일", "*저장*"]    -> 와일드카드 (glob)
+    /// path = ["*", "regex:저장.*"] -> 정규식
     /// 반환: 0 = 미발견
     /// </summary>
     public static uint ResolveMenuPath(IntPtr hwnd, string[] path)
@@ -529,7 +529,7 @@ public static class Win32ShortcutActivator
     private static string ExtractMenuLabel(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
-        // 탭 구분 뒤 단축키 힌트 제거: "저장(&S)\tCtrl+S" → "저장(&S)"
+        // 탭 구분 뒤 단축키 힌트 제거: "저장(&S)\tCtrl+S" -> "저장(&S)"
         var tab = raw.IndexOf('\t');
         if (tab >= 0) raw = raw[..tab];
         return StripShortcutMarkers(raw).Trim();
@@ -541,11 +541,11 @@ public static class Win32ShortcutActivator
     public static bool DispatchMenuItem(IntPtr hwnd, uint itemId)
     {
         NativeMethods.PostMessageW(hwnd, WM_COMMAND, (IntPtr)itemId, IntPtr.Zero);
-        Console.WriteLine($"  [WIN32-MENU] WM_COMMAND itemId=0x{itemId:X4} → 0x{hwnd:X8}");
+        Console.WriteLine($"  [WIN32-MENU] WM_COMMAND itemId=0x{itemId:X4} -> 0x{hwnd:X8}");
         return true;
     }
 
-    // ── Shortcut PostMessage dispatch (focusless) ─────────────────
+    // -- Shortcut PostMessage dispatch (focusless) ----------------─
 
     /// <summary>
     /// "Alt+S", "Ctrl+Shift+F5", "s" 등 단축키 문자열을 파싱하여
@@ -564,7 +564,7 @@ public static class Win32ShortcutActivator
         uint vk = ParseVirtualKey(keyStr);
         if (vk == 0) { Console.WriteLine($"  [WIN32-KEY] Unknown key '{keyStr}'"); return false; }
 
-        uint scan   = NativeMethods.MapVirtualKeyW(vk, 0); // VK→scan code
+        uint scan   = NativeMethods.MapVirtualKeyW(vk, 0); // VK->scan code
         uint dnLp   = 0x00000001u | (scan << 16);          // repeat=1, scan code
         if (hasAlt) dnLp |= 1u << 29;                      // context bit = Alt held
         uint upLp   = dnLp | (1u << 30) | (1u << 31);     // prev-down + transition
@@ -579,7 +579,7 @@ public static class Win32ShortcutActivator
         if (hasShift) NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP,      (IntPtr)NativeMethods.VK_SHIFT,   unchecked((IntPtr)0xC02A0001u));
         if (hasCtrl)  NativeMethods.PostMessageW(hwnd, NativeMethods.WM_KEYUP,      (IntPtr)NativeMethods.VK_CONTROL, unchecked((IntPtr)0xC01D0001u));
 
-        Console.WriteLine($"  [WIN32-KEY] '{shortcut}' → vk=0x{vk:X2} scan={scan} mods=({(hasCtrl?"Ctrl ":"")}{(hasAlt?"Alt ":"")}{(hasShift?"Shift":"")})");
+        Console.WriteLine($"  [WIN32-KEY] '{shortcut}' -> vk=0x{vk:X2} scan={scan} mods=({(hasCtrl?"Ctrl ":"")}{(hasAlt?"Alt ":"")}{(hasShift?"Shift":"")})");
         return true;
     }
 
@@ -605,7 +605,7 @@ public static class Win32ShortcutActivator
         _ => 0
     };
 
-    // ── Helpers ───────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------─
 
     private static string GetWindowText(IntPtr hwnd)
     {

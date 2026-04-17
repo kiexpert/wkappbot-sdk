@@ -5,12 +5,12 @@ namespace WKAppBot.WebBot;
 
 /// <summary>
 /// Per-site and per-element knowhow storage for web automation.
-/// File-based, append-only, best-effort. No caching — reads from disk each time.
+/// File-based, append-only, best-effort. No caching -- reads from disk each time.
 ///
 /// Directory layout:
-///   {webProfilesDir}/_global/knowhow.md                              — cross-site patterns
-///   {webProfilesDir}/{domain}/knowhow.md                             — site-level quirks
-///   {webProfilesDir}/{domain}/elements/{label}_{hash}/knowhow.md     — element-level quirks
+///   {webProfilesDir}/_global/knowhow.md                              -- cross-site patterns
+///   {webProfilesDir}/{domain}/knowhow.md                             -- site-level quirks
+///   {webProfilesDir}/{domain}/elements/{label}_{hash}/knowhow.md     -- element-level quirks
 /// </summary>
 public static class WebKnowhow
 {

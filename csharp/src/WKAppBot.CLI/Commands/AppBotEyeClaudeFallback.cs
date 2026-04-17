@@ -1,13 +1,13 @@
-// AppBotEyeClaudeFallback.cs — Gemini auto-fallback when Claude hits rate limits or server errors.
+// AppBotEyeClaudeFallback.cs -- Gemini auto-fallback when Claude hits rate limits or server errors.
 //
 // Flow:
-//   Eye tick (1s) → CheckClaudeSessionsForErrors()
-//     → detects error patterns in each card's JSONL last entries
-//     → TryLaunchGeminiHandoff(): writes session file, injects JSONL notification, spawns agent gemini
+//   Eye tick (1s) -> CheckClaudeSessionsForErrors()
+//     -> detects error patterns in each card's JSONL last entries
+//     -> TryLaunchGeminiHandoff(): writes session file, injects JSONL notification, spawns agent gemini
 //
-// Agent loop (RunGeminiLoopAsync) → TryInjectGeminiResponseToSession()
-//     → appends each Gemini step response back into Claude session JSONL
-//     → Claude Code renders new entries on next scroll/view
+// Agent loop (RunGeminiLoopAsync) -> TryInjectGeminiResponseToSession()
+//     -> appends each Gemini step response back into Claude session JSONL
+//     -> Claude Code renders new entries on next scroll/view
 
 using System.Text;
 using System.Text.Json.Nodes;
@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Per-CWD dedup: don't re-fire for the same error within 10 minutes ──
+    // -- Per-CWD dedup: don't re-fire for the same error within 10 minutes --
     static readonly Dictionary<string, DateTime> _geminiHandoffFiredAt = new(StringComparer.OrdinalIgnoreCase);
     static readonly TimeSpan GeminiFallbackCooldown = TimeSpan.FromMinutes(10);
 
@@ -35,7 +35,7 @@ internal partial class Program
             var cwd = card.Cwd;
             if (string.IsNullOrEmpty(cwd)) continue;
 
-            // Cooldown check — don't re-fire within 10 minutes per CWD
+            // Cooldown check -- don't re-fire within 10 minutes per CWD
             if (_geminiHandoffFiredAt.TryGetValue(cwd, out var lastFired)
                 && (now - lastFired) < GeminiFallbackCooldown)
                 continue;
@@ -77,7 +77,7 @@ internal partial class Program
         {
             var lines = ReadLastLines(jsonlPath, 20);
 
-            // ── 1. Error text in assistant turns ──
+            // -- 1. Error text in assistant turns --
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -95,7 +95,7 @@ internal partial class Program
                 }
             }
 
-            // ── 2 & 3. Walk last entries in reverse; collect last user/assistant state ──
+            // -- 2 & 3. Walk last entries in reverse; collect last user/assistant state --
             DateTime? lastUserTs = null;
             bool lastAssistantComplete = true;  // assume complete until proven otherwise
             bool foundAssistant = false;
@@ -131,11 +131,11 @@ internal partial class Program
             {
                 var age = DateTime.UtcNow - lastUserTs.Value;
 
-                // ── 2. Unanswered user prompt (no assistant entry at all, or user is last) ──
+                // -- 2. Unanswered user prompt (no assistant entry at all, or user is last) --
                 if (!foundAssistant && age >= NoResponseFallbackThreshold)
                     return $"no response for {(int)age.TotalMinutes}m (compacting/hang?)";
 
-                // ── 3. Packet bomb: assistant running with no stop_reason for 30+ min ──
+                // -- 3. Packet bomb: assistant running with no stop_reason for 30+ min --
                 if (foundAssistant && !lastAssistantComplete && age >= StreamingTooLongThreshold)
                     return $"streaming {(int)age.TotalMinutes}m with no stop_reason (packet bomb?)";
             }
@@ -227,7 +227,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Claude error → Gemini handoff:
+    /// Claude error -> Gemini handoff:
     ///   1. Write session context file to wkappbot.hq/sessions/
     ///   2. Inject notification into Claude JSONL (visible in chat)
     ///   3. Spawn `wkappbot agent gemini` with last user prompt + session file
@@ -239,13 +239,13 @@ internal partial class Program
             var cwdTag = AbbreviateCwd(cwd);
             if (string.IsNullOrEmpty(cwdTag)) cwdTag = "session";
 
-            // ── 1. Write session context file ──
+            // -- 1. Write session context file --
             var sessionDir = Path.Combine(DataDir, "sessions");
             Directory.CreateDirectory(sessionDir);
             var sessionFile = Path.Combine(sessionDir, $"{cwdTag}-{DateTime.Now:yyyyMMdd-HHmmss}.md");
 
             var sb = new StringBuilder();
-            sb.AppendLine($"# Gemini Handoff Session — {DateTime.Now:yyyy-MM-dd HH:mm}");
+            sb.AppendLine($"# Gemini Handoff Session -- {DateTime.Now:yyyy-MM-dd HH:mm}");
             sb.AppendLine($"**Workspace**: {cwd}");
             sb.AppendLine($"**Reason**: Claude {errorReason}");
             sb.AppendLine();
@@ -285,10 +285,10 @@ internal partial class Program
             File.WriteAllText(sessionFile, sb.ToString(), new UTF8Encoding(false));
             Console.Error.WriteLine($"[FALLBACK] Session file: {sessionFile}");
 
-            // ── 2. Create live MD + open in VS Code (replaces JSONL inject) ──
+            // -- 2. Create live MD + open in VS Code (replaces JSONL inject) --
             var agentId = $"appbot-{cwdTag}";
 
-            // ── 3. Spawn Gemini agent with last user prompt ──
+            // -- 3. Spawn Gemini agent with last user prompt --
             var lastPrompt = GetLastUserPromptFromJsonl(jsonlPath);
             var question = !string.IsNullOrEmpty(lastPrompt)
                 ? lastPrompt
@@ -314,7 +314,7 @@ internal partial class Program
         }
     }
 
-    // ── Live MD file for real-time Gemini fallback output ──
+    // -- Live MD file for real-time Gemini fallback output --
     static readonly AsyncLocal<string?> _agentLiveMdPath = new();
 
     /// <summary>
@@ -332,7 +332,7 @@ internal partial class Program
             var mdPath = Path.Combine(askDir, $"{ts}-gemini-fallback-{slug}.md");
 
             var sb = new StringBuilder();
-            sb.AppendLine($"# Gemini Fallback — {DateTime.Now:yyyy-MM-dd HH:mm}");
+            sb.AppendLine($"# Gemini Fallback -- {DateTime.Now:yyyy-MM-dd HH:mm}");
             sb.AppendLine();
             sb.AppendLine($"> **Reason**: Claude {errorReason}");
             sb.AppendLine($"> **Question**: {question}");
@@ -391,7 +391,7 @@ internal partial class Program
             {
                 var text = answer.Length > 8000 ? answer[..8000] + "\n\n...(truncated)" : answer;
                 var section = new StringBuilder();
-                section.AppendLine($"## Step {step} — {DateTime.Now:HH:mm:ss}");
+                section.AppendLine($"## Step {step} -- {DateTime.Now:HH:mm:ss}");
                 section.AppendLine();
                 section.AppendLine(text);
                 section.AppendLine();

@@ -25,7 +25,7 @@ internal partial class Program
 
     static int NewChatCommand(string[] args)
     {
-        // ── Mutex guard: prevent concurrent/duplicate newchat runs ──
+        // -- Mutex guard: prevent concurrent/duplicate newchat runs --
         var lockFile = Path.Combine(Path.GetTempPath(), "wkappbot_newchat.lock");
         try
         {
@@ -39,7 +39,7 @@ internal partial class Program
         }
         catch { /* best-effort lock */ }
 
-        // ── Parse args ──
+        // -- Parse args --
         string? text = null;
         var filePath = GetArgValue(args, "--file");
 
@@ -66,19 +66,19 @@ internal partial class Program
             return 1;
         }
 
-        // ── Prepend skill summary as reference ──
+        // -- Prepend skill summary as reference --
         try
         {
             var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
             var skillLines = BuildSkillSummary(cwd);
             if (skillLines != null)
             {
-                text = $"## 📚 참고 스킬 (필요할 때 `wkappbot skill show <id>` 로 상세 조회)\n{skillLines}→ 관련 작업 전 해당 스킬 먼저 확인하면 삽질 방지!\n\n---\n{text}";
+                text = $"## 📚 참고 스킬 (필요할 때 `wkappbot skill read <id>` 로 상세 조회)\n{skillLines}-> 관련 작업 전 해당 스킬 먼저 확인하면 삽질 방지!\n\n---\n{text}";
             }
         }
         catch { /* skill summary optional */ }
 
-        // ── Append EmbeddedInitialPrompt + regenerate policy file ──
+        // -- Append EmbeddedInitialPrompt + regenerate policy file --
         // Handoff prompt goes first (handoff context first), policy appended after.
         // Strip "Startup Confirmation" section ??newchat expects handoff response, not "Policy loaded. Ready."
         if (!args.Contains("--no-policy"))
@@ -121,7 +121,7 @@ Then immediately:
             return 1;
         }
 
-        // ── Find VS Code window ──
+        // -- Find VS Code window --
         var vsHwnd = currentPrompt?.WindowHandle ?? FindVSCodeWindowForNewChat();
         if (vsHwnd == IntPtr.Zero)
         {
@@ -245,7 +245,7 @@ Then immediately:
             SkipKnowhow = true,
         });
 
-        // ── Step 0.5: Compress context (--compress) ──
+        // -- Step 0.5: Compress context (--compress) --
         if (args.Contains("--compress"))
         {
             Console.WriteLine("[NEWCHAT] Compressing context before /clear...");
@@ -278,14 +278,14 @@ Then immediately:
             if (editEl == null) return Error("[NEWCHAT] Edit element lost after compress");
         }
 
-        // ── Step 1: /clear via keyboard (slash command menu needs keystroke input!) ──
+        // -- Step 1: /clear via keyboard (slash command menu needs keystroke input!) --
         Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
         if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))
             return Error("[NEWCHAT] Failed to send /clear");
         Console.WriteLine("[NEWCHAT] /clear submitted ??waiting 3s for reset...");
         Thread.Sleep(3000);
 
-        // ── Step 2: Re-find edit (DOM may have changed after /clear) ──
+        // -- Step 2: Re-find edit (DOM may have changed after /clear) --
         root = automation.FromHandle(vsHwnd);
         editEl = root != null ? GrapHelper.WalkTree(root, maxDepth: 25, el =>
         {
@@ -298,11 +298,11 @@ Then immediately:
         }) : null;
         if (editEl == null) return Error("[NEWCHAT] Edit element lost after /clear");
 
-        // ── Step 3: Paste prompt + submit ──
+        // -- Step 3: Paste prompt + submit --
         if (!SetValueAndSubmit(editEl, vsHwnd, text))
             return Error("[NEWCHAT] Failed to send prompt");
 
-        // ── Step 4: Restore focus ──
+        // -- Step 4: Restore focus --
         if (prevFg != IntPtr.Zero && prevFg != vsHwnd)
         {
             Thread.Sleep(500);
@@ -451,8 +451,8 @@ Then immediately:
         }
     }
 
-    // ─────────────────────────────────??    //  VS Code window finder
-    // ─────────────────────────────────??
+    // --------------------------------─??    //  VS Code window finder
+    // --------------------------------─??
     /// <summary>
     /// Find VS Code window for new chat.
     /// Priority 1: ancestor VS Code process (wkappbot was spawned from its terminal ??exact match).
@@ -461,7 +461,7 @@ Then immediately:
     /// </summary>
     static IntPtr FindVSCodeWindowForNewChat()
     {
-        // ── Collect all VS Code windows (top-level + child renderers) ──
+        // -- Collect all VS Code windows (top-level + child renderers) --
         // EnumWindows only returns top-level HWNDs. VS Code sometimes creates Chrome_WidgetWin_1
         // as a SetParent'd child (e.g. "lucy_securepad" panel inside a multi-window frame).
         // We do a 2-pass scan: top-level first, then child scan of each top-level result.
@@ -503,7 +503,7 @@ Then immediately:
 
         if (candidates.Count == 0) return IntPtr.Zero;
 
-        // ── Priority 1: ancestor VS Code PID ──
+        // -- Priority 1: ancestor VS Code PID --
         // Walk parent process chain: wkappbot ??shell ??... ??Code.exe
         var ancestorCodePids = new HashSet<uint>();
         try
@@ -549,7 +549,7 @@ Then immediately:
             }
         }
 
-        // ── Priority 2: CWD folder match ??walk up path hierarchy ──
+        // -- Priority 2: CWD folder match ??walk up path hierarchy --
         // VS Code title = "{activeFile} - {workspaceRoot} - Visual Studio Code"
         // CWD may be a subdirectory of the workspace root, so try each ancestor folder.
         var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
@@ -593,7 +593,7 @@ Then immediately:
             }
         }
 
-        // ── No match ??error (never guess) ──
+        // -- No match ??error (never guess) --
         Console.ForegroundColor = ConsoleColor.Red;
         Console.Error.WriteLine($"[NEWCHAT] ERROR: No VS Code window matches CWD \"{cwdFolder}\" (ancestor PID lookup also failed).");
         Console.WriteLine("  Available VS Code windows:");

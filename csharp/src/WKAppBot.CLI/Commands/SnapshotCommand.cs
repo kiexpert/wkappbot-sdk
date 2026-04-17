@@ -10,7 +10,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: snapshot command — one-shot UIA tree + screenshot + OCR capture
+// partial class: snapshot command -- one-shot UIA tree + screenshot + OCR capture
 internal partial class Program
 {
     /// <summary>
@@ -165,10 +165,10 @@ internal partial class Program
                 var ocrPath = Path.Combine(outDir, "ocr.txt");
 
                 var sb = new StringBuilder();
-                sb.AppendLine($"── OCR Full Text ({ocrResult.Words.Count} words) ──");
+                sb.AppendLine($"-- OCR Full Text ({ocrResult.Words.Count} words) --");
                 sb.AppendLine(ocrResult.FullText);
                 sb.AppendLine();
-                sb.AppendLine("── Words (x, y, w, h, text) ──");
+                sb.AppendLine("-- Words (x, y, w, h, text) --");
                 foreach (var word in ocrResult.Words)
                 {
                     sb.AppendLine($"  ({word.X,4}, {word.Y,4}, {word.Width,3}, {word.Height,3}) \"{word.Text}\"");

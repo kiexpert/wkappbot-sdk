@@ -12,17 +12,17 @@ internal partial class Program
     /// </summary>
     enum InputResult
     {
-        /// <summary>Method succeeded — stop the chain.</summary>
+        /// <summary>Method succeeded -- stop the chain.</summary>
         Success,
-        /// <summary>Method not applicable or failed softly — try next method.</summary>
+        /// <summary>Method not applicable or failed softly -- try next method.</summary>
         Continue,
-        /// <summary>Fatal error (window closed, target gone) — stop the chain immediately.</summary>
+        /// <summary>Fatal error (window closed, target gone) -- stop the chain immediately.</summary>
         Abort,
     }
 
     /// <summary>
     /// Shared mutable state for the 12-tier input fallback chain.
-    /// Passed by reference to each TryMethodN() — methods can read and modify shared state.
+    /// Passed by reference to each TryMethodN() -- methods can read and modify shared state.
     ///
     /// Design decisions (Triad debate 2026-03-28):
     /// - Mutable class (not record): OCR/bitmap/hwnd mutation across methods needs shared visibility
@@ -31,7 +31,7 @@ internal partial class Program
     /// </summary>
     sealed class InputContext
     {
-        // ── Immutable inputs (set once during setup) ──
+        // -- Immutable inputs (set once during setup) --
         public required string Title { get; init; }
         public required string Text { get; init; }
         public required string TargetFormId { get; init; }
@@ -40,7 +40,7 @@ internal partial class Program
         public required int? MethodOnly { get; init; }
         public required int ClickXOffset { get; init; }
 
-        // ── Resolved targets (set during setup, read-only in methods) ──
+        // -- Resolved targets (set during setup, read-only in methods) --
         public required WindowInfo Win { get; init; }
         public required IntPtr MdiClient { get; init; }
         public required WindowInfo TargetForm { get; init; }
@@ -49,7 +49,7 @@ internal partial class Program
         public required ExperienceDb? ExpDb { get; init; }
         public required InputReadinessReport ReadinessReport { get; init; }
 
-        // ── Helper delegates (closures from setup, used by multiple methods) ──
+        // -- Helper delegates (closures from setup, used by multiple methods) --
         public required Func<string, string> OcrDebugPath { get; init; }
         public required Func<string, bool> ConfirmByOcrContains { get; init; }
         public required Func<IntPtr, IntPtr, byte[]?> CaptureControlPng { get; init; }
@@ -57,7 +57,7 @@ internal partial class Program
         public Func<IntPtr, IntPtr, (byte[], int, int, int)?>? CaptureControlRawFast { get; init; }
         public required Func<string, string, int, bool> FuzzyDigitMatch { get; init; }
 
-        // ── Abort flag (any method can set to stop the chain) ──
+        // -- Abort flag (any method can set to stop the chain) --
         public bool AbortChain { get; set; }
 
         /// <summary>Check if a specific method should run (respects --method N filter).</summary>

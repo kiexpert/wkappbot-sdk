@@ -11,7 +11,7 @@ using NativeMethods = WKAppBot.Win32.Native.NativeMethods;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot web <subcommand> — Chrome DevTools Protocol web automation
+// partial class: wkappbot web <subcommand> -- Chrome DevTools Protocol web automation
 internal partial class Program
 {
     static int WebCommand(string[] args)
@@ -36,7 +36,7 @@ internal partial class Program
         }
 
         // Removed (use a11y instead): eval, click, dblclick, type, text, screenshot, wait, check, select, restore/show
-        // Migration: a11y <action> "*Chrome*#<css-selector>" — CSS auto-routed to CDP
+        // Migration: a11y <action> "*Chrome*#<css-selector>" -- CSS auto-routed to CDP
         return sub switch
         {
             "open" => WebOpenCommand(restArgs),
@@ -56,7 +56,7 @@ internal partial class Program
             "--help" or "-h" or "help" => WebUsage(),
             "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
                 or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
-                => Error($"[WEB] 'web {sub}' removed — use a11y instead:\n"
+                => Error($"[WEB] 'web {sub}' removed -- use a11y instead:\n"
                        + $"  a11y {MapRemovedWebCmd(sub)} \"*Chrome*#<css-selector>\" [args]\n"
                        + $"  CSS selectors auto-routed to CDP (no --port needed)"),
             _ => Error($"Unknown web subcommand: {sub}")
@@ -80,7 +80,7 @@ internal partial class Program
     static int WebUsage()
     {
         Console.WriteLine(@"
-WKAppBot WebBot — Chrome DevTools Protocol web automation
+WKAppBot WebBot -- Chrome DevTools Protocol web automation
 
 Usage:
   wkappbot web <subcommand> [options]
@@ -103,15 +103,15 @@ Navigation:
   url [--port N]               Get current page URL.
   title [--port N]             Get current page title.
 
-Removed — use a11y instead (CSS auto-routed to CDP):
-  click <css>      →  a11y click ""*Chrome*#<css>""
-  type <css> <txt> →  a11y type  ""*Chrome*#<css>"" ""text""
-  text <css>       →  a11y read  ""*Chrome*#<css>""
-  screenshot       →  a11y screenshot ""*Chrome*""
-  wait <css>       →  a11y wait  ""*Chrome*#<css>""
-  check/select     →  a11y click/select ""*Chrome*#<css>""
-  restore/show     →  a11y restore ""*Chrome*""
-  eval <js>        →  a11y read  ""*Chrome*"" --eval-js ""<js>""
+Removed -- use a11y instead (CSS auto-routed to CDP):
+  click <css>      ->  a11y click ""*Chrome*#<css>""
+  type <css> <txt> ->  a11y type  ""*Chrome*#<css>"" ""text""
+  text <css>       ->  a11y read  ""*Chrome*#<css>""
+  screenshot       ->  a11y screenshot ""*Chrome*""
+  wait <css>       ->  a11y wait  ""*Chrome*#<css>""
+  check/select     ->  a11y click/select ""*Chrome*#<css>""
+  restore/show     ->  a11y restore ""*Chrome*""
+  eval <js>        ->  a11y read  ""*Chrome*"" --eval-js ""<js>""
 
 Output:
   capture [-o output.png] [--port N]
@@ -141,14 +141,14 @@ Options:
         return 0;
     }
 
-    // ── Helper: connect to CDP ───────────────────────────────────
+    // -- Helper: connect to CDP ----------------------------------─
 
     static int GetPort(string[] args) =>
         int.TryParse(GetArgValue(args, "--port"), out var p) ? p : 9222;
 
     /// <summary>
     /// Compute a short session tag from the caller's CWD.
-    /// Same CWD (= same project) → same hash → same Chrome tab across CLI invocations.
+    /// Same CWD (= same project) -> same hash -> same Chrome tab across CLI invocations.
     /// In Eye mode: CWD is passed by Launcher via pipe (AsyncLocal CallerCwd).
     /// Direct mode: falls back to Environment.CurrentDirectory.
     /// This ensures parallel sessions from different projects get isolated tabs.
@@ -169,7 +169,7 @@ Options:
     static CdpClient ConnectCdp(int port, bool withBar = false, bool verifyWebBot = false, bool ensureWindow = true, string? navigateUrl = null)
     {
         var cdp = new CdpClient();
-        // Prefer domain-based tab lookup over title (titles are unstable — GPT changes them)
+        // Prefer domain-based tab lookup over title (titles are unstable -- GPT changes them)
         string? domainHint = null;
         try { if (!string.IsNullOrWhiteSpace(navigateUrl)) domainHint = new Uri(navigateUrl).Host; } catch { }
 
@@ -180,7 +180,7 @@ Options:
         catch
         {
             // Auto-launch Chrome WebBot if not running
-            Console.Error.WriteLine($"[WEB] CDP port {port} not available — launching Chrome...");
+            Console.Error.WriteLine($"[WEB] CDP port {port} not available -- launching Chrome...");
             var proc = WKAppBot.WebBot.ChromeLauncher.LaunchAsync(port, navigateUrl).GetAwaiter().GetResult();
             if (proc != null)
                 Console.Error.WriteLine($"[WEB] Chrome launched (pid={proc.Id})");
@@ -188,7 +188,7 @@ Options:
         }
 
         // Ensure we're connected to this session's tab in the correctly-positioned window.
-        // When navigateUrl is provided: use sandbox key "web+{host}+{hwnd:X8}" — guaranteed isolated tab per host+HWND.
+        // When navigateUrl is provided: use sandbox key "web+{host}+{hwnd:X8}" -- guaranteed isolated tab per host+HWND.
         // When no navigateUrl: legacy "web-{cwdHash}" path (general web browsing, no host constraint).
         if (ensureWindow)
         {
@@ -196,7 +196,7 @@ Options:
             {
                 if (!string.IsNullOrWhiteSpace(navigateUrl))
                 {
-                    // Sandboxed: web+{host}+{hwnd} key → GetOrCreateSandboxedTabAsync
+                    // Sandboxed: web+{host}+{hwnd} key -> GetOrCreateSandboxedTabAsync
                     var host = new Uri(navigateUrl).Host;
                     var sandboxKey = BuildSandboxKey("web", host);
                     var targetId = Task.Run(() => GetOrCreateSandboxedTabAsync(cdp, port, sandboxKey, host))
@@ -243,13 +243,13 @@ Options:
         return cdp;
     }
 
-    // ── Web Target: renderer HWND-based tab identity ─────────────────────────
+    // -- Web Target: renderer HWND-based tab identity ------------------------─
     // Each Chrome tab has its own Chrome_RenderWidgetHostHWND (child window, renderer process).
     // This HWND is the most reliable per-tab identifier:
     //   - hwnd:XXXXXXXX works in windows/a11y/inspect via WindowFinder direct lookup
     //   - web commands accept hwnd:XXXXXXXX to reconnect to the exact tab
     //
-    // In-memory cache: HWND(hex) → (port, targetId, url)
+    // In-memory cache: HWND(hex) -> (port, targetId, url)
     static readonly Dictionary<string, (int port, string targetId, string url)> _webHwndCache = new();
 
     /// <summary>Find Chrome_RenderWidgetHostHWND for the current CDP tab.</summary>
@@ -277,8 +277,8 @@ Options:
     }
 
     /// <summary>
-    /// Save renderHwnd → (port, targetId, url) to cache and print the TARGET line.
-    /// Output: [WEB] TARGET: hwnd:XXXXXXXX  ← this string re-attaches to this exact tab
+    /// Save renderHwnd -> (port, targetId, url) to cache and print the TARGET line.
+    /// Output: [WEB] TARGET: hwnd:XXXXXXXX  <- this string re-attaches to this exact tab
     /// </summary>
     static void PrintWebTarget(CdpClient cdp, int port)
     {
@@ -311,7 +311,7 @@ Options:
 
     /// <summary>
     /// Connect to CDP tab by renderer HWND (from hwnd:XXXXXXXX target string).
-    /// Looks up runtime cache → reconnects to exact tab by targetId.
+    /// Looks up runtime cache -> reconnects to exact tab by targetId.
     /// Falls back to URL-based tab search if cache miss.
     /// </summary>
     static CdpClient? ConnectCdpByHwnd(IntPtr renderHwnd)
@@ -330,12 +330,12 @@ Options:
                     var ok = cdp.ConnectToTabAsync(cached.port, cached.targetId).GetAwaiter().GetResult();
                     if (ok) return cdp;
                 }
-                return cdp; // cache hit but targetId stale — still connected to port
+                return cdp; // cache hit but targetId stale -- still connected to port
             }
             catch { }
         }
 
-        // 2. Cache miss — walk up to find Chrome browser HWND → CDP port
+        // 2. Cache miss -- walk up to find Chrome browser HWND -> CDP port
         try
         {
             var parent = renderHwnd;
@@ -366,14 +366,14 @@ Options:
         }
         catch { }
 
-        Console.Error.WriteLine($"[WEB] ERROR: Cannot reconnect to hwnd:{key} — no cache entry and no CDP port found");
+        Console.Error.WriteLine($"[WEB] ERROR: Cannot reconnect to hwnd:{key} -- no cache entry and no CDP port found");
         return null;
     }
 
     /// <summary>Connect to CDP and switch to tab matching --tab pattern (if specified).</summary>
     static CdpClient? ConnectCdpWithTab(string[] args, bool withBar = false)
     {
-        // hwnd:XXXXXXXX target — reconnect to exact tab by renderer HWND
+        // hwnd:XXXXXXXX target -- reconnect to exact tab by renderer HWND
         var hwndTarget = args.FirstOrDefault(a => a.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase)
                                                 && !a.StartsWith("--"));
         if (hwndTarget != null)
@@ -430,7 +430,7 @@ Options:
         return 0;
     }
 
-    // ── open ─────────────────────────────────────────────────────
+    // -- open ----------------------------------------------------─
     // ★ IMPORTANT: App mode (--app) is the DEFAULT and MUST stay that way!
     //   - App mode creates an isolated Chrome window: no address bar, no tabs, no extensions
     //   - This prevents mixing with user's normal Chrome sessions/profiles
@@ -473,14 +473,14 @@ Options:
             }
         }
 
-        // Connect via CDP — pass url so sandboxed tab reuse path is used (prevents tab accumulation)
+        // Connect via CDP -- pass url so sandboxed tab reuse path is used (prevents tab accumulation)
         Console.Write($"[WEB] Connecting via CDP... ");
         using var cdp = ConnectCdp(port, navigateUrl: url);
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"Connected ({cdp.WebSocketUrl})");
         Console.ResetColor();
 
-        // Navigate to URL — always via CDP NavigateAsync so WebBot bar gets injected
+        // Navigate to URL -- always via CDP NavigateAsync so WebBot bar gets injected
         if (!string.IsNullOrEmpty(url))
         {
             if (freshLaunch)
@@ -524,11 +524,11 @@ Options:
         PrintWebTarget(cdp, port);
 
         // Verify this is our WebBot window (CDP port-based connection is already sufficient;
-        // title check can fail due to async bar injection timing — warn only, don't abort).
+        // title check can fail due to async bar injection timing -- warn only, don't abort).
         if (title == null || !title.Contains("WKWebBot"))
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[WEB] WARN: WKWebBot bar not yet in title (injection may still be pending) — continuing.");
+            Console.WriteLine("[WEB] WARN: WKWebBot bar not yet in title (injection may still be pending) -- continuing.");
             Console.ResetColor();
         }
 
@@ -553,7 +553,7 @@ Options:
         return 0;
     }
 
-    // ── navigate ─────────────────────────────────────────────────
+    // -- navigate ------------------------------------------------─
 
     static int WebNavigateCommand(string[] args)
     {
@@ -586,14 +586,14 @@ Options:
         // Show past knowhow for this domain
         ShowDomainKnowhow(url);
 
-        // ── ActionState IPC ──
+        // -- ActionState IPC --
         try { ActionState.Write(new ActionState { Source = "web", WebUrl = url, WebTitle = title, ActionName = "navigate", ActionDetail = $"Navigate: {url}", Status = "pass" }); } catch { }
 
         return 0;
     }
 
 
-    // ── capture (Win32 window — includes title bar) ─────────────
+    // -- capture (Win32 window -- includes title bar) ------------─
 
     static int WebCaptureCommand(string[] args)
     {
@@ -614,7 +614,7 @@ Options:
             return 1;
         }
 
-        // Use Win32 ScreenCapture (PrintWindow) — captures title bar + chrome
+        // Use Win32 ScreenCapture (PrintWindow) -- captures title bar + chrome
         var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd);
         if (bmp == null)
         {
@@ -639,7 +639,7 @@ Options:
         return 0;
     }
 
-    // ── html ─────────────────────────────────────────────────────
+    // -- html ----------------------------------------------------─
 
     static int WebHtmlCommand(string[] args)
     {
@@ -671,7 +671,7 @@ Options:
         return 0;
     }
 
-    // ── url ──────────────────────────────────────────────────────
+    // -- url ------------------------------------------------------
 
     static int WebUrlCommand(string[] args)
     {
@@ -684,7 +684,7 @@ Options:
         return 0;
     }
 
-    // ── title ────────────────────────────────────────────────────
+    // -- title ----------------------------------------------------
 
     static int WebTitleCommand(string[] args)
     {
@@ -697,7 +697,7 @@ Options:
         return 0;
     }
 
-    // ── close ────────────────────────────────────────────────────
+    // -- close ----------------------------------------------------
 
     static int WebCloseCommand(string[] args)
     {
@@ -721,7 +721,7 @@ Options:
         return 0;
     }
 
-    // ── status ───────────────────────────────────────────────────
+    // -- status --------------------------------------------------─
 
     static int WebStatusCommand(string[] args)
     {
@@ -768,7 +768,7 @@ Options:
         return 0;
     }
 
-    // ── file (set file input) ──────────────────────────────────
+    // -- file (set file input) ----------------------------------
 
     static int WebFileInputCommand(string[] args)
     {
@@ -815,7 +815,7 @@ Options:
         }
     }
 
-    // ── run (batch) ──────────────────────────────────────────────
+    // -- run (batch) ----------------------------------------------
 
     static int WebRunCommand(string[] args)
     {
@@ -876,7 +876,7 @@ Options:
                     "status"        => WebStatusCommand(subRest),
                     "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
                         or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
-                        => Error($"[WEB] 'web {sub}' removed — use a11y in your script: a11y {MapRemovedWebCmd(sub)} \"*Chrome*#<css>\""),
+                        => Error($"[WEB] 'web {sub}' removed -- use a11y in your script: a11y {MapRemovedWebCmd(sub)} \"*Chrome*#<css>\""),
                     _ => Error($"Unknown step: {sub}")
                 };
 
@@ -945,7 +945,7 @@ Options:
 
     /// <summary>
     /// Show domain knowhow when navigating to a URL.
-    /// "선배의 메모" — future Claude sessions see past lessons automatically.
+    /// "선배의 메모" -- future Claude sessions see past lessons automatically.
     /// </summary>
     static void ShowDomainKnowhow(string url)
     {
@@ -962,7 +962,7 @@ Options:
 
             if (string.IsNullOrEmpty(domain)) return;
 
-            // Read site-level knowhow (not element-level — too verbose)
+            // Read site-level knowhow (not element-level -- too verbose)
             var sitePath = Path.Combine(WebProfilesDir, WebKnowhow.SanitizeDomain(domain), "knowhow.md");
             if (!File.Exists(sitePath)) return;
 
@@ -973,7 +973,7 @@ Options:
             var entryCount = content.Split('\n').Count(l => l.StartsWith("## "));
 
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.Error.WriteLine($"[KNOWHOW] {domain} — {entryCount} note(s) from past sessions:");
+            Console.Error.WriteLine($"[KNOWHOW] {domain} -- {entryCount} note(s) from past sessions:");
             Console.ResetColor();
 
             // Show compact summary: each ## header as bullet
@@ -981,7 +981,7 @@ Options:
             {
                 if (line.StartsWith("## "))
                 {
-                    // Strip timestamp: "## [2026-02-21 03:18:45] category" → "category"
+                    // Strip timestamp: "## [2026-02-21 03:18:45] category" -> "category"
                     var header = line[3..].Trim();
                     var bracketEnd = header.IndexOf(']');
                     if (bracketEnd > 0 && header.StartsWith('['))

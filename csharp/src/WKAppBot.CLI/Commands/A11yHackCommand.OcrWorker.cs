@@ -1,4 +1,4 @@
-// A11yHackCommand.OcrWorker.cs — Background OCR worker for hack analysis
+// A11yHackCommand.OcrWorker.cs -- Background OCR worker for hack analysis
 // Processes text/container segments off the main thread so overlay stays responsive.
 // Updates stageLabels + overlay incrementally as each segment completes.
 

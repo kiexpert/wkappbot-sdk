@@ -5,7 +5,7 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Android ADB dispatch for a11y commands.
-/// Handles adb:// grap patterns — routes to ADB instead of Win32/UIA.
+/// Handles adb:// grap patterns -- routes to ADB instead of Win32/UIA.
 /// Experience DB integration: inspect/actions save to A11Y + OS paths.
 ///
 /// Supported actions (26):
@@ -20,7 +20,7 @@ internal partial class Program
     private static readonly Lazy<AdbExperienceDb> _adbExpDb = new(() => new AdbExperienceDb(DataDir!));
     private static AdbExperienceDb AdbExpDb => _adbExpDb.Value;
 
-    // ── Entry point ───────────────────────────────────────
+    // -- Entry point --------------------------------------─
 
     /// <summary>
     /// Dispatch a11y command to Android ADB pipeline.
@@ -35,7 +35,7 @@ internal partial class Program
         var adb = new AdbClient();
         var registry = new AdbDeviceRegistry(adb, DataDir);
 
-        // ── Resolve device ────────────────────────────────
+        // -- Resolve device --------------------------------
         var resolved = registry.ResolveDevice(grap.Device);
         if (resolved == null)
         {
@@ -50,7 +50,7 @@ internal partial class Program
             if (grap.Device == null && devices.Count > 1)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"[ADB] Multiple devices connected — specify device in grap:");
+                Console.Error.WriteLine($"[ADB] Multiple devices connected -- specify device in grap:");
                 Console.ResetColor();
                 foreach (var d in devices)
                     Console.WriteLine($"  adb://{d.Model ?? d.Serial}/...");
@@ -64,13 +64,13 @@ internal partial class Program
 
         var (serial, displayId) = resolved.Value;
 
-        // ── AAR: device-level readiness ──────────────────
+        // -- AAR: device-level readiness ------------------
         var adbAar = new AdbActionReadiness(adb);
         // Quick global check: device awake? (skip for discovery/window actions)
         if (action is not ("windows" or "inspect" or "find" or "screenshot" or "ocr"
             or "read" or "highlight"))
         {
-            // Use a dummy target for global-only check — Stage 0 only needs serial
+            // Use a dummy target for global-only check -- Stage 0 only needs serial
             var globalCtx = new ReadinessContext { Serial = serial };
             // Create a minimal target from current activity for global check
             var globalResult = adbAar.Ensure(action,
@@ -84,7 +84,7 @@ internal partial class Program
             }
         }
 
-        // ── Dispatch by action ────────────────────────────
+        // -- Dispatch by action ----------------------------
         return action switch
         {
             // Discovery
@@ -97,7 +97,7 @@ internal partial class Program
             "close"      => AdbClose(adb, serial, grap),
             "minimize"   => AdbKeyAction(adb, serial, "HOME", "minimize", () => adb.Home(serial)),
             "maximize"   => AdbWindowStub("maximize"),
-            "restore"    => AdbKeyAction(adb, serial, "RECENT→select", "restore", () => adb.RecentApps(serial)),
+            "restore"    => AdbKeyAction(adb, serial, "RECENT->select", "restore", () => adb.RecentApps(serial)),
             "move"       => AdbMove(adb, serial, grap, args),
             "resize"     => AdbResize(adb, serial, grap, args),
             // Element
@@ -126,7 +126,7 @@ internal partial class Program
         };
     }
 
-    // ── Windows (list devices + running apps) ─────────────
+    // -- Windows (list devices + running apps) ------------─
 
     static int AdbWindows(AdbClient adb, AdbDeviceRegistry registry)
     {
@@ -149,13 +149,13 @@ internal partial class Program
             {
                 var activity = adb.GetCurrentActivity(info.Device.Serial);
                 if (activity != null)
-                    Console.WriteLine($"    → {activity}");
+                    Console.WriteLine($"    -> {activity}");
             }
         }
         return 0;
     }
 
-    // ── Inspect (dump a11y tree) ──────────────────────────
+    // -- Inspect (dump a11y tree) --------------------------
 
     static int AdbInspect(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -211,12 +211,12 @@ internal partial class Program
             else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found — showing from package root");
+                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found -- showing from package root");
                 Console.ResetColor();
             }
         }
 
-        // Hot focus chain (depth-irrelevant — orthogonal axis)
+        // Hot focus chain (depth-irrelevant -- orthogonal axis)
         var focusChain = AndroidA11yTree.GetFocusChain(target);
         if (!string.IsNullOrEmpty(focusChain))
             Console.Write(focusChain);
@@ -226,7 +226,7 @@ internal partial class Program
         var treeDump = AndroidA11yTree.DumpTree(target, depth);
         Console.Write(treeDump);
 
-        // ── Experience: save tree snapshot + broadcast paths/knowhow ──
+        // -- Experience: save tree snapshot + broadcast paths/knowhow --
         var pkg = target.Package;
         if (string.IsNullOrEmpty(pkg) && grap.Package != null)
         {
@@ -238,7 +238,7 @@ internal partial class Program
             var screenName = grap.Scopes.Length > 0 ? grap.Scopes[0] : null;
             var saved = AdbExpDb.SaveTreeSnapshot(pkg, treeDump, screenName);
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"\n[EXP] tree → {Path.GetRelativePath(DataDir, saved)}");
+            Console.WriteLine($"\n[EXP] tree -> {Path.GetRelativePath(DataDir, saved)}");
             Console.ResetColor();
 
             BroadcastAdbPaths(pkg, screenName);
@@ -247,7 +247,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Screenshot ────────────────────────────────────────
+    // -- Screenshot ----------------------------------------
 
     static int AdbScreenshot(AdbClient adb, string serial, string? displayId, string[] args)
     {
@@ -260,7 +260,7 @@ internal partial class Program
         if (adb.Screencap(output, serial, displayId))
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"OK → {output}");
+            Console.WriteLine($"OK -> {output}");
             Console.ResetColor();
             return 0;
         }
@@ -270,7 +270,7 @@ internal partial class Program
         return 1;
     }
 
-    // ── OCR (screencap + local SimpleOcr) ─────────────────
+    // -- OCR (screencap + local SimpleOcr) ----------------─
 
     static int AdbOcr(AdbClient adb, string serial, string? displayId, string[] args)
     {

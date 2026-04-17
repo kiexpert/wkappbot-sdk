@@ -6,13 +6,13 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// 앱 핫키 스캐너 + 검증기.
-/// - ScanAndMerge: Win32 컨트롤 + 메뉴(다국어) + UIA AccessKey → DB 누적
+/// - ScanAndMerge: Win32 컨트롤 + 메뉴(다국어) + UIA AccessKey -> DB 누적
 /// - Verify: 발동 전 라이브 확인 (스태일이면 DB에서 제거)
 /// - Dispatch: 검증된 엔트리 포커스리스 발동
 /// </summary>
 internal static class A11yHotkeyScanner
 {
-    // ── 풀스캔 + 누적 머지 ────────────────────────────────────────
+    // -- 풀스캔 + 누적 머지 ----------------------------------------
 
     public static void ScanAndMerge(IntPtr hwnd, AutomationElement? el, string processName, string? exeVersion = null)
     {
@@ -30,7 +30,7 @@ internal static class A11yHotkeyScanner
             }
         }
 
-        // ② 라이브 HMENU — 현재 표시 언어만 (빠름, ~1ms)
+        // ② 라이브 HMENU -- 현재 표시 언어만 (빠름, ~1ms)
         foreach (var (label, itemId) in Win32ShortcutActivator.BuildMenuTextMapLive(hwnd))
             newEntries.Add(new HotkeyDbEntry(label, "win32_menu", "menu_cmd", itemId, null, null));
 
@@ -56,7 +56,7 @@ internal static class A11yHotkeyScanner
 
         int added = HotkeyExperienceDb.Merge(processName, newEntries, exeVersion);
         HotkeyExperienceDb.MarkSessionScanned(processName);
-        Console.Error.WriteLine($"[HOTKEY-DB] Fast scan done — {newEntries.Count} found, {added} new merged");
+        Console.Error.WriteLine($"[HOTKEY-DB] Fast scan done -- {newEntries.Count} found, {added} new merged");
 
         // ④ 백그라운드: 다국어 리소스 스캔 (LoadLibraryExW, 느림)
         // 메인 스레드 차단 없이 추가 언어팩 메뉴 항목 보충
@@ -70,13 +70,13 @@ internal static class A11yHotkeyScanner
                     .ToList();
                 var bgAdded = HotkeyExperienceDb.Merge(bgProc, bgEntries, bgVer);
                 if (bgAdded > 0)
-                    Console.Error.WriteLine($"[HOTKEY-DB] BG multi-lang scan — {bgAdded} additional entries merged");
+                    Console.Error.WriteLine($"[HOTKEY-DB] BG multi-lang scan -- {bgAdded} additional entries merged");
             }
             catch (Exception ex) { Console.Error.WriteLine($"[HOTKEY-DB] BG scan error: {ex.Message}"); }
         });
     }
 
-    // ── 발동 전 라이브 검증 ───────────────────────────────────────
+    // -- 발동 전 라이브 검증 --------------------------------------─
 
     /// <summary>
     /// DB 엔트리가 현재 창 상태에서 여전히 유효한지 확인.
@@ -95,7 +95,7 @@ internal static class A11yHotkeyScanner
 
         if (!valid)
         {
-            Console.Error.WriteLine($"[HOTKEY-DB] Stale entry '{entry.Label}' ({entry.Method}) — removing");
+            Console.Error.WriteLine($"[HOTKEY-DB] Stale entry '{entry.Label}' ({entry.Method}) -- removing");
             HotkeyExperienceDb.RemoveStale(processName, [entry.Label], exeVersion);
         }
         return valid;
@@ -128,7 +128,7 @@ internal static class A11yHotkeyScanner
         return textMap.Any(t => t.Label.Equals(label, StringComparison.OrdinalIgnoreCase));
     }
 
-    // ── 발동 ─────────────────────────────────────────────────────
+    // -- 발동 ----------------------------------------------------─
 
     public static bool Dispatch(HotkeyDbEntry entry, IntPtr hwnd, IntPtr parentHwnd)
     {
@@ -157,7 +157,7 @@ internal static class A11yHotkeyScanner
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------─
 
     internal static IntPtr GetParentHwnd(IntPtr hwnd, AutomationElement? el)
     {

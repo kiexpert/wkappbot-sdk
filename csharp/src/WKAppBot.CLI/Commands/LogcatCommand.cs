@@ -39,7 +39,7 @@ internal partial class Program
         bool jsonMode = false;    // --json: structural JSON key+value matching
         bool dbgMode = false;     // --dbg: capture OutputDebugString via DBWIN_BUFFER
         int dbgPid = 0;           // --dbg PID filter (0 = all processes)
-        // (removed --max-context-lines — indent context limit is in file edit, not grap)
+        // (removed --max-context-lines -- indent context limit is in file edit, not grap)
         // Case: grap/grep default = case-sensitive (grep compat); logcat default = insensitive
         bool ignoreCase = !GrapMode;
 
@@ -97,8 +97,8 @@ internal partial class Program
         else if (positional.Count > 0 && (LooksLikePath(positional[0]) || LooksLikeFileGlob(positional[0])))
             positional.Insert(0, "*"); // shift: treat original [0] as file arg, pattern = match-all
         // Each positional[1..] is a file glob; ';' within a segment = OR at that path level
-        // e.g. "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
-        // Absolute path args: "D:/foo/bar/*.log" → dir=D:/foo/bar, pattern=*.log (auto-added to dirs)
+        // e.g. "logs/가;나;다/*.txt" -> ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
+        // Absolute path args: "D:/foo/bar/*.log" -> dir=D:/foo/bar, pattern=*.log (auto-added to dirs)
         var rawFileArgs = positional.Count > 1 ? positional.Skip(1).ToList() : new List<string> { fileFilterArg };
         var extraDirsFromArgs = new List<(string dir, string pattern)>();
         var relativeFileArgs = new List<string>();
@@ -141,7 +141,7 @@ internal partial class Program
             var pat = messageFilterArg.Trim();
             if (pat.StartsWith("{") && pat.EndsWith("}"))
             {
-                // Structural: { "key": "val" } → key+value regex AND matching
+                // Structural: { "key": "val" } -> key+value regex AND matching
                 var kvPatterns = new List<(Regex keyRx, Regex valRx)>();
                 var inner = pat[1..^1].Trim();
                 foreach (var pair in SplitJsonPatternPairs(inner))
@@ -171,7 +171,7 @@ internal partial class Program
         }
         else if (!string.IsNullOrWhiteSpace(messageFilterArg) && messageFilterArg != "*")
         {
-            // ';' = grap-style OR separator → convert to regex '|'
+            // ';' = grap-style OR separator -> convert to regex '|'
             var rxPat = messageFilterArg.Contains(';')
                 ? string.Join("|", messageFilterArg.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(p => $"(?:{p})"))
                 : messageFilterArg;
@@ -188,20 +188,20 @@ internal partial class Program
         var baseDir = baseDirOverride ?? Environment.CurrentDirectory;
         var dirs = new List<string> { baseDir };
 
-        // Absolute path args → add their dirs + filename patterns
+        // Absolute path args -> add their dirs + filename patterns
         if (extraDirsFromArgs.Count > 0)
         {
             foreach (var (absDir, absPat) in extraDirsFromArgs)
                 dirs.Add(absDir);
             if (relativeFileArgs.Count == 0)
             {
-                // Only absolute args given — search abs dirs only, don't flood baseDir
+                // Only absolute args given -- search abs dirs only, don't flood baseDir
                 filePatterns = extraDirsFromArgs.Select(x => x.pattern).Distinct().ToArray();
                 dirs.Remove(baseDir);
             }
             else
             {
-                // Mix of absolute + relative — merge patterns, search all dirs
+                // Mix of absolute + relative -- merge patterns, search all dirs
                 filePatterns = filePatterns.Concat(extraDirsFromArgs.Select(x => x.pattern)).Distinct().ToArray();
             }
         }
@@ -221,7 +221,7 @@ internal partial class Program
             dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw", "logs"));
         }
 
-        // Non-TTY (piped/redirected) without explicit watch flags → one-shot grep mode.
+        // Non-TTY (piped/redirected) without explicit watch flags -> one-shot grep mode.
         // result=$(grap pattern *.txt) should work like grep: scan files, output matches, exit.
         // Diagnostic lines go to stderr so stdout contains only matches (grep-compatible).
         // grep-compat: one-shot when piped OR when called as grap/grep (TTY or not)
@@ -436,7 +436,7 @@ internal partial class Program
 
     /// <summary>
     /// Expand ';'-OR within each path segment into multiple glob patterns.
-    /// "logs/가;나;다/*.txt" → ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
+    /// "logs/가;나;다/*.txt" -> ["logs/가/*.txt", "logs/나/*.txt", "logs/다/*.txt"]
     /// Can be applied universally to any glob-based file search.
     /// </summary>
     internal static IEnumerable<string> ExpandGlobSegments(string pattern)
@@ -503,11 +503,11 @@ internal partial class Program
         return $"{seconds:0}s";
     }
 
-    const int MaxLineLengthForEmit = 32_768; // 32 KB — guard against binary files with no newlines
+    const int MaxLineLengthForEmit = 32_768; // 32 KB -- guard against binary files with no newlines
 
-    /// <summary>JSON match function — set by LogcatCommand when --json is active. Thread-static for safety.</summary>
+    /// <summary>JSON match function -- set by LogcatCommand when --json is active. Thread-static for safety.</summary>
     [ThreadStatic] static Func<string, bool>? _jsonMatchFn;
-    /// <summary>Total output line cap — 0 = unlimited. Shared with EmitDeltaLines.</summary>
+    /// <summary>Total output line cap -- 0 = unlimited. Shared with EmitDeltaLines.</summary>
 #pragma warning disable CS0414
     [ThreadStatic] static int _maxOutputLines;
     [ThreadStatic] static int _outputLineCount;
@@ -523,8 +523,8 @@ internal partial class Program
         int afterLines = 0, int beforeLines = 0,
         bool invertMatch = false, bool filesOnly = false,
         bool countOnly = false, int maxCount = int.MaxValue,
-        TextWriter? grepOut = null,  // non-null → grep-mode: clean output to this writer
-        bool showFilename = true,    // false → suppress filename prefix (single-file grep compat)
+        TextWriter? grepOut = null,  // non-null -> grep-mode: clean output to this writer
+        bool showFilename = true,    // false -> suppress filename prefix (single-file grep compat)
         bool showLineNums = false)   // -n: prepend line numbers
     {
         if (!File.Exists(path)) return;
@@ -534,10 +534,10 @@ internal partial class Program
 
         FileStream? fs = null;
         try { fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); }
-        catch { return; } // locked or inaccessible — skip silently
+        catch { return; } // locked or inaccessible -- skip silently
         if (start > fs.Length) start = 0;
 
-        // Auto-detect encoding: UTF-8/BOM/CP949 (EUC-KR) — essential for Korean HTS source files
+        // Auto-detect encoding: UTF-8/BOM/CP949 (EUC-KR) -- essential for Korean HTS source files
         Encoding fileEnc = Encoding.UTF8;
         if (GrapMode && start == 0)
         {
@@ -559,7 +559,7 @@ internal partial class Program
 
         long emitted = lineCounts.TryGetValue(path, out var lc) ? lc : 0;
 
-        // No filter: tail-preview mode — path + last 7 non-empty lines
+        // No filter: tail-preview mode -- path + last 7 non-empty lines
         if (msgRegex == null && _jsonMatchFn == null && !invertMatch)
         {
             var tail = new Queue<string>(8);
@@ -648,7 +648,7 @@ internal partial class Program
             emitted++;
             if (grepOut != null)
             {
-                // Grep-mode: clean output — file:content (no timestamps, no markers)
+                // Grep-mode: clean output -- file:content (no timestamps, no markers)
                 int bef  = Math.Max(beforeLines, 0);
                 int aft  = Math.Max(afterLines, 0);
                 int from = Math.Max(printUntil + 1, i - bef);

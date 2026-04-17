@@ -9,11 +9,11 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: input command — Type text into MDI form controls (5 strategies)
+// partial class: input command -- Type text into MDI form controls (5 strategies)
 internal partial class Program
 {
-    // ═══════════════════════════════════════════════════════════════════════
-    // input — Type text into a specific control (MDI form + control ID)
+    // =======================================================================
+    // input -- Type text into a specific control (MDI form + control ID)
     //
     // Tries multiple strategies:
     //   3. WM_SETTEXT (focusless/direct text replacement)
@@ -21,7 +21,7 @@ internal partial class Program
     //   5. Click + PostMessage WM_CHAR (physical focus + message)
     //   1. Focus + WM_CHAR (AttachThread + SetFocus + SendMessage)
     //   2. Click + VK-Type (physical keyboard input)
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     static int InputCommand(string[] args)
     {
         if (args.Length < 3)
@@ -29,17 +29,17 @@ internal partial class Program
   Types text into a control in an MDI form.
 
 Strategies (tried in order, or specify --method):
-A11Y: UIA Value   — standard accessibility (focusless, works on standard edits)
- 10: Focusless     — pure PostMessage WITHOUT SetFocus (MFC custom edits, focusless!)
-  9: PostMsgPipe   — pure PostMessage: SetFocus+Home+chars+Enter to hwnd (focus-immune)
-  6: EM_REPLACESEL — select-all + EM_REPLACESEL (standard edit replace, fires EN_CHANGE)
-  7: SETTEXT+NOTIFY — WM_SETTEXT + WM_COMMAND(EN_CHANGE) to parent (force change notification)
-  3: WM_SETTEXT    — direct text replacement (updates Win32 text, not internal buffer)
-  8: AtomicBatch   — single SendInput call: Home+Shift+End+chars+Enter (no inter-key gap)
-  4: PostMsg       — SetFocus + PostMessage WM_KEYDOWN/WM_CHAR with proper lParam
-  5: Click+PostMsg — physical click (left area) → PostMessage WM_CHAR (hybrid, best for CMaskEdit)
-  1: Focus+WM_CHAR — AttachThread + SetFocus + SendMessage WM_CHAR
-  2: Click+Type    — physical click on field → Home+Shift+End → SendInput VK
+A11Y: UIA Value   -- standard accessibility (focusless, works on standard edits)
+ 10: Focusless     -- pure PostMessage WITHOUT SetFocus (MFC custom edits, focusless!)
+  9: PostMsgPipe   -- pure PostMessage: SetFocus+Home+chars+Enter to hwnd (focus-immune)
+  6: EM_REPLACESEL -- select-all + EM_REPLACESEL (standard edit replace, fires EN_CHANGE)
+  7: SETTEXT+NOTIFY -- WM_SETTEXT + WM_COMMAND(EN_CHANGE) to parent (force change notification)
+  3: WM_SETTEXT    -- direct text replacement (updates Win32 text, not internal buffer)
+  8: AtomicBatch   -- single SendInput call: Home+Shift+End+chars+Enter (no inter-key gap)
+  4: PostMsg       -- SetFocus + PostMessage WM_KEYDOWN/WM_CHAR with proper lParam
+  5: Click+PostMsg -- physical click (left area) -> PostMessage WM_CHAR (hybrid, best for CMaskEdit)
+  1: Focus+WM_CHAR -- AttachThread + SetFocus + SendMessage WM_CHAR
+  2: Click+Type    -- physical click on field -> Home+Shift+End -> SendInput VK
 
 Options:
   --cid N           Target control ID (default: 3780, the stock code field)
@@ -88,7 +88,7 @@ Examples:
             };
         }
 
-        // Find target window — try all matches until one has MDIClient
+        // Find target window -- try all matches until one has MDIClient
         // (e.g. "투혼" matches both main window and #32770 dialogs)
         var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
@@ -132,7 +132,7 @@ Examples:
         if (readinessReport.ElevationMismatch)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("  ✗ Target is elevated but wkappbot is not. Run as admin.");
+            Console.WriteLine("  X Target is elevated but wkappbot is not. Run as admin.");
             Console.ResetColor();
             readinessReport.Zoom?.ShowFail("Elevation mismatch");
             return 1;
@@ -140,7 +140,7 @@ Examples:
         bool weAreElevated = readinessReport.WeAreElevated;
         bool targetElevated = readinessReport.TargetElevated;
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("  ✓ Elevated — input enabled");
+        Console.WriteLine("  v Elevated -- input enabled");
         Console.ResetColor();
 
         // Auto-dismiss blocker if detected by readiness
@@ -165,9 +165,9 @@ Examples:
                 expDb = new ExperienceDb(expDir);
             }
         }
-        catch { /* best-effort — proceed without experience DB */ }
+        catch { /* best-effort -- proceed without experience DB */ }
 
-        // ── Pre-input: auto-dismiss "알림!!" / alert popups that block MDI access ──
+        // -- Pre-input: auto-dismiss "알림!!" / alert popups that block MDI access --
         TryDismissAlertPopups(win.Handle, mdiClient);
 
         // First check: is there a specific MDI child the user wants?
@@ -177,7 +177,7 @@ Examples:
             f.Title.Contains($"[{targetFormId}]")).ToList();
         if (matchingForms.Count == 0) return Error($"Form [{targetFormId}] not found");
 
-        // Select the best form: MDI active → focus ancestor → largest visible → Z-order first
+        // Select the best form: MDI active -> focus ancestor -> largest visible -> Z-order first
         // GPT insight: "WM_MDIGETACTIVE + GetGUIThreadInfo(hwndFocus) 교차검증이 정답"
         WindowInfo? targetForm = matchingForms[0];
         string formSelection = "Z-order first";
@@ -193,7 +193,7 @@ Examples:
             }
             else
             {
-                // Priority 2: GetGUIThreadInfo — find which form contains hwndFocus
+                // Priority 2: GetGUIThreadInfo -- find which form contains hwndFocus
                 var focusHwnd = NativeMethods.GetFocusedHwndInProcess(win.Handle);
                 if (focusHwnd != IntPtr.Zero)
                 {
@@ -248,19 +248,19 @@ Examples:
             if (!formVisible)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("  ⚠ Form is NOT visible — input may go to hidden window");
+                Console.WriteLine("  ! Form is NOT visible -- input may go to hidden window");
                 Console.ResetColor();
             }
             if (formIconic)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("  ⚠ Form is minimized (iconic)");
+                Console.WriteLine("  ! Form is minimized (iconic)");
                 Console.ResetColor();
             }
             if (!formEnabled)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine("  ⚠ Form is disabled — a modal dialog may be blocking");
+                Console.WriteLine("  ! Form is disabled -- a modal dialog may be blocking");
                 Console.ResetColor();
             }
 
@@ -295,7 +295,7 @@ Examples:
             if (blocker != IntPtr.Zero)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"  ✗ BLOCKER detected: {blockerInfo}");
+                Console.WriteLine($"  X BLOCKER detected: {blockerInfo}");
                 Console.ResetColor();
 
                 // Try to auto-dismiss using dialog handlers (login, alert, etc.)
@@ -305,7 +305,7 @@ Examples:
                 if (preHandled)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("  ✓ [BLOCK] Pre-input blocker auto-dismissed");
+                    Console.WriteLine("  v [BLOCK] Pre-input blocker auto-dismissed");
                     Console.ResetColor();
                     Thread.Sleep(300); // wait for app to recover
                 }
@@ -355,7 +355,7 @@ Examples:
         Console.ForegroundColor = ConsoleColor.White;
         Console.Write($" \"{currentText}\"");
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($" → \"{text}\"");
+        Console.WriteLine($" -> \"{text}\"");
         Console.ResetColor();
 
         // Show control-level experience hints (past failures + knowhow for this cid)
@@ -366,7 +366,7 @@ Examples:
 
         bool success = false;
 
-        // OCR debug images → experience DB form dir if available, else logs/ocr/
+        // OCR debug images -> experience DB form dir if available, else logs/ocr/
         string OcrDebugPath(string tag)
         {
             string dir;
@@ -443,9 +443,9 @@ Examples:
             catch { return null; }
         }
 
-        // [ZOOM] Fast capture for live preview — CopyFromScreen (~15-25ms, no blocking!)
+        // [ZOOM] Fast capture for live preview -- CopyFromScreen (~15-25ms, no blocking!)
         // PrintWindow is too slow on MFC apps (1000ms+ due to WM_PRINT message blocking).
-        // CopyFromScreen captures whatever is visible — if control is covered by another window,
+        // CopyFromScreen captures whatever is visible -- if control is covered by another window,
         // the preview shows the covering window, which is acceptable for live preview.
         // BMP format (no PNG compression) saves ~10-30ms per frame.
         byte[]? CaptureControlFast(IntPtr formHandle, IntPtr controlHandle)
@@ -465,8 +465,8 @@ Examples:
             catch { return null; }
         }
 
-        // Raw BGRA pixel capture — no codec encode/decode. ~10x faster than BMP path.
-        // For live zoom updates: foreground → CopyFromScreen, background → PrintWindow+crop.
+        // Raw BGRA pixel capture -- no codec encode/decode. ~10x faster than BMP path.
+        // For live zoom updates: foreground -> CopyFromScreen, background -> PrintWindow+crop.
         (byte[] pixels, int w, int h, int stride)? CaptureControlRawFast(IntPtr formHandle, IntPtr controlHandle)
         {
             try
@@ -489,7 +489,7 @@ Examples:
                         if (ScreenCapture.IsBlankBitmap(bmp)) { bmp?.Dispose(); bmp = null; }
                     }
 
-                    // Background (or screen capture blank) → PrintWindow+crop (Z-order safe)
+                    // Background (or screen capture blank) -> PrintWindow+crop (Z-order safe)
                     if (bmp == null)
                     {
                         NativeMethods.GetWindowRect(formHandle, out var fr);
@@ -544,7 +544,7 @@ Examples:
             return dp[n, m] <= maxErrors;
         }
 
-        // ═══ Orchestrator: 12-tier input fallback chain ═══
+        // === Orchestrator: 12-tier input fallback chain ===
         // Each method extracted to TryInputMethodN() in partial class files.
         // Unpack-and-call pattern: zero behavioral change from original if-chain.
         var inputCtx = new InputContext
@@ -571,7 +571,7 @@ Examples:
             FuzzyDigitMatch = FuzzyDigitMatch,
         };
 
-        // Try each method in empirical priority order (hardcoded — this IS the domain knowledge)
+        // Try each method in empirical priority order (hardcoded -- this IS the domain knowledge)
         var inputMethods = new (int num, string name, Func<InputContext, InputResult> fn)[]
         {
             (0,  "A11Y",         TryInputMethodA11y),
@@ -615,20 +615,20 @@ Examples:
                 Console.ResetColor();
             }
         }
-        catch { /* best-effort — don't fail input because of dismiss failure */ }
+        catch { /* best-effort -- don't fail input because of dismiss failure */ }
 
         // Summary
         Console.WriteLine();
         if (success)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"  ✓ Input successful: \"{text}\" → cid={targetCid} in [{targetFormId}]");
+            Console.WriteLine($"  v Input successful: \"{text}\" -> cid={targetCid} in [{targetFormId}]");
             Console.ResetColor();
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  ✗ All methods failed for cid={targetCid}");
+            Console.WriteLine($"  X All methods failed for cid={targetCid}");
             Console.ResetColor();
 
             // [FALLBACK] Guide: scan the app to build experience for future sessions
@@ -662,7 +662,7 @@ Examples:
             return 1;
         }
 
-        // ── ActionState IPC: share input-command info with AppBotEye ──
+        // -- ActionState IPC: share input-command info with AppBotEye --
         try
         {
             ActionState.Write(new ActionState
@@ -671,7 +671,7 @@ Examples:
                 WindowTitle = win.Title,
                 ElementName = $"cid={targetCid}",
                 ActionName = "type_text",
-                ActionDetail = $"Input: \"{text}\" → cid={targetCid} in [{targetFormId}]",
+                ActionDetail = $"Input: \"{text}\" -> cid={targetCid} in [{targetFormId}]",
                 Status = success ? "pass" : "fail",
             });
         }
@@ -683,7 +683,7 @@ Examples:
     /// <summary>
     /// Auto-dismiss alert/error dialogs that block MDI form access.
     /// Checks both title AND message text (Static controls) for alert keywords.
-    /// Uses BM_CLICK on "확인" button — fully focusless.
+    /// Uses BM_CLICK on "확인" button -- fully focusless.
     /// Handles: 알림!!, VBScript 오류, 스크립트 오류, 접속 끊김 알림 등
     /// </summary>
     /// <summary>
@@ -786,7 +786,7 @@ Examples:
 
                 totalDismissed += dismissed.Count;
 
-                if (dismissed.Count == 0) break; // no more popups — done!
+                if (dismissed.Count == 0) break; // no more popups -- done!
                 Thread.Sleep(200); // wait for dialog close + check for more
             }
 

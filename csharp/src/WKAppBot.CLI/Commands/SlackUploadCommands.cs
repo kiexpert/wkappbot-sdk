@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// Upload a file to Slack channel (v2 API: getUploadURLExternal → PUT → completeUploadExternal).
+    /// Upload a file to Slack channel (v2 API: getUploadURLExternal -> PUT -> completeUploadExternal).
     /// </summary>
     static async Task<bool> SlackUploadFileAsync(string botToken, string channel, string filePath,
         string? title = null, string? threadTs = null, string? initialComment = null)

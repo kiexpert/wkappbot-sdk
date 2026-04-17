@@ -11,7 +11,7 @@ public sealed partial class ClaudePromptHelper
 {
     /// <summary>
     /// Find the Claude Code prompt input by walking the process tree.
-    /// Strategy: current process → parent → grandparent ... → find Electron/VSCode main window → UIA search.
+    /// Strategy: current process -> parent -> grandparent ... -> find Electron/VSCode main window -> UIA search.
     /// </summary>
     public PromptInfo? FindPrompt(string? callerCwd = null)
     {
@@ -71,7 +71,7 @@ public sealed partial class ClaudePromptHelper
             if (usable != null) return usable;
         }
 
-        // Strategy 3: Enumerate all VS Code windows — pool ALL windows first, then sort by callerCwd.
+        // Strategy 3: Enumerate all VS Code windows -- pool ALL windows first, then sort by callerCwd.
         // Important: multiple Code.exe processes exist (one per window). Iterating process-by-process
         // means callerCwd preference only applies within each process, not globally.
         // Pooling all windows and sorting globally ensures the right folder window wins.
@@ -116,7 +116,7 @@ public sealed partial class ClaudePromptHelper
             }
         }
 
-        // Strategy 4: Brute-force — scan ALL Chrome_WidgetWin_1 windows for turn-form
+        // Strategy 4: Brute-force -- scan ALL Chrome_WidgetWin_1 windows for turn-form
         Console.WriteLine("  [PROMPT] Brute-force: scanning all Chrome_WidgetWin_1 windows...");
         var allElectronWindows = new List<IntPtr>();
         NativeMethods.EnumWindows((hWnd, _) =>
@@ -168,14 +168,14 @@ public sealed partial class ClaudePromptHelper
             catch { }
         }
 
-        Console.WriteLine("  [PROMPT] ALL strategies exhausted — no prompt found");
+        Console.WriteLine("  [PROMPT] ALL strategies exhausted -- no prompt found");
         return null;
     }
 
     /// <summary>
     /// Find ALL Claude Code prompt inputs across all windows.
     /// Unlike FindPrompt (which returns first match), this returns every available prompt.
-    /// Used for broadcast messages (e.g., ping → all Claude instances respond).
+    /// Used for broadcast messages (e.g., ping -> all Claude instances respond).
     /// </summary>
     private static DateTime _lastFullScan = DateTime.MinValue;
     private static List<PromptInfo> _cachedPromptResults = new();
@@ -253,7 +253,7 @@ public sealed partial class ClaudePromptHelper
         foreach (var h in deadHwnds) _turnFormCache.Remove(h);
 
         // Scan all Chrome_WidgetWin_1 windows (covers Electron + VS Code)
-        // Cache pid→procName: each Electron/VS Code process has many Chrome_WidgetWin_1 windows,
+        // Cache pid->procName: each Electron/VS Code process has many Chrome_WidgetWin_1 windows,
         // so Process.GetProcessById() would be called N times for the same pid without caching.
         var procNameCache = new Dictionary<uint, string>();
         var allWindows = new List<(IntPtr hWnd, string title, string procName, uint pid)>();
@@ -304,7 +304,7 @@ public sealed partial class ClaudePromptHelper
             }
 
             // VS Code: title check first to skip background/helper windows (they have no "Visual Studio Code" suffix).
-            // Only main editor windows carry the " - Visual Studio Code" suffix — saves UIA traversal on dozens of helper hwnd's.
+            // Only main editor windows carry the " - Visual Studio Code" suffix -- saves UIA traversal on dozens of helper hwnd's.
             if (procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
             {
                 if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase))
@@ -324,7 +324,7 @@ public sealed partial class ClaudePromptHelper
                     continue;
 
                 // Native Claude Code extension (no turn-form)
-                // Each VS Code window gets its own entry — SmartSetForegroundWindow(hwnd) targets
+                // Each VS Code window gets its own entry -- SmartSetForegroundWindow(hwnd) targets
                 // the specific window, and foreground verification in TypeAndSubmit prevents
                 // wrong-window delivery. No per-process dedup needed.
                 NativeMethods.GetWindowRect(hWnd, out var wr);
@@ -380,7 +380,7 @@ public sealed partial class ClaudePromptHelper
             return true;
         }, IntPtr.Zero);
 
-        // Priority 1: VS Code — match by window title containing folder name
+        // Priority 1: VS Code -- match by window title containing folder name
         foreach (var (hWnd, title, procName) in allWindows)
         {
             if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase)) continue;
@@ -407,7 +407,7 @@ public sealed partial class ClaudePromptHelper
             }
         }
 
-        // Priority 2: Claude Desktop — search UIA for CWD text at bottom bar
+        // Priority 2: Claude Desktop -- search UIA for CWD text at bottom bar
         foreach (var (hWnd, title, procName) in allWindows)
         {
             if (!procName.Equals("claude", StringComparison.OrdinalIgnoreCase)) continue;
@@ -454,14 +454,14 @@ public sealed partial class ClaudePromptHelper
     /// <summary>
     /// Find turn-form prompt input in a specific window handle.
     /// Shared helper for FindPrompt and FindPromptForCwd.
-    /// Results are cached per hwnd — UIA scan only on first encounter.
+    /// Results are cached per hwnd -- UIA scan only on first encounter.
     /// </summary>
     private PromptInfo? FindTurnFormInWindow(IntPtr hWnd, string title, string procName)
     {
         // Positive cache hit: validate hwnd still alive (Electron can recreate windows during updates/navigation).
         if (_turnFormCache.TryGetValue(hWnd, out var cached))
         {
-            if (!NativeMethods.IsWindow(hWnd)) { _turnFormCache.Remove(hWnd); } // stale → fall through to rescan
+            if (!NativeMethods.IsWindow(hWnd)) { _turnFormCache.Remove(hWnd); } // stale -> fall through to rescan
             else return cached.WindowTitle == title
                 ? RequireUsablePrompt(cached)
                 : RequireUsablePrompt(cached with { WindowTitle = title });
@@ -478,7 +478,7 @@ public sealed partial class ClaudePromptHelper
 
             AutomationElement? turnForm = null;
 
-            // Fast-path A: GetFocusedElement — if user is typing in this window's prompt,
+            // Fast-path A: GetFocusedElement -- if user is typing in this window's prompt,
             // walk up the focus chain (≤6 levels) to find turn-form. O(depth) not O(tree).
             try
             {
@@ -498,7 +498,7 @@ public sealed partial class ClaudePromptHelper
             }
             catch { }
 
-            // Fast-path B: Document → direct child search (1-2 levels, avoids deep conversation tree).
+            // Fast-path B: Document -> direct child search (1-2 levels, avoids deep conversation tree).
             if (turnForm == null)
             {
                 try
@@ -519,7 +519,7 @@ public sealed partial class ClaudePromptHelper
 
             if (turnForm == null)
             {
-                // Cache negative result — suppress re-scan for 2s.
+                // Cache negative result -- suppress re-scan for 2s.
                 _negativeCache[hWnd] = DateTime.UtcNow + NegativeCacheTtl;
                 return null;
             }
@@ -604,7 +604,7 @@ public sealed partial class ClaudePromptHelper
                         else
                         {
                             sb.AppendLine("      turn-form: NOT FOUND");
-                            // Deep UIA dump → saved to file for analysis
+                            // Deep UIA dump -> saved to file for analysis
                             try
                             {
                                 var deepSb = new System.Text.StringBuilder();

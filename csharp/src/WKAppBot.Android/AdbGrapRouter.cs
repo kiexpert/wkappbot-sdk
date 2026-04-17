@@ -46,7 +46,7 @@ public static class AdbGrapRouter
         }
         else
         {
-            // No slash — could be just device or just package
+            // No slash -- could be just device or just package
             // If it contains * or looks like a package, treat as package (auto-detect device)
             if (rest.Contains('.') || rest.Contains('*'))
                 package = rest;

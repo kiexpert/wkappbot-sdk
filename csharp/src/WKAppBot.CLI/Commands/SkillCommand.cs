@@ -5,10 +5,10 @@ using System.Text.RegularExpressions;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot skill <subcommand> — executable automation skills
+// partial class: wkappbot skill <subcommand> -- executable automation skills
 // Storage:
-//   project skills (managed): {callerCwd}/skills/   ← contribute/delete here
-//   hq skills (installed):    {DataDir}/skills/     ← copied via `skill install`
+//   project skills (managed): {callerCwd}/skills/   <- contribute/delete here
+//   hq skills (installed):    {DataDir}/skills/     <- copied via `skill install`
 //   list/search merges both
 internal partial class Program
 {
@@ -35,6 +35,7 @@ internal partial class Program
         return args[0].ToLowerInvariant() switch
         {
             "list"       => SkillListCommand(args.Skip(1).ToArray()),
+            "read"       => SkillShowCommand(args.Skip(1).ToArray()),
             "show"       => SkillShowCommand(args.Skip(1).ToArray()),
             "contribute" => SkillContributeCommand(args.Skip(1).ToArray()),
             "edit"       => SkillEditCommand(args.Skip(1).ToArray()),
@@ -50,7 +51,7 @@ internal partial class Program
         };
     }
 
-    // ── List ─────────────────────────────────────────────────────────────────────
+    // -- List --------------------------------------------------------------------─
 
     static int SkillListCommand(string[] args)
     {
@@ -104,13 +105,13 @@ internal partial class Program
         return 0;
     }
 
-    // ── Show ─────────────────────────────────────────────────────────────────────
+    // -- Show --------------------------------------------------------------------─
 
     static int SkillShowCommand(string[] args)
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot skill show <id> [--developer]");
+            Console.WriteLine("Usage: wkappbot skill read <id> [--developer]");
             return 1;
         }
 
@@ -125,7 +126,7 @@ internal partial class Program
             return 1;
         }
 
-        // Project skills (loaded from CWD/skills/) are shown in full by default —
+        // Project skills (loaded from CWD/skills/) are shown in full by default --
         // you're already in the right codebase context. HQ skills from other projects
         // show step titles only; full content requires --developer.
         bool developerMode = explicitDev || skill.Source == SkillSource.Project;
@@ -143,7 +144,7 @@ internal partial class Program
         {
             if (hqForeignSkill)
             {
-                // HQ skill from another project — show step titles only (first sentence),
+                // HQ skill from another project -- show step titles only (first sentence),
                 // full content hidden behind --developer
                 Console.WriteLine("  Steps  :");
                 for (int i = 0; i < skill.Steps.Count; i++)
@@ -167,7 +168,7 @@ internal partial class Program
                 }
                 else if (opSteps.Count == 0)
                 {
-                    Console.WriteLine($"  Steps  : (all {devSteps.Count} step(s) are [DEV] — use --developer to show)");
+                    Console.WriteLine($"  Steps  : (all {devSteps.Count} step(s) are [DEV] -- use --developer to show)");
                 }
                 else
                 {
@@ -175,7 +176,7 @@ internal partial class Program
                     for (int i = 0; i < opSteps.Count; i++)
                         Console.WriteLine($"    {i + 1}. {opSteps[i]}");
                     if (devSteps.Count > 0)
-                        Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden — use --developer to show)");
+                        Console.WriteLine($"    (+{devSteps.Count} [DEV] step(s) hidden -- use --developer to show)");
                 }
             }
         }
@@ -186,7 +187,7 @@ internal partial class Program
             foreach (var r in skill.SourceRefs)
             {
                 var suffix = r.Line.HasValue ? $":{r.Line}" : "";
-                var pat = !string.IsNullOrEmpty(r.Pattern) ? $" → \"{r.Pattern}\"" : "";
+                var pat = !string.IsNullOrEmpty(r.Pattern) ? $" -> \"{r.Pattern}\"" : "";
                 var note = !string.IsNullOrEmpty(r.Note) ? $" ({r.Note})" : "";
                 Console.WriteLine($"    {r.File}{suffix}{pat}{note}");
             }
@@ -199,7 +200,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Extract step title: text up to first sentence boundary (. ! ? or —) or 80 chars.
+    /// Extract step title: text up to first sentence boundary (. ! ? or --) or 80 chars.
     /// Preserves bracket tags like [RULE], [DEV] etc. at the start.
     /// </summary>
     static string StepTitle(string step)
@@ -207,8 +208,8 @@ internal partial class Program
         // Keep leading [TAG] if present, then cut at first sentence end
         var m = System.Text.RegularExpressions.Regex.Match(step, @"^(\[[A-Z:]+\]\s*)?(.{0,120})");
         var text = step;
-        // Cut at sentence boundary: '. ' or '— ' or end of 80 chars
-        var cut = System.Text.RegularExpressions.Regex.Match(text, @"^.{10,}?(?:[.!?](?:\s|$)|(?:\s—\s))");
+        // Cut at sentence boundary: '. ' or '-- ' or end of 80 chars
+        var cut = System.Text.RegularExpressions.Regex.Match(text, @"^.{10,}?(?:[.!?](?:\s|$)|(?:\s--\s))");
         if (cut.Success && cut.Value.Length < text.Length)
             return cut.Value.TrimEnd();
         // Fallback: hard cut at 80 chars with ellipsis
@@ -217,11 +218,11 @@ internal partial class Program
 
     // A step is developer-only if:
     // (1) explicitly tagged [DEV], OR
-    // (2) auto-detected as implementation detail — strong signals only:
+    // (2) auto-detected as implementation detail -- strong signals only:
     //     - Windows/Unix source path (C:\, D:\, csharp/, src/)
     //     - Source file reference with line number (Foo.cs:123)
-    //     - Implementation note: "in Foo.cs", "see Foo.cs", "→ Foo.cs"
-    //     - Multiple chained method calls indicating code walkthrough (Foo() → Bar())
+    //     - Implementation note: "in Foo.cs", "see Foo.cs", "-> Foo.cs"
+    //     - Multiple chained method calls indicating code walkthrough (Foo() -> Bar())
     // Intentionally NOT flagged: single method name mention in conceptual description
     // e.g. "stderrRelay.Wait(2000)" in a rule explanation stays as operator.
     static readonly System.Text.RegularExpressions.Regex _devStepPattern =
@@ -229,16 +230,16 @@ internal partial class Program
             \[DEV\]                                     # explicit tag
             | [A-Za-z]:\\                               # Windows absolute path (C:\, D:\)
             | \bcsharp/|\bsrc/                          # Unix-style source root path
-            | \w+\.cs:\d+                               # Foo.cs:123 — file+line ref
-            | \b(in|see|→)\s+\w+\.cs\b                 # 'in Foo.cs' / 'see Foo.cs' / '→ Foo.cs'
-            | \w+\(\)\s*→\s*\w+\(\)                    # Foo() → Bar() — chained calls = code walkthrough
+            | \w+\.cs:\d+                               # Foo.cs:123 -- file+line ref
+            | \b(in|see|->)\s+\w+\.cs\b                 # 'in Foo.cs' / 'see Foo.cs' / '-> Foo.cs'
+            | \w+\(\)\s*->\s*\w+\(\)                    # Foo() -> Bar() -- chained calls = code walkthrough
         ", System.Text.RegularExpressions.RegexOptions.IgnorePatternWhitespace |
            System.Text.RegularExpressions.RegexOptions.IgnoreCase |
            System.Text.RegularExpressions.RegexOptions.Compiled);
 
     static bool IsDevStep(string step) => _devStepPattern.IsMatch(step);
 
-    // ── Search ───────────────────────────────────────────────────────────────────
+    // -- Search ------------------------------------------------------------------─
 
     static int SkillSearchCommand(string[] args)
     {
@@ -277,11 +278,11 @@ internal partial class Program
         Console.Error.WriteLine($"[SKILL] {hits.Count} match(es):");
         foreach (var s in hits)
             Console.WriteLine($"  [{s.App}] {s.Id} [{AudienceProfile(s)}] - {s.Title}");
-        Console.WriteLine($"\n  Use: wkappbot skill show <id>");
+        Console.WriteLine($"\n  Use: wkappbot skill read <id>");
         return 0;
     }
 
-    // ── Contribute ───────────────────────────────────────────────────────────────
+    // -- Contribute --------------------------------------------------------------─
 
     static int SkillContributeCommand(string[] args)
     {
@@ -377,7 +378,7 @@ internal partial class Program
     }
 
     // Copies regression script into experience/tests/{cmd}/{subcmd}/ and returns relative path from DataDir.
-    // Filename convention: test-{cmd}-{subcmd}[-desc].sh  →  cmd + subcmd extracted from filename.
+    // Filename convention: test-{cmd}-{subcmd}[-desc].sh  ->  cmd + subcmd extracted from filename.
     static string? RegisterRegressionScript(string scriptPath, string skillSlug)
     {
         if (!File.Exists(scriptPath))
@@ -407,11 +408,11 @@ internal partial class Program
             File.WriteAllLines(manifestPath, manifest.OrderBy(x => x));
 
         var relPath = Path.GetRelativePath(DataDir, destPath).Replace('\\', '/');
-        Console.Error.WriteLine($"[SKILL] Regression → experience/tests/{cmd}/{subcmd}/{destName}");
+        Console.Error.WriteLine($"[SKILL] Regression -> experience/tests/{cmd}/{subcmd}/{destName}");
         return relPath;
     }
 
-    // ── Edit (partial update) ────────────────────────────────────────────────────
+    // -- Edit (partial update) ----------------------------------------------------
 
     static int SkillEditCommand(string[] args)
     {
@@ -420,7 +421,7 @@ internal partial class Program
             Console.WriteLine("Usage: wkappbot skill edit <id> [--title X] [--desc X] [--tags t1,t2] [--steps s1|s2]");
             Console.WriteLine("                           [--step N --content X]   edit single step by 1-based index");
             Console.WriteLine("                           [--add-step X]           append a new step");
-            Console.WriteLine("  Partial update — only specified fields are changed. Version auto-bumped.");
+            Console.WriteLine("  Partial update -- only specified fields are changed. Version auto-bumped.");
             Console.WriteLine("  Note: to rename the file slug, use delete + contribute --id <new-slug>.");
             return 1;
         }
@@ -455,7 +456,7 @@ internal partial class Program
         bool hasSingleStep = stepIndex > 0 && stepContent != null;
         if (title == null && desc == null && steps == null && tags == null && !hasSingleStep && !addStep)
         {
-            Console.WriteLine("[SKILL] Nothing to edit — specify at least one of: --title, --desc, --tags, --steps, --step N --content X, --add-step X");
+            Console.WriteLine("[SKILL] Nothing to edit -- specify at least one of: --title, --desc, --tags, --steps, --step N --content X, --add-step X");
             return 1;
         }
 
@@ -496,7 +497,7 @@ internal partial class Program
                 return Error($"--step {stepIndex} out of range (skill has {skill.Steps.Count} step(s))");
             var old = skill.Steps[idx];
             skill.Steps[idx] = stepContent!;
-            Console.Error.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" → \"{stepContent}\"");
+            Console.Error.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" -> \"{stepContent}\"");
         }
 
         // --add-step X : append new step
@@ -515,7 +516,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Delete ───────────────────────────────────────────────────────────────────
+    // -- Delete ------------------------------------------------------------------─
 
     static int SkillDeleteCommand(string[] args)
     {
@@ -545,7 +546,7 @@ internal partial class Program
         return 1;
     }
 
-    // ── Install ──────────────────────────────────────────────────────────────────
+    // -- Install ------------------------------------------------------------------
 
     static int SkillInstallCommand(string[] args)
     {
@@ -605,7 +606,7 @@ internal partial class Program
         return cmp != 0 ? cmp : an.CompareTo(bn);
     }
 
-    // ── Export ───────────────────────────────────────────────────────────────────
+    // -- Export ------------------------------------------------------------------─
 
     static int SkillExportCommand(string[] args)
     {
@@ -638,11 +639,11 @@ internal partial class Program
             count++;
         }
 
-        Console.Error.WriteLine($"[SKILL] Exported {count} skill(s) → {outPath}");
+        Console.Error.WriteLine($"[SKILL] Exported {count} skill(s) -> {outPath}");
         return 0;
     }
 
-    // ── Import ───────────────────────────────────────────────────────────────────
+    // -- Import ------------------------------------------------------------------─
 
     static int SkillImportCommand(string[] args)
     {
@@ -674,7 +675,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Verify ───────────────────────────────────────────────────────────────────
+    // -- Verify ------------------------------------------------------------------─
 
     static int SkillVerifyCommand(string[] args)
     {
@@ -687,13 +688,13 @@ internal partial class Program
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Error.WriteLine($"[SKILL] No regression script registered for '{skill.Id}'.");
-            Console.Error.WriteLine($"  → To add one: wkappbot skill contribute --id {skill.Id} --regression-script <test-{skill.App}-*.sh>");
+            Console.Error.WriteLine($"  -> To add one: wkappbot skill contribute --id {skill.Id} --regression-script <test-{skill.App}-*.sh>");
             Console.ResetColor();
         }
         return (missing + stale > 0 || regResult > 0) ? 1 : 0;
     }
 
-    // ── Audit ────────────────────────────────────────────────────────────────────
+    // -- Audit --------------------------------------------------------------------
 
     static int SkillAuditCommand(string[] args)
     {
@@ -714,7 +715,7 @@ internal partial class Program
             var (ok, missing, stale) = RunVerify(skill, verbose: false);
             if (missing + stale > 0)
             {
-                Console.WriteLine($"  ⚠ [{skill.App}] {skill.Id}:");
+                Console.WriteLine($"  ! [{skill.App}] {skill.Id}:");
                 RunVerify(skill, verbose: true);
                 issueIds.Add(skill.Id);
                 totalIssues++;
@@ -726,8 +727,8 @@ internal partial class Program
         Console.Error.WriteLine($"[SKILL] Audit: {totalOk} ok, {totalIssues} stale/missing, {noRefs} without refs");
         if (issueIds.Count > 0)
         {
-            Console.WriteLine("  → Fix: wkappbot skill show <id>  then  wkappbot skill contribute ...");
-            foreach (var id in issueIds) Console.WriteLine($"    wkappbot skill show {id}");
+            Console.WriteLine("  -> Fix: wkappbot skill read <id>  then  wkappbot skill contribute ...");
+            foreach (var id in issueIds) Console.WriteLine($"    wkappbot skill read {id}");
         }
         return totalIssues > 0 ? 1 : 0;
     }
@@ -754,7 +755,7 @@ internal partial class Program
             }
             if (string.IsNullOrEmpty(r.Pattern))
             {
-                if (verbose) Console.WriteLine($"    ✅ {r.File} — file exists");
+                if (verbose) Console.WriteLine($"    ✅ {r.File} -- file exists");
                 ok++; continue;
             }
 
@@ -768,14 +769,14 @@ internal partial class Program
 
             if (foundLine > 0)
             {
-                if (verbose) Console.WriteLine($"    ✅ {r.File}:{foundLine} — \"{r.Pattern}\"");
+                if (verbose) Console.WriteLine($"    ✅ {r.File}:{foundLine} -- \"{r.Pattern}\"");
                 ok++;
             }
             else
             {
                 if (verbose)
                 {
-                    Console.WriteLine($"    ⚠ PATTERN NOT FOUND: \"{r.Pattern}\" in {r.File}");
+                    Console.WriteLine($"    ! PATTERN NOT FOUND: \"{r.Pattern}\" in {r.File}");
                     if (r.Line.HasValue)
                     {
                         int start = Math.Max(0, r.Line.Value - 2);
@@ -866,7 +867,7 @@ internal partial class Program
         return exit == 0 ? 0 : 1;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
+    // -- Helpers ------------------------------------------------------------------
 
     // Loads from project dir + hq dir, deduplicating by id (project wins)
     static List<SkillRecord> LoadAllSkills(string? appFilter = null)
@@ -909,7 +910,7 @@ internal partial class Program
 
     static string Slugify(string title)
     {
-        // Strip non-ASCII (CJK etc.) — caller must use --id for Korean-only titles
+        // Strip non-ASCII (CJK etc.) -- caller must use --id for Korean-only titles
         var ascii = Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
         return ascii; // empty string = caller must supply --id
     }
@@ -958,7 +959,7 @@ internal partial class Program
 
             var label = sub != null ? $"'{command} {sub}'" : $"'{command}'";
             Console.WriteLine();
-            Console.WriteLine($"Skills for {label}: (wkappbot skill show <id>)");
+            Console.WriteLine($"Skills for {label}: (wkappbot skill read <id>)");
             foreach (var (s, score) in scored)
                 Console.WriteLine($"  - {s.Title}  [{s.Id}] [{AudienceProfile(s)}]");
         }
@@ -1058,15 +1059,15 @@ internal partial class Program
         Console.WriteLine("         {hq}/skills/          (installed, [HQ] tag in list)");
         Console.WriteLine();
         Console.WriteLine("  list [app|audience]               List skills grouped by app or audience");
-        Console.WriteLine("  show <id>                         Show skill details");
+        Console.WriteLine("  read <id>                         Show skill details");
         Console.WriteLine("  search <keyword> [--app X] [--audience X]  Search by keyword in title/desc/tags");
         Console.WriteLine("  contribute --app X --title Y --desc Z");
         Console.WriteLine("             [--steps \"s1|s2\"] [--tags \"t1,t2\"] [--id <slug>]");
         Console.WriteLine("                                    Create or update skill in project dir");
         Console.WriteLine("  edit <id> [--title X] [--desc X] [--tags X] [--steps X]");
-        Console.WriteLine("                                    Partial update — only specified fields changed");
+        Console.WriteLine("                                    Partial update -- only specified fields changed");
         Console.WriteLine("  delete <id>                       Remove skill from project dir");
-        Console.WriteLine("  install [--app X] [--force]       Copy project skills → HQ (on deploy)");
+        Console.WriteLine("  install [--app X] [--force]       Copy project skills -> HQ (on deploy)");
         Console.WriteLine("  export [--app X] [--out f.zip]    Export project skills to zip");
         Console.WriteLine("  import <file.zip>                 Import skills into project dir");
         Console.WriteLine("  verify <id>                       Check if source_refs still match code");
@@ -1085,7 +1086,7 @@ internal partial class Program
         Console.WriteLine("  wkappbot skill search retry");
         Console.WriteLine("  wkappbot skill search retry --audience developer");
         Console.WriteLine("  wkappbot skill search retry --audience operator");
-        Console.WriteLine("  wkappbot skill show cdp-eval-taskcancel-retry");
+        Console.WriteLine("  wkappbot skill read cdp-eval-taskcancel-retry");
         Console.WriteLine("  wkappbot skill contribute --app wkappbot-webbot \\");
         Console.WriteLine("    --title \"CDP EvalAsync Retry\" --desc \"retry on cancel/timeout\" \\");
         Console.WriteLine("    --steps \"catch TaskCanceledException|500ms backoff\" --tags \"cdp,retry\" \\");
@@ -1097,7 +1098,7 @@ internal partial class Program
     }
 }
 
-// ── SkillSource / SkillRecord ─────────────────────────────────────────────
+// -- SkillSource / SkillRecord --------------------------------------------─
 
 internal enum SkillSource { Project, Hq }
 
@@ -1124,7 +1125,7 @@ internal sealed class SkillRecord
     [JsonPropertyName("updated")]            public DateTime? Updated                     { get; set; }
     [JsonPropertyName("version")]            public string? Version                       { get; set; }
 
-    /// <summary>Most recent activity date — updated if set, otherwise created.</summary>
+    /// <summary>Most recent activity date -- updated if set, otherwise created.</summary>
     [JsonIgnore] public DateTime LastActivity => Updated ?? Created;
 
     [JsonIgnore] public SkillSource Source   { get; set; } = SkillSource.Project;

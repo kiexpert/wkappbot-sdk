@@ -76,9 +76,9 @@ internal partial class Program
         }
         var (textParts, filePaths) = ParseTextAndFiles(remaining.ToArray());
         var replyText = JoinShellGroupedTextParts(textParts);
-        // C-style escape decode: \n → newline, \t → tab, \\ → backslash
+        // C-style escape decode: \n -> newline, \t -> tab, \\ -> backslash
         replyText = DecodeCEscapes(replyText);
-        // Bash history expansion escapes ! to \! even in single quotes — undo it
+        // Bash history expansion escapes ! to \! even in single quotes -- undo it
         replyText = replyText.Replace("\\!", "!");
         if (string.IsNullOrWhiteSpace(replyText))
         {
@@ -145,13 +145,13 @@ internal partial class Program
                 || text.Contains("Done") || text.Contains("Complete");
             if (hasBullets && hasCompletion) return true;
             // Debate/test results
-            if (text.Contains("═══") && text.Contains("완료")) return true;
+            if (text.Contains("===") && text.Contains("완료")) return true;
             if (text.Contains("PASS") && text.Contains("FAIL")) return true;
             return false;
         }
 
-        // Thread reply: send as-is (no splitting — already in thread context).
-        // Channel post (no threadTs): use PostWithOverflow — first paragraph + overflow as thread.
+        // Thread reply: send as-is (no splitting -- already in thread context).
+        // Channel post (no threadTs): use PostWithOverflow -- first paragraph + overflow as thread.
         bool hasTargetThread = !string.IsNullOrEmpty(threadTs);
         bool ok = false;
         string? postedTs = null;
@@ -162,7 +162,7 @@ internal partial class Program
             Console.WriteLine("[SLACK] Auto-broadcast: completion message detected");
 
         // Smart merge: if last message in thread is from same sender, no attachments,
-        // same minute, and combined size < 3800 → edit instead of new message (saves message quota)
+        // same minute, and combined size < 3800 -> edit instead of new message (saves message quota)
         bool merged = false;
         if (hasTargetThread && filePaths.Count == 0)
         {
@@ -204,10 +204,10 @@ internal partial class Program
             if (hasTargetThread)
             {
                 (ok, _) = SlackSendViaApi(botToken, channel, replyText, threadTs, username: senderName, replyBroadcast: autoBroadcast).GetAwaiter().GetResult();
-                // Fallback: thread not found (old workspace, deleted thread) → post as new message
+                // Fallback: thread not found (old workspace, deleted thread) -> post as new message
                 if (!ok)
                 {
-                    Console.WriteLine("[SLACK] Thread reply failed — falling back to new message");
+                    Console.WriteLine("[SLACK] Thread reply failed -- falling back to new message");
                     (ok, postedTs) = PostWithOverflow(botToken, channel, replyText, username: senderName);
                 }
             }
@@ -336,7 +336,7 @@ internal partial class Program
                 // Format: message first, then source attribution + reply hint (with thread_ts)
                 var ts = msg?["ts"]?.GetValue<string>() ?? "";
                     var replyCmd = $"MUST REPLY VIA SLACK ONLY: wkappbot slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {ts}";
-                var promptText = $"{text}\n\n(Slack @{user} → {replyCmd})";
+                var promptText = $"{text}\n\n(Slack @{user} -> {replyCmd})";
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.Error.WriteLine($"[SLACK] >> Typing into prompt: {promptText}");
@@ -409,7 +409,7 @@ internal partial class Program
         if (lastTs != null)
             Console.Error.WriteLine($"[SLACK] Fetching messages after ts={lastTs}");
         else
-            Console.Error.WriteLine($"[SLACK] No bookmark — fetching last {limit} messages");
+            Console.Error.WriteLine($"[SLACK] No bookmark -- fetching last {limit} messages");
 
         var messages = SlackFetchHistoryAsync(botToken, channel, lastTs, limit).GetAwaiter().GetResult();
 
@@ -436,7 +436,7 @@ internal partial class Program
             var promptInfo = promptHelper.FindPrompt();
             if (promptInfo == null)
             {
-                Console.WriteLine("[SLACK] WARNING: Could not find Claude prompt — writing to inbox instead");
+                Console.WriteLine("[SLACK] WARNING: Could not find Claude prompt -- writing to inbox instead");
                 toPrompt = false;
             }
         }
@@ -472,7 +472,7 @@ internal partial class Program
                 if (toPrompt && promptHelper != null)
                 {
             var replyHint = $"MUST REPLY VIA SLACK ONLY: wkappbot slack reply \"MUST PUT FINAL ANSWER HERE\" --msg {replyThread}";
-                    var promptText = $"{cleanText}\n\n(Slack @{user} → {replyHint})";
+                    var promptText = $"{cleanText}\n\n(Slack @{user} -> {replyHint})";
 
                     var fresh = promptHelper.FindPrompt();
                     if (fresh != null)
@@ -519,7 +519,7 @@ internal partial class Program
         if (double.TryParse(s, System.Globalization.NumberStyles.Any,
             System.Globalization.CultureInfo.InvariantCulture, out _))
             return s;
-        // ISO date/datetime → Unix epoch
+        // ISO date/datetime -> Unix epoch
         if (DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.AssumeLocal, out var dt))
             return ((DateTimeOffset)dt).ToUnixTimeSeconds().ToString();
         Console.Error.WriteLine($"[SLACK] --oldest/--latest: cannot parse '{s}' as timestamp");
@@ -560,7 +560,7 @@ internal partial class Program
 
     /// <summary>
     /// Fetch thread replies via Slack conversations.replies API.
-    /// Returns all messages in the thread (parent first, then replies oldest→newest).
+    /// Returns all messages in the thread (parent first, then replies oldest->newest).
     /// </summary>
     static async Task<List<JsonNode>> SlackFetchRepliesAsync(string botToken, string channel,
         string threadTs, int limit = 20)
@@ -664,7 +664,7 @@ internal partial class Program
                 .GetAwaiter().GetResult();
 
 
-            // If empty or single (no replies) → maybe it's a reply ts, not the parent
+            // If empty or single (no replies) -> maybe it's a reply ts, not the parent
             // Fetch that message to find its thread_ts (parent)
             if (messages.Count <= 1)
             {
@@ -674,7 +674,7 @@ internal partial class Program
                 var parentTs = probe.FirstOrDefault()?["thread_ts"]?.GetValue<string>();
                 if (parentTs != null && parentTs != threadTs)
                 {
-                    Console.Error.WriteLine($"[SLACK] ts={threadTs} is a reply → parent={parentTs}");
+                    Console.Error.WriteLine($"[SLACK] ts={threadTs} is a reply -> parent={parentTs}");
                     threadTs = parentTs;
                     messages = Task.Run(async () =>
                         await SlackFetchRepliesAsync(botToken, channel, threadTs, limit))
@@ -696,12 +696,12 @@ internal partial class Program
             return 0;
         }
 
-        // ── Client-side filtering ──
+        // -- Client-side filtering --
         System.Text.RegularExpressions.Regex? searchRegex = null;
         if (searchPattern != null)
         {
             try { searchRegex = new System.Text.RegularExpressions.Regex(searchPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase); }
-            catch { /* invalid regex → fallback to substring */ }
+            catch { /* invalid regex -> fallback to substring */ }
         }
 
         if (searchPattern != null || fromFilter != null)
@@ -743,7 +743,7 @@ internal partial class Program
             var replyUsers = m["reply_users_count"]?.GetValue<int>() ?? 0;
             var latestReply = m["latest_reply"]?.GetValue<string>();
 
-            // Timestamp → human-readable
+            // Timestamp -> human-readable
             string timeStr = ts;
             if (ts.IndexOf('.') is int dot and > 0
                 && long.TryParse(ts.AsSpan(0, dot), out var epoch))
@@ -801,10 +801,10 @@ internal partial class Program
             var botId = m["bot_id"]?.GetValue<string>();
             if (botId != null) botLabel += $" bot={botId[..Math.Min(8, botId.Length)]}";
 
-            // Truncate text (Console.WindowWidth throws when stdout is redirected — fallback to 120)
+            // Truncate text (Console.WindowWidth throws when stdout is redirected -- fallback to 120)
             int maxLen;
             try { maxLen = Console.WindowWidth > 40 ? Console.WindowWidth - 30 : 120; } catch { maxLen = 120; }
-            var preview = text.Length > maxLen ? text[..maxLen] + "…" : text;
+            var preview = text.Length > maxLen ? text[..maxLen] + "..." : text;
 
             Console.Write($"  {timeStr} | ");
             Console.ForegroundColor = replyCount > 0 ? ConsoleColor.Cyan : ConsoleColor.Gray;
@@ -820,7 +820,7 @@ internal partial class Program
             if (deletePattern != null && WildcardMatch(text, deletePattern))
             {
                 if (replyCount > 0)
-                    toSkipThreadStarter.Add((ts, preview, replyCount)); // thread starter — refuse delete
+                    toSkipThreadStarter.Add((ts, preview, replyCount)); // thread starter -- refuse delete
                 else
                     toDelete.Add((ts, preview));
             }
@@ -830,17 +830,17 @@ internal partial class Program
         Console.WriteLine(new string('─', 120));
         Console.WriteLine($"  Total: {messages.Count} messages");
 
-        // ── Thread-starter protection: warn and refuse ──
+        // -- Thread-starter protection: warn and refuse --
         if (deletePattern != null && toSkipThreadStarter.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[SLACK] ✗ REFUSED — {toSkipThreadStarter.Count} thread-starter(s) matched but will NOT be deleted (has replies):");
+            Console.WriteLine($"\n[SLACK] X REFUSED -- {toSkipThreadStarter.Count} thread-starter(s) matched but will NOT be deleted (has replies):");
             Console.ResetColor();
             foreach (var (ts, preview, rc) in toSkipThreadStarter)
-                Console.WriteLine($"  ✗ SKIP {ts} | 💬{rc} | {preview}");
+                Console.WriteLine($"  X SKIP {ts} | 💬{rc} | {preview}");
         }
 
-        // ── Delete matching messages ──
+        // -- Delete matching messages --
         if (deletePattern != null && toDelete.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -852,7 +852,7 @@ internal partial class Program
                 var ok = Task.Run(async () =>
                     await SlackDeleteMessageAsync(botToken, channel, ts, guardThreadStarter: false)) // pre-scanned r=0
                     .GetAwaiter().GetResult();
-                var status = ok ? "✓" : "✗";
+                var status = ok ? "v" : "X";
                 Console.WriteLine($"  {status} {ts} | {preview}");
                 if (ok) deleted++;
                 Thread.Sleep(300); // rate limit
@@ -906,16 +906,16 @@ internal partial class Program
 
             if (ok)
             {
-                Console.WriteLine($"  ✓ {ts}");
+                Console.WriteLine($"  v {ts}");
                 deleted++;
             }
             else
             {
                 // Check if it was a thread-starter skip or an actual API failure
                 // SlackDeleteMessageAsync logs SKIP message itself when guardThreadStarter fires
-                Console.WriteLine($"  ✗ {ts}");
+                Console.WriteLine($"  X {ts}");
                 if (!force)
-                    skipped++; // thread-starter protection fired — need --i-really-want-to-delete-including-replies to override
+                    skipped++; // thread-starter protection fired -- need --i-really-want-to-delete-including-replies to override
                 else
                     failed++;
             }

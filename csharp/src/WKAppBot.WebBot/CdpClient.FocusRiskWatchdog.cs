@@ -114,8 +114,8 @@ public sealed partial class CdpClient
         return Task.CompletedTask;
     }
 
-    // ── JS Focus Lock (TODO-11): monkey-patch HTMLElement.focus() to block OS-focus theft ──
-    // Guard: window.__appbot_lock_focus = true → focus() calls use preventScroll only (no OS activation).
+    // -- JS Focus Lock (TODO-11): monkey-patch HTMLElement.focus() to block OS-focus theft --
+    // Guard: window.__appbot_lock_focus = true -> focus() calls use preventScroll only (no OS activation).
     // Inject once per tab; toggle around CDP input operations.
 
     private bool _focusLockInjected;

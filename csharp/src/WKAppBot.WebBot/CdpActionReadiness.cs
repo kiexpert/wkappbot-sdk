@@ -4,12 +4,12 @@ namespace WKAppBot.WebBot;
 
 /// <summary>
 /// Action-Aware Readiness (AAR) for Chrome DevTools Protocol (CDP) web elements.
-/// Lightweight pipeline: Pass-through → Target validation → Action-specific.
+/// Lightweight pipeline: Pass-through -> Target validation -> Action-specific.
 ///
 /// Return convention:
-///   null        → blocked (hard fail)
-///   == target   → success (proceed)
-///   != target   → retarget (not used for CDP yet)
+///   null        -> blocked (hard fail)
+///   == target   -> success (proceed)
+///   != target   -> retarget (not used for CDP yet)
 ///
 /// Tag: [AAR]
 /// </summary>
@@ -19,13 +19,13 @@ public sealed class CdpActionReadiness : IActionReadiness
     {
         var act = action.ToLowerInvariant();
 
-        // ── Pass-through actions ──
+        // -- Pass-through actions --
         if (IsPassThrough(act))
             return target;
 
-        // ── Stage 0: Global — no lock screen check for web (handled by Windows AAR above) ──
+        // -- Stage 0: Global -- no lock screen check for web (handled by Windows AAR above) --
 
-        // ── Stage 1: Target validation ──
+        // -- Stage 1: Target validation --
         if (!target.Visible)
         {
             if (act is "type" or "set-value" or "click" or "invoke")
@@ -45,7 +45,7 @@ public sealed class CdpActionReadiness : IActionReadiness
             }
         }
 
-        // ── Stage 2: Action-specific ──
+        // -- Stage 2: Action-specific --
         if (target is CdpActionTarget cdpTarget)
         {
             switch (act)

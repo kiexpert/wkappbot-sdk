@@ -1,8 +1,8 @@
 ﻿{
     "id":  "stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net",
     "app":  "wkappbot",
-    "title":  "Stop AI From Clicking the Wrong Button — 6-Layer Target Safety Net",
-    "desc":  "L1: ambiguous pattern matches multiple windows → list + hwnd auto-heal. L2: modal alert blocking → auto-find buttons inside. L3: FOCUSED/LEAF terminal node → suggest grab target. L4: Win32 child not found → list siblings (MFC/HTS). L5: no #scope on element action → root children + focus chain. L6: UIA scope element miss → list available elements.",
+    "title":  "Stop AI From Clicking the Wrong Button -- 6-Layer Target Safety Net",
+    "desc":  "L1: ambiguous pattern matches multiple windows -> list + hwnd auto-heal. L2: modal alert blocking -> auto-find buttons inside. L3: FOCUSED/LEAF terminal node -> suggest grab target. L4: Win32 child not found -> list siblings (MFC/HTS). L5: no #scope on element action -> root children + focus chain. L6: UIA scope element miss -> list available elements.",
     "steps":  [
 
               ],

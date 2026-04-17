@@ -4,9 +4,9 @@ namespace WKAppBot.CLI;
 
 // Deep-scan OCR fallback for PDF pages.
 //
-// Step 1 (caller): full-page OCR → OcrFullResult with word coordinates  (1 call, fast)
-// Step 2 (here):   pixel line detection → segment list
-//                  segments NOT covered by step-1 OCR words → crop → additional OCR  (fallback)
+// Step 1 (caller): full-page OCR -> OcrFullResult with word coordinates  (1 call, fast)
+// Step 2 (here):   pixel line detection -> segment list
+//                  segments NOT covered by step-1 OCR words -> crop -> additional OCR  (fallback)
 //
 // "Not covered" = segment rect has zero overlapping OcrWords, or OCR word density < threshold.
 // This catches math formula variables, subscripts, table cells that Windows OCR misses at full scale.
@@ -16,7 +16,7 @@ internal partial class Program
 
     /// <summary>
     /// Additional OCR pass for regions the full-page OCR missed.
-    /// Call AFTER RecognizeAll() on the full page — pass in the OcrFullResult for coverage check.
+    /// Call AFTER RecognizeAll() on the full page -- pass in the OcrFullResult for coverage check.
     /// Returns supplemental text found in uncovered regions.
     /// </summary>
     static async Task<string> DeepScanOcrAsync(
@@ -27,7 +27,7 @@ internal partial class Program
     {
         int w = bmp.Width, h = bmp.Height;
 
-        // ── Copy pixels for fast row/col scanning ──────────────────────────────
+        // -- Copy pixels for fast row/col scanning ------------------------------
         var bmpData = bmp.LockBits(
             new System.Drawing.Rectangle(0, 0, w, h),
             System.Drawing.Imaging.ImageLockMode.ReadOnly,
@@ -37,7 +37,7 @@ internal partial class Program
         bmp.UnlockBits(bmpData);
         int stride = bmpData.Stride;
 
-        // ── Step 1: detect pixel-active rows → line bands ─────────────────────
+        // -- Step 1: detect pixel-active rows -> line bands --------------------─
         var activeRows = new bool[h];
         for (int y = 0; y < h; y++)
         {
@@ -63,7 +63,7 @@ internal partial class Program
             }
         }
 
-        // ── Step 2: build OCR coverage map (word bounding boxes) ─────────────
+        // -- Step 2: build OCR coverage map (word bounding boxes) ------------─
         // OcrWord coords are in bitmap pixels (already scaled back by RecognizeAll)
         var covered = fullOcr.Words
             .Select(ww => new System.Drawing.Rectangle(ww.X, ww.Y, Math.Max(1, ww.Width), Math.Max(1, ww.Height)))
@@ -76,7 +76,7 @@ internal partial class Program
             return false;
         }
 
-        // ── Step 3: per-band column scan → segments → fallback OCR ───────────
+        // -- Step 3: per-band column scan -> segments -> fallback OCR ----------─
         var results = new List<string>();
         int totalFallback = 0;
 
@@ -85,7 +85,7 @@ internal partial class Program
             int bh = bottom - top + 1;
             if (bh < 3) continue;
 
-            // Column scan → active cols + pixel count (used for coverage judgment below)
+            // Column scan -> active cols + pixel count (used for coverage judgment below)
             var activeCols = new bool[w];
             int darkPixels = 0;
             for (int x = 0; x < w; x++)
@@ -96,13 +96,13 @@ internal partial class Program
                 }
 
             // "미진" check: OCR chars vs pixel activity ratio
-            // If OCR got plenty of text relative to pixel density → well-covered, skip
+            // If OCR got plenty of text relative to pixel density -> well-covered, skip
             int bandOcrChars = fullOcr.Words
                 .Where(ww => ww.Y >= top - 4 && ww.Y <= bottom + 4)
                 .Sum(ww => ww.Text.Length);
             double pixelDensity  = (double)darkPixels / w;          // active cols / total cols
             double charPerPixel  = pixelDensity > 0 ? bandOcrChars / (pixelDensity * w) : 0;
-            if (charPerPixel >= 0.4) continue; // OCR coverage sufficient → skip this band
+            if (charPerPixel >= 0.4) continue; // OCR coverage sufficient -> skip this band
 
             int segStart = -1, lastActiveCol = -1;
             var segs = new List<System.Drawing.Rectangle>();

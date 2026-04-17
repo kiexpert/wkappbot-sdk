@@ -1,4 +1,4 @@
-// AppBotEyeClaudeStatusStreamer.cs — Per-instance Claude Desktop status streaming.
+// AppBotEyeClaudeStatusStreamer.cs -- Per-instance Claude Desktop status streaming.
 // Tracks multiple Claude Desktop windows independently, streams each to Slack.
 // Extracted from AppBotEyeGlobalMode.cs for readability.
 
@@ -15,7 +15,7 @@ internal partial class Program
     /// <summary>
     /// Emoji prefixes used for Claude/Eye STATUS messages in Slack.
     /// Only these are eligible for auto-cleanup on Eye restart.
-    /// NOTE: :memo: is NOT a status emoji — it's used by suggest (건의) messages.
+    /// NOTE: :memo: is NOT a status emoji -- it's used by suggest (건의) messages.
     /// </summary>
     static readonly HashSet<string> StatusEmojis = new(StringComparer.Ordinal)
     {
@@ -36,24 +36,24 @@ internal partial class Program
         return false;
     }
 
-    // ── Per-instance state ──────────────────────────────────────────────────
+    // -- Per-instance state --------------------------------------------------
 
     /// <summary>Per-Claude-Desktop-instance state: spinner detection + Slack status streaming.</summary>
     sealed class ClaudeInstanceState
     {
-        // ── Spinner detection (per-hwnd, filled by DetectSpinnerIdle) ──
+        // -- Spinner detection (per-hwnd, filled by DetectSpinnerIdle) --
         public uint LastSpinnerHash;
         public int ConsecutiveNoChange;
         public IntPtr CachedRenderHwnd;
 
-        // ── Slack status streaming ──
+        // -- Slack status streaming --
         public string? SlackStatusTs;
         public string? LastSlackStatusText;
         public string? LastExecutingText;
         public string? IdleAfterText;
         public bool IdleMessageSent;
 
-        // ── Rate limit ──
+        // -- Rate limit --
         public bool WasRateLimited;
         public DateTime? RateLimitDetectedAt;
         public DateTime? RateLimitResetTime;
@@ -64,29 +64,29 @@ internal partial class Program
         public string? LastServerErrorText; // dedup: don't re-fire for same error text
 #pragma warning restore CS0649
 
-        // ── Plan/permission approval ──
+        // -- Plan/permission approval --
         public bool PlanApprovalSentToSlack;
         public string? PendingPlanApprovalSlackTs;
         public bool PermissionPromptSentToSlack;
         public string? PendingPermissionSlackTs;
         public DateTime? PermissionPromptFirstSeen;
 
-        // ── Display label (CWD short name for Slack messages) ──
+        // -- Display label (CWD short name for Slack messages) --
         public string CwdLabel = "";
 
-        // ── Last status type (executing/idle/etc.) for edit-vs-delete decision ──
+        // -- Last status type (executing/idle/etc.) for edit-vs-delete decision --
         public string? LastStatusType;
 
-        // ── Homework injection: idle 1min → pending suggestions → newchat ──
+        // -- Homework injection: idle 1min -> pending suggestions -> newchat --
         public DateTime? IdleStartedAt;
         public bool HomeworkNotified;
-        public DateTime? LastHomeworkAt; // global cooldown — prevents re-fire across session resets
+        public DateTime? LastHomeworkAt; // global cooldown -- prevents re-fire across session resets
         public string? FullCwd;          // full workspace path (for JSONL new-session detection)
 
-        // ── Streaming dedup: minimum 1s between Slack chat.update calls ──
+        // -- Streaming dedup: minimum 1s between Slack chat.update calls --
         public DateTime LastSlackStreamAt;
 
-        // ── File-size watermark: only stream edit when JSONL has grown since last post ──
+        // -- File-size watermark: only stream edit when JSONL has grown since last post --
         // On first tick with known CWD, watermark is calibrated to current size (skip re-streaming old state).
         public long LastPostedJsonlSize;
         public bool JsonlSizeInitialized;
@@ -95,8 +95,8 @@ internal partial class Program
     // Per-hwnd instance state dictionary. Entries added on first encounter, purged when window gone.
     static readonly Dictionary<IntPtr, ClaudeInstanceState> _instanceStates = new();
 
-    // Stale status messages collected at Eye startup — deleted after first successful new post.
-    // Avoids the gap: "old deleted → 1s pause → new posted".
+    // Stale status messages collected at Eye startup -- deleted after first successful new post.
+    // Avoids the gap: "old deleted -> 1s pause -> new posted".
     static readonly List<string> _staleStatusTsOnStartup = new();
 
     // Cached hwnd of appbot's own VS Code window (the WKAppBot project window).
@@ -127,7 +127,7 @@ internal partial class Program
                         state.SlackStatusTs = recovered.ts;
                         state.LastSlackStatusText = recovered.text;
                         Console.Error.WriteLine($"[EYE] Restored status ts from Slack for '{expectedUser}': {recovered.ts}");
-                        _recoveredStatusByUsername.Remove(expectedUser); // consume — one-time recovery
+                        _recoveredStatusByUsername.Remove(expectedUser); // consume -- one-time recovery
                         break;
                     }
                 }
@@ -144,11 +144,11 @@ internal partial class Program
 
     /// <summary>
     /// Resolve a short display label for a Claude Desktop hwnd.
-    /// Priority: _cachedCards PID match → window title short form → hwnd hex.
+    /// Priority: _cachedCards PID match -> window title short form -> hwnd hex.
     /// </summary>
     static string ResolveInstanceCwdLabel(IntPtr hwnd)
     {
-        // Priority 1: VS Code — use window title (each window has unique title with folder name)
+        // Priority 1: VS Code -- use window title (each window has unique title with folder name)
         // Multiple VS Code windows share the same PID, so title-based CWD is the only reliable source.
         try
         {
@@ -162,7 +162,7 @@ internal partial class Program
         }
         catch { }
 
-        // Priority 2: _cachedCards PID match (claude-desktop / codex — single window per process)
+        // Priority 2: _cachedCards PID match (claude-desktop / codex -- single window per process)
         try
         {
             GetWindowThreadProcessId(hwnd, out var pid);
@@ -181,17 +181,17 @@ internal partial class Program
             var pi = FindAllPromptsViaMcp().FirstOrDefault(p => p.WindowHandle == hwnd);
             if (pi != null && !string.IsNullOrEmpty(pi.WindowTitle))
             {
-                var t = pi.WindowTitle.Replace("— Claude", "").Trim();
-                if (t.Length > 15) t = t[..15] + "…";
+                var t = pi.WindowTitle.Replace("-- Claude", "").Trim();
+                if (t.Length > 15) t = t[..15] + "...";
                 if (!string.IsNullOrEmpty(t)) return t;
             }
         }
         catch { }
 
-        return "";  // no label — claude-desktop is single global instance
+        return "";  // no label -- claude-desktop is single global instance
     }
 
-    // ── Main per-tick entry point ───────────────────────────────────────────
+    // -- Main per-tick entry point ------------------------------------------─
 
     /// <summary>
     /// Detect and stream status for ALL Claude Desktop instances.
@@ -208,7 +208,7 @@ internal partial class Program
         const int RateLimitCooldownMinutes = 30;
         const int RateLimitAlertCooldownMinutes = 30;
 
-        // ── Purge dead hwnds (clean up window prop atoms before removing) ──
+        // -- Purge dead hwnds (clean up window prop atoms before removing) --
         var deadHwnds = _instanceStates.Keys.Where(h => !IsWindow(h)).ToList();
         foreach (var h in deadHwnds)
         {
@@ -218,11 +218,11 @@ internal partial class Program
             _instanceStates.Remove(h);
         }
 
-        // ── Re-find primary Claude window if lost ──
+        // -- Re-find primary Claude window if lost --
         if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
             claudeHwnd = FindClaudeDesktopWindow();
 
-        // ── Collect all AI instances (Desktop + VS Code + Codex) from prompt cache ──
+        // -- Collect all AI instances (Desktop + VS Code + Codex) from prompt cache --
         var allClaudePrompts = FindAllPromptsViaMcp()
             .Where(p => (p.HostType == "claude-desktop" || ClaudePromptHelper.IsVsCodeHostType(p.HostType) || p.HostType == "codex-desktop") && IsWindow(p.WindowHandle))
             .GroupBy(p => p.WindowHandle).Select(g => g.First()).ToList();
@@ -233,13 +233,13 @@ internal partial class Program
         if (claudeHwnd != IntPtr.Zero && !claudeInstances.Contains(claudeHwnd))
             claudeInstances.Add(claudeHwnd);
 
-        // ── Per-card context usage monitor (runs once per tick, not per instance) ──
+        // -- Per-card context usage monitor (runs once per tick, not per instance) --
         try
         {
             foreach (var card in _cachedCards)
             {
                 if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
-                // Use exact SessionJsonl from registry when available — avoids CWD scan ambiguity
+                // Use exact SessionJsonl from registry when available -- avoids CWD scan ambiguity
                 // (two AIs sharing the same CWD would otherwise get the same JSONL from CWD scan)
                 var (pct, _, jsonlPath, fileSize) = !string.IsNullOrEmpty(card.SessionJsonl) && File.Exists(card.SessionJsonl)
                     ? GetContextInfoForJsonl(card.SessionJsonl)
@@ -250,17 +250,17 @@ internal partial class Program
                 const double UrgentMB      = 10.0;   // urgent handoff threshold
                 if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
 
-                // Key by SessionJsonl when available — two AIs with same CWD must not share dedup state
+                // Key by SessionJsonl when available -- two AIs with same CWD must not share dedup state
                 var cwdKey = !string.IsNullOrEmpty(card.SessionJsonl)
                     ? card.SessionJsonl.Replace('\\', '/').ToLowerInvariant()
                     : card.Cwd.Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                 contextWarnedPcts.TryGetValue(cwdKey, out var prevWarned);
                 var curMB = (int)sizeMB; // deduplicate at 1MB granularity
 
-                // New session detected: jsonlPath changed (ctime-new file selected by mtime) → reset counter
+                // New session detected: jsonlPath changed (ctime-new file selected by mtime) -> reset counter
                 if (prevWarned.path != null && prevWarned.path != jsonlPath)
                 {
-                    Console.Error.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL — context warn counter reset (was {prevWarned.mb}MB)");
+                    Console.Error.WriteLine($"[EYE] [{AbbreviateCwd(card.Cwd)}] New session JSONL -- context warn counter reset (was {prevWarned.mb}MB)");
                     prevWarned = (0, null);
                 }
 
@@ -278,7 +278,7 @@ internal partial class Program
                 {
                     // 9.5MB-10MB: nudge to contribute a skill before handoff
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB — contribute a skill then hand off");
+                    Console.Error.WriteLine($"[EYE] 💡 [{cwdTag}] Context {sizeMB:F1}MB -- contribute a skill then hand off");
                     Console.ResetColor();
                     try
                     {
@@ -293,13 +293,13 @@ internal partial class Program
                 else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) — handoff immediately!");
+                    Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) -- handoff immediately!");
                     Console.ResetColor();
 
                     // Forward urgent warning to the prompt window (runs in MCP subprocess)
                     try
                     {
-                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) — 즉시 인수인계하세요! wkappbot newchat \"...\"을 실행하세요";
+                        var urgentNudge = $"🚨 컨텍스트 {pct}%! ({sizeMB:F1}/{ContextLimitMB}MB) -- 즉시 인수인계하세요! wkappbot newchat \"...\"을 실행하세요";
                         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdTag, urgentNudge]);
                         Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Urgent nudge sent via MCP");
                     }
@@ -312,14 +312,14 @@ internal partial class Program
                 else if (!string.IsNullOrEmpty(slackBotToken))
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB — prepare for handoff");
+                    Console.Error.WriteLine($"[EYE] !️ [{cwdTag}] Context {sizeMB:F1}MB/{ContextLimitMB}MB -- prepare for handoff");
                     Console.ResetColor();
 
                     var handoff = BuildHandoffPrompt(jsonlPath, _cachedCards, sizeMB, ContextLimitMB);
                     try
                     {
                         var nudge = $"""
-                            ⚠️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!
+                            !️ 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB 도달!
                             준비되면 아래 명령을 실행:
 
                             wkappbot newchat "{handoff}"
@@ -332,7 +332,7 @@ internal partial class Program
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"[EYE] ⚠️ [{cwdTag}] Nudge delivery failed: {ex.Message}");
+                        Console.Error.WriteLine($"[EYE] !️ [{cwdTag}] Nudge delivery failed: {ex.Message}");
                         Task.Run(async () => await SlackSendViaApi(slackBotToken!, slackChannel!,
                             $":warning: *[{cwdTag}] 컨텍스트 {sizeMB:F1}/{ContextLimitMB}MB!*\n인수인계 전달 실패! 직접 확인해주세요.",
                             username: SlackBroadcastUsername)).Wait(3000);
@@ -342,12 +342,12 @@ internal partial class Program
         }
         catch { /* best-effort */ }
 
-        // ── Per-instance status detection + streaming ──
+        // -- Per-instance status detection + streaming --
         string? combinedStatusText = null;
 
         if (!claudeInstances.Any())
         {
-            // No Claude windows — update any stale Slack status messages to "idle"
+            // No Claude windows -- update any stale Slack status messages to "idle"
             foreach (var (_, stale) in _instanceStates)
             {
                 if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel)
@@ -358,12 +358,12 @@ internal partial class Program
                 {
                     try
                     {
-                        var idleText = ":zzz: Claude 창 없음 — 프롬프트 대기";
+                        var idleText = ":zzz: Claude 창 없음 -- 프롬프트 대기";
                         Task.Run(async () => await SlackUpdateMessageAsync(
                             slackBotToken!, slackChannel!, stale.SlackStatusTs, idleText))
                             .Wait(3000);
                         stale.LastSlackStatusText = idleText;
-                        Console.WriteLine("[EYE] Claude window lost → Slack idle");
+                        Console.WriteLine("[EYE] Claude window lost -> Slack idle");
                     }
                     catch { }
                 }
@@ -371,13 +371,13 @@ internal partial class Program
             return null;
         }
 
-        var primaryHwnd = claudeHwnd; // local copy — ref params cannot be captured in lambdas
+        var primaryHwnd = claudeHwnd; // local copy -- ref params cannot be captured in lambdas
 
         foreach (var hwnd in claudeInstances)
         {
             var state = GetOrCreateInstanceState(hwnd);
             instanceHostTypes.TryGetValue(hwnd, out var hostType);
-            // UIA-idle mode: no pixel spinner — use turn-form prompt_ready as idle signal (VS Code + Codex)
+            // UIA-idle mode: no pixel spinner -- use turn-form prompt_ready as idle signal (VS Code + Codex)
             bool isVsCode = ClaudePromptHelper.IsVsCodeHostType(hostType) || hostType == "codex-desktop";
             var label = string.IsNullOrEmpty(state.CwdLabel) ? "" : $"[{state.CwdLabel}] ";
 
@@ -386,7 +386,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(appbotFolder) && !string.IsNullOrEmpty(state.CwdLabel) &&
                 state.CwdLabel.Contains(appbotFolder, StringComparison.OrdinalIgnoreCase))
                 _cachedAppbotOwnHwnd = hwnd;
-            // Slack status text omits label — CWD already shown in bot username (e.g. "클롣[WG-WKAppBot]")
+            // Slack status text omits label -- CWD already shown in bot username (e.g. "클롣[WG-WKAppBot]")
             const string slackLabel = "";
 
             Tuple<string, string>? claudeStatus = null;
@@ -394,7 +394,7 @@ internal partial class Program
             {
                 claudeStatus = DetectClaudeDesktopStatusViaRoute(hwnd);
 
-                // VS Code / Codex: no turn-form in UIA → DetectClaudeDesktopStatus always null.
+                // VS Code / Codex: no turn-form in UIA -> DetectClaudeDesktopStatus always null.
                 // Use JSONL card-based detection instead.
                 if (claudeStatus == null && isVsCode)
                 {
@@ -435,12 +435,12 @@ internal partial class Program
                         }
                         else if (ageSec < 30 && !string.IsNullOrEmpty(lastLine))
                         {
-                            // Recent JSONL activity → executing
+                            // Recent JSONL activity -> executing
                             claudeStatus = Tuple.Create("executing", lastLine);
                         }
                         else if (!string.IsNullOrEmpty(lastLine))
                         {
-                            // Stale → idle (prompt_ready equivalent)
+                            // Stale -> idle (prompt_ready equivalent)
                             claudeStatus = Tuple.Create("prompt_ready", lastLine);
                         }
                     }
@@ -464,7 +464,7 @@ internal partial class Program
 
                     combinedStatusText = isEditPlaceholder ? null : $"{label}Claude: {statusText}";
 
-                    // ── Rate limit detection ──
+                    // -- Rate limit detection --
                     bool justHitRateLimit = false;
                     if (claudeStatus.Item1 == "rate_limit")
                     {
@@ -514,7 +514,7 @@ internal partial class Program
                         }
                     }
 
-                    // ── Rate limit alert to Slack ──
+                    // -- Rate limit alert to Slack --
                     bool alertCooldownOk = state.LastRateLimitAlertTime == null ||
                         (DateTime.Now - state.LastRateLimitAlertTime.Value).TotalMinutes >= RateLimitAlertCooldownMinutes;
                     if (justHitRateLimit && alertCooldownOk && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
@@ -534,7 +534,7 @@ internal partial class Program
                         }
                         catch { }
 
-                        // ── Gemini fallback handoff (rate limit) ──
+                        // -- Gemini fallback handoff (rate limit) --
                         // Server errors handled by CheckClaudeSessionsForErrors in tick
                         if (!state.GeminiHandoffFired)
                         {
@@ -554,7 +554,7 @@ internal partial class Program
                     if (!justHitRateLimit && !state.WasRateLimited)
                         state.GeminiHandoffFired = false;
 
-                    // ── Slack status streaming ──
+                    // -- Slack status streaming --
                     if (slackClient != null && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
                     {
                         try
@@ -566,7 +566,7 @@ internal partial class Program
                             bool wasIdle = false;
                             if (claudeStatus.Item1 == "prompt_ready")
                             {
-                                // VS Code: UIA-confirmed idle → post :zzz: message directly (no spinner)
+                                // VS Code: UIA-confirmed idle -> post :zzz: message directly (no spinner)
                                 if (isVsCode && !state.IdleMessageSent
                                     && state.LastSlackStatusText?.Contains(":zzz:") != true)
                                 {
@@ -602,9 +602,9 @@ internal partial class Program
                                     state.IdleStartedAt = DateTime.UtcNow;
                                     state.HomeworkNotified = false;
                                     state.LastExecutingText = null;
-                                    Console.Error.WriteLine($"[EYE] {label}VS Code → idle: {idleMsg}");
+                                    Console.Error.WriteLine($"[EYE] {label}VS Code -> idle: {idleMsg}");
                                 }
-                                goto skipStatusStreaming; // Skip — spinner handles idle for claude-desktop
+                                goto skipStatusStreaming; // Skip -- spinner handles idle for claude-desktop
                             }
                             else
                             {
@@ -613,10 +613,10 @@ internal partial class Program
                                 if (state.IdleMessageSent)
                                 {
                                     if (!isVsCode && DetectSpinnerIdle(hwnd, state)) goto skipStatusStreaming;
-                                    // Spinner animating again (or VS Code executing) → activity resumed
+                                    // Spinner animating again (or VS Code executing) -> activity resumed
                                     if (!isVsCode) ResetSpinnerDetection(state);
                                     state.IdleAfterText = null;
-                                    Console.Error.WriteLine($"[EYE] {label}Idle badge cleared — activity detected");
+                                    Console.Error.WriteLine($"[EYE] {label}Idle badge cleared -- activity detected");
                                 }
                                 state.IdleMessageSent = false;
                                 state.IdleStartedAt = null;
@@ -635,7 +635,7 @@ internal partial class Program
                             }
 
                             // File-size watermark: only stream if JSONL has grown since last successful post/edit.
-                            // Exception: idle→active transition bypasses watermark to remove idle badge immediately.
+                            // Exception: idle->active transition bypasses watermark to remove idle badge immediately.
                             var (_, _, _, curJsonlSize) = GetContextInfoForCwdEx(state.FullCwd);
                             if (wasIdle)
                             {
@@ -659,7 +659,7 @@ internal partial class Program
                             {
                                 var instanceUsername = BuildSlackBotUsername(SlackClaudePrefix, state.CwdLabel);
                                 var capturedJsonlSize = curJsonlSize;
-                                // Fire-and-forget — do NOT Wait() here; FSW can trigger status updates rapidly
+                                // Fire-and-forget -- do NOT Wait() here; FSW can trigger status updates rapidly
                                 // and blocking the Eye loop for 5s per update causes visible streaming lag.
                                 _ = Task.Run(async () =>
                                 {
@@ -671,7 +671,7 @@ internal partial class Program
                         catch { /* best-effort */ }
 
                         skipStatusStreaming:
-                        // ── Spinner pixel idle / active transition (Claude Desktop only) ──
+                        // -- Spinner pixel idle / active transition (Claude Desktop only) --
                         if (!isVsCode && !string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
                         {
                             try
@@ -679,7 +679,7 @@ internal partial class Program
                                 bool spinnerIdle = DetectSpinnerIdle(hwnd, state);
                                 if (!state.IdleMessageSent && spinnerIdle)
                                 {
-                                    // Spinner settled → Claude is idle → post idle message
+                                    // Spinner settled -> Claude is idle -> post idle message
                                     if (state.IdleAfterText == null)
                                     {
                                         if (state.LastExecutingText != null)
@@ -710,23 +710,23 @@ internal partial class Program
                                 }
                                 else if (state.IdleMessageSent && !spinnerIdle)
                                 {
-                                    // Spinner active again → Claude resumed → clear idle so next tick posts executing
+                                    // Spinner active again -> Claude resumed -> clear idle so next tick posts executing
                                     state.IdleMessageSent = false;
                                     state.IdleStartedAt = null;
                                     state.LastSlackStatusText = null;
                                     ResetSpinnerDetection(state);
-                                    Console.Error.WriteLine($"[EYE] {label}Activity resumed — idle cleared");
+                                    Console.Error.WriteLine($"[EYE] {label}Activity resumed -- idle cleared");
                                 }
                             }
                             catch { }
                         }
 
-                        // ── Homework injection (WKAppBot 담당 인스턴스 전용) ────────────────────────────
+                        // -- Homework injection (WKAppBot 담당 인스턴스 전용) ----------------------------
                         // 타이밍 (유저와 협의 확정):
-                        //   · Claude 유휴 1분  — 짧은 멈춤이 아닌 진짜 쉬는 상태 판정
-                        //   · 쿨다운 1시간    — 서제스트 축적 속도 감안, 루프 방지
-                        // LastHomeworkAt 디스크 영속 → Eye 재시작 후에도 쿨다운 유지.
-                        // 비앱봇 인스턴스(회사업무 클롣)는 유휴여도 측정 제외 — 담당자 유휴만 의미있음.
+                        //   · Claude 유휴 1분  -- 짧은 멈춤이 아닌 진짜 쉬는 상태 판정
+                        //   · 쿨다운 1시간    -- 서제스트 축적 속도 감안, 루프 방지
+                        // LastHomeworkAt 디스크 영속 -> Eye 재시작 후에도 쿨다운 유지.
+                        // 비앱봇 인스턴스(회사업무 클롣)는 유휴여도 측정 제외 -- 담당자 유휴만 의미있음.
                         var _isWkAppBotInstance =
                             (state.FullCwd  ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0 ||
                             (state.CwdLabel ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -745,7 +745,7 @@ internal partial class Program
                             catch { }
                         }
 
-                        // ── Plan approval → Slack ──
+                        // -- Plan approval -> Slack --
                         if (claudeStatus.Item1 == "plan_approval_pending" && !state.PlanApprovalSentToSlack)
                         {
                             try
@@ -787,7 +787,7 @@ internal partial class Program
                             state.PendingPlanApprovalSlackTs = null;
                         }
 
-                        // ── Permission prompt → Slack (3s debounce) ──
+                        // -- Permission prompt -> Slack (3s debounce) --
                         if (claudeStatus.Item1 == "permission_prompt" && !state.PermissionPromptSentToSlack)
                         {
                             if (state.PermissionPromptFirstSeen == null)
@@ -835,7 +835,7 @@ internal partial class Program
                 }
                 else
                 {
-                    // claudeStatus null → idle
+                    // claudeStatus null -> idle
                     if (state.WasRateLimited)
                     {
                         state.WasRateLimited = false;
@@ -860,7 +860,7 @@ internal partial class Program
             }
             catch { /* best-effort per-instance */ }
 
-            // ── Fallback: when claudeStatus==null (UIA failed), still track spinner state (Claude Desktop only) ──
+            // -- Fallback: when claudeStatus==null (UIA failed), still track spinner state (Claude Desktop only) --
             if (!isVsCode && claudeStatus == null && state.IdleMessageSent && state.SlackStatusTs != null
                 && slackClient != null && !string.IsNullOrEmpty(slackBotToken))
             {
@@ -871,7 +871,7 @@ internal partial class Program
                         state.IdleMessageSent = false;
                         state.LastSlackStatusText = null;
                         ResetSpinnerDetection(state);
-                        Console.Error.WriteLine($"[EYE] {label}UIA null but spinner active — idle cleared");
+                        Console.Error.WriteLine($"[EYE] {label}UIA null but spinner active -- idle cleared");
                     }
                 }
                 catch { }
@@ -908,7 +908,7 @@ internal partial class Program
         try { File.WriteAllText(statusTsFile, ""); } catch { }
     }
 
-    // ── Window prop string helpers (GlobalAtom-based, survives Eye restart) ──────────
+    // -- Window prop string helpers (GlobalAtom-based, survives Eye restart) ----------
     // Prop names written to the AI app window (VS Code / Codex / Claude Desktop)
     private const string PropAiOut      = "WKAppBot.AiOut";    // last AI output line
     private const string PropSlackTs    = "WKAppBot.SlTs";     // last Slack status message TS
@@ -950,8 +950,8 @@ internal partial class Program
 
     /// <summary>
     /// Post or update a Slack status message for an AI instance.
-    /// Same state type → edit in place (no channel spam).
-    /// State type changed → delete old + post new (moves to bottom = "latest message").
+    /// Same state type -> edit in place (no channel spam).
+    /// State type changed -> delete old + post new (moves to bottom = "latest message").
     /// Also persists SlackTs and text to window props for restart resilience.
     /// </summary>
     static async Task PostOrUpdateAiStatusAsync(
@@ -960,14 +960,14 @@ internal partial class Program
         string slackBotToken, string slackChannel, string instanceUsername,
         string statusTsFile, IntPtr claudeHwnd, long jsonlSize = 0)
     {
-        // ── Step 0: idle→idle skip — no change, no spam ──
+        // -- Step 0: idle->idle skip -- no change, no spam --
         if (statusType == "idle" && state.LastStatusType == "idle" && state.SlackStatusTs != null)
             return;
 
-        // ── Step 1: Is our status message still the latest in the channel? ──────────────────
-        // "Latest = ours" → edit in place (streaming).
-        // "Latest = another Eye message" → adopt that ts and edit in place (no new post spam).
-        // "Latest = someone else" → delete our old status + post new below.
+        // -- Step 1: Is our status message still the latest in the channel? ------------------
+        // "Latest = ours" -> edit in place (streaming).
+        // "Latest = another Eye message" -> adopt that ts and edit in place (no new post spam).
+        // "Latest = someone else" -> delete our old status + post new below.
         bool latestIsOurs = false;
         bool hasReplies = false;
 
@@ -977,15 +977,15 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE-DBG] ownFound={ownFound} adoptTs={adoptTs} adoptBotId={adoptBotId} isVeryLatest={isVeryLatest}");
             if (ownFound)
             {
-                latestIsOurs = true; // our ts is still in recent messages → edit in place
+                latestIsOurs = true; // our ts is still in recent messages -> edit in place
             }
             else if (adoptTs != null)
             {
-                // Found a bot status message among recent N → adopt it (no new post needed)
+                // Found a bot status message among recent N -> adopt it (no new post needed)
                 state.SlackStatusTs = adoptTs;
                 SetWindowStringProp(hwnd, PropSlackTs, adoptTs);
                 latestIsOurs = true;
-                Console.Error.WriteLine($"[EYE] Adopted bot status ts={adoptTs} → edit in place");
+                Console.Error.WriteLine($"[EYE] Adopted bot status ts={adoptTs} -> edit in place");
             }
         }
         catch { }
@@ -996,13 +996,13 @@ internal partial class Program
             catch { }
         }
 
-        // ── Step 2: Edit in place if we are the latest (and no replies on our message) ──────
-        // EXCEPTION: idle↔active transition → always delete old + post new (shows exact transition time).
+        // -- Step 2: Edit in place if we are the latest (and no replies on our message) ------
+        // EXCEPTION: idle↔active transition -> always delete old + post new (shows exact transition time).
         bool isIdleTransition = state.LastStatusType != null && state.LastStatusType != statusType
                                 && (statusType == "idle" || state.LastStatusType == "idle");
         if (latestIsOurs && !hasReplies && !isIdleTransition)
         {
-            // Split: header → main ts, overflow → first summary reply (prevents msg_too_long on main)
+            // Split: header -> main ts, overflow -> first summary reply (prevents msg_too_long on main)
             var (statusHeader, statusOverflow) = SplitMessageForChannel(slackText);
             var (ok, _, editError) = await SlackUpdateMessageAsync(slackBotToken, slackChannel, state.SlackStatusTs!, statusHeader);
             if (ok)
@@ -1025,20 +1025,20 @@ internal partial class Program
             return;
         }
 
-        // ── Step 3: Not latest (or idle↔active transition) → delete old + post new ──────
+        // -- Step 3: Not latest (or idle↔active transition) -> delete old + post new ------
 
-        // Delete our previous status (unless it has replies — never destroy a thread)
+        // Delete our previous status (unless it has replies -- never destroy a thread)
         if (state.SlackStatusTs != null && !hasReplies)
         {
             var oldTs = state.SlackStatusTs;
             state.SlackStatusTs = null;
             SetWindowStringProp(hwnd, PropSlackTs, null);
             await SlackDeleteMessageAsync(slackBotToken, slackChannel, oldTs);
-            Console.Error.WriteLine($"[EYE] Deleted old status (not latest) → posting new");
+            Console.Error.WriteLine($"[EYE] Deleted old status (not latest) -> posting new");
         }
         else if (hasReplies)
         {
-            // Thread started on old status → leave it, post fresh below
+            // Thread started on old status -> leave it, post fresh below
             state.SlackStatusTs = null;
             SetWindowStringProp(hwnd, PropSlackTs, null);
         }
@@ -1062,7 +1062,7 @@ internal partial class Program
             _ = Task.Run(() => SlackCleanStaleStatusAsync(slackBotToken, slackChannel));
 
             // Sweep stale startup messages now that the new post is visible (no gap).
-            // Delay 8s so all instances finish their first tick and populate _instanceStates —
+            // Delay 8s so all instances finish their first tick and populate _instanceStates --
             // then read active ts from window atom props directly (most reliable source).
             if (_staleStatusTsOnStartup.Count > 0)
             {
@@ -1097,9 +1097,9 @@ internal partial class Program
         }
     }
 
-    // ── Independent startup stale sweep ──────────────────────────────────────────────────
+    // -- Independent startup stale sweep --------------------------------------------------
     // Runs 20s after Eye startup regardless of whether a new post was made.
-    // Fixes: if all ticks are "idle" at startup (idle → skip new post → sweep never fires).
+    // Fixes: if all ticks are "idle" at startup (idle -> skip new post -> sweep never fires).
     internal static async Task SweepStaleOnStartupAsync(string slackBotToken, string slackChannel)
     {
         if (_staleStatusTsOnStartup.Count == 0) return;
@@ -1122,8 +1122,8 @@ internal partial class Program
         }
     }
 
-    // ── Homework injection ────────────────────────────────────────────────────────────────
-    // Persisted homework cooldown file — survives Eye restarts (per CWD key).
+    // -- Homework injection ----------------------------------------------------------------
+    // Persisted homework cooldown file -- survives Eye restarts (per CWD key).
     static string _homeworkStatePath => Path.Combine(DataDir, "homework_state.json");
 
     static DateTime? LoadHomeworkAt(string cwdKey)
@@ -1160,12 +1160,12 @@ internal partial class Program
     // types prompt directly via TypeAndSubmit (NO /clear, NO policy injection).
     static void CheckAndSendHomework(ClaudeInstanceState state, IntPtr hwnd, string label)
     {
-        state.HomeworkNotified = true;  // set first — prevent double-fire even on exception
-        // NOTE: LastHomeworkAt (1h cooldown) is set only after successful delivery — not here.
+        state.HomeworkNotified = true;  // set first -- prevent double-fire even on exception
+        // NOTE: LastHomeworkAt (1h cooldown) is set only after successful delivery -- not here.
         // This allows skip-and-retry without waiting 1h.
         var cwdKey = state.FullCwd ?? state.CwdLabel;
 
-        // 트리거 시점에 이미 WKAppBot 인스턴스 여부 확인 완료 — 여기선 전체 서제스트 처리.
+        // 트리거 시점에 이미 WKAppBot 인스턴스 여부 확인 완료 -- 여기선 전체 서제스트 처리.
         var instanceCwd = state.FullCwd ?? state.CwdLabel;
 
         var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
@@ -1182,7 +1182,7 @@ internal partial class Program
                 if (status is "done") continue;
 
                 var isMerge = node?["type"]?.GetValue<string>() == "merge";
-                // 서제스트는 발신자 무관 시스템 전체 아이템 — CWD 필터 없음
+                // 서제스트는 발신자 무관 시스템 전체 아이템 -- CWD 필터 없음
 
                 var text = node?["text"]?.GetValue<string>() ?? "";
                 string summary;
@@ -1193,7 +1193,7 @@ internal partial class Program
                     var root  = node?["rootCause"]?.GetValue<string>();
                     var prio  = node?["priority"]?.GetValue<int>() ?? 0;
                     summary = $"[MERGE×{count} p={prio} {risk}] {text}";
-                    if (root != null) summary += $" — {root}";
+                    if (root != null) summary += $" -- {root}";
                 }
                 else
                 {
@@ -1213,7 +1213,7 @@ internal partial class Program
             return am == bm ? 0 : am ? -1 : 1;
         });
 
-        if (pending.Count == 0) return; // no pending → nothing to do
+        if (pending.Count == 0) return; // no pending -> nothing to do
 
         // Build prompt (English, as user requested)
         var summaryLines = string.Join("\n", pending.Take(5).Select((s, i) => $"  {i + 1}. {s}"));
@@ -1225,16 +1225,16 @@ internal partial class Program
             $"Please review and process them when you have a chance.";
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.Error.WriteLine($"[EYE] {label}Homework injection → {pending.Count} pending suggestions");
+        Console.Error.WriteLine($"[EYE] {label}Homework injection -> {pending.Count} pending suggestions");
         Console.ResetColor();
 
-        // Deliver via MCP subprocess (prompt send with --when-idle) — keeps UIA out of Eye memory.
+        // Deliver via MCP subprocess (prompt send with --when-idle) -- keeps UIA out of Eye memory.
         // If window gone, TrySpawnAppbotVsCode will open VS Code and deliver after it's ready.
         try
         {
             var cwdFilter = state.FullCwd ?? state.CwdLabel;
 
-            // Set 1h cooldown now — persisted to disk
+            // Set 1h cooldown now -- persisted to disk
             state.LastHomeworkAt = DateTime.UtcNow;
             if (!string.IsNullOrEmpty(cwdKey))
                 SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
@@ -1246,7 +1246,7 @@ internal partial class Program
 
             if (exitCode != 0)
             {
-                Console.Error.WriteLine($"[EYE] {label}Homework: MCP delivery failed (exit={exitCode}) — spawning VS Code");
+                Console.Error.WriteLine($"[EYE] {label}Homework: MCP delivery failed (exit={exitCode}) -- spawning VS Code");
                 state.HomeworkNotified = false; // re-arm
                 TrySpawnAppbotVsCode(prompt);
             }
@@ -1261,6 +1261,6 @@ internal partial class Program
         }
     }
 
-    // Gemini fallback logic → AppBotEyeClaudeFallback.cs
+    // Gemini fallback logic -> AppBotEyeClaudeFallback.cs
 
 }

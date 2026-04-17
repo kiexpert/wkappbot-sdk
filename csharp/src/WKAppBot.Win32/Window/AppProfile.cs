@@ -4,16 +4,16 @@ using System.Text.Json.Serialization;
 namespace WKAppBot.Win32.Window;
 
 /// <summary>
-/// App Profile — persistent knowledge about a target application's window structure.
+/// App Profile -- persistent knowledge about a target application's window structure.
 /// Saved as JSON in {exe_dir}/profiles/{profile_name}.json
 ///
 /// The profile stores:
 ///   - App identification (process name, window class, title pattern)
 ///   - Top-level zone map (which cid is toolbar, MDI container, etc.)
-///   - Form type definitions (form_id → known controls with semantic roles)
+///   - Form type definitions (form_id -> known controls with semantic roles)
 ///
 /// On subsequent scans, the scanner only traverses the tree until it hits
-/// a known DB item (form, grid, chart, etc.) — no need to go deeper.
+/// a known DB item (form, grid, chart, etc.) -- no need to go deeper.
 /// </summary>
 public sealed class AppProfile
 {
@@ -115,7 +115,7 @@ public sealed class ControlDefinition
     public double? OcrConfidence { get; set; }
 }
 
-// ── Profile Store (Load/Save/Match) ──────────────────────
+// -- Profile Store (Load/Save/Match) ----------------------
 
 /// <summary>
 /// Manages app profile files on disk.
@@ -325,7 +325,7 @@ public sealed class ProfileStore
     private static string ExtractTitleKeyword(string title)
     {
         // Try to find a short, meaningful keyword
-        // "LS증권 투혼" → "투혼", "영웅문4" → "영웅문"
+        // "LS증권 투혼" -> "투혼", "영웅문4" -> "영웅문"
         var parts = title.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length >= 2) return parts[^1]; // last word
         return title;

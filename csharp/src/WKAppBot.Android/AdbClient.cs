@@ -20,7 +20,7 @@ public class AdbClient
 
     public string AdbPath => _adbPath;
 
-    // ── Core execution ────────────────────────────────────
+    // -- Core execution ------------------------------------
 
     public AdbResult Run(string args, string? serial = null, int? timeoutMs = null)
     {
@@ -40,7 +40,7 @@ public class AdbClient
         return Run($"shell {shellCmd}", serial, timeoutMs);
     }
 
-    // ── Device operations ─────────────────────────────────
+    // -- Device operations --------------------------------─
 
     public List<AdbDevice> ListDevices()
     {
@@ -79,7 +79,7 @@ public class AdbClient
         return devices;
     }
 
-    // ── Screencap ─────────────────────────────────────────
+    // -- Screencap ----------------------------------------─
 
     public bool Screencap(string outputPath, string? serial = null, string? displayId = null)
     {
@@ -93,7 +93,7 @@ public class AdbClient
         var r2 = Run($"pull {remotePath} \"{outputPath}\"", serial, 15000);
         if (r2.ExitCode != 0) return false;
 
-        // Verify not blank (foldable may capture OFF display → tiny file)
+        // Verify not blank (foldable may capture OFF display -> tiny file)
         try
         {
             var fi = new FileInfo(outputPath);
@@ -157,7 +157,7 @@ public class AdbClient
         return displayCount > 1 || force ? activeId : null;
     }
 
-    // ── UI Automator dump ─────────────────────────────────
+    // -- UI Automator dump --------------------------------─
 
     public string? DumpUiTree(string? serial = null)
     {
@@ -174,7 +174,7 @@ public class AdbClient
         return File.ReadAllText(localPath);
     }
 
-    // ── Input commands ────────────────────────────────────
+    // -- Input commands ------------------------------------
 
     public AdbResult Tap(int x, int y, string? serial = null)
         => Shell($"input tap {x} {y}", serial);
@@ -187,7 +187,7 @@ public class AdbClient
 
     public AdbResult InputText(string text, string? serial = null)
     {
-        // ASCII only — Korean requires ADB Keyboard IME or clipboard paste
+        // ASCII only -- Korean requires ADB Keyboard IME or clipboard paste
         var escaped = text.Replace("\"", "\\\"").Replace(" ", "%s").Replace("&", "\\&");
         return Shell($"input text \"{escaped}\"", serial);
     }
@@ -208,7 +208,7 @@ public class AdbClient
         return KeyEvent("279", serial); // KEYCODE_PASTE
     }
 
-    // ── App management ────────────────────────────────────
+    // -- App management ------------------------------------
 
     public AdbResult ForceStop(string package, string? serial = null)
         => Shell($"am force-stop {package}", serial);
@@ -238,7 +238,7 @@ public class AdbClient
         return r.ExitCode == 0 ? r.StdOut.Trim() : null;
     }
 
-    // ── Internal ──────────────────────────────────────────
+    // -- Internal ------------------------------------------
 
     private AdbResult Execute(string args, int timeoutMs)
     {
@@ -301,7 +301,7 @@ public class AdbClient
     }
 }
 
-// ── Models ────────────────────────────────────────────────
+// -- Models ------------------------------------------------
 
 public record AdbResult(int ExitCode, string StdOut, string StdErr)
 {

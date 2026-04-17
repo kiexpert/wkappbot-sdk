@@ -4,13 +4,13 @@ using System.Text.Json;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Eye command pipe server — executes delegated CLI commands via MCP subprocess or in-process.
-/// Protocol: client sends JSON string[] args line → server streams output lines → sends "\x00END {code}".
+/// Eye command pipe server -- executes delegated CLI commands via MCP subprocess or in-process.
+/// Protocol: client sends JSON string[] args line -> server streams output lines -> sends "\x00END {code}".
 /// Parallel execution: AsyncLocal routing isolates each command's output. No global serialization.
-/// TeeTextWriter wraps pipeWriter per-command → real-time streaming to pipe + per-command log file.
-/// CWD: Launcher prepends "__cwd:{path}" as first arg → extracted here, stored in AsyncLocal
+/// TeeTextWriter wraps pipeWriter per-command -> real-time streaming to pipe + per-command log file.
+/// CWD: Launcher prepends "__cwd:{path}" as first arg -> extracted here, stored in AsyncLocal
 ///      so GetSessionTag() and tab-key builders use caller CWD (not Eye's own CWD).
-/// Background: "__bg" anywhere in args → immediate EndMarker response + fire-and-forget task.
+/// Background: "__bg" anywhere in args -> immediate EndMarker response + fire-and-forget task.
 ///      For ask commands, "--slack" is auto-added so result reaches the user via Slack.
 ///
 /// MCP routing (v4.9): a11y/inspect/windows/capture/ocr/ask/prompt/scan/focus commands are routed
@@ -29,19 +29,19 @@ internal static class EyeCmdPipeServer
     internal static readonly AsyncLocal<string?> CallerCwd = new();
     /// <summary>Per-command caller foreground HWND hint (set by Launcher for direct prompt window lookup)</summary>
     internal static readonly AsyncLocal<IntPtr?> CallerHwnd = new();
-    /// <summary>Per-command actual args passed to Program.Main (e.g. ["ask","gemini","..."]) — for approval popup display</summary>
+    /// <summary>Per-command actual args passed to Program.Main (e.g. ["ask","gemini","..."]) -- for approval popup display</summary>
     internal static readonly AsyncLocal<string[]?> CallerArgs = new();
 
     /// <summary>
     /// Global (non-task-local) snapshot of the most recently dispatched command args.
     /// Updated whenever CallerArgs is set. Safe for read from any thread/context.
     /// Use for diagnostics, focus guards, and overlay decisions where async context is unavailable.
-    /// Note: concurrent commands may overwrite each other — this reflects the LATEST dispatch, not per-task.
+    /// Note: concurrent commands may overwrite each other -- this reflects the LATEST dispatch, not per-task.
     /// For per-task isolation, use CallerArgs.Value.
     /// </summary>
     public static volatile string[]? CurrentCommandGlobal;
 
-    /// <summary>Active command count — screensaver checks eye_busy file to suppress during automation.</summary>
+    /// <summary>Active command count -- screensaver checks eye_busy file to suppress during automation.</summary>
     static int _activeCommandCount;
     static readonly string EyeBusyFile = Path.Combine(
         Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "wkappbot.hq", "runtime", "eye_busy");
@@ -55,7 +55,7 @@ internal static class EyeCmdPipeServer
 
     /// <summary>
     /// Stop accepting NEW pipe connections immediately (hot-swap retiring).
-    /// Call this as soon as _slackRetiring = true — new Eye takes over new connections instantly.
+    /// Call this as soon as _slackRetiring = true -- new Eye takes over new connections instantly.
     /// In-flight connections continue to be served until StopAcceptingAndWaitForDrain() is called.
     /// </summary>
     public static void StopAccepting() => _acceptCts.Cancel();
@@ -64,7 +64,7 @@ internal static class EyeCmdPipeServer
     /// Wait for all in-progress commands to finish.
     /// Call StopAccepting() first (or this will do it too).
     /// Logs a warning every 9s; hard-caps at timeoutSeconds (default 30s for hot-swap).
-    /// New Eye is already running — long drain just delays old Eye exit, not user experience.
+    /// New Eye is already running -- long drain just delays old Eye exit, not user experience.
     /// </summary>
     public static void StopAcceptingAndWaitForDrain(int timeoutSeconds = 30)
     {
@@ -82,7 +82,7 @@ internal static class EyeCmdPipeServer
             if (sw.Elapsed.TotalSeconds >= timeoutSeconds)
             {
                 int n = Volatile.Read(ref _activeConnections);
-                Console.WriteLine($"[EYE:HOT-SWAP] drain timeout {timeoutSeconds}s — forcing exit with {n} connection(s) still active");
+                Console.WriteLine($"[EYE:HOT-SWAP] drain timeout {timeoutSeconds}s -- forcing exit with {n} connection(s) still active");
                 break;
             }
             Thread.Sleep(200);
@@ -100,14 +100,14 @@ internal static class EyeCmdPipeServer
 
         var cmd = args[0].ToLowerInvariant();
 
-        // "a11y kill" must NOT go through MCP — it kills processes including the MCP worker itself
+        // "a11y kill" must NOT go through MCP -- it kills processes including the MCP worker itself
         if (cmd == "a11y" && args.Length > 1 && args[1].Equals("kill", StringComparison.OrdinalIgnoreCase))
             return false;
-        // "a11y hack-hover" is long-running — MCP 60s timeout too short
+        // "a11y hack-hover" is long-running -- MCP 60s timeout too short
         if (cmd == "a11y" && args.Length > 1 && args[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase))
             return false;
 
-        // Eye-internal commands — run in-process (no UIA dependency)
+        // Eye-internal commands -- run in-process (no UIA dependency)
         return cmd switch
         {
             "slack" => false,     // pure HTTP
@@ -120,7 +120,7 @@ internal static class EyeCmdPipeServer
             "validate" => false,  // config validation
             "suggest" => false,   // Slack API + file I/O (no UIA)
             "file" => false,      // file read/edit/grep/glob (no UIA)
-            // json-grep removed — use "grap ... --json" instead
+            // json-grep removed -- use "grap ... --json" instead
             "logcat" => false,    // log search (no UIA)
             "web" => false,       // CDP web operations (no UIA)
             "help" or "--help" or "-h" => false,
@@ -137,13 +137,13 @@ internal static class EyeCmdPipeServer
     /// Fire-and-forget: run args in background via MCP subprocess or in-process routing.
     /// Output is isolated to a per-invocation log file (not mixed into Eye console).
     /// callerHwnd: explicitly set CallerHwnd (use a fixed sentinel for non-pipe callers such as HoverAnalyzer
-    ///             so tab sandbox keys are deterministic — pass null to clear it).
+    ///             so tab sandbox keys are deterministic -- pass null to clear it).
     /// </summary>
     internal static void DispatchBg(string[] args, IntPtr? callerHwnd = null)
     {
         if (ShouldRouteToMcp(args))
         {
-            // Route through MCP subprocess — fire-and-forget
+            // Route through MCP subprocess -- fire-and-forget
             Console.Error.WriteLine($"[DISPATCHBG-MCP] {string.Join(" ", args)}");
             EyeMcpClient.CallFireAndForget(args);
             return;
@@ -160,11 +160,11 @@ internal static class EyeCmdPipeServer
         _ = Task.Run(() =>
         {
             CallerCwd.Value = null;
-            CallerHwnd.Value = callerHwnd; // explicit — never inherit parent AsyncLocal value
+            CallerHwnd.Value = callerHwnd; // explicit -- never inherit parent AsyncLocal value
             CallerArgs.Value = args;
             CurrentCommandGlobal = args;
             Program.RunningInEye = true;
-            // ReadOnlyMode no longer set here — Eye routes all a11y through MCP subprocess
+            // ReadOnlyMode no longer set here -- Eye routes all a11y through MCP subprocess
             var memBefore = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             int bgCode = 0;
             using (ThreadRoutingWriter.Route(tee))
@@ -175,7 +175,7 @@ internal static class EyeCmdPipeServer
             var memAfter = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             var delta = memAfter - memBefore;
             if (Math.Abs(delta) >= 5) // log only significant changes (±5MB)
-                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore}→{memAfter}MB ({(delta >= 0 ? "+" : "")}{delta})");
+                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore}->{memAfter}MB ({(delta >= 0 ? "+" : "")}{delta})");
             tee.ExitCode = bgCode;
             tee.Dispose();
         });
@@ -183,7 +183,7 @@ internal static class EyeCmdPipeServer
 
     static async Task ServerLoop()
     {
-        Console.WriteLine("[EYE] CmdPipe server started — delegated commands run in-process (parallel)");
+        Console.WriteLine("[EYE] CmdPipe server started -- delegated commands run in-process (parallel)");
         var ct = _acceptCts.Token;
         while (!ct.IsCancellationRequested)
         {
@@ -234,7 +234,7 @@ internal static class EyeCmdPipeServer
                     args = args[1..];
                 }
 
-                // ── --sudo fallback guard ──
+                // -- --sudo fallback guard --
                 // Regular (non-elevated) user Eye must NOT attempt to handle --sudo requests:
                 // it can't elevate itself and proxying via admin Eye is the caller's job.
                 // Respond with explicit FALLBACK marker + exit 125 so the Launcher can re-run
@@ -249,7 +249,7 @@ internal static class EyeCmdPipeServer
                     return;
                 }
 
-                // Check __bg flag — fire-and-forget: return immediately, run in background
+                // Check __bg flag -- fire-and-forget: return immediately, run in background
                 bool isBg = args.Contains(BgFlag, StringComparer.Ordinal);
                 if (isBg)
                 {
@@ -257,7 +257,7 @@ internal static class EyeCmdPipeServer
                     // Auto-add --slack for ask commands so the result reaches the user
                     if (args.Length > 0 && args[0] == "ask" && !args.Contains("--slack"))
                         args = [..args, "--slack"];
-                    await pw.WriteLineAsync("[BG] Running in background (result → Slack)");
+                    await pw.WriteLineAsync("[BG] Running in background (result -> Slack)");
                     await pw.WriteLineAsync($"{EndMarker} 0");
                     var bgArgs = args; var bgCwd = callerCwd; var bgHwnd = callerHwnd;
                     _ = Task.Run(() => RunInEye(bgArgs, TextWriter.Null, bgCwd, bgHwnd));
@@ -289,7 +289,7 @@ internal static class EyeCmdPipeServer
         var logFile = Path.Combine(logDir, $"wkappbot-core.exe.out-{DateTime.Now:yyyyMMdd_HHmmss}.{cmdTag}.pid={Environment.ProcessId}.log");
         Program._currentLogPath = logFile; // track for auto-heal diagnostics
 
-        // ── MCP routing: a11y commands go to subprocess, Eye-internal stay in-process ──
+        // -- MCP routing: a11y commands go to subprocess, Eye-internal stay in-process --
         if (ShouldRouteToMcp(args))
         {
             // Set caller context for MCP routing (used by GetSendReplyUsername in MCP worker)
@@ -302,7 +302,7 @@ internal static class EyeCmdPipeServer
             var cmdLine = string.Join(" ", args);
             Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"} hwnd=0x{callerHwnd?.ToInt64():X}");
 
-            // CWD mismatch: caller has different CWD than Eye's own CWD → MCP worker may use wrong base path.
+            // CWD mismatch: caller has different CWD than Eye's own CWD -> MCP worker may use wrong base path.
             // Register as bug for path-sensitive commands (a11y, file, logcat, inspect).
             var eyeCwd = Program.EyeCallerCwd;
             if (!string.IsNullOrEmpty(callerCwd) && !string.IsNullOrEmpty(eyeCwd)
@@ -317,7 +317,7 @@ internal static class EyeCmdPipeServer
                 bool callerIsParent = eyeNorm.StartsWith(callerNorm + '\\', StringComparison.OrdinalIgnoreCase);
                 if (callerIsParent)
                 {
-                    Console.Error.WriteLine($"[CMD-CWD-CORRECT] Eye CWD subdir of caller — auto-correcting EyeCallerCwd: {eyeCwd} → {callerCwd}");
+                    Console.Error.WriteLine($"[CMD-CWD-CORRECT] Eye CWD subdir of caller -- auto-correcting EyeCallerCwd: {eyeCwd} -> {callerCwd}");
                     Program.SetEyeCallerCwd(callerCwd);
                 }
                 else
@@ -326,7 +326,7 @@ internal static class EyeCmdPipeServer
                     Program.AutoRegisterBug(
                         $"[BUG-AUTO] CWD mismatch on `{cmdLine}`\n" +
                         $"Caller: {callerCwd}\nEye: {eyeCwd}\n" +
-                        $"MCP worker runs with Eye CWD — relative paths in caller may resolve differently.",
+                        $"MCP worker runs with Eye CWD -- relative paths in caller may resolve differently.",
                         args, callerCwd);
                 }
             }
@@ -346,18 +346,18 @@ internal static class EyeCmdPipeServer
             finally { EndCommand(); }
         }
 
-        // ── Long-running commands (ask/agent): dispatch as background task ──
+        // -- Long-running commands (ask/agent): dispatch as background task --
         // Launcher gets immediate response; Core continues working with Slack streaming.
         // Exception: --help/-h must run inline so help text reaches the caller immediately.
         var cmd0 = args.Length > 0 ? args[0].ToLowerInvariant() : "";
         // Only background-dispatch ask/agent when there's a real AI target (gpt/gemini/claude/triad/all).
-        // No-args or help flags → run inline so usage text reaches the caller.
+        // No-args or help flags -> run inline so usage text reaches the caller.
         var aiTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "gpt", "gemini", "claude", "triad", "all" };
         var hasAiTarget = args.Length > 1 && aiTargets.Contains(args[1]);
         if (cmd0 is "ask" or "agent" && hasAiTarget && !args.Any(a => a is "--help" or "-h"))
         {
-            pipeWriter.WriteLine($"[CMD] {string.Join(" ", args)} → dispatched to background");
+            pipeWriter.WriteLine($"[CMD] {string.Join(" ", args)} -> dispatched to background");
             pipeWriter.WriteLine($"Log: {logFile}");
             // Pass callerCwd so Slack bot-name and thread work correctly in background
             var bgCwd = callerCwd;
@@ -387,13 +387,13 @@ internal static class EyeCmdPipeServer
             return 0; // immediate return to launcher
         }
 
-        // ── In-process path for Eye-internal commands ──
+        // -- In-process path for Eye-internal commands --
         // TeeTextWriter wraps pipeWriter: output goes to pipe (real-time) AND log file.
         // AsyncLocal routing isolates this command's output from concurrent commands.
         var oldSubDir2 = Program.ComputeOldSubDirPublic(args);
         var tee = new TeeTextWriter(pipeWriter, logFile, oldSubDir: oldSubDir2);
         int code;
-        // CallerCwd + CallerHwnd stored in AsyncLocal — propagates to all async continuations of this command
+        // CallerCwd + CallerHwnd stored in AsyncLocal -- propagates to all async continuations of this command
         CallerCwd.Value = callerCwd;
         CallerHwnd.Value = callerHwnd;
         CallerArgs.Value = args;
@@ -412,15 +412,15 @@ internal static class EyeCmdPipeServer
             var memAfter2 = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             var delta2 = memAfter2 - memBefore2;
             if (Math.Abs(delta2) >= 5)
-                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore2}→{memAfter2}MB ({(delta2 >= 0 ? "+" : "")}{delta2})");
+                Console.Error.WriteLine($"[PIPE-MEM] {cmdTag}: {memBefore2}->{memAfter2}MB ({(delta2 >= 0 ? "+" : "")}{delta2})");
         }
-        // Guard: command dispatched but missing from CommandHelpMap → auto-suggest (once per command)
+        // Guard: command dispatched but missing from CommandHelpMap -> auto-suggest (once per command)
         var cmdForHelp = args.Length > 0 ? args[0].ToLowerInvariant() : "";
         if (!string.IsNullOrEmpty(cmdForHelp) && !Program.CommandHelpMap.ContainsKey(cmdForHelp)
             && cmdForHelp is not ("--help" or "-h" or "help" or "--version" or "version")
             && !cmdForHelp.StartsWith("file-") && !cmdForHelp.StartsWith("kro-trial-"))
         {
-            Program.AutoRegisterBug($"[BUG-AUTO] Command \"{cmdForHelp}\" missing from CommandHelpMap — add --help entry for discoverability");
+            Program.AutoRegisterBug($"[BUG-AUTO] Command \"{cmdForHelp}\" missing from CommandHelpMap -- add --help entry for discoverability");
         }
 
         tee.ExitCode = code;

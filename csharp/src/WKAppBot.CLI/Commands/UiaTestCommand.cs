@@ -10,10 +10,10 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// MFC-SAFE UIA pattern exerciser — tests focusless operations without poisoning COM.
+    /// MFC-SAFE UIA pattern exerciser -- tests focusless operations without poisoning COM.
     ///
     /// KEY LESSONS (paid for with many restarts):
-    /// 1. GetSupportedPatterns() on MFC Scroll elements → COM 0x80040201 → permanent hang
+    /// 1. GetSupportedPatterns() on MFC Scroll elements -> COM 0x80040201 -> permanent hang
     /// 2. Certain Tab selections can ALSO trigger COM 0x80040201
     /// 3. Once COM is poisoned, ALL UIA calls on that window fail
     /// 4. VS debugger catching the exception makes it worse (freezes UI thread)
@@ -27,7 +27,7 @@ internal partial class Program
         var formId = GetArgValue(args, "--form") ?? "";
         var invokeTarget = GetArgValue(args, "--invoke") ?? "";
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        // Resolve grap: "window/child#uiaScope" -- '/' and '#' are equivalent separators
         UIA3Automation automation;
         AutomationElement root;
         IntPtr mainHwnd;
@@ -45,7 +45,7 @@ internal partial class Program
             root = resolved.Value.root;
             Console.WriteLine($"Target: \"{WindowFinder.GetWindowText(mainHwnd)}\" (0x{mainHwnd:X})");
 
-            // Quick invoke mode — use resolved root (already scope-narrowed)
+            // Quick invoke mode -- use resolved root (already scope-narrowed)
             if (!string.IsNullOrEmpty(invokeTarget))
                 return QuickInvoke(mainHwnd, invokeTarget, root);
 
@@ -75,21 +75,21 @@ internal partial class Program
             try
             {
                 var detail = action();
-                if (detail.StartsWith("SKIP")) { skip++; results.Add((name, "SKIP", detail)); Console.WriteLine($"  [SKIP] {name} — {detail}"); }
-                else { pass++; results.Add((name, "PASS", detail)); Console.WriteLine($"  [PASS] {name} — {detail}"); }
+                if (detail.StartsWith("SKIP")) { skip++; results.Add((name, "SKIP", detail)); Console.WriteLine($"  [SKIP] {name} -- {detail}"); }
+                else { pass++; results.Add((name, "PASS", detail)); Console.WriteLine($"  [PASS] {name} -- {detail}"); }
             }
             catch (Exception ex)
             {
                 fail++;
                 var msg = Trunc(ex.Message, 100);
                 results.Add((name, "FAIL", msg));
-                Console.WriteLine($"  [FAIL] {name} — {msg}");
+                Console.WriteLine($"  [FAIL] {name} -- {msg}");
                 if (ex.Message.Contains("0x80040201")) comDead = true;
             }
         }
 
-        // ═══ Phase 1: Safe element count ═══
-        Console.WriteLine("\n═══ Phase 1: MFC-Safe Element Count ═══");
+        // === Phase 1: Safe element count ===
+        Console.WriteLine("\n=== Phase 1: MFC-Safe Element Count ===");
         int totalElements = 0, btnCount = 0;
         try
         {
@@ -101,8 +101,8 @@ internal partial class Program
         }
         catch (Exception ex) { Console.WriteLine($"  ERR: {Trunc(ex.Message, 80)}"); }
 
-        // ═══ Phase 2: Button Invoke — RUN FIRST (before tabs can poison COM) ═══
-        Console.WriteLine("\n═══ Phase 2: Button Invoke — Focusless ═══");
+        // === Phase 2: Button Invoke -- RUN FIRST (before tabs can poison COM) ===
+        Console.WriteLine("\n=== Phase 2: Button Invoke -- Focusless ===");
         if (btnCount > 0 && !comDead) try
         {
             var buttons = root.FindAllDescendants(x => x.ByControlType(ControlType.Button));
@@ -119,7 +119,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    if (ex.Message.Contains("0x80040201")) { comDead = true; Console.WriteLine("    ⚠ COM poisoned!"); }
+                    if (ex.Message.Contains("0x80040201")) { comDead = true; Console.WriteLine("    ! COM poisoned!"); }
                 }
             }
 
@@ -152,9 +152,9 @@ internal partial class Program
             if (ex.Message.Contains("0x80040201")) comDead = true;
         }
 
-        // ═══ Phase 3: Tab SelectionItem ═══
-        Console.WriteLine("\n═══ Phase 3: SelectionItem (Tab Switch) — Focusless ═══");
-        if (comDead) Console.WriteLine("  SKIPPED — COM already dead!");
+        // === Phase 3: Tab SelectionItem ===
+        Console.WriteLine("\n=== Phase 3: SelectionItem (Tab Switch) -- Focusless ===");
+        if (comDead) Console.WriteLine("  SKIPPED -- COM already dead!");
         else try
         {
             var tabs = root.FindAllDescendants(x => x.ByControlType(ControlType.Tab));
@@ -206,12 +206,12 @@ internal partial class Program
             if (ex.Message.Contains("0x80040201")) comDead = true;
         }
 
-        // ═══ Phase 4: Scroll — DO NOT TOUCH ═══
-        Console.WriteLine("\n═══ Phase 4: Scroll — TOXIC ON MFC ═══");
-        Console.WriteLine("  SKIPPED — COM 0x80040201 → permanent hang! GetSupportedPatterns도 위험!");
+        // === Phase 4: Scroll -- DO NOT TOUCH ===
+        Console.WriteLine("\n=== Phase 4: Scroll -- TOXIC ON MFC ===");
+        Console.WriteLine("  SKIPPED -- COM 0x80040201 -> permanent hang! GetSupportedPatterns도 위험!");
 
-        // ═══ Phase 5: Win32 WM_GETTEXT (works even with dead COM) ═══
-        Console.WriteLine("\n═══ Phase 5: Win32 WM_GETTEXT — Focusless ═══");
+        // === Phase 5: Win32 WM_GETTEXT (works even with dead COM) ===
+        Console.WriteLine("\n=== Phase 5: Win32 WM_GETTEXT -- Focusless ===");
         try
         {
             var childHwnds = new List<IntPtr>();
@@ -239,9 +239,9 @@ internal partial class Program
         }
         catch (Exception ex) { Console.WriteLine($"  Phase 5 ERR: {Trunc(ex.Message, 80)}"); }
 
-        // ═══ Phase 6: LegacyIA on Tabs (if COM alive) ═══
-        Console.WriteLine("\n═══ Phase 6: LegacyIAccessible — Focusless ═══");
-        if (comDead) Console.WriteLine("  SKIPPED — COM dead");
+        // === Phase 6: LegacyIA on Tabs (if COM alive) ===
+        Console.WriteLine("\n=== Phase 6: LegacyIAccessible -- Focusless ===");
+        if (comDead) Console.WriteLine("  SKIPPED -- COM dead");
         else try
         {
             var tabs = root.FindAllDescendants(x => x.ByControlType(ControlType.Tab));
@@ -270,9 +270,9 @@ internal partial class Program
         }
         catch (Exception ex) { Console.WriteLine($"  Phase 6 ERR: {Trunc(ex.Message, 80)}"); }
 
-        // ═══ Phase 7: MDI info ═══
-        Console.WriteLine("\n═══ Phase 7: MDI Info ═══");
-        if (comDead) Console.WriteLine("  (COM dead — using Win32 only)");
+        // === Phase 7: MDI info ===
+        Console.WriteLine("\n=== Phase 7: MDI Info ===");
+        if (comDead) Console.WriteLine("  (COM dead -- using Win32 only)");
         try
         {
             var hMdi = NativeMethods.FindWindowExW(mainHwnd, IntPtr.Zero, "MDIClient", null);
@@ -286,16 +286,16 @@ internal partial class Program
         }
         catch (Exception ex) { Console.WriteLine($"  Phase 7 ERR: {Trunc(ex.Message, 80)}"); }
 
-        // ═══ Summary ═══
-        Console.WriteLine($"\n═══ Summary ═══");
+        // === Summary ===
+        Console.WriteLine($"\n=== Summary ===");
         Console.WriteLine($"  PASS: {pass}  FAIL: {fail}  SKIP: {skip}  Total: {pass + fail + skip}");
-        if (comDead) Console.WriteLine("  ⚠ COM session was poisoned during testing — some phases skipped");
+        if (comDead) Console.WriteLine("  ! COM session was poisoned during testing -- some phases skipped");
 
         if (fail > 0)
         {
             Console.WriteLine("\n  Failed tests:");
             foreach (var (test, _, detail) in results.Where(r => r.result == "FAIL"))
-                Console.WriteLine($"    ✗ {test}: {detail}");
+                Console.WriteLine($"    X {test}: {detail}");
         }
 
         automation.Dispose();
@@ -308,7 +308,7 @@ internal partial class Program
         a.ConnectionTimeout = TimeSpan.FromSeconds(10);
         a.TransactionTimeout = TimeSpan.FromSeconds(10);
         var root = preResolvedRoot ?? a.FromHandle(hwnd);
-        // Recursive walk (like inspect) to find element by name — FindAllDescendants misses Electron subtrees
+        // Recursive walk (like inspect) to find element by name -- FindAllDescendants misses Electron subtrees
         AutomationElement? btn = null;
         var candidates = new List<(string type, string name)>();
         void Walk(AutomationElement el, int depth)

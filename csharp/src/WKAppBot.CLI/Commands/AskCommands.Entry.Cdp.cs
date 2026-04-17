@@ -27,7 +27,7 @@ internal partial class Program
     /// <summary>
     /// Set the output line prefix for the current async execution context (e.g. "[gpt] ").
     /// Installs a single AsyncPrefixWriter on Console.Out the first time it is called.
-    /// Each parallel Task.Run context gets its own AsyncLocal value → correct per-AI prefix
+    /// Each parallel Task.Run context gets its own AsyncLocal value -> correct per-AI prefix
     /// even when multiple AIs stream output concurrently.
     /// </summary>
     static IDisposable? ApplyOutputPrefix(string? prefix)
@@ -57,7 +57,7 @@ internal partial class Program
     /// <summary>
     /// Single global Console.Out replacement. Reads AsyncLocal prefix per async execution context.
     /// Buffers per-context line, flushes with prefix atomically when '\n' is seen.
-    /// Parallel Task.Run tasks each have their own AsyncLocal → correct AI label per output line.
+    /// Parallel Task.Run tasks each have their own AsyncLocal -> correct AI label per output line.
     /// </summary>
     sealed class AsyncPrefixWriter(TextWriter sink) : TextWriter
     {
@@ -96,7 +96,7 @@ internal partial class Program
 
     /// <summary>
     /// Build a sandbox key: "{command}+{subcommand}+{hwnd:X8}".
-    /// HWND-based: each prompt window → isolated Chrome tab, guaranteed no cross-contamination.
+    /// HWND-based: each prompt window -> isolated Chrome tab, guaranteed no cross-contamination.
     /// Falls back to cwdHash if HWND not available (direct CLI mode, no Eye).
     /// </summary>
     static string BuildSandboxKey(string command, string subcommand)
@@ -109,11 +109,11 @@ internal partial class Program
     }
 
     /// <summary>
-    /// GetOrCreateSandboxedTab — core sandboxing algorithm:
-    ///   ① Registry hit → validate URL against expectedHost
-    ///       match  → return existing tab (reconnect)
-    ///       mismatch → fast-fail: invalidate registry + create new tab (leave polluted tab for debugging)
-    ///   ② Registry miss → EnsureCorrectWindowAsync (existing positioning logic) → register
+    /// GetOrCreateSandboxedTab -- core sandboxing algorithm:
+    ///   ① Registry hit -> validate URL against expectedHost
+    ///       match  -> return existing tab (reconnect)
+    ///       mismatch -> fast-fail: invalidate registry + create new tab (leave polluted tab for debugging)
+    ///   ② Registry miss -> EnsureCorrectWindowAsync (existing positioning logic) -> register
     /// </summary>
     static async Task<string?> GetOrCreateSandboxedTabAsync(CdpClient cdp, int port, string key, string expectedHost)
     {
@@ -134,16 +134,16 @@ internal partial class Program
         var entry = AskTargetRegistry.GetEntry(key);
         if (entry != null)
         {
-            // Registry hit — validate URL
+            // Registry hit -- validate URL
             var targets = await GetPageTargetsAsync(port);
             var tab = targets.FirstOrDefault(t => t.Id == entry.TargetId);
             if (tab != null)
             {
                 if (tab.Url.Contains(expectedHost, StringComparison.OrdinalIgnoreCase))
                 {
-                    // ✓ URL OK — reconnect to this tab
+                    // v URL OK -- reconnect to this tab
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Error.WriteLine($"[SANDBOX] ✓ Hit: {key} → {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
+                    Console.Error.WriteLine($"[SANDBOX] v Hit: {key} -> {entry.TargetId[..Math.Min(8,entry.TargetId.Length)]}");
                     Console.ResetColor();
                     if (cdp.TargetId != entry.TargetId)
                         await cdp.SwitchToTargetAsync(entry.TargetId, port);
@@ -151,16 +151,16 @@ internal partial class Program
                 }
                 else
                 {
-                    // ✗ URL mismatch — fast-fail: invalidate + new tab
+                    // X URL mismatch -- fast-fail: invalidate + new tab
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Error.WriteLine($"[SANDBOX] ✗ Mismatch: {key}");
+                    Console.Error.WriteLine($"[SANDBOX] X Mismatch: {key}");
                     Console.Error.WriteLine($"[SANDBOX]   expected host: {expectedHost}");
                     Console.Error.WriteLine($"[SANDBOX]   actual url:    {tab.Url[..Math.Min(80, tab.Url.Length)]}");
-                    Console.Error.WriteLine($"[SANDBOX]   → invalidating registry, creating clean tab");
+                    Console.Error.WriteLine($"[SANDBOX]   -> invalidating registry, creating clean tab");
                     Console.ResetColor();
 
                     AskTargetRegistry.RemoveEntry(key);
-                    // Leave polluted tab alive (debugging) — create a new clean tab
+                    // Leave polluted tab alive (debugging) -- create a new clean tab
                     try
                     {
                         var beforeTargets = await TryGetTargetsBeforeCreateAsync(port);
@@ -174,7 +174,7 @@ internal partial class Program
                             AskTargetRegistry.SetEntry(key, newId, expectedHost);
                             await cdp.TryCloseTabByIdAsync(port, entry.TargetId, "sandbox-mismatch");
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.Error.WriteLine($"[SANDBOX] ✓ New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
+                            Console.Error.WriteLine($"[SANDBOX] v New tab after mismatch: {newId[..Math.Min(8,newId.Length)]}");
                             Console.ResetColor();
                             return newId;
                         }
@@ -188,13 +188,13 @@ internal partial class Program
             }
             else
             {
-                // Tab gone — remove stale entry, fall through to create
-                Console.Error.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) — removing");
+                // Tab gone -- remove stale entry, fall through to create
+                Console.Error.WriteLine($"[SANDBOX] Stale entry {key} (tab no longer exists) -- removing");
                 AskTargetRegistry.RemoveEntry(key);
             }
         }
 
-        // Registry miss — first check if a matching-host tab already exists (e.g. Chrome launched with URL)
+        // Registry miss -- first check if a matching-host tab already exists (e.g. Chrome launched with URL)
         // This prevents duplicate tabs when ChromeLauncher already opened the target URL.
         {
             var existingTargets = await GetPageTargetsAsync(port);
@@ -213,9 +213,9 @@ internal partial class Program
             }
         }
 
-        // No existing tab — create a fresh isolated tab.
+        // No existing tab -- create a fresh isolated tab.
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Error.WriteLine($"[SANDBOX] Miss: {key} — creating fresh tab for {expectedHost}");
+        Console.Error.WriteLine($"[SANDBOX] Miss: {key} -- creating fresh tab for {expectedHost}");
         Console.ResetColor();
         try
         {
@@ -229,7 +229,7 @@ internal partial class Program
                 await cdp.SwitchToTargetAsync(newId, port);
                 AskTargetRegistry.SetEntry(key, newId, expectedHost);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Error.WriteLine($"[SANDBOX] ✓ Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
+                Console.Error.WriteLine($"[SANDBOX] v Fresh tab: {newId[..Math.Min(8, newId.Length)]}");
                 Console.ResetColor();
                 return newId;
             }
@@ -247,9 +247,9 @@ internal partial class Program
         {
             try
             {
-                // ── Multi-browser port scan ──
+                // -- Multi-browser port scan --
                 // When a preferred host is set, scan ports 9222-9230 to find which Chrome
-                // instance already has that host open — avoids hardcoding port 9222.
+                // instance already has that host open -- avoids hardcoding port 9222.
                 if (!string.IsNullOrWhiteSpace(preferredHost))
                 {
                     var hostPort = await ChromeLauncher.FindBestPortForHostAsync(preferredHost);
@@ -265,7 +265,7 @@ internal partial class Program
                     }
                     else
                     {
-                        // Host not open anywhere — find a free port for new Chrome launch
+                        // Host not open anywhere -- find a free port for new Chrome launch
                         var freePort = await ChromeLauncher.FindFirstFreePortAsync();
                         if (freePort != port)
                         {
@@ -281,7 +281,7 @@ internal partial class Program
                 if (!active)
                 {
                     var launchUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
-                    Console.Error.WriteLine($"[ASK] Launching Chrome on port {port}…{launchUrl ?? "about:blank"}...");
+                    Console.Error.WriteLine($"[ASK] Launching Chrome on port {port}...{launchUrl ?? "about:blank"}...");
                     await ChromeLauncher.LaunchAsync(port: port, url: launchUrl);
                     await Task.Delay(2500);
                 }
@@ -293,20 +293,20 @@ internal partial class Program
                 }
                 catch (Exception firstEx)
                 {
-                    // If Chrome is running but CDP timed out (Runtime.enable) → broken state → restart
+                    // If Chrome is running but CDP timed out (Runtime.enable) -> broken state -> restart
                     bool chromeBroken = firstEx is TimeoutException
                         && await ChromeLauncher.IsPortActiveAsync(port);
                     if (chromeBroken)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine("[ASK] Chrome stuck (Runtime.enable timeout) — restarting Chrome…");
+                        Console.WriteLine("[ASK] Chrome stuck (Runtime.enable timeout) -- restarting Chrome...");
                         Console.ResetColor();
                         await ChromeLauncher.KillChromeOnPortAsync(port);
                         AskTargetRegistry.ClearAll();
                     }
                     else
                     {
-                        Console.WriteLine("[ASK] CDP connect failed — launching Chrome...");
+                        Console.WriteLine("[ASK] CDP connect failed -- launching Chrome...");
                     }
 
                     var launchUrl2 = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
@@ -315,25 +315,25 @@ internal partial class Program
                     await cdp.ConnectAsync(port, timeoutMs: 10000, preferredTargetTag: preferredHost);
                 }
 
-                // ── Pre-minimize Chrome BEFORE any tab action (prevent focus steal) ──
+                // -- Pre-minimize Chrome BEFORE any tab action (prevent focus steal) --
                 var preMinHwnd = cdp.GetChromeWindowHandle();
                 if (preMinHwnd != IntPtr.Zero && !NativeMethods.IsIconic(preMinHwnd))
                 {
                     NativeMethods.ShowWindow(preMinHwnd, 6); // SW_MINIMIZE
-                    // Wait until actually iconic (up to 500ms) — tab action must not start before minimize completes
+                    // Wait until actually iconic (up to 500ms) -- tab action must not start before minimize completes
                     for (int wi = 0; wi < 50 && !NativeMethods.IsIconic(preMinHwnd); wi++)
                         await Task.Delay(10);
                     Console.WriteLine("[ASK] Chrome minimized before tab action (focus-steal prevention)");
                 }
 
-                // Sandbox: Registry hit → URL validate → fast-fail on mismatch
-                // Registry miss → EnsureCorrectWindowAsync (positioning + creation)
+                // Sandbox: Registry hit -> URL validate -> fast-fail on mismatch
+                // Registry miss -> EnsureCorrectWindowAsync (positioning + creation)
                 string? resolvedId;
                 if (!string.IsNullOrWhiteSpace(preferredHost) && !string.IsNullOrWhiteSpace(targetTag))
                 {
                     resolvedId = await GetOrCreateSandboxedTabAsync(cdp, port, targetTag, preferredHost);
 
-                    // Sandbox path bypasses EnsureCorrectWindowAsync — manually position window to ExpectedBounds.
+                    // Sandbox path bypasses EnsureCorrectWindowAsync -- manually position window to ExpectedBounds.
                     // Without this, Chrome opens wherever it defaults (wrong position / wrong monitor).
                     if (resolvedId != null)
                     {
@@ -350,7 +350,7 @@ internal partial class Program
                 }
                 else
                 {
-                    // No host constraint — fall back to old EnsureCorrectWindowAsync path
+                    // No host constraint -- fall back to old EnsureCorrectWindowAsync path
                     var savedTargetId = !string.IsNullOrWhiteSpace(targetTag) ? AskTargetRegistry.GetTargetId(targetTag) : null;
                     await CloseBlankTabs(port);
                     var navigateUrl = !string.IsNullOrWhiteSpace(preferredHost) ? $"https://{preferredHost}" : null;
@@ -359,7 +359,7 @@ internal partial class Program
                     {
                         AskTargetRegistry.SetTargetId(targetTag, resolvedId);
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Error.WriteLine($"[ASK] Target: {targetTag} → {resolvedId[..Math.Min(8, resolvedId.Length)]}");
+                        Console.Error.WriteLine($"[ASK] Target: {targetTag} -> {resolvedId[..Math.Min(8, resolvedId.Length)]}");
                         Console.ResetColor();
                     }
                 }
@@ -377,7 +377,7 @@ internal partial class Program
                     }
                     if (NativeMethods.IsIconic(chromeHwnd))
                     {
-                        Console.Error.WriteLine($"[AAR:CDP] Chrome minimized …focusless restore");
+                        Console.Error.WriteLine($"[AAR:CDP] Chrome minimized ...focusless restore");
                         NativeMethods.ShowWindow(chromeHwnd, 4);
                         await Task.Delay(300);
                     }
@@ -425,7 +425,7 @@ internal partial class Program
                         AutoBugReport($"focus-theft UNGUARDED: '{baseMethod}' not in IsFocusStealingMethod -- apply focusless pattern (SW_SHOWMINNOACTIVE+WaitForWindowState+RestoreChromeNoActivate)");
                 };
 
-                // JS errors → Slack thread (빠른 버그 추적)
+                // JS errors -> Slack thread (빠른 버그 추적)
                 cdp.OnJsError = (dump) => SlackPostToThread($"🔴 {dump}", "🦉 Moderator");
 
                 return (CdpClient?)cdp;

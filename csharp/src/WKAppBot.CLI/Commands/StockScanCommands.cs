@@ -5,7 +5,7 @@ using WKAppBot.WebBot;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// wkappbot stock-scan — Naver Finance stock scanner via CDP.
+/// wkappbot stock-scan -- Naver Finance stock scanner via CDP.
 /// [STOCK] tag for all output.
 /// </summary>
 internal partial class Program
@@ -283,7 +283,7 @@ Options:
                     {
                         var title = news.Title.Length > 50 ? news.Title[..49] + ".." : news.Title;
                         var src = string.IsNullOrEmpty(news.Source) ? "" : $" _{news.Source}_";
-                        sb.AppendLine($"  └ <{news.Url}|{title}>{src}");
+                        sb.AppendLine($"  + <{news.Url}|{title}>{src}");
                     }
                 }
             }

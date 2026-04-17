@@ -76,7 +76,7 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
-        // Amber border when admin Eye proxy is reachable — NOT when current process is
+        // Amber border when admin Eye proxy is reachable -- NOT when current process is
         // elevated. User Eye itself is never elevated; what matters is whether a separate
         // admin Eye is serving the wkappbot_elevated pipe so --sudo commands can route
         // to it. IsElevated() here was a long-standing bug that kept the border blue
@@ -88,9 +88,9 @@ internal partial class Program
             ? "[EYE_RENDER] summary=empty"
             : $"[EYE_RENDER] summary-len={eyeSummary.Length}");
 
-        // CCA live analysis removed from Eye (v4.8) — now in analyze-hack server process.
+        // CCA live analysis removed from Eye (v4.8) -- now in analyze-hack server process.
         // Eye only does read-only operations: card summary, UIA status, context %.
-        // No Bitmap/CCA/FlaUI in Eye → memory savings ~500MB+.
+        // No Bitmap/CCA/FlaUI in Eye -> memory savings ~500MB+.
 
         host.UpdateAccessibilityText(eyeSummary);
         PulseStep.Mark("tick-host-text");
@@ -134,7 +134,7 @@ internal partial class Program
 
         TryGuardLgOverlay("[EYE_TICK][GUARD]");
 
-        // ── Claude error → Gemini fallback (1s check) ──
+        // -- Claude error -> Gemini fallback (1s check) --
         CheckClaudeSessionsForErrors();
     }
 
@@ -157,7 +157,7 @@ internal partial class Program
     /// </summary>
     static (bool tickDirty, bool promptDirty) CheckGlobalDirtyFlags(bool forceFull = false)
     {
-        // ── Fast path: FSW event-driven flags (instant, no I/O) ──
+        // -- Fast path: FSW event-driven flags (instant, no I/O) --
         bool tickDirty = _fswTickDirty;
         bool promptDirty = _fswPromptDirty;
         var promptChangedFile = _fswPromptChangedFile;
@@ -170,11 +170,11 @@ internal partial class Program
             var trackedName = Path.GetFileName(_dirtyPromptFile);
             if (!string.Equals(promptChangedFile, trackedName, StringComparison.OrdinalIgnoreCase))
             {
-                promptDirty = false; // irrelevant file change — skip
+                promptDirty = false; // irrelevant file change -- skip
             }
         }
 
-        // ── Slow path: FileInfo poll (only on 1s safety-net intervals) ──
+        // -- Slow path: FileInfo poll (only on 1s safety-net intervals) --
         // Catches edge cases: FSW buffer overflow, network drives, watcher init failure
         if (forceFull)
         {
@@ -224,7 +224,7 @@ internal partial class Program
 
     /// <summary>
     /// FSW hybrid: create FileSystemWatchers for tick file + OpenClaw sessions dir.
-    /// Events set volatile dirty flags → 100ms loop picks them up instantly (no FileInfo poll).
+    /// Events set volatile dirty flags -> 100ms loop picks them up instantly (no FileInfo poll).
     /// 1s full-load safety net unchanged.
     /// </summary>
 }

@@ -6,7 +6,7 @@ internal partial class Program
 {
     static int EyeTickCommand(string[] args)
     {
-        // ── Hard timeout: --timeout N kills the process if tick takes too long ──
+        // -- Hard timeout: --timeout N kills the process if tick takes too long --
         var timeoutSec = 0;
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "--timeout") int.TryParse(args[i + 1], out timeoutSec);
@@ -15,7 +15,7 @@ internal partial class Program
         {
             killTimer = new System.Threading.Timer(_ =>
             {
-                Console.Error.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded — exiting");
+                Console.Error.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded -- exiting");
                 Console.Out.Flush();
                 Environment.Exit(2);
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
@@ -35,10 +35,10 @@ internal partial class Program
             var swTotal = Stopwatch.StartNew();
 
             PulseStep.Mark("ipc-query");
-            // ── Fast path: query running Eye loop via IPC pipe ──
-            // Eye loop maintains all caches in memory — IPC response is ~5ms vs ~600ms legacy scan.
+            // -- Fast path: query running Eye loop via IPC pipe --
+            // Eye loop maintains all caches in memory -- IPC response is ~5ms vs ~600ms legacy scan.
             // Fallback to legacy only when Eye is not running or pipe query fails.
-            // RunningInEye=true: already inside Eye process — call BuildIpcTickResponse() directly (no pipe round-trip).
+            // RunningInEye=true: already inside Eye process -- call BuildIpcTickResponse() directly (no pipe round-trip).
             var ipc = Program.RunningInEye
                 ? BuildIpcTickResponse()
                 : EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
@@ -59,19 +59,19 @@ internal partial class Program
                 foreach (var line in ipc.Summary.Split('\n'))
                     Console.Error.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
-                // Slack forwarding handled by OnMessage → slack route worker (no HTTP poll on tick)
+                // Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll on tick)
                 PulseStep.Mark("ipc-done");
                 Console.Out.Flush();
                 return 0;
             }
 
-            // ── Eye not running or refused: fall back to legacy scan ──
+            // -- Eye not running or refused: fall back to legacy scan --
             // Eye는 간접 런칭만! tick에서 직접 spawn하지 않음.
             // 다음 일반 명령(inspect, a11y 등) 실행 시 자동 spawn됨.
             PulseStep.Mark("ipc-failed-legacy");
-            Console.WriteLine("[EYE] IPC query failed — falling back to legacy scan");
+            Console.WriteLine("[EYE] IPC query failed -- falling back to legacy scan");
 
-            // ── Phase 1: ReadLatestTick ──
+            // -- Phase 1: ReadLatestTick --
             var swPhase = Stopwatch.StartNew();
             long tickRead = 0, tickParse = 0;
             var latest = ReadLatestTick(out tickRead, out tickParse);
@@ -80,7 +80,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
             Console.Out.Flush();
 
-            // ── Phase 2: ReadLatestOpenClawPromptPreview ──
+            // -- Phase 2: ReadLatestOpenClawPromptPreview --
             swPhase.Restart();
             var promptDiag = new PromptDiag();
             var prompt = ReadLatestOpenClawPromptPreview(promptDiag);
@@ -89,7 +89,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
             Console.Out.Flush();
 
-            // ── Phase 3: ReadEyeCards + prompt-based discovery ──
+            // -- Phase 3: ReadEyeCards + prompt-based discovery --
             swPhase.Restart();
             var cards = ReadEyeCards(staleSeconds: 86400); // 24 hours
             SupplementCardsFromPrompts(cards);
@@ -100,7 +100,7 @@ internal partial class Program
             Console.Out.Flush();
             _lastPromptSource = promptDiag.Source;
 
-            // ── Phase 4: Context % check ──
+            // -- Phase 4: Context % check --
             swPhase.Restart();
             try
             {
@@ -125,7 +125,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
             Console.Out.Flush();
 
-            // ── Phase 5: ExtractRecentPlanItems ──
+            // -- Phase 5: ExtractRecentPlanItems --
             swPhase.Restart();
             var plans = ExtractRecentPlanItems(maxItems: 3);
             swPhase.Stop();
@@ -133,7 +133,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
             Console.Out.Flush();
 
-            // ── Phase 6: BuildEyeSummary ──
+            // -- Phase 6: BuildEyeSummary --
             swPhase.Restart();
             var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
             swPhase.Stop();
@@ -141,7 +141,7 @@ internal partial class Program
             Console.Error.WriteLine($"[PROF] BuildSummary={msSummary}ms");
             Console.Out.Flush();
 
-            // ── Print results ──
+            // -- Print results --
             var ctxInfo = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
             Console.WriteLine("[EYE] one-shot tick");
             Console.Error.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
@@ -176,12 +176,12 @@ internal partial class Program
                 Console.Error.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
             Console.Out.Flush();
 
-            // Phase 7: Slack forwarding handled by OnMessage → slack route worker (no HTTP poll)
+            // Phase 7: Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll)
 
             // Phase 8: Eye watchdog + route retry flush (called by Task Scheduler every 10 min)
             try
             {
-                // Respawn Eye daemon if it was killed — watchdog core behavior
+                // Respawn Eye daemon if it was killed -- watchdog core behavior
                 RouteRetryQueue.EnsureEyeRunning();
 
                 // Flush due retry items
@@ -218,7 +218,7 @@ internal partial class Program
         {
             killTimer?.Dispose();
 
-            // ── atexit: Eye 살아있나 체크 → 없으면 spawn ──
+            // -- atexit: Eye 살아있나 체크 -> 없으면 spawn --
             // tick이 할 일 다 하고 퇴근 직전에 Eye 생존 확인.
             // 워치독(10분)이 이걸 호출하므로 Eye 사망 시 최대 10분 안에 자동 복구.
             PulseStep.Mark("eye-check");
@@ -228,7 +228,7 @@ internal partial class Program
                 if (probe.WaitOne(0))
                 {
                     probe.ReleaseMutex();
-                    // Eye is dead — spawn and WAIT until confirmed alive
+                    // Eye is dead -- spawn and WAIT until confirmed alive
                     PulseStep.Mark("eye-dead-spawning");
                     LaunchAppBotEyeIfNeededCore("");
                     // Wait up to 10s for Eye to acquire mutex (= alive)
@@ -247,7 +247,7 @@ internal partial class Program
             }
             catch (System.Threading.AbandonedMutexException)
             {
-                // Eye crashed — spawn and wait
+                // Eye crashed -- spawn and wait
                 PulseStep.Mark("eye-crashed-spawning");
                 LaunchAppBotEyeIfNeededCore("");
                 for (int wi = 0; wi < 100; wi++)
@@ -259,7 +259,7 @@ internal partial class Program
                 }
             }
             catch { }
-            // ── Safety net: always schedule next watchdog tick ──
+            // -- Safety net: always schedule next watchdog tick --
             // Even if Eye spawn fails, next tick will try again in 5 min.
             PulseStep.Mark("watchdog-schedule");
             try { EnsureEyeWatchdogTask(); } catch { }
@@ -268,7 +268,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Build IPC response from cached state — called by EyeIpcServer on pipe connection.
+    /// Build IPC response from cached state -- called by EyeIpcServer on pipe connection.
     /// All fields read from static cache updated by RunOneGlobalTick; no UIA/file scan needed.
     /// </summary>
     public static EyeIpcTickResponse BuildIpcTickResponse()

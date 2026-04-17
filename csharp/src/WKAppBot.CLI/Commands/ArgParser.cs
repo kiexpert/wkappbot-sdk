@@ -1,6 +1,6 @@
 namespace WKAppBot.CLI;
 
-// partial class: shared arg parsing — separate text vs files from mixed args
+// partial class: shared arg parsing -- separate text vs files from mixed args
 internal partial class Program
 {
     /// <summary>
@@ -9,7 +9,7 @@ internal partial class Program
     /// </summary>
     /// <param name="args">Raw arguments to parse.</param>
     /// <param name="startIndex">Index to start parsing from (skip subcommand etc).</param>
-    /// <returns>(textParts, filePaths) — text lines and resolved file paths.</returns>
+    /// <returns>(textParts, filePaths) -- text lines and resolved file paths.</returns>
     static (List<string> TextParts, List<string> FilePaths) ParseTextAndFiles(string[] args, int startIndex = 0)
     {
         var textParts = new List<string>();
@@ -82,7 +82,7 @@ internal partial class Program
     /// <summary>
     /// Inline small .txt/.md files as question text instead of as attachments.
     /// Called after ParseTextAndFilesWithMarkers. Mutates attachFiles in place.
-    /// Example: ask gpt /tmp/question.txt → file content used as question, not attached.
+    /// Example: ask gpt /tmp/question.txt -> file content used as question, not attached.
     /// </summary>
     static string InlineTextFiles(List<string> questionParts, List<string> attachFiles)
     {
@@ -100,7 +100,7 @@ internal partial class Program
                     if (fpath != null && new FileInfo(fpath).Length < 100_000)
                     {
                         parts.Add(File.ReadAllText(fpath, System.Text.Encoding.UTF8).Trim());
-                        attachFiles.Remove(fpath); // remove from attachments — inlined instead
+                        attachFiles.Remove(fpath); // remove from attachments -- inlined instead
                         continue;
                     }
                 }

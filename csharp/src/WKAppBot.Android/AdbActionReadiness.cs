@@ -3,13 +3,13 @@ using WKAppBot.Abstractions;
 namespace WKAppBot.Android;
 
 /// <summary>
-/// Action-Aware Readiness (AAR) for Android ADB — implements IActionReadiness.
-/// Lightweight 3-stage pipeline: Global → Target → Action-Specific.
+/// Action-Aware Readiness (AAR) for Android ADB -- implements IActionReadiness.
+/// Lightweight 3-stage pipeline: Global -> Target -> Action-Specific.
 ///
 /// Return convention:
-///   null        → blocked (hard fail)
-///   == target   → success (proceed)
-///   != target   → retarget (not used for Android yet)
+///   null        -> blocked (hard fail)
+///   == target   -> success (proceed)
+///   != target   -> retarget (not used for Android yet)
 ///
 /// Tag: [AAR]
 /// </summary>
@@ -26,11 +26,11 @@ public sealed class AdbActionReadiness : IActionReadiness
     {
         var act = action.ToLowerInvariant();
 
-        // ── Pass-through actions ──
+        // -- Pass-through actions --
         if (IsPassThrough(act))
             return target;
 
-        // ── Stage 0: Global — device awake? ──
+        // -- Stage 0: Global -- device awake? --
         if (!string.IsNullOrEmpty(ctx.Serial))
         {
             if (!CheckDeviceAwake(ctx.Serial))
@@ -40,7 +40,7 @@ public sealed class AdbActionReadiness : IActionReadiness
             }
         }
 
-        // ── Stage 1: Target validation ──
+        // -- Stage 1: Target validation --
         if (!target.Enabled && IsBlockOnDisabled(act))
         {
             Console.Error.WriteLine($"[AAR:ADB] BLOCKED: target not enabled for {action}: \"{target.DisplayName}\"");
@@ -56,7 +56,7 @@ public sealed class AdbActionReadiness : IActionReadiness
             }
         }
 
-        // ── Stage 2: Action-specific ──
+        // -- Stage 2: Action-specific --
         switch (act)
         {
             case "type" or "set-value":
@@ -64,7 +64,7 @@ public sealed class AdbActionReadiness : IActionReadiness
                 if (target.NativeHandle is AndroidNode node && !node.Focusable)
                 {
                     Console.Error.WriteLine($"[AAR:ADB] WARNING: target not focusable for {action}: \"{target.DisplayName}\"");
-                    // Warn only — some apps handle text input on non-focusable views
+                    // Warn only -- some apps handle text input on non-focusable views
                 }
                 break;
 
@@ -88,7 +88,7 @@ public sealed class AdbActionReadiness : IActionReadiness
         return target;
     }
 
-    // ── Helpers ──────────────────────────────────────────────
+    // -- Helpers ----------------------------------------------
 
     private static bool IsPassThrough(string action)
         => action is "read" or "inspect" or "find" or "highlight" or "windows"

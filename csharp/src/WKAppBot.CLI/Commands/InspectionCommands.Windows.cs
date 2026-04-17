@@ -94,7 +94,7 @@ internal partial class Program
             return perf;
         }
 
-        // Command line cache (WMI, lazy — only used when --cmd)
+        // Command line cache (WMI, lazy -- only used when --cmd)
         var cmdLineCache = new Dictionary<uint, string>();
         string GetCommandLine(uint pid)
         {
@@ -115,7 +115,7 @@ internal partial class Program
         // Pre-create matcher ONCE for all filter checks (avoid per-window regex compile)
         var ownerCandidateMatcher = filterTitle != null ? PatternMatcher.Create(filterTitle) : null;
 
-        // Token-AND cmdline/URL match — delegates to shared PatternMatcher.TokenMatchAny
+        // Token-AND cmdline/URL match -- delegates to shared PatternMatcher.TokenMatchAny
         bool CmdLineOrUrlMatch(string text) =>
             filterTitle != null && PatternMatcher.TokenMatchAny(filterTitle, text);
 
@@ -143,12 +143,12 @@ internal partial class Program
             int h = rect.Bottom - rect.Top;
             bool visible = NativeMethods.IsWindowVisible(hWnd);
 
-            // Skip noise unless --all (cheap checks first — no process lookup needed)
+            // Skip noise unless --all (cheap checks first -- no process lookup needed)
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
             // Fast title-only pre-filter: if title doesn't match AND className doesn't match,
-            // skip expensive GetProcessName. Most windows fail here → huge speedup.
+            // skip expensive GetProcessName. Most windows fail here -> huge speedup.
             if (ownerCandidateMatcher != null && !showAll
                 && !ownerCandidateMatcher.IsMatch(title)
                 && !ownerCandidateMatcher.IsMatch(className))
@@ -159,7 +159,7 @@ internal partial class Program
                 MarkSlow("get-process-name-prefilter", hWnd, slowSw.ElapsedMilliseconds);
                 if (!ownerCandidateMatcher.IsMatch(fpn))
                 {
-                    // Last chance: cmdline + web URL — token-AND for plain multi-word patterns
+                    // Last chance: cmdline + web URL -- token-AND for plain multi-word patterns
                     if (!allowCmdLineUrlFallback) return null;
                     var cmdLine = GetCommandLine(fpid);
                     MarkSlow("get-commandline-prefilter", hWnd, slowSw.ElapsedMilliseconds);
@@ -177,7 +177,7 @@ internal partial class Program
             // Skip wkappbot windows
             if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
-            // Apply filters — full search key check for remaining candidates
+            // Apply filters -- full search key check for remaining candidates
             // Search scope: title + full searchKey + cmdline (all cached per PID)
             if (ownerCandidateMatcher != null)
             {
@@ -223,7 +223,7 @@ internal partial class Program
             return (title, className, processName, pid, w, h, visible);
         }
 
-        // Broken pipe detection — TeeTextWriter handles IOException globally,
+        // Broken pipe detection -- TeeTextWriter handles IOException globally,
         // but we check IsPipeBroken to stop expensive EnumWindows/EnumChildWindows early
         bool IsPipeBroken() => Console.Out is TeeTextWriter tee && tee.IsPipeBroken;
 
@@ -271,7 +271,7 @@ internal partial class Program
             if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) tags.Add("tool");
             var ownerHwnd = NativeMethods.GetWindow(hWnd, 4 /*GW_OWNER*/);
 
-            // ── Compact columnar output ──
+            // -- Compact columnar output --
             // [hwnd] title(40)  process(12)  WxH  flags
             static string TrimToWidth(string s, int maxW)
             {
@@ -291,7 +291,7 @@ internal partial class Program
                 foreach (var c in s) w += (c >= 0x1100 && c <= 0xD7AF) || (c >= 0x2500 && c <= 0x27FF) || (c >= 0x3000 && c <= 0x9FFF) || (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF00 && c <= 0xFFEF) || c >= 0x10000 ? 2 : 1;
                 return w < targetW ? s + new string(' ', targetW - w) : s;
             }
-            int titleWidth = isChild ? 44 : 45; // child: └ takes 1 col → shrink title to keep alignment
+            int titleWidth = isChild ? 44 : 45; // child: + takes 1 col -> shrink title to keep alignment
             var trimTitle = TrimToWidth(displayTitle, titleWidth);
             var padTitle = PadToWidth(trimTitle, titleWidth);
             var procPid = $"{process}:{pid}";
@@ -301,13 +301,13 @@ internal partial class Program
             var cpuLifeStr = perf.cpuPct.HasValue ? $"{perf.cpuPct.Value,5:F1}%" : "    -";
             var wsStr = perf.wsMb > 0 ? $"{perf.wsMb,5}M" : "    -";
             var pmStr = perf.pmMb > 0 ? $"{perf.pmMb,5}M" : "    -";
-            // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ↑=topmost)
+            // Flags: single-char compact (H=hidden L=layered T=tool M=min X=max D=disabled ^=topmost)
             var flagChars = new StringBuilder();
             if (!visible) flagChars.Append('H');
             if (NativeMethods.IsIconic(hWnd)) flagChars.Append('M');
             if ((exStyle & NativeMethods.WS_EX_LAYERED) != 0) flagChars.Append('L');
             if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) flagChars.Append('T');
-            if ((exStyle & NativeMethods.WS_EX_TOPMOST) != 0) flagChars.Append('↑');
+            if ((exStyle & NativeMethods.WS_EX_TOPMOST) != 0) flagChars.Append('^');
             if ((exStyle & NativeMethods.WS_EX_NOACTIVATE) != 0) flagChars.Append('N');
             if ((style & NativeMethods.WS_DISABLED) != 0) flagChars.Append('D');
             var flagStr = flagChars.Length > 0 ? $" [{flagChars}]" : "";
@@ -363,7 +363,7 @@ internal partial class Program
                     Console.WriteLine(focusPath);
                 }
             }
-            // Full UIA focus path — DISABLED for speed. Use GetFocusPath (Win32) above.
+            // Full UIA focus path -- DISABLED for speed. Use GetFocusPath (Win32) above.
             // To re-enable: if (!isChild && (isForeground || hasFilter)) PrintFocusAndPopup(hWnd);
 
             // [GRAP] TARGET: print JSON5 pattern when filter is active (reusable in any a11y command)
@@ -389,7 +389,7 @@ internal partial class Program
                 if (gtiOk && gti.hwndFocus == IntPtr.Zero)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine("    KB focus: (none — no stored keyboard focus for this thread)");
+                    Console.WriteLine("    KB focus: (none -- no stored keyboard focus for this thread)");
                     Console.ResetColor();
                 }
                 // Show focus child (including focus == self for a11y path)
@@ -406,7 +406,7 @@ internal partial class Program
                     Console.Error.WriteLine($"[{gti.hwndFocus:X8}] \"{(focusTitle.Length > 40 ? focusTitle[..37] + "..." : focusTitle)}\" ({focusClassBuf})");
                     Console.ResetColor();
 
-                    // UIA focused LEAF element — TreeWalker + HasKeyboardFocus (works for background windows)
+                    // UIA focused LEAF element -- TreeWalker + HasKeyboardFocus (works for background windows)
                     try
                     {
                         PulseStep.Mark("focus-uia-init");
@@ -424,7 +424,7 @@ internal partial class Program
                         if (focusEl == null)
                         {
                             Console.ForegroundColor = ConsoleColor.Yellow;
-                            Console.WriteLine($"    ⚠ a11y focus: unavailable (hwndFocus=0x{gti.hwndFocus:X}, thread={threadId})");
+                            Console.WriteLine($"    ! a11y focus: unavailable (hwndFocus=0x{gti.hwndFocus:X}, thread={threadId})");
                             Console.ResetColor();
                         }
                         else
@@ -502,7 +502,7 @@ internal partial class Program
         }
 #pragma warning restore CS8321
 
-        // ── Hot Focus Line helper ──
+        // -- Hot Focus Line helper --
         static void PrintHotFocusLine(IntPtr fgWnd, WindowFinder.FocusSnapshot focus, Func<uint, string> getProcessName)
         {
             if (fgWnd == IntPtr.Zero) return;
@@ -511,7 +511,7 @@ internal partial class Program
             var kbFocus = focus.KeyboardHwnd;
             if (kbFocus == IntPtr.Zero) kbFocus = fgWnd;
 
-            // Build chain: focus → parent → parent → ... → top-level
+            // Build chain: focus -> parent -> parent -> ... -> top-level
             var chain = new List<IntPtr>();
             var seen = new HashSet<IntPtr>();
             var cur = kbFocus;
@@ -524,7 +524,7 @@ internal partial class Program
             if (!seen.Contains(fgWnd))
                 chain.Add(fgWnd);
 
-            Console.WriteLine("── hot focus ──");
+            Console.WriteLine("-- hot focus --");
             var titleBuf = new StringBuilder(256);
             var classBuf = new StringBuilder(128);
 
@@ -582,18 +582,18 @@ internal partial class Program
         int uiaMatchWindows = 0;
 
         PulseStep.Mark("focus-snapshot");
-        // ── Hot Focus Line: focused child → parent → ... → top-level ──
+        // -- Hot Focus Line: focused child -> parent -> ... -> top-level --
         PrintHotFocusLine(fgWnd, focus, GetProcessName);
         PulseStep.Mark("hot-focus-line-done");
 
-        // EnumWindows enumerates in Z-order (front to back) — no re-sort needed!
+        // EnumWindows enumerates in Z-order (front to back) -- no re-sort needed!
         bool hasPathSearch = filterTitle != null && (filterTitle.Contains('/') || filterTitle.Contains("**"));
         string mode = hasPathSearch ? "find path (Z-order ★=foreground)"
             : uiaDeep ? "find --deep (Z-order ★=foreground)"
             : uiaSearch ? "find (Z-order ★=foreground)"
             : deep ? "windows (deep, Z-order ★=foreground)"
             : "windows (Z-order ★=foreground)";
-        Console.WriteLine($"── {mode} ──");
+        Console.WriteLine($"-- {mode} --");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         //            "  [XXXXXXXX] {,-45}                                        {,-12}     {,9}  flags"
         Console.WriteLine($"  {"[hwnd____]",-11}{"title",-45} {"process:pid",-16} {"cpu",6} {"ws",6} {"pm",6} {"WxH",9}  flags");
@@ -622,7 +622,7 @@ internal partial class Program
             if (!showAll && string.IsNullOrEmpty(title) && !visible) return null;
             if (!showAll && w == 0 && h == 0) return null;
 
-            // Skip wkappbot windows (Eye/Zoom overlays) — don't pollute results.
+            // Skip wkappbot windows (Eye/Zoom overlays) -- don't pollute results.
             // --all overrides: useful to identify mcp/eye/a11y processes by args (--cmd).
             if (!showAll && processName.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)) return null;
 
@@ -651,7 +651,7 @@ internal partial class Program
             foreach (var m in matches)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"    → [{m.ControlType}] ");
+                Console.Write($"    -> [{m.ControlType}] ");
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.Write($"\"{m.Name}\"");
                 if (!string.IsNullOrEmpty(m.AutomationId))
@@ -671,7 +671,7 @@ internal partial class Program
             {
                 var tag = GrapHelper.FormatNodeLabel(m.ControlType, m.AutomationId, m.Name);
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write($"    → {tag}");
+                Console.Write($"    -> {tag}");
                 if (!string.IsNullOrEmpty(m.NamePath))
                 {
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -683,7 +683,7 @@ internal partial class Program
         }
 
         // Collapse consecutive same-name segments for display (VS Code style)
-        // Pane/Pane/Pane/Pane → Pane/...   (3+ repeats → keep first + ...)
+        // Pane/Pane/Pane/Pane -> Pane/...   (3+ repeats -> keep first + ...)
         string CollapsePath(string path)
         {
             var segs = path.Split('/');
@@ -701,14 +701,14 @@ internal partial class Program
         }
 
         // Build regex from path pattern for partial matching against full UIA name paths.
-        // Path pattern → regex (partial match, IgnoreCase)
-        // ** → .*             (any chars including / — crosses levels)
-        // *  → [^/]*          (any chars excluding / — within one level)
-        // /  → [^/]*/[^/]*   (one level boundary)
-        // ?  → [^/]           (single char excluding /)
-        // else → Regex.Escape (literal — . $ + etc. safely escaped)
-        // "투혼/현재가"    → 투혼[^/]*/[^/]*현재가
-        // "투혼/**/현재가" → 투혼[^/]*/[^/]*.*[^/]*/[^/]*현재가
+        // Path pattern -> regex (partial match, IgnoreCase)
+        // ** -> .*             (any chars including / -- crosses levels)
+        // *  -> [^/]*          (any chars excluding / -- within one level)
+        // /  -> [^/]*/[^/]*   (one level boundary)
+        // ?  -> [^/]           (single char excluding /)
+        // else -> Regex.Escape (literal -- . $ + etc. safely escaped)
+        // "투혼/현재가"    -> 투혼[^/]*/[^/]*현재가
+        // "투혼/**/현재가" -> 투혼[^/]*/[^/]*.*[^/]*/[^/]*현재가
         Regex BuildPathRegex(string pattern)
         {
             // Tokenize with regex: ** first (greedy), then single special chars, then literal runs
@@ -718,12 +718,12 @@ internal partial class Program
                 "*"  => "[^/]*",
                 "/"  => "[^/]*/[^/]*",
                 "?"  => "[^/]",
-                _    => Regex.Escape(m.Value),  // literal chunk (.→\. $→\$ etc.)
+                _    => Regex.Escape(m.Value),  // literal chunk (.->\. $->\$ etc.)
             });
             return new Regex(rxStr, RegexOptions.IgnoreCase | RegexOptions.Compiled);
         }
 
-        // Pre-scan: lightweight pid→hwnd map only (no GetProcessName — that's expensive!)
+        // Pre-scan: lightweight pid->hwnd map only (no GetProcessName -- that's expensive!)
         var _pidWindows = new Dictionary<uint, List<(IntPtr hWnd, uint pid)>>();
         if (hasFilter)
         {
@@ -738,14 +738,14 @@ internal partial class Program
         }
         var _printedChildPids = new HashSet<uint>();
 
-        // ── --pid fast path: all top-level windows owned by a specific process ──
-        // Uses _pidWindows cache built in pre-scan above (pid → hwnd list).
-        // Shows every window the process created — entry point for hwndRoot grouping.
+        // -- --pid fast path: all top-level windows owned by a specific process --
+        // Uses _pidWindows cache built in pre-scan above (pid -> hwnd list).
+        // Shows every window the process created -- entry point for hwndRoot grouping.
         if (filterPid != null)
         {
             PulseStep.Mark("pid-filter-start");
             var procName = GetProcessName(filterPid.Value);
-            Console.Error.WriteLine($"[windows] pid={filterPid} proc={procName} — all owned top-level windows:");
+            Console.Error.WriteLine($"[windows] pid={filterPid} proc={procName} -- all owned top-level windows:");
             if (_pidWindows.TryGetValue(filterPid.Value, out var pidHwnds))
             {
                 foreach (var (h, _) in pidHwnds)
@@ -766,7 +766,7 @@ internal partial class Program
             return 0;
         }
 
-        // ── JSON5 fast path: {field:value,...} patterns → delegate to WindowFinder which handles JSON5 natively ──
+        // -- JSON5 fast path: {field:value,...} patterns -> delegate to WindowFinder which handles JSON5 natively --
         // ownerCandidateMatcher is a literal matcher that would filter out all results (no window title = "{...}")
         if (filterTitle != null && filterTitle.StartsWith('{') && filterTitle.EndsWith('}')
             && filterCmd == null && !deep && !uiaSearch)
@@ -797,9 +797,9 @@ internal partial class Program
 
             if (uiaSearch && filterTitle != null)
             {
-                // ── Unified search: title OR UIA elements ──
-                // Path search ("/") → build full name-path, match with PathGlob
-                // Regular search → same keyword for title and UIA (OR logic)
+                // -- Unified search: title OR UIA elements --
+                // Path search ("/") -> build full name-path, match with PathGlob
+                // Regular search -> same keyword for title and UIA (OR logic)
                 bool isPathSearch = filterTitle.Contains('/') || filterTitle.Contains("**");
 
                 var raw = GetRawWindowInfo(hWnd);
@@ -810,16 +810,16 @@ internal partial class Program
 
                 if (isPathSearch)
                 {
-                    // ── Path search: "투혼/현재가" → regex partial match on full name path ──
+                    // -- Path search: "투혼/현재가" -> regex partial match on full name path --
                     var pathRx = BuildPathRegex(filterTitle);
 
-                    // Search all UIA elements with name paths (maxResults high — filtering is done post-hoc by regex)
+                    // Search all UIA elements with name paths (maxResults high -- filtering is done post-hoc by regex)
                     var allElements = uiaDeep
                         ? UiaLocator.QuickSearch(hWnd, "", maxDepth: 12, maxResults: 5000, maxVisited: 3000, timeoutMs: 10000)
                         : UiaLocator.QuickSearch(hWnd, "", maxDepth: 4, maxResults: 2000, maxVisited: 1000, timeoutMs: 5000);
 
                     // Match full path: windowTitle/[Type]Name/... (partial match!)
-                    // Skip [Text] elements — conversation content noise (self-referencing echo)
+                    // Skip [Text] elements -- conversation content noise (self-referencing echo)
                     var uiaMatches = new List<UiaQuickMatch>();
                     foreach (var el in allElements)
                     {
@@ -844,7 +844,7 @@ internal partial class Program
                 }
                 else
                 {
-                    // ── Regular search: keyword matches title OR UIA elements (OR logic) ──
+                    // -- Regular search: keyword matches title OR UIA elements (OR logic) --
                     var titleMatch = ownerCandidateMatcher!.IsMatch(r.title);
 
                     var uiaMatches = uiaDeep
@@ -885,7 +885,7 @@ internal partial class Program
             }
             else
             {
-                // ── Original mode: title/process/class filter only ──
+                // -- Original mode: title/process/class filter only --
                 var info = GetWindowInfo(hWnd);
 
                 if (hasFilter && info != null)
@@ -897,7 +897,7 @@ internal partial class Program
                     // Show cross-process children: other PIDs that injected windows into this root
                     if (_printedChildPids.Add(v.pid))
                     {
-                        // Scan all top-level windows: same owner chain → different pid = injected
+                        // Scan all top-level windows: same owner chain -> different pid = injected
                         foreach (var entry in _pidWindows)
                         {
                             if (entry.Key == v.pid) continue; // same process = noise
@@ -926,7 +926,7 @@ internal partial class Program
                 }
                 if (ownerCandidateMatcher != null && info == null)
                 {
-                    // ── Owner chain candidate: even 0x0/hidden windows that match pattern ──
+                    // -- Owner chain candidate: even 0x0/hidden windows that match pattern --
                     var owner = NativeMethods.GetWindow(hWnd, 4 /* GW_OWNER */);
                     if (owner != IntPtr.Zero && owner != hWnd)
                     {
@@ -974,12 +974,12 @@ internal partial class Program
         }, IntPtr.Zero);
         PulseStep.Mark("enum-windows-done");
 
-        // ── Parent process fallback: find host windows for hidden child processes ──
-        // If filter matched only hidden/tiny windows (wslhost → WindowsTerminal, chrome renderer → Chrome),
+        // -- Parent process fallback: find host windows for hidden child processes --
+        // If filter matched only hidden/tiny windows (wslhost -> WindowsTerminal, chrome renderer -> Chrome),
         // show their host windows too via WindowFinder parent chain.
         // If only hidden/tiny windows matched, follow owner-window chain to find visible host.
-        // e.g. wslhost PseudoConsoleWindow(owner=CASCADIA) → WindowsTerminal CASCADIA tab.
-        // O(1) per matched window × max 3 hops — no re-enumeration needed.
+        // e.g. wslhost PseudoConsoleWindow(owner=CASCADIA) -> WindowsTerminal CASCADIA tab.
+        // O(1) per matched window × max 3 hops -- no re-enumeration needed.
         if (filterTitle != null && visibleResultCount == 0 && matchedHiddenHwnds.Count > 0)
         {
             PulseStep.Mark("host-fallback-start");
@@ -990,7 +990,7 @@ internal partial class Program
 
             void ReportProgress(IntPtr hwnd, uint pid, string tag)
             {
-                if (pid == lastReportedPid) return; // same process → skip output
+                if (pid == lastReportedPid) return; // same process -> skip output
                 lastReportedPid = pid;
                 var t = new StringBuilder(256);
                 NativeMethods.GetWindowTextW(hwnd, t, t.Capacity);
@@ -1007,7 +1007,7 @@ internal partial class Program
                     Console.Error.Write($"\r{line,-100}");
             }
 
-            // ── Strategy 1: Owner chain (O(1) per hidden window, max 3 hops) ──
+            // -- Strategy 1: Owner chain (O(1) per hidden window, max 3 hops) --
             foreach (var hiddenHwnd in matchedHiddenHwnds)
             {
                 var cur = hiddenHwnd;
@@ -1028,7 +1028,7 @@ internal partial class Program
                 }
             }
 
-            // ── Strategy 2: Top-down child process scan (only if owner chain found nothing) ──
+            // -- Strategy 2: Top-down child process scan (only if owner chain found nothing) --
             // For each visible top-level window, check if ANY child belongs to a matching process.
             // ClassName pre-filter: only scan known host classes (삼두 optimization #2).
             // Fast skip: no children=skip, same-PID children=skip.
@@ -1051,25 +1051,25 @@ internal partial class Program
                     NativeMethods.GetWindowRect(topWnd, out var tr);
                     if (tr.Right - tr.Left < 50 || tr.Bottom - tr.Top < 50) return true;
 
-                    // ClassName pre-filter — skip windows that never host cross-process children
+                    // ClassName pre-filter -- skip windows that never host cross-process children
                     var clsBuf = new StringBuilder(256);
                     NativeMethods.GetClassNameW(topWnd, clsBuf, clsBuf.Capacity);
                     if (!hostClasses.Contains(clsBuf.ToString())) return true;
 
                     NativeMethods.GetWindowThreadProcessId(topWnd, out uint topPid);
 
-                    // Quick skip: check first child's PID — if same as parent, no cross-process children likely
+                    // Quick skip: check first child's PID -- if same as parent, no cross-process children likely
                     bool foundMatch = false;
                     NativeMethods.EnumChildWindows(topWnd, (childWnd, _) =>
                     {
                         NativeMethods.GetWindowThreadProcessId(childWnd, out uint childPid);
-                        if (childPid == topPid) return true; // same process → keep scanning
+                        if (childPid == topPid) return true; // same process -> keep scanning
                         // Different process child! Check if it matches the search pattern
                         var cn = GetProcessName(childPid);
                         if (fmatch.IsMatch(cn))
                         {
                             foundMatch = true;
-                            return false; // early exit — found it!
+                            return false; // early exit -- found it!
                         }
                         return true;
                     }, IntPtr.Zero);
@@ -1083,12 +1083,12 @@ internal partial class Program
             }
 
             // Final summary
-            Console.Error.WriteLine($"\r{"[HOST] " + matchedHiddenHwnds.Count + " hidden → " + hostHwnds.Count + " host(s)",-100}");
+            Console.Error.WriteLine($"\r{"[HOST] " + matchedHiddenHwnds.Count + " hidden -> " + hostHwnds.Count + " host(s)",-100}");
 
             if (hostHwnds.Count > 0)
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine("\n── host windows (owner/child) ──");
+                Console.WriteLine("\n-- host windows (owner/child) --");
                 Console.ResetColor();
                 foreach (var oh in hostHwnds)
                 {
@@ -1104,7 +1104,7 @@ internal partial class Program
             PulseStep.Mark("host-fallback-done");
         }
 
-        // 2nd pass: group by pid — root window + children inline
+        // 2nd pass: group by pid -- root window + children inline
         PulseStep.Mark("summary-write");
         Console.WriteLine();
         string uiaNote = uiaSearch ? $", UIA matched in {uiaMatchWindows} window(s)" : "";

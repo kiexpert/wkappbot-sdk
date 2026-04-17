@@ -1,4 +1,4 @@
-// KiwoomEventSink.cs — IDispatch-based event sink for KHOpenAPI events.
+// KiwoomEventSink.cs -- IDispatch-based event sink for KHOpenAPI events.
 // Uses IConnectionPoint to subscribe to _DKHOpenAPIEvents (9 events).
 // The IReflect approach allows us to receive COM events without a type library reference.
 
@@ -25,7 +25,7 @@ public class KiwoomEventSink : IReflect, IDisposable
     /// <summary>Fired when any COM event is received.</summary>
     public event Action<string, object?[]>? OnEvent;
 
-    // Known DISPID → event name mapping (from ComInspect analysis)
+    // Known DISPID -> event name mapping (from ComInspect analysis)
     private static readonly Dictionary<int, string> DispIdToName = new()
     {
         [1] = "OnReceiveTrData",
@@ -68,7 +68,7 @@ public class KiwoomEventSink : IReflect, IDisposable
         }
     }
 
-    // ── IReflect implementation — COM calls IDispatch::Invoke which routes through IReflect ──
+    // -- IReflect implementation -- COM calls IDispatch::Invoke which routes through IReflect --
 
     // This is the key method: COM's IDispatch::Invoke ends up here
     public MethodInfo? GetMethod(string name, BindingFlags bindingAttr) => null;

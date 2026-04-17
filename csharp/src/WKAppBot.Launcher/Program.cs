@@ -8,17 +8,17 @@ namespace WKAppBot.Launcher;
 /// <summary>
 /// Ultra-thin relay launcher for WKAppBot.
 /// Happy path: delegates to Eye via named pipe (~200ms total, no cold-start).
-/// Fallback: spawns wkappbot-core.exe directly (~3s, rare — Eye not running).
+/// Fallback: spawns wkappbot-core.exe directly (~3s, rare -- Eye not running).
 ///
 /// Routing control flags (parsed here, stripped before forwarding to Eye/Core):
-///   --only-eye       Eye pipe required — fail with exit 3 if Eye unavailable (no Core fallback)
-///   --only-core      Skip Eye pipe — run Core directly regardless of Eye state
+///   --only-eye       Eye pipe required -- fail with exit 3 if Eye unavailable (no Core fallback)
+///   --only-core      Skip Eye pipe -- run Core directly regardless of Eye state
 ///   --timeout N      Kill Core after N seconds (Launcher-level watchdog, exit 2 on timeout)
 ///   --timeout-exit N Override timeout exit code (default: 2); applies to both normal and mcp mode
 ///
 /// Fixed routing (flag-independent):
-///   mcp  → Launcher owns stdio pipe permanently; Core runs behind proxy (restartable)
-///   eye  → Core directly (eye IS the daemon)
+///   mcp  -> Launcher owns stdio pipe permanently; Core runs behind proxy (restartable)
+///   eye  -> Core directly (eye IS the daemon)
 /// </summary>
 partial class Program
 {
@@ -30,10 +30,10 @@ partial class Program
         ("inspect","inspect"),
         ("ocr",    "ocr"),
         ("logcat", "logcat"),
-        ("grep",   "logcat"), // grep → logcat alias (busybox-style)
-        ("grap",   "logcat"), // grap → logcat alias (GRab Accessible Pattern)
+        ("grep",   "logcat"), // grep -> logcat alias (busybox-style)
+        ("grap",   "logcat"), // grap -> logcat alias (GRab Accessible Pattern)
         ("scan",   "scan"),
-        ("wkedit", "file"),   // wkedit.exe → file edit (busybox-style)
+        ("wkedit", "file"),   // wkedit.exe -> file edit (busybox-style)
     };
 
     // Aliases that bypass Launcher and point directly to Core (no relay needed)
@@ -42,7 +42,7 @@ partial class Program
         "grap", "grep", "logcat",
     };
 
-    // WKAPPBOT_PROFILE=1 support — static so RunCore() can log too
+    // WKAPPBOT_PROFILE=1 support -- static so RunCore() can log too
     static readonly System.Diagnostics.Stopwatch _sw = System.Diagnostics.Stopwatch.StartNew();
     static readonly bool _prof = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1";
     // Prof: only outputs when WKAPPBOT_PROFILE=1 (was: also on stderr redirect, but that fires in every bash pipe)
@@ -59,7 +59,7 @@ partial class Program
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
 
-        // Dim all Launcher stderr via ANSI codes — MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
+        // Dim all Launcher stderr via ANSI codes -- MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
         Console.SetError(new DimStderrWriter(Console.Error));
 
         // stderr AutoFlush: when redirected (piped to file/log), ensure real-time output
@@ -67,16 +67,16 @@ partial class Program
             errSw.AutoFlush = true;
         prof("Main() entered");
 
-        // ── Console encoding ──────────────────────────────────────────────────────────────────
-        // Core runs as DETACHED_PROCESS → no console attached → Console.OutputEncoding
+        // -- Console encoding ------------------------------------------------------------------
+        // Core runs as DETACHED_PROCESS -> no console attached -> Console.OutputEncoding
         // falls back to system ACP (CP949 on Korean Windows), not UTF-8.
         // So Core outputs CP949 bytes to the pipe.
         //
         // Passthrough policy:
-        //   CP949 CMD  → passthrough (CP949→CP949) ✓
-        //   UTF-8 terminal (CP65001, TERM, MSYSTEM, etc.) → Core outputs CP949 → need transcode CP949→UTF-8
+        //   CP949 CMD  -> passthrough (CP949->CP949) v
+        //   UTF-8 terminal (CP65001, TERM, MSYSTEM, etc.) -> Core outputs CP949 -> need transcode CP949->UTF-8
         //
-        // Do NOT call SetConsoleOutputCP — changes the terminal's CP, breaks host shell.
+        // Do NOT call SetConsoleOutputCP -- changes the terminal's CP, breaks host shell.
         _consoleCodePage = (int)GetConsoleOutputCP();
         {
             // Git Bash PTY: GetConsoleOutputCP() returns 949 (Windows ACP) but expects UTF-8 output.
@@ -87,7 +87,7 @@ partial class Program
                 || !string.IsNullOrEmpty(Env("MSYSTEM"))
                 || !string.IsNullOrEmpty(Env("TERM"))
                 || !string.IsNullOrEmpty(Env("TERM_PROGRAM"));
-            // Core always outputs UTF-8. Transcode UTF-8→CP for non-UTF-8 terminals (e.g. CP949 CMD).
+            // Core always outputs UTF-8. Transcode UTF-8->CP for non-UTF-8 terminals (e.g. CP949 CMD).
             // UTF-8 terminals: passthrough.
             // EyeCmdPipeClient uses _consoleCodePage to decide encoding; normalize to 65001 for UTF-8 mode.
             _needsTranscode = !isUtf8Term;
@@ -98,7 +98,7 @@ partial class Program
         if (quietFind)
             Environment.SetEnvironmentVariable("WKAPPBOT_QUIET_FIND", "1");
 
-        // ── Identity: who am I, who's my parent, what terminal am I in? ──
+        // -- Identity: who am I, who's my parent, what terminal am I in? --
         try
         {
             var myPid = Environment.ProcessId;
@@ -109,7 +109,7 @@ partial class Program
             try
             {
                 using var me = System.Diagnostics.Process.GetCurrentProcess();
-                // .NET doesn't expose PPID directly on Windows — use WMI-free P/Invoke
+                // .NET doesn't expose PPID directly on Windows -- use WMI-free P/Invoke
                 parentPid = GetParentProcessId(myPid);
                 if (parentPid > 0) try { parentName = System.Diagnostics.Process.GetProcessById(parentPid).ProcessName; } catch { }
             }
@@ -146,7 +146,7 @@ partial class Program
             var fgHwnd = GetForegroundWindow();
             var fgTitle = "";
             try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
-            // Build JSON with stealth \r after each field — cursor resets, no wrap
+            // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase)))
             {
             var err = Console.Error;
@@ -185,15 +185,15 @@ partial class Program
         }
         catch { }
 
-        // ── Encoding recovery: GetCommandLineA() → system codepage raw bytes ──
+        // -- Encoding recovery: GetCommandLineA() -> system codepage raw bytes --
         // bash (Git Bash/MSYS2) corrupts Korean args at UTF-8↔CP949 boundary.
-        // GetCommandLineA() returns raw system-codepage bytes — decode with system encoding.
+        // GetCommandLineA() returns raw system-codepage bytes -- decode with system encoding.
         // If decoded args differ from Unicode args, the A version is the correct one.
         args = TryRecoverEncodingFromAnsiCommandLine(args);
         prof("encoding-recovery");
 
         // Busybox-style: if invoked as a11y.exe / wka11y.exe / etc., prepend implicit command.
-        // Must be done in Launcher because Core is spawned as a new process — argv[0] loses the symlink name.
+        // Must be done in Launcher because Core is spawned as a new process -- argv[0] loses the symlink name.
         // Also auto-create missing symlinks when running as wkappbot.exe.
         var argv0      = Environment.GetCommandLineArgs().FirstOrDefault() ?? "";
         var exeBase    = Path.GetFileNameWithoutExtension(argv0).ToLowerInvariant();
@@ -204,7 +204,7 @@ partial class Program
             .FirstOrDefault();
         if (implicitCmd != null)
         {
-            // grap/grep: pass alias name to Core (not "logcat") — Core handles arg-order translation + help.
+            // grap/grep: pass alias name to Core (not "logcat") -- Core handles arg-order translation + help.
             // This allows Core's help fast path to show grap-specific help for "grap" with no args.
             // wkedit: prepend "file" + "edit" (two args, not one)
             var prependCmd = (exeBase == "grap" || exeBase == "grep") ? exeBase : implicitCmd;
@@ -216,11 +216,11 @@ partial class Program
         }
 
 
-        // ── FAST EXITS ────────────────────────────────────────────────────────────────────────────
+        // -- FAST EXITS ----------------------------------------------------------------------------
         // Encoding is set by app.manifest activeCodePage=UTF-8 (OS load, no runtime API call needed).
-        // No Console.OutputEncoding/InputEncoding assignments in Launcher — encoding set via manifest.
+        // No Console.OutputEncoding/InputEncoding assignments in Launcher -- encoding set via manifest.
 
-        // grap/grep with no args (or --help/-h): print help directly in Launcher — no Core needed.
+        // grap/grep with no args (or --help/-h): print help directly in Launcher -- no Core needed.
         if (args.Length > 0 && args[0].ToLowerInvariant() is "grap" or "grep"
             && (args.Length == 1 || args.Any(a => a is "--help" or "-h")))
         {
@@ -231,10 +231,10 @@ partial class Program
         }
 
         // wkappbot no-args: print usage directly in Launcher (same pattern as grap help path).
-        // No Core spawn — avoids ConPTY handle issues entirely. TerminateSelf before encoding setup → fast.
+        // No Core spawn -- avoids ConPTY handle issues entirely. TerminateSelf before encoding setup -> fast.
         if (args.Length == 0)
         {
-            prof("no-args → PrintUsage + TerminateSelf");
+            prof("no-args -> PrintUsage + TerminateSelf");
             PrintUsage();
             Console.Out.Flush();
             TerminateSelf(1);
@@ -244,7 +244,7 @@ partial class Program
         // Encoding: app.manifest activeCodePage=UTF-8 sets CP65001 at OS load.
 
         // --args-file <path>: read args from UTF-8 text file (one arg per line) to bypass
-        // bash→PowerShell CP949/UTF-8 mismatch that corrupts Korean command-line args.
+        // bash->PowerShell CP949/UTF-8 mismatch that corrupts Korean command-line args.
         // Scan after busybox prepend so implicit command is already present if needed.
         // File format: one arg per line, empty lines ignored. No quoting needed.
         // Usage: printf '%s\n' a11y type "hello" > /tmp/a.txt && wkappbot --args-file /tmp/a.txt
@@ -274,10 +274,10 @@ partial class Program
         }
 
         // --sudo admin Eye 100ms liveness probe (Launcher-side first layer).
-        // Paired with a 100ms probe in Core — total worst-case handshake budget 200ms.
+        // Paired with a 100ms probe in Core -- total worst-case handshake budget 200ms.
         // Pipe path check: \\.\pipe\wkappbot_elevated
         // Connect attempt bounded at 100ms. If admin Eye is in bad state (pipe file present
-        // but unresponsive), we fall through to Core spawn — Core's own 100ms probe will re-check,
+        // but unresponsive), we fall through to Core spawn -- Core's own 100ms probe will re-check,
         // then enter sudo protection (LaunchElevatedEye spawns a fresh admin Eye).
         if (args.Any(a => a == "--sudo"))
         {
@@ -290,7 +290,7 @@ partial class Program
                 using var cts = new System.Threading.CancellationTokenSource(100);
                 pipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
                 Console.Error.WriteLine(pipe.IsConnected
-                    ? "[LAUNCHER:SUDO] admin Eye ping (100ms): alive — Core will reuse"
+                    ? "[LAUNCHER:SUDO] admin Eye ping (100ms): alive -- Core will reuse"
                     : "[LAUNCHER:SUDO] admin Eye ping (100ms): unreachable");
             }
             catch
@@ -321,7 +321,7 @@ partial class Program
             }
         }
 
-        // Routing control flags — parsed by Launcher, stripped before forwarding to Eye/Core
+        // Routing control flags -- parsed by Launcher, stripped before forwarding to Eye/Core
         bool onlyEye  = args.Any(a => a == "--only-eye");
         bool onlyCore = args.Any(a => a == "--only-core");
 
@@ -352,44 +352,44 @@ partial class Program
         // mcp: Launcher holds the stdio pipe to Claude Code and manages Core lifecycle
         if (cmd == "mcp")
         {
-            prof("mcp → RunMcpProxy");
+            prof("mcp -> RunMcpProxy");
             return RunMcpProxy(forwardArgs);
         }
 
         // eye (no subcommand / --elevated): IS the daemon, must run core directly
-        // eye tick: one-shot status query — can go through Eye pipe (fast-path if Eye running, falls to Core if not)
-        // file read-pdf/ocr: may take several seconds — use --only-core for long PDF/OCR jobs
-        // file edit/read/grep/glob: fast operations — route through Eye pipe for zero cold-start
-        // help/no-args: fast path — skip Eye pipe, run Core directly (Core is ~22ms for help)
-        // logcat/grep/grap: streaming log monitor — needs direct stdout, TeeConsole, full error handling
+        // eye tick: one-shot status query -- can go through Eye pipe (fast-path if Eye running, falls to Core if not)
+        // file read-pdf/ocr: may take several seconds -- use --only-core for long PDF/OCR jobs
+        // file edit/read/grep/glob: fast operations -- route through Eye pipe for zero cold-start
+        // help/no-args: fast path -- skip Eye pipe, run Core directly (Core is ~22ms for help)
+        // logcat/grep/grap: streaming log monitor -- needs direct stdout, TeeConsole, full error handling
         var isSlowFileCmd = cmd == "file" && args.Length > 1
             && args[1].ToLowerInvariant() is "read-pdf";
         // First-output guard: if Eye doesn't produce output within 100ms, fall back to Core.
-        // Applies to most commands — prevents 30s+ stall when Eye is busy but Core can handle it.
+        // Applies to most commands -- prevents 30s+ stall when Eye is busy but Core can handle it.
         // Excluded: slack (Eye owns WebSocket), ask/newchat (long-running, double-run risk),
         //           logcat/grep/grap (streaming, already excluded below), eye daemon (isEyeDaemon).
         var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat";
-        // eye tick / eye hotswap / eye homework: one-shot subcommands — route through Eye pipe if running
+        // eye tick / eye hotswap / eye homework: one-shot subcommands -- route through Eye pipe if running
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
             && eyeSubcmd is not ("tick" or "hotswap" or "homework" or "shutdown");
         var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
-        // hack-* workers are long-running → bypass Eye pipe (would timeout)
+        // hack-* workers are long-running -> bypass Eye pipe (would timeout)
         var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
             && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
-        // skill contribute/delete writes to callerCwd/skills/ — must run Core with real CWD, not Eye's CWD
+        // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
         // --sudo admin session auto-inherit (Layer 10):
         // --sudo is a SESSION START, not per-invocation. While admin Eye (pipe
         // wkappbot_elevated) is alive, every subsequent command inherits admin privilege
         // without the user having to re-type --sudo. To end the session, kill admin Eye
-        // (wkappbot a11y kill …). Matches shell sudo semantics.
+        // (wkappbot a11y kill ...). Matches shell sudo semantics.
         //
         // Skip auto-inherit for:
         //   - Eye daemon (re-entrant admin path)
         //   - Already --sudo
-        //   - CDP-dependent commands (ask, web, agent, newchat) — these need local Chrome
+        //   - CDP-dependent commands (ask, web, agent, newchat) -- these need local Chrome
         //     access which admin Eye's subprocess context cannot provide
         // CDP commands need local Chrome; run/do need local UIA/window access
         var isCdpCommand = cmd is "ask" or "web" or "agent" or "newchat" or "run" or "do";
@@ -403,12 +403,12 @@ partial class Program
                 probePipe.ConnectAsync(100, cts.Token).GetAwaiter().GetResult();
                 if (probePipe.IsConnected)
                 {
-                    Console.Error.WriteLine("[LAUNCHER:SESSION] admin Eye alive — auto-inheriting --sudo");
+                    Console.Error.WriteLine("[LAUNCHER:SESSION] admin Eye alive -- auto-inheriting --sudo");
                     forwardArgs = forwardArgs.Append("--sudo").ToArray();
                     relayArgs = forwardArgs;
                 }
             }
-            catch { /* admin Eye down — proceed as regular user */ }
+            catch { /* admin Eye down -- proceed as regular user */ }
         }
 
         // --sudo must always go to a fresh Core (stale in-memory user Eye can't do admin work
@@ -426,7 +426,7 @@ partial class Program
                 if (forwardArgs[i] == "--timeout-exit" && int.TryParse(forwardArgs[i + 1], out var e)) eyeTimeoutExit = e;
             }
 
-            int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard → Core fallback
+            int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard -> Core fallback
             prof($"Eye pipe attempt cmd={cmd}");
             if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
@@ -441,15 +441,15 @@ partial class Program
 
             if (onlyEye)
             {
-                Console.Error.WriteLine("[LAUNCHER] --only-eye: Eye pipe unavailable — refusing Core fallback");
+                Console.Error.WriteLine("[LAUNCHER] --only-eye: Eye pipe unavailable -- refusing Core fallback");
                 return 3; // distinct exit: Eye required but not running
             }
         }
 
-        prof($"→ RunCore cmd={cmd}");
+        prof($"-> RunCore cmd={cmd}");
 
         // grap/grep with args: spawn Core via UseShellExecute=true (ShellExecuteEx).
-        // ShellExecuteEx detaches from bash's ConPTY/job tracking → bash
+        // ShellExecuteEx detaches from bash's ConPTY/job tracking -> bash
         // exits as soon as Launcher (wkappbot.exe) exits. Core runs in background.
         // Output relay: Core writes to WKAPPBOT_RELAY_FILE, signals .ready; Launcher reads+relays.
         // Follow mode (-f/--follow) runs normally (streaming, Ctrl+C to stop).
@@ -467,7 +467,7 @@ partial class Program
                 var _exitCodePath = _relayFile + ".exitcode";
                 foreach (var p in new[] { _relayFile, _readyPath, _ackPath, _exitCodePath }) try { File.Delete(p); } catch { }
 
-                // Set relay env var on our own process — inherited by UseShellExecute spawn
+                // Set relay env var on our own process -- inherited by UseShellExecute spawn
                 Environment.SetEnvironmentVariable("WKAPPBOT_RELAY_FILE", _relayFile);
 
                 var _tp = new System.Diagnostics.Process
@@ -538,7 +538,7 @@ partial class Program
 
         // Fast-exit commands (help): watchdog reports exact step if process hangs >3s.
         // _lDiagStep is a static field so RunCore() can update it directly.
-        // --regression and --help (auto-regression) run test scripts → skip fast-exit unless opted out
+        // --regression and --help (auto-regression) run test scripts -> skip fast-exit unless opted out
         bool isFastExit = (cmd is "help" or "--help" or "-h")
             && !forwardArgs.Any(a => a == "--regression")
             && forwardArgs.Any(a => a == "--no-regression");  // fast only when tests explicitly skipped
@@ -560,7 +560,7 @@ partial class Program
             _lWatchdog.Start();
 
             // Core calls FastExit (TerminateProcess) after flushing help output.
-            // proc.WaitForExit detects termination immediately — no named-event needed.
+            // proc.WaitForExit detects termination immediately -- no named-event needed.
             var code = RunCore(relayArgs, fastExitTimeoutMs: 2000);
             _lDiagStep = "post-RunCore";
             TerminateSelf((uint)code);
@@ -572,7 +572,7 @@ partial class Program
         return finalCode; // unreachable
     }
 
-    // Shared step name for fast-exit watchdog — updated in both Main() and RunCore().
+    // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
     static volatile string _lDiagStep = "";
 
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
@@ -665,13 +665,13 @@ partial class Program
     const uint STARTF_USESTDHANDLES = AppBotPipe.STARTF_USESTDHANDLES;
     static readonly IntPtr INVALID_HANDLE = new IntPtr(-1);
 
-    // Named event for Core→Launcher exit signaling (bypasses FS visibility delay + process exit delay)
+    // Named event for Core->Launcher exit signaling (bypasses FS visibility delay + process exit delay)
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     static extern IntPtr CreateEventW(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string lpName);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     static extern bool SetEvent(IntPtr hEvent);
 
-    /// <summary>Thin delegate to AppBotPipe.CreateProcess — null CWD guard + trace.</summary>
+    /// <summary>Thin delegate to AppBotPipe.CreateProcess -- null CWD guard + trace.</summary>
     static bool CreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd, ref STARTUPINFOW si, out PROCESS_INFORMATION pi)
         => AppBotPipe.CreateProcess(app, cmd, pa, ta, inh, flags, env, cwd, ref si, out pi, out _, "LAUNCHER");
@@ -710,7 +710,7 @@ partial class Program
 
     /// <summary>
     /// Spawn Core with DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB.
-    /// Core runs outside bash's ConPTY session and job object → bash doesn't wait for Core.
+    /// Core runs outside bash's ConPTY session and job object -> bash doesn't wait for Core.
     /// Returns Core's process handle (caller must CloseHandle) or IntPtr.Zero on failure.
     /// </summary>
     static IntPtr SpawnDetachedCore(string core, string[] args, IntPtr envBlock)
@@ -744,7 +744,7 @@ partial class Program
         SetHandleInformation(hStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
         SetHandleInformation(hStderrWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
         // Make Launcher's own stdout/stderr non-inheritable so Core doesn't inherit bash's pipe.
-        // Without this, Core holds bash's pipe write end → bash waits for Core to die (~30s) after Launcher exits.
+        // Without this, Core holds bash's pipe write end -> bash waits for Core to die (~30s) after Launcher exits.
         var hLauncherOut = GetStdHandle(-11); var hLauncherErr = GetStdHandle(-12);
         if (hLauncherOut != IntPtr.Zero && hLauncherOut != (IntPtr)(-1)) SetHandleInformation(hLauncherOut, HANDLE_FLAG_INHERIT, 0);
         if (hLauncherErr != IntPtr.Zero && hLauncherErr != (IntPtr)(-1)) SetHandleInformation(hLauncherErr, HANDLE_FLAG_INHERIT, 0);
@@ -763,7 +763,7 @@ partial class Program
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, true, // bInheritHandles=true for pipe handles
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT,
             envBlock, Environment.CurrentDirectory, ref si, out var pi);
-        // Close write ends in parent — child holds them; closing here causes EOF when child exits
+        // Close write ends in parent -- child holds them; closing here causes EOF when child exits
         CloseHandle(hStdoutWrite);
         CloseHandle(hStderrWrite);
         if (!ok) { CloseHandle(hStdoutRead); CloseHandle(hStderrRead); hStdoutRead = hStderrRead = IntPtr.Zero; return false; }
@@ -775,7 +775,7 @@ partial class Program
     /// <summary>
     /// grap/grep one-shot: spawn Core detached.
     /// Core writes output to relay file (WKAPPBOT_RELAY_FILE). Launcher polls for .ready sentinel
-    /// (created by Core while still alive → immediately visible). Reads relay, exits fast.
+    /// (created by Core while still alive -> immediately visible). Reads relay, exits fast.
     /// </summary>
     static int RunGrapDetached(string[] args, int timeoutMs)
     {
@@ -804,7 +804,7 @@ partial class Program
             }
             Prof($"detached core spawned pid=?, polling .ready");
 
-            // Poll for .ready (Core creates it while alive → visible on local FS immediately)
+            // Poll for .ready (Core creates it while alive -> visible on local FS immediately)
             var sw = System.Diagnostics.Stopwatch.StartNew();
             bool found = false;
             while (sw.ElapsedMilliseconds < timeoutMs)
@@ -829,7 +829,7 @@ partial class Program
             }
             else
             {
-                // Core never signaled — kill it (abnormal)
+                // Core never signaled -- kill it (abnormal)
                 try { TerminateProcess(hProc, 1); } catch { }
             }
             CloseHandle(hProc);
@@ -848,7 +848,7 @@ partial class Program
     /// <summary>Core exe path override (--core flag). Null = default (wkappbot-core.exe next to launcher).</summary>
     static string? _coreExePath;
 
-    /// <summary>True when console can't do UTF-8 — IOCP relay must transcode Core's UTF-8 output.</summary>
+    /// <summary>True when console can't do UTF-8 -- IOCP relay must transcode Core's UTF-8 output.</summary>
     static bool _needsTranscode;
     /// <summary>Console output code page (e.g. 949 for Korean CMD). Used by TranscodeStream + EyeCmdPipeClient.</summary>
     internal static int _consoleCodePage;
@@ -862,7 +862,7 @@ partial class Program
     }
 
     /// <summary>
-    /// Universal exit — flushes timestamped stderr log on error, then TerminateSelf.
+    /// Universal exit -- flushes timestamped stderr log on error, then TerminateSelf.
     /// Usage: AppBotExit(0);  // success, discard errors
     ///        AppBotExit(1);  // error, flush stderr log
     /// </summary>

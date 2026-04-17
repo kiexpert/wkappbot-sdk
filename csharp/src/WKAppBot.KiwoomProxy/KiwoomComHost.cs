@@ -1,4 +1,4 @@
-// KiwoomComHost.cs — COM host for KHOpenAPI.ocx (32-bit ActiveX).
+// KiwoomComHost.cs -- COM host for KHOpenAPI.ocx (32-bit ActiveX).
 // Creates COM object via Type.GetTypeFromProgID + Activator.CreateInstance.
 // All method calls use late binding (Type.InvokeMember) since we can't reference the OCX directly.
 // Each call is automatically recorded for the COM Experience DB.
@@ -149,7 +149,7 @@ public class KiwoomComException : Exception
     public new int HResult { get; }
 
     public KiwoomComException(string methodName, int hresult, string message, Exception? inner = null)
-        : base($"COM error in {methodName}: 0x{hresult:X8} — {message}", inner)
+        : base($"COM error in {methodName}: 0x{hresult:X8} -- {message}", inner)
     {
         MethodName = methodName;
         HResult = hresult;

@@ -11,12 +11,12 @@ using System.Windows.Threading;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// "Whisper Spectrum Ring" — radial HUD overlay for real-time FFT visualization.
+/// "Whisper Spectrum Ring" -- radial HUD overlay for real-time FFT visualization.
 /// 8 arc segments around a circle, each representing a frequency band.
 /// Center shows mode (VOICE/WHISPER/QUIET/NOISE) + current token hex.
 /// Recent tokens scroll along the bottom.
 ///
-/// Design: Cybernetic ring — compact, always-on-top, non-interactive.
+/// Design: Cybernetic ring -- compact, always-on-top, non-interactive.
 /// Tag: [WHISPER]
 /// </summary>
 internal sealed class WhisperRingWindow : Window
@@ -47,27 +47,27 @@ internal sealed class WhisperRingWindow : Window
     private readonly System.Windows.Shapes.Line _pointer;      // energy centroid pointer (current, all sounds)
     private readonly WpfEllipse _pointerDot;                   // pointer tip dot (current)
 
-    // Voice-only pointer — green, only active during VOICE/WHSPR
+    // Voice-only pointer -- green, only active during VOICE/WHSPR
     private readonly System.Windows.Shapes.Line _voicePointer;
     private readonly WpfEllipse _voicePointerDot;
 
-    // Ghost trail — 4 afterimage lines that fade+blur like dissipating smoke
+    // Ghost trail -- 4 afterimage lines that fade+blur like dissipating smoke
     private const int GhostCount = 4;
     private readonly System.Windows.Shapes.Line[] _ghosts = new System.Windows.Shapes.Line[GhostCount];
     private readonly WpfEllipse[] _ghostDots = new WpfEllipse[GhostCount];
     private readonly double[] _ghostAge = new double[GhostCount]; // 0=fresh, 1=gone
     private int _ghostCursor = 0;                                 // ring buffer index
 
-    // Band colors — warm-to-cool gradient matching articulatory zones
+    // Band colors -- warm-to-cool gradient matching articulatory zones
     private static readonly Color[] BandColors = [
-        Color.FromRgb(0xFF, 0x44, 0x44), // 0 VxLip — red (vocal cord)
-        Color.FromRgb(0xFF, 0x88, 0x33), // 1 Pharx — orange
-        Color.FromRgb(0xFF, 0xCC, 0x22), // 2 Velar — yellow
-        Color.FromRgb(0x44, 0xFF, 0x88), // 3 OralR — green
-        Color.FromRgb(0x33, 0xCC, 0xFF), // 4 HiRes — cyan
-        Color.FromRgb(0x44, 0x88, 0xFF), // 5 Burst — blue
-        Color.FromRgb(0x88, 0x44, 0xFF), // 6 Sibil — purple
-        Color.FromRgb(0xCC, 0x44, 0xFF), // 7 Breth — magenta
+        Color.FromRgb(0xFF, 0x44, 0x44), // 0 VxLip -- red (vocal cord)
+        Color.FromRgb(0xFF, 0x88, 0x33), // 1 Pharx -- orange
+        Color.FromRgb(0xFF, 0xCC, 0x22), // 2 Velar -- yellow
+        Color.FromRgb(0x44, 0xFF, 0x88), // 3 OralR -- green
+        Color.FromRgb(0x33, 0xCC, 0xFF), // 4 HiRes -- cyan
+        Color.FromRgb(0x44, 0x88, 0xFF), // 5 Burst -- blue
+        Color.FromRgb(0x88, 0x44, 0xFF), // 6 Sibil -- purple
+        Color.FromRgb(0xCC, 0x44, 0xFF), // 7 Breth -- magenta
     ];
 
     // Mode colors
@@ -76,7 +76,7 @@ internal sealed class WhisperRingWindow : Window
     private static readonly SolidColorBrush ModeBrushQuiet = new(Color.FromRgb(0x55, 0x55, 0x66));
     private static readonly SolidColorBrush ModeBrushNoise = new(Color.FromRgb(0xFF, 0x66, 0x44));
 
-    // Cached per-frame mutable brushes — reuse instead of new() every frame to prevent WPF GC pressure
+    // Cached per-frame mutable brushes -- reuse instead of new() every frame to prevent WPF GC pressure
     private readonly SolidColorBrush[] _arcStrokeBrushes = new SolidColorBrush[BandCount];
     private readonly SolidColorBrush _pointerStrokeBrush = new(Colors.White);
     private readonly SolidColorBrush _pointerDotBrush = new(Colors.White);
@@ -160,7 +160,7 @@ internal sealed class WhisperRingWindow : Window
         Canvas.SetTop(_coreDot, cy - 4);
         _canvas.Children.Add(_coreDot);
 
-        // ── Pointer layer (separate Canvas so blur only affects needles) ──
+        // -- Pointer layer (separate Canvas so blur only affects needles) --
         _pointerLayer = new Canvas { Width = size, Height = size };
 
         // Ghost trail lines (oldest first, rendered behind current pointer)
@@ -190,7 +190,7 @@ internal sealed class WhisperRingWindow : Window
         _pointerStrokeBrush.Color = Color.FromArgb(0xCC, 0xFF, 0xFF, 0xFF);
         _pointerDotBrush.Color = Color.FromRgb(0xFF, 0xFF, 0xFF);
 
-        // Current pointer — all sounds (white, on top of ghosts)
+        // Current pointer -- all sounds (white, on top of ghosts)
         _pointer = new System.Windows.Shapes.Line
         {
             X1 = cx, Y1 = cy, X2 = cx, Y2 = cy,
@@ -210,7 +210,7 @@ internal sealed class WhisperRingWindow : Window
         };
         _pointerLayer.Children.Add(_pointerDot);
 
-        // Voice-only pointer — gold (#FFD700) with glow, only during VOICE/WHSPR
+        // Voice-only pointer -- gold (#FFD700) with glow, only during VOICE/WHSPR
         _voicePointer = new System.Windows.Shapes.Line
         {
             X1 = cx, Y1 = cy, X2 = cx, Y2 = cy,
@@ -318,7 +318,7 @@ internal sealed class WhisperRingWindow : Window
 
         root.Children.Add(_canvas);
 
-        // Recent tokens (bottom bar) — tween-scroll container
+        // Recent tokens (bottom bar) -- tween-scroll container
         _recentTx = new TranslateTransform(0, 0);
         _recentText = new TextBlock
         {
@@ -343,7 +343,7 @@ internal sealed class WhisperRingWindow : Window
     }
 
     /// <summary>Format sound code as octal (no leading zeros).
-    /// Band 0 (VxLip/성대음) rank 1 → encode ranks 2,3,4; otherwise ranks 1,2,3.</summary>
+    /// Band 0 (VxLip/성대음) rank 1 -> encode ranks 2,3,4; otherwise ranks 1,2,3.</summary>
     private static string FormatSoundCode(ushort sc)
     {
         if (sc == 0) return "..";
@@ -353,12 +353,12 @@ internal sealed class WhisperRingWindow : Window
     }
 
     /// <summary>
-    /// Normalize trail for display: spaces between tokens → '-', ".." → ' ', collapse spaces.
-    /// e.g. "1 176 137 .. 362 160" → "1-176-137 362-160"
+    /// Normalize trail for display: spaces between tokens -> '-', ".." -> ' ', collapse spaces.
+    /// e.g. "1 176 137 .. 362 160" -> "1-176-137 362-160"
     /// </summary>
     private static string FormatTrailDisplay(string trail)
     {
-        // Split on ".." boundaries → each segment has space-separated tokens → join with '-'
+        // Split on ".." boundaries -> each segment has space-separated tokens -> join with '-'
         var parts = trail.Split(new[] { " .. ", ".." }, StringSplitOptions.None);
         var joined = string.Join(" ", parts.Select(p =>
             string.Join("-", p.Split(' ', StringSplitOptions.RemoveEmptyEntries))));
@@ -431,8 +431,8 @@ internal sealed class WhisperRingWindow : Window
             UpdateArc(i, startAngle, arcSpan, thickness, cx, cy);
         }
 
-        // ── Energy centroid pointer (articulatory position indicator) ──
-        // Weighted average of band angles by energy → shows dominant articulation point
+        // -- Energy centroid pointer (articulatory position indicator) --
+        // Weighted average of band angles by energy -> shows dominant articulation point
         double totalEnergy = 0;
         double vecX = 0, vecY = 0;
         for (int i = 0; i < BandCount && i < levels.Length; i++)
@@ -453,7 +453,7 @@ internal sealed class WhisperRingWindow : Window
             double tipX = cx + pointerLen * Math.Cos(angle);
             double tipY = cy + pointerLen * Math.Sin(angle);
 
-            // ── Spawn ghost: snapshot current pointer position before moving ──
+            // -- Spawn ghost: snapshot current pointer position before moving --
             if (_pointer.Opacity > 0.1)
             {
                 var g = _ghosts[_ghostCursor];
@@ -470,7 +470,7 @@ internal sealed class WhisperRingWindow : Window
                 _ghostCursor = (_ghostCursor + 1) % GhostCount;
             }
 
-            // ── Move current pointer ──
+            // -- Move current pointer --
             _pointer.X1 = cx; _pointer.Y1 = cy;
             _pointer.X2 = tipX; _pointer.Y2 = tipY;
 
@@ -487,8 +487,8 @@ internal sealed class WhisperRingWindow : Window
             _pointer.Opacity = 0.7 + magnitude * 0.3;
             _pointerDot.Opacity = 1.0;
 
-            // ── Voice-only gold pointer: independent centroid from post-DUET spectrum ──
-            // Uses voiceLevels (noise-killed) for its own direction — diverges from white when noisy
+            // -- Voice-only gold pointer: independent centroid from post-DUET spectrum --
+            // Uses voiceLevels (noise-killed) for its own direction -- diverges from white when noisy
             var vLevels = voiceLevels ?? levels; // fallback to raw if mono
             double vTotalEnergy = 0;
             double vVecX = 0, vVecY = 0;
@@ -521,7 +521,7 @@ internal sealed class WhisperRingWindow : Window
             }
             else
             {
-                // Not voice → gold fades
+                // Not voice -> gold fades
                 _voicePointer.Opacity = Math.Max(0, _voicePointer.Opacity - 0.06);
                 _voicePointerDot.Opacity = Math.Max(0, _voicePointerDot.Opacity - 0.06);
             }
@@ -536,23 +536,23 @@ internal sealed class WhisperRingWindow : Window
             _voicePointerDot.Opacity = Math.Max(0, _voicePointerDot.Opacity - 0.06);
         }
 
-        // ── Age all ghosts: thicken + blur + fade = smoke dissipation ──
+        // -- Age all ghosts: thicken + blur + fade = smoke dissipation --
         for (int g = 0; g < GhostCount; g++)
         {
             if (_ghostAge[g] >= 1.0) continue; // already gone
             _ghostAge[g] += 0.06; // ~0.55s full fade @ 30fps (slower for more visible spread)
             if (_ghostAge[g] >= 1.0) _ghostAge[g] = 1.0;
 
-            double age = _ghostAge[g]; // 0=fresh → 1=gone
+            double age = _ghostAge[g]; // 0=fresh -> 1=gone
             double fade = 1.0 - age;
             _ghosts[g].Opacity = fade * 0.6;
             _ghostDots[g].Opacity = fade * 0.5;
 
-            // Thicken as ghost ages — gives blur more "material" to spread
-            _ghosts[g].StrokeThickness = 2 + age * 10;       // 2px → 12px
-            _ghostDots[g].Width = _ghostDots[g].Height = 6 + age * 14; // 6px → 20px
+            // Thicken as ghost ages -- gives blur more "material" to spread
+            _ghosts[g].StrokeThickness = 2 + age * 10;       // 2px -> 12px
+            _ghostDots[g].Width = _ghostDots[g].Height = 6 + age * 14; // 6px -> 20px
 
-            // Blur expands as ghost ages — smoke spreading effect
+            // Blur expands as ghost ages -- smoke spreading effect
             if (_ghosts[g].Effect is System.Windows.Media.Effects.BlurEffect gb1) gb1.Radius = age * 18;
             if (_ghostDots[g].Effect is System.Windows.Media.Effects.BlurEffect gb2) gb2.Radius = age * 16;
         }
@@ -564,7 +564,7 @@ internal sealed class WhisperRingWindow : Window
             "VOICE" => ModeBrushVoice,
             "WHSPR" => ModeBrushWhisper,
             "NOISE" => ModeBrushNoise,
-            "LOUD" => ModeBrushNoise, // red-ish — external noise filtered out
+            "LOUD" => ModeBrushNoise, // red-ish -- external noise filtered out
             _ => ModeBrushQuiet,
         };
 
@@ -584,7 +584,7 @@ internal sealed class WhisperRingWindow : Window
             _coreGlowBrush.GradientStops[1].Color = Color.FromArgb(0x00, coreColor.R, coreColor.G, coreColor.B);
         }
 
-        // Recent sound codes — RLE trail (stored as "1 176 .. 362", display-normalized to "1-176 362")
+        // Recent sound codes -- RLE trail (stored as "1 176 .. 362", display-normalized to "1-176 362")
         if (soundCode != _scLast)
         {
             _scLast = soundCode;
@@ -594,7 +594,7 @@ internal sealed class WhisperRingWindow : Window
                 : (_scTrail.Length > 0 ? _scTrail + " " + tag : tag);
         }
 
-        // Display: spaces between tokens → '-', ".." → ' ', collapse multiple spaces
+        // Display: spaces between tokens -> '-', ".." -> ' ', collapse multiple spaces
         var display = FormatTrailDisplay(_scTrail);
 
         // Clock area: show sound codes only when enough accumulated, else clock
@@ -615,7 +615,7 @@ internal sealed class WhisperRingWindow : Window
             _tokenText.Foreground = _tokenTextBrush;
         }
 
-        // Bottom bar: full trail with tween scroll — slow start, accelerate when queued
+        // Bottom bar: full trail with tween scroll -- slow start, accelerate when queued
         _recentText.Text = display;
         _recentText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         double textWidth = _recentText.DesiredSize.Width;
@@ -627,7 +627,7 @@ internal sealed class WhisperRingWindow : Window
             double currentX = _recentTx.X;
             double distance = Math.Abs(targetX - currentX);
             double durationMs = Math.Clamp(16000 - distance * 100, 3000, 16000);
-            // 3-phase keyframe: snail crawl → zoom → gentle landing
+            // 3-phase keyframe: snail crawl -> zoom -> gentle landing
             var anim = new DoubleAnimationUsingKeyFrames
             {
                 Duration = TimeSpan.FromMilliseconds(durationMs)
@@ -652,13 +652,13 @@ internal sealed class WhisperRingWindow : Window
             _recentTx.X = 0;
         }
 
-        // ── STT line: dedicated, never overwritten by clock/frames ──
+        // -- STT line: dedicated, never overwritten by clock/frames --
         double sttAgeSec = sttAgeTicks / (double)TimeSpan.TicksPerSecond;
         bool hasStt = !string.IsNullOrEmpty(sttText) && sttAgeSec < 5.0;
 
         if (hasStt)
         {
-            // New STT result → update + reset sound code trail (sentence boundary)
+            // New STT result -> update + reset sound code trail (sentence boundary)
             if (_scTrail.Length > 0) { _scTrail = ""; _scLast = ushort.MaxValue; }
             _sttText.Text = sttText!.Length > 16 ? sttText[..16] : sttText;
             _sttText.Foreground = Brushes.White;
@@ -671,7 +671,7 @@ internal sealed class WhisperRingWindow : Window
         }
         else
         {
-            // No active STT → always show live clock
+            // No active STT -> always show live clock
             _sttText.Text = DateTime.Now.ToString("HH:mm:ss");
             _sttTextBrush.Color = Color.FromRgb(0x33, 0xCC, 0xFF);
             _sttText.Foreground = _sttTextBrush;

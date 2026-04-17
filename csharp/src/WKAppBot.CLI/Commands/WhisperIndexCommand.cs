@@ -4,14 +4,14 @@ using NAudio.Wave;
 
 namespace WKAppBot.CLI;
 
-// wkappbot whisper index — extract first-syllable sound token from sliced MP3s → phoneme DB
+// wkappbot whisper index -- extract first-syllable sound token from sliced MP3s -> phoneme DB
 //
 // For each MP3 in slices/:
 //   1. Decode to 16kHz mono PCM
 //   2. FFT band analysis (same algorithm as WhisperEngine)
-//   3. First voiced syllable → dominant soundCode
-//   4. Format code: vocaled (band0=rank1) → ranks 2,3,4; else → ranks 1,2,3 (octal, no leading zeros)
-//   5. Files with < MinVoicedFrames voiced frames → Recycle Bin (incomplete/ambiguous)
+//   3. First voiced syllable -> dominant soundCode
+//   4. Format code: vocaled (band0=rank1) -> ranks 2,3,4; else -> ranks 1,2,3 (octal, no leading zeros)
+//   5. Files with < MinVoicedFrames voiced frames -> Recycle Bin (incomplete/ambiguous)
 //   6. Create folder: phoneme_db/<code>/
 //   7. Copy/move file as <word>_<seq>.mp3
 //
@@ -20,10 +20,10 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // Band definitions — identical to WhisperEngine.Bands (must stay in sync)
+    // Band definitions -- identical to WhisperEngine.Bands (must stay in sync)
     private static readonly (int Lo, int Hi)[] IndexBands =
     [
-        (   70,  1021),   // 0: VxLip — vocal cord + lip burst
+        (   70,  1021),   // 0: VxLip -- vocal cord + lip burst
         ( 1021,  1397),   // 1: Pharx
         ( 1397,  1699),   // 2: Velar
         ( 1699,  2647),   // 3: OralR
@@ -39,8 +39,8 @@ internal partial class Program
     private const float IdxPreEmph  = 0.97f;
 
     // Frames with soundCode != 0 that belong to the first syllable
-    private const int IdxSilenceGap    = 6;  // consecutive silence frames → syllable ended
-    private const int MinVoicedFrames  = 9;  // < 9 voiced frames (~90ms) → too short → Recycle Bin
+    private const int IdxSilenceGap    = 6;  // consecutive silence frames -> syllable ended
+    private const int MinVoicedFrames  = 9;  // < 9 voiced frames (~90ms) -> too short -> Recycle Bin
 
     static int WhisperIndexCommand(string[] args)
     {
@@ -77,10 +77,10 @@ internal partial class Program
             {
                 var name = Path.GetFileNameWithoutExtension(mp3);
 
-                // Word = filename up to last _NNNN suffix (e.g., "안녕_0001" → "안녕")
+                // Word = filename up to last _NNNN suffix (e.g., "안녕_0001" -> "안녕")
                 var word = ExtractWordFromSliceName(name);
 
-                // FSA trie: extract per-syllable code sequence → each code = one folder level
+                // FSA trie: extract per-syllable code sequence -> each code = one folder level
                 var (syllables, totalVoiced) = ExtractSyllableSequence(mp3);
                 if (syllables.Count == 0)
                 {
@@ -89,7 +89,7 @@ internal partial class Program
                     continue;
                 }
 
-                // Too few voiced frames → incomplete/ambiguous → Recycle Bin
+                // Too few voiced frames -> incomplete/ambiguous -> Recycle Bin
                 if (totalVoiced < MinVoicedFrames)
                 {
                     trashed++;
@@ -115,7 +115,7 @@ internal partial class Program
                 }
 
                 ok++;
-                Console.Error.WriteLine($"[INDEX] {pathStr}/  {word}  ← {name}  ({syllables.Count} syllables)");
+                Console.Error.WriteLine($"[INDEX] {pathStr}/  {word}  <- {name}  ({syllables.Count} syllables)");
 
                 if (!dryRun)
                 {
@@ -133,7 +133,7 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine($"\n[INDEX] Done — ok={ok} trashed={trashed} skipped={skipped} errors={errors}");
+        Console.WriteLine($"\n[INDEX] Done -- ok={ok} trashed={trashed} skipped={skipped} errors={errors}");
         Console.Error.WriteLine($"[INDEX] DB   : {outDir}");
         return errors > 0 ? 1 : 0;
     }
@@ -151,7 +151,7 @@ internal partial class Program
         for (int i = 0; i < IdxFftSize; i++)
             hann[i] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * i / IdxFftSize));
 
-        // Decode MP3 → 16kHz mono float samples
+        // Decode MP3 -> 16kHz mono float samples
         var pcm = new List<float>(IdxSampleRate * 3);
         using (var reader = new Mp3FileReader(mp3Path))
         {
@@ -216,7 +216,7 @@ internal partial class Program
             for (int b = 0; b < IdxBandCount; b++)
                 clean[b] = Math.Max(0, raw[b] - noise[b]);
 
-            // Sort bands by clean energy descending (insertion sort — 8 elements)
+            // Sort bands by clean energy descending (insertion sort -- 8 elements)
             for (int b = 0; b < IdxBandCount; b++) ranked[b] = b;
             for (int i = 1; i < IdxBandCount; i++)
             {
@@ -234,10 +234,10 @@ internal partial class Program
                 sc |= (ushort)(gray << (12 - r * 3));
             }
 
-            // Gate: need meaningful signal — rank-1 band must be significantly above noise
+            // Gate: need meaningful signal -- rank-1 band must be significantly above noise
             double maxClean = clean[ranked[0]];
             double maxNoise = noise[ranked[0]];
-            if (maxClean < maxNoise * 1.5) sc = 0; // below 1.5× noise → silence
+            if (maxClean < maxNoise * 1.5) sc = 0; // below 1.5× noise -> silence
 
             if (sc != 0)
             {
@@ -323,7 +323,7 @@ internal partial class Program
             noise[b]   = sorted[idx20];
         }
 
-        // Pass 2: RLE-deduplicate tokens → FSA trie path (one folder per distinct token)
+        // Pass 2: RLE-deduplicate tokens -> FSA trie path (one folder per distinct token)
         var tokens      = new List<ushort>();
         int totalVoiced = 0;
         ushort lastSc   = 0;
@@ -363,7 +363,7 @@ internal partial class Program
             }
             else
             {
-                lastSc = 0; // silence resets RLE — next voiced token always added
+                lastSc = 0; // silence resets RLE -- next voiced token always added
             }
         }
 
@@ -371,7 +371,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Extract word from slice filename. "안녕_0001" → "안녕", "hello_0042" → "hello".
+    /// Extract word from slice filename. "안녕_0001" -> "안녕", "hello_0042" -> "hello".
     /// </summary>
     static string ExtractWordFromSliceName(string nameNoExt)
     {
@@ -381,7 +381,7 @@ internal partial class Program
 
     /// <summary>
     /// Format soundCode as octal folder name.
-    /// Band 0 (VxLip) rank 1 → encode ranks 2,3,4 (>>3); else ranks 1,2,3 (>>6).
+    /// Band 0 (VxLip) rank 1 -> encode ranks 2,3,4 (>>3); else ranks 1,2,3 (>>6).
     /// </summary>
     static string FormatIndexCode(ushort sc)
     {

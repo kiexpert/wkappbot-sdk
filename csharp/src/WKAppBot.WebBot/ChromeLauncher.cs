@@ -11,7 +11,7 @@ namespace WKAppBot.WebBot;
 public static class ChromeLauncher
 {
     /// <summary>
-    /// Focus theft callback: (stolenByHwnd, prevFgHwnd) — called when Chrome steals focus during restore.
+    /// Focus theft callback: (stolenByHwnd, prevFgHwnd) -- called when Chrome steals focus during restore.
     /// CLI layer hooks this to show FocuslessWarningOverlay.
     /// </summary>
     public static Action<IntPtr, IntPtr>? OnFocusTheft { get; set; }
@@ -76,7 +76,7 @@ public static class ChromeLauncher
         // Check if Chrome is already listening on this port
         if (await IsPortActiveAsync(port))
         {
-            // Existing Chrome — don't touch its windows!
+            // Existing Chrome -- don't touch its windows!
             // Caller uses CdpClient.EnsureCorrectWindowAsync() to handle positioning.
             return null;
         }
@@ -107,7 +107,7 @@ public static class ChromeLauncher
         arguments += " --disable-features=TranslateUI,BlinkGenPropertyTrees";
         arguments += " --disable-hang-monitor --disable-popup-blocking";
         arguments += " --disable-session-crashed-bubble --disable-infobars --hide-crash-restore-bubble";
-        // Force accessibility tree for web content — enables UIA to read page headings, text, links
+        // Force accessibility tree for web content -- enables UIA to read page headings, text, links
         arguments += " --force-renderer-accessibility";
         // Position at expected bounds from start. Focus guard handles focus theft.
         var bounds = CdpClient.ExpectedBounds;
@@ -148,11 +148,11 @@ public static class ChromeLauncher
                         var mainHwnd = FindChromeMainWindow(process.Id);
                         if (mainHwnd != IntPtr.Zero)
                         {
-                            // Restore from minimized → focusless (SW_SHOWNOACTIVATE=4)
+                            // Restore from minimized -> focusless (SW_SHOWNOACTIVATE=4)
                             ShowWindow(mainHwnd, 4);
                             // SWP_NOACTIVATE(0x10)|SWP_NOZORDER(0x4)|SWP_NOOWNERZORDER(0x200)
                             SetWindowPos(mainHwnd, IntPtr.Zero, bounds.X, bounds.Y, bounds.W, bounds.H, 0x0214);
-                            // Tag window as WKWebBot + CDP port — survives title changes
+                            // Tag window as WKWebBot + CDP port -- survives title changes
                             SetPropW(mainHwnd, "wkappbot.webbot", new IntPtr(1));
                             SetPropW(mainHwnd, "wkappbot.cdp", new IntPtr(port));
                         }
@@ -231,7 +231,7 @@ public static class ChromeLauncher
                 var json = await http.GetStringAsync($"http://localhost:{port}/json/version");
                 if (!string.IsNullOrEmpty(json)) continue; // port active
             }
-            catch { return port; } // connect failed → port is free
+            catch { return port; } // connect failed -> port is free
         }
         return startPort + scanCount; // all taken
     }
@@ -309,7 +309,7 @@ public static class ChromeLauncher
                         proc.WaitForExit(3000);
                     }
                 }
-                catch { } // Access denied etc — skip
+                catch { } // Access denied etc -- skip
             }
 
             // Wait a moment for file locks to release

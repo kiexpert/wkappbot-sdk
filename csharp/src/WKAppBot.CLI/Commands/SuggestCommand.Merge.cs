@@ -1,4 +1,4 @@
-// SuggestCommand.Merge.cs — suggest merge subcommand + helpers
+// SuggestCommand.Merge.cs -- suggest merge subcommand + helpers
 // Split from SuggestCommand.cs for maintainability (~330 lines)
 
 using System.Text.Json;
@@ -9,7 +9,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// suggest merge — combine multiple related suggestions into one self-healing merge record.
+    /// suggest merge -- combine multiple related suggestions into one self-healing merge record.
     /// Replaces individual entries with a single grouped record tracking frequency, root cause,
     /// repro cmdlines, estimated work, and auto-heal metadata.
     /// </summary>

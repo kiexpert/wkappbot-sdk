@@ -10,7 +10,7 @@ namespace WKAppBot.Win32.Native;
 /// </summary>
 public static partial class NativeMethods
 {
-    // ── Window finding ───────────────────────────────────────────
+    // -- Window finding ------------------------------------------─
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     public delegate bool EnumChildWindowsProc(IntPtr hWnd, IntPtr lParam);
 
@@ -35,7 +35,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
-    // ── Menu API ─────────────────────────────────────────────────
+    // -- Menu API ------------------------------------------------─
     [DllImport("user32.dll")]
     public static extern IntPtr GetMenu(IntPtr hWnd);
 
@@ -56,7 +56,7 @@ public static partial class NativeMethods
     public const uint MF_GRAYED     = 0x00000001u;
     public const uint MF_DISABLED   = 0x00000002u;
 
-    // ── Menu resource scanning (multi-language) ───────────────────
+    // -- Menu resource scanning (multi-language) ------------------─
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern uint GetWindowModuleFileNameW(IntPtr hwnd, StringBuilder pszFileName, uint cchFileNameMax);
 
@@ -115,8 +115,8 @@ public static partial class NativeMethods
     public const int SW_SHOWMINNOACTIVE = 7;
     public const int SW_RESTORE = 9;
 
-    // ── Screen Reader announcement (SPI_SETSCREENREADER) ──
-    // Tells all apps "a screen reader is running" → Chromium/Electron auto-enable A11Y tree
+    // -- Screen Reader announcement (SPI_SETSCREENREADER) --
+    // Tells all apps "a screen reader is running" -> Chromium/Electron auto-enable A11Y tree
     public const uint SPI_GETSCREENREADER = 0x0046;
     public const uint SPI_SETSCREENREADER = 0x0047;
     public const uint SPIF_SENDCHANGE = 0x0002;
@@ -163,7 +163,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr RemovePropW(IntPtr hWnd, string lpString);
 
-    // Global atom table — used to cache strings in window props (survives Eye restart)
+    // Global atom table -- used to cache strings in window props (survives Eye restart)
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     public static extern void OutputDebugStringW(string lpOutputString);
 
@@ -202,7 +202,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
-    // ── GUI thread info (cross-validate focus target) ────────────
+    // -- GUI thread info (cross-validate focus target) ------------
     [StructLayout(LayoutKind.Sequential)]
     public struct GUITHREADINFO
     {
@@ -234,7 +234,7 @@ public static partial class NativeMethods
         return IntPtr.Zero;
     }
 
-    // ── Window rect / state ──────────────────────────────────────
+    // -- Window rect / state --------------------------------------
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
@@ -249,7 +249,7 @@ public static partial class NativeMethods
 
     /// <summary>
     /// Like WindowFromPoint but ignores transparent/disabled windows and drills into real child controls.
-    /// Returns the deepest child that actually owns the point — useful for WPF/Electron host windows.
+    /// Returns the deepest child that actually owns the point -- useful for WPF/Electron host windows.
     /// </summary>
     [DllImport("user32.dll")]
     public static extern IntPtr RealChildWindowFromPoint(IntPtr hwndParent, POINT ptParentClientCoords);
@@ -258,7 +258,7 @@ public static partial class NativeMethods
     public static extern IntPtr SetFocusRaw(IntPtr hWnd);
 
     /// <summary>
-    /// Smart SetFocus — [FOCUS-GUARD] blocks if user is actively typing.
+    /// Smart SetFocus -- [FOCUS-GUARD] blocks if user is actively typing.
     /// Use for all NEW focus acquisitions (not restores).
     /// For focus-restore patterns (FocusSnapshot.Restore, MidInputFocusCheck): use SetFocusRaw.
     /// </summary>
@@ -269,14 +269,14 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Raw SetForegroundWindow P/Invoke — NO guards, NO focusless check.
+    /// Raw SetForegroundWindow P/Invoke -- NO guards, NO focusless check.
     /// Use ONLY for focus-restore patterns (undoing a previous steal).
     /// For all other uses: SetForegroundWindow (proxy) or SmartSetForegroundWindow (full gate).
     /// </summary>
     [DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
     public static extern bool SetForegroundWindowRaw(IntPtr hWnd);
 
-    // ── IME (Korean/CJK input mode + composition) ────────────────────────────
+    // -- IME (Korean/CJK input mode + composition) ----------------------------
     [DllImport("imm32.dll")]
     public static extern IntPtr ImmGetContext(IntPtr hWnd);
     [DllImport("imm32.dll")]
@@ -291,7 +291,7 @@ public static partial class NativeMethods
     // SCS_SETSTR=0x0002: re-inject composition string into IME buffer
     [DllImport("imm32.dll", CharSet = CharSet.Unicode)]
     public static extern bool ImmSetCompositionStringW(IntPtr hIMC, uint dwIndex, string lpComp, uint dwCompLen, IntPtr lpRead, uint dwReadLen);
-    // NI_COMPOSITIONSTR=0x0015, CPS_COMPLETE=0x0001: finalize composition → commit to app
+    // NI_COMPOSITIONSTR=0x0015, CPS_COMPLETE=0x0001: finalize composition -> commit to app
     [DllImport("imm32.dll")]
     public static extern bool ImmNotifyIME(IntPtr hIMC, uint dwAction, uint dwIndex, uint dwValue);
 
@@ -300,9 +300,9 @@ public static partial class NativeMethods
 
     /// <summary>
     /// [FOCUS-GUARD] 현재 키보드 포커스를 가진 HWND 반환.
-    /// GetForegroundWindow()보다 정밀 — 같은 창 내에서도 컨트롤 간 포커스 이동을 감지.
-    /// 예: VS Code 코드 에디터 → Message input 이동 = 같은 hwnd이지만 hwndFocus 다름.
-    /// idThread=0 → 포그라운드 스레드의 키보드 포커스 반환.
+    /// GetForegroundWindow()보다 정밀 -- 같은 창 내에서도 컨트롤 간 포커스 이동을 감지.
+    /// 예: VS Code 코드 에디터 -> Message input 이동 = 같은 hwnd이지만 hwndFocus 다름.
+    /// idThread=0 -> 포그라운드 스레드의 키보드 포커스 반환.
     /// </summary>
     public static IntPtr GetKeyboardFocusHwnd()
     {
@@ -312,7 +312,7 @@ public static partial class NativeMethods
 
     /// <summary>
     /// 특정 스레드의 키보드 포커스 hwnd 반환.
-    /// 전경 여부 무관 — 백그라운드 창의 per-thread focus 조회 가능.
+    /// 전경 여부 무관 -- 백그라운드 창의 per-thread focus 조회 가능.
     /// </summary>
     public static IntPtr GetThreadFocusHwnd(uint tid)
     {
@@ -326,7 +326,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr hWnd, int x, int y, int nWidth, int nHeight, bool bRepaint);
 
-    // ── Messages ─────────────────────────────────────────────────
+    // -- Messages ------------------------------------------------─
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
@@ -342,7 +342,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool PostMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-    // ── Input ────────────────────────────────────────────────────
+    // -- Input ----------------------------------------------------
     [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
@@ -364,7 +364,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern uint MapVirtualKeyW(uint uCode, uint uMapType);
 
-    // ── Child window from point ─────────────────────────────────
+    // -- Child window from point --------------------------------─
     [DllImport("user32.dll")]
     public static extern IntPtr ChildWindowFromPointEx(IntPtr hWndParent, POINT pt, uint uFlags);
 
@@ -376,7 +376,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
 
-    // ── Z-order / hit-test ────────────────────────────────────────
+    // -- Z-order / hit-test ----------------------------------------
     [DllImport("user32.dll")]
     public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
@@ -396,7 +396,7 @@ public static partial class NativeMethods
     public const int GWL_STYLE = -16;
     public const int GWL_EXSTYLE = -20;
 
-    // WS_* — Window Styles (GWL_STYLE)
+    // WS_* -- Window Styles (GWL_STYLE)
     public const int WS_POPUP       = unchecked((int)0x80000000);
     public const int WS_CHILD       = 0x40000000;
     public const int WS_VISIBLE     = 0x10000000;
@@ -407,7 +407,7 @@ public static partial class NativeMethods
     public const int WS_VSCROLL     = 0x00200000;
     public const int WS_HSCROLL     = 0x00100000;
 
-    // WS_EX_* — Extended Window Styles (GWL_EXSTYLE)
+    // WS_EX_* -- Extended Window Styles (GWL_EXSTYLE)
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_TOOLWINDOW = 0x00000080;
     public const int WS_EX_TOPMOST    = 0x00000008;
@@ -418,7 +418,7 @@ public static partial class NativeMethods
     public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
     public const uint LWA_ALPHA = 0x02;
 
-    // ── Cursor detection (EditCursor hint for DYN-A11Y) ──
+    // -- Cursor detection (EditCursor hint for DYN-A11Y) --
     [StructLayout(LayoutKind.Sequential)]
     public struct CURSORINFO
     {
@@ -561,13 +561,13 @@ public static partial class NativeMethods
         return false;
     }
 
-    // ── Console codepage ──────────────────────────────────────────
+    // -- Console codepage ------------------------------------------
     [DllImport("kernel32.dll")]
     public static extern bool SetConsoleCP(uint wCodePageID);
     [DllImport("kernel32.dll")]
     public static extern bool SetConsoleOutputCP(uint wCodePageID);
 
-    // ── DPI ──────────────────────────────────────────────────────
+    // -- DPI ------------------------------------------------------
     [DllImport("shcore.dll")]
     public static extern int SetProcessDpiAwareness(int awareness);
 
@@ -620,7 +620,7 @@ public static partial class NativeMethods
     // SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77
     // SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79
 
-    // ── Clipboard ────────────────────────────────────────────────
+    // -- Clipboard ------------------------------------------------
     [DllImport("user32.dll")]
     public static extern bool OpenClipboard(IntPtr hWndNewOwner);
 
@@ -642,7 +642,7 @@ public static partial class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern bool GlobalUnlock(IntPtr hMem);
 
-    // ── SendMessageTimeout (responsive check: SMTO_ABORTIFHUNG) ──
+    // -- SendMessageTimeout (responsive check: SMTO_ABORTIFHUNG) --
     public const uint WM_NULL = 0x0000;
     public const uint SMTO_ABORTIFHUNG = 0x0002;
 
@@ -651,7 +651,7 @@ public static partial class NativeMethods
         IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam,
         uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
 
-    // ── MDI ──────────────────────────────────────────────────────
+    // -- MDI ------------------------------------------------------
     public const uint WM_CLOSE = 0x0010;
     public const uint WM_COPYDATA = 0x004A;
     public const uint WM_GETTEXT = 0x000D;
@@ -686,7 +686,7 @@ public static partial class NativeMethods
     /// <summary>Pack (x, y) screen coords into lParam for WM_NCHITTEST.</summary>
     public static IntPtr MakeScreenLParam(int x, int y) => (IntPtr)((y << 16) | (x & 0xFFFF));
 
-    // ── Process ──────────────────────────────────────────────────
+    // -- Process --------------------------------------------------
     [DllImport("user32.dll")]
     public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
 
@@ -725,7 +725,7 @@ public static partial class NativeMethods
     public static bool? IsProcessElevated(uint processId)
     {
         var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, processId);
-        if (hProcess == IntPtr.Zero) return null; // access denied → likely elevated
+        if (hProcess == IntPtr.Zero) return null; // access denied -> likely elevated
 
         try
         {
@@ -779,7 +779,7 @@ public static partial class NativeMethods
         finally { CloseHandle(hProcess); }
     }
 
-    // ── UIPI integrity level ───────────────────────────────────
+    // -- UIPI integrity level ----------------------------------─
 
     [DllImport("advapi32.dll", EntryPoint = "GetTokenInformation", SetLastError = true)]
     private static extern bool GetTokenInformationPtr(
@@ -832,7 +832,7 @@ public static partial class NativeMethods
         finally { Marshal.FreeHGlobal(buf); }
     }
 
-    // ── User idle detection ────────────────────────────────────
+    // -- User idle detection ------------------------------------
 
     [StructLayout(LayoutKind.Sequential)]
     public struct LASTINPUTINFO
@@ -855,7 +855,7 @@ public static partial class NativeMethods
         return (uint)((Environment.TickCount & 0x7FFFFFFF) - (lii.dwTime & 0x7FFFFFFF));
     }
 
-    // ── Sleep / Display prevention ─────────────────────────────
+    // -- Sleep / Display prevention ----------------------------─
     [DllImport("kernel32.dll")]
     public static extern uint SetThreadExecutionState(uint esFlags);
 
@@ -863,7 +863,7 @@ public static partial class NativeMethods
     public const uint ES_SYSTEM_REQUIRED = 0x00000001;
     public const uint ES_DISPLAY_REQUIRED = 0x00000002;
 
-    // ── Screen capture ───────────────────────────────────────────
+    // -- Screen capture ------------------------------------------─
     [DllImport("user32.dll")]
     public static extern IntPtr GetDC(IntPtr hWnd);
 
@@ -900,7 +900,7 @@ public static partial class NativeMethods
     public const uint PW_CLIENTONLY = 0x01;
     public const uint PW_RENDERFULLCONTENT = 0x02;
 
-    // ── GDI clip region + viewport (PrintWindow sub-region optimization) ──
+    // -- GDI clip region + viewport (PrintWindow sub-region optimization) --
 
     [DllImport("gdi32.dll")]
     public static extern bool SetViewportOrgEx(IntPtr hdc, int x, int y, out POINT lppt);
@@ -911,7 +911,7 @@ public static partial class NativeMethods
     [DllImport("gdi32.dll")]
     public static extern int SelectClipRgn(IntPtr hdc, IntPtr hrgn);
 
-    // ── Window Z-order positioning ─────────────────────────────
+    // -- Window Z-order positioning ----------------------------─
     [DllImport("user32.dll")]
     public static extern bool SetWindowPos(
         IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
@@ -928,7 +928,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool BringWindowToTop(IntPtr hWnd);
 
-    // ── Paint detection (hollow invoke check) ──────────────────
+    // -- Paint detection (hollow invoke check) ------------------
     /// <summary>Returns true if update region is non-empty (pending paint = something was redrawn).</summary>
     [DllImport("user32.dll")]
     public static extern bool GetUpdateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
@@ -937,7 +937,7 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool ValidateRect(IntPtr hWnd, IntPtr lpRect);
 
-    // ── Focus / Alert ──────────────────────────────────────────
+    // -- Focus / Alert ------------------------------------------
     [DllImport("user32.dll")]
     public static extern bool MessageBeep(uint uType);
 
@@ -970,7 +970,7 @@ public static partial class NativeMethods
 
     /// <summary>
     /// Core SetForegroundWindow with AttachThreadInput trick.
-    /// No guards — guards are applied by callers (SetForegroundWindow / SmartSetForegroundWindow).
+    /// No guards -- guards are applied by callers (SetForegroundWindow / SmartSetForegroundWindow).
     /// </summary>
     private static bool SetForegroundWindowCore(IntPtr hWnd)
     {
@@ -978,7 +978,7 @@ public static partial class NativeMethods
         SetForegroundWindowRaw(hWnd);
         if (GetForegroundWindow() == hWnd) return true;
 
-        // AttachThreadInput trick — Z-order + keyboard focus 동시 확보
+        // AttachThreadInput trick -- Z-order + keyboard focus 동시 확보
         var fgHwnd = GetForegroundWindow();
         uint fgThread = GetWindowThreadProcessId(fgHwnd, out _);
         uint ourThread = GetCurrentThreadId();
@@ -1001,7 +1001,7 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Force foreground window — AttachThreadInput trick, no FocuslessGuard.
+    /// Force foreground window -- AttachThreadInput trick, no FocuslessGuard.
     /// Use ONLY for focus RESTORATION after a detected theft (defensive).
     /// Do NOT use for offensive focus acquisition.
     /// </summary>
@@ -1009,10 +1009,10 @@ public static partial class NativeMethods
         => SetForegroundWindowCore(hWnd);
 
     /// <summary>
-    /// Public SetForegroundWindow proxy — routes through FocuslessGuard + AttachThreadInput trick.
+    /// Public SetForegroundWindow proxy -- routes through FocuslessGuard + AttachThreadInput trick.
     /// Use for any focus action (window activation, bring-to-front).
     /// BLOCKED by FocuslessGuard in focusless mode.
-    /// Does NOT require Probe() (no AssertReadiness) — safe for dialog/restore-adjacent contexts.
+    /// Does NOT require Probe() (no AssertReadiness) -- safe for dialog/restore-adjacent contexts.
     /// For full input acquisition (SendInput path): use SmartSetForegroundWindow.
     /// </summary>
     public static bool SetForegroundWindow(IntPtr hWnd)
@@ -1023,14 +1023,14 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Smart SetForegroundWindow — full input acquisition gate.
+    /// Smart SetForegroundWindow -- full input acquisition gate.
     /// Windows normally blocks SetForegroundWindow from non-foreground threads.
     /// By attaching our input queue to the foreground thread, we gain permission.
     /// BLOCKED by FocuslessGuard + AssertReadiness (requires Probe() before call).
     /// </summary>
     public static bool SmartSetForegroundWindow(IntPtr hWnd)
     {
-        // 정확 핸들 비교 — 같은 프로세스의 다른 창은 "foreground"가 아님!
+        // 정확 핸들 비교 -- 같은 프로세스의 다른 창은 "foreground"가 아님!
         if (GetForegroundWindow() == hWnd) return true;
 
         // FocuslessGuard: block if enabled (only when we actually NEED to steal focus)
@@ -1047,18 +1047,18 @@ public static partial class NativeMethods
 
         // [FOCUS-GUARD] Active-user guard: block if user typed/clicked recently.
         // Probe() approved at T=0 (idle), but user may have started typing between
-        // Probe() and this focus steal → race condition → steal disrupts user input.
+        // Probe() and this focus steal -> race condition -> steal disrupts user input.
         // CheckActiveGuard blocks (return false) if idleMs < threshold AND no grace period.
-        // Grace period: Probe yield-approval click itself resets idle → allowed for 3s.
+        // Grace period: Probe yield-approval click itself resets idle -> allowed for 3s.
         if (!WKAppBot.Win32.Input.InputReadiness.CheckActiveGuard("SmartSetForegroundWindow"))
             return false;
 
         // Keyboard input lock: if another session is currently sending keystrokes, yield focus.
-        // "먼저 잡은 넘이 우선권" — don't interrupt ongoing typing in another process.
+        // "먼저 잡은 넘이 우선권" -- don't interrupt ongoing typing in another process.
         if (Input.KeyboardInput.IsInputLockedByOther())
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine($"[FOCUS] ⚠ SmartSetForegroundWindow skipped — another session is typing (hwnd={hWnd:X8})");
+            Console.WriteLine($"[FOCUS] ! SmartSetForegroundWindow skipped -- another session is typing (hwnd={hWnd:X8})");
             Console.ResetColor();
             return false;
         }
@@ -1102,7 +1102,7 @@ public static partial class NativeMethods
         }
     }
 
-    // ── Process CWD reading via NtQueryInformationProcess → PEB ──────
+    // -- Process CWD reading via NtQueryInformationProcess -> PEB ------
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
         [Out] byte[] lpBuffer, int nSize, out int lpNumberOfBytesRead);
@@ -1126,7 +1126,7 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Read the current working directory of any process via NtQueryInformationProcess → PEB.
+    /// Read the current working directory of any process via NtQueryInformationProcess -> PEB.
     /// Returns null on failure (access denied, 32/64-bit mismatch, etc.).
     /// </summary>
     public static string? GetProcessCurrentDirectory(int pid)
@@ -1179,7 +1179,7 @@ public static partial class NativeMethods
     }
 
     /// <summary>
-    /// Read the command line of any process via NtQueryInformationProcess → PEB.
+    /// Read the command line of any process via NtQueryInformationProcess -> PEB.
     /// Returns null on failure.
     /// </summary>
     /// <summary>
@@ -1251,7 +1251,7 @@ public static partial class NativeMethods
     }
 }
 
-// ── Structs ──────────────────────────────────────────────────
+// -- Structs --------------------------------------------------
 
 [StructLayout(LayoutKind.Sequential)]
 public struct RECT
@@ -1276,7 +1276,7 @@ public struct COPYDATASTRUCT
     public IntPtr lpData;
 }
 
-// ── SendInput structs ────────────────────────────────────────
+// -- SendInput structs ----------------------------------------
 
 [StructLayout(LayoutKind.Sequential)]
 public struct INPUT

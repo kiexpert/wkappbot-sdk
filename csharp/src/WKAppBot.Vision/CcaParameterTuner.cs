@@ -5,21 +5,21 @@ namespace WKAppBot.Vision;
 
 /// <summary>
 /// Auto-tuning CCA parameters per process using Gemini Vision feedback.
-/// When Gemini says "this is an icon, not text" → misclassification signal → adjust thresholds.
+/// When Gemini says "this is an icon, not text" -> misclassification signal -> adjust thresholds.
 ///
 /// Parameters tuned:
-///   1. TextMinDensity   — minimum foreground pixel density for text (default 0.10)
-///   2. TextMaxDensity   — maximum density for text (above = filled icon) (default 0.85)
-///   3. TextMinAR        — minimum aspect ratio for text (default 0.20)
-///   4. TextMaxAR        — maximum aspect ratio for text (default 5.0)
-///   5. TextMaxSize      — maximum width/height for single glyph (default 80)
-///   6. IconMinSize      — minimum width/height for icon (default 8)
-///   7. NoiseMaxPixels   — max pixel count for noise (default 4)
+///   1. TextMinDensity   -- minimum foreground pixel density for text (default 0.10)
+///   2. TextMaxDensity   -- maximum density for text (above = filled icon) (default 0.85)
+///   3. TextMinAR        -- minimum aspect ratio for text (default 0.20)
+///   4. TextMaxAR        -- maximum aspect ratio for text (default 5.0)
+///   5. TextMaxSize      -- maximum width/height for single glyph (default 80)
+///   6. IconMinSize      -- minimum width/height for icon (default 8)
+///   7. NoiseMaxPixels   -- max pixel count for noise (default 4)
 ///
 /// Algorithm: Exponential Moving Average (EMA) with boundary learning.
 ///   - Each misclassification nudges the boundary toward the misclassified sample
 ///   - Correct classifications reinforce current boundaries (smaller nudge)
-///   - α = 0.15 (learning rate) — stabilizes after ~20 samples
+///   - α = 0.15 (learning rate) -- stabilizes after ~20 samples
 ///
 /// Storage: experience/{processName}/cca_params.json
 /// </summary>
@@ -28,7 +28,7 @@ public sealed class CcaParameterTuner
     private const double InitialLearningRate = 0.15;  // EMA α start for misclassification
     private const double ReinforcementRate = 0.02;    // EMA α for correct classification
     private const double AlphaDecay = 0.995;          // per-sample decay (Claude recommendation)
-    private const double AlphaFloor = 0.005;          // minimum α — never stop learning entirely
+    private const double AlphaFloor = 0.005;          // minimum α -- never stop learning entirely
     private const int MinSamplesForStable = 15;       // min samples before parameters are "confident"
 
     public CcaParams Params { get; private set; } = new();
@@ -69,7 +69,7 @@ public sealed class CcaParameterTuner
     /// <summary>
     /// Compute a layout hash from CCA regions: encodes component count,
     /// relative positions, and size classes into a short hex string.
-    /// Same visual layout → same hash, even across sessions.
+    /// Same visual layout -> same hash, even across sessions.
     /// </summary>
     public static string ComputeLayoutHash(List<ConnectedComponentAnalyzer.Region> regions, int imgW, int imgH)
     {
@@ -134,8 +134,8 @@ public sealed class CcaParameterTuner
             if (predicted == ConnectedComponentAnalyzer.RegionType.DyText
                 && actual == ConnectedComponentAnalyzer.RegionType.DyIcon)
             {
-                // CCA said text but it's icon → tighten text boundaries to exclude this sample
-                // If density is low → raise min density; if density is high → lower max density
+                // CCA said text but it's icon -> tighten text boundaries to exclude this sample
+                // If density is low -> raise min density; if density is high -> lower max density
                 if (density < Params.TextMinDensity + 0.3)
                     Params.TextMinDensity = Nudge(Params.TextMinDensity, density + 0.05, alpha, lower: false);
                 else
@@ -149,7 +149,7 @@ public sealed class CcaParameterTuner
             else if (predicted == ConnectedComponentAnalyzer.RegionType.DyIcon
                      && actual == ConnectedComponentAnalyzer.RegionType.DyText)
             {
-                // CCA said icon but it's text → widen text boundaries to include this sample
+                // CCA said icon but it's text -> widen text boundaries to include this sample
                 if (density < Params.TextMinDensity)
                     Params.TextMinDensity = Nudge(Params.TextMinDensity, density - 0.02, alpha, lower: true);
                 if (aspectRatio < Params.TextMinAR)
@@ -224,7 +224,7 @@ public sealed class CcaParameterTuner
 /// <summary>Serializable CCA parameters with tuning metadata.</summary>
 public sealed class CcaParams
 {
-    // ── Tunable thresholds ──
+    // -- Tunable thresholds --
     public double TextMinDensity { get; set; } = 0.10;
     public double TextMaxDensity { get; set; } = 0.85;
     public double TextMinAR { get; set; } = 0.20;
@@ -234,7 +234,7 @@ public sealed class CcaParams
     public int NoiseMaxPixels { get; set; } = 4;
     public double TextMinSolidity { get; set; } = 0.30;  // convex hull fill ratio (Claude suggestion)
 
-    // ── Tuning metadata ──
+    // -- Tuning metadata --
     public int TotalSamples { get; set; }
     public int CorrectCount { get; set; }
     public int MisclassifiedCount { get; set; }

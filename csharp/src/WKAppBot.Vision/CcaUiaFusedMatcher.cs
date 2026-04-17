@@ -1,12 +1,12 @@
-// CcaUiaFusedMatcher.cs — CCA↔UIA Spatial+Semantic Fused Matching
+// CcaUiaFusedMatcher.cs -- CCA↔UIA Spatial+Semantic Fused Matching
 // Inspired by GPT(weighted score), Gemini(Grid Hash), Claude(Hungarian+Containment).
 //
 // Pipeline:
-//   1. Grid Hash index UIA elements (50px buckets) → O(N) candidate generation
-//   2. Asymmetric dilation (±6px) → absorb border/shadow pixel error
+//   1. Grid Hash index UIA elements (50px buckets) -> O(N) candidate generation
+//   2. Asymmetric dilation (±6px) -> absorb border/shadow pixel error
 //   3. Weighted score: 0.40×IoU + 0.20×contain + 0.15×centerDist + 0.15×sizeDelta + 0.10×rowColAlign
 //   4. Greedy 1:1 assignment (sort by score desc, first-come-first-serve)
-//   5. Unmatched CCA regions → synthetic UIA nodes (gap filling)
+//   5. Unmatched CCA regions -> synthetic UIA nodes (gap filling)
 
 using System.Drawing;
 
@@ -58,7 +58,7 @@ public sealed class CcaUiaFusedMatcher
         var results = new List<MatchResult>();
         if (ccaRegions.Count == 0) return results;
 
-        // ── Step 1: Grid Hash index for UIA elements ──
+        // -- Step 1: Grid Hash index for UIA elements --
         var grid = new Dictionary<(int, int), List<int>>();
         for (int i = 0; i < uiaElements.Count; i++)
         {
@@ -77,7 +77,7 @@ public sealed class CcaUiaFusedMatcher
                 }
         }
 
-        // ── Step 2: Score each CCA↔UIA candidate pair ──
+        // -- Step 2: Score each CCA↔UIA candidate pair --
         var candidates = new List<(int ccaIdx, int uiaIdx, double score)>();
         var uiaUsed = new HashSet<int>();
 
@@ -111,7 +111,7 @@ public sealed class CcaUiaFusedMatcher
             }
         }
 
-        // ── Step 3: Greedy 1:1 assignment (sort by score desc) ──
+        // -- Step 3: Greedy 1:1 assignment (sort by score desc) --
         candidates.Sort((a, b) => b.score.CompareTo(a.score));
         var ccaMatched = new HashSet<int>();
 
@@ -129,7 +129,7 @@ public sealed class CcaUiaFusedMatcher
             });
         }
 
-        // ── Step 4: Unmatched CCA → synthetic (gap filling) ──
+        // -- Step 4: Unmatched CCA -> synthetic (gap filling) --
         for (int ci = 0; ci < ccaRegions.Count; ci++)
         {
             if (ccaMatched.Contains(ci)) continue;
@@ -142,7 +142,7 @@ public sealed class CcaUiaFusedMatcher
             });
         }
 
-        // ── Step 5: Unmatched UIA (no CCA counterpart) ──
+        // -- Step 5: Unmatched UIA (no CCA counterpart) --
         for (int ui = 0; ui < uiaElements.Count; ui++)
         {
             if (uiaUsed.Contains(ui)) continue;
@@ -171,7 +171,7 @@ public sealed class CcaUiaFusedMatcher
     /// <summary>
     /// Weighted spatial score (GPT formula):
     /// 0.40×IoU + 0.20×contain + 0.15×(1-centerDistNorm) + 0.15×(1-sizeDeltaNorm) + 0.10×rowColAlign
-    /// With asymmetric dilation: try exact, dilated-CCA, dilated-UIA → max IoU.
+    /// With asymmetric dilation: try exact, dilated-CCA, dilated-UIA -> max IoU.
     /// </summary>
     static double ComputeScore(Rectangle cca, Rectangle uia)
     {
@@ -210,7 +210,7 @@ public sealed class CcaUiaFusedMatcher
     }
 
     /// <summary>
-    /// Text similarity: normalized exact → substring → token Jaccard.
+    /// Text similarity: normalized exact -> substring -> token Jaccard.
     /// Claude formula: exact=1.0, substring=0.85, else 0.6×tokenJaccard + 0.4×editSim.
     /// Simplified for speed: exact/substring/token Jaccard only.
     /// </summary>
@@ -232,7 +232,7 @@ public sealed class CcaUiaFusedMatcher
 
     static string Normalize(string s)
     {
-        // Unicode NFC normalization (Korean jamo composition: ㅎ+ㅏ+ㄴ → 한)
+        // Unicode NFC normalization (Korean jamo composition: ㅎ+ㅏ+ㄴ -> 한)
         s = s.Normalize(System.Text.NormalizationForm.FormC);
         return new string(s.ToLowerInvariant().Where(c => char.IsLetterOrDigit(c) || c == ' ').ToArray()).Trim();
     }
@@ -292,7 +292,7 @@ public sealed class CcaUiaFusedMatcher
 
     /// <summary>
     /// Load recent match results from Experience DB.
-    /// Returns latest entry's top matches (UIA name → CCA bounds mapping).
+    /// Returns latest entry's top matches (UIA name -> CCA bounds mapping).
     /// </summary>
     public static List<(string uiaName, string ccaType, Rectangle bounds, double score)>
         LoadFromExperienceDb(string experienceDir, string processName, string className)

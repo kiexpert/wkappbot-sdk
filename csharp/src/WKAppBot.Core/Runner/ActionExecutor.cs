@@ -12,15 +12,15 @@ namespace WKAppBot.Core.Runner;
 /// <summary>
 /// Executes individual step actions.
 /// 5-tier Chain of Responsibility:
-///   1. UIA (Accessibility) — fast, reliable
-///   2. Vision Cache — cached results (경험치!)
-///   3. Simple OCR — Windows.Media.Ocr text matching (free, fast, offline)
-///   4. Vision API — Claude screenshot analysis (expensive, cached)
-///   5. Coordinate — raw x,y fallback
+///   1. UIA (Accessibility) -- fast, reliable
+///   2. Vision Cache -- cached results (경험치!)
+///   3. Simple OCR -- Windows.Media.Ocr text matching (free, fast, offline)
+///   4. Vision API -- Claude screenshot analysis (expensive, cached)
+///   5. Coordinate -- raw x,y fallback
 ///
 /// Focusless-First principle:
-///   - UIA Invoke (click), UIA Value (type) → no focus needed, user undisturbed
-///   - SendInput (mouse/keyboard) → EnsureFocus required
+///   - UIA Invoke (click), UIA Value (type) -> no focus needed, user undisturbed
+///   - SendInput (mouse/keyboard) -> EnsureFocus required
 /// </summary>
 public sealed class ActionExecutor : IDisposable
 {
@@ -50,14 +50,14 @@ public sealed class ActionExecutor : IDisposable
     private readonly RuntimeContext _ctx;
     private readonly bool _verbose;
 
-    // Vision tier (optional — only when vision_enabled: true)
+    // Vision tier (optional -- only when vision_enabled: true)
     private VisionCache? _visionCache;
     private VisionAnalyzer? _visionAnalyzer;
     private SimpleOcrAnalyzer? _simpleOcr;
     private OcrSegmentCache? _segmentCache;  // Tier 2.5: form-level dynamic a11y tree
 
-    // [ZOOM] Overlay factory — set by CLI layer (ClickZoomAdapter)
-    // Parameters: (screenRect, formHandle, actionName, label) → IActionZoom?
+    // [ZOOM] Overlay factory -- set by CLI layer (ClickZoomAdapter)
+    // Parameters: (screenRect, formHandle, actionName, label) -> IActionZoom?
     private IActionZoom? _currentZoom;
 
     /// <summary>
@@ -67,13 +67,13 @@ public sealed class ActionExecutor : IDisposable
     public Func<System.Drawing.Rectangle, IntPtr, string, string, IActionZoom?>? CreateZoom { get; set; }
 
     /// <summary>
-    /// Optional Vision AI ask delegate — CLI wires this to Gemini/Claude CDP for blob identification.
+    /// Optional Vision AI ask delegate -- CLI wires this to Gemini/Claude CDP for blob identification.
     ///
     /// Called when OcrSegmentCache has no text match AND Vision API isn't configured.
     /// Parameters: (formScreenshot, elementDescription)
     /// Returns: OcrSegment with x/y/w/h from Gemini JSON, or null on failure.
     ///
-    /// Coordinates come directly from Gemini JSON — no BestMatch step needed.
+    /// Coordinates come directly from Gemini JSON -- no BestMatch step needed.
     /// Result is used to:
     ///   1. Save blob crop: {pixelHash}={label}.png
     ///   2. Teach OcrSegmentCache (source="gemini") for future lookups
@@ -94,53 +94,53 @@ public sealed class ActionExecutor : IDisposable
         _simpleOcr = simpleOcr;
     }
 
-    // ── [READINESS] Pre-action input readiness check ────────────
+    // -- [READINESS] Pre-action input readiness check ------------
 
     /// <summary>
     /// Optional InputReadiness instance. Set by CLI layer to enable pre-action readiness checks.
-    /// When set, every a11y action triggers: readiness check → zoom → actual call.
+    /// When set, every a11y action triggers: readiness check -> zoom -> actual call.
     /// </summary>
     public InputReadiness? Readiness { get; set; }
 
     /// <summary>
     /// Lightweight readiness check before a11y action:
-    ///   1. Minimized → focusless restore (SW_SHOWNOACTIVATE)
+    ///   1. Minimized -> focusless restore (SW_SHOWNOACTIVATE)
     ///   2. Blocker detection (~5ms, QuickMode)
-    /// Does NOT do full Probe — keeps action latency minimal.
+    /// Does NOT do full Probe -- keeps action latency minimal.
     /// </summary>
     private void EnsureInputReady(FlaUI.Core.AutomationElements.AutomationElement? element, string action)
     {
         var mainHwnd = _ctx.MainWindowHandle;
         if (mainHwnd == IntPtr.Zero) return;
 
-        // Step 1: Minimized → focusless restore
+        // Step 1: Minimized -> focusless restore
         if (NativeMethods.IsIconic(mainHwnd))
         {
-            Log($"  [READINESS] Window minimized — restoring (focusless)");
+            Log($"  [READINESS] Window minimized -- restoring (focusless)");
             NativeMethods.ShowWindow(mainHwnd, NativeMethods.SW_SHOWNOACTIVATE);
             Thread.Sleep(200); // wait for restore animation
         }
 
-        // Step 2: Blocker detection (quick — ~5ms)
+        // Step 2: Blocker detection (quick -- ~5ms)
         if (Readiness != null)
         {
             var blocker = Readiness.DetectBlocker(mainHwnd);
             if (blocker != null)
             {
-                Log($"  [READINESS] Blocker: {blocker.ClassName} \"{blocker.Title}\" — attempting dismiss");
+                Log($"  [READINESS] Blocker: {blocker.ClassName} \"{blocker.Title}\" -- attempting dismiss");
                 var (handled, _) = Readiness.BlockerHandler?.TryHandle(mainHwnd, blocker)
                                    ?? (false, false);
                 if (!handled)
-                    Log($"  [READINESS] Blocker not handled — continuing anyway");
+                    Log($"  [READINESS] Blocker not handled -- continuing anyway");
             }
         }
     }
 
-    // ── [ZOOM] Overlay helper ───────────────────────────────
+    // -- [ZOOM] Overlay helper ------------------------------─
 
     /// <summary>
     /// Start zoom overlay for the located element (if factory is set).
-    /// Sets _currentZoom field — Execute() manages ShowPass/ShowFail/Dispose.
+    /// Sets _currentZoom field -- Execute() manages ShowPass/ShowFail/Dispose.
     /// </summary>
     private void BeginZoomForElement(FlaUI.Core.AutomationElements.AutomationElement? element, StepDefinition step)
     {
@@ -160,27 +160,27 @@ public sealed class ActionExecutor : IDisposable
 
             _currentZoom = CreateZoom(screenRect, formHandle, step.Action, label);
         }
-        catch { /* zoom is non-critical — never block automation */ }
+        catch { /* zoom is non-critical -- never block automation */ }
     }
 
-    // ── Smart Focus ("위치확보") ─────────────────────────────
+    // -- Smart Focus ("위치확보") ----------------------------─
 
     /// <summary>
     /// Ensure the target window has focus before SendInput.
     /// Called only when focusless path is not available.
     ///
     /// Flow:
-    ///   1. Already focused? → return (0ms)
-    ///   2. Alert (beep + flash) → wait alertDelay for user to switch back
-    ///   3. Force focus (AttachThreadInput trick) → retry loop
-    ///   4. Timeout → throw exception
+    ///   1. Already focused? -> return (0ms)
+    ///   2. Alert (beep + flash) -> wait alertDelay for user to switch back
+    ///   3. Force focus (AttachThreadInput trick) -> retry loop
+    ///   4. Timeout -> throw exception
     /// </summary>
     private void EnsureFocus()
     {
         if (!_ctx.FocusCheck) return;
         if (_ctx.MainWindowHandle == IntPtr.Zero) return;
 
-        // Quick check — most common case
+        // Quick check -- most common case
         if (NativeMethods.IsWindowForeground(_ctx.MainWindowHandle))
             return;
 
@@ -195,7 +195,7 @@ public sealed class ActionExecutor : IDisposable
         if (!success)
         {
             throw new InvalidOperationException(
-                $"Focus recovery failed after {_ctx.FocusTimeout:F1}s — " +
+                $"Focus recovery failed after {_ctx.FocusTimeout:F1}s -- " +
                 "please switch to the test window or disable focus_check");
         }
     }
@@ -257,7 +257,7 @@ public sealed class ActionExecutor : IDisposable
                     DoScroll(step, result);
                     break;
 
-                // ── UIA Pattern actions (all focusless!) ──────────────
+                // -- UIA Pattern actions (all focusless!) --------------
                 case "toggle":
                     DoToggle(step, result);
                     break;
@@ -290,7 +290,7 @@ public sealed class ActionExecutor : IDisposable
                     DoWindowAction(step, result, "maximize");
                     break;
 
-                // ── Focusless UIA pattern actions (pure COM, no SendInput) ──
+                // -- Focusless UIA pattern actions (pure COM, no SendInput) --
                 case "invoke":
                     DoInvoke(step, result);
                     break;
@@ -323,10 +323,10 @@ public sealed class ActionExecutor : IDisposable
             _currentZoom = null;
         }
 
-        // ── Expect-Recovery gate (P1 competition response) ──
+        // -- Expect-Recovery gate (P1 competition response) --
         // After the action executes, poll for expected UI state.
         // If expect fails and recovery is defined, run recovery then retry.
-        // All polling uses focusless UIA queries — no SendInput, no focus steal.
+        // All polling uses focusless UIA queries -- no SendInput, no focus steal.
         if (result.Status == StepStatus.Pass && step.Expect != null)
         {
             var expectResult = PollExpect(step.Expect, step.Target);
@@ -373,7 +373,7 @@ public sealed class ActionExecutor : IDisposable
                         {
                             result.Status = StepStatus.Fail;
                             result.Message = $"Expect '{step.Expect.Condition}' failed after {step.Recovery.MaxRetries} recovery attempts";
-                            Log($"  [RECOVERY] exhausted — step fails");
+                            Log($"  [RECOVERY] exhausted -- step fails");
                         }
                     }
                 }
@@ -409,10 +409,10 @@ public sealed class ActionExecutor : IDisposable
             try
             {
                 // Condition names are UIA-aligned: extensions of IUIAutomation properties/patterns.
-                //   element_*       → AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus, …)
-                //   value_*         → ValuePattern.Value operations (UIA ValuePattern)
-                //   window_*        → window-scope checks via WindowFinder
-                //   toggle_*, selected, expanded, collapsed → UIA pattern states
+                //   element_*       -> AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus, ...)
+                //   value_*         -> ValuePattern.Value operations (UIA ValuePattern)
+                //   window_*        -> window-scope checks via WindowFinder
+                //   toggle_*, selected, expanded, collapsed -> UIA pattern states
                 bool met = expect.Condition switch
                 {
                     // Element presence / state (UIA AutomationElement properties)
@@ -421,7 +421,7 @@ public sealed class ActionExecutor : IDisposable
                     "element_absent"   => !CheckElementVisible(target),
                     "element_focused"  => CheckElementFocused(target),   // HasKeyboardFocus
 
-                    // ValuePattern (UIA) — the element's Value property
+                    // ValuePattern (UIA) -- the element's Value property
                     "value_contains"   => CheckValueContains(target, expect.Value ?? ""),
                     "value_equals"     => CheckValueEquals(target, expect.Value ?? ""),
 
@@ -443,7 +443,7 @@ public sealed class ActionExecutor : IDisposable
                 };
                 if (met) return true;
             }
-            catch { /* element not found yet — keep polling */ }
+            catch { /* element not found yet -- keep polling */ }
 
             Thread.Sleep(intervalMs);
         }
@@ -571,7 +571,7 @@ public sealed class ActionExecutor : IDisposable
         Execute(recoveryStep);
     }
 
-    // ── Click actions ──────────────────────────────────────────
+    // -- Click actions ------------------------------------------
 
     private string DoClick(StepDefinition step, StepResult result)
     {
@@ -585,7 +585,7 @@ public sealed class ActionExecutor : IDisposable
             if (center != null)
                 _ctx.SetActionPoint(center.Value.x, center.Value.y, step.Name, "click", elemDesc);
 
-            // Focusless path: UIA Invoke (no focus needed — user undisturbed!)
+            // Focusless path: UIA Invoke (no focus needed -- user undisturbed!)
             if (_ctx.PreferFocusless && UiaLocator.TryInvoke(element))
             {
                 result.ActionDetail = $"Click {elemDesc} (Invoke, {method}, focusless)";
@@ -595,7 +595,7 @@ public sealed class ActionExecutor : IDisposable
 
             if (center != null)
             {
-                // SendInput path: pre-verify → focus → post-verify → click
+                // SendInput path: pre-verify -> focus -> post-verify -> click
                 var verify = VerifiedEnsureFocus(center.Value.x, center.Value.y,
                     expectedAid: step.Target?.AutomationId);
                 MouseInput.Click(center.Value.x, center.Value.y);
@@ -608,7 +608,7 @@ public sealed class ActionExecutor : IDisposable
         if (step.Target?.X != null && step.Target?.Y != null)
         {
             _ctx.SetActionPoint(step.Target.X.Value, step.Target.Y.Value, step.Name, "click", "coordinate");
-            // SendInput path: pre-verify → focus → post-verify → click
+            // SendInput path: pre-verify -> focus -> post-verify -> click
             var verify = VerifiedEnsureFocus(step.Target.X.Value, step.Target.Y.Value);
             MouseInput.Click(step.Target.X.Value, step.Target.Y.Value);
             result.ActionDetail = $"Click ({step.Target.X},{step.Target.Y}) (coordinate, {verify})";
@@ -684,7 +684,7 @@ public sealed class ActionExecutor : IDisposable
         throw new InvalidOperationException("Cannot locate element for right_click");
     }
 
-    // ── Text / Keyboard ────────────────────────────────────────
+    // -- Text / Keyboard ----------------------------------------
 
     private void DoTypeText(StepDefinition step, StepResult result)
     {
@@ -693,7 +693,7 @@ public sealed class ActionExecutor : IDisposable
 
         FlaUI.Core.AutomationElements.AutomationElement? element = null;
 
-        // ── Tier 1: UIA Value pattern (focusless — no focus needed!) ──
+        // -- Tier 1: UIA Value pattern (focusless -- no focus needed!) --
         if (_ctx.PreferFocusless && step.Target != null)
         {
             try
@@ -709,10 +709,10 @@ public sealed class ActionExecutor : IDisposable
                     return;
                 }
             }
-            catch { /* UIA Value not available — fall through */ }
+            catch { /* UIA Value not available -- fall through */ }
         }
 
-        // ── Tier 2: WM_CHAR PostMessage (cross-process, queued to target) ──
+        // -- Tier 2: WM_CHAR PostMessage (cross-process, queued to target) --
         // Best for MFC CMaskEdit, owner-drawn inputs (Gemini recommendation)
         var hWnd = GetTargetHwnd(step, element);
         if (hWnd != IntPtr.Zero)
@@ -734,14 +734,14 @@ public sealed class ActionExecutor : IDisposable
                         Log($"  Typed via WM_CHAR: \"{text}\"");
                         return;
                     }
-                    // WM_CHAR sent but verification failed — try next tier
+                    // WM_CHAR sent but verification failed -- try next tier
                     Log($"  WM_CHAR sent but verify failed (got \"{readBack}\"), trying next...");
                 }
             }
-            catch { /* WM_CHAR failed — fall through */ }
+            catch { /* WM_CHAR failed -- fall through */ }
         }
 
-        // ── Tier 3: EM_REPLACESEL (Edit control text insertion) ──
+        // -- Tier 3: EM_REPLACESEL (Edit control text insertion) --
         if (hWnd != IntPtr.Zero)
         {
             try
@@ -762,10 +762,10 @@ public sealed class ActionExecutor : IDisposable
                     Log($"  EM_REPLACESEL sent but verify failed (got \"{readBack}\"), trying next...");
                 }
             }
-            catch { /* EM_REPLACESEL failed — fall through */ }
+            catch { /* EM_REPLACESEL failed -- fall through */ }
         }
 
-        // ── Tier 4: SendInput Unicode (physical input, most reliable, needs focus) ──
+        // -- Tier 4: SendInput Unicode (physical input, most reliable, needs focus) --
         EnsureFocus();
         // Pass hWnd so TypeText can check focus per-character and restore on drift
         KeyboardInput.TypeText(text, hWnd);
@@ -826,7 +826,7 @@ public sealed class ActionExecutor : IDisposable
         Log($"  Hotkey: {string.Join("+", keys)}");
     }
 
-    // ── Wait ───────────────────────────────────────────────────
+    // -- Wait --------------------------------------------------─
 
     private void DoWait(StepDefinition step, StepResult result)
     {
@@ -836,7 +836,7 @@ public sealed class ActionExecutor : IDisposable
         Log($"  Waited {seconds}s");
     }
 
-    // ── Assert ─────────────────────────────────────────────────
+    // -- Assert ------------------------------------------------─
 
     private void DoAssert(StepDefinition step, StepResult result)
     {
@@ -858,7 +858,7 @@ public sealed class ActionExecutor : IDisposable
 
         Log($"  Assert {assertType}: actual=\"{actualText}\" expected=\"{expected}\"");
 
-        // Assert types use the same vocabulary as ExpectDefinition conditions —
+        // Assert types use the same vocabulary as ExpectDefinition conditions --
         // value_* operate on UIA ValuePattern.Value, consistent across assert + expect.
         bool pass = assertType switch
         {
@@ -877,10 +877,10 @@ public sealed class ActionExecutor : IDisposable
             : $"FAIL: \"{actualText}\" does not {assertType} \"{expected}\"";
         result.LocatorMethod = method;
         result.ActionDetail = $"Assert {assertType} \"{expected}\" on {step.Target?.AutomationId ?? step.Target?.Name ?? "?"}";
-        if (pass) result.ActionDetail += $" → \"{actualText}\"";
+        if (pass) result.ActionDetail += $" -> \"{actualText}\"";
     }
 
-    // ── Screenshot ─────────────────────────────────────────────
+    // -- Screenshot --------------------------------------------─
 
     private void DoScreenshot(StepDefinition step, StepResult result)
     {
@@ -897,18 +897,18 @@ public sealed class ActionExecutor : IDisposable
         result.ScreenshotPath = fullPath;
         result.Status = StepStatus.Pass;
         result.Message = $"Saved: {fullPath}";
-        result.ActionDetail = $"Screenshot → {filename}";
+        result.ActionDetail = $"Screenshot -> {filename}";
         Log($"  Screenshot: {fullPath}");
     }
 
-    // ── Scroll ─────────────────────────────────────────────────
+    // -- Scroll ------------------------------------------------─
 
     private void DoScroll(StepDefinition step, StepResult result)
     {
         var direction = step.Params?.Direction ?? "down";
         var amount = step.Params?.Amount ?? 3;
 
-        // ── Try UIA Scroll pattern first (focusless!) ──
+        // -- Try UIA Scroll pattern first (focusless!) --
         if (_ctx.PreferFocusless && step.Target != null)
         {
             try
@@ -950,10 +950,10 @@ public sealed class ActionExecutor : IDisposable
                     }
                 }
             }
-            catch { /* UIA Scroll not available — fall through to SendInput */ }
+            catch { /* UIA Scroll not available -- fall through to SendInput */ }
         }
 
-        // ── Fallback: SendInput mouse wheel (requires focus) ──
+        // -- Fallback: SendInput mouse wheel (requires focus) --
         int clicks = direction.ToLowerInvariant() == "up" ? amount : -amount;
         EnsureFocus();
         MouseInput.Scroll(clicks);
@@ -961,7 +961,7 @@ public sealed class ActionExecutor : IDisposable
         Log($"  Scrolled {direction} {amount}");
     }
 
-    // ── UIA Pattern actions (all focusless!) ─────────────────────
+    // -- UIA Pattern actions (all focusless!) --------------------─
 
     /// <summary>
     /// Toggle a checkbox or toggle button.
@@ -987,8 +987,8 @@ public sealed class ActionExecutor : IDisposable
             if (UiaLocator.TrySetToggle(element, step.Params.Checked.Value))
             {
                 var afterState = UiaLocator.GetToggleState(element);
-                result.ActionDetail = $"Toggle {elemDesc} → {(step.Params.Checked.Value ? "ON" : "OFF")} ({method}, focusless)";
-                Log($"  Toggle set to {(step.Params.Checked.Value ? "ON" : "OFF")} via UIA ({method}, focusless) [{stateStr} → {afterState}]");
+                result.ActionDetail = $"Toggle {elemDesc} -> {(step.Params.Checked.Value ? "ON" : "OFF")} ({method}, focusless)";
+                Log($"  Toggle set to {(step.Params.Checked.Value ? "ON" : "OFF")} via UIA ({method}, focusless) [{stateStr} -> {afterState}]");
                 return;
             }
         }
@@ -998,8 +998,8 @@ public sealed class ActionExecutor : IDisposable
             if (UiaLocator.TryToggle(element))
             {
                 var afterState = UiaLocator.GetToggleState(element);
-                result.ActionDetail = $"Toggle {elemDesc} ({method}, focusless) [{stateStr} → {afterState}]";
-                Log($"  Toggled via UIA ({method}, focusless) [{stateStr} → {afterState}]");
+                result.ActionDetail = $"Toggle {elemDesc} ({method}, focusless) [{stateStr} -> {afterState}]";
+                Log($"  Toggled via UIA ({method}, focusless) [{stateStr} -> {afterState}]");
                 return;
             }
         }
@@ -1020,7 +1020,7 @@ public sealed class ActionExecutor : IDisposable
     }
 
     /// <summary>
-    /// Focusless UIA Invoke — click a button/menu without stealing focus.
+    /// Focusless UIA Invoke -- click a button/menu without stealing focus.
     /// Pure COM call: IUIAutomationInvokePattern::Invoke().
     /// </summary>
     private void DoInvoke(StepDefinition step, StepResult result)
@@ -1045,7 +1045,7 @@ public sealed class ActionExecutor : IDisposable
         {
             MouseInput.Click(center.Value.x, center.Value.y);
             result.ActionDetail = $"Invoke {elemDesc} (click fallback)";
-            Log($"  Invoke fallback → click at ({center.Value.x},{center.Value.y})");
+            Log($"  Invoke fallback -> click at ({center.Value.x},{center.Value.y})");
             return;
         }
 
@@ -1053,7 +1053,7 @@ public sealed class ActionExecutor : IDisposable
     }
 
     /// <summary>
-    /// Focusless UIA SetValue — type text without focus or keyboard.
+    /// Focusless UIA SetValue -- type text without focus or keyboard.
     /// Pure COM call: IUIAutomationValuePattern::SetValue().
     /// </summary>
     private void DoSetValue(StepDefinition step, StepResult result)
@@ -1066,7 +1066,7 @@ public sealed class ActionExecutor : IDisposable
         var elemDesc = step.Target?.AutomationId ?? step.Target?.Name ?? "?";
         BeginZoomForElement(element, step);
 
-        // UIA ValuePattern.SetValue — pure COM, focusless
+        // UIA ValuePattern.SetValue -- pure COM, focusless
         try
         {
             var vp = element.Patterns.Value;
@@ -1107,8 +1107,8 @@ public sealed class ActionExecutor : IDisposable
         if (success)
         {
             var afterState = UiaLocator.GetExpandCollapseState(element);
-            result.ActionDetail = $"{action} {elemDesc} ({method}, focusless) [{beforeState} → {afterState}]";
-            Log($"  {action}ed via UIA ({method}, focusless) [{beforeState} → {afterState}]");
+            result.ActionDetail = $"{action} {elemDesc} ({method}, focusless) [{beforeState} -> {afterState}]";
+            Log($"  {action}ed via UIA ({method}, focusless) [{beforeState} -> {afterState}]");
             return;
         }
 
@@ -1217,7 +1217,7 @@ public sealed class ActionExecutor : IDisposable
         if (UiaLocator.TrySetRangeValue(element, value))
         {
             var after = UiaLocator.GetRangeValueInfo(element);
-            result.ActionDetail = $"SetRange {elemDesc} → {value} ({method}, focusless) [{before?.Value} → {after?.Value}]";
+            result.ActionDetail = $"SetRange {elemDesc} -> {value} ({method}, focusless) [{before?.Value} -> {after?.Value}]";
             Log($"  Set range to {value} via UIA RangeValue ({method}, focusless)");
             return;
         }
@@ -1437,9 +1437,9 @@ public sealed class ActionExecutor : IDisposable
             // Check if the element's window still exists
             var hwnd = closedElement.Properties.NativeWindowHandle.ValueOrDefault;
             if (hwnd == IntPtr.Zero) return null;
-            if (!NativeMethods.IsWindow(hwnd)) return null; // window gone — clean close
+            if (!NativeMethods.IsWindow(hwnd)) return null; // window gone -- clean close
 
-            // Window still present → likely a modal dialog appeared
+            // Window still present -> likely a modal dialog appeared
             // Walk UIA children to find dialog + its buttons
             var buttons = new List<string>();
             try
@@ -1470,21 +1470,21 @@ public sealed class ActionExecutor : IDisposable
             if (buttons.Count > 0)
             {
                 var btnList = string.Join("] [", buttons);
-                return $"Modal dialog blocking close — buttons: [{btnList}]. Use: a11y invoke \"*{buttons[0]}*\" to dismiss.";
+                return $"Modal dialog blocking close -- buttons: [{btnList}]. Use: a11y invoke \"*{buttons[0]}*\" to dismiss.";
             }
-            return "Window still alive after close — possible modal dialog (no buttons found via UIA)";
+            return "Window still alive after close -- possible modal dialog (no buttons found via UIA)";
         }
         catch { return null; }
     }
 
-    // ── Element location (5-tier chain) ────────────────────────
+    // -- Element location (5-tier chain) ------------------------
 
     /// <summary>
     /// 5-tier element locator chain:
-    ///   1. UIA (AutomationId → Name → ControlType)
+    ///   1. UIA (AutomationId -> Name -> ControlType)
     ///   2. Vision Cache (class_path + description + window_size)
-    ///   3. Simple OCR (Windows.Media.Ocr text matching — free, offline)
-    ///   4. Vision API (screenshot + Claude API → cache result, expensive)
+    ///   3. Simple OCR (Windows.Media.Ocr text matching -- free, offline)
+    ///   4. Vision API (screenshot + Claude API -> cache result, expensive)
     ///   5. Coordinate (step.Target.X/Y)
     /// Returns (UIA element if found, locator method string).
     /// For Vision/OCR/Coordinate hits, sets step.Target.X/Y for SendInput.
@@ -1493,7 +1493,7 @@ public sealed class ActionExecutor : IDisposable
     {
         if (step.Target == null) return (null, null);
 
-        // ── Tier 1: UIA (Accessibility) — UiaLocator handles ";" OR internally ──
+        // -- Tier 1: UIA (Accessibility) -- UiaLocator handles ";" OR internally --
         var (element, method) = _uia.FindElement(
             _ctx.MainWindowHandle,
             step.Target.AutomationId,
@@ -1510,7 +1510,7 @@ public sealed class ActionExecutor : IDisposable
             return (element, method);
         }
 
-        // ── Tier 2+3+4: Vision/OCR (only if enabled + description available) ──
+        // -- Tier 2+3+4: Vision/OCR (only if enabled + description available) --
         if ((_ctx.VisionEnabled || _ctx.OcrPreview) && !string.IsNullOrEmpty(step.Target.Description))
         {
             var visionCoords = TryVisionLocate(step);
@@ -1523,13 +1523,13 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
-        // ── Tier 5: Coordinate (already set in YAML) ────────
-        // Returned as (null, null) — caller checks step.Target.X/Y
+        // -- Tier 5: Coordinate (already set in YAML) --------
+        // Returned as (null, null) -- caller checks step.Target.X/Y
         return (null, null);
     }
 
     /// <summary>
-    /// Try Vision Cache → Simple OCR → Vision API (Claude) fallback chain.
+    /// Try Vision Cache -> Simple OCR -> Vision API (Claude) fallback chain.
     /// Returns absolute screen coordinates if found.
     /// Saves debug screenshots to vision_cache_dir for future Claude review.
     /// </summary>
@@ -1550,7 +1550,7 @@ public sealed class ActionExecutor : IDisposable
         }
         catch { classPath = "unknown"; }
 
-        // ── Tier 2: Vision Cache ────────────────────────────
+        // -- Tier 2: Vision Cache ----------------------------
         if (_visionCache != null)
         {
             var cached = _visionCache.Get(classPath, step.Target.Description, winW, winH);
@@ -1562,7 +1562,7 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
-        // ── Capture screenshot once (shared by OCR + Vision API) ──
+        // -- Capture screenshot once (shared by OCR + Vision API) --
         System.Drawing.Bitmap? bmp = null;
         string? screenshotPath = null;
         try
@@ -1579,9 +1579,9 @@ public sealed class ActionExecutor : IDisposable
             Log($"  Vision capture error: {ex.Message}");
         }
 
-        // ── Tier 2.5: OcrSegmentCache — form-level dynamic a11y tree ──────
+        // -- Tier 2.5: OcrSegmentCache -- form-level dynamic a11y tree ------
         // Build full-form segments ONCE; reuse for all element lookups.
-        // Form hash detects UI changes → auto-rebuild on mismatch.
+        // Form hash detects UI changes -> auto-rebuild on mismatch.
         if (_simpleOcr != null && bmp != null)
         {
             try
@@ -1594,7 +1594,7 @@ public sealed class ActionExecutor : IDisposable
 
                 if (segments == null)
                 {
-                    // Cache miss or stale — rebuild from OCR
+                    // Cache miss or stale -- rebuild from OCR
                     Log($"  OcrSeg: building segments (hash={formHash[..8]})...");
                     segments = _simpleOcr.SegmentAll(bmp).GetAwaiter().GetResult();
 
@@ -1636,8 +1636,8 @@ public sealed class ActionExecutor : IDisposable
 
                 Log($"  OcrSeg: \"{step.Target.Description}\" not found in {segments.Count} segments");
 
-                // ── Tier 3: Ask Vision AI (Gemini) — returns OcrSegment with coords from JSON ──
-                // Gemini identifies element AND provides x/y/w/h directly → no BestMatch step.
+                // -- Tier 3: Ask Vision AI (Gemini) -- returns OcrSegment with coords from JSON --
+                // Gemini identifies element AND provides x/y/w/h directly -> no BestMatch step.
                 if (AskVisionFn != null)
                 {
                     try
@@ -1695,7 +1695,7 @@ public sealed class ActionExecutor : IDisposable
             }
         }
 
-        // ── Tier 4: Vision API (Claude — expensive, last resort) ──
+        // -- Tier 4: Vision API (Claude -- expensive, last resort) --
         if (_visionAnalyzer != null && bmp != null)
         {
             try
@@ -1814,7 +1814,7 @@ public sealed class ActionExecutor : IDisposable
     /// <summary>
     /// OCR Preview: run OCR in background even when UIA succeeds.
     /// Compares UIA text vs OCR text for accuracy benchmarking.
-    /// Does NOT affect actual element location — purely informational.
+    /// Does NOT affect actual element location -- purely informational.
     /// </summary>
     private void RunOcrPreview(StepDefinition step)
     {
@@ -1903,9 +1903,9 @@ public sealed class ActionExecutor : IDisposable
         return 2.0 * intersection / (setA.Count + setB.Count);
     }
 
-    // ── Pre/Post Action Verification ────────────────────────
+    // -- Pre/Post Action Verification ------------------------
 
-    // ── Pre/Post Action Verification ────────────────────────
+    // -- Pre/Post Action Verification ------------------------
 
     /// <summary>
     /// Snapshot of element + overlay state at a screen coordinate.
@@ -1931,9 +1931,9 @@ public sealed class ActionExecutor : IDisposable
     /// Take a UIA + overlay snapshot at screen coordinates.
     ///
     /// Checks:
-    ///   1. UIA element at (x,y) — identity and properties
-    ///   2. Point inside element BoundingRectangle — 좌표가 렉트 안쪽인지
-    ///   3. WindowFromPoint — 방해하는 창이 없는지 (overlay detection)
+    ///   1. UIA element at (x,y) -- identity and properties
+    ///   2. Point inside element BoundingRectangle -- 좌표가 렉트 안쪽인지
+    ///   3. WindowFromPoint -- 방해하는 창이 없는지 (overlay detection)
     /// </summary>
     private TargetSnapshot? SnapshotAt(int x, int y)
     {
@@ -1999,10 +1999,10 @@ public sealed class ActionExecutor : IDisposable
     ///      - Same element? (type + automationId)
     ///      - Point inside element rect? (좌표가 렉트 안)
     ///      - No overlay? (방해 창 없음)
-    ///      → All OK → "verify=OK"
-    ///      → Warning → "verify=WARN(...)" + [VERIFY] log
+    ///      -> All OK -> "verify=OK"
+    ///      -> Warning -> "verify=WARN(...)" + [VERIFY] log
     ///
-    /// Never blocks execution — only logs warnings.
+    /// Never blocks execution -- only logs warnings.
     /// </summary>
     private string VerifiedEnsureFocus(int x, int y, string? expectedName = null, string? expectedAid = null)
     {
@@ -2015,7 +2015,7 @@ public sealed class ActionExecutor : IDisposable
         // Post-snap (after focus)
         var post = SnapshotAt(x, y);
 
-        // ── Analyze results ──
+        // -- Analyze results --
         var warnings = new List<string>();
 
         if (pre == null && post == null)
@@ -2024,14 +2024,14 @@ public sealed class ActionExecutor : IDisposable
         // Use post-snap (after focus = actual state at click time)
         var snap = post ?? pre;
 
-        // Check 1: Overlay — 방해하는 창 없나?
+        // Check 1: Overlay -- 방해하는 창 없나?
         if (snap!.OverlayDetected)
         {
             warnings.Add($"overlay({snap.OverlayClass})");
             LogVerify($"Overlay detected at ({x},{y}): class=\"{snap.OverlayClass}\" blocking target window");
         }
 
-        // Check 2: Point inside bounds — 좌표가 렉트 안인가?
+        // Check 2: Point inside bounds -- 좌표가 렉트 안인가?
         if (!snap.PointInsideBounds)
         {
             warnings.Add("outside_bounds");
@@ -2067,12 +2067,12 @@ public sealed class ActionExecutor : IDisposable
             if (!sameElement)
             {
                 warnings.Add("element_changed");
-                LogVerify($"Element changed after focus: [{pre.ControlType}]\"{pre.Name}\" → [{post.ControlType}]\"{post.Name}\"");
+                LogVerify($"Element changed after focus: [{pre.ControlType}]\"{pre.Name}\" -> [{post.ControlType}]\"{post.Name}\"");
             }
             else if (pre.Name != post.Name)
             {
-                // Same element, name changed — likely state change (not a warning, just info)
-                Log($"  [VERIFY] Name changed: \"{pre.Name}\" → \"{post.Name}\" (state change)");
+                // Same element, name changed -- likely state change (not a warning, just info)
+                Log($"  [VERIFY] Name changed: \"{pre.Name}\" -> \"{post.Name}\" (state change)");
             }
         }
 
@@ -2112,7 +2112,7 @@ public sealed class ActionExecutor : IDisposable
             int cy = rect.Top + rect.Height / 2;
             _ctx.SetActionPoint(cx, cy, stepName, action, desc);
         }
-        catch { /* ignore — non-critical */ }
+        catch { /* ignore -- non-critical */ }
     }
 
     private void Log(string msg)

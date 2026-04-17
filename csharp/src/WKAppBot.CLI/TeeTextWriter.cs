@@ -5,12 +5,12 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// TextWriter that writes to both the original Console.Out and a log file.
-/// Install via Console.SetOut() at program start — all Console.Write/WriteLine
+/// Install via Console.SetOut() at program start -- all Console.Write/WriteLine
 /// automatically goes to both destinations.
 ///
 /// Features:
-/// - Broken pipe safe: stdout IOException → suppress, file logging continues
-/// - Crash safe: UnhandledException → ForceCloseWithoutMove() flushes + keeps in logs/
+/// - Broken pipe safe: stdout IOException -> suppress, file logging continues
+/// - Crash safe: UnhandledException -> ForceCloseWithoutMove() flushes + keeps in logs/
 /// - Periodic flush: auto-flushes console every ~1 second (reduces output lag)
 /// - File always AutoFlush=true (real-time log)
 /// </summary>
@@ -20,8 +20,8 @@ public sealed class TeeTextWriter : TextWriter
     private readonly StreamWriter _file;
     private bool _moveToOldOnDispose;
     private string _logPath;
-    private bool _pipeBroken;    // stdout broken → skip console writes, file continues
-    private bool _fileClosed;    // ForceCloseWithoutMove called → skip all file writes
+    private bool _pipeBroken;    // stdout broken -> skip console writes, file continues
+    private bool _fileClosed;    // ForceCloseWithoutMove called -> skip all file writes
     private long _lastFlushTicks;  // for periodic console flush (~1s)
     private const long FlushIntervalTicks = TimeSpan.TicksPerSecond; // 1 second
 
@@ -35,7 +35,7 @@ public sealed class TeeTextWriter : TextWriter
 
     public TextWriter OriginalConsole => _console;
 
-    // Non-whitespace chars written to stdout — used by AppBotExit to detect blank output
+    // Non-whitespace chars written to stdout -- used by AppBotExit to detect blank output
     private long _nonWsChars;
     public bool StdoutIsBlank => Interlocked.Read(ref _nonWsChars) == 0;
     public override Encoding Encoding => Encoding.UTF8;
@@ -66,7 +66,7 @@ public sealed class TeeTextWriter : TextWriter
         };
 
         // Write header
-        _file.WriteLine($"# WKAppBot Console Log — {DateTime.Now:yyyy-MM-dd HH:mm:ss} (PID={Environment.ProcessId})");
+        _file.WriteLine($"# WKAppBot Console Log -- {DateTime.Now:yyyy-MM-dd HH:mm:ss} (PID={Environment.ProcessId})");
         _file.WriteLine($"# Command: {Environment.CommandLine}");
         _file.WriteLine();
 
@@ -81,13 +81,13 @@ public sealed class TeeTextWriter : TextWriter
 
     public string LogPath => _logPath;
 
-    /// <summary>Set before Dispose() — if non-zero, a one-line error summary is appended to errors.jsonl.</summary>
+    /// <summary>Set before Dispose() -- if non-zero, a one-line error summary is appended to errors.jsonl.</summary>
     public int ExitCode { get; set; } = 0;
 
     private bool _errorRecordWritten = false;
 
     /// <summary>
-    /// Write errors.jsonl entry immediately — call BEFORE WriteExitFile() so the record is
+    /// Write errors.jsonl entry immediately -- call BEFORE WriteExitFile() so the record is
     /// written before the Launcher kills Core via TerminateProcess after the exit event fires.
     /// Dispose() skips errors.jsonl if already written.
     /// </summary>
@@ -99,7 +99,7 @@ public sealed class TeeTextWriter : TextWriter
         TryAppendErrorRecord(_logPath, ExitCode, Environment.TickCount64 - _startMs, _startCpuMs);
     }
 
-    // ── Broken-pipe-safe console write helpers ──────────────────
+    // -- Broken-pipe-safe console write helpers ------------------
 
     private void ConsoleWrite(char value)
     {
@@ -149,7 +149,7 @@ public sealed class TeeTextWriter : TextWriter
         }
     }
 
-    // ── Core overrides ──────────────────────────────────────────
+    // -- Core overrides ------------------------------------------
 
     /// <summary>Update last-write timestamp and erase spinner if showing.</summary>
     private void TouchWriteTime()
@@ -251,7 +251,7 @@ public sealed class TeeTextWriter : TextWriter
         _lastFlushTicks = Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
     }
 
-    /// <summary>Flush and close the log file WITHOUT moving to old/ — for crash dumps.
+    /// <summary>Flush and close the log file WITHOUT moving to old/ -- for crash dumps.
     /// Crash log stays in logs/ as evidence (not buried in old/).
     /// Safe to call from UnhandledException handler (abort imminent).</summary>
     public void ForceCloseWithoutMove()
@@ -262,7 +262,7 @@ public sealed class TeeTextWriter : TextWriter
         try
         {
             if (_pipeBroken)
-                _file.WriteLine($"\n# [PIPE] stdout broken — file logging continued normally");
+                _file.WriteLine($"\n# [PIPE] stdout broken -- file logging continued normally");
             _file.WriteLine($"\n# [CRASH] Process terminated abnormally at {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             _file.Flush();
             _file.Dispose();
@@ -399,12 +399,12 @@ public sealed class TeeTextWriter : TextWriter
     {
         try
         {
-            // Collect last value per [TAG] — forward scan, later lines overwrite earlier ones
+            // Collect last value per [TAG] -- forward scan, later lines overwrite earlier ones
             var fields = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
             var lastLines = new System.Collections.Generic.List<string>(); // fallback: last non-empty lines
             if (File.Exists(logPath))
             {
-                // Must open with FileShare.ReadWrite — TeeTextWriter holds file open for writing;
+                // Must open with FileShare.ReadWrite -- TeeTextWriter holds file open for writing;
                 // File.ReadLines defaults to FileShare.Read which conflicts with the write handle.
                 using var fs = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 using var sr = new StreamReader(fs, Encoding.UTF8);
@@ -430,7 +430,7 @@ public sealed class TeeTextWriter : TextWriter
             // If no tagged fields found, fall back to last log lines so exit≠0 is always recorded
             if (fields.Count == 0)
             {
-                if (lastLines.Count == 0) return; // log was completely empty — nothing useful
+                if (lastLines.Count == 0) return; // log was completely empty -- nothing useful
                 fields["_last"] = string.Join(" | ", lastLines);
             }
 
@@ -524,7 +524,7 @@ public sealed class TeeTextWriter : TextWriter
             {
                 // Log broken pipe event if it happened
                 if (_pipeBroken)
-                    _file.WriteLine($"\n# [PIPE] stdout broken — file logging continued normally");
+                    _file.WriteLine($"\n# [PIPE] stdout broken -- file logging continued normally");
 
                 _file.Flush();
                 _file.Dispose();

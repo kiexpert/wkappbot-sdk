@@ -5,16 +5,16 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ═══ Kill-by-Pattern: close --kill ═══
+    // === Kill-by-Pattern: close --kill ===
     // Kills processes matching grap pattern. No window needed.
-    // Search key per process: "[pid]processName.exe" — substring match by default (no * needed).
+    // Search key per process: "[pid]processName.exe" -- substring match by default (no * needed).
     // Supports:
-    //   "wkappbot-core"            → any process named wkappbot-core (substring)
-    //   "node/wkappbot-core"       → wkappbot-core whose direct parent is node
-    //   "flutter/node/wkappbot-core" → chain: flutter→node→wkappbot-core
-    //   "**/wkappbot-core"         → wkappbot-core with any ancestor (any depth)
-    //   "wkappbot-core#regex:lucy" → '#' splits name#exePathFilter
-    // If process has a window → WM_CLOSE first then Kill; else → Kill directly.
+    //   "wkappbot-core"            -> any process named wkappbot-core (substring)
+    //   "node/wkappbot-core"       -> wkappbot-core whose direct parent is node
+    //   "flutter/node/wkappbot-core" -> chain: flutter->node->wkappbot-core
+    //   "**/wkappbot-core"         -> wkappbot-core with any ancestor (any depth)
+    //   "wkappbot-core#regex:lucy" -> '#' splits name#exePathFilter
+    // If process has a window -> WM_CLOSE first then Kill; else -> Kill directly.
     // KillCandidate: a process that passed all guards and is eligible to kill.
     record KillCandidate(System.Diagnostics.Process Proc, string NodeKey, string CmdLine, string CmdBrief);
 
@@ -42,7 +42,7 @@ internal partial class Program
         var exeMatcher = exeFilter != null ? PatternMatcher.Create(exeFilter) : null;
 
         var allProcs = System.Diagnostics.Process.GetProcesses();
-        // PID→processName lookup for ancestor chain resolution
+        // PID->processName lookup for ancestor chain resolution
         var pidToName = allProcs.GroupBy(p => p.Id)
             .ToDictionary(g => g.Key, g => g.First().ProcessName);
 
@@ -50,7 +50,7 @@ internal partial class Program
         var candidates = new List<KillCandidate>();
         var skipped = new List<string>();
 
-        // ── Pass 1: collect all eligible kill targets (no actual killing yet) ──
+        // -- Pass 1: collect all eligible kill targets (no actual killing yet) --
         foreach (var p in allProcs)
         {
             try
@@ -59,7 +59,7 @@ internal partial class Program
                 string exePath = "";
                 try { exePath = p.MainModule?.FileName ?? ""; } catch { }
 
-                // Search key: "[pid]processName.exe" — substring by default
+                // Search key: "[pid]processName.exe" -- substring by default
                 var nodeKey = $"[{p.Id}]{procName}.exe";
 
                 // cmdLine is populated lazily: only fetched on name-miss (perf),
@@ -68,17 +68,17 @@ internal partial class Program
 
                 if (!targetMatcher.IsMatch(nodeKey) && !targetMatcher.IsMatch(procName))
                 {
-                    // Last chance: cmdline search — token-AND for plain multi-word patterns (order-independent)
+                    // Last chance: cmdline search -- token-AND for plain multi-word patterns (order-independent)
                     // e.g. "tick eye" matches "wkappbot eye tick --timeout 15" regardless of token order
                     try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
                     if (!KillCmdLineMatch(cmdLine, targetPattern)) continue;
 
                     // Self-kill guard: pattern matched only via cmdLine of a wkappbot-core process.
                     // Two cases:
-                    //   (A) wkappbot-core running as a daemon (e.g. "screensaver", "whisper-ring") —
-                    //       first arg matches the pattern → legitimate kill target, let it proceed.
+                    //   (A) wkappbot-core running as a daemon (e.g. "screensaver", "whisper-ring") --
+                    //       first arg matches the pattern -> legitimate kill target, let it proceed.
                     //   (B) wkappbot-core running a command (e.g. a11y hack "*LG*") and the pattern
-                    //       "LG" only matched its command args — false positive, skip without bug.
+                    //       "LG" only matched its command args -- false positive, skip without bug.
                     if (procName.Equals("wkappbot-core", StringComparison.OrdinalIgnoreCase)
                         && !targetPattern.Contains("wkappbot", StringComparison.OrdinalIgnoreCase))
                     {
@@ -90,13 +90,13 @@ internal partial class Program
                             continue;
                         }
                         // If the pattern matches the FIRST positional arg (daemon subcommand), allow kill.
-                        // e.g. "wkappbot-core screensaver ..." → pattern "screensaver" → legitimate target.
+                        // e.g. "wkappbot-core screensaver ..." -> pattern "screensaver" -> legitimate target.
                         var firstArg = ExtractFirstCmdArg(cmdLine);
                         bool isDaemonTarget = !string.IsNullOrEmpty(firstArg) && targetMatcher.IsMatch(firstArg);
                         if (!isDaemonTarget)
                         {
-                            // Pattern only hit command args, not the daemon name — false positive guard.
-                            Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (self-kill guard: \"{targetPattern}\" only matched cmd args)\n       cmd: {brief}");
+                            // Pattern only hit command args, not the daemon name -- false positive guard.
+                            Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} -- SKIP (self-kill guard: \"{targetPattern}\" only matched cmd args)\n       cmd: {brief}");
                             skipped.Add($"[{p.Id}]{procName} (self-kill-guard)");
                             continue;
                         }
@@ -139,7 +139,7 @@ internal partial class Program
                     cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
                 {
                     skipped.Add($"[{p.Id}]{procName} (eye-child)");
-                    Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (eye-child: {cmdBrief})");
+                    Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} -- SKIP (eye-child: {cmdBrief})");
                     continue;
                 }
 
@@ -153,7 +153,7 @@ internal partial class Program
                     if (m.Success)
                     {
                         skipped.Add($"[{p.Id}]{procName} (webbot-cdp:port={m.Groups[1].Value})");
-                        Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} — SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
+                        Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} -- SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
                         continue;
                     }
                 }
@@ -170,7 +170,7 @@ internal partial class Program
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             foreach (var s in skipped)
-                Console.Error.WriteLine($"[GUARD] skipped {s} — use --allow-ancestors to override");
+                Console.Error.WriteLine($"[GUARD] skipped {s} -- use --allow-ancestors to override");
             Console.ResetColor();
         }
 
@@ -182,11 +182,11 @@ internal partial class Program
             return 1;
         }
 
-        // ── Ambiguity guard: multiple candidates without --nth → show find-mode list ──
+        // -- Ambiguity guard: multiple candidates without --nth -> show find-mode list --
         if (candidates.Count > 1 && nthRaw == null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[KILL] ambiguous — {candidates.Count} processes match \"{grap}\". Use --nth N to target one:");
+            Console.Error.WriteLine($"[KILL] ambiguous -- {candidates.Count} processes match \"{grap}\". Use --nth N to target one:");
             Console.ResetColor();
             for (int i = 0; i < candidates.Count; i++)
             {
@@ -198,7 +198,7 @@ internal partial class Program
             return 1;
         }
 
-        // ── Pass 2: resolve --nth selection, then kill ──
+        // -- Pass 2: resolve --nth selection, then kill --
         IEnumerable<KillCandidate> targets;
         if (nthRaw != null && candidates.Count > 1)
         {
@@ -238,7 +238,7 @@ internal partial class Program
 
                 if (dryRun)
                 {
-                    Console.Error.WriteLine($"[KILL:DRY] {c.NodeKey} — {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL:DRY] {c.NodeKey} -- {c.CmdBrief}");
                     killed.Add(c.NodeKey);
                     continue;
                 }
@@ -247,21 +247,21 @@ internal partial class Program
                 bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
                 if (hasWindow)
                 {
-                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
                     NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
                     Thread.Sleep(800);
                     try { p.Refresh(); } catch { }
                     if (p.HasExited)
                     {
-                        Console.Error.WriteLine($"[KILL] {c.NodeKey} — exited gracefully");
+                        Console.Error.WriteLine($"[KILL] {c.NodeKey} -- exited gracefully");
                         killed.Add(c.NodeKey);
                         continue;
                     }
-                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — still alive, force kill");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- still alive, force kill");
                 }
                 else
                 {
-                    Console.Error.WriteLine($"[KILL] {c.NodeKey} — no window, force kill\n       cmd: {c.CmdBrief}");
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- no window, force kill\n       cmd: {c.CmdBrief}");
                 }
                 p.Kill(entireProcessTree: false);
                 killed.Add(c.NodeKey);
@@ -325,7 +325,7 @@ internal partial class Program
         return KillMatchChainRec(ancestorPatterns.Reverse().ToArray(), 0, ancestors, 0);
     }
 
-    // Cmdline match for kill — delegates to shared PatternMatcher.TokenMatchAny
+    // Cmdline match for kill -- delegates to shared PatternMatcher.TokenMatchAny
     static bool KillCmdLineMatch(string cmdLine, string pattern) =>
         PatternMatcher.TokenMatchAny(pattern, cmdLine);
 
@@ -348,7 +348,7 @@ internal partial class Program
     }
 
     // Extracts the first positional argument from a Windows command line string.
-    // e.g. `"C:\bin\wkappbot-core.exe" "screensaver" "1400"` → "screensaver"
+    // e.g. `"C:\bin\wkappbot-core.exe" "screensaver" "1400"` -> "screensaver"
     static string ExtractFirstCmdArg(string cmdLine)
     {
         if (string.IsNullOrWhiteSpace(cmdLine)) return "";

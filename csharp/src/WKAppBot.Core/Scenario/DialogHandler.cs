@@ -74,7 +74,7 @@ public sealed class DialogActionParams
 /// <summary>
 /// Condition for active-patrol wait loop after handler action.
 /// Loop polls every ~500ms: checks condition + runs TryHandleBlocker.
-/// "핸들러 개입환영" — welcomes handler intervention during wait.
+/// "핸들러 개입환영" -- welcomes handler intervention during wait.
 /// </summary>
 public sealed class WaitUntilCondition
 {
@@ -97,7 +97,7 @@ public sealed class WaitUntilCondition
 
     /// <summary>
     /// Wait until the target window's message loop is responsive.
-    /// Uses SendMessageTimeout(WM_NULL, SMTO_ABORTIFHUNG) — returns true when the app
+    /// Uses SendMessageTimeout(WM_NULL, SMTO_ABORTIFHUNG) -- returns true when the app
     /// finishes heavy initialization and can process messages again.
     /// Combined with window_exists: first wait for window, then wait for it to respond.
     /// Default: false.

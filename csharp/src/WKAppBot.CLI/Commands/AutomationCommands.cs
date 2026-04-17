@@ -66,26 +66,26 @@ Examples:
             // MCP/Eye mode: no process launch, signal only
             if (Program.IsMcpMode || Program.RunningInEye)
             {
-                Console.Error.WriteLine($"[ELEVATION] Click: target pid={targetPid} elevated, MCP/Eye mode — using WaitForAdminServer");
+                Console.Error.WriteLine($"[ELEVATION] Click: target pid={targetPid} elevated, MCP/Eye mode -- using WaitForAdminServer");
                 if (ElevationHelper.WaitForAdminServer())
                     return ElevatedEyeClient.ExecuteViaProxy("click", args) == 0 ? 0 : 1;
                 return 1; // elevation unavailable
             }
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"  ⚠ Target process (pid={targetPid}) is elevated (admin).");
-            Console.WriteLine($"  ⚠ This process is NOT elevated → SendInput/SetCursorPos will be blocked by UIPI.");
+            Console.WriteLine($"  ! Target process (pid={targetPid}) is elevated (admin).");
+            Console.WriteLine($"  ! This process is NOT elevated -> SendInput/SetCursorPos will be blocked by UIPI.");
             Console.ResetColor();
 
             // Auto-relaunch as admin
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("  → Re-launching as administrator...");
+            Console.WriteLine("  -> Re-launching as administrator...");
             Console.ResetColor();
             Console.Out.Flush();
 
             try
             {
-                // Find the .exe (not .dll) — dotnet publish creates both
+                // Find the .exe (not .dll) -- dotnet publish creates both
                 var exePath = Environment.ProcessPath ?? "wkappbot.exe";
                 if (exePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     exePath = Path.ChangeExtension(exePath, ".exe");
@@ -115,7 +115,7 @@ Examples:
                 {
                     Console.WriteLine();
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine("  ── Elevated process output ──");
+                    Console.WriteLine("  -- Elevated process output --");
                     Console.ResetColor();
                     Console.Write(File.ReadAllText(resultFile));
                 }
@@ -125,7 +125,7 @@ Examples:
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223) // user cancelled UAC
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("  ✗ UAC cancelled. Cannot click elevated app without admin privileges.");
+                Console.WriteLine("  X UAC cancelled. Cannot click elevated app without admin privileges.");
                 Console.ResetColor();
                 return 1;
             }
@@ -134,9 +134,9 @@ Examples:
         if (weAreElevated)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write("  ✓ Running elevated");
+            Console.Write("  v Running elevated");
             Console.ResetColor();
-            Console.WriteLine(" — physical mouse input enabled");
+            Console.WriteLine(" -- physical mouse input enabled");
         }
 
         // Scan to find MDI forms
@@ -172,7 +172,7 @@ Examples:
         if (listAll)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"── All Controls in [{targetFormId}] ({allControls.Count}) ────────────────────");
+            Console.WriteLine($"-- All Controls in [{targetFormId}] ({allControls.Count}) --------------------");
             Console.ResetColor();
             foreach (var (ctrl, depth, path) in allControls)
             {
@@ -200,7 +200,7 @@ Examples:
             {
                 Console.WriteLine();
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"── ComboBoxes ({allCombos.Count}) ────────────────────");
+                Console.WriteLine($"-- ComboBoxes ({allCombos.Count}) --------------------");
                 Console.ResetColor();
                 for (int ci = 0; ci < allCombos.Count; ci++)
                 {
@@ -212,7 +212,7 @@ Examples:
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write($" cid={combo.ControlId} @({combo.Rect.Left},{combo.Rect.Top}) {combo.Rect.Width}x{combo.Rect.Height}");
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($" — {count} items (selected: {(curSel >= 0 ? curSel.ToString() : "none")})");
+                    Console.WriteLine($" -- {count} items (selected: {(curSel >= 0 ? curSel.ToString() : "none")})");
                     Console.ResetColor();
 
                     for (int j = 0; j < Math.Min(count, 30); j++)
@@ -254,7 +254,7 @@ Examples:
 
         // Display all found buttons
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"── Buttons in [{targetFormId}] ({allButtons.Count}) ────────────────────");
+        Console.WriteLine($"-- Buttons in [{targetFormId}] ({allButtons.Count}) --------------------");
         Console.ResetColor();
 
         WindowInfo? matchedButton = null;
@@ -296,12 +296,12 @@ Examples:
             Console.ResetColor();
         }
 
-        // ── Process combo selections BEFORE button click ──
+        // -- Process combo selections BEFORE button click --
         if (comboSelections.Count > 0 && allCombos.Count > 0)
         {
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("── ComboBox Selections ────────────────────");
+            Console.WriteLine("-- ComboBox Selections --------------------");
             Console.ResetColor();
 
             foreach (var (comboIdx, itemIdx) in comboSelections)
@@ -309,7 +309,7 @@ Examples:
                 if (comboIdx < 1 || comboIdx > allCombos.Count)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"  ✗ Combo #{comboIdx} not found (have {allCombos.Count} combos)");
+                    Console.WriteLine($"  X Combo #{comboIdx} not found (have {allCombos.Count} combos)");
                     Console.ResetColor();
                     continue;
                 }
@@ -318,7 +318,7 @@ Examples:
                 if (itemIdx < 0 || itemIdx >= count)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"  ✗ Combo #{comboIdx}: item [{itemIdx}] out of range (have {count} items)");
+                    Console.WriteLine($"  X Combo #{comboIdx}: item [{itemIdx}] out of range (have {count} items)");
                     Console.ResetColor();
                     continue;
                 }
@@ -346,9 +346,9 @@ Examples:
                 Thread.Sleep(200);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"  ✓ Combo #{comboIdx}");
+                Console.Write($"  v Combo #{comboIdx}");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.Write($" → [{itemIdx}] \"{itemText}\"");
+                Console.Write($" -> [{itemIdx}] \"{itemText}\"");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.WriteLine($" (cid={comboControlId})");
                 Console.ResetColor();
@@ -366,7 +366,7 @@ Examples:
             return 0;
         }
 
-        // Click the matched button — if no button found, try UIA TabItem fallback
+        // Click the matched button -- if no button found, try UIA TabItem fallback
         if (matchedButton == null && buttonText != null)
         {
             // UIA TabItem fallback: search ALL matching forms for tab items
@@ -391,7 +391,7 @@ Examples:
                     if (selPattern != null && selPattern.IsSupported && selPattern.Pattern.IsSelected)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"  [TAB] \"{ti.Name}\" already selected — skipping");
+                        Console.WriteLine($"  [TAB] \"{ti.Name}\" already selected -- skipping");
                         Console.ResetColor();
                         continue;
                     }
@@ -409,7 +409,7 @@ Examples:
                             selPattern.Pattern.Select();
                             selected = true;
                         }
-                        catch { /* UIA Select failed — try click fallback */ }
+                        catch { /* UIA Select failed -- try click fallback */ }
                     }
 
                     // Fallback: PostMessage click on tab item coordinates
@@ -445,12 +445,12 @@ Examples:
                     {
                         tabsSelected++;
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($" ✓ (focusless!)");
+                        Console.WriteLine($" v (focusless!)");
                     }
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($" ✗ FAIL");
+                        Console.WriteLine($" X FAIL");
                     }
                     Console.ResetColor();
                     Thread.Sleep(200);
@@ -466,7 +466,7 @@ Examples:
             if (tabsSelected > 0)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"\n  ✓ {tabsSelected} tab(s) \"{buttonText}\" selected across all forms");
+                Console.WriteLine($"\n  v {tabsSelected} tab(s) \"{buttonText}\" selected across all forms");
                 Console.ResetColor();
                 return 0;
             }
@@ -529,7 +529,7 @@ Examples:
             Console.Write($"(rect: {btnRect.Left},{btnRect.Top}-{btnRect.Right},{btnRect.Bottom}) ");
             Console.ResetColor();
 
-            // ── Click Strategy ──
+            // -- Click Strategy --
             // Try message-based click first (no cursor movement).
             // If no reaction detected, fall back to physical mouse click.
             bool usePhysicalMouse = args.Contains("--mouse");
@@ -537,7 +537,7 @@ Examples:
 
             if (!usePhysicalMouse)
             {
-                // Strategy 1: BM_CLICK (0x00F5) — standard button click message
+                // Strategy 1: BM_CLICK (0x00F5) -- standard button click message
                 // Works for standard Win32 Button class, even owner-drawn
                 NativeMethods.PostMessageW(matchedButton.Handle, 0x00F5, IntPtr.Zero, IntPtr.Zero);
                 Thread.Sleep(200);
@@ -555,7 +555,7 @@ Examples:
             }
             else
             {
-                // Strategy 3: Physical mouse (SendInput) — guaranteed but moves cursor
+                // Strategy 3: Physical mouse (SendInput) -- guaranteed but moves cursor
                 MouseInput.Click(cx, cy);
                 clickMethod = "mouse";
             }
@@ -569,9 +569,9 @@ Examples:
             // Wait for reaction
             Thread.Sleep(500);
 
-            // ── Detect reaction ──
+            // -- Detect reaction --
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("\n── Reaction Check ────────────────────");
+            Console.WriteLine("\n-- Reaction Check --------------------");
             Console.ResetColor();
 
             bool anyReaction = false;
@@ -624,14 +624,14 @@ Examples:
                 }
             }
 
-            // 4. Check if button text changed (toggle buttons like 매매시작→매매중지)
+            // 4. Check if button text changed (toggle buttons like 매매시작->매매중지)
             var postButtonText = WindowFinder.GetWindowText(matchedButton.Handle);
             if (postButtonText != preButtonText)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.Write("  🔄 Button text changed: ");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"\"{preButtonText}\" → \"{postButtonText}\"");
+                Console.WriteLine($"\"{preButtonText}\" -> \"{postButtonText}\"");
                 Console.ResetColor();
                 anyReaction = true;
             }
@@ -661,7 +661,7 @@ Examples:
             if (!anyReaction)
             {
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.WriteLine("  (no visible reaction detected — button may require specific state)");
+                Console.WriteLine("  (no visible reaction detected -- button may require specific state)");
                 Console.ResetColor();
             }
         }
@@ -684,7 +684,7 @@ Examples:
         if (buttons.Count == 0) return;
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write($"  ✓ Auto-{label}: ");
+        Console.Write($"  v Auto-{label}: ");
         Console.ResetColor();
 
         SmartClickButton(buttons[0].Handle, hDialog);
@@ -692,7 +692,7 @@ Examples:
 
     /// <summary>
     /// Smart click: tries strategies in experience-optimized order, checking for window change after each.
-    /// Default priority: no cursor movement first → cursor movement last.
+    /// Default priority: no cursor movement first -> cursor movement last.
     /// With ExperienceDb: reorders by historical success rate.
     /// Detection: checks if dialog closed OR a new modal appeared.
     /// </summary>
@@ -732,7 +732,7 @@ Examples:
             },
             ["send_input"] = () =>
             {
-                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // automation command — user-invoked
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // automation command -- user-invoked
                 NativeMethods.SmartSetForegroundWindow(hDialogOrParent); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(100);
                 MouseInput.MoveTo(cx, cy);
@@ -771,7 +771,7 @@ Examples:
                         return $"{s}({st.SuccessRate:P0})";
                     return $"{s}(new)";
                 });
-                Console.Write(string.Join(" → ", parts));
+                Console.Write(string.Join(" -> ", parts));
                 Console.ResetColor();
                 Console.Write("  ");
             }
@@ -825,7 +825,7 @@ Examples:
                 continue;
 
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.Write(isFirst ? $"@({cx},{cy}) {strategyName}" : $" → {strategyName}");
+            Console.Write(isFirst ? $"@({cx},{cy}) {strategyName}" : $" -> {strategyName}");
             Console.ResetColor();
             isFirst = false;
 
@@ -865,7 +865,7 @@ Examples:
 
         // Record overall failure + knowhow
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine(" ✗ (all strategies failed)");
+        Console.WriteLine(" X (all strategies failed)");
         Console.ResetColor();
         if (hasExpData)
         {
@@ -909,19 +909,19 @@ Examples:
         if (dialogGone)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($" ✓ [{strategyName}: dialog closed]");
+            Console.WriteLine($" v [{strategyName}: dialog closed]");
             Console.ResetColor();
             return true;
         }
 
         if (newModalAppeared)
         {
-            // A new window appeared on top — the click probably worked and triggered something
+            // A new window appeared on top -- the click probably worked and triggered something
             var sb = new System.Text.StringBuilder(256);
             NativeMethods.GetWindowTextW(fgNow, sb, 256);
             string newTitle = sb.ToString();
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($" ✓ [{strategyName}: new modal] ");
+            Console.Write($" v [{strategyName}: new modal] ");
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"\"{newTitle}\"");
             Console.ResetColor();

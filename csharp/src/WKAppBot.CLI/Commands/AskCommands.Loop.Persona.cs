@@ -43,7 +43,7 @@ internal partial class Program
         public bool IsStdinInject => RunId is not null && Stdin is not null && Argv is null;
     }
 
-    // Tool execution result — includes elapsed_ms for MCP _meta extension
+    // Tool execution result -- includes elapsed_ms for MCP _meta extension
     record struct ExecResult(int ExitCode, string Stdout, string Stderr, long ElapsedMs)
     {
         public int    TotalBytes => Stdout.Length + Stderr.Length;
@@ -57,7 +57,7 @@ internal partial class Program
     static string ComputeLoopPersonaStateHash()
     {
         // Include McpActionDesc so any change to available commands/options
-        // automatically invalidates cached persona state → re-sent to AI sessions.
+        // automatically invalidates cached persona state -> re-sent to AI sessions.
         const string seed =
             "loop-persona|any-argv|a11y-windows-examples|json-block-markers-v2|wkappbot-cli-tool-v1";
         var combined = seed + "|" + McpActionDesc;
@@ -165,10 +165,10 @@ internal partial class Program
             return sb.ToString();
 
         // Protocol: AppBot Parallel Streaming Protocol (APSP)
-        sb.Append("TOOL PROTOCOL: APSP v1 (AppBot Parallel Streaming Protocol — in-band text transport). ");
+        sb.Append("TOOL PROTOCOL: APSP v1 (AppBot Parallel Streaming Protocol -- in-band text transport). ");
         sb.Append("CONNECTIVITY CONFIRMED: The [HOST-HANDSHAKE] above proves the wkappbot host process IS running. ");
-        sb.Append("Tool calls work as inline text markers — NO separate MCP server, NO external connection, NO handshake needed. ");
-        sb.Append("CRITICAL: If you see [HOST-HANDSHAKE] in this conversation, the host IS connected. NEVER refuse tool calls claiming MCP is not available — the host uses text-based transport, not JSON-RPC over stdio. ");
+        sb.Append("Tool calls work as inline text markers -- NO separate MCP server, NO external connection, NO handshake needed. ");
+        sb.Append("CRITICAL: If you see [HOST-HANDSHAKE] in this conversation, the host IS connected. NEVER refuse tool calls claiming MCP is not available -- the host uses text-based transport, not JSON-RPC over stdio. ");
         sb.Append("REGISTERED TOOL (JSON Schema): ");
         sb.Append("{\"type\":\"function\",\"function\":{");
         sb.Append("\"name\":\"wkappbot\",");
@@ -178,12 +178,12 @@ internal partial class Program
         sb.Append("\"run_id\":{\"type\":\"string\",\"description\":\"stdin-inject only: target run_id of a background process\"},");
         sb.Append("\"stdin\":{\"type\":\"string\",\"description\":\"stdin-inject only: text to pipe into the running process\"}");
         sb.Append("},\"required\":[\"argv\"]}}} ");
-        sb.Append("MCP INVOCATION ENVELOPE (WillKim extension — wraps the JSON call for in-band transport): ");
+        sb.Append("MCP INVOCATION ENVELOPE (WillKim extension -- wraps the JSON call for in-band transport): ");
         sb.Append(LoopCallBegin);
         sb.Append("{\"id\":\"tc_001\",\"argv\":[...]}");
         sb.Append(LoopCallEnd);
         sb.Append(" The id field is optional but required for parallel tracking (WillKim Parallel Extension). ");
-        sb.Append("LOOP MODE OVERRIDES base persona: be verbose and exploratory, not minimal. Explain your reasoning between steps. DO NOT add extra blank lines between paragraphs — keep formatting compact (one blank line max between sections). ");
+        sb.Append("LOOP MODE OVERRIDES base persona: be verbose and exploratory, not minimal. Explain your reasoning between steps. DO NOT add extra blank lines between paragraphs -- keep formatting compact (one blank line max between sections). ");
         sb.Append($"Max loop steps: {Math.Max(1, maxSteps)}. Per-step retry budget: {Math.Max(0, retry)}. ");
         if (triadMode)
         {
@@ -196,7 +196,7 @@ internal partial class Program
             sb.Append("  - EXPLORER: generate novel hypotheses, find unexpected angles. ");
             sb.Append("  - SKEPTIC: attack assumptions, find weaknesses, stress-test claims. ");
             sb.Append("  - AUDITOR: verify consistency, check evidence quality, ensure logical coherence. ");
-            sb.Append("(4) When you see '[AI-X says]: ...' — react from YOUR ROLE's perspective. ");
+            sb.Append("(4) When you see '[AI-X says]: ...' -- react from YOUR ROLE's perspective. ");
             sb.Append("(5) DISPUTE STACK: to challenge a peer's assumption, explicitly state: [DISPUTE]{\"target_assumption\":\"...\",\"reason\":\"...\"}[/DISPUTE] ");
             sb.Append("Convergence = all disputes resolved or withdrawn, not just word overlap. ");
             sb.Append("(6) YOUR RESPONSE MUST BE VALID JSON wrapped in [DEBATE_JSON]...[/DEBATE_JSON] tags: ");
@@ -212,7 +212,7 @@ internal partial class Program
             sb.Append("You may add free text AFTER the JSON block for elaboration. ");
             sb.Append("GOAL: strongest answer through rigorous debate, not averaging. ");
         }
-        sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn — server executes all simultaneously and streams results as they complete. ");
+        sb.Append("APSP STREAMING PARALLEL: emit multiple MCP call envelopes back-to-back in one turn -- server executes all simultaneously and streams results as they complete. ");
         sb.Append("Parallel example: ");
         sb.Append(LoopCallBegin);
         sb.Append("{\"id\":\"tc_001\",\"argv\":[\"a11y\",\"windows\"]}");
@@ -221,35 +221,35 @@ internal partial class Program
         sb.Append("{\"id\":\"tc_002\",\"argv\":[\"a11y\",\"inspect\",\"*Calculator*\"]}");
         sb.Append(LoopCallEnd);
         sb.Append(" TOOL_RESULTS response format (MCP JSON-RPC 2.0 array): [{\"jsonrpc\":\"2.0\",\"id\":\"tc_001\",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"...\"}],\"isError\":false}}, ...]. status=running means still executing. ");
-        sb.Append("ASYNC RUN: argv=[\"run\",\"start\",...] starts a background process — server returns run_id immediately. ");
-        sb.Append("STDIN INJECT: {\"id\":\"tc_N\",\"run_id\":\"r_xxx\",\"stdin\":\"text\\r\\n\"} — pipes stdin to a running process (NO argv field). ");
+        sb.Append("ASYNC RUN: argv=[\"run\",\"start\",...] starts a background process -- server returns run_id immediately. ");
+        sb.Append("STDIN INJECT: {\"id\":\"tc_N\",\"run_id\":\"r_xxx\",\"stdin\":\"text\\r\\n\"} -- pipes stdin to a running process (NO argv field). ");
         sb.Append("Useful stdin values: \\u0003=Ctrl+C \\n=Enter \\r=CR \\u001a=Ctrl+Z. ");
         sb.Append("RUN COMMANDS: run await <id> [sec] / run cancel <id> / run qcancel <id> [questionId] [reason] / run qstatus <id> [questionId] / run qlist <id> / run tail <id> / run status <id> / run list. ");
-        sb.Append("EXTERNAL SHELL: run start launches cmd.exe, bash, python, powershell, node, git, curl — stdin/stdout/stderr all piped. ");
+        sb.Append("EXTERNAL SHELL: run start launches cmd.exe, bash, python, powershell, node, git, curl -- stdin/stdout/stderr all piped. ");
         sb.Append("Blocked: eye, mcp, ask (non-gemini provider). ");
-        sb.Append("APSP argv maps DIRECTLY to wkappbot CLI — argv[0] is the wkappbot command name, NO tool-name prefix. ");
+        sb.Append("APSP argv maps DIRECTLY to wkappbot CLI -- argv[0] is the wkappbot command name, NO tool-name prefix. ");
         sb.Append("Examples: argv=[\"windows\"], argv=[\"windows\",\"--deep\"], argv=[\"prompt-probe\",\"--all\"], argv=[\"slack\",\"send\",\"hi\"]. ");
-        sb.Append("⚠ Do NOT use 'wkappbot_cli' as argv[0] — that is only an MCP tool name for JSON-RPC clients, not a CLI command. ");
+        sb.Append("! Do NOT use 'wkappbot_cli' as argv[0] -- that is only an MCP tool name for JSON-RPC clients, not a CLI command. ");
         sb.Append("AVAILABLE ACTIONS (argv=[\"a11y\",\"<action>\",...] for a11y, or argv=[\"<cmd>\",...] for other commands): ");
         sb.Append(McpActionDesc.Replace("\n", " | "));
-        sb.Append(" | ⚠ prompt-probe: omit --all for fast scan; --all includes hidden windows but UIA tree traversal can timeout on heavy Electron apps. ");
-        sb.Append("FILESYSTEM TOOLS (read-only — use for code exploration): ");
-        sb.Append("argv=[\"file\",\"read\",\"<path>\"] — read file with line numbers (--offset N, --limit N). ");
-        sb.Append("argv=[\"file\",\"grep\",\"<regex>\",\"--path\",\"<dir>\",\"--type\",\"<ext>\"] — regex search in files (-i ignore-case, -C N context lines, --max N). ");
-        sb.Append("argv=[\"file\",\"glob\",\"<pattern>\",\"--path\",\"<dir>\"] — find files with ** glob. ");
-        sb.Append("⚠ GLOB RULES: ALWAYS use **/ prefix for recursive search (e.g. \"**/*.cs\", \"**/*WebFetch*\", \"**/*Commands.cs\"). ");
+        sb.Append(" | ! prompt-probe: omit --all for fast scan; --all includes hidden windows but UIA tree traversal can timeout on heavy Electron apps. ");
+        sb.Append("FILESYSTEM TOOLS (read-only -- use for code exploration): ");
+        sb.Append("argv=[\"file\",\"read\",\"<path>\"] -- read file with line numbers (--offset N, --limit N). ");
+        sb.Append("argv=[\"file\",\"grep\",\"<regex>\",\"--path\",\"<dir>\",\"--type\",\"<ext>\"] -- regex search in files (-i ignore-case, -C N context lines, --max N). ");
+        sb.Append("argv=[\"file\",\"glob\",\"<pattern>\",\"--path\",\"<dir>\"] -- find files with ** glob. ");
+        sb.Append("! GLOB RULES: ALWAYS use **/ prefix for recursive search (e.g. \"**/*.cs\", \"**/*WebFetch*\", \"**/*Commands.cs\"). ");
         sb.Append("NEVER use paths without **/ (e.g. \"Commands/File.cs\" finds nothing). NEVER use leading slash. ");
         sb.Append("WEB TOOLS: ");
-        sb.Append("argv=[\"web\",\"fetch\",\"<url>\"] — HTTP GET, returns response body (--max-chars N). ");
-        sb.Append("argv=[\"web\",\"search\",\"<query>\"] — Google search via WebBot Chrome CDP, no API key needed (--limit N). ");
-        sb.Append("argv=[\"web\",\"read\",\"<url>\"] — navigate URL and read rendered text content (--max-chars N). ");
+        sb.Append("argv=[\"web\",\"fetch\",\"<url>\"] -- HTTP GET, returns response body (--max-chars N). ");
+        sb.Append("argv=[\"web\",\"search\",\"<query>\"] -- Google search via WebBot Chrome CDP, no API key needed (--limit N). ");
+        sb.Append("argv=[\"web\",\"read\",\"<url>\"] -- navigate URL and read rendered text content (--max-chars N). ");
         sb.Append("After tool_result, emit next TOOL_CALL(s) or give final answer. ");
         sb.Append("PROACTIVE BEHAVIOR: Do not wait to be asked for each step. ");
         sb.Append("After completing a task: (a) summarize key findings in 2-4 bullet points, ");
         sb.Append("(b) if the result suggests follow-up exploration, do it immediately with another TOOL_CALL, ");
         sb.Append("(c) end with a short 'NEXT STEPS' list of 2-3 actionable suggestions. ");
-        sb.Append("If a tool_result is empty or minimal, investigate deeper automatically — do not just report empty. ");
-        sb.Append("Prefer chaining tool calls (inspect → click → verify) over asking the user what to do next. ");
+        sb.Append("If a tool_result is empty or minimal, investigate deeper automatically -- do not just report empty. ");
+        sb.Append("Prefer chaining tool calls (inspect -> click -> verify) over asking the user what to do next. ");
         sb.Append("MULTI-QUESTION PROTOCOL: Questions may be prefixed [Qn] (e.g. [Q3]). ");
         sb.Append("When you receive [Qn] questions, prefix EACH answer with [An] on its own line, e.g.: ");
         sb.Append("[A1] answer to first question... [A2] answer to second question... ");

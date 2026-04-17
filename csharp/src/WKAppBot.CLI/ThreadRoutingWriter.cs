@@ -4,7 +4,7 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Thread-local Console router for Eye command pipe.
-/// Eye threads write to the global (TeeWriter → file+console).
+/// Eye threads write to the global (TeeWriter -> file+console).
 /// Command threads call Route(sw) to redirect their output to a StringWriter for piping.
 /// This avoids the global Console.SetOut race where Eye tick output leaks into command output.
 /// </summary>

@@ -5,7 +5,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
-// Claude usage probe — WebBot CDP only (claude.ai/settings/usage)
+// Claude usage probe -- WebBot CDP only (claude.ai/settings/usage)
 internal partial class Program
 {
     /// <summary>
@@ -74,7 +74,7 @@ internal partial class Program
         return report;
     }
 
-    /// <summary>claude-usage — one-shot usage probe with Slack alert.</summary>
+    /// <summary>claude-usage -- one-shot usage probe with Slack alert.</summary>
     static int A11yClaudeUsage()
     {
         Console.WriteLine("[USAGE] Trying web probe (claude.ai/settings/usage)...");
@@ -113,9 +113,9 @@ internal partial class Program
         catch { }
 
         Console.WriteLine();
-        Console.WriteLine($"  Session: {report.SessionPercent}% used ({sessionRemain}% left) — {report.SessionReset ?? "?"}{jsonlInfo}");
-        Console.WriteLine($"  Weekly:  {report.WeeklyAllPercent}% used ({weeklyRemain}% left) — {report.WeeklyAllReset ?? "?"}");
-        Console.WriteLine($"  Sonnet:  {report.WeeklySonnetPercent}% used — {report.WeeklySonnetReset ?? "?"}");
+        Console.WriteLine($"  Session: {report.SessionPercent}% used ({sessionRemain}% left) -- {report.SessionReset ?? "?"}{jsonlInfo}");
+        Console.WriteLine($"  Weekly:  {report.WeeklyAllPercent}% used ({weeklyRemain}% left) -- {report.WeeklyAllReset ?? "?"}");
+        Console.WriteLine($"  Sonnet:  {report.WeeklySonnetPercent}% used -- {report.WeeklySonnetReset ?? "?"}");
         Console.WriteLine($"  URL:     {ClaudeUsageUrl}");
 
         // Slack alert
@@ -123,14 +123,14 @@ internal partial class Program
         if (report.WeeklyAllPercent >= 95)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"\n[USAGE] CRITICAL: Weekly {report.WeeklyAllPercent}% — {weeklyRemain}% left!");
+            Console.WriteLine($"\n[USAGE] CRITICAL: Weekly {report.WeeklyAllPercent}% -- {weeklyRemain}% left!");
             Console.ResetColor();
             slackMsg = $":rotating_light: *Claude 주간 사용량 {report.WeeklyAllPercent}%* ({weeklyRemain}% 남음)\n해제: {report.WeeklyAllReset}\n세션: {report.SessionPercent}% ({report.SessionReset})";
         }
         else if (report.WeeklyAllPercent >= 85)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"\n[USAGE] WARNING: Weekly {report.WeeklyAllPercent}% — {weeklyRemain}% left");
+            Console.WriteLine($"\n[USAGE] WARNING: Weekly {report.WeeklyAllPercent}% -- {weeklyRemain}% left");
             Console.ResetColor();
             slackMsg = $":warning: *Claude 주간 사용량 {report.WeeklyAllPercent}%* ({weeklyRemain}% 남음)\n해제: {report.WeeklyAllReset}";
         }

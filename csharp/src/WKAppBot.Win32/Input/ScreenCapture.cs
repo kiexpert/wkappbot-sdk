@@ -35,13 +35,13 @@ public static class ScreenCapture
         }
         bmp.Dispose();
 
-        // Fallback: bring window to front → capture from screen → restore Z-order
+        // Fallback: bring window to front -> capture from screen -> restore Z-order
         // (Prevents overlapping windows from appearing in the screenshot)
         return CaptureWindowWithBringToFront(hWnd);
     }
 
     /// <summary>
-    /// PrintWindow-only capture — NO BringToFront fallback.
+    /// PrintWindow-only capture -- NO BringToFront fallback.
     /// Returns null if PrintWindow fails (blank bitmap).
     /// Designed for live preview where skipping a frame is acceptable (~200ms until next attempt).
     /// Cost: ~5-15ms vs ~200ms+ with BringToFront fallback.
@@ -64,7 +64,7 @@ public static class ScreenCapture
                 return bmp;
         }
         bmp.Dispose();
-        return null; // Skip this frame — caller will retry in ~200ms
+        return null; // Skip this frame -- caller will retry in ~200ms
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public static class ScreenCapture
 
     /// <summary>
     /// Check if a bitmap is blank (all-black or nearly uniform).
-    /// Samples 9 points (3x3 grid) — if ALL are (0,0,0), the capture failed.
+    /// Samples 9 points (3x3 grid) -- if ALL are (0,0,0), the capture failed.
     /// Important: bad screenshots pollute ExperienceDB and mislead future Claude sessions.
     /// </summary>
     public static bool IsBlankBitmap(Bitmap bmp)
@@ -127,10 +127,10 @@ public static class ScreenCapture
                 if (x >= bmp.Width || y >= bmp.Height) continue;
                 var p = bmp.GetPixel(x, y);
                 if (p.R != 0 || p.G != 0 || p.B != 0)
-                    return false; // At least one non-black pixel → not blank
+                    return false; // At least one non-black pixel -> not blank
             }
         }
-        return true; // All 9 sample points are black → blank capture
+        return true; // All 9 sample points are black -> blank capture
     }
 
     /// <summary>

@@ -7,14 +7,14 @@ using WKAppBot.Win32.Native;
 namespace WKAppBot.Win32.Input;
 
 /// <summary>
-/// Action-Aware Readiness (AAR) for Windows — implements IActionReadiness.
-/// 4-stage pipeline: Global → Target Resolution → Occlusion → Action-Specific.
+/// Action-Aware Readiness (AAR) for Windows -- implements IActionReadiness.
+/// 4-stage pipeline: Global -> Target Resolution -> Occlusion -> Action-Specific.
 /// Wraps existing InputReadiness for blocker detection and method probing.
 ///
 /// Return convention:
-///   null        → blocked (hard fail)
-///   == target   → success (proceed)
-///   != target   → retarget (popup/modal found)
+///   null        -> blocked (hard fail)
+///   == target   -> success (proceed)
+///   != target   -> retarget (popup/modal found)
 ///
 /// Tag: [AAR]
 /// </summary>
@@ -22,45 +22,45 @@ public sealed class ActionReadiness : IActionReadiness
 {
     private readonly InputReadiness _readiness;
 
-    // Stability cache via Win32 SetProp/GetProp — attached to the target window handle
+    // Stability cache via Win32 SetProp/GetProp -- attached to the target window handle
     // Survives across CLI invocations (each `wkappbot a11y` = new process), zero file I/O
     private const string StabilityPropName = "WKAppBot_AAR_StableTick";
-    private const int StabilityCacheTtlMs = 5000; // 5초 이내 재액션 → 풀 프로브 스킵
+    private const int StabilityCacheTtlMs = 5000; // 5초 이내 재액션 -> 풀 프로브 스킵
 
     public ActionReadiness(InputReadiness readiness)
     {
         _readiness = readiness ?? throw new ArgumentNullException(nameof(readiness));
     }
 
-    // ── IActionReadiness ─────────────────────────────────────────
+    // -- IActionReadiness ----------------------------------------─
 
     public IActionTarget? Ensure(string action, IActionTarget target, ReadinessContext ctx)
     {
         var sw = Stopwatch.StartNew();
         var act = action.ToLowerInvariant();
 
-        // ── Pass-through actions (no readiness needed) ──
+        // -- Pass-through actions (no readiness needed) --
         if (IsPassThrough(act))
             return target;
 
-        // ── Stage 0: Global Pre-Condition ──
+        // -- Stage 0: Global Pre-Condition --
         if (!CheckGlobal(act, out var globalReason))
         {
             Console.Error.WriteLine($"[AAR] BLOCKED (global): {globalReason}");
             return null;
         }
 
-        // ── Stage 1: Target Resolution ──
+        // -- Stage 1: Target Resolution --
         var stage1 = CheckTargetResolution(act, target, ctx);
         if (stage1 == null) return null;    // hard block
         if (stage1 != target) return stage1; // retarget
 
-        // ── Stage 2: Occlusion / Blocker Detection ──
+        // -- Stage 2: Occlusion / Blocker Detection --
         var stage2 = CheckOcclusion(act, target, ctx);
         if (stage2 == null) return null;
         if (stage2 != target) return stage2;
 
-        // ── Stage 2.5: Stability Sampling Probe (100ms 2-shot, file-cached) ──
+        // -- Stage 2.5: Stability Sampling Probe (100ms 2-shot, file-cached) --
         if (IsStabilityRequired(act))
         {
             var probeHwnd = ResolveHwnd(target, ctx);
@@ -80,14 +80,14 @@ public sealed class ActionReadiness : IActionReadiness
             }
         }
 
-        // ── Stage 3: Stale Element Detection ──
+        // -- Stage 3: Stale Element Detection --
         if (target is UiaActionTarget staleCheck && !IsAlive(staleCheck))
         {
             Console.Error.WriteLine($"[AAR] BLOCKED: stale element for {action}: \"{target.DisplayName}\"");
             return null;
         }
 
-        // ── Stage 4: Action-Specific Checks ──
+        // -- Stage 4: Action-Specific Checks --
         var stage4 = CheckActionSpecific(act, target, ctx);
         if (stage4 == null) return null;
 
@@ -96,7 +96,7 @@ public sealed class ActionReadiness : IActionReadiness
         return stage4;
     }
 
-    // ── Stage 0: Global Pre-Condition ────────────────────────────
+    // -- Stage 0: Global Pre-Condition ----------------------------
 
     private static bool CheckGlobal(string action, out string reason)
     {
@@ -113,11 +113,11 @@ public sealed class ActionReadiness : IActionReadiness
         return true;
     }
 
-    // ── Stage 1: Target Resolution ──────────────────────────────
+    // -- Stage 1: Target Resolution ------------------------------
 
     private IActionTarget? CheckTargetResolution(string action, IActionTarget target, ReadinessContext ctx)
     {
-        // 1a. Minimized window → focusless restore
+        // 1a. Minimized window -> focusless restore
         if (target.WindowState == "minimized" || IsMinimized(target, ctx))
         {
             var hwnd = ResolveHwnd(target, ctx);
@@ -130,10 +130,10 @@ public sealed class ActionReadiness : IActionReadiness
             }
         }
 
-        // 1b. Window-level target for element-level action → warn
+        // 1b. Window-level target for element-level action -> warn
         if (target.IsWindow && IsElementAction(action))
         {
-            Console.Error.WriteLine($"[AAR] WARNING: {action} on window-level target \"{target.DisplayName}\" — intended?");
+            Console.Error.WriteLine($"[AAR] WARNING: {action} on window-level target \"{target.DisplayName}\" -- intended?");
             // Warn only, don't block
         }
 
@@ -151,7 +151,7 @@ public sealed class ActionReadiness : IActionReadiness
         return target;
     }
 
-    // ── Stage 2: Occlusion / Blocker ────────────────────────────
+    // -- Stage 2: Occlusion / Blocker ----------------------------
 
     private IActionTarget? CheckOcclusion(string action, IActionTarget target, ReadinessContext ctx)
     {
@@ -188,7 +188,7 @@ public sealed class ActionReadiness : IActionReadiness
             }
         }
 
-        // Blocker persists — policy depends on action
+        // Blocker persists -- policy depends on action
         if (IsBlockOnOcclusion(action))
         {
             Console.Error.WriteLine($"[AAR] BLOCKED: persistent blocker for {action}");
@@ -199,7 +199,7 @@ public sealed class ActionReadiness : IActionReadiness
         return target;
     }
 
-    // ── Stage 3: Action-Specific ────────────────────────────────
+    // -- Stage 3: Action-Specific --------------------------------
 
     private IActionTarget? CheckActionSpecific(string action, IActionTarget target, ReadinessContext ctx)
     {
@@ -244,7 +244,7 @@ public sealed class ActionReadiness : IActionReadiness
                 if (!target.Enabled)
                 {
                     Console.Error.WriteLine($"[AAR] WARNING: target disabled for {action}");
-                    // Warn only — UIA Toggle/Select can sometimes work on "disabled" MFC controls
+                    // Warn only -- UIA Toggle/Select can sometimes work on "disabled" MFC controls
                 }
                 break;
 
@@ -264,7 +264,7 @@ public sealed class ActionReadiness : IActionReadiness
         return target;
     }
 
-    // ── Helpers ──────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------
 
     /// <summary>Actions that need no readiness check at all.</summary>
     private static bool IsPassThrough(string action)
@@ -306,7 +306,7 @@ public sealed class ActionReadiness : IActionReadiness
 
     /// <summary>
     /// Try reading stability cache from window property (SetProp/GetProp).
-    /// The tick is stored as IntPtr value — truncated to 32-bit but wraps safely within TTL.
+    /// The tick is stored as IntPtr value -- truncated to 32-bit but wraps safely within TTL.
     /// </summary>
     private static bool TryStabilityCache(IntPtr hwnd, out long ageMs)
     {
@@ -367,19 +367,19 @@ public sealed class ActionReadiness : IActionReadiness
             // Check if this blocker itself has child popups
             var childBlocker = _readiness.DetectBlocker(current.Handle);
             if (childBlocker == null || childBlocker.Handle == current.Handle)
-                break; // no deeper popup → current is the deepest
+                break; // no deeper popup -> current is the deepest
 
             Console.Error.WriteLine($"[AAR] close retarget depth {depth + 1}: [{childBlocker.ClassName}] \"{childBlocker.Title}\"");
             current = childBlocker;
         }
 
-        Console.Error.WriteLine($"[AAR] close retarget → [{current.ClassName}] \"{current.Title}\"");
+        Console.Error.WriteLine($"[AAR] close retarget -> [{current.ClassName}] \"{current.Title}\"");
         return CreateRetarget(current);
     }
 
     /// <summary>
     /// Stability Sampling Probe: take BoundingRect twice with 100ms gap.
-    /// If coordinates differ, the element is animating/transitioning → unstable.
+    /// If coordinates differ, the element is animating/transitioning -> unstable.
     /// </summary>
     private static bool CheckStability(IActionTarget target)
     {
@@ -388,14 +388,14 @@ public sealed class ActionReadiness : IActionReadiness
             var r1 = target.BoundingRect;
             // Zero-size elements are inherently unstable (or invisible)
             if (r1.Right - r1.Left <= 0 || r1.Bottom - r1.Top <= 0)
-                return true; // pass — visibility check is elsewhere
+                return true; // pass -- visibility check is elsewhere
 
             Thread.Sleep(100);
             var r2 = target.BoundingRect;
 
             if (r1 != r2)
             {
-                Console.Error.WriteLine($"[AAR] Stability probe: rect changed ({r1.Left},{r1.Top},{r1.Right},{r1.Bottom}) → ({r2.Left},{r2.Top},{r2.Right},{r2.Bottom})");
+                Console.Error.WriteLine($"[AAR] Stability probe: rect changed ({r1.Left},{r1.Top},{r1.Right},{r1.Bottom}) -> ({r2.Left},{r2.Top},{r2.Right},{r2.Bottom})");
                 return false;
             }
             return true;
@@ -408,13 +408,13 @@ public sealed class ActionReadiness : IActionReadiness
 
     /// <summary>
     /// Check if a UIA element is still alive (not stale/disconnected).
-    /// Tries to access a basic property — if COM throws, element is dead.
+    /// Tries to access a basic property -- if COM throws, element is dead.
     /// </summary>
     private static bool IsAlive(UiaActionTarget target)
     {
         try
         {
-            // Access ProcessId — a lightweight COM call that fails on stale elements
+            // Access ProcessId -- a lightweight COM call that fails on stale elements
             _ = target.Element.Properties.ProcessId.ValueOrDefault;
             return true;
         }

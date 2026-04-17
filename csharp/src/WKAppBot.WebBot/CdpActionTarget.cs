@@ -14,17 +14,17 @@ namespace WKAppBot.WebBot;
 /// </summary>
 public sealed class CdpActionTarget : IActionTarget
 {
-    // ── Identity ──
+    // -- Identity --
     public string DisplayName { get; init; } = "";
     public string? Identifier { get; init; }
     public string? ClassName { get; init; }
     public string BackendType => "CDP";
     public object? NativeHandle { get; init; }  // CSS selector string
 
-    // ── Bounds (screen coords) ──
+    // -- Bounds (screen coords) --
     public (int Left, int Top, int Right, int Bottom) BoundingRect { get; init; }
 
-    // ── State ──
+    // -- State --
     public bool Focused { get; init; }
     public bool Enabled { get; init; } = true;
     public bool Visible { get; init; } = true;
@@ -32,11 +32,11 @@ public sealed class CdpActionTarget : IActionTarget
     public bool IsWindow => false;
     public string? WindowState => null;
 
-    // ── Hierarchy (flat — CDP doesn't expose tree walking cheaply) ──
+    // -- Hierarchy (flat -- CDP doesn't expose tree walking cheaply) --
     public IActionTarget? Parent => null;
     public IReadOnlyList<IActionTarget> Children { get; } = Array.Empty<IActionTarget>();
 
-    // ── Extra CDP properties (for action-specific checks) ──
+    // -- Extra CDP properties (for action-specific checks) --
 
     /// <summary>True if the element has readonly or contenteditable=false.</summary>
     public bool IsReadOnly { get; init; }
@@ -139,7 +139,7 @@ public sealed class CdpActionTarget : IActionTarget
     }
 
     /// <summary>
-    /// Get the Chrome window's content area offset for viewport→screen conversion.
+    /// Get the Chrome window's content area offset for viewport->screen conversion.
     /// Uses CDP Browser.getWindowBounds if available, otherwise returns (0, 0).
     /// </summary>
     public static (int X, int Y) GetWindowContentOffset(CdpClient cdp)

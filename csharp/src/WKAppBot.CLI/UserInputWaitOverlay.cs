@@ -14,13 +14,13 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Non-focus-stealing WPF overlay that asks user to yield focus.
-/// Countdown timer — auto-approves when user idle, resets on user activity.
+/// Countdown timer -- auto-approves when user idle, resets on user activity.
 /// Owner set to target app's main window (stays above target, hides with it).
 ///
 /// Design: "사용자님의 포커스 양보가 필요합니다"
-/// - User clicks "확인" → immediate confirm (foreground right guaranteed)
-/// - User idle until timeout → auto-approve (try SetForegroundWindow)
-/// - User active (mouse/keyboard) → reset timer to 30s
+/// - User clicks "확인" -> immediate confirm (foreground right guaranteed)
+/// - User idle until timeout -> auto-approve (try SetForegroundWindow)
+/// - User active (mouse/keyboard) -> reset timer to 30s
 /// Tag: [READINESS] [ZOOM]
 /// </summary>
 internal sealed class UserInputWaitWindow : Window
@@ -30,7 +30,7 @@ internal sealed class UserInputWaitWindow : Window
     private readonly TextBlock _idleText;
     private readonly DispatcherTimer _countdownTimer;
     private readonly IntPtr _ownerHwnd;
-    private readonly IntPtr _prevFg;  // foreground before overlay shown — restore on deny/ESC
+    private readonly IntPtr _prevFg;  // foreground before overlay shown -- restore on deny/ESC
     private readonly int _resetSeconds;
     private int _remainingSeconds;
     private uint _lastInputTick;
@@ -69,7 +69,7 @@ internal sealed class UserInputWaitWindow : Window
         ShowActivated = false; // CRITICAL: never steal focus
         ResizeMode = ResizeMode.NoResize;
 
-        // ── Build visual tree ──
+        // -- Build visual tree --
         var outerBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xF5, 0x1A, 0x1A, 0x2E)),
@@ -113,7 +113,7 @@ internal sealed class UserInputWaitWindow : Window
             TextWrapping = TextWrapping.Wrap,
         });
 
-        // Idle info (dynamic — updates on user activity detection)
+        // Idle info (dynamic -- updates on user activity detection)
         _idleText = new TextBlock
         {
             Text = $"마지막 입력: {userIdleMs / 1000.0:F1}초 전",
@@ -125,7 +125,7 @@ internal sealed class UserInputWaitWindow : Window
         };
         stack.Children.Add(_idleText);
 
-        // Action info (readonly scrollable textbox — shows what automation was doing)
+        // Action info (readonly scrollable textbox -- shows what automation was doing)
         if (actionInfo != null)
         {
             var infoBox = new TextBox
@@ -239,7 +239,7 @@ internal sealed class UserInputWaitWindow : Window
         _countdownTimer.Tick += OnCountdownTick;
         _countdownTimer.Start();
 
-        // 음성 안내: 멜로디 먼저 → 완료 후 speak (NoSound=true면 둘 다 생략)
+        // 음성 안내: 멜로디 먼저 -> 완료 후 speak (NoSound=true면 둘 다 생략)
         Loaded += (_, _) => { if (!NoSound) PlayChimeThenSpeak(); };
 
         // ESC = deny (restore focus to prevFg, don't give Chrome a chance)
@@ -264,7 +264,7 @@ internal sealed class UserInputWaitWindow : Window
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW));
 
-        // Re-apply physical position AFTER owner set — GWL_HWNDPARENT causes Windows to reposition
+        // Re-apply physical position AFTER owner set -- GWL_HWNDPARENT causes Windows to reposition
         if (_physX != int.MinValue)
             SetWindowPos(helper.Handle, IntPtr.Zero, _physX, _physY, 0, 0,
                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -277,8 +277,8 @@ internal sealed class UserInputWaitWindow : Window
         _countdownTimer.Stop();
 
         // 핵심: 유저가 우리 창을 클릭했으므로 foreground right 보유 중!
-        // 즉시 타겟 윈도우에 포커스 이전 → 호출자가 EnsureFocus 스킵 가능
-        // AttachThreadInput for symmetry — SetForegroundWindow can still fail without it
+        // 즉시 타겟 윈도우에 포커스 이전 -> 호출자가 EnsureFocus 스킵 가능
+        // AttachThreadInput for symmetry -- SetForegroundWindow can still fail without it
         if (_ownerHwnd != IntPtr.Zero)
         {
             RestoreFocus(_ownerHwnd);
@@ -296,7 +296,7 @@ internal sealed class UserInputWaitWindow : Window
         _confirmed = true;
         _countdownTimer.Stop();
         DeniedByUser = true;
-        // Restore focus to original window (user said no — don't let Chrome steal it)
+        // Restore focus to original window (user said no -- don't let Chrome steal it)
         RestoreFocus(_prevFg != IntPtr.Zero ? _prevFg : _ownerHwnd);
         Dispatcher.InvokeShutdown();
     }
@@ -310,7 +310,7 @@ internal sealed class UserInputWaitWindow : Window
         _buttonText.Text = "자동 진행!";
         _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0x40, 0xC0, 0x40));
 
-        // User idle → safe to grab focus (weaker foreground entitlement — no fresh click)
+        // User idle -> safe to grab focus (weaker foreground entitlement -- no fresh click)
         // Must restore before InvokeShutdown: teardown itself does not preserve focus
         if (_ownerHwnd != IntPtr.Zero)
         {
@@ -320,7 +320,7 @@ internal sealed class UserInputWaitWindow : Window
         }
 
         Confirmed?.Invoke();
-        // Brief green flash then close — restore again right before shutdown (double-guard)
+        // Brief green flash then close -- restore again right before shutdown (double-guard)
         var close = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
         close.Tick += (_, _) =>
         {
@@ -333,14 +333,14 @@ internal sealed class UserInputWaitWindow : Window
 
     private void OnCountdownTick(object? sender, EventArgs e)
     {
-        // ── Check user activity via GetLastInputInfo ──
+        // -- Check user activity via GetLastInputInfo --
         uint currentTick = GetLastInputTick();
         if (currentTick != _lastInputTick)
         {
-            // User active → reset timer to _resetSeconds
+            // User active -> reset timer to _resetSeconds
             _lastInputTick = currentTick;
             _remainingSeconds = _resetSeconds;
-            _idleText.Text = "유저 활동 감지 — 대기 연장";
+            _idleText.Text = "유저 활동 감지 -- 대기 연장";
             _buttonText.Text = $"확인 ({_remainingSeconds})";
             _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00));
             return;
@@ -353,7 +353,7 @@ internal sealed class UserInputWaitWindow : Window
         }
         else if (_remainingSeconds <= 5)
         {
-            // Auto-approve approaching → amber→green transition
+            // Auto-approve approaching -> amber->green transition
             _buttonText.Text = $"자동 진행 ({_remainingSeconds})";
             byte r = (byte)(0xFF - (0xFF - 0x40) * (5 - _remainingSeconds) / 5);
             byte g = (byte)(0xA0 + (0xC0 - 0xA0) * (5 - _remainingSeconds) / 5);
@@ -365,7 +365,7 @@ internal sealed class UserInputWaitWindow : Window
         }
     }
 
-    // ── 멜로디 → speak 순서 재생 ──
+    // -- 멜로디 -> speak 순서 재생 --
 
     private static void PlayChimeThenSpeak()
     {
@@ -376,7 +376,7 @@ internal sealed class UserInputWaitWindow : Window
         });
     }
 
-    // ── Speak: TTS 음성 안내 ──
+    // -- Speak: TTS 음성 안내 --
 
     private static void PlaySpeakAnnounce()
     {
@@ -384,23 +384,23 @@ internal sealed class UserInputWaitWindow : Window
         {
             AppBotPipe.Spawn("wkappbot", "speak \"포커스 양보가 필요합니다\" --bg", Environment.CurrentDirectory, caller: "OVERLAY");
         }
-        catch { /* best effort — fallback to silent */ }
+        catch { /* best effort -- fallback to silent */ }
     }
 
-    // ── Chime: 정중한 요청 멜로디 (C5→E5→G5→C6 메이저 아르페지오) — blocking ──
+    // -- Chime: 정중한 요청 멜로디 (C5->E5->G5->C6 메이저 아르페지오) -- blocking --
 
     private static void PlayChimeSync()
     {
         try
         {
             const int rate = 22050;
-                // Ascending major arpeggio — polite "attention please~" chime
+                // Ascending major arpeggio -- polite "attention please~" chime
                 (double hz, int ms)[] melody =
                 {
                     (523.25, 100),  // C5
                     (659.25, 100),  // E5
                     (783.99, 100),  // G5
-                    (1046.50, 220), // C6 — longer, resolving note
+                    (1046.50, 220), // C6 -- longer, resolving note
                 };
 
                 var pcm = new System.Collections.Generic.List<short>();
@@ -444,10 +444,10 @@ internal sealed class UserInputWaitWindow : Window
             using var player = new SoundPlayer(wav);
             player.PlaySync();
         }
-        catch { /* audio not available — silent fallback */ }
+        catch { /* audio not available -- silent fallback */ }
     }
 
-    // ── GetLastInputInfo: user activity detection ──
+    // -- GetLastInputInfo: user activity detection --
 
     private static uint GetLastInputTick()
     {
@@ -473,13 +473,13 @@ internal sealed class UserInputWaitWindow : Window
     private static void RestoreFocus(IntPtr target)
     {
         if (target == IntPtr.Zero) return;
-        // Use raw SetForegroundWindow — SmartSetForeground would re-enter CheckActiveGuard
+        // Use raw SetForegroundWindow -- SmartSetForeground would re-enter CheckActiveGuard
         // and spawn another overlay on top of the one we just confirmed. [FOCUS-GUARD]
         try { SetForegroundWindowRaw(target); }
-        catch { /* non-fatal — best effort */ }
+        catch { /* non-fatal -- best effort */ }
     }
 
-    // ── Win32 P/Invoke ──
+    // -- Win32 P/Invoke --
     private const int GWL_EXSTYLE = -20;
     private const int GWL_HWNDPARENT = -8;
     private const int WS_EX_NOACTIVATE  = 0x08000000;
@@ -540,7 +540,7 @@ internal static class UserInputWaitOverlay
                 prevFg: prevFgForRestore, actionInfo: actionInfo);
             if (noSound) window.NoSound = true;
 
-            // Position: physical pixel coords → SetWindowPos in OnSourceInitialized
+            // Position: physical pixel coords -> SetWindowPos in OnSourceInitialized
             // (GWL_HWNDPARENT causes Windows to reposition if we use WPF Left/Top)
             if (posHwnd != IntPtr.Zero && GetWindowRect(posHwnd, out var posRect)
                 && posRect.right - posRect.left > 0)
@@ -597,7 +597,7 @@ internal static class UserInputWaitOverlay
         thread.Name = "UserInputWait-STA";
         thread.Start();
 
-        // Block caller — 5 minute hard cap (user activity resets can extend beyond initial timeout)
+        // Block caller -- 5 minute hard cap (user activity resets can extend beyond initial timeout)
         done.Wait(5 * 60 * 1000);
         done.Dispose();
 

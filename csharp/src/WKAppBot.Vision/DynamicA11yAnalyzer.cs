@@ -34,7 +34,7 @@ public sealed class DynamicA11yAnalyzer
 
     /// <summary>
     /// Generate a stable dynamic AutomationId from physical properties only.
-    /// No AI-inferred data (type, label) — those can change between queries.
+    /// No AI-inferred data (type, label) -- those can change between queries.
     /// Primary:  dyn_r{row}c{col}_{width}x{height}  (absolute pixels)
     /// Fallback: dyn_r{row}c{col}_p{w%}x{h%}        (% of parent, for ratio-based layouts)
     /// </summary>
@@ -93,7 +93,7 @@ public sealed class DynamicA11yAnalyzer
     }
 
     /// <summary>
-    /// Assign row/col positions to regions by spatial sorting (top→bottom, left→right).
+    /// Assign row/col positions to regions by spatial sorting (top->bottom, left->right).
     /// Groups regions into rows by Y-overlap, then sorts columns within each row.
     /// </summary>
     public static List<(int row, int col, T region)> AssignGridPositions<T>(
@@ -138,7 +138,7 @@ public sealed class DynamicA11yAnalyzer
     {
         return $@"You are a UI accessibility expert analyzing screenshots of Windows desktop application controls.
 These are from Korean financial trading software (HTS) built with Win32/MFC.
-Many controls are owner-drawn with NO accessibility information — you must infer everything visually.
+Many controls are owner-drawn with NO accessibility information -- you must infer everything visually.
 
 The attached image contains {regionCount} numbered UI region(s).
 
@@ -247,14 +247,14 @@ IMPORTANT:
         var actions = info.Actions.Count > 0 ? string.Join(", ", info.Actions) : "(none)";
         var state = info.State != "Unknown" ? $" [{info.State}]" : "";
         var label = !string.IsNullOrEmpty(info.Label) ? $" \"{info.Label}\"" : "";
-        var desc = !string.IsNullOrEmpty(info.Description) ? $" — {info.Description}" : "";
+        var desc = !string.IsNullOrEmpty(info.Description) ? $" -- {info.Description}" : "";
         var conf = info.Confidence > 0 ? $" ({info.Confidence:P0})" : "";
         var dynId = !string.IsNullOrEmpty(info.DynId) ? $" aid=\"{info.DynId}\"" : "";
         return $"[DYN-A11Y] {info.ControlType}{label}{state}{dynId}{desc}{conf}\n"
              + $"  [ACTIONS: {actions}]";
     }
 
-    // ── Cache: experience DB per control + layout hash ──────────────────────
+    // -- Cache: experience DB per control + layout hash ----------------------
 
     /// <summary>Load cached analysis from experience DB.</summary>
     public static A11yInfo? LoadFromCache(string controlDir, string layoutHash)

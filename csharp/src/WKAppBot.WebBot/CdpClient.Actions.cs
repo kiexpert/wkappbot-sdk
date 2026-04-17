@@ -23,7 +23,7 @@ public sealed partial class CdpClient
             catch (Exception ex) when (ex is TimeoutException or TaskCanceledException)
             {
                 var delayMs = (attempt + 1) * 500; // 500ms, 1000ms
-                Console.Error.WriteLine($"[CDP:EVAL] {ex.GetType().Name} attempt {attempt} — retry in {delayMs}ms ({expression[..Math.Min(60, expression.Length)]})");
+                Console.Error.WriteLine($"[CDP:EVAL] {ex.GetType().Name} attempt {attempt} -- retry in {delayMs}ms ({expression[..Math.Min(60, expression.Length)]})");
                 await Task.Delay(delayMs);
             }
         }
@@ -52,7 +52,7 @@ public sealed partial class CdpClient
             result = await SendAsync("Runtime.evaluate", parameters, sendTimeoutMs);
         }
 
-        // Log JS exceptions — critical for debugging CDP automation bugs
+        // Log JS exceptions -- critical for debugging CDP automation bugs
         var exDetails = result?["exceptionDetails"];
         if (exDetails != null)
         {
@@ -311,7 +311,7 @@ public sealed partial class CdpClient
     }
 
     /// <summary>
-    /// Type text using CDP Input.insertText — bypasses IME composition issues.
+    /// Type text using CDP Input.insertText -- bypasses IME composition issues.
     /// Best for CJK (Korean/Japanese/Chinese) input in contentEditable editors (Notion, Slack, etc.).
     /// </summary>
     public async Task TypeInsertTextAsync(string selector, string text)
@@ -323,7 +323,7 @@ public sealed partial class CdpClient
         if (focusResult == "NOT_FOUND")
             throw new InvalidOperationException($"Element not found: {selector}");
 
-        // Use CDP Input.insertText — injects text directly without key events
+        // Use CDP Input.insertText -- injects text directly without key events
         await SendAsync("Input.insertText", new JsonObject { ["text"] = text });
     }
 
@@ -426,7 +426,7 @@ public sealed partial class CdpClient
         return await EvalAsync("document.title");
     }
 
-    /// <summary>Default page read — returns structured page summary (title, url, readyState, text snippet).</summary>
+    /// <summary>Default page read -- returns structured page summary (title, url, readyState, text snippet).</summary>
     public async Task<string?> ReadPageAsync()
     {
         return await EvalAsync("""
@@ -460,7 +460,7 @@ public sealed partial class CdpClient
             """);
     }
 
-    /// <summary>Default click — finds the most likely interactive button (send/submit/confirm).</summary>
+    /// <summary>Default click -- finds the most likely interactive button (send/submit/confirm).</summary>
     public async Task<string?> DefaultClickAsync()
     {
         return await EvalAsync("""
@@ -485,7 +485,7 @@ public sealed partial class CdpClient
             """);
     }
 
-    /// <summary>Default type — finds editor, types text, sends with Enter (full prompt flow).</summary>
+    /// <summary>Default type -- finds editor, types text, sends with Enter (full prompt flow).</summary>
     public async Task<string?> DefaultTypeAsync(string text, bool autoSend = true)
     {
         var escaped = text.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\n", "\\n");
@@ -507,7 +507,7 @@ public sealed partial class CdpClient
             "return 'NOT_FOUND';})()";
         var result = await EvalAsync(js);
 
-        // Auto-send with Enter key (AI chat flow: type → Enter → send)
+        // Auto-send with Enter key (AI chat flow: type -> Enter -> send)
         if (autoSend && result != null && result.StartsWith("typed:"))
         {
             await Task.Delay(100);
@@ -526,7 +526,7 @@ public sealed partial class CdpClient
         return result;
     }
 
-    /// <summary>Default focus — finds the most likely editor/input and focuses it.</summary>
+    /// <summary>Default focus -- finds the most likely editor/input and focuses it.</summary>
     public async Task<string?> DefaultFocusAsync()
     {
         return await EvalAsync("""
@@ -696,7 +696,7 @@ public sealed partial class CdpClient
             "return(r[r.length-1].textContent||'').trim()})()");
     }
 
-    /// <summary>Click an element via JS (no mouse events — works when iconified).</summary>
+    /// <summary>Click an element via JS (no mouse events -- works when iconified).</summary>
     public async Task JsClickAsync(string selector)
     {
         var escaped = selector.Replace("'", "\\'");
@@ -711,7 +711,7 @@ public sealed partial class CdpClient
     public async Task BringToFrontAsync()
     {
         // Check if our target is already the active tab in Chrome (via CDP)
-        // If so, Page.bringToFront is a no-op — skip the minimize dance
+        // If so, Page.bringToFront is a no-op -- skip the minimize dance
         bool alreadyActive = false;
         try
         {
@@ -722,7 +722,7 @@ public sealed partial class CdpClient
 
         if (!alreadyActive)
         {
-            // Tab is not active → minimize Chrome before activation to prevent OS focus theft
+            // Tab is not active -> minimize Chrome before activation to prevent OS focus theft
             var hwnd = GetChromeWindowHandle();
             bool didMinimize = false;
             if (hwnd != IntPtr.Zero && !IsIconic(hwnd))
@@ -731,13 +731,13 @@ public sealed partial class CdpClient
                 ShowWindowNative(hwnd, 8); // SW_SHOWMINNOACTIVE: minimize without activating next window
                 ScheduleMinimizeDump("bring-to-front-tab-switch", hwnd);
                 didMinimize = true;
-                // Poll until minimized (replaces fixed 50ms delay — Chrome may not be iconic yet)
+                // Poll until minimized (replaces fixed 50ms delay -- Chrome may not be iconic yet)
                 var preWb = await GetWindowForTargetAsync();
                 if (preWb != null)
                     await WaitForWindowStateAsync(preWb.Value.windowId, "minimized", timeoutMs: 1000);
             }
             await SendAsync("Page.bringToFront");
-            // Restore after tab switch — poll until normal (replaces fixed 200ms delay)
+            // Restore after tab switch -- poll until normal (replaces fixed 200ms delay)
             if (didMinimize)
             {
                 RestoreChromeNoActivate();
@@ -749,7 +749,7 @@ public sealed partial class CdpClient
     }
 
     /// <summary>
-    /// Bring this tab to the OS foreground (recovery use only — steals focus).
+    /// Bring this tab to the OS foreground (recovery use only -- steals focus).
     /// Uses Page.bringToFront which activates the tab AND brings Chrome to front.
     /// </summary>
     /// <summary>
@@ -765,7 +765,7 @@ public sealed partial class CdpClient
         // SW_SHOWNOACTIVATE=4: visible, not minimized, does NOT steal focus
         ShowWindowNative(hwnd, 4);
         CancelMinimizeDump("restore-no-activate");
-        Console.WriteLine("[CDP] Chrome restored (SW_SHOWNOACTIVATE — no focus steal)");
+        Console.WriteLine("[CDP] Chrome restored (SW_SHOWNOACTIVATE -- no focus steal)");
     }
 
     public void MinimizeChrome()
@@ -780,12 +780,12 @@ public sealed partial class CdpClient
         Console.Error.WriteLine($"[CDP:MINIMIZE] Chrome minimized (hwnd={hwnd:X8})\n  callstack: {caller.Replace("\n", "\n  ")}");
     }
 
-    /// <summary>Legacy recovery — replaced by RestoreChromeNoActivate. Kept as no-op.</summary>
+    /// <summary>Legacy recovery -- replaced by RestoreChromeNoActivate. Kept as no-op.</summary>
     public Task BringTabToFrontAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Activate this tab in Chrome.
-    /// WARNING: Target.activateTarget DOES steal OS foreground window when Chrome is in background —
+    /// WARNING: Target.activateTarget DOES steal OS foreground window when Chrome is in background --
     /// Chrome calls SetForegroundWindow internally as part of tab activation.
     /// Unlike Page.bringToFront (even more aggressive), but still NOT truly focusless.
     ///
@@ -793,14 +793,14 @@ public sealed partial class CdpClient
     /// CDP Runtime.evaluate / DOM commands work on background tabs via targetId WebSocket.
     /// Only call this when the tab MUST be visible (e.g. rendering-dependent operations).
     /// </summary>
-    /// <summary>No-op — tab activation not needed; CDP operates on background tabs via targetId.</summary>
+    /// <summary>No-op -- tab activation not needed; CDP operates on background tabs via targetId.</summary>
     public Task ActivateTabAsync() => Task.CompletedTask;
 
     /// <summary>
     /// Intercept file chooser dialog and provide files programmatically (fully focusless).
     /// Uses Input.dispatchMouseEvent (trusted gesture) so Chrome opens the file chooser,
     /// which is intercepted by Page.setInterceptFileChooserDialog BEFORE the native OS dialog
-    /// appears → no focus stealing at all.
+    /// appears -> no focus stealing at all.
     /// Steps: 1) Enable interception 2) Trusted-click upload button 3) Wait for fileChooserOpened
     ///         4) If menu appeared, trusted-click menu item + wait again 5) handleFileChooser
     /// </summary>
@@ -808,7 +808,7 @@ public sealed partial class CdpClient
     {
         try
         {
-            // Enable file chooser interception BEFORE the click — intercepts before OS dialog opens
+            // Enable file chooser interception BEFORE the click -- intercepts before OS dialog opens
             await SendAsync("Page.setInterceptFileChooserDialog", new JsonObject { ["enabled"] = true });
             _fileChooserTcs = new TaskCompletionSource<JsonNode?>();
 
@@ -828,11 +828,11 @@ public sealed partial class CdpClient
             Console.WriteLine($"[CDP] FileChooser btn: {btnInfo}");
             if (btnInfo == "NO_BTN") return false;
 
-            // Trusted gesture click — Chrome treats this as real user input for file chooser
+            // Trusted gesture click -- Chrome treats this as real user input for file chooser
             var btnCoords = btnInfo!.Split(':')[0].Split(',');
             await TrustedClickAsync(int.Parse(btnCoords[0]), int.Parse(btnCoords[1]));
 
-            // Wait for file chooser event (direct open — no menu)
+            // Wait for file chooser event (direct open -- no menu)
             using var cts = new CancellationTokenSource(timeoutMs);
             cts.Token.Register(() => _fileChooserTcs.TrySetCanceled());
 
@@ -842,7 +842,7 @@ public sealed partial class CdpClient
             }
             catch (TaskCanceledException)
             {
-                // Menu opened instead of direct file chooser — find and trusted-click menu item
+                // Menu opened instead of direct file chooser -- find and trusted-click menu item
                 var menuInfo = await EvalAsync("""
                     (() => {
                         var items = document.querySelectorAll('[role=menuitem], [role=option]');
@@ -876,14 +876,14 @@ public sealed partial class CdpClient
                 var menuCoords = menuInfo!.Split(':')[0].Split(',');
                 await TrustedClickAsync(int.Parse(menuCoords[0]), int.Parse(menuCoords[1]));
 
-                using var cts2 = new CancellationTokenSource(12000); // 12s — React menu click may take time
+                using var cts2 = new CancellationTokenSource(12000); // 12s -- React menu click may take time
                 cts2.Token.Register(() => _fileChooserTcs.TrySetCanceled());
                 try { await _fileChooserTcs.Task; }
                 catch (TaskCanceledException)
                 {
-                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click — trying speculative handleFileChooser...");
+                    Console.WriteLine("[CDP] FileChooser: no event after menu trusted-click -- trying speculative handleFileChooser...");
                     // Chrome may still be holding the pending chooser even after our TCS timed out.
-                    // Speculatively send handleFileChooser — if Chrome accepts it, the file is set.
+                    // Speculatively send handleFileChooser -- if Chrome accepts it, the file is set.
                     try
                     {
                         var fp2 = absolutePath.Replace('\\', '/');
@@ -892,7 +892,7 @@ public sealed partial class CdpClient
                             ["action"] = "accept",
                             ["files"] = new JsonArray { fp2 },
                         });
-                        Console.WriteLine("[CDP] FileChooser: speculative accept sent — file likely set");
+                        Console.WriteLine("[CDP] FileChooser: speculative accept sent -- file likely set");
                         return true;
                     }
                     catch (Exception ex2)
@@ -903,7 +903,7 @@ public sealed partial class CdpClient
                 }
             }
 
-            // Accept — Chrome provides file to the page without opening native OS dialog
+            // Accept -- Chrome provides file to the page without opening native OS dialog
             var filePath = absolutePath.Replace('\\', '/');
             await SendAsync("Page.handleFileChooser", new JsonObject
             {
@@ -951,10 +951,10 @@ public sealed partial class CdpClient
         catch { }
     }
 
-    // ── Hotkey / Keyboard dispatch ────────────────────────────────
+    // -- Hotkey / Keyboard dispatch --------------------------------
 
     /// <summary>
-    /// CDP Input.dispatchKeyEvent — 포커스리스 키 이벤트 발송 (탭 내 포커스 기준).
+    /// CDP Input.dispatchKeyEvent -- 포커스리스 키 이벤트 발송 (탭 내 포커스 기준).
     /// modifiers: 0=none, 1=Alt, 2=Ctrl, 4=Meta, 8=Shift (OR 조합)
     /// </summary>
     public async Task DispatchKeyAsync(string key, int modifiers = 0, string code = "")
@@ -1011,15 +1011,15 @@ public sealed partial class CdpClient
 
     /// <summary>
     /// aria-keyshortcuts / accesskey 문자열을 파싱하여 CDP DispatchKeyAsync 호출.
-    /// "Alt+S", "Ctrl+Shift+S", "s" (accesskey → Alt+key) 등 지원.
+    /// "Alt+S", "Ctrl+Shift+S", "s" (accesskey -> Alt+key) 등 지원.
     /// </summary>
     public async Task<bool> DispatchShortcutAsync(string shortcut, bool isAccessKey = false)
     {
-        // accesskey는 브라우저가 Alt(+Shift)로 발동 — 여기선 Alt 조합으로 처리
+        // accesskey는 브라우저가 Alt(+Shift)로 발동 -- 여기선 Alt 조합으로 처리
         if (isAccessKey && shortcut.Length == 1)
         {
             await DispatchKeyAsync(shortcut.ToUpperInvariant(), modifiers: 1); // Alt=1
-            Console.WriteLine($"  [CDP-HOTKEY] accesskey '{shortcut}' → Alt+{shortcut.ToUpperInvariant()}");
+            Console.WriteLine($"  [CDP-HOTKEY] accesskey '{shortcut}' -> Alt+{shortcut.ToUpperInvariant()}");
             return true;
         }
 
@@ -1039,7 +1039,7 @@ public sealed partial class CdpClient
             };
         }
         await DispatchKeyAsync(key, mods);
-        Console.WriteLine($"  [CDP-HOTKEY] '{shortcut}' → key={key} mods={mods}");
+        Console.WriteLine($"  [CDP-HOTKEY] '{shortcut}' -> key={key} mods={mods}");
         return true;
     }
 

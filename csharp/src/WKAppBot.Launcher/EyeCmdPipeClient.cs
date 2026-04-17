@@ -23,7 +23,7 @@ internal static class EyeCmdPipeClient
     /// timeoutMs: if >0, close the pipe after this many ms (enforces Launcher-level timeout
     /// even for Eye in-process commands that don't implement their own timeout).
     /// firstOutputTimeoutMs: if >0, fall back to Core if Eye produces no output within this time.
-    ///   Use for fast commands (file edit/read/grep) where Eye stall → Core is safer than waiting.
+    ///   Use for fast commands (file edit/read/grep) where Eye stall -> Core is safer than waiting.
     ///   Returns false so caller runs Core; pipe is closed (Eye gets BrokenPipe and skips command).
     /// </summary>
     public static bool TryDelegate(string[] args, out int exitCode, int timeoutMs = 0, int timeoutExitCode = 2, int firstOutputTimeoutMs = 0)
@@ -33,7 +33,7 @@ internal static class EyeCmdPipeClient
         var pipe = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut);
         // Eye pipe sends UTF-8 text. We decode it to Unicode strings via StreamReader,
         // then re-encode to terminal CP via WideCharToMultiByte (NativeAOT-safe, no managed code pages).
-        // Encoding.GetEncoding(949) is NOT used — NativeAOT trims code page support; silent UTF-8
+        // Encoding.GetEncoding(949) is NOT used -- NativeAOT trims code page support; silent UTF-8
         // fallback caused garbled Korean in CMD. Win32 WideCharToMultiByte has no such limitation.
         var rawStdout = Console.OpenStandardOutput();
         var cp = Program._consoleCodePage;
@@ -59,7 +59,7 @@ internal static class EyeCmdPipeClient
 
             // First-output timeout: both LAUNCH JSON and [CMD] must arrive within N ms.
             // Normal Eye: LAUNCH JSON + [CMD] come back-to-back in <10ms.
-            // If either is missing within timeout → Eye is stalled → Core fallback.
+            // If either is missing within timeout -> Eye is stalled -> Core fallback.
             string? peekedLine = null;
             string? peekedLine2 = null;
             if (firstOutputTimeoutMs > 0)
@@ -68,7 +68,7 @@ internal static class EyeCmdPipeClient
                 if (!firstReadTask.Wait(firstOutputTimeoutMs))
                 {
                     try { pipe.Close(); } catch { }
-                    return false; // no LAUNCH JSON → Core fallback
+                    return false; // no LAUNCH JSON -> Core fallback
                 }
                 peekedLine = firstReadTask.Result;
 
@@ -76,15 +76,15 @@ internal static class EyeCmdPipeClient
                 var secondReadTask = Task.Run(() => r.ReadLine());
                 if (!secondReadTask.Wait(firstOutputTimeoutMs))
                 {
-                    // LAUNCH JSON came but [CMD] didn't → Eye stuck after dispatch
+                    // LAUNCH JSON came but [CMD] didn't -> Eye stuck after dispatch
                     try { pipe.Close(); } catch { }
-                    Console.Error.WriteLine("[PIPE] no [CMD] within timeout — falling back to Core");
+                    Console.Error.WriteLine("[PIPE] no [CMD] within timeout -- falling back to Core");
                     return false;
                 }
                 peekedLine2 = secondReadTask.Result;
             }
 
-            // Timeout: fire timer closes pipe → unblocks ReadLine with IOException.
+            // Timeout: fire timer closes pipe -> unblocks ReadLine with IOException.
             // Eye continues executing in background; Launcher returns timeout exit code.
             bool timedOut = false;
             Timer? timeoutTimer = null;
@@ -120,7 +120,7 @@ internal static class EyeCmdPipeClient
                         break;
                     }
                     writeLine(line);
-                    // LAUNCH JSON is a sentinel header — don't count as real output
+                    // LAUNCH JSON is a sentinel header -- don't count as real output
                     if (!line.StartsWith("{\"_\":\"LAUNCH\"") && !line.StartsWith("{\"_\": \"LAUNCH\""))
                         outputLines++;
                 }
@@ -136,18 +136,18 @@ internal static class EyeCmdPipeClient
             }
 
             // Incomplete pipe guard: pipe closed without EndMarker
-            //   Case A: only LAUNCH JSON came (or nothing) → Core fallback (silent crash/kill)
-            //   Case B: some real output came + no EndMarker → error but no re-run (partial output already sent)
+            //   Case A: only LAUNCH JSON came (or nothing) -> Core fallback (silent crash/kill)
+            //   Case B: some real output came + no EndMarker -> error but no re-run (partial output already sent)
             if (!timedOut && !gotEndMarker)
             {
                 if (outputLines == 0) // only LAUNCH JSON or truly empty
                 {
-                    Console.Error.WriteLine("[PIPE] incomplete — no output after LAUNCH, falling back to Core");
+                    Console.Error.WriteLine("[PIPE] incomplete -- no output after LAUNCH, falling back to Core");
                     return false; // Launcher will re-run via Core
                 }
                 else // partial real output was already written
                 {
-                    Console.Error.WriteLine("[PIPE] incomplete — pipe closed without EndMarker (partial output)");
+                    Console.Error.WriteLine("[PIPE] incomplete -- pipe closed without EndMarker (partial output)");
                     exitCode = -1;
                 }
             }
@@ -180,7 +180,7 @@ internal static class EyeCmdPipeClient
     static void WriteLineW(Stream stdout, string line, int codePage, byte[] lineEnd)
     {
         // Encode string to target code page via Win32 WideCharToMultiByte.
-        // Works in NativeAOT — no managed Encoding stack required.
+        // Works in NativeAOT -- no managed Encoding stack required.
         int len = line.Length;
         if (len > _charBuf.Length) len = _charBuf.Length;
         line.CopyTo(0, _charBuf, 0, len);

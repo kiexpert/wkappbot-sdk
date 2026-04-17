@@ -20,11 +20,11 @@ public class AdbDeviceRegistry
         _aliasPath = Path.Combine(hq, "profiles", "adb_devices.json");
     }
 
-    // ── Device resolution ─────────────────────────────────
+    // -- Device resolution --------------------------------─
 
     /// <summary>
     /// Resolve device identifier to serial + optional display ID.
-    /// Matching order: alias → model → serial (wildcard supported)
+    /// Matching order: alias -> model -> serial (wildcard supported)
     /// Returns (serial, displayId?) or null if not found.
     /// </summary>
     public (string serial, string? displayId)? ResolveDevice(string? deviceName)
@@ -32,14 +32,14 @@ public class AdbDeviceRegistry
         var devices = _adb.ListDevices().Where(d => d.IsOnline).ToList();
         if (devices.Count == 0) return null;
 
-        // No device specified → auto-detect single device
+        // No device specified -> auto-detect single device
         if (string.IsNullOrEmpty(deviceName))
         {
             if (devices.Count == 1) return (devices[0].Serial, null);
-            return null; // Ambiguous — multiple devices
+            return null; // Ambiguous -- multiple devices
         }
 
-        // Split display suffix: "Fold5:outer" → device="Fold5", display hint
+        // Split display suffix: "Fold5:outer" -> device="Fold5", display hint
         string? displayHint = null;
         var colonIdx = deviceName.IndexOf(':');
         if (colonIdx > 0)
@@ -112,7 +112,7 @@ public class AdbDeviceRegistry
         SaveAliases(aliases);
     }
 
-    // ── Display handling (foldables) ──────────────────────
+    // -- Display handling (foldables) ----------------------
 
     public List<DisplayInfo> GetDisplays(string serial)
     {
@@ -153,7 +153,7 @@ public class AdbDeviceRegistry
         return displays.FirstOrDefault(d => d.DisplayId == hint)?.DisplayId;
     }
 
-    // ── Pattern matching ──────────────────────────────────
+    // -- Pattern matching ----------------------------------
 
     private static AdbDevice? MatchDevice(List<AdbDevice> devices, string pattern, Func<AdbDevice, string?> selector)
     {
@@ -181,7 +181,7 @@ public class AdbDeviceRegistry
         });
     }
 
-    // ── Alias persistence ─────────────────────────────────
+    // -- Alias persistence --------------------------------─
 
     private Dictionary<string, string> LoadAliases()
     {
@@ -205,7 +205,7 @@ public class AdbDeviceRegistry
     }
 }
 
-// ── Models ────────────────────────────────────────────────
+// -- Models ------------------------------------------------
 
 public class DeviceInfo
 {

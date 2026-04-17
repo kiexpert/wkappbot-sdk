@@ -13,7 +13,7 @@ namespace WKAppBot.Win32.Window;
 ///   1. Classify top-level children into zones (toolbar/mdi/bar/service/...)
 ///   2. Enumerate MDI forms with form_id + form_name + stock_code
 ///   3. Group forms by type for clean summary output
-///   4. (--ocr) OCR unknown buttons/labels → save to Experience DB
+///   4. (--ocr) OCR unknown buttons/labels -> save to Experience DB
 ///
 /// Works with any MFC-based HTS app (LS Tuhon, Kiwoom HeroMun, NH NaMu, etc.)
 /// </summary>
@@ -232,11 +232,11 @@ public static class AppScanner
         return count;
     }
 
-    // ── OCR Experience Learning ────────────────────────────────
+    // -- OCR Experience Learning --------------------------------
 
     /// <summary>
     /// OCR-scan leaf controls inside each unique form type and learn their text.
-    /// Captures each form → runs OCR → matches words to child controls by position.
+    /// Captures each form -> runs OCR -> matches words to child controls by position.
     ///
     /// Only scans one instance per form type (e.g., one [1101] 현재가 out of 6).
     /// Focuses on Button, Static (label), and small unidentified controls.
@@ -244,7 +244,7 @@ public static class AppScanner
     /// <param name="scanResult">Scan result with forms to OCR</param>
     /// <param name="expDb">Experience DB to store learned controls</param>
     /// <param name="ocrRecognizeAll">
-    /// OCR function: takes Bitmap → returns (text, x, y, w, h, confidence)[]
+    /// OCR function: takes Bitmap -> returns (text, x, y, w, h, confidence)[]
     /// Injected to avoid WKAppBot.Vision dependency in Win32 project.
     /// </param>
     /// <param name="onProgress">Optional progress callback (formId, controlCount)</param>
@@ -259,7 +259,7 @@ public static class AppScanner
         var result = new OcrLearnResult();
 
         // Bring the main window to front before capturing MDI children.
-        // MDI child windows live inside the parent — SetWindowPos on a child alone
+        // MDI child windows live inside the parent -- SetWindowPos on a child alone
         // won't help if another app (editor, browser) covers the parent.
         // SWP_NOACTIVATE avoids stealing focus from the user.
         var originalFg = NativeMethods.GetForegroundWindow();
@@ -274,7 +274,7 @@ public static class AppScanner
         try
         {
 
-        // Group forms by type — only OCR one instance per type
+        // Group forms by type -- only OCR one instance per type
         var formGroups = scanResult.Forms
             .Where(f => f.FormId != null && f.IsVisible && f.Rect.Width > 50 && f.Rect.Height > 50)
             .GroupBy(f => f.FormId!)
@@ -307,7 +307,7 @@ public static class AppScanner
                     continue;
                 }
 
-                // Capture the form window (skip blank captures — protect DB from bad data)
+                // Capture the form window (skip blank captures -- protect DB from bad data)
                 using var screenshot = ScreenCapture.CaptureWindow(form.Handle);
                 if (screenshot.Width < 10 || screenshot.Height < 10) continue;
                 if (ScreenCapture.IsBlankBitmap(screenshot))
@@ -381,7 +381,7 @@ public static class AppScanner
                     expDb.LearnControl(formId, form.FormName ?? formId, experience, treePath);
                     result.ControlsLearned++;
 
-                    // ── Per-control detail capture ──
+                    // -- Per-control detail capture --
                     // --detail: always refresh screenshots + text history
                     // default: auto-capture on first encounter (no existing screenshot)
                     bool shouldCapture = ctrl.Rect.Width > 0 && ctrl.Rect.Height > 0
@@ -390,7 +390,7 @@ public static class AppScanner
                     {
                         try
                         {
-                            // Crop from form bitmap (PrintWindow-safe — no other window interference)
+                            // Crop from form bitmap (PrintWindow-safe -- no other window interference)
                             int cropX = ctrl.Rect.Left - form.Rect.Left;
                             int cropY = ctrl.Rect.Top - form.Rect.Top;
                             using var ctrlBmp = ScreenCapture.CropRegion(
@@ -403,13 +403,13 @@ public static class AppScanner
                             if (expDb.AppendTextHistory(formId, ctrl.ControlId, matchedText, wmText, treePath))
                                 result.DetailTextChanges++;
                         }
-                        catch { /* best-effort — don't fail scan over detail capture */ }
+                        catch { /* best-effort -- don't fail scan over detail capture */ }
                     }
                 }
 
                 onProgress?.Invoke(formId, result.ControlsLearned);
 
-                // ── Parent control screenshots (grids, tables, panels — children included) ──
+                // -- Parent control screenshots (grids, tables, panels -- children included) --
                 // Parent controls are treated as regular controls for screenshot purposes.
                 // They get exactly one screenshot showing their full content with all children.
                 foreach (var pwp in parentControls)
@@ -555,12 +555,12 @@ public static class AppScanner
 
             if (grandChildren.Count == 0)
             {
-                // Leaf node — this is a single control (button, label, edit, etc.)
+                // Leaf node -- this is a single control (button, label, edit, etc.)
                 leafResult.Add(new ControlWithPath(child, currentPath));
             }
             else
             {
-                // Has children — check if it's a known leaf-like class, otherwise recurse
+                // Has children -- check if it's a known leaf-like class, otherwise recurse
                 if (IsLeafLikeClass(child.ClassName))
                 {
                     leafResult.Add(new ControlWithPath(child, currentPath));
@@ -596,7 +596,7 @@ public static class AppScanner
         // Definitely OCR: buttons, labels (Static doesn't expose text via GetWindowText sometimes)
         if (cls is "Button" or "Static") return true;
 
-        // AfxWnd (MFC custom controls) — might be owner-drawn buttons/labels
+        // AfxWnd (MFC custom controls) -- might be owner-drawn buttons/labels
         if (cls.StartsWith("Afx", StringComparison.Ordinal)) return true;
 
         // Small controls that might be buttons (unknown MFC classes)
@@ -666,11 +666,11 @@ public static class AppScanner
         return "control";
     }
 
-    // ── Quick Touch Controls (lightweight ExperienceDb accumulation) ──
+    // -- Quick Touch Controls (lightweight ExperienceDb accumulation) --
 
     /// <summary>
     /// Quick per-control experience accumulation WITHOUT OCR.
-    /// Uses PrintWindow bitmap + WM_GETTEXT only — much lighter than LearnFormsWithOcr.
+    /// Uses PrintWindow bitmap + WM_GETTEXT only -- much lighter than LearnFormsWithOcr.
     /// Called from snapshot/capture commands to accumulate experience on every encounter.
     /// </summary>
     /// <param name="scanResult">AppScanResult from Scan()</param>
@@ -736,7 +736,7 @@ public static class AppScanner
                     catch { /* best-effort per control */ }
                 }
 
-                // Parent controls (containers) — screenshot only, no text
+                // Parent controls (containers) -- screenshot only, no text
                 foreach (var parent in parentControls)
                 {
                     try
@@ -767,13 +767,13 @@ public static class AppScanner
         return (formCount, controlCount, screenshotCount);
     }
 
-    // ── Form-level Text Snapshot (WM_GETTEXT) ─────────────────
+    // -- Form-level Text Snapshot (WM_GETTEXT) ----------------─
 
     /// <summary>
     /// Collect all visible text (WM_GETTEXT) from a form's child controls, sorted by Y-coordinate.
     /// Returns text lines for puppet pattern building via ExperienceDb.AddTextSnapshot().
     ///
-    /// Text collection is NEVER skipped even for DB-known controls — needed for puppet pattern diff.
+    /// Text collection is NEVER skipped even for DB-known controls -- needed for puppet pattern diff.
     /// </summary>
     /// <param name="hForm">Form window handle</param>
     /// <param name="formRect">Form bounding rectangle (for relative Y sorting)</param>
@@ -783,7 +783,7 @@ public static class AppScanner
         var textItems = new List<(int y, string text)>();
         CollectTextRecursive(hForm, formRect, textItems, 0, maxDepth);
 
-        // Sort by Y-coordinate → deduplicate adjacent identical lines
+        // Sort by Y-coordinate -> deduplicate adjacent identical lines
         return textItems
             .OrderBy(item => item.y)
             .Select(item => item.text)
@@ -818,15 +818,15 @@ public static class AppScanner
         }
     }
 
-    // ── Structural Fingerprint + OCR Keywords ──────────────────
+    // -- Structural Fingerprint + OCR Keywords ------------------
 
     /// <summary>
     /// Generate a structural fingerprint from a form's control list.
-    /// Each control → "{NormalizedClass}:{Cid}:{SizeBucket}:{PosBucket}" token.
-    /// Tokens sorted → joined → SHA256 hash (first 16 hex chars).
+    /// Each control -> "{NormalizedClass}:{Cid}:{SizeBucket}:{PosBucket}" token.
+    /// Tokens sorted -> joined -> SHA256 hash (first 16 hex chars).
     ///
     /// The fingerprint captures the STABLE structure of a form type:
-    ///   - ClassName normalized (AfxWnd110/140 → "AfxWnd", Afx:hex... → "Afx:*")
+    ///   - ClassName normalized (AfxWnd110/140 -> "AfxWnd", Afx:hex... -> "Afx:*")
     ///   - ControlId (stable per form type)
     ///   - SizeBucket (XS/S/M/L/XL based on area)
     ///   - PosBucket (TL/TC/TR/ML/MC/MR/BL/BC/BR based on relative position)
@@ -848,7 +848,7 @@ public static class AppScanner
         tokens.Sort(StringComparer.Ordinal);
         var fingerprint = string.Join("\n", tokens);
 
-        // SHA256 → first 16 hex chars
+        // SHA256 -> first 16 hex chars
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(fingerprint));
         var fingerprintHash = Convert.ToHexString(hashBytes)[..16].ToLowerInvariant();
 
@@ -858,7 +858,7 @@ public static class AppScanner
     /// <summary>
     /// Refine OCR keywords for a form type.
     /// First scan (scan_count==1): all OCR text words become keyword candidates.
-    /// Subsequent scans: intersect with existing keywords → filter out dynamic data.
+    /// Subsequent scans: intersect with existing keywords -> filter out dynamic data.
     /// </summary>
     public static List<string> RefineOcrKeywords(FormExperience form)
     {
@@ -895,15 +895,15 @@ public static class AppScanner
     /// </summary>
     internal static string NormalizeClassName(string className)
     {
-        // AfxWnd110, AfxWnd140, AfxWnd70s etc. → "AfxWnd"
+        // AfxWnd110, AfxWnd140, AfxWnd70s etc. -> "AfxWnd"
         if (Regex.IsMatch(className, @"^AfxWnd\d+[su]?$"))
             return "AfxWnd";
 
-        // Afx:00E80000:b:00010005:... → "Afx:*" (session-unique identifiers)
+        // Afx:00E80000:b:00010005:... -> "Afx:*" (session-unique identifiers)
         if (className.StartsWith("Afx:", StringComparison.Ordinal))
             return "Afx:*";
 
-        // AfxFrameOrView, AfxMDIFrame, etc. → keep as-is (stable class names)
+        // AfxFrameOrView, AfxMDIFrame, etc. -> keep as-is (stable class names)
         return className;
     }
 
@@ -953,22 +953,22 @@ public static class AppScanner
         // Too short (single char often noise)
         if (word.Length < 2) return false;
 
-        // Pure numbers (prices, quantities) → dynamic
+        // Pure numbers (prices, quantities) -> dynamic
         if (Regex.IsMatch(word, @"^[\d.,+\-]+$")) return false;
 
-        // Time patterns → dynamic
+        // Time patterns -> dynamic
         if (Regex.IsMatch(word, @"^\d{1,2}:\d{2}")) return false;
 
-        // Stock code patterns (4-8 digits, optional letter prefix) → dynamic
+        // Stock code patterns (4-8 digits, optional letter prefix) -> dynamic
         if (Regex.IsMatch(word, @"^[A-Z]?\d{4,8}$")) return false;
 
-        // Percentage → dynamic
+        // Percentage -> dynamic
         if (Regex.IsMatch(word, @"^\d+\.?\d*[%t]$")) return false;
 
         return true;
     }
 
-    // ── Pretty-print ─────────────────────────────────────────
+    // -- Pretty-print ----------------------------------------─
 
     /// <summary>
     /// Format the scan result as a human-readable summary string.
@@ -978,14 +978,14 @@ public static class AppScanner
         var sb = new StringBuilder(2048);
 
         // Header
-        sb.AppendLine($"=== {result.WindowTitle} — App Scan ===");
+        sb.AppendLine($"=== {result.WindowTitle} -- App Scan ===");
         sb.AppendLine($"Class: {result.WindowClass}  Process: {result.ProcessName} (PID:{result.ProcessId})");
         sb.AppendLine($"Size: {result.Rect.Width}x{result.Rect.Height}");
         if (profileName != null)
             sb.AppendLine($"Profile: {profileName}");
         sb.AppendLine();
 
-        // Zones (skip forms — they're in MDI section)
+        // Zones (skip forms -- they're in MDI section)
         foreach (var z in result.Zones)
         {
             if (z.Zone.Type == ZoneType.Form) continue; // forms shown in MDI section
@@ -1008,7 +1008,7 @@ public static class AppScanner
         if (result.Forms.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine($"── MDI Forms ({result.Forms.Count}) ────────────────────────");
+            sb.AppendLine($"-- MDI Forms ({result.Forms.Count}) ------------------------");
 
             // Group by form_id
             var groups = result.Forms
@@ -1051,7 +1051,7 @@ public static class AppScanner
     }
 }
 
-// ── Data models ─────────────────────────────────────────
+// -- Data models ----------------------------------------─
 
 /// <summary>
 /// Complete scan result for a target window.
@@ -1118,7 +1118,7 @@ public sealed class FormScanEntry
 }
 
 /// <summary>
-/// OCR word info — lightweight struct for passing OCR results from Vision layer.
+/// OCR word info -- lightweight struct for passing OCR results from Vision layer.
 /// Avoids direct dependency on WKAppBot.Vision in Win32 project.
 /// </summary>
 public sealed class OcrWordInfo

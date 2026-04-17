@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Slack Report ──
+    // -- Slack Report --
 
     // AsyncLocal: triad parent can pre-create a shared thread ts before spawning Task.Run children.
     // Each child Task inherits the value and posts to the same thread (no duplicate headers).
@@ -34,7 +34,7 @@ internal partial class Program
     // 0 = no Q# (triad, internal sub-calls). Used to label Slack posts as [AI/Q#].
     internal static readonly System.Threading.AsyncLocal<int> _currentQid = new();
 
-    // CDP client + host + editorSel for the current ask — set by each AI function so
+    // CDP client + host + editorSel for the current ask -- set by each AI function so
     // SlackPostAnswerBlocks can inject re-education system messages.
     internal static readonly System.Threading.AsyncLocal<WKAppBot.WebBot.CdpClient?> _currentAskCdp = new();
     internal static readonly System.Threading.AsyncLocal<string?> _currentAskHost = new(); // "claude" | "gemini" | "chatgpt"
@@ -121,7 +121,7 @@ internal partial class Program
             if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel)) return;
             var uname = username ?? BotUsername;
 
-            // ── Always merge bot replies: same author in thread -- edit with separator ──
+            // -- Always merge bot replies: same author in thread -- edit with separator --
             // No time limit ??bot replies always merge. Keeps thread compact + saves quota.
             if (_slackThreadLastPost.TryGetValue(sessionTs, out var last) && last.user == uname)
             {
@@ -163,8 +163,8 @@ internal partial class Program
 
     /// <summary>
     /// Parse [An] answer blocks from AI response.
-    /// Returns dict of qid → answer text. Empty if no [An] markers found.
-    /// Format: "[A3] answer text..." — may span multiple lines until next [An] or EOF.
+    /// Returns dict of qid -> answer text. Empty if no [An] markers found.
+    /// Format: "[A3] answer text..." -- may span multiple lines until next [An] or EOF.
     /// </summary>
     internal static Dictionary<int, string> ParseAnswerBlocks(string response)
     {
@@ -197,7 +197,7 @@ internal partial class Program
     {
         var sysMsg = $"[SYSTEM] Format error: your response must begin with [A{qid}] on its own line. " +
                      $"Restate your full answer starting with exactly \"[A{qid}]\" and nothing before it.";
-        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [A{qid}] 마커 없음 → 재교육 메시지 주입...");
+        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: [A{qid}] 마커 없음 -> 재교육 메시지 주입...");
 
         // ClearEditorAsync timeout here was the root cause of GPT session resets (suggest #19).
         // On failure: skip reeducate injection, fall back to reading existing page response.
@@ -209,7 +209,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: ClearEditor 실패 ({ex.GetType().Name}) → 페이지 응답 읽기로 복구");
+            Console.Error.WriteLine($"[REEDUCATE] Q{qid}: ClearEditor 실패 ({ex.GetType().Name}) -> 페이지 응답 읽기로 복구");
         }
 
         if (!clearOk)
@@ -239,7 +239,7 @@ internal partial class Program
                     var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
                     if (vis == "1") { started = true; break; }
                 }
-                catch { break; } // EvalAsync timeout → stop polling
+                catch { break; } // EvalAsync timeout -> stop polling
             }
             if (started) break;
         }
@@ -257,7 +257,7 @@ internal partial class Program
                     var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
                     if (vis == "1") { still = true; break; }
                 }
-                catch { break; } // EvalAsync timeout → assume done, break
+                catch { break; } // EvalAsync timeout -> assume done, break
             }
             if (!still) break;
         }
@@ -303,7 +303,7 @@ internal partial class Program
         var blocks = ParseAnswerBlocks(response);
         var qid = _currentQid.Value;
 
-        // Re-education: Q# assigned but AI didn't use [An] format → inject correction
+        // Re-education: Q# assigned but AI didn't use [An] format -> inject correction
         if (blocks.Count == 0 && qid > 0)
         {
             var cdp = _currentAskCdp.Value;
@@ -317,12 +317,12 @@ internal partial class Program
                     blocks = ParseAnswerBlocks(retryResponse);
                     if (blocks.Count > 0)
                     {
-                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 성공 — {blocks.Count}개 블록 파싱됨");
+                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 성공 -- {blocks.Count}개 블록 파싱됨");
                         response = retryResponse;
                     }
                     else
                     {
-                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 후에도 [An] 없음 — 스킵");
+                        Console.Error.WriteLine($"[REEDUCATE] Q{qid}: 재교육 후에도 [An] 없음 -- 스킵");
                     }
                 }
             }
@@ -516,7 +516,7 @@ internal partial class Program
                 {
                     // Reuse existing thread: post new question as a reply separator
                     _slackSessionThreadTs.Value = existingTs;
-                    var sep = $"─── *[{labelWithQ}]* ───\n{qTrunc}";
+                    var sep = $"--─ *[{labelWithQ}]* --─\n{qTrunc}";
                     SlackSendViaApi(botToken, channel, sep,
                         threadTs: existingTs, username: GetSendReplyUsername())
                         .GetAwaiter().GetResult();
@@ -525,7 +525,7 @@ internal partial class Program
                 }
             }
 
-            // No existing thread — create new top-level post
+            // No existing thread -- create new top-level post
             var (ok, ts) = SlackSendViaApi(botToken, channel, $"*[{labelWithQ}]* {qTrunc}", username: GetSendReplyUsername())
                                .GetAwaiter().GetResult();
             if (ok && ts != null)
@@ -540,7 +540,7 @@ internal partial class Program
         catch { return null; }
     }
 
-    // ── Agent stop flag (--terminate / --stop-agent) ──────────────────────────
+    // -- Agent stop flag (--terminate / --stop-agent) --------------------------
     // Flag file: runtime/agent_stop_{sanitized_key}.flag
     // Loop checks this at each step; --terminate writes it; clear on loop exit.
 
@@ -575,11 +575,11 @@ internal partial class Program
 
     /// <summary>
     /// 훈수두기: inject msg into existing AI tab (CDP) + post to Slack thread.
-    ///   triad/all → Slack-only (reads runtime/last_triad_ts.txt)
-    ///   gemini/gpt/claude → CDP inject into tab + Slack thread
-    ///   threadKey → agent mode (e.g. "claude-agent-myjob")
-    /// Tab found → CDP inject (세션 유지, 초기화 없이 메시지 추가)
-    /// Tab not found → Slack-only fallback (warn)
+    ///   triad/all -> Slack-only (reads runtime/last_triad_ts.txt)
+    ///   gemini/gpt/claude -> CDP inject into tab + Slack thread
+    ///   threadKey -> agent mode (e.g. "claude-agent-myjob")
+    /// Tab found -> CDP inject (세션 유지, 초기화 없이 메시지 추가)
+    /// Tab not found -> Slack-only fallback (warn)
     /// </summary>
     static int AskIntercept(string ai, string msg, string? label = null, string? threadKey = null, bool interrupt = false)
     {
@@ -589,7 +589,7 @@ internal partial class Program
         var threadLabel = label ?? ai;
         var mode = interrupt ? "인터럽트" : "훈수";
 
-        // ── CDP injection (tab must exist) ─────────────────────────────────────
+        // -- CDP injection (tab must exist) ------------------------------------─
         bool cdpOk = false;
         if (ai is not ("triad" or "all"))
         {
@@ -601,11 +601,11 @@ internal partial class Program
             }
             else
             {
-                Console.Error.WriteLine($"[{mode}] 탭 없음 ({regKey}) — Slack 전송만 합니다.");
+                Console.Error.WriteLine($"[{mode}] 탭 없음 ({regKey}) -- Slack 전송만 합니다.");
             }
         }
 
-        // ── Slack post ─────────────────────────────────────────────────────────
+        // -- Slack post --------------------------------------------------------─
         string? threadTs = null;
         if (!string.IsNullOrEmpty(threadKey))
         {
@@ -629,7 +629,7 @@ internal partial class Program
 
         if (string.IsNullOrEmpty(botToken) || string.IsNullOrEmpty(channel))
         {
-            Console.Error.WriteLine($"[{mode}] Slack config 없음 — CDP만 동작");
+            Console.Error.WriteLine($"[{mode}] Slack config 없음 -- CDP만 동작");
             return cdpOk ? 0 : 1;
         }
 
@@ -640,7 +640,7 @@ internal partial class Program
             .GetAwaiter().GetResult();
 
         Console.WriteLine(ok
-            ? $"[{mode}] {cdpTag} 전달완료 → {threadLabel} thread={threadTs}"
+            ? $"[{mode}] {cdpTag} 전달완료 -> {threadLabel} thread={threadTs}"
             : $"[{mode}] Slack 전송 실패 (CDP: {(cdpOk ? "OK" : "SKIP")})");
 
         return (cdpOk || ok) ? 0 : 1;
@@ -671,14 +671,14 @@ internal partial class Program
 
             if (interrupt)
             {
-                // ⚡ CPU 인터럽트 방식: stop 버튼 클릭 → 즉시 inject
+                // ⚡ CPU 인터럽트 방식: stop 버튼 클릭 -> 즉시 inject
                 foreach (var s in stopSels)
                 {
                     var esc = s.Replace("'", "\\'");
                     var vis = await cdp.EvalAsync($"(()=>{{var b=document.querySelector('{esc}');return b&&b.offsetParent!==null?'1':'0'}})()");
                     if (vis == "1")
                     {
-                        Console.Error.WriteLine($"[{mode}] AI 응답 중단 → 즉시 주입");
+                        Console.Error.WriteLine($"[{mode}] AI 응답 중단 -> 즉시 주입");
                         await cdp.ClickStopButtonAsync();
                         await Task.Delay(300); // brief settle
                         break;
@@ -698,7 +698,7 @@ internal partial class Program
                         if (vis == "1") { generating = true; break; }
                     }
                     if (!generating) break;
-                    if (w == 0) Console.Error.WriteLine($"[{mode}] AI 응답 중 — 완료 대기 (최대 15s)...");
+                    if (w == 0) Console.Error.WriteLine($"[{mode}] AI 응답 중 -- 완료 대기 (최대 15s)...");
                     await Task.Delay(500);
                 }
             }
@@ -733,7 +733,7 @@ internal partial class Program
 
             if (interrupt)
             {
-                // ⚡ Auto-resume: wait for AI response → inject "continue previous task"
+                // ⚡ Auto-resume: wait for AI response -> inject "continue previous task"
                 // Wait for AI to start generating (stop button appears, up to 10s)
                 Console.WriteLine("[인터럽트] AI 응답 대기 중...");
                 for (int w = 0; w < 20; w++)
@@ -767,7 +767,7 @@ internal partial class Program
                 await cdp.InsertContentEditableAsync(editorSel, "[INTERRUPT HANDLED] Continue with your previous task.");
                 await Task.Delay(200);
                 await cdp.SendPromptAsync(editorSel);
-                Console.WriteLine("[인터럽트] 자동 복귀 완료 → AI가 이전 작업 재개");
+                Console.WriteLine("[인터럽트] 자동 복귀 완료 -> AI가 이전 작업 재개");
             }
 
             return true;
@@ -784,14 +784,14 @@ internal partial class Program
     }
 
     /// <summary>
-    /// --terminate / --stop-agent: write stop flag → loop exits cleanly at next step.
+    /// --terminate / --stop-agent: write stop flag -> loop exits cleanly at next step.
     /// Also clicks stop button via CDP if AI is currently generating.
     /// </summary>
     static int AskTerminate(string ai, string? threadKey = null)
     {
         var key = threadKey ?? BuildSandboxKey("ask", ai);
         AgentStopFlagCreate(key);
-        Console.Error.WriteLine($"[TERMINATE] 중단 플래그 생성 → {key}");
+        Console.Error.WriteLine($"[TERMINATE] 중단 플래그 생성 -> {key}");
 
         // Also click stop button in CDP tab (immediate effect while loop waits)
         var entry = AskTargetRegistry.GetEntry(key);

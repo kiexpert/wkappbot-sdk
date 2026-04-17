@@ -26,7 +26,7 @@ internal partial class Program
             Console.WriteLine("  --ltrb l,t,r,b screen rect (left,top,right,bottom)");
             Console.WriteLine("  --ltwh l,t,w,h screen rect (left,top,width,height)");
             Console.WriteLine("  --engine gemini|gpt  vision engine");
-            Console.WriteLine("  Pipeline: capture → CCA → OCR → Vision → dynamic a11y tree");
+            Console.WriteLine("  Pipeline: capture -> CCA -> OCR -> Vision -> dynamic a11y tree");
             return 1;
         }
 
@@ -108,9 +108,9 @@ internal partial class Program
                     wr.Left = r.X; wr.Top = r.Y; wr.Right = r.X + r.Width; wr.Bottom = r.Y + r.Height;
                     hackLog.WriteLine($"[HACK] Scoped to: \"{uiaScope}\" rect=({r.X},{r.Y} {r.Width}x{r.Height})");
                 }
-                else hackLog.WriteLine($"[HACK] Scope \"{uiaScope}\" not found — using full window");
+                else hackLog.WriteLine($"[HACK] Scope \"{uiaScope}\" not found -- using full window");
             }
-            catch { hackLog.WriteLine($"[HACK] Scope error — using full window"); }
+            catch { hackLog.WriteLine($"[HACK] Scope error -- using full window"); }
         }
         int w = wr.Right - wr.Left, h = wr.Bottom - wr.Top;
         if (w <= 0 || h <= 0)
@@ -133,7 +133,7 @@ internal partial class Program
         }));
         liveOverlay?.StartHoverTracking(fullWr.Left, fullWr.Top);
 
-        // ── Abort checks (two tiers) ──
+        // -- Abort checks (two tiers) --
         var hackAborted = false;
         var inputBaselineTick = Environment.TickCount;
         RECT baselineWr = wr;
@@ -145,7 +145,7 @@ internal partial class Program
         bool isAutoHack = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
         int abortIdleThresholdMs = isAutoHack ? 1000 : 3000;
 
-        // Tier 1: user input only (cheap — called per OCR item)
+        // Tier 1: user input only (cheap -- called per OCR item)
         bool HackShouldAbort()
         {
             if (hackAborted) return true;
@@ -154,7 +154,7 @@ internal partial class Program
             if (idleMs < elapsed && idleMs < abortIdleThresholdMs)
             {
                 hackAborted = true;
-                hackLog.WriteLine("[HACK] User input detected — aborting");
+                hackLog.WriteLine("[HACK] User input detected -- aborting");
                 if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
@@ -175,7 +175,7 @@ internal partial class Program
                 || curWr.Right != baselineWr.Right || curWr.Bottom != baselineWr.Bottom)
             {
                 hackAborted = true;
-                hackLog.WriteLine("[HACK] Window moved/resized — aborting");
+                hackLog.WriteLine("[HACK] Window moved/resized -- aborting");
                 if (!_hackHoverAnalyzing) liveOverlay?.Hide();
                 return true;
             }
@@ -186,7 +186,7 @@ internal partial class Program
                 if (cur != baselinePixelHash)
                 {
                     hackAborted = true;
-                    hackLog.WriteLine("[HACK] Content changed — aborting for re-analysis");
+                    hackLog.WriteLine("[HACK] Content changed -- aborting for re-analysis");
                     liveOverlay?.Hide();
                     return true;
                 }
@@ -194,7 +194,7 @@ internal partial class Program
             return false;
         }
 
-        // Sample 9 pixels (3x3 grid at target center) — no GDI Bitmap, just GetPixel
+        // Sample 9 pixels (3x3 grid at target center) -- no GDI Bitmap, just GetPixel
         static long SampleCenterPixels(Rectangle r)
         {
             try
@@ -270,9 +270,9 @@ internal partial class Program
         PulseStep.Mark("table-detect");
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
-        // UIA answer key: scan UIA tree, build rect→info map for cross-reference
+        // UIA answer key: scan UIA tree, build rect->info map for cross-reference
         var uiaAnswers = new Dictionary<int, (string name, string type, string aid)>();
-        var uiaSibIdx = new Dictionary<int, int>(); // region → sibling index (1-based)
+        var uiaSibIdx = new Dictionary<int, int>(); // region -> sibling index (1-based)
         var uiaBounds = new Dictionary<int, Rectangle>(); // UIA element screen rect (most specific)
         var _uiaBestArea = new Dictionary<int, int>();
         List<A11yHackOverlayBox>? uiaStandaloneBoxes = null;
@@ -390,7 +390,7 @@ internal partial class Program
             catch { }
             hackLog.WriteLine($"[HACK] UIA standalone boxes: {uiaStandaloneBoxes.Count}");
 
-            // Print UIA tree summary: window root → children (depth-limited)
+            // Print UIA tree summary: window root -> children (depth-limited)
             try
             {
                 var rootName = uiaRoot.Properties.Name.ValueOrDefault ?? "";
@@ -427,7 +427,7 @@ internal partial class Program
                 narrowed = Rectangle.Intersect(narrowed, new Rectangle(0, 0, w, h));
                 if (narrowed.Width > 0 && narrowed.Height > 0 && narrowed.Width * narrowed.Height < seg.Bounds.Width * seg.Bounds.Height)
                 {
-                    hackLog.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} → {narrowed.Width}x{narrowed.Height} (UIA)");
+                    hackLog.WriteLine($"[HACK] Region[{ri}] narrowed: {seg.Bounds.Width}x{seg.Bounds.Height} -> {narrowed.Width}x{narrowed.Height} (UIA)");
                     regions[ri] = new ConnectedComponentAnalyzer.Region
                     {
                         Bounds = narrowed, Type = seg.Type, PixelCount = seg.PixelCount,
@@ -450,7 +450,7 @@ internal partial class Program
 
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
 
-        // ── OCR + Vision: background workers (overlay stays responsive) ──
+        // -- OCR + Vision: background workers (overlay stays responsive) --
         var gapCollector = new OcrGapCollector();
         var workerCtx = new HackWorkerContext
         {
@@ -476,8 +476,8 @@ internal partial class Program
         }
         gapCollector.Dispose();
 
-        // ── Summary + MD table ──
-        hackLog.WriteLine($"[HACK] ── Summary ──");
+        // -- Summary + MD table --
+        hackLog.WriteLine($"[HACK] -- Summary --");
         hackLog.WriteLine($"  Segments: {regions.Count} (Text={textCount} Icon={iconCount} Sep={sepCount} Container={contCount})");
         hackLog.WriteLine($"  OCR: {workerCtx.OcrOk} ok, {workerCtx.OcrEmpty} failed");
         if (table != null) hackLog.WriteLine($"  Table: {table.Rows}x{table.Cols}");
@@ -485,7 +485,7 @@ internal partial class Program
         var positions = DynamicA11yAnalyzer.AssignGridPositions(
             regions, r => r.Bounds, rowGap: 5);
 
-        // (OCR/Vision moved to background workers — see OcrWorker.cs / VisionWorker.cs)
+        // (OCR/Vision moved to background workers -- see OcrWorker.cs / VisionWorker.cs)
 
         bool hasRows = regions.Any(r => r.Type != ConnectedComponentAnalyzer.RegionType.DyNoise);
         if (hasRows)

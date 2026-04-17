@@ -6,11 +6,11 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot web fetch/search/read — HTTP + search + TTS tools for loop agents
+// partial class: wkappbot web fetch/search/read -- HTTP + search + TTS tools for loop agents
 // web fetch <url> [--timeout N] [--max-chars N]
 // web search <query> [--limit N] [--port N] [--speak]
 // web read <url> [--port N] [--speak] [--max-chars N]
-//   search/read: uses already-running WebBot Chrome (CDP) — no API key needed.
+//   search/read: uses already-running WebBot Chrome (CDP) -- no API key needed.
 internal partial class Program
 {
     static int WebFetchCommand(string[] args)
@@ -53,10 +53,10 @@ internal partial class Program
         catch (Exception ex) { return Error($"Fetch failed: {ex.Message}"); }
     }
 
-    // Serializes concurrent CDP navigate+eval calls — prevents triad agents from stealing each other's tab
+    // Serializes concurrent CDP navigate+eval calls -- prevents triad agents from stealing each other's tab
     static readonly System.Threading.SemaphoreSlim _cdpBrowserLock = new(1, 1);
 
-    // ── web search — via WebBot Chrome CDP (Google, no API key) ────────────
+    // -- web search -- via WebBot Chrome CDP (Google, no API key) ------------
     static int WebSearchCommand(string[] args)
     {
         var parts = new List<string>();
@@ -80,7 +80,7 @@ internal partial class Program
         try
         {
             var searchUrl = $"https://www.google.com/search?q={Uri.EscapeDataString(query)}&num={Math.Min(limit, 20)}";
-            Console.Error.WriteLine($"[SEARCH] \"{query}\" → {searchUrl}");
+            Console.Error.WriteLine($"[SEARCH] \"{query}\" -> {searchUrl}");
 
             // Pass searchUrl as navigateUrl: EnsureCorrectWindowAsync will use a dedicated
             // web tab (not an AI chat tab) and navigate it to searchUrl directly.
@@ -92,7 +92,7 @@ internal partial class Program
             if (!curUrl.StartsWith(searchUrl.Split('?')[0], StringComparison.OrdinalIgnoreCase))
                 cdp.NavigateAsync(searchUrl).GetAwaiter().GetResult();
 
-            // Poll via JS promise — waits up to 3s for h3 result elements to render
+            // Poll via JS promise -- waits up to 3s for h3 result elements to render
             var js = $$"""
                 new Promise(resolve => {
                     function extract() {
@@ -130,8 +130,8 @@ internal partial class Program
                 new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (results == null || results.Count == 0)
             {
-                // JS selector may have broken (Google HTML change) — fall back to UIA a11y tree
-                Console.WriteLine("[SEARCH] JS selector returned 0 — falling back to UIA a11y tree...");
+                // JS selector may have broken (Google HTML change) -- fall back to UIA a11y tree
+                Console.WriteLine("[SEARCH] JS selector returned 0 -- falling back to UIA a11y tree...");
                 results = ExtractSearchResultsFromUia(limit);
             }
             if (results == null || results.Count == 0)
@@ -162,12 +162,12 @@ internal partial class Program
 
             return 0;
         }
-        catch (Exception ex) { return Error($"Search failed: {ex.Message}\nTip: make sure WebBot Chrome is running — wkappbot web open"); }
+        catch (Exception ex) { return Error($"Search failed: {ex.Message}\nTip: make sure WebBot Chrome is running -- wkappbot web open"); }
         finally { _cdpBrowserLock.Release(); }
     }
 
-    // ── web read — navigate to URL and read visible text via a11y/CDP ──────
-    // Reads document.body.innerText (rendered text, no HTML) — same as what user sees.
+    // -- web read -- navigate to URL and read visible text via a11y/CDP ------
+    // Reads document.body.innerText (rendered text, no HTML) -- same as what user sees.
     // --speak: TTS-read the content with karaoke overlay.
     static int WebReadCommand(string[] args)
     {
@@ -235,13 +235,13 @@ internal partial class Program
 
             return 0;
         }
-        catch (Exception ex) { return Error($"Read failed: {ex.Message}\nTip: make sure WebBot Chrome is running — wkappbot web open"); }
+        catch (Exception ex) { return Error($"Read failed: {ex.Message}\nTip: make sure WebBot Chrome is running -- wkappbot web open"); }
         finally { _cdpBrowserLock.Release(); }
     }
 
     record SearchResult(string Title, string Url, string Snippet);
 
-    // ── UIA fallback: read Chrome a11y tree for search results ────────────
+    // -- UIA fallback: read Chrome a11y tree for search results ------------
     // Called when JS h3 selector returns 0 results (Google changed their HTML).
     // Finds the WebBot Chrome window, extracts Hyperlink elements from the page.
     static List<SearchResult> ExtractSearchResultsFromUia(int limit)

@@ -8,7 +8,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Helpers ───────────────────────────────────────────
+    // -- Helpers ------------------------------------------─
 
     static AndroidNode? ResolveAdbTarget(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -45,7 +45,7 @@ internal partial class Program
             if (scoped == null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found in UIA tree — trying OCR fallback...");
+                Console.Error.WriteLine($"[ADB] Scope '{grap.ScopePath}' not found in UIA tree -- trying OCR fallback...");
                 Console.ResetColor();
 
                 // Show available targets for debugging
@@ -59,7 +59,7 @@ internal partial class Program
                     Console.ResetColor();
                 }
 
-                // ── OCR Fallback: screenshot → OCR → find text match → synthetic node ──
+                // -- OCR Fallback: screenshot -> OCR -> find text match -> synthetic node --
                 var ocrNode = TryOcrFallback(adb, serial, grap.Scopes[^1]);
                 if (ocrNode != null)
                 {
@@ -101,7 +101,7 @@ internal partial class Program
         return target;
     }
 
-    /// <summary>Shared text input logic: ADB Keyboard → clipboard paste → ASCII input</summary>
+    /// <summary>Shared text input logic: ADB Keyboard -> clipboard paste -> ASCII input</summary>
     static int AdbInputText(AdbClient adb, string serial, string text, AndroidNode node, AdbGrapInfo grap, string actionName)
     {
         Console.Write($"[ADB] Input text \"{text}\"... ");
@@ -147,12 +147,12 @@ internal partial class Program
         return 1;
     }
 
-    // ── Pre-input focus verification ──────────────────
+    // -- Pre-input focus verification ------------------
 
     /// <summary>
     /// Verify the target node has keyboard focus using the already-dumped tree (no re-dump).
     /// Walks Parent chain to root, then searches for focused node.
-    /// If focused node ≠ target → dump hot focus chain + IME as warning, return false.
+    /// If focused node ≠ target -> dump hot focus chain + IME as warning, return false.
     /// </summary>
     static bool VerifyInputFocus(AdbClient adb, string serial, AndroidNode targetNode)
     {
@@ -163,7 +163,7 @@ internal partial class Program
             while (root.Parent != null) root = root.Parent;
 
             var focused = FindFocusedNode(root);
-            if (focused == null) return true; // no focus info → proceed
+            if (focused == null) return true; // no focus info -> proceed
 
             // Match by resource-id or content-desc or text
             bool matches = false;
@@ -182,15 +182,15 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 var targetLabel = !string.IsNullOrEmpty(targetNode.ShortResourceId) ? targetNode.ShortResourceId : targetNode.DisplayName;
                 var focusLabel = !string.IsNullOrEmpty(focused.ShortResourceId) ? focused.ShortResourceId : focused.DisplayName;
-                var msg = $"focus mismatch — target: {targetLabel}, focused: {focusLabel}";
-                Console.Error.WriteLine($"[ADB] ⚠ {msg}");
+                var msg = $"focus mismatch -- target: {targetLabel}, focused: {focusLabel}";
+                Console.Error.WriteLine($"[ADB] ! {msg}");
                 Console.ResetColor();
                 DumpFailureDiagnostics(adb, serial);
 
                 // Device notification + TTS speak (best effort, background)
                 try
                 {
-                    adb.Shell($"cmd notification post -t WKAppBot FOCUS_WARN '⚠ {targetLabel} ≠ {focusLabel}'", serial);
+                    adb.Shell($"cmd notification post -t WKAppBot FOCUS_WARN '! {targetLabel} ≠ {focusLabel}'", serial);
                     AppBotPipe.StartTracked(new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = "wkappbot",
@@ -219,7 +219,7 @@ internal partial class Program
         return null;
     }
 
-    // ── Failure diagnostics (hot focus + IME) ─────────
+    // -- Failure diagnostics (hot focus + IME) --------─
 
     /// <summary>
     /// On action failure, dump hot focus chain + IME status for instant diagnosis.
@@ -228,7 +228,7 @@ internal partial class Program
     static void DumpFailureDiagnostics(AdbClient adb, string serial)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("[ADB] ── failure diagnostics ──");
+        Console.WriteLine("[ADB] -- failure diagnostics --");
         Console.ResetColor();
 
         // 1. Hot focus chain from fresh tree dump
@@ -261,7 +261,7 @@ internal partial class Program
                     var trimmed = line.Trim();
                     if (trimmed.StartsWith("mCurId="))
                     {
-                        // mCurId=com.samsung.android.honeyboard/.service.HoneyBoardService → "honeyboard"
+                        // mCurId=com.samsung.android.honeyboard/.service.HoneyBoardService -> "honeyboard"
                         var val = trimmed["mCurId=".Length..];
                         var slash = val.IndexOf('/');
                         var pkg = slash >= 0 ? val[..slash] : val;
@@ -274,7 +274,7 @@ internal partial class Program
 
                 if (imeId != null)
                 {
-                    var icon = imeShown ? "⚡" : "○";
+                    var icon = imeShown ? "⚡" : "o";
                     var state = imeShown ? "visible" : "hidden";
                     Console.ForegroundColor = imeShown ? ConsoleColor.Magenta : ConsoleColor.DarkGray;
                     Console.WriteLine($"  {icon} [IME] {imeId} ({state})");
@@ -296,7 +296,7 @@ internal partial class Program
         return 1;
     }
 
-    // ── Experience DB helpers ────────────────────────────
+    // -- Experience DB helpers ----------------------------
 
     /// <summary>Log action result to experience DB (actions.jsonl)</summary>
     static void LogAdbAction(string action, AndroidNode? node, AdbGrapInfo grap, string serial, bool success, string? detail)
@@ -333,7 +333,7 @@ internal partial class Program
         Console.ResetColor();
         Console.WriteLine(Path.GetRelativePath(DataDir, osDir));
 
-        // Broadcast knowhow files — reuse Windows ShowKnowhowBroadcast (title + first paragraph)
+        // Broadcast knowhow files -- reuse Windows ShowKnowhowBroadcast (title + first paragraph)
         var knowhows = AdbExpDb.GetKnowhowFiles(package, screenName);
         foreach (var (path, tag) in knowhows)
             ShowKnowhowBroadcast(path, tag);
@@ -358,9 +358,9 @@ internal partial class Program
         public IReadOnlyList<IActionTarget> Children => [];
     }
 
-    // ── ADB OCR Fallback ──────────────────────────────────────────────────
+    // -- ADB OCR Fallback --------------------------------------------------
     /// <summary>
-    /// OCR fallback for ADB element not found: screenshot → Windows OCR → text match → synthetic node.
+    /// OCR fallback for ADB element not found: screenshot -> Windows OCR -> text match -> synthetic node.
     /// Returns an AndroidNode with approximate bounds, or null if text not found.
     /// </summary>
     static AndroidNode? TryOcrFallback(AdbClient adb, string serial, string searchText)

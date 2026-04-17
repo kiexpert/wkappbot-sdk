@@ -191,7 +191,7 @@ internal partial class Program
                 return;
             }
         }
-        Console.WriteLine("[ASK] Image upload wait timeout — proceeding");
+        Console.WriteLine("[ASK] Image upload wait timeout -- proceeding");
     }
 
     /// <summary>

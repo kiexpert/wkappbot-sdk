@@ -10,8 +10,8 @@ namespace WKAppBot.CLI;
 ///   e.g. "ask+claude+001A2B3C"  "ask+gemini+001A2B3C"  "web+google.com+001A2B3C"
 ///
 /// Contract:
-///   - key ↔ expectedHost: 1:1 fixed. Same HWND+command → always the same tab.
-///   - URL mismatch → immediate invalidation + new tab (fast-fail).
+///   - key ↔ expectedHost: 1:1 fixed. Same HWND+command -> always the same tab.
+///   - URL mismatch -> immediate invalidation + new tab (fast-fail).
 ///   - Eye restart: PurgeDeadHwnds() removes entries for dead HWND handles.
 /// </summary>
 internal static class AskTargetRegistry
@@ -54,7 +54,7 @@ internal static class AskTargetRegistry
         return dict.TryGetValue(key, out var entry) ? entry : null;
     }
 
-    /// <summary>Register or update a sandbox key → (targetId, expectedHost). Stamps lastUsed = now.</summary>
+    /// <summary>Register or update a sandbox key -> (targetId, expectedHost). Stamps lastUsed = now.</summary>
     internal static void SetEntry(string key, string targetId, string expectedHost)
     {
         var dict = Load();
@@ -102,7 +102,7 @@ internal static class AskTargetRegistry
     /// <summary>
     /// Remove all entries whose HWND segment is dead (IsWindow == false).
     /// Called on Eye restart to clean up orphan entries from the previous session.
-    /// Key format: "cmd+sub+HWND8" — last '+'-segment is 8-char hex HWND.
+    /// Key format: "cmd+sub+HWND8" -- last '+'-segment is 8-char hex HWND.
     /// </summary>
     internal static void PurgeDeadHwnds()
     {
@@ -116,7 +116,7 @@ internal static class AskTargetRegistry
             // Only purge HWND-based keys (8 hex chars, non-zero)
             if (hwndStr.Length != 8) continue;
             if (!long.TryParse(hwndStr, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal)) continue;
-            if (hwndVal == 0) continue; // cwdHash fallback key — skip
+            if (hwndVal == 0) continue; // cwdHash fallback key -- skip
             var hwnd = new IntPtr(hwndVal);
             if (!WKAppBot.Win32.Native.NativeMethods.IsWindow(hwnd))
                 removed.Add(key);
@@ -134,10 +134,10 @@ internal static class AskTargetRegistry
         Console.WriteLine("[SANDBOX] Registry cleared (Chrome restart)");
     }
 
-    // ── Per-tab question ID counter ──────────────────────────────────────────
+    // -- Per-tab question ID counter ------------------------------------------
     // Each ask on the same tab gets a unique monotonic Q# (Q1, Q2, Q3...).
     // Persisted to ask_qid.json so counter survives process restarts.
-    // Triad uses its own Game ID — skip Qid for triad mode.
+    // Triad uses its own Game ID -- skip Qid for triad mode.
 
     private static readonly string _qidFilePath = Path.Combine(
         AppContext.BaseDirectory, "wkappbot.hq", "runtime", "ask_qid.json");
@@ -170,8 +170,8 @@ internal static class AskTargetRegistry
         }
     }
 
-    // ── Per-page Slack thread persistence ────────────────────────────────────
-    // Maps sandboxKey → Slack thread ts. One thread per (command+ai+hwnd) tuple.
+    // -- Per-page Slack thread persistence ------------------------------------
+    // Maps sandboxKey -> Slack thread ts. One thread per (command+ai+hwnd) tuple.
     // File: wkappbot.hq/runtime/ask_slack_threads.json
 
     private static readonly string _slackThreadsFilePath = Path.Combine(
@@ -207,14 +207,14 @@ internal static class AskTargetRegistry
         catch { /* best effort */ }
     }
 
-    // ── Legacy shims: backward-compat for any remaining old callers ────────
+    // -- Legacy shims: backward-compat for any remaining old callers --------
 
     internal static string? GetTargetId(string tag)
         => GetEntry(tag)?.TargetId;
 
     internal static void SetTargetId(string tag, string targetId)
     {
-        // Legacy: expectedHost unknown — preserve existing if any
+        // Legacy: expectedHost unknown -- preserve existing if any
         var dict = Load();
         var existing = dict.TryGetValue(tag, out var e) ? e : null;
         dict[tag] = new RegistryEntry(targetId, existing?.ExpectedHost ?? "");

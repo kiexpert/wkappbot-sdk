@@ -8,12 +8,12 @@ namespace WKAppBot.CLI;
 // partial class: chart-analyze + tooltip-probe commands
 internal partial class Program
 {
-    // ── chart-analyze ───────────────────────────────────────────
+    // -- chart-analyze ------------------------------------------─
 
     /// <summary>
     /// chart-analyze: Extract OHLC candlestick data from chart screenshots.
     ///
-    /// ── Design Intent ──
+    /// -- Design Intent --
     /// Runs ChartAnalyzer pipeline on a live window capture or saved image.
     /// Supports 3 detection strategies (body-first, column-scan, hts_style).
     ///
@@ -27,14 +27,14 @@ internal partial class Program
     ///
     /// --debug: Saves debug overlay image showing detected regions, candle markers,
     ///   and Y-axis calibration lines. Useful for visual verification.
-    /// ──
+    /// --
     /// </summary>
     static int ChartAnalyzeCommand(string[] args)
     {
         if (args.Length == 0)
             return Error(@"Usage: appbot chart-analyze <window-title|image.png> [--form <id>] [--candles N] [--tooltip] [-o output.json] [--debug]
   Analyzes candlestick chart screenshot and extracts OHLC + volume data.
-  Supports any HTS — detects chart region, axis labels, and candle colors automatically.
+  Supports any HTS -- detects chart region, axis labels, and candle colors automatically.
 
   <window-title>  Live window capture + analyze
   <image.png>     Analyze saved image file
@@ -125,17 +125,17 @@ internal partial class Program
 
         // Print summary
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"\n── Chart Analysis ──────────────────────────");
+        Console.WriteLine($"\n-- Chart Analysis --------------------------");
         Console.ResetColor();
 
         Console.WriteLine($"  Chart region: ({result.ChartLeft},{result.ChartTop}) - ({result.ChartRight},{result.ChartBottom})");
         Console.WriteLine($"  Y-axis calibration: {result.YAxisPoints.Count} points");
         foreach (var yp in result.YAxisPoints)
-            Console.WriteLine($"    Y={yp.Pixel} → {yp.Value:N0} ({yp.Label})");
+            Console.WriteLine($"    Y={yp.Pixel} -> {yp.Value:N0} ({yp.Label})");
 
         Console.WriteLine($"  X-axis labels: {result.XAxisPoints.Count} points");
         foreach (var xp in result.XAxisPoints)
-            Console.WriteLine($"    X={xp.Pixel} → \"{xp.Label}\"");
+            Console.WriteLine($"    X={xp.Pixel} -> \"{xp.Label}\"");
 
         Console.WriteLine($"  Color convention: {result.BullishColor}=bullish, {result.BearishColor}=bearish");
 
@@ -177,11 +177,11 @@ internal partial class Program
             }
         }
 
-        // ── Tooltip-based Y-axis recalibration (Phase B) ──
+        // -- Tooltip-based Y-axis recalibration (Phase B) --
         if (useTooltip && capturedHwnd != IntPtr.Zero && capturedPid != 0 && result.Candles.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Magenta;
-            Console.WriteLine($"\n── Tooltip Calibration ─────────────────────");
+            Console.WriteLine($"\n-- Tooltip Calibration --------------------─");
             Console.ResetColor();
 
             // Get window rect for pixel-to-screen coordinate mapping
@@ -211,7 +211,7 @@ internal partial class Program
             }
         }
 
-        // Output JSON — save both per-candle and columnar formats
+        // Output JSON -- save both per-candle and columnar formats
         if (outputPath != null)
         {
             // Per-candle object format (original)
@@ -231,7 +231,7 @@ internal partial class Program
         if (result.Candles.Count > 0)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"\n── OHLC Arrays ({result.Candles.Count} candles) ───────────────");
+            Console.WriteLine($"\n-- OHLC Arrays ({result.Candles.Count} candles) --------------─");
             Console.ResetColor();
 
             int n = result.Candles.Count;
@@ -273,7 +273,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── tooltip-probe ─────────────────────────────────────────
+    // -- tooltip-probe ----------------------------------------─
 
     /// <summary>
     /// tooltip-probe: Enumerate all top-level windows for a process to find tooltip windows.

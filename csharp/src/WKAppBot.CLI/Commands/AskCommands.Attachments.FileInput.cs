@@ -11,7 +11,7 @@ internal partial class Program
 {
     /// <summary>
     /// Attach a non-image file via CDP DOM.setFileInputFiles on hidden file input.
-    /// Works for txt, cs, log, pdf, etc. Fully focusless — no clipboard involved.
+    /// Works for txt, cs, log, pdf, etc. Fully focusless -- no clipboard involved.
     /// Tier 1: DOM.setFileInputFiles + change event
     /// Tier 2: Synthetic drop event with DataTransfer (for React apps that ignore file input)
     /// </summary>
@@ -35,7 +35,7 @@ internal partial class Program
                 return true;
 
             // Tier 0.5: CDP File Chooser Interception + click (fully focusless)
-            Console.WriteLine("[ASK] Tier 0.5: CDP chooser intercept (intercept ON → click → intercept file)...");
+            Console.WriteLine("[ASK] Tier 0.5: CDP chooser intercept (intercept ON -> click -> intercept file)...");
             var chooserOk = await cdp.SetFileViaChooserAsync(absPath, timeoutMs: 6000);
             if (chooserOk)
             {
@@ -50,10 +50,10 @@ internal partial class Program
             if (await TrySetFileInputFiles(cdp, absPath, fileName))
                 return true;
 
-            // Tier 0: Native OS file dialog via UIA (STEALS FOCUS — last resort)
+            // Tier 0: Native OS file dialog via UIA (STEALS FOCUS -- last resort)
             // Temporarily disable focus-theft monitoring: the HWND change here is expected and intentional.
             await cdp.DisableFileChooserInterception();
-            Console.WriteLine("[ASK] All focusless tiers failed → falling back to native file dialog (will steal focus)...");
+            Console.WriteLine("[ASK] All focusless tiers failed -> falling back to native file dialog (will steal focus)...");
             var prevFocusMonitor = cdp.EnableFocusTheftMonitoring;
             cdp.EnableFocusTheftMonitoring = false;
             bool uiaOk;
@@ -267,9 +267,9 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Open Gemini upload menu → click "파일 업로드" → OS file dialog appears → UIA type path + click Open.
+    /// Open Gemini upload menu -> click "파일 업로드" -> OS file dialog appears -> UIA type path + click Open.
     /// Returns true if file was successfully attached via the native dialog.
-    /// originalUserFg: the user's foreground window BEFORE the ask command started — restored after dialog closes.
+    /// originalUserFg: the user's foreground window BEFORE the ask command started -- restored after dialog closes.
     /// </summary>
     static async Task<bool> TryAttachViaFileDialog(CdpClient cdp, string absPath, IntPtr originalUserFg = default)
     {

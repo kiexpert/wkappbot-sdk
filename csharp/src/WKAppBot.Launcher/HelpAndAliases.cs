@@ -6,7 +6,7 @@ namespace WKAppBot.Launcher;
 partial class Program
 {
     /// <summary>
-    /// Auto-create busybox symlinks (a11y.exe, wka11y.exe → wkappbot.exe) if missing.
+    /// Auto-create busybox symlinks (a11y.exe, wka11y.exe -> wkappbot.exe) if missing.
     /// Symlink preferred; falls back to hardlink if no permission.
     /// Stale hardlinks (size mismatch after hot-swap) are deleted and recreated.
     /// </summary>
@@ -28,7 +28,7 @@ partial class Program
             foreach (var alias in aliasNames)
             {
                 var linkPath   = Path.Combine(dir, alias + ".exe");
-                // grap/grep/logcat → Core directly (no Launcher relay needed, ~0.2s startup)
+                // grap/grep/logcat -> Core directly (no Launcher relay needed, ~0.2s startup)
                 var targetName = CoreDirectAliases.Contains(alias) && File.Exists(corePath)
                     ? coreName : launcherName;
                 var targetSize = targetName == coreName
@@ -44,7 +44,7 @@ partial class Program
                             try { File.Delete(linkPath); } catch { continue; }
                         else continue;
                     }
-                    else continue; // symlink exists → keep as-is
+                    else continue; // symlink exists -> keep as-is
                 }
                 else
                 {
@@ -70,7 +70,7 @@ partial class Program
     /// grap/grep one-shot: named pipe relay.
     /// Creates a named pipe server, spawns Core with WKAPPBOT_NAMED_PIPE env var (no stream redirect),
     /// reads output until Core closes the pipe (before TerminateProcess), outputs to Console, exits.
-    /// Core's 27s SMB cleanup continues in the background — Launcher is already gone by then.
+    /// Core's 27s SMB cleanup continues in the background -- Launcher is already gone by then.
     /// </summary>
     static int RunGrapWithNamedPipe(string[] args)
     {
@@ -103,9 +103,9 @@ partial class Program
     }
 
     /// <summary>
-    /// Prints wkappbot usage directly from the Launcher — no Core spawn required.
+    /// Prints wkappbot usage directly from the Launcher -- no Core spawn required.
     /// Kept in sync with UsageCommand.GetUsageText in WKAppBot.CLI.
-    /// Called from no-args fast path (before Console.OutputEncoding setup) → TerminateSelf is fast.
+    /// Called from no-args fast path (before Console.OutputEncoding setup) -> TerminateSelf is fast.
     /// </summary>
     static void PrintUsage()
     {
@@ -113,8 +113,8 @@ partial class Program
         var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
         Console.Write($@"
 WKAppBot{verStr} - Windows App Automation Test Framework
-Give AI eyes and hands — operate any app, help any human. No API, no rewrite needed.
-All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
+Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
+All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
 
 Usage:
@@ -123,11 +123,11 @@ Usage:
 === Public Commands ===================================================
 
   a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
-      Universal accessibility interface — 31 standard actions for ANY window.
-      3-tier fallback: UIA → Win32 → SendInput. Busybox: symlink `a11y.exe` works.
+      Universal accessibility interface -- 31 standard actions for ANY window.
+      3-tier fallback: UIA -> Win32 -> SendInput. Busybox: symlink `a11y.exe` works.
 
-      Auto-pipeline per action: blocker dismiss → minimize restore → tab activate
-        → zoom/magnifier → execute (3-tier) → result feedback (green/amber) → fade
+      Auto-pipeline per action: blocker dismiss -> minimize restore -> tab activate
+        -> zoom/magnifier -> execute (3-tier) -> result feedback (green/amber) -> fade
 
       Window (8):  close  kill  minimize  maximize  restore  focus  move  resize
       Element (13): read  find  highlight  invoke  click  toggle
@@ -143,11 +143,11 @@ Usage:
                First exact match stops interactive actions fast.
                Arrays are for lookup; actions take the top target.
                ';' = OR   # = scope drill-down
-               Ex: ""*Notepad*#*File*"" → Notepad's File menu
+               Ex: ""*Notepad*#*File*"" -> Notepad's File menu
 
       a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
       a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
-      a11y invoke ""*app*#*button*""      # click (UIA Invoke → BM_CLICK → SendInput)
+      a11y invoke ""*app*#*button*""      # click (UIA Invoke -> BM_CLICK -> SendInput)
       a11y close ""*Chrome*"" --nth 2~    # close 2nd window onwards
       a11y type ""*app*#*edit*"" ""hello""
 
@@ -169,7 +169,7 @@ Usage:
   input <window-title> <text>
       Type text into a window (focusless PostMessage preferred).
   eye [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye — live overlay + Slack daemon (always on).
+      WK AppBot Eye -- live overlay + Slack daemon (always on).
       ctx=N% in tick output, auto-deletes stale idle messages on restart.
   newchat ""prompt"" [--file prompt.txt]
       Open new Claude Desktop chat + submit prompt (all focusless UIA).
@@ -185,7 +185,7 @@ Usage:
   ask gpt|gemini|claude|triad ""question"" [file.png]
       Ask AI via CDP (focusless). ask triad = parallel 3-way.
   chat [""question""] [-p] [--no-fallback]
-      Claude Code CLI passthrough. On rate-limit → auto-fallback to ask triad.
+      Claude Code CLI passthrough. On rate-limit -> auto-fallback to ask triad.
       No args: exec claude interactively (inherits stdio).
   logcat [regex] [files] [--past N] [-f] [--timeout N] [--hq]
       Stream/search logs. grep/grap = aliases with grep-compat arg order.
@@ -204,15 +204,15 @@ Run 'wkappbot --help' for full command reference.
     }
 
     /// <summary>
-    /// Prints grap/grep help directly from the Launcher — no Core spawn required.
+    /// Prints grap/grep help directly from the Launcher -- no Core spawn required.
     /// Kept in sync with UsageCommand.PrintGrapHelp in WKAppBot.CLI.
     /// </summary>
     static void PrintGrapHelp(string alias)
     {
         var isgrap = alias == "grap";
         Console.WriteLine($"""
-            {alias} — WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
-            Internally: {alias} <pattern> [files...] → logcat <files> <pattern>
+            {alias} -- WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
+            Internally: {alias} <pattern> [files...] -> logcat <files> <pattern>
 
             Usage:
               {alias} <pattern> [files...] [options]
@@ -256,7 +256,7 @@ Run 'wkappbot --help' for full command reference.
 
 /// <summary>
 /// Minimal focus-restore helper for Launcher (no Win32 project reference available).
-/// Only use for restore patterns — not for acquiring focus.
+/// Only use for restore patterns -- not for acquiring focus.
 /// </summary>
 static class FocusGuard
 {
@@ -266,7 +266,7 @@ static class FocusGuard
     public static extern bool SetForegroundWindow(IntPtr hWnd);
 }
 
-/// <summary>Dim stderr writer — ANSI dim for console, passthrough for pipes.</summary>
+/// <summary>Dim stderr writer -- ANSI dim for console, passthrough for pipes.</summary>
 sealed class DimStderrWriter : System.IO.TextWriter
 {
     private readonly System.IO.TextWriter _inner;

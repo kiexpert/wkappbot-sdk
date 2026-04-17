@@ -6,10 +6,10 @@ using System.Text.Json;
 namespace WKAppBot.Vision;
 
 /// <summary>
-/// Self-learning OCR correction dictionary: pixel-hash → corrected text.
+/// Self-learning OCR correction dictionary: pixel-hash -> corrected text.
 ///
 /// When SimpleOCR misreads a glyph/region, verified ground truth (from UIA, Vision API,
-/// or manual correction) is stored as pixel-hash → correct text. On subsequent OCR of
+/// or manual correction) is stored as pixel-hash -> correct text. On subsequent OCR of
 /// identical pixel patterns, the correction is applied instantly.
 ///
 /// Especially effective for HTS/MFC bitmap fonts where glyphs render identically.
@@ -78,7 +78,7 @@ public sealed class OcrCorrectionDb
     }
 
     /// <summary>
-    /// Try to correct OCR text by pixel-hash only (no bitmap — use precomputed hash).
+    /// Try to correct OCR text by pixel-hash only (no bitmap -- use precomputed hash).
     /// </summary>
     public string? TryCorrect(string pixelHash, string ocrText)
     {
@@ -119,7 +119,7 @@ public sealed class OcrCorrectionDb
             },
             (_, existing) =>
             {
-                // Update if same wrong→correct mapping, or overwrite with higher-priority source
+                // Update if same wrong->correct mapping, or overwrite with higher-priority source
                 if (SourcePriority(source) >= SourcePriority(existing.Source))
                 {
                     existing.Wrong = wrongText;
@@ -139,9 +139,9 @@ public sealed class OcrCorrectionDb
     /// <summary>All entries (for diagnostics).</summary>
     public IEnumerable<CorrectionEntry> Entries => _cache.Values;
 
-    // ── Pixel hash (shared algorithm with OcrGapCollector) ──────────────────
+    // -- Pixel hash (shared algorithm with OcrGapCollector) ------------------
 
-    /// <summary>Fast pixel hash: sample every 4th pixel, MD5 → 8-char hex. Same as OcrGapCollector.</summary>
+    /// <summary>Fast pixel hash: sample every 4th pixel, MD5 -> 8-char hex. Same as OcrGapCollector.</summary>
     public static string ComputePixelHash(Bitmap bmp)
     {
         using var md5 = MD5.Create();
@@ -159,7 +159,7 @@ public sealed class OcrCorrectionDb
         return Convert.ToHexString(hash)[..8].ToLowerInvariant();
     }
 
-    // ── Persistence ─────────────────────────────────────────────────────────
+    // -- Persistence --------------------------------------------------------─
 
     void Load()
     {
@@ -204,7 +204,7 @@ public sealed class OcrCorrectionDb
         catch { }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------------------
 
     static bool IsSimilar(string a, string b)
     {
@@ -247,7 +247,7 @@ public sealed class OcrCorrectionDb
         return new string(s.Select(c => Array.IndexOf(invalid, c) >= 0 ? '_' : c).ToArray());
     }
 
-    // ── Data ────────────────────────────────────────────────────────────────
+    // -- Data ----------------------------------------------------------------
 
     public sealed class CorrectionEntry
     {

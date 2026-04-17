@@ -4,22 +4,22 @@ using NAudio.Wave;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Whisper Keyboard Engine — Phase 1: Mel-scale FFT spectrum analyzer + 32-bit tokenizer.
+/// Whisper Keyboard Engine -- Phase 1: Mel-scale FFT spectrum analyzer + 32-bit tokenizer.
 ///
 /// Architecture (platform-portable core):
-///   Mic capture (NAudio/platform) → FFT → N-band energy extraction → 32-bit token
+///   Mic capture (NAudio/platform) -> FFT -> N-band energy extraction -> 32-bit token
 ///
 /// Two modes (same 32-bit token):
-///   16-band × 2bit (default) — higher spectral resolution, better phoneme discrimination
-///   8-band  × 4bit (--8band) — coarser but more amplitude detail per band
+///   16-band × 2bit (default) -- higher spectral resolution, better phoneme discrimination
+///   8-band  × 4bit (--8band) -- coarser but more amplitude detail per band
 ///
 /// Mel-scale band boundaries (log-spaced, human hearing aligned):
 ///   Low bands dense (formant region), high bands wide (sibilant/air)
 ///   Band 0 always = vocal cord detector (성대 기본주파수)
 ///
 /// Detection logic:
-///   Band0 energy HIGH + others → normal speech → LEARN mode (STT채점용)
-///   Band0 energy LOW  + whisper bands active → whisper → INPUT mode
+///   Band0 energy HIGH + others -> normal speech -> LEARN mode (STT채점용)
+///   Band0 energy LOW  + whisper bands active -> whisper -> INPUT mode
 ///
 /// Recommendations applied from GPT/Gemini 삼두협의체:
 ///   - Mel/log scale bands (not linear) for better phoneme discrimination
@@ -28,7 +28,7 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal partial class Program
 {
-    // ── 16-band articulatory (default): 2bit per band = 32bit token ──
+    // -- 16-band articulatory (default): 2bit per band = 32bit token --
     // Band 0 = vocal cord detector (ALL humans: male 85Hz ~ child 400Hz)
     // Band 1-15 = 7 articulatory zones subdivided (all > dead zone ~389-487Hz)
     // Non-integer-multiple boundaries verified: 0 pairs within 3% of N× (Monte Carlo 1M iter)
@@ -56,7 +56,7 @@ internal partial class Program
         ( 9930, 11030, "Gate"),   // 15: upper gate (ambient noise)
     ];
 
-    // ── 8-band articulatory (--8band): 4bit per band = 32bit token ──
+    // -- 8-band articulatory (--8band): 4bit per band = 32bit token --
     // Band 0 = vocal cord + lips unified (성대 감지 겸 입술 저역)
     // Band 1-6 = 6 articulatory mechanisms, Band 7 = noise gate
     // Non-integer-multiple boundaries verified: 0 pairs within 3% (Monte Carlo 200K iter)
@@ -237,7 +237,7 @@ internal partial class Program
                     if (energy > maxEnergy) maxEnergy = energy;
                 }
 
-                // Quantize to N-bit per band → pack into 32-bit token
+                // Quantize to N-bit per band -> pack into 32-bit token
                 uint token = 0;
                 var levels = new int[bandCount];
                 for (int b = 0; b < bandCount; b++)
@@ -251,8 +251,8 @@ internal partial class Program
                 }
 
                 // Detect mode
-                // 8-band: Band0 (VxLip) high = vocal cord active → voiced
-                // 16-band: Band0 (Vocal) high = vocal cord → voiced
+                // 8-band: Band0 (VxLip) high = vocal cord active -> voiced
+                // 16-band: Band0 (Vocal) high = vocal cord -> voiced
                 int voiceThreshold = maxLevel / 2;
                 bool isVoiced = levels[0] >= voiceThreshold;
                 bool isSilence = maxEnergy < 0.005;
@@ -274,7 +274,7 @@ internal partial class Program
                     if (prevTokens.Count > 100) prevTokens.RemoveAt(0);
                 }
 
-                // ── Ring HUD overlay update ──
+                // -- Ring HUD overlay update --
                 if (ringHost?.IsAlive == true)
                 {
                     int start8 = Math.Max(0, prevTokens.Count - 6);
@@ -289,29 +289,29 @@ internal partial class Program
                     }
                     else
                     {
-                        // Map 16 bands → 8: pairs averaged, scale 0-3 → 0-15
+                        // Map 16 bands -> 8: pairs averaged, scale 0-3 -> 0-15
                         ringLevels = new int[8];
                         for (int b = 0; b < 8; b++)
                         {
                             int b0 = b * 2, b1 = b * 2 + 1;
-                            ringLevels[b] = (levels[b0] + levels[b1]) * 5; // 0-3 avg → 0-15ish
+                            ringLevels[b] = (levels[b0] + levels[b1]) * 5; // 0-3 avg -> 0-15ish
                         }
                         ringMax = 15;
                     }
                     ringHost.UpdateSpectrum(ringLevels, ringMax, mode, token, recent);
                 }
 
-                // ── Console visualization ──
+                // -- Console visualization --
                 frameCount++;
 
                 if (useAnsi)
                 {
                     Console.SetCursorPosition(0, headerLines);
-                    int barWidth = use8Band ? 15 : 20; // wider bars for 2-bit (0-3 → scale up)
+                    int barWidth = use8Band ? 15 : 20; // wider bars for 2-bit (0-3 -> scale up)
 
                     for (int b = 0; b < bandCount; b++)
                     {
-                        int barLen = use8Band ? levels[b] : levels[b] * 5; // scale: 0-3 → 0-15
+                        int barLen = use8Band ? levels[b] : levels[b] * 5; // scale: 0-3 -> 0-15
                         int barMax = use8Band ? 15 : 15;
                         barLen = Math.Min(barLen, barMax);
                         string bar = new string('█', barLen) + new string('░', barMax - barLen);
@@ -371,7 +371,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Cooley-Tukey radix-2 FFT in-place. Pure C# — no platform dependency.
+    /// Cooley-Tukey radix-2 FFT in-place. Pure C# -- no platform dependency.
     /// </summary>
     private static void Fft(Complex[] data)
     {

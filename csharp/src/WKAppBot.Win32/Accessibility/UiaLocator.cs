@@ -82,9 +82,9 @@ public sealed partial class UiaLocator : IDisposable
     /// Walks all descendants and matches against pattern.
     ///
     /// Pattern syntax:
-    ///   "exact text"      — exact match (handled by FindByName, not this)
-    ///   "*partial*"       — wildcard (* = 0+ chars, ? = 1 char)
-    ///   "regex:pattern"   — regular expression
+    ///   "exact text"      -- exact match (handled by FindByName, not this)
+    ///   "*partial*"       -- wildcard (* = 0+ chars, ? = 1 char)
+    ///   "regex:pattern"   -- regular expression
     /// </summary>
     public AutomationElement? FindByNamePattern(IntPtr hWnd, string pattern)
     {
@@ -151,7 +151,7 @@ public sealed partial class UiaLocator : IDisposable
         string? name,
         string? controlType)
     {
-        // ── AutomationId: supports ";" OR, exact + pattern fallback ──
+        // -- AutomationId: supports ";" OR, exact + pattern fallback --
         foreach (var id in SplitOr(automationId))
         {
             if (PatternMatcher.IsPattern(id))
@@ -166,7 +166,7 @@ public sealed partial class UiaLocator : IDisposable
             }
         }
 
-        // ── Name: supports ";" OR, exact + pattern fallback ──
+        // -- Name: supports ";" OR, exact + pattern fallback --
         foreach (var n in SplitOr(name))
         {
             if (PatternMatcher.IsPattern(n))
@@ -181,7 +181,7 @@ public sealed partial class UiaLocator : IDisposable
             }
         }
 
-        // ── ControlType (with name hint if provided — try each name alternative) ──
+        // -- ControlType (with name hint if provided -- try each name alternative) --
         if (controlType != null)
         {
             foreach (var n in SplitOr(name))
@@ -200,8 +200,8 @@ public sealed partial class UiaLocator : IDisposable
     }
 
     /// <summary>
-    /// Split a pattern on ";" for OR semantics — mirrors a11y CLI behavior.
-    /// "A;B" → [A, B]. Single value (no ";") → [value]. Null/empty → empty.
+    /// Split a pattern on ";" for OR semantics -- mirrors a11y CLI behavior.
+    /// "A;B" -> [A, B]. Single value (no ";") -> [value]. Null/empty -> empty.
     /// Each part is trimmed; empty parts dropped.
     /// </summary>
     private static IEnumerable<string> SplitOr(string? value)
@@ -250,7 +250,7 @@ public sealed partial class UiaLocator : IDisposable
         }
         catch { /* not supported */ }
 
-        // Fallback: LegacyIAccessible DoDefaultAction — needed for Electron Hyperlinks
+        // Fallback: LegacyIAccessible DoDefaultAction -- needed for Electron Hyperlinks
         // where Patterns.Invoke.IsSupported throws COM exception.
         try
         {
@@ -269,11 +269,11 @@ public sealed partial class UiaLocator : IDisposable
         return false;
     }
 
-    // ── Toggle Pattern (Checkbox/ToggleButton — focusless!) ──────
+    // -- Toggle Pattern (Checkbox/ToggleButton -- focusless!) ------
 
     /// <summary>
     /// Toggle a checkbox or toggle button. Returns true if toggled.
-    /// Focusless — no mouse or focus needed!
+    /// Focusless -- no mouse or focus needed!
     /// </summary>
     public static bool TryToggle(AutomationElement element)
     {
@@ -333,7 +333,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── ExpandCollapse Pattern (ComboBox/TreeNode — focusless!) ──
+    // -- ExpandCollapse Pattern (ComboBox/TreeNode -- focusless!) --
 
     /// <summary>
     /// Expand a tree node, combo box, or group. Focusless!
@@ -386,7 +386,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── SelectionItem Pattern (ListItem/TabItem/ComboItem — focusless!) ──
+    // -- SelectionItem Pattern (ListItem/TabItem/ComboItem -- focusless!) --
 
     /// <summary>
     /// Select an item in a list, tab, or combo box. Focusless!
@@ -421,7 +421,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── Scroll Pattern (ScrollableContainer — focusless!) ──
+    // -- Scroll Pattern (ScrollableContainer -- focusless!) --
 
     /// <summary>
     /// Scroll a container in a direction. Focusless!
@@ -490,7 +490,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── ScrollItem Pattern (scroll element into view — focusless!) ──
+    // -- ScrollItem Pattern (scroll element into view -- focusless!) --
 
     /// <summary>
     /// Scroll a TreeItem/ListItem into the visible area. Focusless!
@@ -511,7 +511,7 @@ public sealed partial class UiaLocator : IDisposable
         return false;
     }
 
-    // ── Window Pattern (Window close/minimize/maximize — focusless!) ──
+    // -- Window Pattern (Window close/minimize/maximize -- focusless!) --
 
     /// <summary>
     /// Close a window via UIA Window pattern. Focusless!
@@ -565,7 +565,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── RangeValue Pattern (Slider/ProgressBar — focusless!) ──
+    // -- RangeValue Pattern (Slider/ProgressBar -- focusless!) --
 
     /// <summary>
     /// Set a range value (slider, progress bar). Focusless!
@@ -613,7 +613,7 @@ public sealed partial class UiaLocator : IDisposable
         return null;
     }
 
-    // ── Pattern Enumeration (for diagnostics) ──────────────────
+    // -- Pattern Enumeration (for diagnostics) ------------------
 
     /// <summary>
     /// Get all supported pattern names for an element.
@@ -885,7 +885,7 @@ public sealed partial class UiaLocator : IDisposable
             var children = parent.FindAllChildren();
             if (children == null || children.Length == 0) return parent;
 
-            // Explore ALL matching children (not just first) — critical for Electron/Chrome
+            // Explore ALL matching children (not just first) -- critical for Electron/Chrome
             // where multiple Pane siblings share the same BoundingRectangle.
             // Pick the result with the smallest area (most specific element).
             FlaUI.Core.AutomationElements.AutomationElement? bestResult = null;
@@ -964,8 +964,8 @@ public sealed partial class UiaLocator : IDisposable
 
     /// <summary>
     /// Focusless click at a screen point within a window's UIA tree.
-    /// Finds the deepest element → tries Invoke/Toggle/Select/ExpandCollapse patterns.
-    /// Returns (success, elementInfo) — no foreground or physical click needed!
+    /// Finds the deepest element -> tries Invoke/Toggle/Select/ExpandCollapse patterns.
+    /// Returns (success, elementInfo) -- no foreground or physical click needed!
     /// </summary>
     public (bool ok, string detail) TryFocuslessClickAtPoint(int screenX, int screenY, IntPtr hWnd)
     {
@@ -1013,7 +1013,7 @@ public sealed partial class UiaLocator : IDisposable
 
             var patterns = GetSupportedPatterns(found);
             string patStr = patterns.Count > 0 ? string.Join(",", patterns) : "none";
-            return (false, $"{desc} patterns=[{patStr}] — no focusless action available");
+            return (false, $"{desc} patterns=[{patStr}] -- no focusless action available");
         }
         catch (Exception ex)
         {
@@ -1025,7 +1025,7 @@ public sealed partial class UiaLocator : IDisposable
     /// 미니마이즈 윈도우용: 자식 트리에서 Invoke/Toggle 가능 요소 수집.
     /// rcNormalPosition 기준 상대좌표로 거리 계산하여 가까운 순으로 정렬.
     /// BoundingRectangle이 비어있는 요소도 포함 (미니마이즈 상태에서 rect=0,0,0,0).
-    /// 미니마이즈에서 BoundingRect이 없으면 트리 순서(DFS)로 수집 → 첫 번째 = 가장 위/왼쪽.
+    /// 미니마이즈에서 BoundingRect이 없으면 트리 순서(DFS)로 수집 -> 첫 번째 = 가장 위/왼쪽.
     /// </summary>
     public List<InvocableCandidate> FindInvocableDescendants(
         IntPtr hWnd, int targetX, int targetY, RECT normalRect)
@@ -1081,7 +1081,7 @@ public sealed partial class UiaLocator : IDisposable
                         try { aid = child.AutomationId ?? ""; } catch { }
                         try { ct = child.ControlType.ToString(); } catch { ct = "?"; }
 
-                        // BoundingRectangle 거리 계산 (미니마이즈면 0,0,0,0 → HasBounds=false)
+                        // BoundingRectangle 거리 계산 (미니마이즈면 0,0,0,0 -> HasBounds=false)
                         var rect = System.Drawing.Rectangle.Empty;
                         bool hasBounds = false;
                         double dist = double.MaxValue;
@@ -1337,7 +1337,7 @@ public sealed partial class UiaLocator : IDisposable
             return sb.ToString();
         }
 
-        sb.AppendLine($"── {matches.Count} match(es) for \"{filterPattern}\" ──");
+        sb.AppendLine($"-- {matches.Count} match(es) for \"{filterPattern}\" --");
         sb.AppendLine();
 
         // Phase 2: For each match, show path one-liner + subtree dump
@@ -1353,7 +1353,7 @@ public sealed partial class UiaLocator : IDisposable
             var pathParts = ancestors.ToList(); // already formatted as tags
             pathParts.Add(GrapHelper.FormatNodeLabel(elemCt, elemAid, elemName));
 
-            // Path line with index — A11Y: prefix to distinguish from Win32 tree paths
+            // Path line with index -- A11Y: prefix to distinguish from Win32 tree paths
             sb.AppendLine($"[{i + 1}] A11Y:/{string.Join("/", pathParts)}");
 
             // Subtree dump starting at depth 0 (flat, easy to read)
@@ -1394,7 +1394,7 @@ public sealed partial class UiaLocator : IDisposable
         }
         catch { rectStr = "(?)"; }
 
-        // Check if this element matches the filter — token-AND for plain multi-word patterns
+        // Check if this element matches the filter -- token-AND for plain multi-word patterns
         bool isMatch;
         if (matcher != null)
             isMatch = matcher.MatchAny(name, aid, ctStr);
@@ -1411,7 +1411,7 @@ public sealed partial class UiaLocator : IDisposable
         }
         else
         {
-            // Not a match — recurse into children
+            // Not a match -- recurse into children
             try
             {
                 var children = element.FindAllChildren();
@@ -1432,7 +1432,7 @@ public sealed partial class UiaLocator : IDisposable
 
         var indent = new string(' ', depth * 2);
 
-        // Some UWP elements don't support all properties — access safely
+        // Some UWP elements don't support all properties -- access safely
         string name, aid, ctStr, rectStr;
         try { name = element.Name ?? "(null)"; } catch { name = "(err)"; }
         try { aid = element.AutomationId ?? ""; } catch { aid = ""; }
@@ -1486,7 +1486,7 @@ public sealed partial class UiaLocator : IDisposable
                     var indent2 = new string(' ', (depth + 1) * 2);
                     foreach (var leaf in leaves.Take(30))
                         sb.AppendLine($"{indent2}📝 \"{leaf.text}\"");
-                    if (leaves.Count > 30) sb.AppendLine($"{indent2}… +{leaves.Count - 30} more");
+                    if (leaves.Count > 30) sb.AppendLine($"{indent2}... +{leaves.Count - 30} more");
                 }
             }
             catch { }
@@ -1500,7 +1500,7 @@ public sealed partial class UiaLocator : IDisposable
             var focused = _automation.FocusedElement();
             if (focused == null) return "";
 
-            // Build chain from focused → parent → ... → root
+            // Build chain from focused -> parent -> ... -> root
             var chain = new List<AutomationElement>();
             var cur = focused;
             int safety = 50;
@@ -1544,7 +1544,7 @@ public sealed partial class UiaLocator : IDisposable
             if (trimmed.Count <= 1) return ""; // focus is on root itself
 
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine("── hot focus (UIA) ──");
+            sb.AppendLine("-- hot focus (UIA) --");
             for (int i = 0; i < trimmed.Count; i++)
             {
                 var el = trimmed[i];
@@ -1560,7 +1560,7 @@ public sealed partial class UiaLocator : IDisposable
                 catch { rectStr = ""; }
 
                 string indent = new string(' ', i * 2);
-                string arrow = i == 0 ? "⌨ " : "└ ";
+                string arrow = i == 0 ? "⌨ " : "+ ";
                 System.Drawing.Rectangle? rectParsed = null;
                 try
                 {
@@ -1621,7 +1621,7 @@ public sealed partial class UiaLocator : IDisposable
                 catch { }
             }
 
-            // ── Siblings of focused element ──
+            // -- Siblings of focused element --
             try
             {
                 var focusedEl = trimmed[0];
@@ -1639,7 +1639,7 @@ public sealed partial class UiaLocator : IDisposable
 
                 if (siblings.Count > 1) // only show if there are actual siblings
                 {
-                    sb.AppendLine("── siblings ──");
+                    sb.AppendLine("-- siblings --");
                     foreach (var (sib, isSelf) in siblings)
                     {
                         string sName, sAid, sCt;
@@ -1668,7 +1668,7 @@ public sealed partial class UiaLocator : IDisposable
         _automation.Dispose();
     }
 
-    // ── Quick UIA search (static, self-contained) ──────────────────
+    // -- Quick UIA search (static, self-contained) ------------------
 
     /// <summary>
     /// Lightweight BFS search of a window's UIA tree for keyword matches.
@@ -1742,13 +1742,13 @@ public sealed partial class UiaLocator : IDisposable
                 try { ct = el.Properties.ControlType.ValueOrDefault.ToString(); }
                 catch { ct = "?"; }
 
-                // Build name path segment: [Type:aid]Name — type+id+name as one "folder"
+                // Build name path segment: [Type:aid]Name -- type+id+name as one "folder"
                 // [Button:radix-_r_42_]사이드바, [Pane]Claude, [Pane] (unnamed, no aid)
                 string segName = !string.IsNullOrEmpty(aid) ? $"[{ct}:{aid}]{name}" : $"[{ct}]{name}";
                 string currentPath = depth == 0 ? "" : string.IsNullOrEmpty(parentPath) ? segName : $"{parentPath}/{segName}";
 
                 // Match on Name or AutomationId (skip root element)
-                // Empty keyword → return all elements (for path search mode)
+                // Empty keyword -> return all elements (for path search mode)
                 // Supports: substring (default), glob (*/?) and regex: prefix
                 if (depth > 0)
                 {
@@ -1759,7 +1759,7 @@ public sealed partial class UiaLocator : IDisposable
                     }
                     else
                     {
-                        // token-AND for plain multi-word keywords — name+aid pool, order-independent
+                        // token-AND for plain multi-word keywords -- name+aid pool, order-independent
                         bool isElemMatch = matcher != null
                             ? matcher.MatchAny(name, aid)
                             : PatternMatcher.TokenMatchAny(keyword, name, aid);
@@ -1830,16 +1830,16 @@ public sealed class ElementAtPointInfo
 /// Unified pattern matcher for UI element name/id matching.
 ///
 /// Syntax:
-///   "exact text"       — literal exact match (default, backward-compatible)
-///   "*partial*"        — wildcard: * = 0+ chars, ? = 1 char (glob-style)
-///   "regex:pattern"    — regular expression (case-insensitive)
+///   "exact text"       -- literal exact match (default, backward-compatible)
+///   "*partial*"        -- wildcard: * = 0+ chars, ? = 1 char (glob-style)
+///   "regex:pattern"    -- regular expression (case-insensitive)
 ///
 /// Examples:
-///   "num5Button"       → exact match for automation id
-///   "*Button*"         → any name containing "Button"
-///   "결과*"            → names starting with "결과"
-///   "regex:btn_\\d+"   → regex matching btn_ followed by digits
-///   "?u?"              → 3-char names with 'u' in middle
+///   "num5Button"       -> exact match for automation id
+///   "*Button*"         -> any name containing "Button"
+///   "결과*"            -> names starting with "결과"
+///   "regex:btn_\\d+"   -> regex matching btn_ followed by digits
+///   "?u?"              -> 3-char names with 'u' in middle
 /// </summary>
 public sealed class PatternMatcher
 {
@@ -1857,14 +1857,14 @@ public sealed class PatternMatcher
     /// </summary>
     public static PatternMatcher Create(string pattern)
     {
-        // regex: prefix → explicit regex (user controls anchoring)
+        // regex: prefix -> explicit regex (user controls anchoring)
         if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
         {
             var regexStr = pattern[6..];
             return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
 
-        // Contains wildcard chars → convert glob to regex (NO anchoring = substring)
+        // Contains wildcard chars -> convert glob to regex (NO anchoring = substring)
         if (pattern.Contains('*') || pattern.Contains('?'))
         {
             var regexStr = Regex.Escape(pattern)
@@ -1873,7 +1873,7 @@ public sealed class PatternMatcher
             return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
 
-        // Plain literal → substring match (Contains)
+        // Plain literal -> substring match (Contains)
         return new PatternMatcher(pattern);
     }
 
@@ -1885,28 +1885,28 @@ public sealed class PatternMatcher
     /// Also supports <c>regex:</c> prefix for explicit regex.
     /// </summary>
     /// <example>
-    /// "*/#32770"          → any single parent + #32770
-    /// "**/#32770"         → #32770 at any depth
-    /// "E*Trade*/#32770"   → parent starts with E*Trade + #32770
-    /// "*_59648/**/Button_*" → CID 59648 parent, Button at any depth below
+    /// "*/#32770"          -> any single parent + #32770
+    /// "**/#32770"         -> #32770 at any depth
+    /// "E*Trade*/#32770"   -> parent starts with E*Trade + #32770
+    /// "*_59648/**/Button_*" -> CID 59648 parent, Button at any depth below
     /// </example>
     public static PatternMatcher CreatePathGlob(string pattern)
     {
-        // regex: prefix → pass through
+        // regex: prefix -> pass through
         if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
         {
             var regexStr = pattern[6..];
             return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
         }
 
-        // Path-aware glob → regex conversion
+        // Path-aware glob -> regex conversion
         // Process order: **/ first (special: zero-or-more segments), then standalone **, then *, then ?
         var escaped = Regex.Escape(pattern);
         escaped = escaped
-            .Replace(@"\*\*/", "(.*/)?")   // **/ → zero or more path segments (GitHub-style: matches empty too)
-            .Replace(@"\*\*", ".*")        // **  → match anything including / (at end or standalone)
-            .Replace(@"\*", "[^/]*")       // *   → match within single segment (no /)
-            .Replace(@"\?", "[^/]");       // ?   → single char within segment (no /)
+            .Replace(@"\*\*/", "(.*/)?")   // **/ -> zero or more path segments (GitHub-style: matches empty too)
+            .Replace(@"\*\*", ".*")        // **  -> match anything including / (at end or standalone)
+            .Replace(@"\*", "[^/]*")       // *   -> match within single segment (no /)
+            .Replace(@"\?", "[^/]");       // ?   -> single char within segment (no /)
 
         var rx = "^" + escaped + "$";
         return new PatternMatcher(new Regex(rx, RegexOptions.IgnoreCase | RegexOptions.Compiled));
@@ -1923,11 +1923,11 @@ public sealed class PatternMatcher
     /// <summary>
     /// Ensure a pattern does substring matching by wrapping with <c>*...*</c>.
     /// Handles all cases gracefully:
-    ///   "실현손익"  → "*실현손익*"  (plain literal)
-    ///   "*실현손익" → "*실현손익*"  (missing trailing *)
-    ///   "실현손익*" → "*실현손익*"  (missing leading *)
-    ///   "*실현*"    → "*실현*"     (already wrapped)
-    ///   "regex:..."  → "regex:..."   (explicit regex, unchanged)
+    ///   "실현손익"  -> "*실현손익*"  (plain literal)
+    ///   "*실현손익" -> "*실현손익*"  (missing trailing *)
+    ///   "실현손익*" -> "*실현손익*"  (missing leading *)
+    ///   "*실현*"    -> "*실현*"     (already wrapped)
+    ///   "regex:..."  -> "regex:..."   (explicit regex, unchanged)
     /// Use this for contexts where substring matching is the expected default
     /// (e.g., window finding, UIA scope narrowing, child window matching).
     /// </summary>
@@ -1942,7 +1942,7 @@ public sealed class PatternMatcher
 
     /// <summary>
     /// Does the pattern use path-aware glob syntax?
-    /// True if it contains <c>/</c> or <c>**</c> — should match against full classPath hierarchy.
+    /// True if it contains <c>/</c> or <c>**</c> -- should match against full classPath hierarchy.
     /// False means match against leaf className only (backward compatible).
     /// </summary>
     public static bool IsPathGlob(string pattern) =>
@@ -1955,14 +1955,14 @@ public sealed class PatternMatcher
     {
         if (_regex != null)
             return _regex.IsMatch(value);
-        // Literal → substring match (Contains), not exact match
+        // Literal -> substring match (Contains), not exact match
         return value.Contains(_literal!, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Token-AND match across one or more texts (order-independent).
     /// Plain multi-word patterns: each token must appear in ANY of the provided texts.
-    ///   "eye tick" matches {"AppBotEye", "[wkappbot] ... eye tick ..."}  — tokens spread across fields.
+    ///   "eye tick" matches {"AppBotEye", "[wkappbot] ... eye tick ..."}  -- tokens spread across fields.
     /// Glob/regex patterns: standard IsMatch against any of the texts.
     /// </summary>
     public static bool TokenMatchAny(string pattern, params string[] texts)
@@ -1986,10 +1986,10 @@ public sealed class PatternMatcher
     {
         if (_regex != null)
             return texts.Any(t => _regex.IsMatch(t));
-        // Single-word literal — standard Contains on any text
+        // Single-word literal -- standard Contains on any text
         if (!_literal!.Contains(' '))
             return texts.Any(t => t.Contains(_literal, StringComparison.OrdinalIgnoreCase));
-        // Multi-word literal — token-AND across combined pool
+        // Multi-word literal -- token-AND across combined pool
         var tokens = _literal.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var combined = string.Join(" ", texts);
         return tokens.All(t => combined.Contains(t, StringComparison.OrdinalIgnoreCase));

@@ -14,7 +14,7 @@ public class NaverFinanceScraper
     private readonly string? _webProfilesDir;
     private const string Domain = "finance.naver.com";
 
-    // Naver Finance table extraction JS — verified against live DOM (2026-02-20)
+    // Naver Finance table extraction JS -- verified against live DOM (2026-02-20)
     // table.type_2 tbody tr: rank|name(link)|price|change|changePct|volume|...
     private const string ExtractionJs = @"
 (function() {
@@ -91,7 +91,7 @@ public class NaverFinanceScraper
 })();
 ";
 
-    // Naver News search extraction — forEach+JSON.stringify pattern (NOT IIFE! IIFE returns empty in CDP EvalAsync)
+    // Naver News search extraction -- forEach+JSON.stringify pattern (NOT IIFE! IIFE returns empty in CDP EvalAsync)
     // .list_news contains Fender SPA rendered news items
     // Pattern: short-text link (press name) followed by long-text link (article title, same href = body preview)
     // De-duplicate by href, capture press name from preceding short link
@@ -257,7 +257,7 @@ JSON.stringify(_r.slice(0,5));
         }
         catch (Exception ex)
         {
-            RecordKnowhow(source, "FAIL", $"{url} — {ex.Message}");
+            RecordKnowhow(source, "FAIL", $"{url} -- {ex.Message}");
             return Fail(source, ex.Message, sw.Elapsed);
         }
     }

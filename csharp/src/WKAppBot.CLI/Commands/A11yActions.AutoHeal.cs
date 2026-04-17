@@ -9,19 +9,19 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Auto-Heal: click/invoke 전 티어 실패 시 삼두에 해결방법 자동 문의 ──────────────────
+    // -- Auto-Heal: click/invoke 전 티어 실패 시 삼두에 해결방법 자동 문의 ------------------
     //
     // 동작 조건:
     //   1. --auto-heal 플래그 명시  OR
     //   2. CWD가 WKAppBot 프로젝트 폴더 (안전장치: 앱봇 작업 중에만 자동 발동)
     //
-    // 흐름: A11yClick/A11yInvoke 각 tier → _autoHealTiers 에 결과 기록
-    //        → 최종 false 반환 시 FireAutoHeal → 슬랙 알림 + Task.Run(삼두 문의)
+    // 흐름: A11yClick/A11yInvoke 각 tier -> _autoHealTiers 에 결과 기록
+    //        -> 최종 false 반환 시 FireAutoHeal -> 슬랙 알림 + Task.Run(삼두 문의)
 
     // Per-thread tier log: populated during A11yClick/A11yInvoke execution.
     [ThreadStatic] static List<string>? _autoHealTiers;
 
-    // Per-thread current command log file path — set at command start, captured before Task.Run.
+    // Per-thread current command log file path -- set at command start, captured before Task.Run.
     // Enables triad queries to attach the full action log for detailed diagnosis.
     [ThreadStatic] internal static string? _currentLogPath;
 
@@ -31,13 +31,13 @@ internal partial class Program
     internal static bool ShouldAutoHeal(string[] args)
     {
         if (args.Any(a => a == "--auto-heal")) return true;
-        // Auto-on when working inside the WKAppBot project (safety guard — avoids spam in other projects)
+        // Auto-on when working inside the WKAppBot project (safety guard -- avoids spam in other projects)
         var cwd = Environment.CurrentDirectory.Replace('\\', '/');
         return cwd.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Focusless Alternative Query ─────────────────────────────────────────────────────────
-    // SendInput 도달 = 포커스리스 전 티어 실패 → "성공"이 아님.
+    // -- Focusless Alternative Query --------------------------------------------------------─
+    // SendInput 도달 = 포커스리스 전 티어 실패 -> "성공"이 아님.
     // 첫 번째 도달 시: 삼두에 포커스리스 대안 문의 (sentinel: knowhow-triad.md).
     // 삼두 무관하게: 실패 로그를 경험DB에 자동 저장.
     internal static void QueryFocuslessAlternativeOnce(IntPtr hwnd, AutomationElement el)
@@ -71,22 +71,22 @@ internal partial class Program
             // Capture log path before Task.Run (ThreadStatic not accessible across threads)
             var capturedLogPath = _currentLogPath;
 
-            // ── 실패 로그 → 경험DB 자동 저장 (삼두 무관) ──────────────────────────────
+            // -- 실패 로그 -> 경험DB 자동 저장 (삼두 무관) ------------------------------
             var failLogPath = Path.Combine(expDir, $"faillog-click-{DateTime.Now:yyyyMMdd_HHmmss}.log");
             var tried = _autoHealTiers;
             var triedStr = tried is { Count: > 0 }
                 ? string.Join("\n", tried.Select((t, i) => $"  {i + 1}. {t}"))
                 : "  (no tier log)";
             File.WriteAllText(failLogPath,
-                $"# Click Failure Log — SendInput reached (all focusless tiers failed)\n" +
+                $"# Click Failure Log -- SendInput reached (all focusless tiers failed)\n" +
                 $"Time   : {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
                 $"Window : proc={procName}, class={className}, title=\"{winTitle}\"\n" +
                 $"Element: name=\"{name}\" type={type} aid=\"{aid}\" {coords}\n\n" +
                 $"Tried:\n{triedStr}\n\n" +
                 $"Action log: {capturedLogPath ?? "(unavailable)"}\n");
-            Console.Error.WriteLine($"[FOCUSLESS] fail-log → {Path.GetFileName(failLogPath)}");
+            Console.Error.WriteLine($"[FOCUSLESS] fail-log -> {Path.GetFileName(failLogPath)}");
 
-            // ── 삼두 숙제: suggestions.jsonl에 추가 ───────────────────────────────────────
+            // -- 삼두 숙제: suggestions.jsonl에 추가 --------------------------------------─
             // 중복 방지: suggestions.jsonl files 배열에 동일 expDir 경로가 있으면 이미 제출된 것
             var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
             bool alreadyRegistered = false;
@@ -116,7 +116,7 @@ internal partial class Program
             if (alreadyRegistered) return;
 
             var suggestionText =
-                $"[FOCUSLESS-HOMEWORK] SendInput reached for `{name}` in `{procName}/{className}` — " +
+                $"[FOCUSLESS-HOMEWORK] SendInput reached for `{name}` in `{procName}/{className}` -- " +
                 $"all focusless tiers failed. Find best focusless click alternative.\n" +
                 $"Context: title=\"{winTitle}\", element type={type}, aid=\"{aid}\", {coords}\n" +
                 $"Tried: {triedStr.Replace("\n", " | ")}\n" +
@@ -135,7 +135,7 @@ internal partial class Program
             {
                 File.AppendAllText(suggPath, suggEntry + "\n");
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Error.WriteLine($"[FOCUSLESS] 삼두숙제 등록 → suggestions.jsonl ({procName}/{className} \"{name}\")");
+                Console.Error.WriteLine($"[FOCUSLESS] 삼두숙제 등록 -> suggestions.jsonl ({procName}/{className} \"{name}\")");
                 Console.ResetColor();
             }
             catch { }
@@ -143,14 +143,14 @@ internal partial class Program
         catch { /* best effort */ }
     }
 
-    // ── Focusless Success Knowhow Recording ────────────────────────────────────────────────
+    // -- Focusless Success Knowhow Recording ------------------------------------------------
     // Two categories:
-    //   Focusless  — zero focus change (FLUTTERVIEW WM_LBUTTON, WM_LBUTTON PostMessage, etc.)
-    //   MinFocus   — brief focus steal + restore (UIA Invoke w/ focus-restore, MSAA put_accValue)
+    //   Focusless  -- zero focus change (FLUTTERVIEW WM_LBUTTON, WM_LBUTTON PostMessage, etc.)
+    //   MinFocus   -- brief focus steal + restore (UIA Invoke w/ focus-restore, MSAA put_accValue)
     //
     // Saved to: wkappbot.hq/experience/{proc}/{class}/knowhow-{action}.md
-    // Read by:  LoadKnowhow() at action start → skip straight to known-working tier
-    // Triad fills unknowns → response saved as draft entry in the same file.
+    // Read by:  LoadKnowhow() at action start -> skip straight to known-working tier
+    // Triad fills unknowns -> response saved as draft entry in the same file.
 
     internal enum KnowhowCategory { Focusless, MinFocus }
 
@@ -177,7 +177,7 @@ internal partial class Program
             try { type = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
             var aid  = el.Properties.AutomationId.ValueOrDefault ?? "";
             var date = DateTime.Now.ToString("yyyy-MM-dd");
-            var entry = $"- **{tierName}** — confirmed {date}  " +
+            var entry = $"- **{tierName}** -- confirmed {date}  " +
                         $"(el: {type} \"{name}\" aid={aid})\n";
 
             var section = category == KnowhowCategory.Focusless
@@ -195,7 +195,7 @@ internal partial class Program
 
             // Init file if new
             if (string.IsNullOrEmpty(existing))
-                existing = $"# Focusless Knowhow — {action} on {procName}/{className}\n\n" +
+                existing = $"# Focusless Knowhow -- {action} on {procName}/{className}\n\n" +
                            $"## ✅ Focusless (포커스 변경 없음)\n\n" +
                            $"## ⚡ Min-focus (포커스 잠깐 양보 후 복원)\n\n" +
                            $"## ❌ 안 됨 (실패 확인)\n";
@@ -210,7 +210,7 @@ internal partial class Program
 
             File.WriteAllText(mdPath, existing);
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine($"[KNOWHOW] ✓ recorded: {tierName} ({category}) → {Path.GetFileName(mdPath)} ({procName}/{className})");
+            Console.Error.WriteLine($"[KNOWHOW] v recorded: {tierName} ({category}) -> {Path.GetFileName(mdPath)} ({procName}/{className})");
             Console.ResetColor();
         }
         catch { /* best effort */ }
@@ -242,7 +242,7 @@ internal partial class Program
             if (lines.Count > 0)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Error.WriteLine($"[KNOWHOW] {action} on {procName}/{className}: known tiers → [{string.Join(", ", lines)}]");
+                Console.Error.WriteLine($"[KNOWHOW] {action} on {procName}/{className}: known tiers -> [{string.Join(", ", lines)}]");
                 Console.ResetColor();
             }
             return lines;
@@ -264,7 +264,7 @@ internal partial class Program
         var cls = new System.Text.StringBuilder(128);
         NativeMethods.GetClassNameW(hwnd, cls, cls.Capacity);
 
-        // Window/element state checks — helps triad diagnose hidden/disabled/occluded targets
+        // Window/element state checks -- helps triad diagnose hidden/disabled/occluded targets
         bool winVisible  = NativeMethods.IsWindowVisible(hwnd);
         bool winEnabled  = NativeMethods.IsWindowEnabled(hwnd);
         bool elEnabled   = true;
@@ -293,21 +293,21 @@ internal partial class Program
             ? string.Join("\n", tried.Select((t, i) => $"  {i + 1}. {t}"))
             : "  (no tier log)";
 
-        // Capture screenshots + OCR — bundled as attachments for the triad.
-        // (1) Element region: tight crop → OCR target verification
-        // (2) Window context: wider view → triad sees the full UI state
+        // Capture screenshots + OCR -- bundled as attachments for the triad.
+        // (1) Element region: tight crop -> OCR target verification
+        // (2) Window context: wider view -> triad sees the full UI state
         var attachFiles = new List<string>();
         string ocrLine = "";
         var tmpDir = Path.Combine(Path.GetTempPath(), "wkappbot_autoheal");
         Directory.CreateDirectory(tmpDir);
         var sessionTag = $"{DateTime.Now:yyyyMMdd_HHmmss}_{action}";
 
-        // Action log — captured at command start, moved to logs/old/ after action completes.
+        // Action log -- captured at command start, moved to logs/old/ after action completes.
         // Background Task.Run waits briefly for the move then attaches the file.
         var capturedLogPathForHeal = _currentLogPath;
 
-        // Source file auto-match: A11yActions.{PascalAction}.cs — triad can read the exact code that failed.
-        // Convention: action "click" → A11yActions.Click.cs, "invoke" → A11yActions.Invoke.cs
+        // Source file auto-match: A11yActions.{PascalAction}.cs -- triad can read the exact code that failed.
+        // Convention: action "click" -> A11yActions.Click.cs, "invoke" -> A11yActions.Invoke.cs
         // Only available in dev context (CWD=WKAppBot), which is already the ShouldAutoHeal guard.
         var actionPascal = char.ToUpper(action[0]) + action[1..];
         var srcFile = Path.Combine(Environment.CurrentDirectory,
@@ -315,20 +315,20 @@ internal partial class Program
         if (File.Exists(srcFile))
         {
             attachFiles.Add(srcFile);
-            Console.Error.WriteLine($"[AUTO-HEAL] source attached → A11yActions.{actionPascal}.cs");
+            Console.Error.WriteLine($"[AUTO-HEAL] source attached -> A11yActions.{actionPascal}.cs");
         }
 
         if (rect != null && rect.Value.Width > 0 && rect.Value.Height > 0)
         {
             try
             {
-                // Element region screenshot → save → OCR
+                // Element region screenshot -> save -> OCR
                 using var elBmp = ScreenCapture.CaptureScreenRegion(
                     rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
                 var elPath = Path.Combine(tmpDir, $"{sessionTag}_element.png");
                 elBmp.Save(elPath, ImageFormat.Png);
                 attachFiles.Add(elPath);
-                Console.Error.WriteLine($"[AUTO-HEAL] element screenshot → {Path.GetFileName(elPath)}");
+                Console.Error.WriteLine($"[AUTO-HEAL] element screenshot -> {Path.GetFileName(elPath)}");
 
                 // OCR on same bitmap (before dispose)
                 using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
@@ -339,9 +339,9 @@ internal partial class Program
                     bool nameMatch = string.IsNullOrEmpty(name) ||
                                      ocrText.Contains(name, StringComparison.OrdinalIgnoreCase) ||
                                      name.Contains(ocrText, StringComparison.OrdinalIgnoreCase);
-                    ocrLine = $"\nOCR text in element area: \"{ocrText}\" (element.Name=\"{name}\", {(nameMatch ? "✓ match" : "⚠ MISMATCH — possible wrong target!")})";
+                    ocrLine = $"\nOCR text in element area: \"{ocrText}\" (element.Name=\"{name}\", {(nameMatch ? "v match" : "! MISMATCH -- possible wrong target!")})";
                     Console.ForegroundColor = nameMatch ? ConsoleColor.Gray : ConsoleColor.Yellow;
-                    Console.Error.WriteLine($"[OCR-VERIFY] \"{ocrText}\" vs element.Name=\"{name}\" → {(nameMatch ? "✓ match" : "⚠ MISMATCH")}");
+                    Console.Error.WriteLine($"[OCR-VERIFY] \"{ocrText}\" vs element.Name=\"{name}\" -> {(nameMatch ? "v match" : "! MISMATCH")}");
                     Console.ResetColor();
                 }
             }
@@ -355,18 +355,18 @@ internal partial class Program
             var winPath = Path.Combine(tmpDir, $"{sessionTag}_window.png");
             winBmp.Save(winPath, ImageFormat.Png);
             attachFiles.Add(winPath);
-            Console.Error.WriteLine($"[AUTO-HEAL] window screenshot → {Path.GetFileName(winPath)}");
+            Console.Error.WriteLine($"[AUTO-HEAL] window screenshot -> {Path.GetFileName(winPath)}");
         }
         catch { }
 
-        // English prompt — triad AIs receive English for efficiency
+        // English prompt -- triad AIs receive English for efficiency
         var question = $"""
             [AUTO-HEAL] All '{action}' tiers failed on a UI element. Suggest a working approach.
             Screenshots attached: element region + window context.
 
             Window : class={cls}, title="{windowTitle}", hwnd=0x{hwnd.ToInt64():X8}
             State  : {stateInfo}
-            Element: name="{(name.Length > 200 ? name[..200] + "…" : name)}", type={type}, automationId="{aid}", {coords}{ocrLine}
+            Element: name="{(name.Length > 200 ? name[..200] + "..." : name)}", type={type}, automationId="{aid}", {coords}{ocrLine}
 
             Tried (all failed / unverified):
             {triedStr}
@@ -377,15 +377,15 @@ internal partial class Program
             """;
 
         Console.ForegroundColor = ConsoleColor.Magenta;
-        Console.Error.WriteLine($"[AUTO-HEAL] {action} — all tiers failed → querying triad ({attachFiles.Count} attachments)...");
+        Console.Error.WriteLine($"[AUTO-HEAL] {action} -- all tiers failed -> querying triad ({attachFiles.Count} attachments)...");
         Console.ResetColor();
 
-        var nameShort = name.Length > 60 ? name[..60] + "…" : name;
-        SlackPostToThread($"🔧 *[AUTO-HEAL]* `{action}` 전 티어 실패 (`{nameShort}` on `{windowTitle}`) → 삼두 해결방법 문의 중... ({attachFiles.Count}개 스샷 첨부)");
+        var nameShort = name.Length > 60 ? name[..60] + "..." : name;
+        SlackPostToThread($"🔧 *[AUTO-HEAL]* `{action}` 전 티어 실패 (`{nameShort}` on `{windowTitle}`) -> 삼두 해결방법 문의 중... ({attachFiles.Count}개 스샷 첨부)");
 
         var capturedFiles = attachFiles.ToList(); // snapshot for closure
         var capturedLogForHeal = capturedLogPathForHeal;
-        // Fire triad in background — user gets answers in the same Slack thread when ready
+        // Fire triad in background -- user gets answers in the same Slack thread when ready
         _ = Task.Run(() =>
         {
             // Attach action log (moved to logs/old/ after action finishes)
@@ -401,7 +401,7 @@ internal partial class Program
                 if (logToAttach != null)
                 {
                     capturedFiles.Add(logToAttach);
-                    Console.Error.WriteLine($"[AUTO-HEAL] action log attached → {Path.GetFileName(logToAttach)}");
+                    Console.Error.WriteLine($"[AUTO-HEAL] action log attached -> {Path.GetFileName(logToAttach)}");
                 }
             }
 

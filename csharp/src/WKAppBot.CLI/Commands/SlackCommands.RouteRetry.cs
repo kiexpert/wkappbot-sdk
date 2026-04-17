@@ -4,10 +4,10 @@ using System.Text.Json.Nodes;
 
 namespace WKAppBot.CLI;
 
-// Route retry queue — persists failed route attempts to disk.
+// Route retry queue -- persists failed route attempts to disk.
 // Dual Task Scheduler structure:
-//   [WKAppBot Eye Watchdog]  permanent 10-min repeat — keeps Eye alive regardless
-//   [WKAppBot Route Retry]   precise one-shot at retryAt — fast retry when item queued
+//   [WKAppBot Eye Watchdog]  permanent 10-min repeat -- keeps Eye alive regardless
+//   [WKAppBot Route Retry]   precise one-shot at retryAt -- fast retry when item queued
 // Plus Eye loop (~10s) and EnsureEyeRunning() as additional layers.
 // Infinite retry: no max retryCount ("사용자의 요청은 한개도 허투로 듣지 않게").
 internal static class RouteRetryQueue
@@ -26,7 +26,7 @@ internal static class RouteRetryQueue
 
     static readonly object _lock = new();
 
-    // ── Public API ─────────────────────────────────────────────────────────────
+    // -- Public API ------------------------------------------------------------─
 
     /// <summary>
     /// Persists a failed route attempt for retry after 1 minute.
@@ -121,7 +121,7 @@ internal static class RouteRetryQueue
             var soonest = GetSoonestRetryAt();
             if (soonest == null)
             {
-                // Queue empty — remove one-shot retry task (watchdog continues independently)
+                // Queue empty -- remove one-shot retry task (watchdog continues independently)
                 RunPowerShell($"Unregister-ScheduledTask -TaskName '{RetryTaskName}' -Confirm:$false -ErrorAction SilentlyContinue", out _);
                 return;
             }
@@ -159,8 +159,8 @@ Register-ScheduledTask -TaskName '{RetryTaskName}' -Action $action -Trigger $tri
 
     /// <summary>
     /// Registers (or refreshes) the permanent Eye watchdog task.
-    /// Runs 'eye tick' every 10 min — respawns Eye if dead, flushes retry queue.
-    /// Called on Eye startup. Never deleted — permanent watchdog.
+    /// Runs 'eye tick' every 10 min -- respawns Eye if dead, flushes retry queue.
+    /// Called on Eye startup. Never deleted -- permanent watchdog.
     /// </summary>
     public static void EnsureWatchdogTask()
     {
@@ -183,7 +183,7 @@ Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $
             : $"[EYE] Watchdog task register exit={exitCode} (non-fatal)");
     }
 
-    // ── Internals ───────────────────────────────────────────────────────────────
+    // -- Internals --------------------------------------------------------------─
 
     static DateTimeOffset? GetSoonestRetryAt()
     {
@@ -231,7 +231,7 @@ Register-ScheduledTask -TaskName '{WatchdogTaskName}' -Action $action -Trigger $
 
     /// <summary>
     /// Checks if Eye is alive via CmdPipe. If not, spawns it.
-    /// Delegates to Program.LaunchAppBotEyeIfNeededCore — single launch code path.
+    /// Delegates to Program.LaunchAppBotEyeIfNeededCore -- single launch code path.
     /// </summary>
     public static void EnsureEyeRunning() => Program.LaunchAppBotEyeIfNeededCore("");
 }

@@ -8,7 +8,7 @@ public sealed partial class ClaudePromptHelper
 {
     /// <summary>
     /// Get caret screen rect via UIA TextPattern.GetSelection().GetBoundingRectangles().
-    /// Primary caret check — cross-process, no AttachThreadInput needed.
+    /// Primary caret check -- cross-process, no AttachThreadInput needed.
     /// Returns the first bounding rect of the current selection/caret.
     /// Returns null if TextPattern not supported or no selection.
     /// </summary>
@@ -29,9 +29,9 @@ public sealed partial class ClaudePromptHelper
     }
 
     /// <summary>
-    /// Ensure caret is in PromptRect — actively secures input position with focusless fallback chain.
+    /// Ensure caret is in PromptRect -- actively secures input position with focusless fallback chain.
     /// Returns true = caret confirmed in prompt (ready for WM_CHAR), false = abort.
-    /// Fallback chain: UIA → Win32 → iconic restore → thread focus → FocusPromptFocusless
+    /// Fallback chain: UIA -> Win32 -> iconic restore -> thread focus -> FocusPromptFocusless
     /// </summary>
     public bool EnsureCaretInPrompt(PromptInfo prompt, IntPtr rendererHwnd, ref IntPtr kbFocus)
     {
@@ -39,14 +39,14 @@ public sealed partial class ClaudePromptHelper
         bool? firstCheck = TryCaretCheck(prompt.PromptRect, ref kbFocus, out var src1);
         if (firstCheck.HasValue)
         {
-            Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src1}) {(firstCheck.Value ? "inside" : "outside")} PromptRect — {(firstCheck.Value ? "safe" : "abort")}");
+            Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src1}) {(firstCheck.Value ? "inside" : "outside")} PromptRect -- {(firstCheck.Value ? "safe" : "abort")}");
             return firstCheck.Value;
         }
 
-        // 3차: 최소화 → 포커스리스 복원 → 재시도
+        // 3차: 최소화 -> 포커스리스 복원 -> 재시도
         if (NativeMethods.IsIconic(prompt.WindowHandle))
         {
-            Console.WriteLine("  [PROMPT] WM_CHAR: iconic — restoring focuslessly");
+            Console.WriteLine("  [PROMPT] WM_CHAR: iconic -- restoring focuslessly");
             NativeMethods.ShowWindow(prompt.WindowHandle, 4); // SW_SHOWNOACTIVATE
             var sw = System.Diagnostics.Stopwatch.StartNew();
             while (NativeMethods.IsIconic(prompt.WindowHandle) && sw.ElapsedMilliseconds < 1000)
@@ -56,7 +56,7 @@ public sealed partial class ClaudePromptHelper
             bool? retry = TryCaretCheck(prompt.PromptRect, ref kbFocus, out var src2);
             if (retry.HasValue)
             {
-                Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src2}/iconic-retry) {(retry.Value ? "inside" : "outside")} PromptRect — {(retry.Value ? "safe" : "abort")}");
+                Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src2}/iconic-retry) {(retry.Value ? "inside" : "outside")} PromptRect -- {(retry.Value ? "safe" : "abort")}");
                 return retry.Value;
             }
         }
@@ -65,28 +65,28 @@ public sealed partial class ClaudePromptHelper
         uint targetTid = NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out _);
         if (NativeMethods.GetThreadFocusHwnd(targetTid) == rendererHwnd)
         {
-            Console.WriteLine("  [PROMPT] WM_CHAR: no caret (background) thread focus == renderer — safe");
+            Console.WriteLine("  [PROMPT] WM_CHAR: no caret (background) thread focus == renderer -- safe");
             return true;
         }
 
-        // 5차: FocusPromptFocusless (WM_LBUTTON) → 재시도
-        Console.WriteLine("  [PROMPT] WM_CHAR: no caret — FocusPromptFocusless → retry");
+        // 5차: FocusPromptFocusless (WM_LBUTTON) -> 재시도
+        Console.WriteLine("  [PROMPT] WM_CHAR: no caret -- FocusPromptFocusless -> retry");
         FocusPromptFocusless(rendererHwnd, prompt.PromptRect);
         Thread.Sleep(80);
         kbFocus = NativeMethods.GetKeyboardFocusHwnd();
         bool? final = TryCaretCheck(prompt.PromptRect, ref kbFocus, out var src3);
         if (final.HasValue)
         {
-            Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src3}/focus-retry) {(final.Value ? "inside" : "outside")} PromptRect — {(final.Value ? "safe" : "abort")}");
+            Console.WriteLine($"  [PROMPT] WM_CHAR: caret({src3}/focus-retry) {(final.Value ? "inside" : "outside")} PromptRect -- {(final.Value ? "safe" : "abort")}");
             return final.Value;
         }
 
-        Console.WriteLine("  [PROMPT] WM_CHAR: all fallbacks exhausted — abort");
+        Console.WriteLine("  [PROMPT] WM_CHAR: all fallbacks exhausted -- abort");
         return false;
     }
 
     /// <summary>
-    /// EnsureCaretInPrompt 간편 오버로드 — renderer를 내부 자동 탐색.
+    /// EnsureCaretInPrompt 간편 오버로드 -- renderer를 내부 자동 탐색.
     /// InputReadiness.EnsureInputPosition 콜백에서 사용: () => promptHelper.EnsureCaretInPrompt(prompt)
     /// </summary>
     public bool EnsureCaretInPrompt(PromptInfo prompt)
@@ -121,7 +121,7 @@ public sealed partial class ClaudePromptHelper
     }
 
     /// <summary>
-    /// Post WM_LBUTTONDOWN+UP to the renderer at PromptRect center — focuslessly places caret.
+    /// Post WM_LBUTTONDOWN+UP to the renderer at PromptRect center -- focuslessly places caret.
     /// No SetForegroundWindow. Chrome renderer responds to WM_LBUTTON without being foreground.
     /// Returns true if messages were posted (not a guarantee of success).
     /// </summary>
@@ -130,7 +130,7 @@ public sealed partial class ClaudePromptHelper
         if (rendererHwnd == IntPtr.Zero || promptScreenRect.IsEmpty) return false;
         try
         {
-            // Screen center of PromptRect → client coords of renderer
+            // Screen center of PromptRect -> client coords of renderer
             var pt = new POINT
             {
                 X = promptScreenRect.X + promptScreenRect.Width / 2,
@@ -205,7 +205,7 @@ public sealed partial class ClaudePromptHelper
         }
 
         // Fallback: first renderer
-        Console.WriteLine($"  [PROMPT] WM_CHAR: no rect match — using first renderer");
+        Console.WriteLine($"  [PROMPT] WM_CHAR: no rect match -- using first renderer");
         return candidates.Count > 0 ? candidates[0] : IntPtr.Zero;
     }
 

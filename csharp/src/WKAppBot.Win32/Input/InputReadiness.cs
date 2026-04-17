@@ -6,7 +6,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.Win32.Input;
 
-// ── Enums & Records ───────────────────────────────────────────────
+// -- Enums & Records ----------------------------------------------─
 
 /// <summary>Input method categories, ordered by preference (focusless first).</summary>
 public enum InputMethodCategory { UiaPattern, MsaaAccessible, Win32Message, SendInput }
@@ -31,7 +31,7 @@ public record BlockerInfo(
     string ProcessName
 );
 
-// ── Request ───────────────────────────────────────────────────────
+// -- Request ------------------------------------------------------─
 
 /// <summary>
 /// 입력위치확보 요청 구조체.
@@ -57,7 +57,7 @@ public record InputReadinessRequest
     /// <summary>선택: 경험DB/노하우용 컨트롤 ID.</summary>
     public int? ControlId { get; init; }
 
-    // ── 플래그 ──
+    // -- 플래그 --
     /// <summary>방해꾼 체크 생략.</summary>
     public bool SkipBlockerCheck { get; init; }
 
@@ -80,9 +80,9 @@ public record InputReadinessRequest
     /// <summary>포커스 양보 대기 타임아웃 (초). 기본 15.</summary>
     public int UserYieldTimeoutSeconds { get; init; } = 15;
 
-    /// <summary>true면 유저 양보 확인 오버레이 스킵 — 즉시 자동승인.
+    /// <summary>true면 유저 양보 확인 오버레이 스킵 -- 즉시 자동승인.
     /// 슬랙 요청 등 유저가 명시적으로 요청한 액션에서 사용.
-    /// 돋보기/포커스확보는 정상 수행됨 — 승인만 자동.</summary>
+    /// 돋보기/포커스확보는 정상 수행됨 -- 승인만 자동.</summary>
     public bool AutoApproveYield { get; init; }
 
     /// <summary>
@@ -94,7 +94,7 @@ public record InputReadinessRequest
     public Func<bool>? EnsureInputPosition { get; init; }
 }
 
-// ── Report ────────────────────────────────────────────────────────
+// -- Report --------------------------------------------------------
 
 /// <summary>
 /// 입력위치확보 전수조사 결과.
@@ -160,7 +160,7 @@ public record InputReadinessReport
     public IActionZoom? Zoom { get; init; }
 }
 
-// ── Callback Interfaces ──────────────────────────────────────────
+// -- Callback Interfaces ------------------------------------------
 
 /// <summary>
 /// 방해꾼 자동 dismiss 콜백. CLI 레이어에서 DialogHandlerManager 래핑.
@@ -172,7 +172,7 @@ public interface IBlockerHandler
 
 /// <summary>
 /// 노하우 방송 콜백. (formId, action) 키로 1회만 방송 보장.
-/// knowhow.md → 파일명+첫문단, knowhow-{action}.md → 파일명만.
+/// knowhow.md -> 파일명+첫문단, knowhow-{action}.md -> 파일명만.
 /// </summary>
 public interface IKnowhowBroadcaster
 {
@@ -203,7 +203,7 @@ public interface IElevationRequester
 {
     /// <summary>
     /// Target is elevated, wkappbot is not. Offer to relaunch as admin via UAC.
-    /// Returns true if relaunched (process will exit — caller should return).
+    /// Returns true if relaunched (process will exit -- caller should return).
     /// Returns false if UAC denied or skipped (continue with focusless methods).
     /// </summary>
     bool RequestElevation(string targetProcessName, uint targetPid);
@@ -227,7 +227,7 @@ public interface IUserInputWait
                                      IntPtr positionHwnd = default);
 }
 
-// ── Main Class ────────────────────────────────────────────────────
+// -- Main Class ----------------------------------------------------
 
 /// <summary>
 /// 입력위치확보 공용 모듈.
@@ -249,12 +249,12 @@ public sealed class InputReadiness
     public IElevationRequester? ElevationRequester { get; set; }
 
     /// <summary>
-    /// <summary>Event fired after Probe() succeeds — for auto a11y hack trigger.</summary>
+    /// <summary>Event fired after Probe() succeeds -- for auto a11y hack trigger.</summary>
     public static event Action<IntPtr, string, string>? OnProbeSuccess; // (targetHwnd, processName, className)
 
     /// Set to true when Probe() or ProbeAtPoint() is called for this invocation.
     /// SmartSetForegroundWindow and physical input entry points check this flag.
-    /// Commands that skip readiness trigger [IDLE⚠] warning — "no-readiness detected".
+    /// Commands that skip readiness trigger [IDLE!] warning -- "no-readiness detected".
     /// </summary>
     // AsyncLocal: flows through async/await continuations even on thread-pool thread switches.
     // [ThreadStatic] would lose the flag after any 'await' that resumes on a different thread.
@@ -272,16 +272,16 @@ public sealed class InputReadiness
     /// 오버레이 "승인" 클릭 자체가 유저 마우스 입력이므로, 클릭 직후 idleMs ≈ 0ms가 됨.
     /// 이 타임스탬프가 없으면 CheckActiveGuard가 "유저 방금 활성!" 로 정당한 포커스 스틸을 차단함.
     ///
-    /// 그레이스 3초: 승인→SmartSetForeground 사이에 유저가 다시 타이핑 시작하면 여전히 차단됨.
-    /// → Probe approved(T=0) → user starts typing(T=1s) → SmartSetForeground(T=5s) → 차단 O
-    /// → Probe approved(T=0) → SmartSetForeground(T=0.5s) → 차단 X (정상 승인 후 즉시 포커스)
+    /// 그레이스 3초: 승인->SmartSetForeground 사이에 유저가 다시 타이핑 시작하면 여전히 차단됨.
+    /// -> Probe approved(T=0) -> user starts typing(T=1s) -> SmartSetForeground(T=5s) -> 차단 O
+    /// -> Probe approved(T=0) -> SmartSetForeground(T=0.5s) -> 차단 X (정상 승인 후 즉시 포커스)
     /// </summary>
     internal static DateTime _lastYieldApprovedAt = DateTime.MinValue;
 
     /// <summary>
     /// Call from physical input entry points (SendInput, SetCursorPos, SmartSetForegroundWindow).
-    /// Throws if Probe()/ProbeAtPoint() was not called first — forces all callers to set up readiness.
-    /// "정식 입력확보 셋업절차 강제" — no warn-only, no exceptions.
+    /// Throws if Probe()/ProbeAtPoint() was not called first -- forces all callers to set up readiness.
+    /// "정식 입력확보 셋업절차 강제" -- no warn-only, no exceptions.
     /// </summary>
     public static void AssertReadiness(string caller)
     {
@@ -290,68 +290,68 @@ public sealed class InputReadiness
         var idleStr = idleMs >= 60000 ? $"{idleMs / 60000}m {idleMs / 1000 % 60}s"
                     : idleMs >= 1000  ? $"{idleMs / 1000.0:F1}s"
                     :                   $"{idleMs}ms";
-        // ── 코딩 가이드 출력: 후배 클롣이 원인과 수정방법을 바로 알 수 있도록 ──
-        var msg = $"[NO-READINESS:{caller}] user input {idleStr} ago — Probe() not called before {caller}!";
+        // -- 코딩 가이드 출력: 후배 클롣이 원인과 수정방법을 바로 알 수 있도록 --
+        var msg = $"[NO-READINESS:{caller}] user input {idleStr} ago -- Probe() not called before {caller}!";
         Console.Error.WriteLine(msg);
-        Console.Error.WriteLine($"  → 이 함수({caller})는 유저 입력을 방해할 수 있는 focus-stealing 경로입니다.");
-        Console.Error.WriteLine($"  → 코딩 규칙: 포커스를 빼앗는 코드 앞에 반드시 InputReadiness.Probe() 호출 후 ReadinessCalled=true 설정!");
-        Console.Error.WriteLine($"  → 빠른 수정: 'ReadinessCalled = true;' 로 건너뛰는 것은 ✖ 금지. ProbeAndSubmit() 또는 Probe()를 호출할 것.");
+        Console.Error.WriteLine($"  -> 이 함수({caller})는 유저 입력을 방해할 수 있는 focus-stealing 경로입니다.");
+        Console.Error.WriteLine($"  -> 코딩 규칙: 포커스를 빼앗는 코드 앞에 반드시 InputReadiness.Probe() 호출 후 ReadinessCalled=true 설정!");
+        Console.Error.WriteLine($"  -> 빠른 수정: 'ReadinessCalled = true;' 로 건너뛰는 것은 ✖ 금지. ProbeAndSubmit() 또는 Probe()를 호출할 것.");
         throw new InvalidOperationException(msg);
     }
 
     /// <summary>
     /// [FOCUS-GUARD] 유저 활성 중 포커스 스틸 차단 가드.
     ///
-    /// ── 설계 의도 (후배 클롣 필독!) ──────────────────────────────────────────────
+    /// -- 설계 의도 (후배 클롣 필독!) ----------------------------------------------
     /// 앱봇이 focus-stealing 함수(SmartSetForegroundWindow, SendInput 등)를 호출하기 전,
     /// "지금 유저가 타이핑/클릭 중인가?"를 확인해서 방해를 차단하는 가드.
     ///
     /// 문제의 시나리오:
-    ///   T=0s  Probe() 실행 → 유저 idle → 자동 승인 (ReadinessCalled=true)
+    ///   T=0s  Probe() 실행 -> 유저 idle -> 자동 승인 (ReadinessCalled=true)
     ///   T=1s  유저가 타이핑 시작 (앱봇은 모름)
-    ///   T=5s  SmartSetForegroundWindow 실행 → 유저 타이핑 중인 창을 빼앗아 버림 ← BAD!
+    ///   T=5s  SmartSetForegroundWindow 실행 -> 유저 타이핑 중인 창을 빼앗아 버림 <- BAD!
     ///
     /// 그레이스 예외 (_lastYieldApprovedAt):
-    ///   유저가 오버레이에서 "승인" 클릭 → 마우스 클릭 = 유저 입력 → idleMs ≈ 0ms
-    ///   타임스탬프 없으면 "승인 즉시 포커스 스틸"도 차단됨 → 이건 잘못된 차단!
+    ///   유저가 오버레이에서 "승인" 클릭 -> 마우스 클릭 = 유저 입력 -> idleMs ≈ 0ms
+    ///   타임스탬프 없으면 "승인 즉시 포커스 스틸"도 차단됨 -> 이건 잘못된 차단!
     ///   그래서 승인 후 3초 이내는 idleMs 무시하고 허용.
     ///
     /// Phase 2 예고:
-    ///   차단 시 타겟 hwnd에 WKAppBot_FocusPending 프로퍼티 스탬프 → 재진입 시 자동 팝업.
+    ///   차단 시 타겟 hwnd에 WKAppBot_FocusPending 프로퍼티 스탬프 -> 재진입 시 자동 팝업.
     ///   현재는 error 출력 후 false 반환으로 호출자가 abort 처리함.
     ///
-    /// ─────────────────────────────────────────────────────────────────────────────
-    /// ⚠ 이 함수를 호출하지 않는 새 focus-stealing 코드를 만들면 안 됩니다!
-    ///   포커스를 빼앗는 코드 → 반드시 AssertReadiness() + CheckActiveGuard() 쌍으로 호출.
-    /// ─────────────────────────────────────────────────────────────────────────────
+    /// ----------------------------------------------------------------------------─
+    /// ! 이 함수를 호출하지 않는 새 focus-stealing 코드를 만들면 안 됩니다!
+    ///   포커스를 빼앗는 코드 -> 반드시 AssertReadiness() + CheckActiveGuard() 쌍으로 호출.
+    /// ----------------------------------------------------------------------------─
     ///
     /// Returns true = safe to proceed, false = block (user is active, no approval obtained).
     /// Call from every focus-stealing entry point AFTER AssertReadiness.
     /// If ActiveGuardYieldCallback is set, shows yield popup synchronously and blocks main thread
-    /// until user approves (or times out). Approved → returns true + sets grace timestamp.
+    /// until user approves (or times out). Approved -> returns true + sets grace timestamp.
     /// </summary>
     public static bool CheckActiveGuard(string caller, int thresholdMs = 2000)
     {
         var idleMs = NativeMethods.GetUserIdleMs();
-        if (idleMs >= thresholdMs) return true; // user idle long enough — safe
+        if (idleMs >= thresholdMs) return true; // user idle long enough -- safe
 
-        // ── 그레이스 예외: Probe 승인 직후 3초 이내는 허용 ──
-        // 오버레이 "승인" 클릭 자체가 마우스 입력(idleMs≈0) → 이 예외 없으면 정당한 포커스 스틸도 차단됨.
+        // -- 그레이스 예외: Probe 승인 직후 3초 이내는 허용 --
+        // 오버레이 "승인" 클릭 자체가 마우스 입력(idleMs≈0) -> 이 예외 없으면 정당한 포커스 스틸도 차단됨.
         var graceSec = (DateTime.UtcNow - _lastYieldApprovedAt).TotalSeconds;
         if (graceSec < 3.0)
         {
-            Console.WriteLine($"[FOCUS-GUARD:{caller}] grace {graceSec:F1}s since yield-approved — allow");
+            Console.WriteLine($"[FOCUS-GUARD:{caller}] grace {graceSec:F1}s since yield-approved -- allow");
             return true;
         }
 
-        // ── 유저 활성 감지 — 팝업으로 승인 대기 (동기) ──
+        // -- 유저 활성 감지 -- 팝업으로 승인 대기 (동기) --
         var idleStr = idleMs >= 1000 ? $"{idleMs / 1000.0:F1}s" : $"{idleMs}ms";
         var kbFocusHwnd = NativeMethods.GetKeyboardFocusHwnd();
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[FOCUS-GUARD:{caller}] 유저 활성 ({idleStr} ago) — 포커스 스틸 전 승인 팝업");
+        Console.WriteLine($"[FOCUS-GUARD:{caller}] 유저 활성 ({idleStr} ago) -- 포커스 스틸 전 승인 팝업");
         Console.ResetColor();
 
-        // [PHASE 2] 팝업 콜백 있으면 동기 대기 — 메인 스레드 블로킹 승인
+        // [PHASE 2] 팝업 콜백 있으면 동기 대기 -- 메인 스레드 블로킹 승인
         var cb = ActiveGuardYieldCallback;
         if (cb != null)
         {
@@ -360,34 +360,34 @@ public sealed class InputReadiness
             if (result.Approved)
             {
                 if (result.FocusAcquired)
-                    _lastYieldApprovedAt = DateTime.UtcNow; // 유저가 오버레이 클릭 → grace 부여
-                Console.WriteLine($"[FOCUS-GUARD:{caller}] 승인됨 → proceed");
+                    _lastYieldApprovedAt = DateTime.UtcNow; // 유저가 오버레이 클릭 -> grace 부여
+                Console.WriteLine($"[FOCUS-GUARD:{caller}] 승인됨 -> proceed");
                 return true;
             }
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[FOCUS-GUARD:{caller}] ✖ 취소됨 → abort");
+            Console.WriteLine($"[FOCUS-GUARD:{caller}] ✖ 취소됨 -> abort");
             Console.ResetColor();
             return false;
         }
 
-        // 콜백 없음 — 에러 출력 후 차단
+        // 콜백 없음 -- 에러 출력 후 차단
         Console.Error.WriteLine(
-            $"[FOCUS-GUARD:{caller}] ✖ BLOCKED — user input {idleStr} ago (threshold {thresholdMs}ms).");
+            $"[FOCUS-GUARD:{caller}] ✖ BLOCKED -- user input {idleStr} ago (threshold {thresholdMs}ms).");
         Console.Error.WriteLine(
-            $"  → 키보드 포커스: 0x{kbFocusHwnd:X8} (fg=0x{NativeMethods.GetForegroundWindow():X8})");
+            $"  -> 키보드 포커스: 0x{kbFocusHwnd:X8} (fg=0x{NativeMethods.GetForegroundWindow():X8})");
         Console.Error.WriteLine(
-            $"  → 입력위치확보(Probe) 후 유저가 다시 활성됨. 포커스 스틸 중단.");
+            $"  -> 입력위치확보(Probe) 후 유저가 다시 활성됨. 포커스 스틸 중단.");
         return false;
     }
 
     /// <summary>
-    /// [FOCUS-GUARD] CheckActiveGuard 팝업 콜백 — CLI 레이어에서 설정.
+    /// [FOCUS-GUARD] CheckActiveGuard 팝업 콜백 -- CLI 레이어에서 설정.
     /// 유저가 활성 중일 때 포커스 스틸 시도 시 동기 승인 팝업을 표시.
     /// null이면 에러 출력 후 차단만.
     /// </summary>
     public static IUserInputWait? ActiveGuardYieldCallback { get; set; }
 
-    // ── Probe: 전수조사 ──────────────────────────────────────────
+    // -- Probe: 전수조사 ------------------------------------------
 
     /// <summary>Global dry-run flag (AsyncLocal, set by CLI ask/agent entry points).</summary>
     public static readonly System.Threading.AsyncLocal<bool> DryRunMode = new();
@@ -395,7 +395,7 @@ public sealed class InputReadiness
     public InputReadinessReport Probe(InputReadinessRequest req)
     {
         // Dry-run gate: block all input actions at the native readiness level.
-        // This is the final safety net — even if higher-level gates are accidentally bypassed,
+        // This is the final safety net -- even if higher-level gates are accidentally bypassed,
         // no write/input action can proceed without Probe() approval.
         if (DryRunMode.Value)
         {
@@ -416,7 +416,7 @@ public sealed class InputReadiness
         long msInit = 0, msElevation = 0, msZoom = 0, msUia = 0, msWin32 = 0, msSendInput = 0;
         long msBlocker = 0, msKnowhow = 0, msYield = 0;
 
-        // MainHwnd 자동 유도: GetAncestor(GA_ROOT) → 진짜 최상위 윈도우로 방해꾼 감지 스코프 확장
+        // MainHwnd 자동 유도: GetAncestor(GA_ROOT) -> 진짜 최상위 윈도우로 방해꾼 감지 스코프 확장
         var swStep = Stopwatch.StartNew();
         var mainHwnd = req.MainHwnd != IntPtr.Zero
             ? req.MainHwnd
@@ -426,7 +426,7 @@ public sealed class InputReadiness
         BlockerInfo? blocker = null;
         IActionZoom? zoom = null;
 
-        // ── 타겟 기본 정보 ──
+        // -- 타겟 기본 정보 --
         var classSb = new StringBuilder(256);
         NativeMethods.GetClassNameW(req.TargetHwnd, classSb, 256);
         var targetClass = classSb.ToString();
@@ -447,23 +447,23 @@ public sealed class InputReadiness
         }
         catch { }
 
-        // ── 윈도우 상태 ──
+        // -- 윈도우 상태 --
         bool formVisible = NativeMethods.IsWindowVisible(mainHwnd);
         bool formEnabled = NativeMethods.IsWindowEnabled(mainHwnd);
         bool formIconic = NativeMethods.IsIconic(mainHwnd);
 
-        // ── 권한 ──
+        // -- 권한 --
         bool weAreElevated = NativeMethods.IsCurrentProcessElevated();
         bool targetElevated = NativeMethods.IsProcessElevated(targetPid) ?? true;
         bool elevationMismatch = targetElevated && !weAreElevated;
         swStep.Stop();
         msInit = swStep.ElapsedMilliseconds;
 
-        // ── 권한 상승 요청 (UIPI 차단 방지) ──
+        // -- 권한 상승 요청 (UIPI 차단 방지) --
         if (elevationMismatch && ElevationRequester != null && !req.QuickMode)
         {
             swStep.Restart();
-            zoom?.UpdateStatus("관리자 권한 필요 — UAC 요청 중...");
+            zoom?.UpdateStatus("관리자 권한 필요 -- UAC 요청 중...");
             if (ElevationRequester.RequestElevation(procName, targetPid))
             {
                 return new InputReadinessReport
@@ -479,11 +479,11 @@ public sealed class InputReadiness
             msElevation = swStep.ElapsedMilliseconds;
         }
 
-        // ── 유저 입력 간섭 분석 ──
+        // -- 유저 입력 간섭 분석 --
         uint idleMs = NativeMethods.GetUserIdleMs();
         bool userRecent = idleMs < req.UserIdleThresholdMs;
 
-        // ── 돋보기 (QuickMode가 아닐 때만) ──
+        // -- 돋보기 (QuickMode가 아닐 때만) --
         if (!req.QuickMode && !req.SkipZoom && ZoomFactory != null)
         {
             swStep.Restart();
@@ -505,55 +505,55 @@ public sealed class InputReadiness
 
         if (!req.QuickMode)
         {
-            // ── 1. UIA 패턴 전수조사 (focusless) ──
+            // -- 1. UIA 패턴 전수조사 (focusless) --
             swStep.Restart();
             if (req.UiaElement != null)
                 ProbeUiaPatterns(req.UiaElement, req.IntendedAction, methods);
             swStep.Stop();
             msUia = swStep.ElapsedMilliseconds;
 
-            // ── 2. Win32 메시지 (focusless) ──
+            // -- 2. Win32 메시지 (focusless) --
             swStep.Restart();
             ProbeWin32Messages(targetClass, methods);
             swStep.Stop();
             msWin32 = swStep.ElapsedMilliseconds;
 
-            // ── 3. SendInput (focus-needed) ──
+            // -- 3. SendInput (focus-needed) --
             swStep.Restart();
             ProbeSendInput(targetElevated, weAreElevated, methods);
             swStep.Stop();
             msSendInput = swStep.ElapsedMilliseconds;
         }
 
-        // ── 방해꾼 감지 ──
+        // -- 방해꾼 감지 --
         swStep.Restart();
         if (!req.SkipBlockerCheck)
             blocker = DetectBlocker(mainHwnd);
         swStep.Stop();
         msBlocker = swStep.ElapsedMilliseconds;
 
-        // ── 노하우 방송 ──
+        // -- 노하우 방송 --
         swStep.Restart();
         if (!req.SkipKnowhow && !req.QuickMode)
             KnowhowBroadcaster?.Broadcast(mainHwnd, req.FormId, req.ControlId, req.IntendedAction);
         swStep.Stop();
         msKnowhow = swStep.ElapsedMilliseconds;
 
-        // ── 유저 입력 간섭 대기 ──
+        // -- 유저 입력 간섭 대기 --
         bool yieldRequested = false;
         bool yieldConfirmed = false;
         bool yieldFocusAcquired = false;
-        // [FOCUS-GUARD] 오버레이 클릭 여부 — 유저가 실제로 클릭했을 때만 grace 부여.
+        // [FOCUS-GUARD] 오버레이 클릭 여부 -- 유저가 실제로 클릭했을 때만 grace 부여.
         // 자동승인(AutoApproveYield, 3초 timeout)은 클릭 없으므로 grace 불필요.
-        // 오버레이 클릭 → 마우스 입력 → idleMs≈0ms → CheckActiveGuard가 오탐 차단하는 문제 방지용.
+        // 오버레이 클릭 -> 마우스 입력 -> idleMs≈0ms -> CheckActiveGuard가 오탐 차단하는 문제 방지용.
         bool explicitUserClickApproved = false;
 
-        // ── FocusStealer / MouseStealer prop check ──
+        // -- FocusStealer / MouseStealer prop check --
         // ActionApi stamps these props when a nominally-focusless UIA action
         // steals keyboard focus OR moves the mouse cursor without user input.
-        // Two separate props → both can coexist on same hwnd+action:
-        //   "WKAppBot_FocusStealer-{action}" — foreground window stolen
-        //   "WKAppBot_MouseStealer-{action}"  — cursor moved
+        // Two separate props -> both can coexist on same hwnd+action:
+        //   "WKAppBot_FocusStealer-{action}" -- foreground window stolen
+        //   "WKAppBot_MouseStealer-{action}"  -- cursor moved
         // Force yield popup on next Probe() so user gets warned.
         bool focusStealerFlagged = false;
         try
@@ -566,10 +566,10 @@ public sealed class InputReadiness
 
                 bool focusStolen = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}{act}") != IntPtr.Zero;
                 // midInput: stamped when mid-keystroke focus drift aborted a type/set-value action
-                // → force yield on ANY subsequent action on this hwnd until cleared
+                // -> force yield on ANY subsequent action on this hwnd until cleared
                 bool midInputStealer = NativeMethods.GetPropW(mainHwnd, $"{FocusStealerPrefix}midInput") != IntPtr.Zero;
                 // Generic stamp (action-agnostic): set whenever ANY action stole focus
-                // Catches cross-action mismatches (e.g., click stole → next probe is type)
+                // Catches cross-action mismatches (e.g., click stole -> next probe is type)
                 bool anyFocusStealer = NativeMethods.GetPropW(mainHwnd, "WKAppBot_FocusStealer") != IntPtr.Zero;
                 // Mouse prop stored as "mouse-{action}" by ActionApi
                 bool mouseStolen = NativeMethods.GetPropW(mainHwnd, $"{MouseStealerPrefix}mouse-{act}") != IntPtr.Zero;
@@ -584,8 +584,8 @@ public sealed class InputReadiness
                     var midTag = midInputStealer ? " (mid-input drift)" : anyFocusStealer ? " (generic)" : "";
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine(
-                        $"  [READINESS] ⚠ {kinds.ToUpperInvariant()} STEALER{midTag}: '{req.IntendedAction}' " +
-                        $"previously grabbed {kinds} on hwnd=0x{mainHwnd:X} → forcing yield popup");
+                        $"  [READINESS] ! {kinds.ToUpperInvariant()} STEALER{midTag}: '{req.IntendedAction}' " +
+                        $"previously grabbed {kinds} on hwnd=0x{mainHwnd:X} -> forcing yield popup");
                     Console.ResetColor();
                 }
             }
@@ -599,24 +599,24 @@ public sealed class InputReadiness
 
             if (targetIsForeground && !userRecent && req.AutoApproveYield && !focusStealerFlagged)
             {
-                // ── 자동승인 즉시 (AutoApproveYield=true: Slack 프롬프트 전달 등 완전 자동화) ──
-                // focusStealerFlagged=true 시 절대 묵살 금지 → 팝업 강제 표시
+                // -- 자동승인 즉시 (AutoApproveYield=true: Slack 프롬프트 전달 등 완전 자동화) --
+                // focusStealerFlagged=true 시 절대 묵살 금지 -> 팝업 강제 표시
                 yieldRequested = true;
                 yieldConfirmed = true;
                 yieldFocusAcquired = true;
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — silent auto-approve (AutoApproveYield)");
+                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s -- silent auto-approve (AutoApproveYield)");
                 Console.ResetColor();
             }
             else if (targetIsForeground && !userRecent && UserInputWait != null)
             {
-                // ── 타겟 전경 + 장기 idle → 3초 팝업 (잘보이게, 졸다가 막을 수 있게) ──
+                // -- 타겟 전경 + 장기 idle -> 3초 팝업 (잘보이게, 졸다가 막을 수 있게) --
                 yieldRequested = true;
-                zoom?.UpdateStatus($"유저 idle {idleMs / 1000}s — 3초 후 자동 진행...");
+                zoom?.UpdateStatus($"유저 idle {idleMs / 1000}s -- 3초 후 자동 진행...");
 
                 Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s — 3s popup (cancellable)");
+                Console.WriteLine($"  [READINESS] Target foreground + user idle {idleMs / 1000}s -- 3s popup (cancellable)");
                 Console.ResetColor();
                 Console.Out.Flush();
 
@@ -629,7 +629,7 @@ public sealed class InputReadiness
             }
             else if (req.AutoApproveYield)
             {
-                // ── 자동승인 즉시 포커스 확보 (키보드+마우스) — 갭 없이! ──
+                // -- 자동승인 즉시 포커스 확보 (키보드+마우스) -- 갭 없이! --
                 yieldRequested = true;
                 yieldConfirmed = true;
 
@@ -637,13 +637,13 @@ public sealed class InputReadiness
                 {
                     yieldFocusAcquired = NativeMethods.SmartSetForegroundWindow(mainHwnd);
                     Console.ForegroundColor = yieldFocusAcquired ? ConsoleColor.Green : ConsoleColor.Red;
-                    Console.WriteLine($"  [READINESS] Auto-yield → focus={(yieldFocusAcquired ? "OK" : "FAIL")} (fg=0x{NativeMethods.GetForegroundWindow():X}, target=0x{mainHwnd:X})");
+                    Console.WriteLine($"  [READINESS] Auto-yield -> focus={(yieldFocusAcquired ? "OK" : "FAIL")} (fg=0x{NativeMethods.GetForegroundWindow():X}, target=0x{mainHwnd:X})");
                     Console.ResetColor();
                 }
             }
             else if (UserInputWait != null)
             {
-                // ── 타겟이 비전경 → 무조건 팝업 (30초), 유저 활동 시에도 팝업 ──
+                // -- 타겟이 비전경 -> 무조건 팝업 (30초), 유저 활동 시에도 팝업 --
                 yieldRequested = true;
                 int yieldTimeout = targetIsForeground
                     ? req.UserYieldTimeoutSeconds  // 전경+유저활동: 기존 타임아웃
@@ -652,10 +652,10 @@ public sealed class InputReadiness
                 var reason = targetIsForeground
                     ? $"유저 입력 감지 ({idleMs}ms ago)"
                     : "타겟이 전경이 아님";
-                zoom?.UpdateStatus($"{reason} — 확인 대기 중...");
+                zoom?.UpdateStatus($"{reason} -- 확인 대기 중...");
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"  [READINESS] {reason} — showing yield overlay ({yieldTimeout}s)...");
+                Console.WriteLine($"  [READINESS] {reason} -- showing yield overlay ({yieldTimeout}s)...");
                 Console.ResetColor();
                 Console.Out.Flush();
 
@@ -673,41 +673,41 @@ public sealed class InputReadiness
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine(yieldFocusAcquired
-                        ? "  [READINESS] User confirmed — focus pre-acquired"
-                        : "  [READINESS] Auto-approved (user idle) — proceeding");
+                        ? "  [READINESS] User confirmed -- focus pre-acquired"
+                        : "  [READINESS] Auto-approved (user idle) -- proceeding");
                     Console.ResetColor();
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("  [READINESS] Yield safety timeout — proceeding anyway");
+                    Console.WriteLine("  [READINESS] Yield safety timeout -- proceeding anyway");
                     Console.ResetColor();
                 }
             }
 
-            // ── FocusStealer props 클리어 (유저 승인 후 재시도에서 반복 팝업 방지) ──
+            // -- FocusStealer props 클리어 (유저 승인 후 재시도에서 반복 팝업 방지) --
             if (yieldConfirmed && mainHwnd != IntPtr.Zero)
             {
                 try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer-midInput"); } catch { }
                 try { NativeMethods.RemovePropW(mainHwnd, "WKAppBot_FocusStealer"); } catch { }
             }
 
-            // ── CheckActiveGuard 그레이스 타임스탬프 ──
+            // -- CheckActiveGuard 그레이스 타임스탬프 --
             // [FOCUS-GUARD] 오직 유저가 오버레이를 직접 클릭한 경우에만 grace 부여!
             //
             // Grace가 필요한 이유:
-            //   오버레이 클릭 → 마우스 입력 → idleMs≈0ms → CheckActiveGuard가 오탐 차단
-            //   → 유저가 명시적으로 승인했는데 포커스 스틸이 막히는 문제
+            //   오버레이 클릭 -> 마우스 입력 -> idleMs≈0ms -> CheckActiveGuard가 오탐 차단
+            //   -> 유저가 명시적으로 승인했는데 포커스 스틸이 막히는 문제
             //
             // Grace가 필요 없는 경우:
-            //   AutoApproveYield (유저 클릭 없음) → idle timer 미리셋 → 오탐 없음
-            //   3초 popup 자동 timeout → 유저 클릭 없음 → 오탐 없음
-            //   → 이 경우 grace를 주면 유저가 타이핑 시작해도 포커스 스틸 허용되는 버그!
+            //   AutoApproveYield (유저 클릭 없음) -> idle timer 미리셋 -> 오탐 없음
+            //   3초 popup 자동 timeout -> 유저 클릭 없음 -> 오탐 없음
+            //   -> 이 경우 grace를 주면 유저가 타이핑 시작해도 포커스 스틸 허용되는 버그!
             if (explicitUserClickApproved)
                 _lastYieldApprovedAt = DateTime.UtcNow;
         }
 
-        // ── 입력위치 확보 콜백 (yield 승인 후) ──
+        // -- 입력위치 확보 콜백 (yield 승인 후) --
         bool? inputPositionEnsured = null;
         if (req.EnsureInputPosition != null)
         {
@@ -715,7 +715,7 @@ public sealed class InputReadiness
             try
             {
                 inputPositionEnsured = req.EnsureInputPosition();
-                Console.WriteLine($"  [READINESS] EnsureInputPosition: {(inputPositionEnsured.Value ? "✓ secured" : "✗ failed")} [{swStep.ElapsedMilliseconds}ms]");
+                Console.WriteLine($"  [READINESS] EnsureInputPosition: {(inputPositionEnsured.Value ? "v secured" : "X failed")} [{swStep.ElapsedMilliseconds}ms]");
             }
             catch (Exception ex)
             {
@@ -724,16 +724,16 @@ public sealed class InputReadiness
             }
         }
 
-        // ── 프로파일링 출력 ──
+        // -- 프로파일링 출력 --
         swProbe.Stop();
         Console.Error.WriteLine($"  [PROF:PROBE] init={msInit}ms zoom={msZoom}ms uia={msUia}ms win32={msWin32}ms send={msSendInput}ms blocker={msBlocker}ms knowhow={msKnowhow}ms yield={msYield}ms TOTAL={swProbe.ElapsedMilliseconds}ms");
         Console.Out.Flush();
 
-        // ── 돋보기 상태 업데이트 ──
+        // -- 돋보기 상태 업데이트 --
         if (zoom != null)
         {
             if (yieldRequested && !yieldConfirmed)
-                zoom.UpdateStatus("안전 타임아웃 — EnsureFocus 진행");
+                zoom.UpdateStatus("안전 타임아웃 -- EnsureFocus 진행");
             else if (blocker != null)
                 zoom.UpdateStatus($"BLOCKED: {blocker.Title}");
             else if (methods.Any(m => m.Available))
@@ -772,7 +772,7 @@ public sealed class InputReadiness
         return report;
     }
 
-    // ── DetectBlocker: 방해꾼 빠른 감지 (~5ms) ────────────────────
+    // -- DetectBlocker: 방해꾼 빠른 감지 (~5ms) --------------------
 
     public BlockerInfo? DetectBlocker(IntPtr mainHwnd)
     {
@@ -781,7 +781,7 @@ public sealed class InputReadiness
         NativeMethods.GetWindowThreadProcessId(mainHwnd, out uint targetPid);
         uint myPid = (uint)Environment.ProcessId;
 
-        // Strategy 1: 전경 윈도우 체크 — 같은 프로세스의 팝업/다이얼로그만 blocker
+        // Strategy 1: 전경 윈도우 체크 -- 같은 프로세스의 팝업/다이얼로그만 blocker
         // 같은 클래스의 최상위 윈도우(예: VS Code 다중창)는 blocker가 아님!
         var fg = NativeMethods.GetForegroundWindow();
         if (fg != mainHwnd && fg != IntPtr.Zero)
@@ -796,10 +796,10 @@ public sealed class InputReadiness
                 var fgCls = fgClsSb.ToString();
                 var mainCls = mainClsSb.ToString();
 
-                // 같은 최상위 클래스(Chrome_WidgetWin_1 등) → 형제 윈도우, blocker 아님
+                // 같은 최상위 클래스(Chrome_WidgetWin_1 등) -> 형제 윈도우, blocker 아님
                 bool isSiblingWindow = fgCls == mainCls
                     && NativeMethods.GetAncestor(fg, NativeMethods.GA_ROOT) == fg;
-                // mainHwnd의 자손(child/grandchild) → 편집 영역 등, blocker 아님
+                // mainHwnd의 자손(child/grandchild) -> 편집 영역 등, blocker 아님
                 bool isDescendant = NativeMethods.GetAncestor(fg, NativeMethods.GA_ROOT) == mainHwnd
                     || NativeMethods.IsChild(mainHwnd, fg);
                 if (!isSiblingWindow && !isDescendant)
@@ -807,7 +807,7 @@ public sealed class InputReadiness
             }
         }
 
-        // Strategy 2: EnumWindows — 같은 프로세스의 팝업/다이얼로그 탐색
+        // Strategy 2: EnumWindows -- 같은 프로세스의 팝업/다이얼로그 탐색
         if (blockerHwnd == IntPtr.Zero)
         {
             var candidates = new List<IntPtr>();
@@ -866,7 +866,7 @@ public sealed class InputReadiness
         );
     }
 
-    // ── TryDismissBlocker: IBlockerHandler 위임 ──────────────────
+    // -- TryDismissBlocker: IBlockerHandler 위임 ------------------
 
     public (bool handled, bool shouldRetry) TryDismissBlocker(IntPtr mainHwnd, BlockerInfo blocker)
     {
@@ -875,7 +875,7 @@ public sealed class InputReadiness
         return BlockerHandler.TryHandle(mainHwnd, blocker);
     }
 
-    // ── PrintReport: 콘솔 출력 ───────────────────────────────────
+    // -- PrintReport: 콘솔 출력 ----------------------------------─
 
     public static void PrintReport(InputReadinessReport report)
     {
@@ -914,7 +914,7 @@ public sealed class InputReadiness
         if (report.UserInputRecent)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"  [USER] Recent input detected ({report.UserIdleMs}ms ago) — focus steal may interfere");
+            Console.WriteLine($"  [USER] Recent input detected ({report.UserIdleMs}ms ago) -- focus steal may interfere");
             Console.ResetColor();
         }
 
@@ -938,12 +938,12 @@ public sealed class InputReadiness
                 if (m.Available)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write($"✓{m.Name}");
+                    Console.Write($"v{m.Name}");
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write($"✗{m.Name}");
+                    Console.Write($"X{m.Name}");
                 }
                 Console.Write(m.Focusless ? "(FL) " : "(FN) ");
             }
@@ -965,14 +965,14 @@ public sealed class InputReadiness
         Console.ForegroundColor = report.Ready ? ConsoleColor.Green : ConsoleColor.Red;
         Console.Write($"  [VERDICT] {(report.Ready ? "READY" : "NOT READY")}");
         if (report.RecommendedMethod != null)
-            Console.Write($" → {report.RecommendedMethod}");
+            Console.Write($" -> {report.RecommendedMethod}");
         if (report.RequiresFocus)
             Console.Write(" (focus needed)");
         Console.ResetColor();
         Console.WriteLine();
     }
 
-    // ── Private: UIA 패턴 전수조사 ───────────────────────────────
+    // -- Private: UIA 패턴 전수조사 ------------------------------─
 
     private static void ProbeUiaPatterns(AutomationElement el, string? action, List<InputMethod> methods)
     {
@@ -1027,7 +1027,7 @@ public sealed class InputReadiness
         methods.Add(new InputMethod("UIA.RangeValue", InputMethodCategory.UiaPattern, true,
             rangeOk, rangeOk ? null : "Pattern not supported"));
 
-        // NOTE: Scroll 패턴은 GetSupportedPatterns() COM 오염 위험 → 개별 체크만
+        // NOTE: Scroll 패턴은 GetSupportedPatterns() COM 오염 위험 -> 개별 체크만
         bool scrollOk = SafePatternCheck(() => el.Patterns.Scroll.IsSupported);
         methods.Add(new InputMethod("UIA.Scroll", InputMethodCategory.UiaPattern, true,
             scrollOk, scrollOk ? null : "Pattern not supported"));
@@ -1039,7 +1039,7 @@ public sealed class InputReadiness
         try { return check(); } catch { return false; }
     }
 
-    // ── Private: Win32 메시지 전수조사 ───────────────────────────
+    // -- Private: Win32 메시지 전수조사 --------------------------─
 
     private static void ProbeWin32Messages(string targetClass, List<InputMethod> methods)
     {
@@ -1069,7 +1069,7 @@ public sealed class InputReadiness
             true, null)); // always possible to attempt
     }
 
-    // ── Private: SendInput 전수조사 ─────────────────────────────
+    // -- Private: SendInput 전수조사 ----------------------------─
 
     private static void ProbeSendInput(bool targetElevated, bool weAreElevated, List<InputMethod> methods)
     {
@@ -1087,11 +1087,11 @@ public sealed class InputReadiness
             !elevOk ? "Elevation mismatch" : focuslessBlocked ? "FocuslessGuard active" : null));
     }
 
-    // ── Private: 액션별 포커스 필요 판단 ──────────────────────────
+    // -- Private: 액션별 포커스 필요 판단 --------------------------
 
     /// <summary>
     /// 해당 액션에 대해 포커스리스 메서드가 없어서 포커스니드로 폴백해야 하는지 판단.
-    /// 포커스리스 경로가 있으면 false → 알림창 불필요.
+    /// 포커스리스 경로가 있으면 false -> 알림창 불필요.
     /// </summary>
     private static bool NeedsFocusForAction(List<InputMethod> methods, string? action)
     {
@@ -1117,7 +1117,7 @@ public sealed class InputReadiness
         return !methods.Any(m => m.Available && m.Focusless);
     }
 
-    // ── Private: 타겟 Rect ──────────────────────────────────────
+    // -- Private: 타겟 Rect --------------------------------------
 
     private static System.Drawing.Rectangle GetTargetRect(IntPtr hwnd, AutomationElement? uia)
     {
@@ -1139,7 +1139,7 @@ public sealed class InputReadiness
         return new System.Drawing.Rectangle(wr.Left, wr.Top, wr.Width, wr.Height);
     }
 
-    // ── Private: ClassPath 빌드 ─────────────────────────────────
+    // -- Private: ClassPath 빌드 --------------------------------─
 
     private static string BuildClassPath(IntPtr hWnd)
     {
@@ -1158,12 +1158,12 @@ public sealed class InputReadiness
         return string.Join("/", parts);
     }
 
-    // ── ProbeAtPoint: 좌표 기반 입력확보 ─────────────────────────
+    // -- ProbeAtPoint: 좌표 기반 입력확보 ------------------------─
 
     /// <summary>
     /// 좌표 기반 입력확보: 해당 좌표에 겹쳐있는 윈도우 스택을 Z-order로 수집,
     /// 앞에서부터 포커스리스 클릭 시도, 방해꾼 dismiss, 타겟을 앞으로 보내기 등.
-    /// 필수 인수: ScreenX, ScreenY, TargetHwnd — 나머지 자동 유도.
+    /// 필수 인수: ScreenX, ScreenY, TargetHwnd -- 나머지 자동 유도.
     /// Tag: [READINESS]
     /// </summary>
     public PointReadinessReport ProbeAtPoint(PointReadinessRequest req)
@@ -1171,7 +1171,7 @@ public sealed class InputReadiness
         ReadinessCalled = true;
         var sw = Stopwatch.StartNew();
 
-        // ── Step 0: 자동 유도 ──
+        // -- Step 0: 자동 유도 --
         var mainHwnd = req.MainHwnd != IntPtr.Zero
             ? req.MainHwnd
             : NativeMethods.GetAncestor(req.TargetHwnd, NativeMethods.GA_ROOT);
@@ -1183,7 +1183,7 @@ public sealed class InputReadiness
 
         var action = req.IntendedAction ?? "click";
 
-        // ── Step 0.5: 미니마이즈 감지 ──
+        // -- Step 0.5: 미니마이즈 감지 --
         bool isMinimized = NativeMethods.IsIconic(mainHwnd) || NativeMethods.IsIconic(req.TargetHwnd);
 
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -1194,13 +1194,13 @@ public sealed class InputReadiness
         if (isMinimized) Console.Write(" [MINIMIZED]");
         Console.WriteLine();
 
-        // ── Step 1: 윈도우 스택 수집 (Z-order) — 미니마이즈면 스킵 ──
+        // -- Step 1: 윈도우 스택 수집 (Z-order) -- 미니마이즈면 스킵 --
         var windowStack = new List<WindowAtPoint>();
         var classification = PointClassification.TargetNotFound;
 
         if (isMinimized)
         {
-            // 미니마이즈: Z-order 의미 없음 → 바로 포커스리스 경로
+            // 미니마이즈: Z-order 의미 없음 -> 바로 포커스리스 경로
             classification = PointClassification.TargetMinimized;
         }
         else
@@ -1218,12 +1218,12 @@ public sealed class InputReadiness
                 Console.ResetColor();
                 Console.Write($"0x{w.Handle:X} [{w.ClassName}]");
                 if (!string.IsNullOrEmpty(w.Title)) Console.Write($" \"{w.Title}\"");
-                if (w.IsTarget) Console.Write(" ←TARGET");
-                if (w.IsBlocker) Console.Write(" ←BLOCKER");
+                if (w.IsTarget) Console.Write(" <-TARGET");
+                if (w.IsBlocker) Console.Write(" <-BLOCKER");
                 Console.WriteLine();
             }
 
-            // ── Step 2: 분류 ──
+            // -- Step 2: 분류 --
             classification = ClassifyPoint(windowStack, req.TargetHwnd, targetPid, mainHwnd);
         }
 
@@ -1232,7 +1232,7 @@ public sealed class InputReadiness
         Console.ResetColor();
         Console.WriteLine(classification.ToString());
 
-        // ── Step 3: 포커스리스 클릭 ──
+        // -- Step 3: 포커스리스 클릭 --
         // UIA Invoke/Toggle/Select는 핸들 기반이라 앞에 뭐가 있든 동작함.
         // 미니마이즈/off-screen도 UIA 핸들 기반으로 동작! (좌표는 UIA rect 기준으로 리매핑)
         bool pathCleared = false;
@@ -1251,7 +1251,7 @@ public sealed class InputReadiness
         {
             if (isMinimized)
             {
-                // 미니마이즈: 순간 복원(NOACTIVATE) → UIA 클릭 → 재미니마이즈
+                // 미니마이즈: 순간 복원(NOACTIVATE) -> UIA 클릭 -> 재미니마이즈
                 (focuslessClicked, resolvedDetail, foregroundStolen) =
                     TryFocuslessOnMinimized(req.ScreenX, req.ScreenY, req.TargetHwnd, mainHwnd);
             }
@@ -1272,21 +1272,21 @@ public sealed class InputReadiness
             if (focuslessClicked)
             {
                 Console.ForegroundColor = foregroundStolen ? ConsoleColor.Yellow : ConsoleColor.Green;
-                Console.Write(foregroundStolen ? "  [FL] ⚠ " : "  [FL] ");
+                Console.Write(foregroundStolen ? "  [FL] ! " : "  [FL] ");
                 string offTag = isOffScreen ? (isMinimized ? "minimized " : "offscreen ") : "";
-                Console.WriteLine($"Focusless {offTag}{(foregroundStolen ? "OK but fg stolen" : "OK")} → {resolvedDetail}");
+                Console.WriteLine($"Focusless {offTag}{(foregroundStolen ? "OK but fg stolen" : "OK")} -> {resolvedDetail}");
                 Console.ResetColor();
             }
         }
 
-        // ── Step 4: 포커스리스 실패 → 물리클릭 경로 (Z-order 정리 필요) ──
-        // off-screen이면 물리클릭 불가 → 포커스리스 실패 = 전체 실패
+        // -- Step 4: 포커스리스 실패 -> 물리클릭 경로 (Z-order 정리 필요) --
+        // off-screen이면 물리클릭 불가 -> 포커스리스 실패 = 전체 실패
         if (!focuslessClicked && !isOffScreen)
         {
             switch (classification)
             {
                 case PointClassification.TargetOnTop:
-                    // 이미 최상단 → 물리클릭 준비 완료
+                    // 이미 최상단 -> 물리클릭 준비 완료
                     break;
 
                 case PointClassification.BlockerOnTop:
@@ -1321,7 +1321,7 @@ public sealed class InputReadiness
                     break;
 
                 case PointClassification.ForeignOnTop:
-                    // 다른 앱이 앞 → 타겟을 앞으로 (focusless: SetWindowPos NOACTIVATE)
+                    // 다른 앱이 앞 -> 타겟을 앞으로 (focusless: SetWindowPos NOACTIVATE)
                     BringTargetForward(req.TargetHwnd, mainHwnd);
                     pathCleared = true;
                     pathClearMethod = "brought_forward";
@@ -1332,13 +1332,13 @@ public sealed class InputReadiness
 
         if (isOffScreen && !focuslessClicked)
             resolvedDetail = isMinimized
-                ? "Target minimized — focusless failed, physical click impossible"
-                : "Target off-screen — focusless failed, physical click impossible";
+                ? "Target minimized -- focusless failed, physical click impossible"
+                : "Target off-screen -- focusless failed, physical click impossible";
 
         bool needsPhysical = !focuslessClicked && !isOffScreen;
         bool ready = focuslessClicked || needsPhysical;
 
-        // ── 결과 출력 ──
+        // -- 결과 출력 --
         Console.ForegroundColor = focuslessClicked ? ConsoleColor.Green
             : needsPhysical ? ConsoleColor.Yellow
             : ConsoleColor.Red;
@@ -1346,9 +1346,9 @@ public sealed class InputReadiness
         Console.ResetColor();
 
         if (focuslessClicked)
-            Console.WriteLine($"FocuslessClick → {resolvedDetail} ({sw.ElapsedMilliseconds}ms)");
+            Console.WriteLine($"FocuslessClick -> {resolvedDetail} ({sw.ElapsedMilliseconds}ms)");
         else if (needsPhysical)
-            Console.WriteLine($"NeedsPhysicalClick → {resolvedDetail ?? "fallback"} ({sw.ElapsedMilliseconds}ms)");
+            Console.WriteLine($"NeedsPhysicalClick -> {resolvedDetail ?? "fallback"} ({sw.ElapsedMilliseconds}ms)");
         else
             Console.WriteLine($"Failed: {resolvedDetail} ({sw.ElapsedMilliseconds}ms)");
 
@@ -1367,20 +1367,20 @@ public sealed class InputReadiness
         };
     }
 
-    // ── Private: 윈도우 스택 수집 ────────────────────────────────
+    // -- Private: 윈도우 스택 수집 --------------------------------
 
     private List<WindowAtPoint> CollectWindowStack(int screenX, int screenY, IntPtr targetHwnd, uint targetPid)
     {
         var stack = new List<WindowAtPoint>();
         int zOrder = 0;
 
-        // WindowFromPoint → 최상단 leaf 윈도우
+        // WindowFromPoint -> 최상단 leaf 윈도우
         var topLeaf = NativeMethods.WindowFromPoint(new POINT { X = screenX, Y = screenY });
         var topRoot = topLeaf != IntPtr.Zero
             ? NativeMethods.GetAncestor(topLeaf, NativeMethods.GA_ROOT)
             : IntPtr.Zero;
 
-        // EnumWindows: Z-order 순 (앞→뒤) — 해당 좌표를 포함하는 visible top-level 윈도우
+        // EnumWindows: Z-order 순 (앞->뒤) -- 해당 좌표를 포함하는 visible top-level 윈도우
         // 우리 프로세스(앱봇) 윈도우는 제외 (돋보기/Eye/경고팝업 등)
         var myPid = (uint)Environment.ProcessId;
         var collected = new List<(IntPtr handle, int z)>();
@@ -1465,7 +1465,7 @@ public sealed class InputReadiness
         return false;
     }
 
-    // ── Private: 분류 ────────────────────────────────────────────
+    // -- Private: 분류 --------------------------------------------
 
     private static PointClassification ClassifyPoint(
         List<WindowAtPoint> stack, IntPtr targetHwnd, uint targetPid, IntPtr mainHwnd)
@@ -1484,7 +1484,7 @@ public sealed class InputReadiness
         if (top.ProcessId == targetPid)
             return PointClassification.SiblingOnTop;
 
-        // 다른 프로세스 → ForeignOnTop, but check if target even exists in stack
+        // 다른 프로세스 -> ForeignOnTop, but check if target even exists in stack
         bool targetInStack = stack.Any(w => w.IsTarget);
         if (!targetInStack)
             return PointClassification.TargetNotFound;
@@ -1492,12 +1492,12 @@ public sealed class InputReadiness
         return PointClassification.ForeignOnTop;
     }
 
-    // ── Private: 포커스리스 클릭 시도 ──────────────────────────────
+    // -- Private: 포커스리스 클릭 시도 ------------------------------
 
     /// <summary>
     /// UiaLocator.TryFocuslessClickAtPoint 래핑.
     /// 글로벌 윈도우 Z-order는 절대 안 건드림 (자식 윈도우만 조정 가능).
-    /// MFC Invoke 부작용(메인창 튀어오름) 감지 → 즉시 복원(prevFg=#1, 도둑=#2) + fgStolen=true.
+    /// MFC Invoke 부작용(메인창 튀어오름) 감지 -> 즉시 복원(prevFg=#1, 도둑=#2) + fgStolen=true.
     /// </summary>
     private static (bool ok, string? detail, bool fgStolen) TryFocuslessAtPoint(
         int screenX, int screenY, IntPtr hWnd)
@@ -1510,7 +1510,7 @@ public sealed class InputReadiness
             var (ok, detail) = uia.TryFocuslessClickAtPoint(screenX, screenY, hWnd);
 
             // 전경 변경 감지: invoke 전후 전경 비교
-            // MFC Invoke 부작용 → 타겟 앱이 SetForegroundWindow 호출 → 전경 도둑질
+            // MFC Invoke 부작용 -> 타겟 앱이 SetForegroundWindow 호출 -> 전경 도둑질
             bool fgStolen = false;
             if (ok && prevFg != IntPtr.Zero)
             {
@@ -1520,12 +1520,12 @@ public sealed class InputReadiness
                 {
                     fgStolen = true;
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"  [FL] ⚠ Foreground stolen! 0x{prevFg:X} → 0x{nowFg:X}");
+                    Console.WriteLine($"  [FL] ! Foreground stolen! 0x{prevFg:X} -> 0x{nowFg:X}");
 
-                    // 즉시 복원: 원래 전경(prevFg)을 다시 전경으로! → 도둑(nowFg)은 자동으로 2등
-                    // Raw restore (no guard) — we're undoing a steal, not acquiring focus
+                    // 즉시 복원: 원래 전경(prevFg)을 다시 전경으로! -> 도둑(nowFg)은 자동으로 2등
+                    // Raw restore (no guard) -- we're undoing a steal, not acquiring focus
                     NativeMethods.SetForegroundWindowRaw(prevFg);
-                    Console.WriteLine($"  [FL] ⚠ Restored: 0x{prevFg:X}→fg, 0x{nowFg:X}→#2");
+                    Console.WriteLine($"  [FL] ! Restored: 0x{prevFg:X}->fg, 0x{nowFg:X}->#2");
                     Console.ResetColor();
                 }
             }
@@ -1538,19 +1538,19 @@ public sealed class InputReadiness
         }
     }
 
-    // ── Private: 미니마이즈 UIA 클릭 (2단계) ──────────────────
+    // -- Private: 미니마이즈 UIA 클릭 (2단계) ------------------
 
     /// <summary>
     /// 미니마이즈 윈도우에서 UIA 포커스리스 클릭. 2단계 전략:
-    /// 1단계: BoundingRect로 정확 매칭 (리스토어 없이) — 좌표에 맞는 요소 찾으면 바로 Invoke
-    /// 2단계: BoundingRect 없으면 포커스리스 리스토어 — SetWindowPlacement(SHOWNOACTIVATE) → UIA 클릭 → 재미니마이즈
+    /// 1단계: BoundingRect로 정확 매칭 (리스토어 없이) -- 좌표에 맞는 요소 찾으면 바로 Invoke
+    /// 2단계: BoundingRect 없으면 포커스리스 리스토어 -- SetWindowPlacement(SHOWNOACTIVATE) -> UIA 클릭 -> 재미니마이즈
     /// </summary>
     private static (bool ok, string? detail, bool fgStolen) TryFocuslessOnMinimized(
         int screenX, int screenY, IntPtr hWnd, IntPtr mainHwnd)
     {
         try
         {
-            // rcNormalPosition → 상대좌표 계산
+            // rcNormalPosition -> 상대좌표 계산
             var wp = new NativeMethods.WINDOWPLACEMENT
             {
                 length = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>()
@@ -1570,7 +1570,7 @@ public sealed class InputReadiness
             Console.Write($"rcNormal=({normalRect.Left},{normalRect.Top} {normalRect.Width}x{normalRect.Height})");
             Console.Write($" rel=({relX},{relY})");
 
-            // ── 1단계: BoundingRect로 정확 매칭 (리스토어 없이) ──
+            // -- 1단계: BoundingRect로 정확 매칭 (리스토어 없이) --
             var prevFg = NativeMethods.GetForegroundWindow();
             using var uia = new UiaLocator();
             var candidates = uia.FindInvocableDescendants(hWnd, targetX, targetY, normalRect);
@@ -1579,7 +1579,7 @@ public sealed class InputReadiness
             var exactMatch = candidates.FirstOrDefault(c => c.HasBounds && c.Distance < 200);
             if (exactMatch != null)
             {
-                Console.Write($" → exact [{exactMatch.ControlType}]");
+                Console.Write($" -> exact [{exactMatch.ControlType}]");
                 if (!string.IsNullOrEmpty(exactMatch.AutomationId))
                     Console.Write($" aid={exactMatch.AutomationId}");
                 Console.Write($" dist={exactMatch.Distance:F0}");
@@ -1589,21 +1589,21 @@ public sealed class InputReadiness
                 {
                     string desc1 = FormatElementDesc(exactMatch);
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($" → Invoke OK (no restore)");
+                    Console.WriteLine($" -> Invoke OK (no restore)");
                     Console.ResetColor();
                     var (_, _, fgStolen1) = DetectAndRestoreForeground(prevFg);
                     return (true, $"{desc1} (Invoke, focusless, no restore)", fgStolen1);
                 }
             }
 
-            // ── 2단계: 포커스리스 리스토어 ──
-            Console.Write(" → no exact match, restoring...");
+            // -- 2단계: 포커스리스 리스토어 --
+            Console.Write(" -> no exact match, restoring...");
 
             // 리매핑: rcNormalPosition 기준 + 클램핑
             int probeX = Math.Clamp(targetX, normalRect.Left, normalRect.Right - 1);
             int probeY = Math.Clamp(targetY, normalRect.Top, normalRect.Bottom - 1);
 
-            // 순간 복원: SW_SHOWNOACTIVATE — 포커스 안 뺏고 원래 위치에 표시
+            // 순간 복원: SW_SHOWNOACTIVATE -- 포커스 안 뺏고 원래 위치에 표시
             wp.showCmd = NativeMethods.SW_SHOWNOACTIVATE;
             NativeMethods.SetWindowPlacement(mainHwnd, ref wp);
             Thread.Sleep(100); // UIA BoundingRectangle 업데이트 대기
@@ -1620,13 +1620,13 @@ public sealed class InputReadiness
             if (ok2)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($" → {detail2} (restored)");
+                Console.WriteLine($" -> {detail2} (restored)");
                 Console.ResetColor();
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($" → FAIL: {detail2}");
+                Console.WriteLine($" -> FAIL: {detail2}");
                 Console.ResetColor();
                 return (false, $"Minimized restore: {detail2}", false);
             }
@@ -1640,7 +1640,7 @@ public sealed class InputReadiness
         }
     }
 
-    /// <summary>전경 도둑질 감지 → SetForegroundWindow로 즉시 복원.</summary>
+    /// <summary>전경 도둑질 감지 -> SetForegroundWindow로 즉시 복원.</summary>
     private static (bool detected, IntPtr thief, bool restored) DetectAndRestoreForeground(IntPtr expectedFg)
     {
         if (expectedFg == IntPtr.Zero) return (false, IntPtr.Zero, false);
@@ -1649,14 +1649,14 @@ public sealed class InputReadiness
         if (nowFg == expectedFg || nowFg == IntPtr.Zero) return (false, IntPtr.Zero, false);
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"  [FL] ⚠ Foreground stolen! 0x{expectedFg:X} → 0x{nowFg:X}");
-        NativeMethods.SetForegroundWindowRaw(expectedFg); // raw restore — undoing steal
-        Console.WriteLine($"  [FL] ⚠ Restored: 0x{expectedFg:X}→fg, 0x{nowFg:X}→#2");
+        Console.WriteLine($"  [FL] ! Foreground stolen! 0x{expectedFg:X} -> 0x{nowFg:X}");
+        NativeMethods.SetForegroundWindowRaw(expectedFg); // raw restore -- undoing steal
+        Console.WriteLine($"  [FL] ! Restored: 0x{expectedFg:X}->fg, 0x{nowFg:X}->#2");
         Console.ResetColor();
         return (true, nowFg, true);
     }
 
-    /// <summary>InvocableCandidate → "[ControlType] Name aid=X" 형식.</summary>
+    /// <summary>InvocableCandidate -> "[ControlType] Name aid=X" 형식.</summary>
     private static string FormatElementDesc(UiaLocator.InvocableCandidate c)
     {
         string desc = $"[{c.ControlType}]";
@@ -1667,10 +1667,10 @@ public sealed class InputReadiness
         return desc;
     }
 
-    // ── Private: off-screen 좌표 리매핑 ──────────────────────────
+    // -- Private: off-screen 좌표 리매핑 --------------------------
 
     /// <summary>
-    /// 미니마이즈 윈도우: GetWindowRect(아이콘 위치, 매우 작음) → UIA BoundingRectangle 기준으로
+    /// 미니마이즈 윈도우: GetWindowRect(아이콘 위치, 매우 작음) -> UIA BoundingRectangle 기준으로
     /// 상대좌표 리매핑 + 클램핑. UIA BoundingRect이 비정상이면 원본 좌표 반환.
     /// </summary>
     private static (int probeX, int probeY) RemapToUiaBounds(int screenX, int screenY, IntPtr hWnd)
@@ -1692,7 +1692,7 @@ public sealed class InputReadiness
             var root = uia.Automation.FromHandle(hWnd);
             if (root == null)
             {
-                Console.WriteLine(" → UIA root=null, using original");
+                Console.WriteLine(" -> UIA root=null, using original");
                 return (screenX, screenY);
             }
 
@@ -1701,7 +1701,7 @@ public sealed class InputReadiness
 
             if (uiaRect.IsEmpty || uiaRect.Width <= 0 || uiaRect.Height <= 0)
             {
-                Console.WriteLine(" → UIA rect empty, using original");
+                Console.WriteLine(" -> UIA rect empty, using original");
                 return (screenX, screenY);
             }
 
@@ -1712,7 +1712,7 @@ public sealed class InputReadiness
             bool clamped = newX != uiaRect.Left + relX || newY != uiaRect.Top + relY;
             bool remapped = newX != screenX || newY != screenY;
 
-            Console.Write($" → probe=({newX},{newY})");
+            Console.Write($" -> probe=({newX},{newY})");
             if (clamped) Console.Write(" [CLAMPED]");
             if (!remapped) Console.Write(" [SAME]");
             Console.WriteLine();
@@ -1722,13 +1722,13 @@ public sealed class InputReadiness
         catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  [REMAP] Failed: {ex.Message} — using original coords");
+            Console.WriteLine($"  [REMAP] Failed: {ex.Message} -- using original coords");
             Console.ResetColor();
             return (screenX, screenY);
         }
     }
 
-    // ── Private: 타겟을 앞으로 (Focusless) ──────────────────────
+    // -- Private: 타겟을 앞으로 (Focusless) ----------------------
 
     private static void BringTargetForward(IntPtr targetHwnd, IntPtr mainHwnd)
     {
@@ -1761,7 +1761,7 @@ public sealed class InputReadiness
         Console.ResetColor();
     }
 
-    // ── Private: BlockerInfo 빌드 ────────────────────────────────
+    // -- Private: BlockerInfo 빌드 --------------------------------
 
     private BlockerInfo? BuildBlockerInfo(IntPtr blockerHwnd)
     {
@@ -1793,7 +1793,7 @@ public sealed class InputReadiness
         );
     }
 
-    // ── Private: Static 텍스트 읽기 (간단 버전) ─────────────────
+    // -- Private: Static 텍스트 읽기 (간단 버전) ----------------─
 
     private static string? ReadStaticText(IntPtr hDialog)
     {
@@ -1816,7 +1816,7 @@ public sealed class InputReadiness
         return texts.Count > 0 ? string.Join(" | ", texts) : null;
     }
 
-    // ── PrintPointReport: 좌표 기반 결과 콘솔 출력 ──────────────
+    // -- PrintPointReport: 좌표 기반 결과 콘솔 출력 --------------
 
     public static void PrintPointReport(PointReadinessReport report)
     {
@@ -1832,7 +1832,7 @@ public sealed class InputReadiness
     }
 }
 
-// ── Point Readiness Types ────────────────────────────────────────
+// -- Point Readiness Types ----------------------------------------
 
 /// <summary>
 /// 좌표 기반 입력확보 요청. 필수 인수 3개만: ScreenX, ScreenY, TargetHwnd.
@@ -1848,10 +1848,10 @@ public record PointReadinessRequest
     /// <summary>필수: 의도한 타겟 윈도우 핸들.</summary>
     public required IntPtr TargetHwnd { get; init; }
 
-    /// <summary>선택: 메인 윈도우 핸들. 미지정 → GetAncestor(GA_ROOT) 자동.</summary>
+    /// <summary>선택: 메인 윈도우 핸들. 미지정 -> GetAncestor(GA_ROOT) 자동.</summary>
     public IntPtr MainHwnd { get; init; }
 
-    /// <summary>선택: 예정 액션. 미지정 → "click".</summary>
+    /// <summary>선택: 예정 액션. 미지정 -> "click".</summary>
     public string? IntendedAction { get; init; }
 
     /// <summary>선택: 포커스리스만 허용 (--fl 플래그).</summary>
@@ -1861,7 +1861,7 @@ public record PointReadinessRequest
 /// <summary>좌표 기반 입력확보 결과.</summary>
 public record PointReadinessReport
 {
-    /// <summary>해당 좌표의 윈도우 스택 (Z-order, 앞→뒤).</summary>
+    /// <summary>해당 좌표의 윈도우 스택 (Z-order, 앞->뒤).</summary>
     public List<WindowAtPoint> WindowStack { get; init; } = new();
 
     /// <summary>분류 결과.</summary>
@@ -1882,14 +1882,14 @@ public record PointReadinessReport
 
     /// <summary>
     /// 포커스리스 클릭은 성공했지만, 전경이 의도치 않게 변경됨!
-    /// MFC Invoke 부작용: BN_CLICKED → 내부 SetForegroundWindow → 타겟이 전경으로.
+    /// MFC Invoke 부작용: BN_CLICKED -> 내부 SetForegroundWindow -> 타겟이 전경으로.
     /// 이 플래그가 true면 호출자가 경고 알림을 표시해야 함.
     /// </summary>
     public bool ForegroundStolen { get; init; }
 
     /// <summary>클릭 가능 상태.</summary>
     public bool Ready { get; init; }
-    /// <summary>포커스리스 실패 → 물리클릭 필요.</summary>
+    /// <summary>포커스리스 실패 -> 물리클릭 필요.</summary>
     public bool NeedsPhysicalClick { get; init; }
 }
 
@@ -1907,16 +1907,16 @@ public record WindowAtPoint(
 /// <summary>좌표 기반 윈도우 스택 분류.</summary>
 public enum PointClassification
 {
-    /// <summary>타겟이 최상단 → 바로 클릭.</summary>
+    /// <summary>타겟이 최상단 -> 바로 클릭.</summary>
     TargetOnTop,
-    /// <summary>방해꾼이 최상단 → dismiss 후 재시도.</summary>
+    /// <summary>방해꾼이 최상단 -> dismiss 후 재시도.</summary>
     BlockerOnTop,
-    /// <summary>같은 앱의 다른 창이 최상단 → 타겟을 앞으로.</summary>
+    /// <summary>같은 앱의 다른 창이 최상단 -> 타겟을 앞으로.</summary>
     SiblingOnTop,
     /// <summary>다른 앱 창이 최상단.</summary>
     ForeignOnTop,
     /// <summary>타겟이 스택에 없음 (좌표 오류).</summary>
     TargetNotFound,
-    /// <summary>타겟이 미니마이즈됨 → Z-order 무관, UIA 핸들 기반 포커스리스.</summary>
+    /// <summary>타겟이 미니마이즈됨 -> Z-order 무관, UIA 핸들 기반 포커스리스.</summary>
     TargetMinimized
 }

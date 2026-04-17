@@ -10,7 +10,7 @@ partial class Program
     /// <summary>
     /// MCP stdio proxy loop.
     /// Launcher holds the stdio pipe to Claude Code permanently.
-    /// Core runs behind the proxy — if it exits with code 42, it is restarted automatically.
+    /// Core runs behind the proxy -- if it exits with code 42, it is restarted automatically.
     /// stdin broadcaster routes bytes to whichever Core instance is current.
     /// </summary>
     static int RunMcpProxy(string[] args)
@@ -51,11 +51,11 @@ partial class Program
                     Arguments       = $"--window 0 new-tab --title \"{wtTitle}\" -- powershell -NoExit -Command \"{psCmd}\"",
                     UseShellExecute = true,
                 });
-                Console.Error.WriteLine($"[LAUNCHER:MCP] WT monitor tab opened → {wtLogFile}");
+                Console.Error.WriteLine($"[LAUNCHER:MCP] WT monitor tab opened -> {wtLogFile}");
                 Thread.Sleep(600);
                 if (fgBeforeWt != IntPtr.Zero && FocusGuard.GetForegroundWindow() != fgBeforeWt)
                 {
-                    Console.Error.WriteLine("[LAUNCHER:MCP] wt.exe stole focus — restoring");
+                    Console.Error.WriteLine("[LAUNCHER:MCP] wt.exe stole focus -- restoring");
                     FocusGuard.SetForegroundWindow(fgBeforeWt);
                 }
             }
@@ -66,15 +66,15 @@ partial class Program
 
         // MCP mode: pipe-based relay (same pattern as Eye↔Core).
         // ConPTY doesn't pass stdin to grandchild, so we pipe explicitly:
-        //   Claude Code → ConPTY → Launcher (ReadFile stdin → WriteFile pipe) → Core
-        //   Core → pipe → Launcher (ReadFile pipe → WriteFile stdout) → ConPTY → Claude Code
+        //   Claude Code -> ConPTY -> Launcher (ReadFile stdin -> WriteFile pipe) -> Core
+        //   Core -> pipe -> Launcher (ReadFile pipe -> WriteFile stdout) -> ConPTY -> Claude Code
 
-        // Create stdin pipe: Launcher writes → Core reads
+        // Create stdin pipe: Launcher writes -> Core reads
         if (!CreatePipe(out var hCoreStdinRead, out var hCoreStdinWrite, IntPtr.Zero, 0))
         { Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdin) failed"); return 1; }
         SetHandleInformation(hCoreStdinRead, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
 
-        // Create stdout pipe: Core writes → Launcher reads
+        // Create stdout pipe: Core writes -> Launcher reads
         if (!CreatePipe(out var hCoreStdoutRead, out var hCoreStdoutWrite, IntPtr.Zero, 0))
         { CloseHandle(hCoreStdinRead); CloseHandle(hCoreStdinWrite); Console.Error.WriteLine("[LAUNCHER:MCP] CreatePipe(stdout) failed"); return 1; }
         SetHandleInformation(hCoreStdoutWrite, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
@@ -104,9 +104,9 @@ partial class Program
         CloseHandle(pi.hThread);
         Console.Error.WriteLine($"[LAUNCHER:MCP] core started via pipe (pid={pi.dwProcessId})");
 
-        // ── State machine for MCP relay ──
+        // -- State machine for MCP relay --
         // Tracks JSON-RPC requests by id for routing during elevation handoff AND hot-swap
-        var _inflight = new Dictionary<string, string>(); // id → raw request line
+        var _inflight = new Dictionary<string, string>(); // id -> raw request line
         var _gate = new object();
         var _outLock = new object();
         string? _initializeLine = null; // cached for admin/new Core synthetic init
@@ -122,7 +122,7 @@ partial class Program
         // stdout handle (needed early for hot-swap FSW closure)
         var hOut = GetStdHandle(-11);
 
-        // ── Hot-swap: watch the original core path only; Eye owns .new.exe staging/rename ──
+        // -- Hot-swap: watch the original core path only; Eye owns .new.exe staging/rename --
         IntPtr _oldCoreStdinWrite = IntPtr.Zero; // drain pipe for old Core during swap
         IntPtr _oldCoreStdoutRead = IntPtr.Zero;
         var _oldInflight = new Dictionary<string, string>(); // requests still in old Core
@@ -163,29 +163,29 @@ partial class Program
                     if (_adminMode || _activeStdinWriter != null)
                     {
                         _pendingSwapWhileAdmin = true;
-                        Console.Error.WriteLine("[HOT-SWAP] admin endpoint active — deferring normal core swap");
+                        Console.Error.WriteLine("[HOT-SWAP] admin endpoint active -- deferring normal core swap");
                         return;
                     }
                 }
                 var currentSwapStamp = System.IO.File.Exists(core) ? System.IO.File.GetLastWriteTimeUtc(core).Ticks.ToString() : string.Empty;
                 if (currentSwapStamp.Length == 0)
                 {
-                    Console.Error.WriteLine("[HOT-SWAP] core path changed but stamp is unreadable — ignoring");
+                    Console.Error.WriteLine("[HOT-SWAP] core path changed but stamp is unreadable -- ignoring");
                     return;
                 }
                 if (currentSwapStamp == _activeCoreStamp)
                 {
-                    Console.Error.WriteLine($"[HOT-SWAP] same active stamp ({currentSwapStamp}) — ignoring");
+                    Console.Error.WriteLine($"[HOT-SWAP] same active stamp ({currentSwapStamp}) -- ignoring");
                     return;
                 }
                 if (currentSwapStamp == _lastFailedSwapStamp)
                 {
-                    Console.Error.WriteLine($"[HOT-SWAP] previously failed stamp ({currentSwapStamp}) — waiting for newer core");
+                    Console.Error.WriteLine($"[HOT-SWAP] previously failed stamp ({currentSwapStamp}) -- waiting for newer core");
                     return;
                 }
-                if (_swapInProgress) { Console.Error.WriteLine("[HOT-SWAP] Already in progress — ignoring"); return; }
+                if (_swapInProgress) { Console.Error.WriteLine("[HOT-SWAP] Already in progress -- ignoring"); return; }
                 _swapInProgress = true;
-                Console.Error.WriteLine($"[HOT-SWAP] core exe changed — starting graceful swap");
+                Console.Error.WriteLine($"[HOT-SWAP] core exe changed -- starting graceful swap");
 
                 try
                 {
@@ -229,7 +229,7 @@ partial class Program
                     if (!CreateProcessW(null, newCmdArr, IntPtr.Zero, IntPtr.Zero, true,
                         CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, Environment.CurrentDirectory, ref newSi, out var newPi))
                     {
-                        Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed — restoring old Core");
+                        Console.Error.WriteLine($"[HOT-SWAP] CreateProcess failed -- restoring old Core");
                         _lastFailedSwapStamp = currentSwapStamp;
                         lock (_gate) { _activeStdinWrite = _oldCoreStdinWrite; _oldCoreStdinWrite = IntPtr.Zero; foreach (var kv in _oldInflight) _inflight[kv.Key] = kv.Value; _oldInflight.Clear(); }
                         _swapInProgress = false; return;
@@ -275,7 +275,7 @@ partial class Program
                     {
                         if (_oldInflight.Count > 0)
                         {
-                            Console.Error.WriteLine($"[HOT-SWAP] drain timeout — {_oldInflight.Count} requests orphaned, re-routing to new Core");
+                            Console.Error.WriteLine($"[HOT-SWAP] drain timeout -- {_oldInflight.Count} requests orphaned, re-routing to new Core");
                             foreach (var kv in _oldInflight)
                             {
                                 var reBytes = System.Text.Encoding.UTF8.GetBytes(kv.Value + "\n");
@@ -287,10 +287,10 @@ partial class Program
                         _oldInflight.Clear();
                     }
 
-                    // 7. Close old Core stdin → graceful exit
+                    // 7. Close old Core stdin -> graceful exit
                     if (_oldCoreStdinWrite != IntPtr.Zero)
                     { CloseHandle(_oldCoreStdinWrite); _oldCoreStdinWrite = IntPtr.Zero; }
-                    Console.Error.WriteLine("[HOT-SWAP] old Core stdin closed — graceful exit");
+                    Console.Error.WriteLine("[HOT-SWAP] old Core stdin closed -- graceful exit");
 
                     _activeCoreStamp = currentSwapStamp;
                     _lastFailedSwapStamp = null;
@@ -338,19 +338,19 @@ partial class Program
                             _toolsListLine = line;
 
                         // Pre-execution gate: --sudo detected + admin Core not yet running
-                        // → trigger admin spawn (same machinery as reactive elevation intercept).
+                        // -> trigger admin spawn (same machinery as reactive elevation intercept).
                         // Queue this request as _elevationRequestLine; SpawnAdminCore replays it on success.
                         // If spawn fails, existing SpawnAdminCore error path handles the response.
                         if (id != null && line.Contains("\"--sudo\"") && _adminProc == IntPtr.Zero && !_adminMode)
                         {
-                            Console.Error.WriteLine($"[LAUNCHER:MCP] --sudo requested (id={id}) — preemptive admin Core spawn");
+                            Console.Error.WriteLine($"[LAUNCHER:MCP] --sudo requested (id={id}) -- preemptive admin Core spawn");
                             _inflight[id] = line;
                             _elevationRequestLine = line;
                             new Thread(() => SpawnAdminCore(core, args, _initializeLine, _elevationRequestLine,
                                 ref _adminStdinWrite, ref _adminStdoutRead, ref _adminProc, ref _activeStdinWrite,
                                 ref _activeStdinWriter, ref _adminMode, ref _pendingSwapWhileAdmin, hCoreStdinWrite, hOut, _gate, _outLock, _inflight))
                             { IsBackground = true, Name = "mcp-sudo-spawn" }.Start();
-                            continue; // don't forward to normal Core — admin will handle after spawn
+                            continue; // don't forward to normal Core -- admin will handle after spawn
                         }
 
                         // Track in-flight requests
@@ -371,7 +371,7 @@ partial class Program
                                 var lineBytes = System.Text.Encoding.UTF8.GetBytes(line + "\n");
                                 WriteFile(target, lineBytes, (uint)lineBytes.Length, out _, IntPtr.Zero);
                                 FlushFileBuffers(target);
-                                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin→core: {line[..System.Math.Min(60, line.Length)]}");
+                                Console.Error.WriteLine($"[LAUNCHER:MCP] stdin->core: {line[..System.Math.Min(60, line.Length)]}");
                             }
                             else
                                 Console.Error.WriteLine("[LAUNCHER:MCP] stdin relay: target handle is ZERO!");
@@ -383,7 +383,7 @@ partial class Program
             }
 
             Console.Error.WriteLine($"[LAUNCHER:MCP] stdin relay: ReadFile loop ended (EOF or error)");
-            // ConPTY stdin EOF → close all Core stdins
+            // ConPTY stdin EOF -> close all Core stdins
             lock (_gate)
             {
                 if (_activeStdinWrite != IntPtr.Zero) { CloseHandle(_activeStdinWrite); _activeStdinWrite = IntPtr.Zero; }
@@ -393,7 +393,7 @@ partial class Program
         }) { IsBackground = true, Name = "mcp-stdin-router" };
         stdinRelay.Start();
 
-        // ── Normal Core stdout relay (main thread) ──
+        // -- Normal Core stdout relay (main thread) --
 
         // Shared helper: relay one Core's stdout to hOut, with elevation detection
         void RelayStdout(IntPtr hRead, string label, bool detectElevation)
@@ -414,7 +414,7 @@ partial class Program
                     if (detectElevation && line.Contains("\"_elevationRequired\":true"))
                     {
                         var failedId = ExtractJsonRpcId(line);
-                        Console.Error.WriteLine($"[LAUNCHER:MCP] Elevation required (id={failedId}) — spawning admin Core");
+                        Console.Error.WriteLine($"[LAUNCHER:MCP] Elevation required (id={failedId}) -- spawning admin Core");
 
                         // Save the original request for re-send
                         string? savedRequest = null;
@@ -580,7 +580,7 @@ partial class Program
             return;
         }
 
-        Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core launched (pid=?) — waiting for pipe connection (60s)...");
+        Console.Error.WriteLine($"[LAUNCHER:MCP] Admin Core launched (pid=?) -- waiting for pipe connection (60s)...");
         adminProc = sei.hProcess;
 
         // Wait for admin Core to connect to named pipes (it uses NamedPipeClientStream)
@@ -601,12 +601,12 @@ partial class Program
             // Transition: close old Core stdin (drain), switch to admin
             lock (gate)
             {
-                CloseHandle(oldCoreStdinWrite); // EOF to old Core → drain remaining work
+                CloseHandle(oldCoreStdinWrite); // EOF to old Core -> drain remaining work
                 activeStdinWrite = IntPtr.Zero; // temporarily null until we set up admin pipe handle
             }
 
             // Send initialize + elevation request to admin Core
-            // NOTE: NOT using 'using' — lifetime managed by finally block below.
+            // NOTE: NOT using 'using' -- lifetime managed by finally block below.
             // 'using' would dispose at method exit while _activeStdinWriter still references it (race).
             stdinWriter = new System.IO.StreamWriter(pipeStdinServer, new System.Text.UTF8Encoding(false)) { AutoFlush = true };
             if (initLine != null)
@@ -662,7 +662,7 @@ partial class Program
         }
         catch (OperationCanceledException)
         {
-            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connection timeout (60s) — elevation failed");
+            Console.Error.WriteLine("[LAUNCHER:MCP] Admin Core connection timeout (60s) -- elevation failed");
             try { TerminateProcess(adminProc, 1); } catch { }
         }
         catch (Exception ex)
@@ -680,7 +680,7 @@ partial class Program
                     pendingSwapWhileAdmin = false;
                 }
             }
-            // Dispose after nulling reference — no race
+            // Dispose after nulling reference -- no race
             try { stdinWriter?.Dispose(); } catch { }
             try { stdoutReader?.Dispose(); } catch { }
         }

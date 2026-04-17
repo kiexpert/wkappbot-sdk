@@ -11,13 +11,13 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot slack <subcommand> — Slack Socket Mode integration
+// partial class: wkappbot slack <subcommand> -- Slack Socket Mode integration
 // Split into multiple files:
-//   SlackCommands.cs         — dispatcher, config, helpers, send/test/status/stop
-//   SlackListenCommand.cs    — listen loop + background launcher
-//   SlackUploadCommands.cs   — file upload + screenshot
-//   SlackPromptCommands.cs   — prompt, reply, inbox, catch-up
-//   SlackMonitorCommands.cs  — WebBot monitor, Claude busy detection, prompt lost handler
+//   SlackCommands.cs         -- dispatcher, config, helpers, send/test/status/stop
+//   SlackListenCommand.cs    -- listen loop + background launcher
+//   SlackUploadCommands.cs   -- file upload + screenshot
+//   SlackPromptCommands.cs   -- prompt, reply, inbox, catch-up
+//   SlackMonitorCommands.cs  -- WebBot monitor, Claude busy detection, prompt lost handler
 internal partial class Program
 {
     static int SlackCommand(string[] args)
@@ -55,7 +55,7 @@ internal partial class Program
     static string SlackStopSignalFile => Path.Combine(DataDir, "slack.stop");
     static string SlackInboxFile => Path.Combine(DataDir, "slack_inbox.jsonl");
     static string SlackLastTsFile => Path.Combine(DataDir, "slack_last_ts.txt");
-    /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" — so 'slack reply' needs no flags.</summary>
+    /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" -- so 'slack reply' needs no flags.</summary>
     static string SlackReplyContextFile => Path.Combine(DataDir, "slack_reply_ctx.txt");
 
     /// <summary>Default keywords for keyword monitoring (Korean typos + English variants).</summary>
@@ -89,7 +89,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Stop background Slack listener (graceful → force kill).</summary>
+    /// <summary>Stop background Slack listener (graceful -> force kill).</summary>
     static int SlackStopCommand()
     {
         if (!IsSlackListenerRunning(out int pid))
@@ -102,7 +102,7 @@ internal partial class Program
         {
             var proc = Process.GetProcessById(pid);
 
-            // Phase 1: graceful — write stop signal file, wait up to 10s
+            // Phase 1: graceful -- write stop signal file, wait up to 10s
             Console.Error.WriteLine($"[SLACK] Sending stop signal to PID={pid}...");
             try
             {
@@ -119,7 +119,7 @@ internal partial class Program
             }
 
             // Phase 2: force kill
-            Console.Error.WriteLine($"[SLACK] Graceful timeout — force killing PID={pid}...");
+            Console.Error.WriteLine($"[SLACK] Graceful timeout -- force killing PID={pid}...");
             proc.Kill(entireProcessTree: true);
             proc.WaitForExit(3000);
             Console.Error.WriteLine($"[SLACK] Listener killed (PID={pid})");
@@ -180,7 +180,7 @@ internal partial class Program
     /// <summary>
     /// Split a message into a short channel-visible header and optional thread overflow.
     /// Channel part: up to first blank line (paragraph boundary), capped at 5 lines.
-    /// Overflow: everything after the split point → posted as a thread reply.
+    /// Overflow: everything after the split point -> posted as a thread reply.
     /// </summary>
     static (string header, string? overflow) SplitMessageForChannel(string message)
     {
@@ -220,9 +220,9 @@ internal partial class Program
         // Parse: text parts + file attachments (shared ParseTextAndFiles)
         var (textParts, filePaths) = ParseTextAndFiles(sendArgs, startIndex: 1);
         var message = JoinShellGroupedTextParts(textParts);
-        // C-style escape decode: \n → newline, \t → tab, \\ → backslash
+        // C-style escape decode: \n -> newline, \t -> tab, \\ -> backslash
         message = DecodeCEscapes(message);
-        // Bash history expansion escapes ! to \! even in single quotes — undo it
+        // Bash history expansion escapes ! to \! even in single quotes -- undo it
         message = message.Replace("\\!", "!");
         var _firstLine = message.Split('\n')[0];
         Console.Error.WriteLine($"[SLACK-DBG] send len={message.Length} lines={message.Split('\n').Length} isStatus={IsStatusEmoji(message)} firstLine={_firstLine[..Math.Min(_firstLine.Length, 60)]}");
@@ -263,7 +263,7 @@ internal partial class Program
             threadTs = ts;
             Console.Error.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(ts != null ? " (+thread)" : "")}");
             if (GetCustomSlackIcon(EyeCmdPipeServer.CallerCwd.Value) == null)
-                Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
+                Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 -> {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
         }
 
         // Upload files (threaded to the message if we got a ts)
@@ -277,7 +277,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>C-style escape decode: \n → newline, \t → tab, \\ → backslash.</summary>
+    /// <summary>C-style escape decode: \n -> newline, \t -> tab, \\ -> backslash.</summary>
     static string DecodeCEscapes(string s)
     {
         if (!s.Contains('\\')) return s;
@@ -317,7 +317,7 @@ internal partial class Program
             var chunks = ChunkText(overflow, 3900);
             foreach (var chunk in chunks)
                 SlackSendViaApi(botToken, channel, chunk, threadTs: ts, username: username).GetAwaiter().GetResult();
-            Console.Error.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines → {chunks.Count} chunk(s)");
+            Console.Error.WriteLine($"[SLACK] Thread: {overflow.Split('\n').Length} lines -> {chunks.Count} chunk(s)");
         }
         return (true, ts);
     }
@@ -372,7 +372,7 @@ internal partial class Program
             var team = json?["team"]?.GetValue<string>();
             var user = json?["user"]?.GetValue<string>();
             var userId = json?["user_id"]?.GetValue<string>();
-            Console.Error.WriteLine($"[SLACK] auth.test OK — team={team}, bot={user} ({userId})");
+            Console.Error.WriteLine($"[SLACK] auth.test OK -- team={team}, bot={user} ({userId})");
         }
         else
         {
@@ -383,7 +383,7 @@ internal partial class Program
         // Test send
         if (!string.IsNullOrEmpty(channel))
         {
-            var (sendOk, _) = SlackSendViaApi(botToken!, channel, "WKAppBot test — connection verified!", username: BotUsername).GetAwaiter().GetResult();
+            var (sendOk, _) = SlackSendViaApi(botToken!, channel, "WKAppBot test -- connection verified!", username: BotUsername).GetAwaiter().GetResult();
             Console.WriteLine(sendOk ? "[SLACK] send OK" : "[SLACK] send FAILED");
         }
 
@@ -409,11 +409,11 @@ internal partial class Program
 
     /// <summary>
     /// Send message via chat.postMessage API. If threadTs is provided, replies in-thread.
-    /// Returns (ok, message_ts) — message_ts is the timestamp of the sent message (for thread tracking).
+    /// Returns (ok, message_ts) -- message_ts is the timestamp of the sent message (for thread tracking).
     /// </summary>
     /// <summary>Read custom icon from {callerCwd}/.wkappbot/slack_icon.txt.
     /// First line: emoji (e.g. :hammer:) or https://... image URL.
-    /// Returns null when file absent — caller uses bot's default profile picture.</summary>
+    /// Returns null when file absent -- caller uses bot's default profile picture.</summary>
     static string? GetCustomSlackIcon(string? callerCwd)
     {
         if (string.IsNullOrWhiteSpace(callerCwd)) return null;
@@ -437,7 +437,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(username))
         {
             dict["username"] = username;
-            // Custom icon from workspace .wkappbot/slack_icon.txt — absent = bot default profile
+            // Custom icon from workspace .wkappbot/slack_icon.txt -- absent = bot default profile
             var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
             var icon = GetCustomSlackIcon(callerCwd);
             if (icon != null)
@@ -466,8 +466,8 @@ internal partial class Program
             var error = json?["error"]?.GetValue<string>() ?? "";
             Console.Error.WriteLine($"[SLACK] API error: {error}");
 
-            // ── message_limit fallback: merge into existing message (thread replies only) ──
-            // Channel messages: no merge — orphan cleanup handles spam instead
+            // -- message_limit fallback: merge into existing message (thread replies only) --
+            // Channel messages: no merge -- orphan cleanup handles spam instead
             if (error == "message_limit_exceeded" && !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(threadTs))
             {
                 var appendTs = FindLastMessageTsByAuthor(botToken, channel, threadTs, username);
@@ -485,18 +485,18 @@ internal partial class Program
                             var cutLen = combined.Length - 3800;
                             var cutIdx = combined.IndexOf("\n━━━\n", cutLen, StringComparison.Ordinal);
                             combined = cutIdx >= 0
-                                ? "…(trimmed)\n━━━\n" + combined[(cutIdx + "\n━━━\n".Length)..]
-                                : "…(trimmed)\n━━━\n" + combined[cutLen..];
+                                ? "...(trimmed)\n━━━\n" + combined[(cutIdx + "\n━━━\n".Length)..]
+                                : "...(trimmed)\n━━━\n" + combined[cutLen..];
                         }
                         var (updOk, _, _) = await SlackUpdateMessageAsync(botToken, channel, appendTs, combined);
                         if (updOk)
                         {
-                            Console.Error.WriteLine($"[SLACK] message_limit → appended to {appendTs} ({username}, {combined.Length}ch)");
+                            Console.Error.WriteLine($"[SLACK] message_limit -> appended to {appendTs} ({username}, {combined.Length}ch)");
                             return (true, appendTs);
                         }
                     }
                 }
-                Console.Error.WriteLine($"[SLACK] message_limit — {(string.IsNullOrEmpty(threadTs) ? "channel msg (no merge)" : "append fallback failed")}");
+                Console.Error.WriteLine($"[SLACK] message_limit -- {(string.IsNullOrEmpty(threadTs) ? "channel msg (no merge)" : "append fallback failed")}");
             }
         }
 
@@ -525,7 +525,7 @@ internal partial class Program
 
             if (string.IsNullOrEmpty(threadTs))
             {
-                // Channel mode: Slack returns newest-first → first match = newest message
+                // Channel mode: Slack returns newest-first -> first match = newest message
                 for (int i = 0; i < msgs.Count; i++)
                 {
                     var msg = msgs[i];
@@ -600,9 +600,9 @@ internal partial class Program
             for (int i = 0; i < Math.Min(4, msgs.Count); i++)
             {
                 if (msgs[i]?["ts"]?.GetValue<string>() == newestEyeTs)
-                    return newestEyeTs; // within top 4 → reuse
+                    return newestEyeTs; // within top 4 -> reuse
             }
-            return null; // too old → post new
+            return null; // too old -> post new
         }
         catch (Exception ex)
         {
@@ -629,7 +629,7 @@ internal partial class Program
     /// <summary>
     /// Smart time mark: full timestamp, left-trimmed against previous separator.
     /// Finds last ━━ in existing text, extracts prev time, trims common prefix at delimiter boundary.
-    /// "03-27 15:32:42" vs "03-27 15:32:58" → ":58"
+    /// "03-27 15:32:42" vs "03-27 15:32:58" -> ":58"
     /// </summary>
     static string SmartTimeMark(string existingText)
     {
@@ -637,7 +637,7 @@ internal partial class Program
 
         // Find previous separator time: last "━━ ... ━━" pattern
         var lastSep = existingText.LastIndexOf("━━ ", StringComparison.Ordinal);
-        if (lastSep < 0) return now; // first separator → full time
+        if (lastSep < 0) return now; // first separator -> full time
 
         var afterSep = lastSep + 3; // skip "━━ "
         var endSep = existingText.IndexOf(" ━━", afterSep, StringComparison.Ordinal);
@@ -653,7 +653,7 @@ internal partial class Program
             common++;
 
         if (common == 0) return now; // completely different
-        if (common >= now.Length) return ":" + now[^2..]; // identical → show seconds
+        if (common >= now.Length) return ":" + now[^2..]; // identical -> show seconds
 
         // Back up to last delimiter for clean cut
         var delimiters = new[] { ':', '-', ' ' };
@@ -662,15 +662,15 @@ internal partial class Program
             cutAt--;
 
         var result = cutAt > 0 ? now[cutAt..] : now;
-        // Seconds-only → "58s"
+        // Seconds-only -> "58s"
         if (!result.Contains(':') && !result.Contains('-') && !result.Contains(' '))
             return result + "s";
-        // Minutes+ changed → trim trailing :ss, add "m" if minutes-only
-        // e.g. "48:10" → "48m", "16:01:05" → "16:01", "28 09:00:05" → "28 09:00"
+        // Minutes+ changed -> trim trailing :ss, add "m" if minutes-only
+        // e.g. "48:10" -> "48m", "16:01:05" -> "16:01", "28 09:00:05" -> "28 09:00"
         if (result.Length >= 5 && result[^3] == ':')
             result = result[..^3]; // trim :ss
         if (!result.Contains(':') && !result.Contains('-') && !result.Contains(' '))
-            return result + "m"; // minutes-only → "48m"
+            return result + "m"; // minutes-only -> "48m"
         return result;
     }
 
@@ -754,7 +754,7 @@ internal partial class Program
     /// </summary>
     static string BuildPlanApprovalBlocks(string planContent, string sourceLabel)
     {
-        // Slack Block Kit has 3000 char limit per text block — split if needed
+        // Slack Block Kit has 3000 char limit per text block -- split if needed
         var truncPlan = planContent.Length > 2900
             ? planContent[..2900] + "\n... (truncated)"
             : planContent;
@@ -841,7 +841,7 @@ internal partial class Program
         var buttonElements = new JsonArray();
         foreach (var name in buttonNames)
         {
-            // "Allow" style buttons → primary (green), "Deny" → danger (red), else default
+            // "Allow" style buttons -> primary (green), "Deny" -> danger (red), else default
             string? style = null;
             if (name.Contains("Allow", StringComparison.OrdinalIgnoreCase) ||
                 name.Contains("허용", StringComparison.OrdinalIgnoreCase) ||
@@ -1037,10 +1037,10 @@ internal partial class Program
             Console.Error.WriteLine($"[SLACK] Config not found: {SlackConfigPath}");
             Console.ResetColor();
             Console.WriteLine();
-            Console.WriteLine("Slack setup required — create the config file with these fields:");
+            Console.WriteLine("Slack setup required -- create the config file with these fields:");
             Console.WriteLine();
             Console.WriteLine("  IMPORTANT: The human must log into Slack admin first.");
-            Console.WriteLine("  You (AI) cannot authenticate — ask the user, then continue your work.");
+            Console.WriteLine("  You (AI) cannot authenticate -- ask the user, then continue your work.");
             Console.WriteLine("  Run this to notify the user via TTS while you proceed:");
             Console.WriteLine("    wkappbot speak \"Slack setup needs your login. Please open api.slack.com and log in.\" --bg");
             Console.WriteLine();
@@ -1053,16 +1053,16 @@ internal partial class Program
             Console.WriteLine("  }}");
             Console.WriteLine();
             Console.WriteLine("How to get tokens (human must be logged into Slack admin):");
-            Console.WriteLine("  1. Go to https://api.slack.com/apps → Create New App (From Scratch)");
-            Console.WriteLine("  2. OAuth & Permissions → Bot Token Scopes: add these scopes:");
+            Console.WriteLine("  1. Go to https://api.slack.com/apps -> Create New App (From Scratch)");
+            Console.WriteLine("  2. OAuth & Permissions -> Bot Token Scopes: add these scopes:");
             Console.WriteLine("     chat:write, chat:write.customize, channels:read,");
             Console.WriteLine("     channels:history, app_mentions:read, files:write");
-            Console.WriteLine("  3. Install to Workspace → copy Bot User OAuth Token (xoxb-...)");
-            Console.WriteLine("  4. Basic Information → App-Level Tokens → Generate (connections:write)");
-            Console.WriteLine("  5. Socket Mode → Enable Socket Mode");
-            Console.WriteLine("  6. Event Subscriptions → Enable → Subscribe: app_mention, message.channels");
+            Console.WriteLine("  3. Install to Workspace -> copy Bot User OAuth Token (xoxb-...)");
+            Console.WriteLine("  4. Basic Information -> App-Level Tokens -> Generate (connections:write)");
+            Console.WriteLine("  5. Socket Mode -> Enable Socket Mode");
+            Console.WriteLine("  6. Event Subscriptions -> Enable -> Subscribe: app_mention, message.channels");
             Console.WriteLine("  7. Invite bot to your channel: /invite @YourBotName");
-            Console.WriteLine("  8. Get channel ID: right-click channel name → View channel details → ID at bottom");
+            Console.WriteLine("  8. Get channel ID: right-click channel name -> View channel details -> ID at bottom");
             return null;
         }
 
@@ -1096,7 +1096,7 @@ internal partial class Program
     {
         try
         {
-            // Format: one line per channel — "channel_id=timestamp"
+            // Format: one line per channel -- "channel_id=timestamp"
             var entries = new Dictionary<string, string>();
             if (File.Exists(SlackLastTsFile))
             {
@@ -1146,7 +1146,7 @@ internal partial class Program
     static void SendAcceptKeystroke(string botToken, string channel, string threadTs)
     {
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("[SLACK] >> Accept command received — sending Ctrl+Enter to Claude prompt");
+        Console.WriteLine("[SLACK] >> Accept command received -- sending Ctrl+Enter to Claude prompt");
         Console.ResetColor();
 
         try
@@ -1162,7 +1162,7 @@ internal partial class Program
             }
 
             // Bring Claude Desktop to foreground for SendInput
-            // Use Smart method (AttachThreadInput trick) — background process can't SetForegroundWindow
+            // Use Smart method (AttachThreadInput trick) -- background process can't SetForegroundWindow
             NativeMethods.SmartSetForegroundWindow(claudeHwnd);
             Thread.Sleep(300); // Wait for focus to settle
 
@@ -1200,7 +1200,7 @@ internal partial class Program
         return (channel, threadTs);
     }
 
-    // ── Display name resolution ─────────────────────────────────────
+    // -- Display name resolution ------------------------------------─
     // Slack user IDs (e.g. U0A21P4RK29) are resolved to display names via users.info API.
     // Token is set once when a listener/eye session starts (single-process, static is safe).
     // Fallback: webhook.json["known_users"] = { "U0A21P4RK29": "Will" } static mapping.
@@ -1354,11 +1354,11 @@ internal partial class Program
         {
             var kept = grp.Take(keep).Select(m => m["ts"]?.GetValue<string>()).Where(t => t != null).ToList();
             foreach (var t in kept) keepSet.Add(t!);
-            Console.Error.WriteLine($"[SLACK:GC] \"{grp.Key}\": {grp.Count()} msgs → keeping {kept.Count}");
+            Console.Error.WriteLine($"[SLACK:GC] \"{grp.Key}\": {grp.Count()} msgs -> keeping {kept.Count}");
         }
 
         var toDelete = allBotMsgs.Where(m => !keepSet.Contains(m["ts"]?.GetValue<string>() ?? "")).ToList();
-        Console.Error.WriteLine($"[SLACK:GC] {allBotMsgs.Count} bot msgs total → {toDelete.Count} to delete");
+        Console.Error.WriteLine($"[SLACK:GC] {allBotMsgs.Count} bot msgs total -> {toDelete.Count} to delete");
         if (toDelete.Count == 0) { Console.WriteLine("[SLACK:GC] Nothing to delete."); return 0; }
         int deleted = 0, skipped = 0;
 
@@ -1368,7 +1368,7 @@ internal partial class Program
             if (ts == null) continue;
             var replyCount = msg["reply_count"]?.GetValue<int>() ?? 0;
             var preview = (msg["text"]?.GetValue<string>() ?? "").Replace("\n", " ");
-            if (preview.Length > 60) preview = preview[..60] + "…";
+            if (preview.Length > 60) preview = preview[..60] + "...";
 
             if (replyCount > 0)
             {
@@ -1411,7 +1411,7 @@ internal partial class Program
             Thread.Sleep(300);
         }
 
-        Console.Error.WriteLine($"[SLACK:GC] Done — deleted={deleted} skipped={skipped}");
+        Console.Error.WriteLine($"[SLACK:GC] Done -- deleted={deleted} skipped={skipped}");
         return 0;
     }
 
@@ -1452,8 +1452,8 @@ internal partial class Program
         Console.WriteLine("                      --interval N: poll interval seconds (default: 3)");
         Console.WriteLine("  list [channel|msg_ts] [--limit N] [--delete-pattern \"pat\"]");
         Console.WriteLine("                        List channel messages or thread replies");
-        Console.WriteLine("                        C0... = channel, 1234.5678 = message → auto thread");
-        Console.WriteLine("                        reply ts → parent thread auto-detected");
+        Console.WriteLine("                        C0... = channel, 1234.5678 = message -> auto thread");
+        Console.WriteLine("                        reply ts -> parent thread auto-detected");
         Console.WriteLine("                        --delete-pattern: delete matching r=0 messages");
         Console.WriteLine("  delete <ts> [ts2 ...]  Delete message(s) by timestamp");
         Console.WriteLine("                        Thread-starter messages (has replies) are protected by default");
@@ -1461,7 +1461,7 @@ internal partial class Program
         Console.WriteLine();
         Console.WriteLine($"Config: {SlackConfigPath}");
         Console.WriteLine();
-        Console.WriteLine("💡 Tip: 봇 프로필 이모찌/사진 커스텀 → {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
+        Console.WriteLine("💡 Tip: 봇 프로필 이모찌/사진 커스텀 -> {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
         PrintRelatedSkills("slack");
         return 1;
     }

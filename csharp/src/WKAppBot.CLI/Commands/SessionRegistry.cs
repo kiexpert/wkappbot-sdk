@@ -1,4 +1,4 @@
-// SessionRegistry.cs — session file-based card system (replaces tick-only cards).
+// SessionRegistry.cs -- session file-based card system (replaces tick-only cards).
 // Each MCP server / CLI invocation registers a session file in runtime/sessions/.
 // Eye reads these files to build cards. Workers (WKAPPBOT_WORKER=1) never register.
 //
@@ -161,7 +161,7 @@ internal partial class Program
     /// <summary>Detect host type from parent process chain + environment variables.</summary>
     static string DetectHostType(int parentPid)
     {
-        // Env-var detection (fastest, most reliable — set by the AI host in all child processes).
+        // Env-var detection (fastest, most reliable -- set by the AI host in all child processes).
         // Check CODEX_HOME first: Codex sets this even in VS Code terminal mode.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return "vscode-codex";
@@ -185,7 +185,7 @@ internal partial class Program
         }
 
         // VSCODE_PID without CLAUDE_CODE_ENTRYPOINT: generic VS Code terminal (Codex ext, Copilot, etc.)
-        // Only use as fallback — real AI host env vars should have been checked above.
+        // Only use as fallback -- real AI host env vars should have been checked above.
         var vscodePidOnly = Environment.GetEnvironmentVariable("VSCODE_PID");
         if (!string.IsNullOrWhiteSpace(vscodePidOnly) && int.TryParse(vscodePidOnly, out var vscPid) && vscPid > 0)
         {
@@ -213,7 +213,7 @@ internal partial class Program
                 if (name == "claude" || name.StartsWith("claude"))
                     return "claude-desktop";
                 if (name == "codex" || title.Contains("Codex", StringComparison.OrdinalIgnoreCase))
-                    return "codex-desktop";   // standalone Codex Desktop app → 코덳앱
+                    return "codex-desktop";   // standalone Codex Desktop app -> 코덳앱
                 if (name == "cursor" || title.Contains("Cursor", StringComparison.OrdinalIgnoreCase))
                     return "cursor";
                 if (name == "copilot")
@@ -242,7 +242,7 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(cwd)) return null;
         try
         {
-            // ~/.claude/projects/{cwd-slug}/ → find most recent .jsonl
+            // ~/.claude/projects/{cwd-slug}/ -> find most recent .jsonl
             var projName = cwd.Replace(':', '-').Replace('\\', '-').Replace('/', '-').Replace('_', '-');
             var projDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -334,7 +334,7 @@ internal partial class Program
 
     /// <summary>
     /// Inject a user+assistant message pair into a Claude Code session JSONL file.
-    /// Appended to the end — Claude Code renders new entries on next scroll/reload.
+    /// Appended to the end -- Claude Code renders new entries on next scroll/reload.
     /// </summary>
     /// <param name="jsonlPath">Path to the .jsonl session file.</param>
     /// <param name="cwd">Workspace CWD (written into each entry).</param>

@@ -15,7 +15,7 @@ internal partial class Program
         var rect = GetBoundingRect(el);
         if (rect == null)
         {
-            Console.Error.WriteLine("[A11Y] click — no BoundingRect available");
+            Console.Error.WriteLine("[A11Y] click -- no BoundingRect available");
             return false;
         }
 
@@ -31,7 +31,7 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(defAction))
                 {
                     legacy.Pattern.DoDefaultAction();
-                    Console.Error.WriteLine($"[A11Y] click — LegacyIA DoDefaultAction at ({cx},{cy})");
+                    Console.Error.WriteLine($"[A11Y] click -- LegacyIA DoDefaultAction at ({cx},{cy})");
                     RecordTierSuccess(hwnd, el, "click", "LegacyIA DoDefaultAction", KnowhowCategory.Focusless);
                     return true;
                 }
@@ -52,11 +52,11 @@ internal partial class Program
             var flutterView = FindFlutterViewChild(elHwnd);
             if (flutterView != IntPtr.Zero)
             {
-                Console.Error.WriteLine($"[A11Y] click — FLUTTERVIEW direct at ({cx},{cy})");
+                Console.Error.WriteLine($"[A11Y] click -- FLUTTERVIEW direct at ({cx},{cy})");
                 if (PostClickToFlutterView(el, flutterView))
                 { RecordTierSuccess(elHwnd, el, "click", "FLUTTERVIEW WM_LBUTTON", KnowhowCategory.Focusless); return true; }
-                // No UI response (e.g. ModalBottomSheet canvas button) → physical click fallback
-                Console.WriteLine("[A11Y] click — FLUTTERVIEW no response → physical click fallback");
+                // No UI response (e.g. ModalBottomSheet canvas button) -> physical click fallback
+                Console.WriteLine("[A11Y] click -- FLUTTERVIEW no response -> physical click fallback");
                 _autoHealTiers?.Add("FLUTTERVIEW WM_LBUTTON: no UI response (element alive + pixel-diff < 2%)");
                 flutterNoResponse = true;
             }
@@ -74,7 +74,7 @@ internal partial class Program
                     NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
                     Thread.Sleep(50);
                     NativeMethods.PostMessageW(elHwnd, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
-                    Console.Error.WriteLine($"[A11Y] click — Win32 WM_LBUTTON at ({cx},{cy})");
+                    Console.Error.WriteLine($"[A11Y] click -- Win32 WM_LBUTTON at ({cx},{cy})");
                     RecordTierSuccess(elHwnd, el, "click", "Win32 WM_LBUTTON", KnowhowCategory.Focusless);
                     return true;
                 }
@@ -82,7 +82,7 @@ internal partial class Program
         }
         else if (IsElectronWindow(hwnd))
         {
-            // Electron/VS Code: elements have no NativeWindowHandle → treat window as surface.
+            // Electron/VS Code: elements have no NativeWindowHandle -> treat window as surface.
             // Send WM_LBUTTON to Chrome_RenderWidgetHostHWND (or root Chrome_WidgetWin_1).
             // This is focusless and more reliable than SendInput for Chromium-based windows.
             if (TryElectronSurfaceClick(hwnd, cx, cy, el))
@@ -102,7 +102,7 @@ internal partial class Program
             });
             if (probeResult.ActiveBlocker != null)
             {
-                Console.Error.WriteLine($"[A11Y] click — physical blocked by: \"{probeResult.ActiveBlocker.Title}\"");
+                Console.Error.WriteLine($"[A11Y] click -- physical blocked by: \"{probeResult.ActiveBlocker.Title}\"");
                 _autoHealTiers?.Add($"Physical SendInput: Probe blocked by \"{probeResult.ActiveBlocker.Title}\"");
                 return false;
             }
@@ -138,7 +138,7 @@ internal partial class Program
         inputs[1].type = INPUT.INPUT_MOUSE;
         inputs[1].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
         NativeMethods.SendInput(2, inputs, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
-        Console.Error.WriteLine($"[A11Y] click — SendInput at ({cx},{cy})");
+        Console.Error.WriteLine($"[A11Y] click -- SendInput at ({cx},{cy})");
 
         // Pixel-diff verification: 280ms after cursor-move = ~310ms from SendInput
         if (sendBefore != null)
@@ -148,14 +148,14 @@ internal partial class Program
             {
                 using var sendAfter = ScreenCapture.CaptureScreenRegion(rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
                 double diff = ComputePixelDiffRatio(sendBefore, sendAfter);
-                Console.Error.WriteLine($"[A11Y] click — SendInput pixel-diff {diff:P1}");
+                Console.Error.WriteLine($"[A11Y] click -- SendInput pixel-diff {diff:P1}");
                 if (diff <= 0.02)
                 {
-                    // No visible UI response → report failure so FireAutoHeal can engage
+                    // No visible UI response -> report failure so FireAutoHeal can engage
                     _autoHealTiers?.Add($"SendInput physical click: no UI response (pixel-diff {diff:P1} ≤ 2%)");
                     return false;
                 }
-                // SendInput worked — query focusless alternative once per app+class (background)
+                // SendInput worked -- query focusless alternative once per app+class (background)
                 QueryFocuslessAlternativeOnce(hwnd, el);
             }
             catch { }
@@ -172,7 +172,7 @@ internal partial class Program
 
     /// <summary>
     /// Electron surface click: WM_LBUTTON to Chrome_RenderWidgetHostHWND (or root Chrome_WidgetWin_1).
-    /// Chromium processes input via the renderer child — sending to root is unreliable;
+    /// Chromium processes input via the renderer child -- sending to root is unreliable;
     /// prefer renderer hwnd with ScreenToClient conversion.
     /// Returns true if pixel-diff confirms a UI response, false otherwise.
     /// </summary>
@@ -205,7 +205,7 @@ internal partial class Program
         NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
         Thread.Sleep(50);
         NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
-        Console.Error.WriteLine($"[A11Y] click — Electron surface WM_LBUTTON screen({screenX},{screenY}) client({pt.X},{pt.Y}) hwnd=0x{targetHwnd:X}");
+        Console.Error.WriteLine($"[A11Y] click -- Electron surface WM_LBUTTON screen({screenX},{screenY}) client({pt.X},{pt.Y}) hwnd=0x{targetHwnd:X}");
 
         if (before != null)
         {
@@ -214,26 +214,26 @@ internal partial class Program
             {
                 using var after = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(rect!.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
                 double diff = ComputePixelDiffRatio(before, after);
-                Console.Error.WriteLine($"[A11Y] click — Electron surface pixel-diff {diff:P1}");
+                Console.Error.WriteLine($"[A11Y] click -- Electron surface pixel-diff {diff:P1}");
                 if (diff > 0.02)
                 {
                     RecordTierSuccess(windowHwnd, el!, "click", "Electron surface WM_LBUTTON", KnowhowCategory.Focusless);
                     return true;
                 }
-                return false; // no response → caller falls through to SendInput
+                return false; // no response -> caller falls through to SendInput
             }
             catch { }
             finally { before.Dispose(); }
         }
 
-        // No rect for pixel-diff → optimistic success
+        // No rect for pixel-diff -> optimistic success
         if (el != null) RecordTierSuccess(windowHwnd, el, "click", "Electron surface WM_LBUTTON", KnowhowCategory.Focusless);
         return true;
     }
 
-    // Send WM_LBUTTON to FLUTTER_VIEW child at element's center (screen→client conversion).
+    // Send WM_LBUTTON to FLUTTER_VIEW child at element's center (screen->client conversion).
     // Returns true if click had a verified UI effect, false if no response (triggers physical fallback).
-    // Verification: (1) element accessibility check → (2) pixel diff of element region.
+    // Verification: (1) element accessibility check -> (2) pixel diff of element region.
     static bool PostClickToFlutterView(AutomationElement el, IntPtr flutterView)
     {
         var rect = GetBoundingRect(el);
@@ -245,14 +245,14 @@ internal partial class Program
         }
         else
         {
-            Console.Error.WriteLine("[A11Y] flutter-click — no BoundingRect, using FLUTTERVIEW center");
+            Console.Error.WriteLine("[A11Y] flutter-click -- no BoundingRect, using FLUTTERVIEW center");
             NativeMethods.GetClientRect(flutterView, out var fb);
             var fp = new POINT { X = (fb.Left + fb.Right) / 2, Y = (fb.Top + fb.Bottom) / 2 };
             NativeMethods.ClientToScreen(flutterView, ref fp);
             cx = fp.X; cy = fp.Y;
         }
 
-        // Clamp to largest inscribed circle of BoundingRect — handles rounded-corner buttons.
+        // Clamp to largest inscribed circle of BoundingRect -- handles rounded-corner buttons.
         if (rect != null)
         {
             const int margin = 4;
@@ -268,7 +268,7 @@ internal partial class Program
                     int origX = cx, origY = cy;
                     cx = (int)Math.Round(rcx + dx / dist * radius);
                     cy = (int)Math.Round(rcy + dy / dist * radius);
-                    Console.Error.WriteLine($"[A11Y] flutter-click — clamped to inscribed circle ({origX},{origY})→({cx},{cy}) r={radius:F0}");
+                    Console.Error.WriteLine($"[A11Y] flutter-click -- clamped to inscribed circle ({origX},{origY})->({cx},{cy}) r={radius:F0}");
                 }
             }
         }
@@ -278,17 +278,17 @@ internal partial class Program
         if (rect != null && rect.Value.Width > 0 && rect.Value.Height > 0)
             try { before = ScreenCapture.CaptureScreenRegion(rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height); } catch { }
 
-        // Convert screen → FLUTTERVIEW client coords and send WM_LBUTTON
+        // Convert screen -> FLUTTERVIEW client coords and send WM_LBUTTON
         var pt = new POINT { X = cx, Y = cy };
         NativeMethods.ScreenToClient(flutterView, ref pt);
         var lParam = (IntPtr)(pt.X | (pt.Y << 16));
         NativeMethods.PostMessageW(flutterView, NativeMethods.WM_LBUTTONDOWN, (IntPtr)1, lParam);
         Thread.Sleep(50);
         NativeMethods.PostMessageW(flutterView, NativeMethods.WM_LBUTTONUP, IntPtr.Zero, lParam);
-        Console.Error.WriteLine($"[A11Y] flutter-click — FLUTTER_VIEW WM_LBUTTON at screen({cx},{cy}) client({pt.X},{pt.Y})");
+        Console.Error.WriteLine($"[A11Y] flutter-click -- FLUTTER_VIEW WM_LBUTTON at screen({cx},{cy}) client({pt.X},{pt.Y})");
 
         // Verify click had effect (wait 250ms total = 300ms from WM_LBUTTONDOWN):
-        // Pass 1 — element accessibility: if element gone → click worked (dismiss happened)
+        // Pass 1 -- element accessibility: if element gone -> click worked (dismiss happened)
         Thread.Sleep(250);
         bool elementGone = false;
         try
@@ -296,16 +296,16 @@ internal partial class Program
             var r = el.Properties.BoundingRectangle.ValueOrDefault;
             elementGone = r.IsEmpty || (r.Width <= 0 && r.Height <= 0);
         }
-        catch { elementGone = true; }  // ElementNotAvailableException → element disappeared
+        catch { elementGone = true; }  // ElementNotAvailableException -> element disappeared
 
         if (elementGone)
         {
-            Console.WriteLine("[A11Y] flutter-click — element gone after 300ms → verified ✓");
+            Console.WriteLine("[A11Y] flutter-click -- element gone after 300ms -> verified v");
             before?.Dispose();
             return true;
         }
 
-        // Pass 2 — pixel diff: capture same region after click, compare with before snapshot.
+        // Pass 2 -- pixel diff: capture same region after click, compare with before snapshot.
         // Catches visual changes that don't dismiss the element (state toggle, ripple, etc.).
         if (before != null && rect != null)
         {
@@ -313,10 +313,10 @@ internal partial class Program
             {
                 using var after = ScreenCapture.CaptureScreenRegion(rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
                 double diff = ComputePixelDiffRatio(before, after);
-                Console.Error.WriteLine($"[A11Y] flutter-click — pixel diff {diff:P1}");
+                Console.Error.WriteLine($"[A11Y] flutter-click -- pixel diff {diff:P1}");
                 if (diff > 0.02)  // 2% threshold: ripple, color change, or dismiss animation
                 {
-                    Console.WriteLine("[A11Y] flutter-click — visual change detected → verified ✓");
+                    Console.WriteLine("[A11Y] flutter-click -- visual change detected -> verified v");
                     return true;
                 }
             }
@@ -328,7 +328,7 @@ internal partial class Program
             before?.Dispose();
         }
 
-        Console.WriteLine("[A11Y] flutter-click — no UI change after 300ms → unverified, physical fallback needed");
+        Console.WriteLine("[A11Y] flutter-click -- no UI change after 300ms -> unverified, physical fallback needed");
         return false;
     }
 

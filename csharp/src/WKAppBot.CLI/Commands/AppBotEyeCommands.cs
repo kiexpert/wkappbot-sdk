@@ -74,7 +74,7 @@ internal partial class Program
     internal static void EyeColor(ConsoleColor c) { try { Console.ForegroundColor = c; } catch { } }
     internal static void EyeResetColor() { try { Console.ResetColor(); } catch { } }
 
-    // ── Eye Watchdog Task (Task Scheduler) ──────────────────────────────
+    // -- Eye Watchdog Task (Task Scheduler) ------------------------------
     // Eye watchdog keeps ticking while alive; if Eye dies, watchdog restarts it.
     // Every 10 ticks: run `eye tick --timeout 15` -- if Eye is dead, re-spawn + retry queue flush.
     internal const string EyeWatchdogStartupRunKeyName = "WKAppBot Eye Startup Recovery";
@@ -238,7 +238,7 @@ internal partial class Program
         SetConsoleCtrlHandler(_eyeCtrlHandler, true);
     }
 
-    // ── Crash detection helpers ──────────────────────────────────────────
+    // -- Crash detection helpers ------------------------------------------
 
     static string GetEyeVbsDir()
     {
@@ -287,7 +287,7 @@ internal partial class Program
         try { File.WriteAllText(Path.Combine(GetEyeVbsDir(), "eye-clean-exit"), "1"); } catch { }
     }
 
-    // ── Eye auto-launch (called from Program.cs for every command) ──
+    // -- Eye auto-launch (called from Program.cs for every command) --
 
     /// <summary>
     /// Auto-launch AppBotEye in unified mode (ActionState IPC) if not already running.
@@ -432,7 +432,7 @@ internal partial class Program
         GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
         int consecutiveHealthFailures = 0;
-        // Guardian runs forever — no self-succession to avoid infinite respawn chains.
+        // Guardian runs forever -- no self-succession to avoid infinite respawn chains.
         // Diag-file freshness check does not require hwnd; works across hot-swaps.
         while (true)
         {
@@ -485,7 +485,7 @@ internal partial class Program
             {
                 if (IsEyeAlive())
                 {
-                    GuardianLog("[EYE_GUARDIAN] eye restored — resuming watch");
+                    GuardianLog("[EYE_GUARDIAN] eye restored -- resuming watch");
                     consecutiveHealthFailures = 0;
                     break;
                 }
@@ -503,10 +503,10 @@ internal partial class Program
                 try { EyeTickCommand(new[] { "--timeout", "15" }); } catch { }
                 if (!IsEyeAlive())
                 {
-                    GuardianLog("[EYE_GUARDIAN] eye unrecoverable — guardian exiting");
+                    GuardianLog("[EYE_GUARDIAN] eye unrecoverable -- guardian exiting");
                     return 1;
                 }
-                GuardianLog("[EYE_GUARDIAN] eye restored via tick — resuming watch");
+                GuardianLog("[EYE_GUARDIAN] eye restored via tick -- resuming watch");
                 deadSinceUtc = null;
                 consecutiveHealthFailures = 0;
             }
@@ -520,7 +520,7 @@ internal partial class Program
     /// <summary>
     /// Eye auto-launch ??called from Program.Main for every CLI command.
     ///
-    /// ─────────────────────────────────────────────────────────────────??    /// ?? Eye Launch Flow (single-instance guarantee)                   ??    /// ??                                                               ??    /// ?? Step 1: Guard checks (RunningInEye, LOOP_CALLER)             ??    /// ?? Step 2: Alive mutex fast check ??is Eye already running?      ??    /// ?? Step 3: Spawn mutex acquire ??serialize concurrent spawners   ??    /// ??         ??If timeout (3s) ??another spawner active ??bail    ??    /// ?? Step 4: Alive mutex re-check ??Eye may have started while    ??    /// ??         we waited for spawn mutex                             ??    /// ?? Step 5: Process.Start("wkappbot-core.exe eye")               ??    /// ??         ??CreateProcess hooks / AV can add 1-5s delay here   ??    /// ?? Step 6: Poll alive mutex (max 5s) ??wait for Eye to signal   ??    /// ??         "I'm alive" before releasing spawn mutex              ??    /// ?? Step 7: Release spawn mutex ??other callers can proceed      ??    /// ─────────────────────────────────────────────────────────────────??    ///
+    /// ----------------------------------------------------------------─??    /// ?? Eye Launch Flow (single-instance guarantee)                   ??    /// ??                                                               ??    /// ?? Step 1: Guard checks (RunningInEye, LOOP_CALLER)             ??    /// ?? Step 2: Alive mutex fast check ??is Eye already running?      ??    /// ?? Step 3: Spawn mutex acquire ??serialize concurrent spawners   ??    /// ??         ??If timeout (3s) ??another spawner active ??bail    ??    /// ?? Step 4: Alive mutex re-check ??Eye may have started while    ??    /// ??         we waited for spawn mutex                             ??    /// ?? Step 5: Process.Start("wkappbot-core.exe eye")               ??    /// ??         ??CreateProcess hooks / AV can add 1-5s delay here   ??    /// ?? Step 6: Poll alive mutex (max 5s) ??wait for Eye to signal   ??    /// ??         "I'm alive" before releasing spawn mutex              ??    /// ?? Step 7: Release spawn mutex ??other callers can proceed      ??    /// ----------------------------------------------------------------─??    ///
     /// Why spawn mutex is held during Step 6:
     ///   Without this, caller B sees "alive mutex free" during Eye's init
     ///   window (between Process.Start and Eye acquiring alive mutex) and
@@ -528,7 +528,7 @@ internal partial class Program
     /// </summary>
     internal static void LaunchAppBotEyeIfNeededCore(string extraArgs)
     {
-        // ── Step 1: Guard checks ──
+        // -- Step 1: Guard checks --
         if (RunningInEye) return;
         if (IsMcpMode) return; // MCP server must NEVER spawn Eye/console windows
         // Loop subprocess mode: Eye inherits stdout pipe handle ??blocks parent's ReadToEndAsync.
@@ -536,7 +536,7 @@ internal partial class Program
 
         PulseStep.Init("eye-launch");
 
-        // ── Step 2: Alive mutex fast check ──
+        // -- Step 2: Alive mutex fast check --
         // WaitOne(0) fails ??Eye holds it ??alive ??skip.
         // WaitOne(0) succeeds ??Eye dead ??release + proceed to spawn.
         try
@@ -554,7 +554,7 @@ internal partial class Program
         PulseStep.Mark("alive-check-passed");
         EyeLog("Eye not running ??attempting spawn");
 
-        // ── Step 3: Spawn mutex acquire ──
+        // -- Step 3: Spawn mutex acquire --
         // Serializes concurrent spawn attempts across all wkappbot processes.
         // 3s timeout: if another process is already spawning, trust it and bail.
         using var spawnMutex = new System.Threading.Mutex(false, EyeSpawnMutexName);
@@ -576,7 +576,7 @@ internal partial class Program
 
         try
         {
-            // ── Step 4: Alive mutex re-check ──
+            // -- Step 4: Alive mutex re-check --
             // Eye may have started while we waited for the spawn mutex.
             try
             {
@@ -591,7 +591,7 @@ internal partial class Program
             }
             catch (System.Threading.AbandonedMutexException) { } // Eye crashed ??spawn
 
-            // ── Step 5: Resolve core exe path and spawn ──
+            // -- Step 5: Resolve core exe path and spawn --
             var launcherPath = Environment.ProcessPath ?? "";
             var dir  = Path.GetDirectoryName(launcherPath) ?? "";
             var exeName = Path.GetFileNameWithoutExtension(launcherPath); // e.g. "wkappbot" or "a11y"
@@ -619,9 +619,9 @@ internal partial class Program
                 // Policy broadcast when Eye first spawns (agent reads stdout)
                 AgentPolicy.StartPolicyBroadcast();
 
-                // ── Step 6: Fire-and-forget — no polling, no blocking ──
+                // -- Step 6: Fire-and-forget -- no polling, no blocking --
                 // Spawn mutex already prevents duplicates. Eye will acquire alive mutex on its own.
-                // Previous design polled alive mutex for up to 1s — removed to eliminate blocking.
+                // Previous design polled alive mutex for up to 1s -- removed to eliminate blocking.
                 {
                     EyeLog($"Eye spawned (fire-and-forget, pid={proc2.Pid})");
                     // Only check if process died immediately (bad path, missing exe, etc.)
@@ -641,7 +641,7 @@ internal partial class Program
         }
         finally
         {
-            // ── Step 7: Release spawn mutex ──
+            // -- Step 7: Release spawn mutex --
             if (acquired) try { spawnMutex.ReleaseMutex(); } catch { }
         }
     }
@@ -731,7 +731,7 @@ internal partial class Program
             try { Console.InputEncoding = System.Text.Encoding.UTF8; } catch { }
             try { WKAppBot.Win32.Native.NativeMethods.SetConsoleOutputCP(65001); } catch { }
             try { WKAppBot.Win32.Native.NativeMethods.SetConsoleCP(65001); } catch { }
-            // Ensure stderr is unbuffered — prevents log loss when piped to parent process or log relay.
+            // Ensure stderr is unbuffered -- prevents log loss when piped to parent process or log relay.
             try
             {
                 var errWriter = new StreamWriter(Console.OpenStandardError(), new System.Text.UTF8Encoding(false)) { AutoFlush = true };
@@ -794,22 +794,22 @@ internal partial class Program
             EyeResetColor();
         }
 
-        // --elevated arg: lightweight proxy mode — skip full Eye (WPF/MCP/Slack/watchdog).
+        // --elevated arg: lightweight proxy mode -- skip full Eye (WPF/MCP/Slack/watchdog).
         // Just start the admin pipe server immediately and wait. Pipe available in <50ms.
         // FSW watches for binary update: when new exe arrives and IsBusy=false,
-        // admin Eye spawns the new version itself (already elevated — no UAC needed) then exits.
+        // admin Eye spawns the new version itself (already elevated -- no UAC needed) then exits.
         if (isElevatedArg)
         {
-            // "나야말로 진짜다" — broadcast close signal: existing admin Eye(s) drain + exit.
-            // Must fire BEFORE starting own pipe so old admin releases its pipe first → clean gap.
+            // "나야말로 진짜다" -- broadcast close signal: existing admin Eye(s) drain + exit.
+            // Must fire BEFORE starting own pipe so old admin releases its pipe first -> clean gap.
             AdminEyeBroadcastClose.FireBroadcast();
 
-            Console.WriteLine("[EYE:ADMIN] Elevated proxy mode — pipe server starting (no WPF/MCP/Slack)");
+            Console.WriteLine("[EYE:ADMIN] Elevated proxy mode -- pipe server starting (no WPF/MCP/Slack)");
             PulseStep.Mark("elevated-proxy-only");
             var proxyCts = new CancellationTokenSource();
             Console.CancelKeyPress += (_, e) => { e.Cancel = true; proxyCts.Cancel(); };
 
-            // Watch for future new-admin-Eye broadcasts → graceful self-exit.
+            // Watch for future new-admin-Eye broadcasts -> graceful self-exit.
             // This is the ONLY self-termination path: a brand-new admin Eye (spawned
             // by Core's SudoHandler, which owns the hot-swap rename) fires broadcast
             // and we drop out of our ListenAsync loop.
@@ -866,7 +866,7 @@ internal partial class Program
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, eyeCwd, elevated, replacePid);
     }
 
-    // ── P/Invoke declarations (shared across all AppBotEye partial class files) ──
+    // -- P/Invoke declarations (shared across all AppBotEye partial class files) --
 
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_BASIC_INFORMATION
@@ -910,7 +910,7 @@ internal partial class Program
     private static extern bool GetWindowRect(IntPtr hWnd, out MV_RECT lpRect);
 
     /// <summary>
-    /// eye hotswap — force Eye self-restart by staging a .new.exe and triggering the hot-swap loop.
+    /// eye hotswap -- force Eye self-restart by staging a .new.exe and triggering the hot-swap loop.
     /// Useful when publish produced an identical binary (same mtime) and Eye skipped the swap.
     /// Works both standalone (FSW picks up .new.exe) and in-process via CMD pipe (flag set directly).
     /// </summary>
@@ -933,12 +933,12 @@ internal partial class Program
         if (File.Exists(newExePath))
         {
             var prev = new FileInfo(newExePath);
-            Console.Error.WriteLine($"[HOTSWAP] existing .new.exe: mtime={prev.LastWriteTimeUtc:HH:mm:ss}UTC size={prev.Length:#,0} — overwriting");
+            Console.Error.WriteLine($"[HOTSWAP] existing .new.exe: mtime={prev.LastWriteTimeUtc:HH:mm:ss}UTC size={prev.Length:#,0} -- overwriting");
         }
 
         try
         {
-            // Copy → touch: ensures mtime differs from running exe → identical check fails → swap proceeds
+            // Copy -> touch: ensures mtime differs from running exe -> identical check fails -> swap proceeds
             File.Copy(selfExe, newExePath, overwrite: true);
             File.SetLastWriteTimeUtc(newExePath, DateTime.UtcNow);
             var newInfo = new FileInfo(newExePath);
@@ -952,19 +952,19 @@ internal partial class Program
 
         if (RunningInEye)
         {
-            // Running in-process via Eye CMD pipe — wake the swap loop immediately (no FSW delay)
+            // Running in-process via Eye CMD pipe -- wake the swap loop immediately (no FSW delay)
             _fswExeDirty = true;
-            Console.WriteLine("[HOTSWAP] Eye notified — swap will trigger on next loop iteration (~100ms)");
+            Console.WriteLine("[HOTSWAP] Eye notified -- swap will trigger on next loop iteration (~100ms)");
         }
         else
         {
-            Console.WriteLine("[HOTSWAP] .new.exe staged — running Eye will pick up via FSW and restart");
+            Console.WriteLine("[HOTSWAP] .new.exe staged -- running Eye will pick up via FSW and restart");
         }
         return 0;
     }
 
     /// <summary>
-    /// eye homework — force-trigger homework injection immediately, bypassing idle/cooldown checks.
+    /// eye homework -- force-trigger homework injection immediately, bypassing idle/cooldown checks.
     /// Finds the WKAppBot Claude instance from _instanceStates and calls CheckAndSendHomework directly.
     /// </summary>
     static int EyeHomeworkCommand(string[] args)
@@ -1008,7 +1008,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// eye shutdown — graceful Eye shutdown via CMD pipe. Sets _eyeShutdownRequested flag;
+    /// eye shutdown -- graceful Eye shutdown via CMD pipe. Sets _eyeShutdownRequested flag;
     /// Eye loop checks this every ~100ms and exits cleanly with WriteEyeCleanExit().
     /// </summary>
     static int EyeShutdownCommand(string[] args)

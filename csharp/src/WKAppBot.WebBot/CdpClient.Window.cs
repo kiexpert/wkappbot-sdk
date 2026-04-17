@@ -104,18 +104,18 @@ public sealed partial class CdpClient
             var style = GetWindowLong(hwnd, -16); // GWL_STYLE
             if ((style & 0x00C00000) == 0) return true; // WS_CAPTION required
 
-            // Match by PID — REQUIRED to avoid hitting VS Code or other Electron apps
+            // Match by PID -- REQUIRED to avoid hitting VS Code or other Electron apps
             GetWindowThreadProcessId(hwnd, out var pid);
             if (targetPid > 0 && pid != targetPid) return true; // wrong process
-            if (targetPid == 0) return true; // PID unknown → refuse to guess
+            if (targetPid == 0) return true; // PID unknown -> refuse to guess
 
-            // Final safety: reject non-browser Electron apps (VS Code, Slack, Discord…).
+            // Final safety: reject non-browser Electron apps (VS Code, Slack, Discord...).
             // DetectCdpPort can mistakenly pick up VS Code's Chromium DevTools endpoint,
-            // setting ChromePid to VS Code's PID → this check prevents VS Code minimize.
+            // setting ChromePid to VS Code's PID -> this check prevents VS Code minimize.
             if (!IsBrowserProcess((int)pid))
             {
                 try { using var p2 = System.Diagnostics.Process.GetProcessById((int)pid);
-                      Console.Error.WriteLine($"[CDP:MINIMIZE] BLOCKED — '{p2.ProcessName}' is not a browser (hwnd=0x{hwnd:X8})"); }
+                      Console.Error.WriteLine($"[CDP:MINIMIZE] BLOCKED -- '{p2.ProcessName}' is not a browser (hwnd=0x{hwnd:X8})"); }
                 catch { }
                 return true; // skip
             }
@@ -163,7 +163,7 @@ public sealed partial class CdpClient
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
 
-    /// <summary>Force foreground via AttachThreadInput — works even when we lost focus rights.</summary>
+    /// <summary>Force foreground via AttachThreadInput -- works even when we lost focus rights.</summary>
     private static void ForceForegroundWindow(IntPtr hWnd)
     {
         BringWindowToTop(hWnd);
@@ -207,7 +207,7 @@ public sealed partial class CdpClient
     private const int SW_SHOWNOACTIVATE = 4;   // Show at previous size/position without activating
     private const int SW_SHOWMINNOACTIVE = 7;  // Show minimized without activating
 
-    // ── Bot window decoration ──────────────────────────────────────────────────
+    // -- Bot window decoration --------------------------------------------------
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
@@ -385,12 +385,12 @@ public sealed partial class CdpClient
         return await EvalAsync("document.documentElement.outerHTML");
     }
 
-    // ── Window management (CDP Browser domain + Target domain) ──
+    // -- Window management (CDP Browser domain + Target domain) --
 
     /// <summary>
     /// Expected WebBot window bounds (right side of virtual screen, near top).
     /// Position: rightmost monitor upper area, 800x600.
-    /// Uses GetSystemMetrics (physical pixels) — same coordinate space as SetWindowPos/CDP.
+    /// Uses GetSystemMetrics (physical pixels) -- same coordinate space as SetWindowPos/CDP.
     /// For WPF Eye alignment, CLI computes separately using SystemParameters (logical px).
     /// </summary>
     public static (int X, int Y, int W, int H) ExpectedBounds => ComputeExpectedBounds();
@@ -408,7 +408,7 @@ public sealed partial class CdpClient
             int rightEdge = vx + vw; // rightmost pixel of virtual screen
 
             // Find the rightmost monitor's top-Y using MonitorFromPoint + GetMonitorInfo
-            // Point at top-right corner of virtual screen → belongs to rightmost monitor
+            // Point at top-right corner of virtual screen -> belongs to rightmost monitor
             int monitorTop = 0;
             var pt = new POINT { x = rightEdge - 1, y = 0 };
             var hMon = MonitorFromPoint(pt, 2 /* MONITOR_DEFAULTTONEAREST */);
@@ -486,7 +486,7 @@ public sealed partial class CdpClient
         try
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            // Chrome ignores bounds changes while minimized — must restore first
+            // Chrome ignores bounds changes while minimized -- must restore first
             await SendAsync("Browser.setWindowBounds", new JsonObject
             {
                 ["windowId"] = windowId,
@@ -527,7 +527,7 @@ public sealed partial class CdpClient
         catch { return false; }
     }
 
-    /// <summary>Minimize Chrome window via CDP Browser.setWindowBounds. Focusless — no OS activation.</summary>
+    /// <summary>Minimize Chrome window via CDP Browser.setWindowBounds. Focusless -- no OS activation.</summary>
     public async Task<bool> MinimizeWindowAsync(string? targetId = null)
     {
         try

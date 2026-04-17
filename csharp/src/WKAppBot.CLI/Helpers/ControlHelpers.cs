@@ -175,11 +175,11 @@ internal partial class Program
             parts.Add(cls);
             current = NativeMethods.GetParent(current);
         }
-        parts.Reverse(); // root → leaf order
+        parts.Reverse(); // root -> leaf order
         return string.Join("/", parts);
     }
 
-    // ── Notice content reading + importance classification ─────────
+    // -- Notice content reading + importance classification --------─
 
     private enum NoticeImportance { Normal, Critical }
 
@@ -309,7 +309,7 @@ internal partial class Program
 
     /// <summary>
     /// Extract Static/Label text from a dialog (for handler message_contains matching).
-    /// Does NOT print to console — use ReadDialogContents for that.
+    /// Does NOT print to console -- use ReadDialogContents for that.
     /// </summary>
     private static string GetDialogMessageText(IntPtr hDialog)
     {
@@ -365,7 +365,7 @@ internal partial class Program
     /// Interactive button learning for unknown dialogs.
     /// Shows buttons, asks user to hover mouse over desired button for 1+ second,
     /// then clicks it and auto-generates a handler YAML.
-    /// Returns: (clicked, shouldRetry, buttonText) — same semantics as TryHandleBlocker.
+    /// Returns: (clicked, shouldRetry, buttonText) -- same semantics as TryHandleBlocker.
     /// </summary>
     private static (bool clicked, bool shouldRetry) InteractiveButtonLearn(
         IntPtr hDialog, string windowTitle, string classPath, string className,
@@ -380,14 +380,14 @@ internal partial class Program
         if (buttons.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("[BLOCK] No buttons found in dialog — cannot learn.");
+            Console.WriteLine("[BLOCK] No buttons found in dialog -- cannot learn.");
             Console.ResetColor();
             return (false, false);
         }
 
         // Show available buttons
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("[BLOCK] Unknown dialog — interactive learning mode!");
+        Console.WriteLine("[BLOCK] Unknown dialog -- interactive learning mode!");
         Console.WriteLine("[BLOCK] Hover your mouse over the button you want, and hold for 1 second.");
         Console.ForegroundColor = ConsoleColor.DarkGray;
         for (int i = 0; i < buttons.Count; i++)
@@ -462,7 +462,7 @@ internal partial class Program
                     var displayText = selectedText ?? "(owner-drawn)";
 
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"\r[BLOCK] Button selected: \"{displayText}\" — clicking now!          ");
+                    Console.WriteLine($"\r[BLOCK] Button selected: \"{displayText}\" -- clicking now!          ");
                     Console.ResetColor();
 
                     // Click the button
@@ -505,9 +505,9 @@ internal partial class Program
             }
         }
 
-        // Timeout — no button selected
+        // Timeout -- no button selected
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"\r[BLOCK] No button selected within {totalTimeoutMs / 1000}s — giving up.          ");
+        Console.WriteLine($"\r[BLOCK] No button selected within {totalTimeoutMs / 1000}s -- giving up.          ");
         Console.ResetColor();
 
         // Still generate sample handler for manual editing

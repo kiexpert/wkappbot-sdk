@@ -12,17 +12,17 @@ namespace WKAppBot.Vision;
 /// FREE, offline, Korean + English built-in on Korean Windows.
 ///
 /// Strategy:
-///   1. Capture screenshot → WinRT SoftwareBitmap
-///   2. OcrEngine.RecognizeAsync() → all text + bounding boxes
+///   1. Capture screenshot -> WinRT SoftwareBitmap
+///   2. OcrEngine.RecognizeAsync() -> all text + bounding boxes
 ///   3. Match description against recognized text (fuzzy)
 ///   4. Return center of matched text region
 ///
 /// Confidence:
-///   - OCR recognizes text → erase recognized pixels → remaining pixel ratio = noise
+///   - OCR recognizes text -> erase recognized pixels -> remaining pixel ratio = noise
 ///   - High text coverage = high confidence
-///   - Low coverage / no match = low confidence → fall back to Claude API
+///   - Low coverage / no match = low confidence -> fall back to Claude API
 ///
-/// Position in chain: UIA → Vision Cache → **Simple OCR** → Claude API → Coordinate
+/// Position in chain: UIA -> Vision Cache -> **Simple OCR** -> Claude API -> Coordinate
 /// </summary>
 public sealed class SimpleOcrAnalyzer : IDisposable
 {
@@ -47,7 +47,7 @@ public sealed class SimpleOcrAnalyzer : IDisposable
         if (!OcrEngine.IsLanguageSupported(primaryLang))
             throw new InvalidOperationException(
                 $"OCR language '{primaryLanguage}' not installed. " +
-                "Install via Settings → Time & Language → Language.");
+                "Install via Settings -> Time & Language -> Language.");
         _ocrEngine = OcrEngine.TryCreateFromLanguage(primaryLang)
             ?? throw new InvalidOperationException($"Failed to create OCR engine for '{primaryLanguage}'");
 
@@ -352,7 +352,7 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     }
 
     /// <summary>
-    /// Text match score (0.0 ~ 1.0) — public for use by OcrSegmentCache.BestMatch.
+    /// Text match score (0.0 ~ 1.0) -- public for use by OcrSegmentCache.BestMatch.
     /// Supports exact, contains, starts-with, and Dice-coefficient fuzzy matching.
     /// </summary>
     public static double MatchScore(string ocrText, string description)
@@ -400,7 +400,7 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     {
         var newWidth = original.Width * factor;
         var newHeight = original.Height * factor;
-        // Always use 32bppArgb — indexed formats (8bpp, 4bpp, 1bpp) can't be used with Graphics
+        // Always use 32bppArgb -- indexed formats (8bpp, 4bpp, 1bpp) can't be used with Graphics
         var scaled = new Bitmap(newWidth, newHeight, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         scaled.SetResolution(original.HorizontalResolution * factor, original.VerticalResolution * factor);
         using var g = Graphics.FromImage(scaled);
@@ -412,11 +412,11 @@ public sealed class SimpleOcrAnalyzer : IDisposable
     }
 
     /// <summary>
-    /// Convert System.Drawing.Bitmap → WinRT SoftwareBitmap for OCR.
+    /// Convert System.Drawing.Bitmap -> WinRT SoftwareBitmap for OCR.
     /// </summary>
     private static async Task<SoftwareBitmap> ConvertToSoftwareBitmap(Bitmap bitmap)
     {
-        // Normalize pixel format — indexed/non-standard formats throw ArgumentException on BMP save
+        // Normalize pixel format -- indexed/non-standard formats throw ArgumentException on BMP save
         Bitmap? owned = null;
         if (bitmap.PixelFormat is not (System.Drawing.Imaging.PixelFormat.Format32bppArgb
             or System.Drawing.Imaging.PixelFormat.Format32bppRgb

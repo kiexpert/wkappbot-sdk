@@ -57,7 +57,7 @@ internal sealed class OcrGapCollector
             // Cache lookup: {aid}-{hash}=*.png
             cachedDescription = LookupCache(aidKey, hash);
             if (cachedDescription != null)
-                return false; // cache hit — no need for Vision
+                return false; // cache hit -- no need for Vision
 
             _entries.Add(new GapEntry(screenRect, ocrPartial, aid, bmp, hash));
             return true;
@@ -114,7 +114,7 @@ internal sealed class OcrGapCollector
 
     internal static string ComputePixelHash(Bitmap bmp)
     {
-        // Fast pixel hash: sample every 4th pixel, MD5 → 8-char hex
+        // Fast pixel hash: sample every 4th pixel, MD5 -> 8-char hex
         using var md5 = MD5.Create();
         int step = 4;
         int w = bmp.Width, h = bmp.Height;
@@ -145,7 +145,7 @@ internal sealed class OcrGapCollector
     /// <summary>
     /// Build 3 composite images (forward, reverse, shuffle) + prompt for cross-verification.
     /// Returns (list of PNG bytes, prompt text for Vision API).
-    /// Gemini sees all 3 in one request — inconsistent answers = suspect.
+    /// Gemini sees all 3 in one request -- inconsistent answers = suspect.
     /// </summary>
     public (List<byte[]> pngImages, string prompt) BuildTripleComposite()
     {
@@ -175,7 +175,7 @@ internal sealed class OcrGapCollector
         var sb = new System.Text.StringBuilder();
         sb.AppendLine("Three images are attached. Each shows the SAME UI regions in DIFFERENT order.");
         sb.AppendLine("Read the text in each numbered region of ALL three images independently.");
-        sb.AppendLine("Do NOT copy answers between images — read each one fresh.");
+        sb.AppendLine("Do NOT copy answers between images -- read each one fresh.");
         sb.AppendLine("If a region contains no readable text but has an icon, symbol, or image,");
         sb.AppendLine("describe it in parentheses: (icon: description) or (image: description).");
         sb.AppendLine("Format your answer as:");
@@ -193,9 +193,9 @@ internal sealed class OcrGapCollector
             var e = _entries[i];
             sb.Append($"  Region {i + 1}: {e.Bounds.Width}x{e.Bounds.Height}px");
             if (!string.IsNullOrEmpty(e.OcrPartial))
-                sb.Append($" — OCR partial: \"{e.OcrPartial}\"");
+                sb.Append($" -- OCR partial: \"{e.OcrPartial}\"");
             else
-                sb.Append(" — OCR: (none)");
+                sb.Append(" -- OCR: (none)");
             sb.AppendLine();
         }
 
@@ -260,7 +260,7 @@ internal sealed class OcrGapCollector
 
     /// <summary>
     /// Parse Vision API response containing 3 image sections (A, B, C).
-    /// Returns per-image results: "A" → {1: "text", 2: "(icon: arrow)"}, etc.
+    /// Returns per-image results: "A" -> {1: "text", 2: "(icon: arrow)"}, etc.
     /// </summary>
     public static Dictionary<string, Dictionary<int, string>> ParseTripleResponse(string response)
     {
@@ -296,7 +296,7 @@ internal sealed class OcrGapCollector
 
     /// <summary>
     /// Cross-verify triple results: score each region by consistency.
-    /// Returns region index → (bestText, score%) where:
+    /// Returns region index -> (bestText, score%) where:
     ///   100% = 3/3 agree, 67% = 2/3 agree (majority wins), 0% = all different.
     /// </summary>
     public static Dictionary<int, (string text, int score)> CrossVerify(

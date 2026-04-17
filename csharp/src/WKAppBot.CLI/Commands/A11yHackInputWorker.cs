@@ -1,4 +1,4 @@
-// A11yHackInputWorker.cs — Standalone hack-input worker (keyboard focus analysis)
+// A11yHackInputWorker.cs -- Standalone hack-input worker (keyboard focus analysis)
 // Usage: wkappbot a11y hack-input [--parent-pid N] [--timeout Ns]
 // Tracks keyboard focus element, shows input capabilities + parent chain.
 // Runs until: Ctrl+C, parent dies, or timeout.
@@ -54,18 +54,18 @@ internal partial class Program
                 {
                     Thread.Sleep(5000);
                     try { System.Diagnostics.Process.GetProcessById(parentPid); }
-                    catch { Log("Parent gone — exiting"); cts.Cancel(); break; }
+                    catch { Log("Parent gone -- exiting"); cts.Cancel(); break; }
                 }
             });
         }
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
         if (timeoutSec > 0)
-            Task.Run(async () => { await Task.Delay(timeoutSec * 1000); Log($"Timeout {timeoutSec}s — exiting"); cts.Cancel(); });
+            Task.Run(async () => { await Task.Delay(timeoutSec * 1000); Log($"Timeout {timeoutSec}s -- exiting"); cts.Cancel(); });
 
         using var locator = new UiaLocator();
 
         string lastKey = "";
-        Log("Loop started — monitoring keyboard focus");
+        Log("Loop started -- monitoring keyboard focus");
 
         while (!cts.IsCancellationRequested)
         {
@@ -104,7 +104,7 @@ internal partial class Program
 
                 // Build output
                 var pats = info.Patterns.Count > 0 ? string.Join(",", info.Patterns) : "none";
-                var valuePreview = info.Value.Length > 0 ? $" val=\"{(info.Value.Length > 30 ? info.Value[..30] + "…" : info.Value)}\"" : "";
+                var valuePreview = info.Value.Length > 0 ? $" val=\"{(info.Value.Length > 30 ? info.Value[..30] + "..." : info.Value)}\"" : "";
 
                 // Input capability assessment
                 var inputMethods = new List<string>();
@@ -114,7 +114,7 @@ internal partial class Program
                 if (info.Patterns.Contains("Toggle")) inputMethods.Add("Toggle");
                 // Always available as fallback
                 inputMethods.Add("SendKeys");
-                var inputStr = string.Join("→", inputMethods);
+                var inputStr = string.Join("->", inputMethods);
 
                 // grap pattern for this element
                 var grap = !string.IsNullOrEmpty(label) ? $"{json5}#*{label}*" : json5;
@@ -130,7 +130,7 @@ internal partial class Program
                 // Parent chain (compact)
                 if (info.ParentChain.Count > 0)
                 {
-                    var chain = string.Join(" → ", info.ParentChain.Take(5).Select(p =>
+                    var chain = string.Join(" -> ", info.ParentChain.Take(5).Select(p =>
                         !string.IsNullOrEmpty(p.name) ? $"{p.type}:\"{p.name}\"" : p.type));
                     Console.WriteLine($"  chain: {chain}");
                 }
