@@ -193,14 +193,10 @@ internal partial class Program
         var (win32Segments, uiaScopePath) = GrapHelper.SplitGrap(rawTitle);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
-        var windows = WindowFinder.FindWindows(win32Segments[0]);
-        if (windows.Count == 0)
-        {
-            Console.WriteLine($"No window found matching: \"{win32Segments[0]}\"");
-            return 1;
-        }
-
-        var mainWin = windows[0];
+        // Ambiguity-guard + readiness Probe (magnifier) on the root target.
+        // Single-target contract: multiple matches -> find-style list + error exit.
+        var mainWin = ResolveA11yTarget(win32Segments[0], "inspect");
+        if (mainWin == null) return 1;
 
         // Elevation auto-detect: delegate to admin proxy if target is elevated
         var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(

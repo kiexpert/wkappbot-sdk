@@ -23,14 +23,9 @@ internal partial class Program
         string? formId = GetArgValue(args, "--form");
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
 
-        var windows = WindowFinder.FindWindows(title);
-        if (windows.Count == 0)
-        {
-            Console.WriteLine($"No window found matching: \"{title}\"");
-            return 1;
-        }
-
-        var win = windows[0];
+        // Ambiguity-guard + readiness Probe (magnifier) on the target.
+        var win = ResolveA11yTarget(title, "screenshot");
+        if (win == null) return 1;
         AppScanResult? scanResult = null;
 
         // Default save location: experience/{proc}/{class}/ (same dir as inspect/scan data)
@@ -144,12 +139,9 @@ internal partial class Program
         }
         else
         {
-            // Treat as window title
-            var windows = WindowFinder.FindWindows(target);
-            if (windows.Count == 0)
-                return Error($"Window not found: \"{target}\"");
-
-            var win = windows[0];
+            // Treat as window title -- ambiguity-guard + readiness Probe (magnifier).
+            var win = ResolveA11yTarget(target, "ocr");
+            if (win == null) return 1;
             Console.WriteLine($"Capturing: {win}");
             screenshot = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
             sourceDesc = win.Title;
