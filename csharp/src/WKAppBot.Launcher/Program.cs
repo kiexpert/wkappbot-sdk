@@ -391,7 +391,8 @@ partial class Program
         //   - Already --sudo
         //   - CDP-dependent commands (ask, web, agent, newchat) — these need local Chrome
         //     access which admin Eye's subprocess context cannot provide
-        var isCdpCommand = cmd is "ask" or "web" or "agent" or "newchat";
+        // CDP commands need local Chrome; run/do need local UIA/window access
+        var isCdpCommand = cmd is "ask" or "web" or "agent" or "newchat" or "run" or "do";
         if (!forwardArgs.Any(a => a == "--sudo") && !isEyeDaemon && !isCdpCommand)
         {
             try

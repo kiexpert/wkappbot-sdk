@@ -2,10 +2,14 @@ scenario:
   name: "Expect-Recovery Demo"
   description: "Demonstrates the P1 expect-recovery pattern: action → poll expected state → recovery on failure"
 
+config:
+  focus_check: false
+  prefer_focusless: true
+
 app:
   launch: "notepad.exe"
   wait_for_window:
-    title_contains: "Notepad"
+    title_contains: "메모장"
     timeout: 5
 
 steps:
@@ -21,7 +25,7 @@ steps:
     params: { keys: ["Control", "s"] }
     expect:
       condition: window_present
-      target: { name: "*Save*" }
+      target: { name: "*저장*" }
       timeout: 5
     recovery:
       action: hotkey
@@ -35,5 +39,5 @@ steps:
     params: { key: Escape }
     expect:
       condition: window_absent
-      target: { name: "*Save*" }
+      target: { name: "*저장*" }
       timeout: 3
