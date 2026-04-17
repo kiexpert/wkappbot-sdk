@@ -50,6 +50,12 @@ internal static class SudoHandler
             return true;
         }
 
+        // Pre-check missed. Distinguishing "admin Eye not running" (cold start, normal)
+        // from "pipe existed but handshake failed" (regression) requires elapsed-time
+        // knowledge which Ping() abstracts away. The Launcher's --sudo probe already
+        // makes this distinction and emits the big banner + bug suggest if it was a
+        // real handshake miss -- no need to duplicate here. Just log the pulse line
+        // and proceed to spawn.
         PulseStep.Line("SudoHandler: admin Eye unresponsive -- need spawn path");
 
         // Step 2a: hot-swap pending .new.exe (file rename only, NO Eye launch)

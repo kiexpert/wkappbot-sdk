@@ -34,7 +34,7 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.14` -- bumped at 2026-04-16 (--sudo 4-layer elevation: MCP Launcher pre-exec gate, Core startup handler with PulseStep tracing, eye --sudo non-destructive force-launch, Eye auto-launch inheritance, LaunchElevatedEye pre-spawn hot-swap + reason/trail for UAC)
+`5.14` -- bumped at 2026-04-16 (--sudo launcher pre-exec gate, Core bootstrap handler with PulseStep tracing, eye --sudo non-destructive force-launch, admin Eye reuse probe, indefinite post-UAC wait, no fallback after takeover, LaunchElevatedEye pre-spawn hot-swap + reason/trail for UAC)
 
 ## Previous versions
 

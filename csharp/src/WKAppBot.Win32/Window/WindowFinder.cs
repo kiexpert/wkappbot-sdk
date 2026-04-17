@@ -205,6 +205,104 @@ public static class WindowFinder
             return true;
         }, IntPtr.Zero);
 
+        // -- Hidden top-level fallback: if the visible scan found nothing, re-scan
+        // invisible top-level windows so process-name / cmdline searches can still
+        // surface admin-only frames, hidden launchers, and windowless shells.
+        if (results.Count == 0)
+        {
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                if (NativeMethods.IsWindowVisible(hWnd)) return true;
+
+                var title = GetWindowText(hWnd);
+                var cls = GetClassName(hWnd);
+
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+                if (!procNameCache.TryGetValue(pid, out var procName))
+                {
+                    procName = NativeMethods.TryGetProcessNameFast(pid) ?? $"pid={pid}";
+                    procNameCache[pid] = procName;
+                }
+
+                NativeMethods.GetWindowRect(hWnd, out var rect);
+                var w = rect.Right - rect.Left;
+                var h = rect.Bottom - rect.Top;
+                var searchKey = BuildSearchKey(hWnd, cls, title, procName, w, h, focus);
+
+                string matchedVia = "hidden";
+                string matchedSnippet = title;
+                bool matched = PatternMatcher.TokenMatchAny(titlePattern, title, searchKey);
+                if (matched && !PatternMatcher.TokenMatchAny(titlePattern, title) && PatternMatcher.TokenMatchAny(titlePattern, procName))
+                {
+                    matchedVia = "proc"; matchedSnippet = procName;
+                }
+
+                if (!matched)
+                {
+                    var url = GetBrowserUrl(hWnd, pid);
+                    if (!string.IsNullOrEmpty(url) && PatternMatcher.TokenMatchAny(titlePattern, url))
+                    {
+                        matched = true;
+                        try { matchedVia = "domain"; matchedSnippet = new Uri(url.Split(' ')[0]).Host; } catch { matchedVia = "url"; matchedSnippet = url.Length > 60 ? url[..60] : url; }
+                    }
+                }
+
+                if (!matched)
+                {
+                    try
+                    {
+                        var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                        if (!string.IsNullOrEmpty(cmdLine) && PatternMatcher.TokenMatchAny(titlePattern, cmdLine))
+                        {
+                            matched = true;
+                            matchedVia = "cmd";
+                            var tokens = cmdLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                            var matchToken = tokens.FirstOrDefault(tk => PatternMatcher.TokenMatchAny(titlePattern, tk))
+                                             ?? (cmdLine.Length > 60 ? cmdLine[..60] : cmdLine);
+                            matchedSnippet = matchToken.Trim('"', '\'');
+                        }
+                    }
+                    catch { }
+                }
+
+                if (!matched)
+                {
+                    if ((procName.Equals("Code", StringComparison.OrdinalIgnoreCase)
+                         || procName.Equals("claude", StringComparison.OrdinalIgnoreCase)
+                         || procName.Equals("codex", StringComparison.OrdinalIgnoreCase)
+                         || cls.StartsWith("Chrome_WidgetWin_", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        try
+                        {
+                            var uiaHits = UiaLocator.QuickSearch(hWnd, titlePattern, maxDepth: 5, maxResults: 3, maxVisited: 250, timeoutMs: 1500);
+                            if (uiaHits.Count > 0)
+                            {
+                                matched = true;
+                                matchedVia = "uia";
+                                matchedSnippet = uiaHits[0].NamePath.Length > 0
+                                    ? uiaHits[0].NamePath
+                                    : (!string.IsNullOrEmpty(uiaHits[0].AutomationId) ? uiaHits[0].AutomationId : uiaHits[0].Name);
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (matched)
+                {
+                    var info = WindowInfo.FromHwnd(hWnd);
+                    var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
+                    info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
+                    info.MatchedVia = matchedVia;
+                    info.MatchedSnippet = matchedSnippet;
+                    results.Add(info);
+                    if (stopOnFirstMatch) return false;
+                }
+
+                return true;
+            }, IntPtr.Zero);
+        }
+
         // -- Windowless process cmdLine scan: find processes with no visible window --
         // Walk PPID chain to find host window (e.g. wkappbot running in VS Code terminal).
         {

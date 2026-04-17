@@ -12,7 +12,7 @@ public sealed partial class ClaudePromptHelper
 {
     /// <summary>
     /// Find prompt in Claude Desktop (Electron) window.
-    /// UIA path: Window -> ... -> Document "Claude" aid="RootWebArea" -> Group aid="turn-form" -> Group "입력하세요"
+    /// UIA path: Window -> ... -> Document "Claude" aid="RootWebArea" -> Group aid="turn-form" -> Group "Type here"
     /// </summary>
     private PromptInfo? FindClaudeDesktopPrompt(int processId)
     {
@@ -82,7 +82,7 @@ public sealed partial class ClaudePromptHelper
                 Console.WriteLine($"  [PROMPT]     turn-form FOUND at ({turnForm.BoundingRectangle})");
 
                 // Found the prompt container! Get the input group
-                // It's a child Group with name "입력하세요" or similar placeholder
+                // It's a child Group with a placeholder-like name.
                 var inputGroup = turnForm.FindFirstChild(
                     new PropertyCondition(
                         _automation.PropertyLibrary.Element.ControlType,
@@ -382,13 +382,7 @@ public sealed partial class ClaudePromptHelper
                 {
                     var n = (e.Name ?? string.Empty).ToLowerInvariant();
                     if (string.IsNullOrWhiteSpace(n)) return false;
-                    return n.Contains("file edit approval") ||
-                           n.Contains("retry without sandbox") ||
-                           n.Contains("approval") ||
-                           n.Contains("permission") ||
-                           n.Contains("approve") ||
-                           n.Contains("수락") ||
-                           n.Contains("허용");
+                    return ApprovalPolicy.ContainsApprovalContext(n);
                 }
                 catch { return false; }
             });
@@ -403,12 +397,7 @@ public sealed partial class ClaudePromptHelper
                         if (!e.IsEnabled) return false;
                         var n = (e.Name ?? string.Empty).ToLowerInvariant();
                         if (string.IsNullOrWhiteSpace(n)) return false;
-                        return n.Contains("approve") ||
-                               n.Equals("accept") ||
-                               n.Contains("allow") ||
-                               n.Equals("yes") ||
-                               n.Contains("수락") ||
-                               n.Contains("허용");
+                        return ApprovalPolicy.ContainsApprovalButtonText(n);
                     }
                     catch { return false; }
                 })

@@ -227,7 +227,7 @@ internal partial class Program
 
     /// <summary>
     /// Click the plan approval button via MCP a11y invoke.
-    /// Searches for a Button containing "계획 승인" in its Name.
+    /// Searches for a button whose Name contains the plan approval label.
     /// Returns true if button was found and invoked.
     /// </summary>
     static bool ClickApproveButton(IntPtr claudeHwnd)
@@ -294,15 +294,11 @@ internal partial class Program
 
     /// <summary>
     /// Check if text is a plan approval keyword.
-    /// Matches: "승인", "ㅇ", "V", "ok", "approve", "ㄱㄱ", "고", "넹", etc.
+    /// Matches approval shortcuts such as "ok", "approve", "yes", "lgtm", and similar forms.
     /// </summary>
     static bool IsPlanApprovalKeyword(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return false;
-        var t = text.Trim().ToLowerInvariant();
-        return t is "승인" or "ㅇ" or "v" or "ok" or "approve" or "yes"
-            or "ㄱㄱ" or "고" or "넹" or "넵" or "ㅇㅇ" or "확인"
-            or "좋아" or "진행" or "시작" or "go" or "lgtm" or "ㅎㅎ";
+        return ApprovalPolicy.IsPlanApprovalKeyword(text);
     }
 
     /// <summary>
@@ -399,12 +395,12 @@ internal partial class Program
 
             var cf = new ConditionFactory(new UIA3PropertyLibrary());
 
-            // 1. Check for "중단" (Stop) button -> Claude is executing
+            // 1. Check for the Stop button -> Claude is executing.
             var stopButton = window.FindFirstDescendant(
                 cf.ByControlType(ControlType.Button).And(cf.ByName("중단")));
             if (stopButton != null)
             {
-                // Live response text -> StatusBar fallback -> generic "실행 중"
+                // Live response text -> StatusBar fallback -> generic "executing".
                 var liveText = GetLiveResponseText(window, cf);
                 var statusText = liveText ?? GetLatestStatusBarText(window, cf);
                 return Tuple.Create("executing", statusText ?? "실행 중");
@@ -536,9 +532,9 @@ internal partial class Program
 
             // 4. ★ turn-form Name fallback -- Electron webview buttons often aren't exposed as UIA buttons
             // turn-form Name contains concatenated text of all child elements, e.g.:
-            //   " 메뉴 토글 권한 요청 Opus 4.6 중단"  -> executing + permission prompt
-            //   " 메뉴 토글 Opus 4.6"                 -> prompt ready (normal)
-            //   "계획" button visible nearby           -> plan approval pending
+            //   "menu toggle permission request Opus 4.6 stop" -> executing + permission prompt
+            //   "menu toggle Opus 4.6"                      -> prompt ready (normal)
+            //   nearby plan button visible                  -> plan approval pending
             var turnForm = window.FindFirstDescendant(
                 cf.ByAutomationId("turn-form"));
             if (turnForm != null)
@@ -559,7 +555,7 @@ internal partial class Program
                     {
                         var turnFormName = turnForm.Name ?? "";
 
-                        // 4a. "중단" in turn-form Name -> executing (Button search missed it)
+                        // 4a. Stop label in turn-form Name -> executing (button search missed it).
                         if (turnFormName.Contains("중단"))
                         {
                             // Also check for permission prompt within executing state
@@ -572,14 +568,14 @@ internal partial class Program
                             return Tuple.Create("executing", statusText ?? "실행 중");
                         }
 
-                        // 4b. "권한 요청" in turn-form Name -> permission prompt
+                        // 4b. Permission request in turn-form Name -> permission prompt.
                         if (turnFormName.Contains("권한 요청") || turnFormName.Contains("권한요청"))
                         {
                             return Tuple.Create("permission_prompt", "권한 요청 대기");
                         }
 
-                        // 4c. Check for plan approval: look for "계획" button nearby
-                        // Claude Desktop shows "계획" tab/button when in plan mode
+                        // 4c. Check for plan approval: look for a nearby plan button.
+                        // Claude Desktop shows a plan tab/button when in plan mode.
                         try
                         {
                             var planButtons = window.FindAllDescendants(cf.ByControlType(ControlType.Button));
@@ -624,7 +620,7 @@ internal partial class Program
 
     /// <summary>
     /// Get the most recent StatusBar text from Claude Desktop's UIA tree.
-    /// Returns text like "파일 읽음", "명령 실행함", "도구 사용함".
+    /// Returns text like "file read", "command executed", or "tool used".
     /// </summary>
     private static string? GetLatestStatusBarText(
         FlaUI.Core.AutomationElements.AutomationElement window, ConditionFactory cf)
@@ -704,7 +700,7 @@ internal partial class Program
 
             if (lastText == null) return null;
 
-            // Extract the last non-empty line -- "방송" view should show the most recent output tail
+            // Extract the last non-empty line -- the broadcast view should show the most recent output tail.
             var lines = lastText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             var lastLine = lines.LastOrDefault(l => l.Length >= 4) ?? lastText.Trim();
             if (string.IsNullOrWhiteSpace(lastLine)) return null;
@@ -815,7 +811,7 @@ internal partial class Program
 
     /// <summary>
     /// Get the parsed reset time from a rate_limit status display text.
-    /// Extracts "HH:mm" from "한도 초과 -- 16:00에 리셋".
+    /// Extracts "HH:mm" from a reset message such as "rate limit exceeded -- resets at 16:00".
     /// Returns null if not parseable.
     /// </summary>
     static DateTime? GetResetTimeFromDisplayText(string? displayText)
@@ -970,7 +966,7 @@ internal partial class Program
 
     /// <summary>
     /// CLI entry: wkappbot claude-detect &lt;hwnd-hex&gt; [--plan]
-    /// Returns JSON: {"status":"executing","text":"실행 중"} or {"status":null}
+    /// Returns JSON: {"status":"executing","text":"executing"} or {"status":null}
     /// With --plan: {"source":"file","content":"plan text..."} or {"source":null}
     /// </summary>
     static int ClaudeDetectCommand(string[] args)

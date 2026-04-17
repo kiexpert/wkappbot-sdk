@@ -203,6 +203,7 @@ static class ElevatedEyeServer
             // Subprocess-tag: skip Eye auto-spawn in child. When elevated parent already holds
             // stdout pipe, a grandchild Eye would inherit it and block ReadToEndAsync forever.
             psi.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = "eye-proxy";
+            psi.EnvironmentVariables["WKAPPBOT_SUDO_ACTIVE"] = "1";
 
             Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} StartTracked exe={Path.GetFileName(exePath)} args=\"{argsStr}\"");
             var swStart = System.Diagnostics.Stopwatch.StartNew();
@@ -303,6 +304,11 @@ static class ElevatedEyeClient
         {
             using var pipe = new NamedPipeClientStream(
                 ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            if (connectMs <= 0)
+            {
+                pipe.Connect();
+                return pipe.IsConnected;
+            }
             using var cts = new CancellationTokenSource(connectMs);
             pipe.ConnectAsync(connectMs, cts.Token).GetAwaiter().GetResult();
             return pipe.IsConnected;
@@ -319,8 +325,19 @@ static class ElevatedEyeClient
             using var pipe = new NamedPipeClientStream(
                 ".", ElevatedEyeServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
 
-            using var cts = new CancellationTokenSource(timeoutMs);
-            await pipe.ConnectAsync(timeoutMs, cts.Token); // use caller's timeoutMs, not hardcoded 3000
+            CancellationToken ct;
+            CancellationTokenSource? cts = null;
+            if (timeoutMs > 0)
+            {
+                cts = new CancellationTokenSource(timeoutMs);
+                ct = cts.Token;
+                await pipe.ConnectAsync(timeoutMs, ct); // use caller's timeoutMs, not hardcoded 3000
+            }
+            else
+            {
+                ct = CancellationToken.None;
+                await Task.Run(() => pipe.Connect());
+            }
 
             var req = new EyeProxyRequest
             {
@@ -329,8 +346,8 @@ static class ElevatedEyeClient
                 Args = args,
             };
 
-            await EyeProxyWire.WriteAsync(pipe, req, cts.Token);
-            return await EyeProxyWire.ReadAsync<EyeProxyResponse>(pipe, cts.Token);
+            await EyeProxyWire.WriteAsync(pipe, req, ct);
+            return await EyeProxyWire.ReadAsync<EyeProxyResponse>(pipe, ct);
         }
         catch (TimeoutException)
         {
