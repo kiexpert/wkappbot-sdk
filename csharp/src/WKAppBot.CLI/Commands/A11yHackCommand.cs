@@ -60,9 +60,11 @@ internal partial class Program
         var hackLog = Console.Error;
         PulseStep.Init("a11y-hack");
 
-        // Snapshot foreground window BEFORE any UIA/capture work -- hack must be focusless;
-        // if any step accidentally steals foreground, we restore at exit.
-        var prevFgHack = NativeMethods.GetForegroundWindow();
+        // [FOCUS-STEAL] End-of-command sentinel + mid-pipeline Checkpoint() calls.
+        // hack must be focusless: UIA FromHandle / FindAllChildren on Chromium/Electron are
+        // the most likely theft vectors. Sentinel restores fg at exit AND emits auto bug
+        // report when theft is detected. Checkpoint() is called after each high-risk stage.
+        using var focusSentinel = new FocusStealSentinel("a11y-hack");
 
         // Parse grap#scope
         var grapFull = string.Join(" ", args.TakeWhile(a => !a.StartsWith("--")));
@@ -152,6 +154,10 @@ internal partial class Program
                 "target", Role: HackBoxRole.Target)
         }));
         liveOverlay?.StartHoverTracking(fullWr.Left, fullWr.Top);
+        // [FOCUS-STEAL:mid] WPF overlay Show should be focusless (WS_EX_NOACTIVATE +
+        // ShowActivated=false + SWP_NOACTIVATE) but check anyway -- if a theft occurs
+        // here it means the overlay creation path regressed.
+        focusSentinel.Checkpoint();
 
         // -- Abort checks (two tiers) --
         var hackAborted = false;
@@ -468,6 +474,17 @@ internal partial class Program
         }
         catch (Exception ex) { hackLog.WriteLine($"[HACK] UIA scan error: {ex.Message}"); }
 
+        // [FOCUS-STEAL:mid] UIA scan (FromHandle / FindAllChildren) is the primary theft vector.
+        // Check now so we bail before OCR/Vision workers spin up on a stolen window.
+        if (focusSentinel.Checkpoint())
+        {
+            hackLog.WriteLine("[HACK] focus stolen during UIA scan -- aborting pipeline");
+            bmp.Dispose();
+            if (!_hackHoverAnalyzing) liveOverlay?.Hide();
+            PulseStep.Done();
+            return 0;
+        }
+
         if (HackTargetChanged()) { bmp.Dispose(); return 0; }
 
         // -- OCR + Vision: background workers (overlay stays responsive) --
@@ -541,22 +558,7 @@ internal partial class Program
         bmp.Dispose();
         if (!_hackHoverAnalyzing) liveOverlay?.Hide();
 
-        // Focus-steal recovery: if anything along the UIA/capture path activated a window,
-        // restore the original foreground. Hack is contractually focusless.
-        try
-        {
-            if (prevFgHack != IntPtr.Zero)
-            {
-                var curFg = NativeMethods.GetForegroundWindow();
-                if (curFg != prevFgHack)
-                {
-                    Console.Error.WriteLine($"[HACK] Focus steal detected: was=0x{prevFgHack.ToInt64():X8} now=0x{curFg.ToInt64():X8} -- restoring");
-                    NativeMethods.ForceForegroundWindow(prevFgHack);
-                }
-            }
-        }
-        catch { }
-
+        // focusSentinel.Dispose() at scope exit handles focus-steal detection + recovery + bug report.
         PulseStep.Done();
         return 0;
     }
