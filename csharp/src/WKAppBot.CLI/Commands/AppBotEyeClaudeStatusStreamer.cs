@@ -292,6 +292,16 @@ internal partial class Program
                 }
                 else if (sizeMB >= UrgentMB && !string.IsNullOrEmpty(slackBotToken))
                 {
+                    // Fire the urgent nudge ONCE per session -- previously this re-fired on every
+                    // +1MB tick past 10MB (10 -> 11 -> 12 ...), spamming the prompt window and
+                    // Slack with identical alerts. A single warning at the threshold crossing
+                    // is enough; the status line keeps showing the live MB regardless.
+                    if (prevWarned.mb >= (int)UrgentMB)
+                    {
+                        Console.Error.WriteLine($"[EYE] [{cwdTag}] urgent already warned at {prevWarned.mb}MB, suppressing ({sizeMB:F1}MB now)");
+                        continue;
+                    }
+
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.Error.WriteLine($"[EYE] 🚨 [{cwdTag}] Context {pct}%! ({sizeMB:F1}MB/{ContextLimitMB}MB) -- handoff immediately!");
                     Console.ResetColor();
