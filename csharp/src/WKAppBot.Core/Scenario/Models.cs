@@ -116,6 +116,63 @@ public sealed class StepDefinition
     public string Action { get; set; } = "";
     public TargetDefinition? Target { get; set; }
     public StepParams? Params { get; set; }
+
+    /// <summary>
+    /// Post-action state gate: poll until expected condition is met.
+    /// If timeout expires, run recovery (if defined) then retry or fail.
+    /// </summary>
+    public ExpectDefinition? Expect { get; set; }
+
+    /// <summary>
+    /// Recovery action executed when expect fails. Can retry original action.
+    /// </summary>
+    public RecoveryDefinition? Recovery { get; set; }
+}
+
+/// <summary>
+/// Expected UI state after action — polled with focusless UIA queries only.
+/// No SendInput, no focus steal during polling.
+/// </summary>
+public sealed class ExpectDefinition
+{
+    /// <summary>
+    /// Condition type: element_visible, element_enabled, element_absent,
+    /// text_contains, text_equals, window_present, window_absent.
+    /// </summary>
+    public string Condition { get; set; } = "element_visible";
+
+    /// <summary>Target to check. Defaults to the step's own target if null.</summary>
+    public TargetDefinition? Target { get; set; }
+
+    /// <summary>Expected value for text-based conditions.</summary>
+    public string? Value { get; set; }
+
+    /// <summary>Polling timeout in seconds. Default 10.</summary>
+    public double Timeout { get; set; } = 10.0;
+
+    /// <summary>Polling interval in seconds. Default 0.3.</summary>
+    public double Interval { get; set; } = 0.3;
+}
+
+/// <summary>
+/// Recovery handler: mini-step executed when expect fails.
+/// </summary>
+public sealed class RecoveryDefinition
+{
+    /// <summary>Action to take (press_key, click, etc.)</summary>
+    public string Action { get; set; } = "";
+
+    /// <summary>Parameters for recovery action.</summary>
+    public StepParams? Params { get; set; }
+
+    /// <summary>Target for recovery action (optional).</summary>
+    public TargetDefinition? Target { get; set; }
+
+    /// <summary>Retry the original step action after recovery. Default true.</summary>
+    public bool Retry { get; set; } = true;
+
+    /// <summary>Max recovery attempts before hard fail. Default 2.</summary>
+    public int MaxRetries { get; set; } = 2;
 }
 
 public sealed class TargetDefinition
