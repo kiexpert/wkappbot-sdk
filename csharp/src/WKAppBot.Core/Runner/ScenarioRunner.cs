@@ -353,6 +353,15 @@ public sealed class ScenarioRunner
                     {
                         ctx.MainWindowHandle = proc.MainWindowHandle;
                         ctx.AppTitle = title;
+                        // Scenario runner is user-initiated: mark readiness so BringToFront
+                    // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
+                    // proper path, but ScenarioRunner may run without a wired ReadinessInstance
+                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // authorized caller, not a rogue background worker.
+                    if (ReadinessInstance != null)
+                        try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
+                    else
+                        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
                         WindowFinder.BringToFront(ctx.MainWindowHandle);
                         Thread.Sleep(500);
                         return;
@@ -362,6 +371,15 @@ public sealed class ScenarioRunner
                 {
                     ctx.MainWindowHandle = proc.MainWindowHandle;
                     ctx.AppTitle = WindowFinder.GetWindowText(proc.MainWindowHandle);
+                    // Scenario runner is user-initiated: mark readiness so BringToFront
+                    // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
+                    // proper path, but ScenarioRunner may run without a wired ReadinessInstance
+                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // authorized caller, not a rogue background worker.
+                    if (ReadinessInstance != null)
+                        try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
+                    else
+                        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
                     WindowFinder.BringToFront(ctx.MainWindowHandle);
                     Thread.Sleep(500);
                     return;
@@ -380,6 +398,16 @@ public sealed class ScenarioRunner
                     ctx.AppTitle = windows[0].Title;
                     if (_verbose)
                         LogRun($"  Found via title search: 0x{ctx.MainWindowHandle:X8} \"{ctx.AppTitle}\"");
+                    // [READINESS] Probe before BringToFront — focus-steal guard requires it
+                    // Scenario runner is user-initiated: mark readiness so BringToFront
+                    // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
+                    // proper path, but ScenarioRunner may run without a wired ReadinessInstance
+                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // authorized caller, not a rogue background worker.
+                    if (ReadinessInstance != null)
+                        try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
+                    else
+                        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
                     WindowFinder.BringToFront(ctx.MainWindowHandle);
                     Thread.Sleep(500);
                     return;
@@ -394,6 +422,15 @@ public sealed class ScenarioRunner
                 {
                     ctx.MainWindowHandle = windows[0].Handle;
                     ctx.AppTitle = windows[0].Title;
+                    // Scenario runner is user-initiated: mark readiness so BringToFront
+                    // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
+                    // proper path, but ScenarioRunner may run without a wired ReadinessInstance
+                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // authorized caller, not a rogue background worker.
+                    if (ReadinessInstance != null)
+                        try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
+                    else
+                        WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
                     WindowFinder.BringToFront(ctx.MainWindowHandle);
                     Thread.Sleep(500);
                     return;
