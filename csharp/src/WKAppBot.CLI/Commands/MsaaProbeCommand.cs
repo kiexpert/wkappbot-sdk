@@ -41,7 +41,7 @@ internal partial class Program
 
         if (writeText != null)
         {
-            Console.Error.WriteLine($"[MSAA-PROBE] Write mode: \"{writeText}\" — will write to L0..L3 and wait 5s");
+            Console.Error.WriteLine($"[MSAA-PROBE] Write mode: \"{writeText}\" -- will write to L0..L3 and wait 5s");
             ClaudePromptHelper.ProbeMsaaWrite(absX, absY, writeText);
         }
         else

@@ -99,7 +99,7 @@ internal partial class Program
         ClaudeChat? ai = null;
         if (aiMode)
         {
-            // Try config file → ANTHROPIC_API_KEY → CLAUDE_CODE_OAUTH_TOKEN (Claude Code session)
+            // Try config file -> ANTHROPIC_API_KEY -> CLAUDE_CODE_OAUTH_TOKEN (Claude Code session)
             var aiKey = config["anthropic_api_key"]?.GetValue<string>();
             if (string.IsNullOrEmpty(aiKey))
                 aiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
@@ -197,12 +197,12 @@ internal partial class Program
         if (startupPrompts.Count > 0)
         {
             var promptInfo = startupPrompts[0];
-            Console.Error.WriteLine($"[SLACK] Prompt: {promptInfo.HostType} — {promptInfo.WindowTitle}");
+            Console.Error.WriteLine($"[SLACK] Prompt: {promptInfo.HostType} -- {promptInfo.WindowTitle}");
             Console.Error.WriteLine($"[SLACK]   Rect: ({promptInfo.PromptRect.X},{promptInfo.PromptRect.Y} {promptInfo.PromptRect.Width}x{promptInfo.PromptRect.Height})");
         }
         else
         {
-            Console.WriteLine("[SLACK] WARNING: Could not find Claude prompt — will retry per message");
+            Console.WriteLine("[SLACK] WARNING: Could not find Claude prompt -- will retry per message");
         }
 
         // Write PID file (for status/stop)
@@ -235,7 +235,7 @@ internal partial class Program
         // Track message timestamps that THIS bot sent (for ping response thread tracking)
         var ownMessageTimestamps = new HashSet<string>();
 
-        // Thread reply relocation: OnMessage → MonitorTick bridge (declared early for lambda capture)
+        // Thread reply relocation: OnMessage -> MonitorTick bridge (declared early for lambda capture)
         var streamingThreadReplies = new ConcurrentQueue<(string user, string text, string threadTs)>();
         string? statusTsForCapture = null; // readable from OnMessage closure (ref can't be captured)
 
@@ -260,12 +260,12 @@ internal partial class Program
                     }
                 }
                 else
-                    Console.WriteLine("[SLACK] Startup announcement timeout — skipping");
+                    Console.WriteLine("[SLACK] Startup announcement timeout -- skipping");
             }
-            catch { Console.WriteLine("[SLACK] Startup announcement failed — skipping"); }
+            catch { Console.WriteLine("[SLACK] Startup announcement failed -- skipping"); }
         }
 
-        // Handle @mentions — always reply in-thread
+        // Handle @mentions -- always reply in-thread
         slack.OnMention += (msg) =>
         {
             Console.Error.WriteLine($"[SLACK] << @mention from {msg.User}: {msg.Text}");
@@ -273,7 +273,7 @@ internal partial class Program
             // Track last processed timestamp for catch-up
             SaveLastTs(msg.Channel, msg.Timestamp);
 
-            // Strip the bot mention from text: "<@U12345> hello" → "hello"
+            // Strip the bot mention from text: "<@U12345> hello" -> "hello"
             var cleanText = System.Text.RegularExpressions.Regex.Replace(
                 msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
 
@@ -287,7 +287,7 @@ internal partial class Program
             // Save reply context so 'slack reply' works with no flags
             SaveReplyContext(msg.Channel, threadKey);
 
-            // "수락" / "accept" → send Ctrl+Enter to Claude Code prompt (remote approval)
+            // "수락" / "accept" -> send Ctrl+Enter to Claude Code prompt (remote approval)
             if (IsAcceptCommand(cleanText))
             {
                 SendAcceptKeystroke(botToken!, msg.Channel, threadKey);
@@ -296,7 +296,7 @@ internal partial class Program
 
             // Always forward to Claude Code prompt
             {
-                var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                var promptText = $"{cleanText}\n\n(Slack @{msg.User} #{msg.Channel} -- reply: wkappbot slack reply \"...\")";
                 var replyHint = SlackReplySuffix(msg.User, threadKey, $"#{msg.Channel}");
                 if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
                     promptText = $"{cleanText}\n\n{replyHint}";
@@ -321,10 +321,10 @@ internal partial class Program
             }
         };
 
-        // Handle channel messages — ping response + thread replies + keyword monitoring
+        // Handle channel messages -- ping response + thread replies + keyword monitoring
         slack.OnMessage += (msg) =>
         {
-            // Check if reply is to the streaming status message → relocate streaming
+            // Check if reply is to the streaming status message -> relocate streaming
             if (webBotMode && msg.ThreadTs != null && msg.ThreadTs == statusTsForCapture)
             {
                 // Skip bot's own messages (relocation reply should not trigger another relocation)
@@ -341,7 +341,7 @@ internal partial class Program
                 return;
             }
 
-            // Any user channel message (not a thread reply) while streaming → relocate to keep status at bottom
+            // Any user channel message (not a thread reply) while streaming -> relocate to keep status at bottom
             // Uses special marker "__channel_msg__" to distinguish from thread reply relocation
             if (webBotMode && statusTsForCapture != null && msg.ThreadTs == null && string.IsNullOrEmpty(msg.BotId))
             {
@@ -349,7 +349,7 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.Error.WriteLine($"[SLACK] Channel msg from {msg.User} -> relocating status to bottom");
                 Console.ResetColor();
-                // Don't return — continue processing (ping, keywords, etc.)
+                // Don't return -- continue processing (ping, keywords, etc.)
             }
 
             // "핑" / "ping" command: bot responds in channel with identity + CWD
@@ -399,7 +399,7 @@ internal partial class Program
                 var cleanText = System.Text.RegularExpressions.Regex.Replace(
                     msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
 
-                // "그만" / "stop" → stop tracking this thread
+                // "그만" / "stop" -> stop tracking this thread
                 if (!string.IsNullOrEmpty(cleanText))
                 {
                     var trimmedLower = cleanText.Trim().ToLowerInvariant();
@@ -423,7 +423,7 @@ internal partial class Program
 
                 if (string.IsNullOrEmpty(cleanText)) return;
 
-                // "수락" / "accept" → send Ctrl+Enter to Claude Code prompt (remote approval)
+                // "수락" / "accept" -> send Ctrl+Enter to Claude Code prompt (remote approval)
                 if (IsAcceptCommand(cleanText))
                 {
                     SendAcceptKeystroke(botToken!, msg.Channel, msg.ThreadTs!);
@@ -440,7 +440,7 @@ internal partial class Program
                         if (!string.IsNullOrEmpty(ctx))
                             threadContext = $"\n\n{ctx}\n";
                     }
-                    var promptText = $"{cleanText}{threadContext}\n\n(Slack @{msg.User} #{msg.Channel} thread — reply: wkappbot slack reply \"...\")";
+                    var promptText = $"{cleanText}{threadContext}\n\n(Slack @{msg.User} #{msg.Channel} thread -- reply: wkappbot slack reply \"...\")";
                     var replyThread = msg.ThreadTs ?? msg.Timestamp;
                     var replyHint = SlackReplySuffix(msg.User, replyThread, $"#{msg.Channel} thread");
                     if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
@@ -467,7 +467,7 @@ internal partial class Program
             }
 
             // Keyword monitoring: check if message contains any watched keywords
-            // Keyword monitoring — always ON, forward to Claude prompt
+            // Keyword monitoring -- always ON, forward to Claude prompt
             if (!string.IsNullOrEmpty(msg.Text))
             {
                 var textLower = msg.Text.ToLowerInvariant();
@@ -490,7 +490,7 @@ internal partial class Program
 
                     // Always forward keyword matches to Claude Code prompt
                     {
-                        var promptText = $"{cleanText}\n\n(Slack keyword:\"{matchedKeyword}\" @{msg.User} #{msg.Channel} — reply: wkappbot slack reply \"...\")";
+                        var promptText = $"{cleanText}\n\n(Slack keyword:\"{matchedKeyword}\" @{msg.User} #{msg.Channel} -- reply: wkappbot slack reply \"...\")";
                         var replyHint = SlackReplySuffix(msg.User, threadKey, $"keyword:{matchedKeyword} #{msg.Channel}");
                         if (!promptText.Contains("--msg", StringComparison.OrdinalIgnoreCase))
                             promptText = $"{cleanText}\n\n{replyHint}";
@@ -531,7 +531,7 @@ internal partial class Program
         bool hotReload = false;
 
         // WebBot monitoring state (--webbot)
-        // Simplified: no CDP/Chrome content — only Claude status via UIA + Slack profile
+        // Simplified: no CDP/Chrome content -- only Claude status via UIA + Slack profile
         CdpClient? webBotCdp = null;       // Kept for Dispose cleanup
         string? webBotStatusTs = null;     // Slack message ts for chat.update
         string? webBotLastUrl = null;      // Unused (kept for ref param compat)
@@ -542,15 +542,15 @@ internal partial class Program
         IntPtr webBotChromeHwnd = IntPtr.Zero; // Unused (kept for ref param compat)
         var webBotIdlePollSw = Stopwatch.StartNew(); // Throttle idle busy-check to ~2s
 
-        // WebBot: lazy CDP connection — connect on first busy detection
+        // WebBot: lazy CDP connection -- connect on first busy detection
         // Avoids sync-over-async deadlock during startup
         if (webBotMode)
         {
-            Console.WriteLine("[SLACK] WebBot mode ON — will connect to Chrome on demand");
+            Console.WriteLine("[SLACK] WebBot mode ON -- will connect to Chrome on demand");
             Console.Out.Flush();
         }
 
-        // Wait until cancelled — fast 100ms tick loop for instant WebBot streaming
+        // Wait until cancelled -- fast 100ms tick loop for instant WebBot streaming
         // UIA/CDP queries themselves take ~50-200ms, acting as natural variable delay
         // Result: ~0.2-0.3s effective loop = broadcast-like real-time streaming
         try
@@ -559,14 +559,14 @@ internal partial class Program
             var keepAliveSw = Stopwatch.StartNew();
             while (!cts.Token.IsCancellationRequested)
             {
-                // Fixed 100ms sleep — UIA queries add variable delay on top
+                // Fixed 100ms sleep -- UIA queries add variable delay on top
                 Task.Delay(100, cts.Token).GetAwaiter().GetResult();
 
                 // Check stop signal file (written by 'slack stop')
                 if (File.Exists(SlackStopSignalFile))
                 {
                     try { File.Delete(SlackStopSignalFile); } catch { }
-                    Console.WriteLine("[SLACK] Stop signal received — shutting down gracefully...");
+                    Console.WriteLine("[SLACK] Stop signal received -- shutting down gracefully...");
                     break;
                 }
 
@@ -589,20 +589,20 @@ internal partial class Program
                             var newTime = File.GetLastWriteTimeUtc(currentExePath);
                             if (newTime != currentExeTime)
                             {
-                                // Someone replaced our EXE while we were renamed — restart
-                                Console.Error.WriteLine($"[SLACK] Hot-reload: EXE updated ({currentExeTime:HH:mm:ss} → {newTime:HH:mm:ss})");
+                                // Someone replaced our EXE while we were renamed -- restart
+                                Console.Error.WriteLine($"[SLACK] Hot-reload: EXE updated ({currentExeTime:HH:mm:ss} -> {newTime:HH:mm:ss})");
                                 hotReload = true;
                                 break;
                             }
                         }
                         else
                         {
-                            // wkappbot.new.exe detected — perform rename swap
+                            // wkappbot.new.exe detected -- perform rename swap
                             Console.WriteLine("[SLACK] Hot-reload: new build detected (wkappbot.new.exe)");
                             var oldPath = currentExePath + ".old";
                             try { File.Delete(oldPath); } catch { }
-                            File.Move(currentExePath, oldPath);     // running EXE → .old (allowed on Windows!)
-                            File.Move(hotReloadSource, currentExePath); // .new → current name
+                            File.Move(currentExePath, oldPath);     // running EXE -> .old (allowed on Windows!)
+                            File.Move(hotReloadSource, currentExePath); // .new -> current name
                             Console.WriteLine("[SLACK] Hot-reload: EXE swapped");
                             hotReload = true;
                             break;
@@ -615,7 +615,7 @@ internal partial class Program
                 }
 
                 // WebBot monitoring:
-                // - When busy: every tick (~100ms + UIA ~100ms = ~200ms effective) — broadcast streaming!
+                // - When busy: every tick (~100ms + UIA ~100ms = ~200ms effective) -- broadcast streaming!
                 // - When idle: every ~2s (just busy-check, no heavy UIA/CDP work)
                 if (webBotMode)
                 {
@@ -671,7 +671,7 @@ internal partial class Program
                 ? $"{uptime.Hours}h{uptime.Minutes}m"
                 : $"{uptime.Minutes}m{uptime.Seconds}s";
             var shutdownMsg = hotReload
-                ? $"클봇 핫리로드! 새 빌드 감지 → 재시작. `{host}` (uptime {uptimeStr})"
+                ? $"클봇 핫리로드! 새 빌드 감지 -> 재시작. `{host}` (uptime {uptimeStr})"
                 : $"클봇 오프라인. `{host}` (uptime {uptimeStr})";
             var (replyChannel, replyThread) = LoadReplyContext();
             var ch = replyChannel ?? defaultChannel!;
@@ -734,7 +734,7 @@ internal partial class Program
 
         var listenArgs = "slack listen";
         if (aiMode) listenArgs += " --ai";
-        // promptMode and keywordMode are always ON — no flags needed
+        // promptMode and keywordMode are always ON -- no flags needed
         if (claudeMode) listenArgs += " --claude";
         else if (webBotMode) listenArgs += " --webbot";
         if (instanceName != null) listenArgs += $" --name \"{instanceName}\"";

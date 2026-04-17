@@ -16,7 +16,7 @@ internal partial class Program
     /// Check if a blocker dialog appeared and try to handle it automatically.
     /// Uses DialogHandlerManager to match and execute handlers from handlers/*.yaml.
     /// If no handler matches, generates a sample YAML template for the user to edit.
-    /// Returns: (handled, shouldRetry) — handled=true if blocker was processed, shouldRetry from handler params.
+    /// Returns: (handled, shouldRetry) -- handled=true if blocker was processed, shouldRetry from handler params.
     /// </summary>
     private static (bool handled, bool shouldRetry) TryHandleBlocker(
         IntPtr expectedFgWindow, DialogHandlerManager? handlerMgr)
@@ -36,7 +36,7 @@ internal partial class Program
                 blockerHwnd = fg;
         }
 
-        // Strategy 2: EnumWindows scan — find popup/dialog owned by same process
+        // Strategy 2: EnumWindows scan -- find popup/dialog owned by same process
         // This catches modal dialogs that overlay the main window but aren't foreground
         if (blockerHwnd == IntPtr.Zero)
         {
@@ -127,7 +127,7 @@ internal partial class Program
 
         // Execute handler action
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write($"[BLOCK] Handler matched → action: {handler.Action}");
+        Console.Write($"[BLOCK] Handler matched -> action: {handler.Action}");
         Console.ResetColor();
 
         bool success = false;
@@ -139,7 +139,7 @@ internal partial class Program
 
             case "dismiss":
                 // Send ESC to close the dialog
-                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler — automation-invoked
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler -- automation-invoked
                 NativeMethods.SmartSetForegroundWindow(blockerHwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(100);
                 KeyboardInput.PressKey("escape");
@@ -153,14 +153,14 @@ internal partial class Program
                     success = !NativeMethods.IsWindow(blockerHwnd) || !NativeMethods.IsWindowVisible(blockerHwnd);
                 }
                 Console.ForegroundColor = success ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(success ? " ✓ dismissed" : " ✗ dismiss failed");
+                Console.WriteLine(success ? " v dismissed" : " X dismiss failed");
                 Console.ResetColor();
                 break;
 
             case "report":
             default:
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(" (report only — no auto-action)");
+                Console.WriteLine(" (report only -- no auto-action)");
                 Console.ResetColor();
                 return (false, false);
         }
@@ -168,7 +168,7 @@ internal partial class Program
         if (success && handler.Params != null)
         {
             // Active patrol loop: handle blockers while waiting for condition
-            // Replaces passive Thread.Sleep — "핸들러 개입환영" (welcomes handler intervention)
+            // Replaces passive Thread.Sleep -- "핸들러 개입환영" (welcomes handler intervention)
             var waitUntil = handler.Params.WaitUntil;
             int patrolMs = handler.Params.WaitAfter > 0
                 ? handler.Params.WaitAfter
@@ -192,8 +192,8 @@ internal partial class Program
 
     /// <summary>
     /// Active patrol loop: checks condition + handles blockers while waiting.
-    /// "핸들러 개입환영" — instead of sleeping, we patrol for more blockers.
-    /// Level 0: Thread.Sleep (멍) → Level 1: Patrol (순찰) → Level 2: Patrol+StableHash (눈뜨고감시)
+    /// "핸들러 개입환영" -- instead of sleeping, we patrol for more blockers.
+    /// Level 0: Thread.Sleep (멍) -> Level 1: Patrol (순찰) -> Level 2: Patrol+StableHash (눈뜨고감시)
     /// </summary>
     private static void PatrolWaitLoop(
         IntPtr expectedFgWindow, DialogHandlerManager? handlerMgr,
@@ -239,7 +239,7 @@ internal partial class Program
         {
             Thread.Sleep(pollInterval);
 
-            // ── Per-second progress output (overwrite same line) ──
+            // -- Per-second progress output (overwrite same line) --
             long currentSec = sw.ElapsedMilliseconds / 1000;
             if (currentSec > lastProgressSec)
             {
@@ -247,11 +247,11 @@ internal partial class Program
                 var sb = new System.Text.StringBuilder();
                 sb.Append($"\r[BLOCK] Patrol {currentSec}s/{totalMs / 1000}s");
                 if (hasWindowCondition)
-                    sb.Append(windowFound ? " window=✓" : " window=…");
+                    sb.Append(windowFound ? " window=v" : " window=...");
                 if (hasStableCondition)
                     sb.Append($" stable={consecutiveStable}/{stableTarget}");
                 if (hasResponsiveCondition)
-                    sb.Append(responsiveConfirmed ? " responsive=✓" : " responsive=…");
+                    sb.Append(responsiveConfirmed ? " responsive=v" : " responsive=...");
                 if (blockerCount > 0)
                     sb.Append($" blockers={blockerCount}");
                 sb.Append("   "); // clear trailing chars
@@ -260,7 +260,7 @@ internal partial class Program
                 Console.ResetColor();
             }
 
-            // ── Check condition: window exists? ──
+            // -- Check condition: window exists? --
             if (hasWindowCondition)
             {
                 var found = WindowFinder.FindWindows(condition!.WindowExists!);
@@ -281,7 +281,7 @@ internal partial class Program
                 }
             }
 
-            // ── Check condition: original dialog gone? ──
+            // -- Check condition: original dialog gone? --
             if (hasDialogGoneCondition && handledDialogHwnd != IntPtr.Zero)
             {
                 bool gone = !NativeMethods.IsWindow(handledDialogHwnd)
@@ -296,7 +296,7 @@ internal partial class Program
                 }
             }
 
-            // ── Check condition: frame stability (Level 2) ──
+            // -- Check condition: frame stability (Level 2) --
             if (hasStableCondition && stableTargetHwnd != IntPtr.Zero)
             {
                 string? frameHash = CaptureFrameHash(stableTargetHwnd);
@@ -323,15 +323,15 @@ internal partial class Program
             }
             else if (hasStableCondition && stableTargetHwnd == IntPtr.Zero)
             {
-                // No target window yet for stability — use expectedFgWindow as fallback
+                // No target window yet for stability -- use expectedFgWindow as fallback
                 if (expectedFgWindow != IntPtr.Zero && NativeMethods.IsWindow(expectedFgWindow))
                     stableTargetHwnd = expectedFgWindow;
             }
 
-            // ── Check condition: responsive (SendMessageTimeout WM_NULL) ──
+            // -- Check condition: responsive (SendMessageTimeout WM_NULL) --
             // "마지막 변화후 센드메시지 보내서 리턴될때까지 기다려봐도 되겠다"
             // SMTO_ABORTIFHUNG: returns 0 if the target message loop is hung (not pumping messages).
-            // WM_NULL: no-op message — zero side effects, pure liveness check.
+            // WM_NULL: no-op message -- zero side effects, pure liveness check.
             // This detects when HTS finishes heavy initialization and starts processing messages again.
             if (hasResponsiveCondition && !responsiveConfirmed)
             {
@@ -345,7 +345,7 @@ internal partial class Program
 
                     if (sent != IntPtr.Zero)
                     {
-                        // Message loop responded within timeout — app is alive!
+                        // Message loop responded within timeout -- app is alive!
                         responsiveConfirmed = true;
 
                         // Check if this is the final remaining condition
@@ -358,21 +358,21 @@ internal partial class Program
                         {
                             Console.WriteLine(); // newline after \r progress
                             Console.ForegroundColor = ConsoleColor.Green;
-                            Console.Error.WriteLine($"[BLOCK] Patrol done: responsive ✓ ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
+                            Console.Error.WriteLine($"[BLOCK] Patrol done: responsive v ({sw.ElapsedMilliseconds}ms, {blockerCount} blockers handled)");
                             Console.ResetColor();
                             return;
                         }
                     }
-                    // sent == 0 means hung/timeout — keep waiting
+                    // sent == 0 means hung/timeout -- keep waiting
                 }
             }
 
-            // ── Patrol: check for new blockers and handle them ──
+            // -- Patrol: check for new blockers and handle them --
             var (handled, _) = TryHandleBlocker(expectedFgWindow, handlerMgr);
             if (handled)
             {
                 blockerCount++;
-                // Blocker handled = screen changed → reset stability + responsive counters
+                // Blocker handled = screen changed -> reset stability + responsive counters
                 consecutiveStable = 0;
                 lastFrameHash = null;
                 responsiveConfirmed = false; // app may hang again after popup dismiss
@@ -438,7 +438,7 @@ internal partial class Program
 
     /// <summary>
     /// Capture a window via PrintWindow and return SHA256 hash of the pixel data.
-    /// Used for frame stability detection — consecutive identical hashes = stable content.
+    /// Used for frame stability detection -- consecutive identical hashes = stable content.
     /// Returns null on capture failure (best-effort, non-blocking).
     /// </summary>
     private static string? CaptureFrameHash(IntPtr hWnd)
@@ -483,7 +483,7 @@ internal partial class Program
         var buttons = allChildren.Where(c => c.IsVisible && c.Rect.Width > 10 && IsButtonLike(c))
             .OrderBy(b => b.Rect.Left).ToList();
 
-        // Build text map: GetWindowText → WM_GETTEXT → OCR fallback for owner-drawn buttons
+        // Build text map: GetWindowText -> WM_GETTEXT -> OCR fallback for owner-drawn buttons
         var buttonTexts = new Dictionary<IntPtr, string>();
         bool needOcr = false;
         foreach (var btn in buttons)
@@ -526,7 +526,7 @@ internal partial class Program
 
         // Debug: show buttons found
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.Write(" →");
+        Console.Write(" ->");
         if (buttons.Count == 0)
             Console.Write(" (no buttons)");
         else
@@ -542,7 +542,7 @@ internal partial class Program
         if (buttons.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(" ✗ no buttons found in dialog");
+            Console.WriteLine(" X no buttons found in dialog");
             Console.ResetColor();
             return false;
         }
@@ -567,7 +567,7 @@ internal partial class Program
             if (textMatch == null)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($" ✗ button \"{prms.ButtonText}\" not found ({buttons.Count} buttons available)");
+                Console.WriteLine($" X button \"{prms.ButtonText}\" not found ({buttons.Count} buttons available)");
                 Console.ResetColor();
                 return false;
             }
@@ -580,7 +580,7 @@ internal partial class Program
             if (idx >= buttons.Count)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($" ✗ button index {idx} out of range ({buttons.Count} buttons)");
+                Console.WriteLine($" X button index {idx} out of range ({buttons.Count} buttons)");
                 Console.ResetColor();
                 return false;
             }
@@ -589,7 +589,7 @@ internal partial class Program
 
         Console.ForegroundColor = ConsoleColor.Green;
         var targetBtnText = buttonTexts.GetValueOrDefault(targetBtn.Handle, targetBtn.Title ?? "");
-        Console.Write($" → clicking \"{targetBtnText}\"");
+        Console.Write($" -> clicking \"{targetBtnText}\"");
         Console.ResetColor();
 
         bool clicked = SmartClickButton(targetBtn.Handle, hDialog);
@@ -611,7 +611,7 @@ internal partial class Program
     /// <summary>
     /// OCR-scan toolbar panes, show recognized text regions, and optionally click one.
     /// MFC apps expose toolbars as Pane elements with custom-drawn buttons (no UIA Button children).
-    /// Strategy: screenshot entire toolbar pane → OCR → find text regions.
+    /// Strategy: screenshot entire toolbar pane -> OCR -> find text regions.
     /// Usage: appbot toolbar-ocr "window-title" [--click "text"] [--save]
     static int ToolbarOcrCommand(string[] args)
     {
@@ -630,7 +630,7 @@ internal partial class Program
         var win = windows[0];
         Console.WriteLine($"Target: [{win.Handle:X8}] \"{win.Title}\"");
 
-        // Find toolbar panes via UIA — MFC toolbars are Pane elements with "툴바" in name
+        // Find toolbar panes via UIA -- MFC toolbars are Pane elements with "툴바" in name
         var uia = new FlaUI.UIA3.UIA3Automation();
         var root = uia.FromHandle(win.Handle);
 
@@ -670,7 +670,7 @@ internal partial class Program
         {
             var tbRect = tbElem.BoundingRectangle;
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"\n── {tbName} ── ({(int)tbRect.X},{(int)tbRect.Y}) {(int)tbRect.Width}x{(int)tbRect.Height}");
+            Console.WriteLine($"\n-- {tbName} -- ({(int)tbRect.X},{(int)tbRect.Y}) {(int)tbRect.Width}x{(int)tbRect.Height}");
             Console.ResetColor();
 
             // Screenshot the entire toolbar pane
@@ -780,7 +780,7 @@ internal partial class Program
                 Console.ResetColor();
 
                 // Use physical mouse click (need foreground)
-                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler — automation-invoked
+                WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true; // blocker dialog handler -- automation-invoked
                 NativeMethods.SmartSetForegroundWindow(win.Handle); // [FOCUS-GUARD] CheckActiveGuard 적용
                 Thread.Sleep(200);
                 MouseInput.Click(cx, cy);
@@ -897,7 +897,7 @@ internal partial class Program
         // Safety: empty keywords match EVERYTHING (String.Contains("") == true)
         if (keywords.Length == 0)
             return Error("No valid keywords provided. Keywords must be at least 2 characters. " +
-                "Empty/whitespace keywords would match all windows — this is a safety check to prevent accidental mass-close.");
+                "Empty/whitespace keywords would match all windows -- this is a safety check to prevent accidental mass-close.");
 
         var windows = WindowFinder.FindWindows(title);
         if (windows.Count == 0) return Error($"Window not found: \"{title}\"");
@@ -935,7 +935,7 @@ internal partial class Program
                 if (handler != null)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"  [DISMISS] Target is #32770 dialog — handler matched: {handler.Action}");
+                    Console.WriteLine($"  [DISMISS] Target is #32770 dialog -- handler matched: {handler.Action}");
                     Console.ResetColor();
 
                     if (handler.Action == "click_button")
@@ -954,7 +954,7 @@ internal partial class Program
                         Thread.Sleep(300);
                         bool gone = !NativeMethods.IsWindow(win.Handle) || !NativeMethods.IsWindowVisible(win.Handle);
                         Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                        Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
+                        Console.WriteLine(gone ? "  <- closed" : "  <- still visible");
                         Console.ResetColor();
                         if (gone)
                         {
@@ -992,14 +992,14 @@ internal partial class Program
                     if (importance == NoticeImportance.Critical && !force)
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"  *** IMPORTANT NOTICE — NOT closing ***");
+                        Console.WriteLine($"  *** IMPORTANT NOTICE -- NOT closing ***");
                         Console.ForegroundColor = ConsoleColor.White;
                         PrintNoticeText(noticeText);
                         Console.ResetColor();
                         continue; // skip closing
                     }
 
-                    // Normal notice (or forced) — print summary and close
+                    // Normal notice (or forced) -- print summary and close
                     Console.ForegroundColor = importance == NoticeImportance.Critical
                         ? ConsoleColor.Yellow : ConsoleColor.DarkGray;
                     if (force && importance == NoticeImportance.Critical)
@@ -1013,7 +1013,7 @@ internal partial class Program
 
                 bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
                 Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
+                Console.WriteLine(gone ? "  <- closed" : "  <- still visible");
                 Console.ResetColor();
                 if (gone) closedCount++;
             }
@@ -1071,7 +1071,7 @@ internal partial class Program
                 Thread.Sleep(300);
                 bool gone = !NativeMethods.IsWindow(hPopup) || !NativeMethods.IsWindowVisible(hPopup);
                 Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(gone ? " ← closed" : " ← still visible");
+                Console.WriteLine(gone ? " <- closed" : " <- still visible");
                 Console.ResetColor();
                 if (gone) closedCount++;
             }
@@ -1081,7 +1081,7 @@ internal partial class Program
         Console.WriteLine($"\n  {closedCount} window(s) dismissed.");
         Console.ResetColor();
 
-        // ── ActionState IPC: share dismiss info with AppBotEye ──
+        // -- ActionState IPC: share dismiss info with AppBotEye --
         try
         {
             ActionState.Write(new ActionState
@@ -1151,7 +1151,7 @@ internal partial class Program
         if (!NativeMethods.IsWindowVisible(dlg.Handle))
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("  Dialog closed ✓");
+            Console.WriteLine("  Dialog closed v");
             Console.ResetColor();
         }
 

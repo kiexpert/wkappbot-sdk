@@ -251,7 +251,7 @@ internal partial class Program
                         return 0;
                     }
                     PulseStep.Finish("EnsureAdminForSudo FAILED (UAC cancelled or spawn timeout)");
-                    Console.Error.WriteLine("[SUDO] Failed to ensure admin Eye — UAC cancelled or timeout");
+                    Console.Error.WriteLine("[SUDO] Failed to ensure admin Eye -- UAC cancelled or timeout");
                     return 1;
                 }
 
@@ -262,7 +262,7 @@ internal partial class Program
                     : "--sudo request";
                 if (SudoHandler.EnsureAdminForSudo(sudoReason))
                 {
-                    // admin Eye is responsive — proxy the command
+                    // admin Eye is responsive -- proxy the command
                     PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=5s)");
                     var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 5000);
                     PulseStep.Line($"proxy attempt exit={exit}");
@@ -271,25 +271,25 @@ internal partial class Program
                         PulseStep.Finish($"proxy OK exit={exit}");
                         return exit;
                     }
-                    // EnsureAdmin said alive but proxy comms dropped — rare; fall through
+                    // EnsureAdmin said alive but proxy comms dropped -- rare; fall through
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
                     Console.Error.WriteLine("[SUDO:FALLBACK] admin Eye proxy dropped request mid-execution");
                     Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user (admin-only ops will fail)");
                     Console.ResetColor();
-                    PulseStep.Line("proxy drop → fallthrough to non-admin");
+                    PulseStep.Line("proxy drop -> fallthrough to non-admin");
                 }
                 else
                 {
                     // UAC cancelled or spawn failed
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
                     Console.Error.WriteLine("[SUDO:FALLBACK] admin Eye unavailable (UAC cancelled or spawn failed)");
-                    Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user — admin-only targets will fail with Access Denied");
+                    Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user -- admin-only targets will fail with Access Denied");
                     Console.ResetColor();
-                    PulseStep.Line("EnsureAdmin failed → fallthrough to non-admin");
+                    PulseStep.Line("EnsureAdmin failed -> fallthrough to non-admin");
                 }
                 // Fall through: args already has --sudo stripped, normal dispatch will run
             }
-            PulseStep.Finish("already elevated or --sudo fallthrough → normal dispatch");
+            PulseStep.Finish("already elevated or --sudo fallthrough -> normal dispatch");
         }
         if (args.Contains("--read-only"))
         {
@@ -326,7 +326,7 @@ internal partial class Program
             try
             {
                 var ex = e.ExceptionObject as Exception;
-                var crashMsg = $"\n[CRASH] Unhandled exception — process terminating\n" + $"[CRASH] {ex?.GetType().FullName}: {ex?.Message}\n" + $"[CRASH] {ex?.StackTrace}\n";
+                var crashMsg = $"\n[CRASH] Unhandled exception -- process terminating\n" + $"[CRASH] {ex?.GetType().FullName}: {ex?.Message}\n" + $"[CRASH] {ex?.StackTrace}\n";
                 if (ex?.InnerException != null)
                     crashMsg += $"[CRASH] Inner: {ex.InnerException.GetType().FullName}: {ex.InnerException.Message}\n" + $"[CRASH] Inner stack: {ex.InnerException.StackTrace}\n";
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -360,13 +360,13 @@ internal partial class Program
             var restArgs = args.Skip(1).ToArray();
             WKAppBot.WebBot.ChromeLauncher.OnFocusTheft ??= (chromeHwnd, prevFgHwnd) =>
             {
-                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 → 즉시 복구됨", "chrome");
+                FocuslessWarningOverlay.Show(chromeHwnd, "Chrome 복원 시 포커스 강탈 -> 즉시 복구됨", "chrome");
                 AutoBugReport($"Chrome focus theft: chrome=0x{chromeHwnd:X} prevFg=0x{prevFgHwnd:X}");
             };
             ActionApi.OnFocusStealer ??= (rootHwnd, action) =>
             {
                 AppendFocusStealerKnowhow(rootHwnd, action);
-                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 → 다음 실행 시 yield 팝업 자동 표시", null);
+                FocuslessWarningOverlay.Show(rootHwnd, $"UIA {action} 포커스 강탈 -> 다음 실행 시 yield 팝업 자동 표시", null);
                 AutoBugReport($"UIA focus steal: action={action} hwnd=0x{rootHwnd:X}");
             };
             WKAppBot.WebBot.CdpClient.OnFallbackSuggest ??= (text) =>
@@ -389,7 +389,7 @@ internal partial class Program
                         var timeoutMs = (long)dur.TotalMilliseconds;
                         timeoutTimer = new System.Threading.Timer(_ =>
                         {
-                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed — exiting (code 124)");
+                            Console.Error.WriteLine($"[TIMEOUT] {dur} elapsed -- exiting (code 124)");
                             try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
                             Environment.Exit(124);
                         }, null, timeoutMs, Timeout.Infinite);
@@ -525,7 +525,7 @@ internal partial class Program
                 _errScope.Finalize(exitCode != 0);
                 if (errorDetected && exitCode == 0)
                 {
-                    AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr — error suppressed");
+                    AutoRegisterBug($"[BUG-AUTO] `{command}` exited 0 but wrote to stderr -- error suppressed");
                     exitCode = -9999;
                 }
             }

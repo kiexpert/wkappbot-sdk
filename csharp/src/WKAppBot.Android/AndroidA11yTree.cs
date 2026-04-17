@@ -18,7 +18,7 @@ public class AndroidA11yTree
 
     public AndroidA11yTree(AdbClient adb) => _adb = adb;
 
-    // ── Tree access ───────────────────────────────────────
+    // -- Tree access --------------------------------------─
 
     /// <summary>Get (cached) root node. Force refresh if stale or on demand.</summary>
     public AndroidNode? GetRoot(string? serial = null, bool forceRefresh = false)
@@ -36,7 +36,7 @@ public class AndroidA11yTree
         return _root;
     }
 
-    // ── Search ────────────────────────────────────────────
+    // -- Search --------------------------------------------
 
     /// <summary>Find nodes matching a package pattern (top-level app matching)</summary>
     public List<AndroidNode> FindByPackage(AndroidNode root, string packagePattern)
@@ -48,7 +48,7 @@ public class AndroidA11yTree
     }
 
     /// <summary>
-    /// Resolve #scope path: content-desc → text → resource-id (same as UIA Name → AutomationId).
+    /// Resolve #scope path: content-desc -> text -> resource-id (same as UIA Name -> AutomationId).
     /// Multi-level: #scope1#scope2 narrows progressively.
     /// </summary>
     public AndroidNode? ResolveScope(AndroidNode root, string[] scopes)
@@ -72,7 +72,7 @@ public class AndroidA11yTree
         return results;
     }
 
-    // ── Tree dump (inspect output) ────────────────────────
+    // -- Tree dump (inspect output) ------------------------
 
     /// <summary>Produce inspect-style tree output matching Windows format</summary>
     public static string DumpTree(AndroidNode node, int maxDepth = 5, int indent = 0)
@@ -109,7 +109,7 @@ public class AndroidA11yTree
             DumpNode(sb, child, maxDepth, baseIndent, depth + 1, hotNodes);
     }
 
-    // ── XML parsing ───────────────────────────────────────
+    // -- XML parsing --------------------------------------─
 
     private static AndroidNode ParseXml(string xml)
     {
@@ -164,12 +164,12 @@ public class AndroidA11yTree
 
     private static string SimplifyClassName(string cls)
     {
-        // "android.widget.FrameLayout" → "FrameLayout"
+        // "android.widget.FrameLayout" -> "FrameLayout"
         var lastDot = cls.LastIndexOf('.');
         return lastDot >= 0 ? cls[(lastDot + 1)..] : cls;
     }
 
-    // ── Search internals ──────────────────────────────────
+    // -- Search internals ----------------------------------
 
     private static void CollectByPackage(AndroidNode node, GrapMatcher matcher, List<AndroidNode> results)
     {
@@ -215,10 +215,10 @@ public class AndroidA11yTree
         return null;
     }
 
-    // ── Hot Focus Chain ────────────────────────────────────
+    // -- Hot Focus Chain ------------------------------------
 
     /// <summary>
-    /// Find the focused node and build parent chain (focused → ... → root).
+    /// Find the focused node and build parent chain (focused -> ... -> root).
     /// Returns formatted string or empty if no focused node found.
     /// </summary>
     public static string GetFocusChain(AndroidNode root)
@@ -226,7 +226,7 @@ public class AndroidA11yTree
         var focused = FindInTree(root, n => n.Focused);
         if (focused == null) return "";
 
-        // Build chain: focused → parent → ... → root
+        // Build chain: focused -> parent -> ... -> root
         var chain = new List<AndroidNode>();
         var cur = focused;
         while (cur != null)
@@ -238,12 +238,12 @@ public class AndroidA11yTree
         if (chain.Count <= 1) return ""; // focus is on root itself
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("── hot focus (Android) ──");
+        sb.AppendLine("-- hot focus (Android) --");
         for (int i = 0; i < chain.Count; i++)
         {
             var node = chain[i];
             var indent = new string(' ', i * 2);
-            var arrow = i == 0 ? "⌨ " : "└ ";
+            var arrow = i == 0 ? "⌨ " : "+ ";
             var label = node.DisplayName;
             var labelStr = !string.IsNullOrEmpty(label)
                 ? (label.Length > 40 ? $" \"{label[..37]}...\"" : $" \"{label}\"")
@@ -258,12 +258,12 @@ public class AndroidA11yTree
             sb.AppendLine($"  {indent}{arrow}[{node.ClassName}]{flags}{labelStr}{ridStr} {node.BoundsString}");
         }
 
-        // ── Siblings of focused element ──
+        // -- Siblings of focused element --
         var focusedNode = chain[0];
         var parentNode = focusedNode.Parent;
         if (parentNode != null && parentNode.Children.Count > 1)
         {
-            sb.AppendLine("── siblings ──");
+            sb.AppendLine("-- siblings --");
             foreach (var sib in parentNode.Children)
             {
                 var isSelf = ReferenceEquals(sib, focusedNode);
@@ -301,7 +301,7 @@ public class AndroidA11yTree
     }
 }
 
-// ── Android Node ──────────────────────────────────────────
+// -- Android Node ------------------------------------------
 
 public class AndroidNode : IActionTarget
 {
@@ -329,13 +329,13 @@ public class AndroidNode : IActionTarget
     public AndroidNode? Parent { get; set; }
     public List<AndroidNode> Children { get; } = [];
 
-    // ── Computed properties ───────────────────────────────
+    // -- Computed properties ------------------------------─
 
     /// <summary>Display name: content-desc first, then text</summary>
     public string DisplayName => !string.IsNullOrEmpty(ContentDesc) ? ContentDesc
                                : !string.IsNullOrEmpty(Text) ? Text : "";
 
-    /// <summary>Short resource-id: "com.kiwoom.heromts:id/rootFrame" → "rootFrame"</summary>
+    /// <summary>Short resource-id: "com.kiwoom.heromts:id/rootFrame" -> "rootFrame"</summary>
     public string ShortResourceId
     {
         get
@@ -346,7 +346,7 @@ public class AndroidNode : IActionTarget
         }
     }
 
-    /// <summary>Short package name: "com.kiwoom.heromts" → "heromts"</summary>
+    /// <summary>Short package name: "com.kiwoom.heromts" -> "heromts"</summary>
     public string ShortPackage
     {
         get
@@ -363,7 +363,7 @@ public class AndroidNode : IActionTarget
     public int Height => BoundsBottom - BoundsTop;
     public string BoundsString => $"[{BoundsLeft},{BoundsTop}][{BoundsRight},{BoundsBottom}]";
 
-    // ── IActionTarget explicit implementation ─────────────────
+    // -- IActionTarget explicit implementation ----------------─
     // DisplayName, ClassName, Enabled, Focused already match by name.
 
     string? IActionTarget.Identifier => ResourceId;
@@ -394,7 +394,7 @@ public class AndroidNode : IActionTarget
     }
 }
 
-// ── Grap-compatible pattern matcher (lightweight, no Win32 dependency) ──
+// -- Grap-compatible pattern matcher (lightweight, no Win32 dependency) --
 
 /// <summary>
 /// Simple pattern matcher: wildcard (*/?), regex:, or literal substring.

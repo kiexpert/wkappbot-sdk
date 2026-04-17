@@ -1,17 +1,17 @@
 ﻿{
     "id":  "logcat-command-cheatsheet",
     "app":  "wkappbot-workflow",
-    "title":  "logcat — Log Viewer Cheatsheet",
+    "title":  "logcat -- Log Viewer Cheatsheet",
     "desc":  "wkappbot logcat tails .log files with regex filtering. OR patterns via semicolon. Glob segments auto-expanded. --past Nh for time window. -f for live follow.",
     "steps":  [
                   "ALL: wkappbot logcat",
                   "FILTER: wkappbot logcat \"OCR\" --past 1h",
-                  "OR: wkappbot logcat \"OCR;DEEP\" — auto → (?:OCR)|(?:DEEP)",
+                  "OR: wkappbot logcat \"OCR;DEEP\" -- auto -> (?:OCR)|(?:DEEP)",
                   "FOLLOW: wkappbot logcat \"error\" -f --timeout 60",
                   "FILES: wkappbot logcat \"pattern\" logs/a.log logs/b.log",
                   "GLOB: wkappbot logcat \"pattern\" \"logs/**/*.log\"",
-                  "JSON: wkappbot logcat --json — structured output",
-                  "Log dir: wkappbot.hq/logs/ — .log extension (not .txt)"
+                  "JSON: wkappbot logcat --json -- structured output",
+                  "Log dir: wkappbot.hq/logs/ -- .log extension (not .txt)"
               ],
     "tags":  [
                  "logcat",

@@ -7,7 +7,7 @@ using WKAppBot.Win32.Native;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Fullscreen black overlay form — WS_EX_NOACTIVATE from birth (CreateParams).
+/// Fullscreen black overlay form -- WS_EX_NOACTIVATE from birth (CreateParams).
 /// Never steals focus, never appears in taskbar, never triggers lock screen feel.
 /// </summary>
 internal sealed class ScreenBlankForm : System.Windows.Forms.Form
@@ -75,7 +75,7 @@ internal partial class Program
         if (sub != "off")
             return Error($"Unknown screen subcommand: {sub}");
 
-        // Parse --duration N (default 60s safety net — prevents accidental permanent blank)
+        // Parse --duration N (default 60s safety net -- prevents accidental permanent blank)
         int durationSec = 60;
         for (int i = 1; i < args.Length; i++)
         {
@@ -92,7 +92,7 @@ internal partial class Program
             return 0;
         }
 
-        // Create fullscreen black overlay — NO focus steal, NO power API
+        // Create fullscreen black overlay -- NO focus steal, NO power API
         var ready = new ManualResetEventSlim(false);
         var thread = new Thread(() =>
         {
@@ -101,12 +101,12 @@ internal partial class Program
             form.FormClosed += (_, _) => { _screenBlankForm = null; };
             _screenBlankForm = form;
 
-            // Snapshot cursor position — compare later to distinguish mouse vs keyboard
+            // Snapshot cursor position -- compare later to distinguish mouse vs keyboard
             NativeMethods.GetCursorPos(out var startCursor);
             var startEnv = Environment.TickCount;
             string wakeReason = "timeout";
 
-            // Poll every 200ms: if user input detected OR duration expired → close
+            // Poll every 200ms: if user input detected OR duration expired -> close
             var poll = new System.Windows.Forms.Timer { Interval = 200 };
             poll.Tick += (_, _) =>
             {
@@ -143,11 +143,11 @@ internal partial class Program
 
         // Wait for form to appear
         ready.Wait(3000);
-        Console.Error.WriteLine($"[SCREEN] blank ON — all monitors blacked out (auto-off in {durationSec}s, or move mouse/key to restore)");
+        Console.Error.WriteLine($"[SCREEN] blank ON -- all monitors blacked out (auto-off in {durationSec}s, or move mouse/key to restore)");
 
         // Wait for form to close (process must stay alive for the overlay thread)
         thread.Join();
-        Console.WriteLine("[SCREEN] blank OFF — restored");
+        Console.WriteLine("[SCREEN] blank OFF -- restored");
 
         return 0;
     }

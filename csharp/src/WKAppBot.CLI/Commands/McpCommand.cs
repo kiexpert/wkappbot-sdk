@@ -11,17 +11,17 @@ using System.Runtime.InteropServices;
 namespace WKAppBot.CLI;
 
 // MCP (Model Context Protocol) stdio server
-// JSON-RPC 2.0 over stdin/stdout — all logs go to stderr
+// JSON-RPC 2.0 over stdin/stdout -- all logs go to stderr
 internal partial class Program
 {
     static readonly object McpWriteGate = new();
     static readonly ConcurrentDictionary<string, SemaphoreSlim> McpActionGates = new();
 
-    // ── APSP v1 프로파일링 메트릭 ────────────────────────────────────
+    // -- APSP v1 프로파일링 메트릭 ------------------------------------
     /// <summary>툴 child process 프로파일링 기본 정보. progress 알림에 확장 필드로 포함.</summary>
     record McpProgressMeta(long MemMb, double? CpuPct, int Threads, int Handles);
 
-    /// <summary>AsyncLocal 사이드채널: PushLine → EmitToolProgress 메트릭 전달 (시그니처 변경 없음).</summary>
+    /// <summary>AsyncLocal 사이드채널: PushLine -> EmitToolProgress 메트릭 전달 (시그니처 변경 없음).</summary>
     static readonly AsyncLocal<McpProgressMeta?> _currentProgressMeta = new();
 
     /// <summary>CPU% 델타 계산용 이전 샘플 (PID 키).</summary>
@@ -64,8 +64,8 @@ internal partial class Program
 
     /// <summary>
     /// Detect workspace CWD for MCP server session. Multi-strategy:
-    /// 1. Parent process chain: VS Code title → ExtractCwdFromVsCodeTitle
-    /// 2. CWD heuristic: if current directory has .mcp.json or .git → likely project root
+    /// 1. Parent process chain: VS Code title -> ExtractCwdFromVsCodeTitle
+    /// 2. CWD heuristic: if current directory has .mcp.json or .git -> likely project root
     /// 3. ~/.claude/projects/: find most recently modified session matching CWD
     /// Works for VS Code, Claude Desktop, Codex, and any MCP client.
     /// </summary>
@@ -99,7 +99,7 @@ internal partial class Program
         }
         catch { }
 
-        // Strategy 2: CWD heuristic — MCP clients often set child CWD to project root
+        // Strategy 2: CWD heuristic -- MCP clients often set child CWD to project root
         var envCwd = Environment.CurrentDirectory;
         if (!string.IsNullOrEmpty(envCwd)
             && !envCwd.Contains("system32", StringComparison.OrdinalIgnoreCase)
@@ -122,7 +122,7 @@ internal partial class Program
     {
         McpLauncherMode = args.Contains("--launcher");
 
-        // Detach from parent console when spawned by EyeMcpClient — prevents LPC deadlock
+        // Detach from parent console when spawned by EyeMcpClient -- prevents LPC deadlock
         // in UIA calls (FindAllPrompts, DetectClaudeDesktopStatus) that csrss.exe mediates.
         if (Environment.GetEnvironmentVariable("WKAPPBOT_MCP_DETACH") == "1")
         {
@@ -156,7 +156,7 @@ internal partial class Program
                 pipeOut.Connect(10_000);
                 jsonIn = pipeIn;
                 jsonOut = pipeOut;
-                Console.Error.WriteLine("[MCP:ADMIN] Named pipes connected — admin MCP ready");
+                Console.Error.WriteLine("[MCP:ADMIN] Named pipes connected -- admin MCP ready");
             }
             catch (Exception ex)
             {
@@ -171,32 +171,32 @@ internal partial class Program
             jsonIn = Console.OpenStandardInput();
         }
 
-        // ── 앱봇관리 콘솔 호스트 설정 ──
-        // stderr → TeeTextWriter(stderr, mainLogFile) → WT 탭 (no-focus)
-        // Console.Out → ThreadRoutingWriter(Console.Error)
-        //   → 도구별 탭: HandleToolsCallAsync 내에서 Route(toolTee) 로 분기
+        // -- 앱봇관리 콘솔 호스트 설정 --
+        // stderr -> TeeTextWriter(stderr, mainLogFile) -> WT 탭 (no-focus)
+        // Console.Out -> ThreadRoutingWriter(Console.Error)
+        //   -> 도구별 탭: HandleToolsCallAsync 내에서 Route(toolTee) 로 분기
         TrySetupMcpConsoleHost(args);
 
-        // Console.Out → ThreadRoutingWriter(stderr) so all logging goes through stderr
+        // Console.Out -> ThreadRoutingWriter(stderr) so all logging goes through stderr
         // Tool invocations will use ThreadRoutingWriter.Route() for per-tab output
         Console.SetOut(new ThreadRoutingWriter(Console.Error));
 
         IsMcpMode = true; // global flag: no console windows, no Eye spawn, no elevation launch, no AllocConsole
 
-        // Detect parent VS Code/Claude Desktop → extract workspace CWD for card system.
-        // MCP server is spawned by VS Code extension; parent chain: VS Code → node → wkappbot.
+        // Detect parent VS Code/Claude Desktop -> extract workspace CWD for card system.
+        // MCP server is spawned by VS Code extension; parent chain: VS Code -> node -> wkappbot.
         _mcpDetectedCwd = DetectMcpParentCwd();
         if (_mcpDetectedCwd != null)
             EyeCmdPipeServer.CallerCwd.Value = _mcpDetectedCwd;
 
         Console.Error.WriteLine($"[MCP] Server starting... (launcher={McpLauncherMode}, cwd={_mcpDetectedCwd ?? "(none)"})");
 
-        // Register session for card system (MCP server = long-lived → one session per server)
+        // Register session for card system (MCP server = long-lived -> one session per server)
         SessionRegister(_mcpDetectedCwd);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => SessionUnregister();
         Console.Error.WriteLine($"[MCP] Session registered: pid={Environment.ProcessId} cwd={_mcpDetectedCwd ?? "(none)"}");
 
-        // ── FlaUI/UIA preload: background fire-and-forget ──
+        // -- FlaUI/UIA preload: background fire-and-forget --
         // Cold-start FlaUI assembly loading takes ~30s. Preload while waiting for first command.
         // By the time first a11y request arrives, assemblies are already in memory.
         _ = Task.Run(() =>
@@ -352,7 +352,7 @@ internal partial class Program
 
     // -- tools/list ---------------------------------------------
 
-    // Shared between MCP tools/list and loop persona — keep in sync
+    // Shared between MCP tools/list and loop persona -- keep in sync
     internal const string McpActionDesc =
         "Action to perform.\n" +
         "Control: close, minimize, maximize, restore, focus, move, resize\n" +
@@ -415,7 +415,7 @@ internal partial class Program
                 }),
             McpTool("grap",
                 "Search wkappbot logs - grep-compatible syntax (grap = GRab Accessible Pattern).\n" +
-                "Pattern comes first, files second — exactly like classic grep/rg.\n" +
+                "Pattern comes first, files second -- exactly like classic grep/rg.\n" +
                 "Internally rewrites to logcat with translated args.\n\n" +
                 "Examples:\n" +
                 "  {pattern:\"exception\"}                                    -> search *.txt in CWD\n" +
@@ -423,7 +423,7 @@ internal partial class Program
                 "  {pattern:\"error\", files:\"*.log\", past:\"30m\", follow:true}-> scan then stream\n" +
                 "  {pattern:\"error\", hq:true, recursive:true}               -> all HQ logs\n" +
                 "  {pattern:\"OCR\", files:\"*.file.*\", timeout:\"30s\"}        -> watch 30s\n" +
-                "  {pattern:\"err\", context:3}                               → 3 lines context\n",
+                "  {pattern:\"err\", context:3}                               -> 3 lines context\n",
                 new JsonObject {
                     ["type"] = "object",
                     ["properties"] = new JsonObject {
@@ -470,15 +470,15 @@ internal partial class Program
                     ["required"] = new JsonArray()
                 }),
             McpTool("wkappbot_cli",
-                // Auto-generated from GetUsageText() — stays in sync with CLI help automatically
+                // Auto-generated from GetUsageText() -- stays in sync with CLI help automatically
                 "Run any wkappbot CLI command via argv array. argv[0] = wkappbot command name.\n" +
                 "Examples: [\"a11y\",\"invoke\",\"*OK*\"], [\"file\",\"read\",\"src/foo.cs\"], [\"web\",\"search\",\"query\"],\n" +
                 "          [\"agent\",\"checkpoint\",\"--label\",\"before compile\"], [\"slack\",\"send\",\"hello\"],\n" +
-                "          [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"OCR-DEEP\"]  ← grep-style log search (exits after scan)\n" +
-                "          [\"logcat\",\"--hq\",\"--past\",\"1h\",\"**\",\"exception\"]          ← search all logs last 1h for 'exception'\n" +
-                "          [\"grap\",\"exception\",\"*.log\",\"--past\",\"1h\"]               ← grap alias: grep-compat order (pattern first)\n" +
-                "          [\"grep\",\"exception\",\"*.log\",\"--past\",\"1h\"]               ← grep alias: same as grap\n" +
-                "⚠ Build/publish: prefer signaling Claude Code via Slack. If Claude Code is offline, checkpoint first then publish.\n\n" +
+                "          [\"logcat\",\"--hq\",\"--past\",\"30s\",\"*.file.*\",\"OCR-DEEP\"]  <- grep-style log search (exits after scan)\n" +
+                "          [\"logcat\",\"--hq\",\"--past\",\"1h\",\"**\",\"exception\"]          <- search all logs last 1h for 'exception'\n" +
+                "          [\"grap\",\"exception\",\"*.log\",\"--past\",\"1h\"]               <- grap alias: grep-compat order (pattern first)\n" +
+                "          [\"grep\",\"exception\",\"*.log\",\"--past\",\"1h\"]               <- grep alias: same as grap\n" +
+                "! Build/publish: prefer signaling Claude Code via Slack. If Claude Code is offline, checkpoint first then publish.\n\n" +
                 GetUsageText(),
                 new JsonObject {
                     ["type"] = "object",

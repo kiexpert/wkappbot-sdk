@@ -4,12 +4,12 @@ using System.Text.Json.Serialization;
 namespace WKAppBot.Android;
 
 /// <summary>
-/// Android Experience DB — per-package knowledge from ADB inspection + actions.
+/// Android Experience DB -- per-package knowledge from ADB inspection + actions.
 /// Mirrors Windows ExperienceDb pattern with A11Y (profile) + OS (package) dual paths.
 ///
-/// A11Y path: profiles/{shortPkg}_exp/         — platform-agnostic knowledge
+/// A11Y path: profiles/{shortPkg}_exp/         -- platform-agnostic knowledge
 ///   knowhow.md, screen_{name}/ subtrees
-/// OS path:   experience/android/{fullPkg}/    — OS-specific logs, screenshots
+/// OS path:   experience/android/{fullPkg}/    -- OS-specific logs, screenshots
 ///   actions.jsonl, device_info.json, screenshots/
 /// </summary>
 public sealed class AdbExperienceDb
@@ -25,7 +25,7 @@ public sealed class AdbExperienceDb
 
     public AdbExperienceDb(string hqPath) => _hqPath = hqPath;
 
-    // ── Path helpers ────────────────────────────────────
+    // -- Path helpers ------------------------------------
 
     /// <summary>A11Y profile path: profiles/{shortPkg}_exp/</summary>
     public string GetA11yDir(string package)
@@ -42,7 +42,7 @@ public sealed class AdbExperienceDb
     public string GetScreenDir(string package, string screenName)
         => Path.Combine(GetA11yDir(package), $"screen_{SanitizeName(screenName)}");
 
-    // ── Tree snapshot (ring buffer 0~9) ─────────────────
+    // -- Tree snapshot (ring buffer 0~9) ----------------─
 
     private int _treeRingIndex;
 
@@ -60,7 +60,7 @@ public sealed class AdbExperienceDb
         return path;
     }
 
-    // ── Action log (append-only JSONL) ──────────────────
+    // -- Action log (append-only JSONL) ------------------
 
     /// <summary>Log an action result to actions.jsonl</summary>
     public void LogAction(string package, AdbActionLog entry)
@@ -74,7 +74,7 @@ public sealed class AdbExperienceDb
         File.AppendAllText(path, line + "\n");
     }
 
-    // ── Screenshot save (ring buffer 0~9) ───────────────
+    // -- Screenshot save (ring buffer 0~9) --------------─
 
     public string SaveScreenshot(string package, string sourcePath)
     {
@@ -89,7 +89,7 @@ public sealed class AdbExperienceDb
         return dest;
     }
 
-    // ── Device info ─────────────────────────────────────
+    // -- Device info ------------------------------------─
 
     public void SaveDeviceInfo(string package, string serial, string? model, string? displayInfo)
     {
@@ -99,7 +99,7 @@ public sealed class AdbExperienceDb
         File.WriteAllText(Path.Combine(dir, "device_info.json"), JsonSerializer.Serialize(info, JsonOpts));
     }
 
-    // ── Knowhow broadcast ───────────────────────────────
+    // -- Knowhow broadcast ------------------------------─
 
     /// <summary>Get knowhow files for broadcast (both A11Y and OS paths)</summary>
     public List<(string Path, string Tag)> GetKnowhowFiles(string package, string? screenName = null)
@@ -132,7 +132,7 @@ public sealed class AdbExperienceDb
         return results;
     }
 
-    // ── Utility ─────────────────────────────────────────
+    // -- Utility ----------------------------------------─
 
     private static string ShortPackage(string package)
     {
@@ -145,7 +145,7 @@ public sealed class AdbExperienceDb
                .Replace(':', '_').Replace('#', '_').Replace('?', '_');
 }
 
-// ── Action log entry ────────────────────────────────────
+// -- Action log entry ------------------------------------
 
 public class AdbActionLog
 {

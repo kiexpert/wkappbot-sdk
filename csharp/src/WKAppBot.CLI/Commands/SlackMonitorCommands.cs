@@ -133,8 +133,8 @@ internal partial class Program
 
     /// <summary>
     /// Build Slack bot username from the active prompt window cards (Eye-cached).
-    /// Priority: callerHwnd exact match → callerCwd match → most-recent card → null (no cards).
-    /// ParentName mapping: "claude"/"code"/"Code" → 클롣, "codex" → 코뎃, else → 앱봇.
+    /// Priority: callerHwnd exact match -> callerCwd match -> most-recent card -> null (no cards).
+    /// ParentName mapping: "claude"/"code"/"Code" -> 클롣, "codex" -> 코뎃, else -> 앱봇.
     /// </summary>
     static string? GetBotUsernameFromCachedCards(string? callerCwd = null, IntPtr? callerHwnd = null)
     {
@@ -150,10 +150,10 @@ internal partial class Program
 
         EyeParentCard? best = null;
 
-        // 0. Direct hwnd match — only trusted when callerCwd is unknown/system,
+        // 0. Direct hwnd match -- only trusted when callerCwd is unknown/system,
         //    OR when the hwnd's CWD actually matches callerCwd.
         //    Reason: GetForegroundWindow() (from Launcher) may return a different VS Code instance
-        //    than the one that actually ran the command → wrong CWD if accepted blindly.
+        //    than the one that actually ran the command -> wrong CWD if accepted blindly.
         if (callerHwnd.HasValue && callerHwnd.Value != IntPtr.Zero)
         {
             var hwndPrompt = FindKnownPromptInfoByHwnd(callerHwnd.Value);
@@ -173,10 +173,10 @@ internal partial class Program
                     var hwndPrefix = GetSlackPrefixForHostType(hwndPrompt.HostType);
                     var hwndTag = !string.IsNullOrEmpty(hwndCwd) ? AbbreviateCwd(hwndCwd) : null;
                     var r0 = !string.IsNullOrWhiteSpace(hwndTag) ? $"{hwndPrefix}[{hwndTag}]" : hwndPrefix;
-                    Console.Error.WriteLine($"[NAME] step=0(hwnd) → {r0} | cwd={callerCwd}");
+                    Console.Error.WriteLine($"[NAME] step=0(hwnd) -> {r0} | cwd={callerCwd}");
                     return r0;
                 }
-                // callerCwd is a real project dir that doesn't match the fg hwnd → ignore hwnd, fall through
+                // callerCwd is a real project dir that doesn't match the fg hwnd -> ignore hwnd, fall through
                 Console.Error.WriteLine($"[NAME] step=0 skip: hwnd-cwd={hwndCwd} ≠ caller-cwd={callerCwd}");
             }
         }
@@ -190,7 +190,7 @@ internal partial class Program
                     StringComparison.OrdinalIgnoreCase));
         }
 
-        // 1b. Prompt window match via callerCwd (title-based — no card needed)
+        // 1b. Prompt window match via callerCwd (title-based -- no card needed)
         // "부모창 우선 확인": if we know the callerCwd, check VS Code windows by title first.
         if (!string.IsNullOrWhiteSpace(callerCwd) && !IsSystemOrInstallDirectory(callerCwd))
         {
@@ -208,16 +208,16 @@ internal partial class Program
                 var matchPrefix = GetSlackPrefixForHostType(matchPrompt.HostType);
                 var matchTag = AbbreviateCwd(callerCwd);
                 var r1b = !string.IsNullOrWhiteSpace(matchTag) ? $"{matchPrefix}[{matchTag}]" : matchPrefix;
-                Console.Error.WriteLine($"[NAME] step=1b(prompt-title) → {r1b} | cwd={callerCwd}");
+                Console.Error.WriteLine($"[NAME] step=1b(prompt-title) -> {r1b} | cwd={callerCwd}");
                 return r1b;
             }
-            // callerCwd is known but no card/window matched — build directly from callerCwd
+            // callerCwd is known but no card/window matched -- build directly from callerCwd
             var directTag = AbbreviateCwd(callerCwd);
             if (!string.IsNullOrWhiteSpace(directTag))
             {
                 var directPrefix = InferSlackPrefixForCaller(callerCwd, callerHwnd);
                 var rDirect = $"{directPrefix}[{directTag}]";
-                Console.Error.WriteLine($"[NAME] step=1b(direct-cwd) → {rDirect} | cwd={callerCwd}");
+                Console.Error.WriteLine($"[NAME] step=1b(direct-cwd) -> {rDirect} | cwd={callerCwd}");
                 return rDirect;
             }
         }
@@ -228,7 +228,7 @@ internal partial class Program
 
         if (best == null)
         {
-            Console.Error.WriteLine($"[NAME] step=? → null (no card match) | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=? -> null (no card match) | cwd={callerCwd}");
             return null;
         }
 
@@ -236,7 +236,7 @@ internal partial class Program
         // Skip cards from wkappbot itself (shouldn't drive username detection)
         if (pname == "wkappbot" || pname.Contains("wkappbot") || pname == "a11y" || pname.Contains("a11y"))
         {
-            Console.Error.WriteLine($"[NAME] step=? → null (wkappbot card skipped) | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=? -> null (wkappbot card skipped) | cwd={callerCwd}");
             return null;
         }
         string prefix;
@@ -246,15 +246,15 @@ internal partial class Program
             prefix = SlackCodexPrefix;
         else
         {
-            Console.Error.WriteLine($"[NAME] step=? → null (unknown parent={pname}) | cwd={callerCwd}");
-            return null; // unknown ParentName — let caller fall through to other detection
+            Console.Error.WriteLine($"[NAME] step=? -> null (unknown parent={pname}) | cwd={callerCwd}");
+            return null; // unknown ParentName -- let caller fall through to other detection
         }
 
         // claude-desktop: global instance, no CWD tag (install dir would abbreviate to "Claude")
         // VS Code (Code.exe): CWD tag meaningful, but skip system/install dirs
         if (pname == "claude" || pname == "claude.exe")
         {
-            Console.Error.WriteLine($"[NAME] step=1/2(card) → {prefix} | cwd={callerCwd}");
+            Console.Error.WriteLine($"[NAME] step=1/2(card) -> {prefix} | cwd={callerCwd}");
             return prefix;
         }
 
@@ -264,7 +264,7 @@ internal partial class Program
         if (cwdTag == null)
             cwdTag = GetSlackFolderTag();
         var rCard = $"{prefix}[{cwdTag}]";
-        Console.Error.WriteLine($"[NAME] step=1/2(card) → {rCard} | cwd={callerCwd}");
+        Console.Error.WriteLine($"[NAME] step=1/2(card) -> {rCard} | cwd={callerCwd}");
         return rCard;
     }
 
@@ -307,7 +307,7 @@ internal partial class Program
         if (!string.IsNullOrWhiteSpace(suggestBypass))
         {
             var bypass = GetSuggestBypassUsername(printDecision);
-            if (printDecision) Console.Error.WriteLine($"[NAME] step=suggest-bypass → {bypass}");
+            if (printDecision) Console.Error.WriteLine($"[NAME] step=suggest-bypass -> {bypass}");
             return bypass;
         }
 
@@ -316,13 +316,13 @@ internal partial class Program
         var envName = Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_NAME");
         if (!string.IsNullOrEmpty(envName) && EyeCmdPipeServer.CallerCwd.Value == null)
         {
-            if (printDecision) Console.Error.WriteLine($"[NAME] step=env → {envName}");
+            if (printDecision) Console.Error.WriteLine($"[NAME] step=env -> {envName}");
             return envName;
         }
 
         // Priority 1: prompt window cards (app type + CWD from actual Claude/Codex instances)
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
-        // Prefer pipe-delivered hwnd (Launcher sends GetForegroundWindow) — faster than process-tree walk.
+        // Prefer pipe-delivered hwnd (Launcher sends GetForegroundWindow) -- faster than process-tree walk.
         // Fall back to process tree walk when running Core directly (no Eye pipe, no CallerHwnd).
         var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value ?? FindCallerParentPromptHwnd();
         var cardUsername = GetBotUsernameFromCachedCards(callerCwd, callerHwnd);
@@ -596,7 +596,7 @@ internal partial class Program
             }
             else
             {
-                // No foreground window — just notify
+                // No foreground window -- just notify
                 SlackSendViaApi(botToken, channel,
                     $"Claude 프롬프트를 찾을 수 없어요! 원래 메시지: {cleanText}",
                     threadTs, username: username).GetAwaiter().GetResult();
@@ -620,7 +620,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Claude Desktop monitor tick — called every ~100ms from the listen loop.
+    /// Claude Desktop monitor tick -- called every ~100ms from the listen loop.
     /// Detects 3 Claude states via UIA: executing, plan_approval_pending, prompt_ready.
     /// Streams status to Slack via chat.postMessage (create) + chat.update (update).
     /// Handles thread reply relocation: when someone replies to the streaming message,
@@ -650,7 +650,7 @@ internal partial class Program
 
                     if (!isChannelMsg)
                     {
-                        // 1. Reply in old thread (acknowledge) — only for thread replies
+                        // 1. Reply in old thread (acknowledge) -- only for thread replies
                         var ackMsg = "(이 쓰레드의 스트리밍은 새 메시지로 이동했어요!)";
                         Task.Run(async () => await SlackSendViaApi(botToken, channel, ackMsg, reply.threadTs, username: GetBotUsername(instanceName))).Wait(3000);
                     }
@@ -666,7 +666,7 @@ internal partial class Program
                     {
                         // Thread reply: update old message with "moved" notice
                         var oldContent = lastContent ?? "Claude 상태";
-                        var oldMsg = oldContent + $"\n_:speech_balloon: 댓글 달림 — 새 메시지로 이동_";
+                        var oldMsg = oldContent + $"\n_:speech_balloon: 댓글 달림 -- 새 메시지로 이동_";
                         Task.Run(async () => await SlackUpdateMessageAsync(botToken, channel, localOldTs!, oldMsg)).Wait(3000);
                     }
 
@@ -675,7 +675,7 @@ internal partial class Program
                     var newEmoji = GetStatusEmoji(curStatus?.Item1);
                     var newText = curStatus?.Item2 ?? "대기 중";
                     var newContent = curStatus != null
-                        ? $"{newEmoji} *{GetStatusLabel(curStatus.Item1)}* — {newText} ({DateTime.Now:HH:mm})"
+                        ? $"{newEmoji} *{GetStatusLabel(curStatus.Item1)}* -- {newText} ({DateTime.Now:HH:mm})"
                         : $":white_check_mark: *Claude 대기 중* ({DateTime.Now:HH:mm})";
 
                     var botUser = GetBotUsername(instanceName);
@@ -712,13 +712,13 @@ internal partial class Program
 
         if (nowActive && !claudeBusy)
         {
-            // Transition: idle → active
+            // Transition: idle -> active
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[SLACK] Claude: {label} — {statusText}");
+            Console.Error.WriteLine($"[SLACK] Claude: {label} -- {statusText}");
             Console.ResetColor();
 
             var displayText = statusText ?? "작업 중...";
-            lastContent = $"{emoji} *{label}* — {displayText} ({DateTime.Now:HH:mm})";
+            lastContent = $"{emoji} *{label}* -- {displayText} ({DateTime.Now:HH:mm})";
 
             // Create or update status message
             if (statusTs == null)
@@ -746,7 +746,7 @@ internal partial class Program
         }
         else if (!nowActive && claudeBusy)
         {
-            // Transition: active → idle
+            // Transition: active -> idle
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("[SLACK] Claude: done");
             Console.ResetColor();
@@ -761,8 +761,8 @@ internal partial class Program
         }
         else if (nowActive && claudeBusy)
         {
-            // Still active — update only when status text changes
-            var newContent = $"{emoji} *{label}* — {statusText ?? "..."} ({DateTime.Now:HH:mm})";
+            // Still active -- update only when status text changes
+            var newContent = $"{emoji} *{label}* -- {statusText ?? "..."} ({DateTime.Now:HH:mm})";
             if (newContent != lastContent)
             {
                 lastContent = newContent;
@@ -851,20 +851,20 @@ internal partial class Program
         if (forceClaude is "1" or "true" or "yes" or "on")
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
-        // Parent-chain-only detection: no AI in parent → treat as human user.
-        // Prefix is determined by host type: vscode-extension → short name, desktop app → "앱" suffix.
-        // Codex: CODEX_HOME (VS Code ext) → 코덳, parent "codex" process (desktop) → 코덳앱.
-        // Claude: CLAUDE_CODE_ENTRYPOINT (VS Code ext) → 클롣, parent "claude" process (desktop) → 클롣앱.
+        // Parent-chain-only detection: no AI in parent -> treat as human user.
+        // Prefix is determined by host type: vscode-extension -> short name, desktop app -> "앱" suffix.
+        // Codex: CODEX_HOME (VS Code ext) -> 코덳, parent "codex" process (desktop) -> 코덳앱.
+        // Claude: CLAUDE_CODE_ENTRYPOINT (VS Code ext) -> 클롣, parent "claude" process (desktop) -> 클롣앱.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT")))
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
-        if (IsRunningFromCodexDesktop())   // parent chain "codex" = Codex Desktop → 코덳앱
+        if (IsRunningFromCodexDesktop())   // parent chain "codex" = Codex Desktop -> 코덳앱
             return BuildSlackBotUsername(SlackCodexAppPrefix, instanceName, spaceBeforeBracket: false);
-        if (IsRunningFromClaudeDesktop())  // parent chain "claude" = Claude Desktop → 클롣앱
+        if (IsRunningFromClaudeDesktop())  // parent chain "claude" = Claude Desktop -> 클롣앱
             return BuildSlackBotUsername(SlackClaudeAppPrefix, instanceName, spaceBeforeBracket: false);
 
-        // No AI in parent chain → human user
+        // No AI in parent chain -> human user
         var loginUser = Environment.UserName;
         if (!string.IsNullOrWhiteSpace(loginUser)) return loginUser;
         return BuildSlackBotUsername(SlackGenericPrefix, instanceName, spaceBeforeBracket: false);
@@ -879,7 +879,7 @@ internal partial class Program
 
     /// <summary>
     /// Given any PID, instantly return the Slack display name.
-    /// Process name → host type → SlackPrefix + [cwdTag].
+    /// Process name -> host type -> SlackPrefix + [cwdTag].
     /// Single source of truth for all ack/status/probe display names.
     /// </summary>
     internal static string ResolveDisplayNameByPid(int pid)
@@ -900,7 +900,7 @@ internal partial class Program
 
         var cwd = WKAppBot.Win32.Native.NativeMethods.GetProcessCurrentDirectory(pid);
         if (!string.IsNullOrEmpty(cwd) && IsSystemOrInstallDirectory(cwd))
-            cwd = null;  // reject system/install dirs — no CWD tag
+            cwd = null;  // reject system/install dirs -- no CWD tag
         var cwdTag = string.IsNullOrEmpty(cwd) ? null : AbbreviateCwd(cwd);
 
         if (procName.Equals("claude", StringComparison.OrdinalIgnoreCase))
@@ -1027,7 +1027,7 @@ internal partial class Program
         {
             using var http = new HttpClient();
             http.DefaultRequestHeaders.Add("Authorization", $"Bearer {botToken}");
-            // Fetch entire thread (up to 50 messages — enough for context)
+            // Fetch entire thread (up to 50 messages -- enough for context)
             var url = $"https://slack.com/api/conversations.replies?channel={channel}&ts={threadTs}&limit=50&inclusive=true";
             var resp = http.GetAsync(url).GetAwaiter().GetResult();
             var body = resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
@@ -1040,9 +1040,9 @@ internal partial class Program
             // 1. Bot's original message (thread parent = first message)
             var parentText = messages[0]?["text"]?.GetValue<string>();
 
-            // 2. Find previous message (right before current — could be user OR bot)
-            // In a thread, conversation flows: bot→user→bot→user, so prev msg gives context
-            // Skip ack messages ("전달했습니다") — they are transient and not meaningful context
+            // 2. Find previous message (right before current -- could be user OR bot)
+            // In a thread, conversation flows: bot->user->bot->user, so prev msg gives context
+            // Skip ack messages ("전달했습니다") -- they are transient and not meaningful context
             string? prevText = null;
             bool prevIsBot = false;
             for (int i = messages.Count - 1; i >= 1; i--)
@@ -1090,7 +1090,7 @@ internal partial class Program
 
     /// <summary>
     /// Update an existing Slack message via chat.update API.
-    /// Returns (ok, ts) — ts is the message timestamp.
+    /// Returns (ok, ts) -- ts is the message timestamp.
     /// </summary>
     static async Task<(bool ok, string? ts, string? error)> SlackUpdateMessageAsync(
         string botToken, string channel, string ts, string text)
@@ -1098,7 +1098,7 @@ internal partial class Program
         // Hard cap: Slack chat.update rejects > 40,000 chars; stay well under to avoid msg_too_long
         const int MaxSlackText = 39000;
         if (text.Length > MaxSlackText)
-            text = text[..MaxSlackText] + "\n…(truncated)";
+            text = text[..MaxSlackText] + "\n...(truncated)";
 
         using var http = new HttpClient();
         var payload = JsonSerializer.Serialize(new { channel, ts, text });
@@ -1128,7 +1128,7 @@ internal partial class Program
     static async Task<bool> SlackDeleteMessageAsync(string botToken, string channel, string ts,
         bool guardThreadStarter = true, bool skipLastMsgProtection = false)
     {
-        // ── Orphan detection: reply whose thread starter was deleted → always delete ──
+        // -- Orphan detection: reply whose thread starter was deleted -> always delete --
         // Fetch message info to check if it's an orphaned reply
         try
         {
@@ -1138,10 +1138,10 @@ internal partial class Program
                 var starter = replies[0];
                 var starterTs = starter?["ts"]?.GetValue<string>();
                 var starterSubtype = starter?["subtype"]?.GetValue<string>();
-                // If starter ts != our ts, we're a reply — check if starter is tombstone
+                // If starter ts != our ts, we're a reply -- check if starter is tombstone
                 if (starterTs != ts && (starterSubtype == "tombstone" || starter?["text"]?.GetValue<string>() == "This message was deleted."))
                 {
-                    Console.Error.WriteLine($"[SLACK] Orphan reply ts={ts} — thread starter deleted → force delete");
+                    Console.Error.WriteLine($"[SLACK] Orphan reply ts={ts} -- thread starter deleted -> force delete");
                     await SlackDeleteRawAsync(botToken, channel, ts);
                     return true;
                 }
@@ -1155,7 +1155,7 @@ internal partial class Program
             for (int pass = 0; pass < 10; pass++) // max 10 passes (safety)
             {
                 var threadReplies = await SlackGetThreadRepliesAsync(botToken, channel, ts);
-                if (threadReplies == null || threadReplies.Count <= 1) break; // no replies → proceed to delete starter
+                if (threadReplies == null || threadReplies.Count <= 1) break; // no replies -> proceed to delete starter
 
                 // Check for human replies
                 bool hasUserReply = false;
@@ -1172,7 +1172,7 @@ internal partial class Program
 
                 if (hasUserReply)
                 {
-                    Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} — thread has user replies");
+                    Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} -- thread has user replies");
                     return false;
                 }
 
@@ -1185,15 +1185,15 @@ internal partial class Program
             }
         }
 
-        // ── Guard: protect last 2 messages per author+profile (message_limit fallback target) ──
+        // -- Guard: protect last 2 messages per author+profile (message_limit fallback target) --
         // skipLastMsgProtection=true bypasses this for explicit gc/cleanup callers
         if (!skipLastMsgProtection && await IsProtectedLastMessageAsync(botToken, channel, ts))
         {
-            Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} — protected (last 2 per author)");
+            Console.Error.WriteLine($"[SLACK] SKIP delete ts={ts} -- protected (last 2 per author)");
             return false;
         }
 
-        // ── Pre-delete: dump full message data for audit trail ──
+        // -- Pre-delete: dump full message data for audit trail --
         SlackDumpMessage(botToken, channel, ts, "[SLACK:DELETE]");
 
         using var http = new HttpClient();
@@ -1216,7 +1216,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// wkappbot slack read <ts> — dump full message data (text, user, emoji, files, reactions, etc.)
+    /// wkappbot slack read <ts> -- dump full message data (text, user, emoji, files, reactions, etc.)
     /// </summary>
     static int SlackReadCommand(string[] args)
     {
@@ -1246,7 +1246,7 @@ internal partial class Program
             var resp = http.GetStringAsync($"https://slack.com/api/conversations.replies?channel={channel}&ts={ts}&limit=1&inclusive=true").GetAwaiter().GetResult();
             var json = JsonSerializer.Deserialize<JsonNode>(resp);
             var msg = json?["messages"]?[0];
-            if (msg == null) { Console.WriteLine($"{prefix} ts={ts} — not found"); return; }
+            if (msg == null) { Console.WriteLine($"{prefix} ts={ts} -- not found"); return; }
 
             Console.WriteLine($"{prefix} ts={ts}");
 
@@ -1300,7 +1300,7 @@ internal partial class Program
 
     /// <summary>
     /// Check if a message is one of the last 2 messages by its author (username).
-    /// Protected messages are fallback targets for message_limit append — deleting them breaks the chain.
+    /// Protected messages are fallback targets for message_limit append -- deleting them breaks the chain.
     /// </summary>
     static async Task<bool> IsProtectedLastMessageAsync(string botToken, string channel, string ts)
     {
@@ -1341,7 +1341,7 @@ internal partial class Program
         {
             Console.Error.WriteLine($"[SLACK] IsProtectedLastMessage error: {ex.Message}");
         }
-        return false; // not found → allow delete
+        return false; // not found -> allow delete
     }
 
     /// <summary>
@@ -1455,7 +1455,7 @@ internal partial class Program
     /// For each stale message: clean bot-only replies first, then delete starter.
     /// Skips threads with human replies.
     /// </summary>
-    // ── Channel history cache: avoid repeated API calls within short window ──
+    // -- Channel history cache: avoid repeated API calls within short window --
     static JsonArray? _channelHistoryCache;
     static DateTime _channelHistoryCacheAt = DateTime.MinValue;
     static readonly TimeSpan ChannelHistoryCacheTtl = TimeSpan.FromSeconds(30);
@@ -1490,7 +1490,7 @@ internal partial class Program
             var msgs = await GetChannelHistoryCachedAsync(botToken, channel);
             if (msgs == null) return;
 
-            // Collect status messages per author (newest first — Slack returns newest first)
+            // Collect status messages per author (newest first -- Slack returns newest first)
             var statusByAuthor = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             var orphanReplies = new List<string>();
 
@@ -1522,7 +1522,7 @@ internal partial class Program
                 await Task.Delay(300);
             }
 
-            // Per-author: keep latest N, delete older — clean bot replies first so starter is deletable
+            // Per-author: keep latest N, delete older -- clean bot replies first so starter is deletable
             foreach (var (author, tsList) in statusByAuthor)
             {
                 if (tsList.Count <= keepPerAuthor) continue;
@@ -1546,7 +1546,7 @@ internal partial class Program
                         }
                         if (hasHumanReply)
                         {
-                            Console.Error.WriteLine($"[SLACK:GC] Status {staleTs} has human reply → skip");
+                            Console.Error.WriteLine($"[SLACK:GC] Status {staleTs} has human reply -> skip");
                             continue;
                         }
                         foreach (var rTs in botReplyTs)
@@ -1573,7 +1573,7 @@ internal partial class Program
         }
     }
 
-    /// <summary>Raw chat.delete — no guards, no audit. For cleaning bot replies before thread starter delete.</summary>
+    /// <summary>Raw chat.delete -- no guards, no audit. For cleaning bot replies before thread starter delete.</summary>
     static async Task SlackDeleteRawAsync(string botToken, string channel, string ts)
     {
         try
@@ -1600,17 +1600,17 @@ internal partial class Program
             var resp = await http.SendAsync(req);
             var body = await resp.Content.ReadAsStringAsync();
             var json = JsonSerializer.Deserialize<JsonNode>(body);
-            if (json?["ok"]?.GetValue<bool>() != true) return true; // API error → assume has replies (don't delete)
+            if (json?["ok"]?.GetValue<bool>() != true) return true; // API error -> assume has replies (don't delete)
 
             // conversations.replies returns the parent message + replies.
             // If count > 1, there is at least one reply.
             var messages = json?["messages"]?.AsArray();
             return (messages?.Count ?? 0) > 1;
         }
-        catch { return true; } // Network/parse error → assume has replies (don't delete)
+        catch { return true; } // Network/parse error -> assume has replies (don't delete)
     }
 
-    // ── Pending Ack file-based IPC ──────────────────────────────
+    // -- Pending Ack file-based IPC ------------------------------
     // Shared between AppBotEye (writes ack ts) and CLI (reads + deletes ack before replying)
     // File: wkappbot.hq/runtime/pending_acks.json
     // Format: { "threadTs": { "channel": "C...", "ackTs": "1234.5678" }, ... }

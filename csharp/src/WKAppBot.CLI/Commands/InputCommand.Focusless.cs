@@ -11,7 +11,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── Method A11y: UIA Value Pattern (focusless) ──
+    // -- Method A11y: UIA Value Pattern (focusless) --
     static InputResult TryInputMethodA11y(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -42,7 +42,7 @@ internal partial class Program
             try
             {
                 var uia = new UIA3Automation();
-                // Direct hwnd → UIA element (fastest path, no tree walk)
+                // Direct hwnd -> UIA element (fastest path, no tree walk)
                 FlaUI.Core.AutomationElements.AutomationElement? targetEl = null;
                 try
                 {
@@ -58,7 +58,7 @@ internal partial class Program
                     // Verify via UIA
                     var uiaVal = targetEl.Patterns.Value.Pattern.Value.Value ?? "";
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write($"[SetValue→\"{uiaVal}\"] ");
+                    Console.Write($"[SetValue->\"{uiaVal}\"] ");
                     Console.ResetColor();
 
                     if (uiaVal.Contains(text))
@@ -76,7 +76,7 @@ internal partial class Program
                         }
 
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"✓ UIA confirmed \"{text}\" (A11Y, focusless!)");
+                        Console.WriteLine($"v UIA confirmed \"{text}\" (A11Y, focusless!)");
                         Console.ResetColor();
                         success = true;
                     }
@@ -106,7 +106,7 @@ internal partial class Program
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 10: Focusless PostMessage ──
+    // -- Method 10: Focusless PostMessage --
     static InputResult TryInputMethod10(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -149,7 +149,7 @@ internal partial class Program
 
                 var perfTotal = Stopwatch.StartNew();
 
-                // NO foreground/focus change — just MDI activate (sendmessage, not focus)
+                // NO foreground/focus change -- just MDI activate (sendmessage, not focus)
                 NativeMethods.SendMessageW(mdiClient, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
                 Thread.Sleep(50); // reduced from 200ms
 
@@ -179,7 +179,7 @@ internal partial class Program
                         }
                         else
                         {
-                            // Large control — check if foreground (visible) or obscured
+                            // Large control -- check if foreground (visible) or obscured
                             var fgHwnd = NativeMethods.GetForegroundWindow();
                             NativeMethods.GetWindowThreadProcessId(targetHwnd, out uint zTargetPid);
                             NativeMethods.GetWindowThreadProcessId(fgHwnd, out uint zFgPid);
@@ -229,13 +229,13 @@ internal partial class Program
                         zoomHost.UpdateHeader($"[ZOOM:{modeName}] input_m10 \"{text}\"");
                         Console.Error.Write($"[ZOOM:{modeName}@{zX},{zY} {zW}x{zH}] ");
 
-                        // Initial capture (Magnifier/Relay only — HighlightBox is transparent)
+                        // Initial capture (Magnifier/Relay only -- HighlightBox is transparent)
                         if (zoomMode != ZoomMode.HighlightBox)
                         {
                             var initPng = CaptureControlPng(targetForm.Handle, targetHwnd);
                             if (initPng != null) zoomHost.UpdateImage(initPng);
                         }
-                        zoomHost.UpdateStatus($"Before → \"{text}\" ({text.Length} chars)");
+                        zoomHost.UpdateStatus($"Before -> \"{text}\" ({text.Length} chars)");
 
                         // Start periodic live capture (fast refresh) + TOPMOST enforcement
                         // Raw pixel path: no codec overhead, ~10x faster than BMP/PNG
@@ -266,7 +266,7 @@ internal partial class Program
                 Thread.Sleep(15); // reduced from 50ms
                 perfHome.Stop();
 
-                // Step 2: WM_CHAR only per digit (no WM_KEYDOWN/UP — avoids TranslateMessage doubling)
+                // Step 2: WM_CHAR only per digit (no WM_KEYDOWN/UP -- avoids TranslateMessage doubling)
                 var perfType = Stopwatch.StartNew();
                 int charIdx10 = 0;
                 foreach (char ch in text)
@@ -276,9 +276,9 @@ internal partial class Program
                     IntPtr lp = MkLParam10(vk);
                     NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, lp);
                     charIdx10++;
-                    Thread.Sleep(10); // reduced from 30ms — PostMessage is async, 10ms is safe
+                    Thread.Sleep(10); // reduced from 30ms -- PostMessage is async, 10ms is safe
 
-                    // [ZOOM] Hook 2: Update status text only (NO capture per character — major perf win!)
+                    // [ZOOM] Hook 2: Update status text only (NO capture per character -- major perf win!)
                     if (zoomHost?.IsAlive == true)
                     {
                         zoomHost.UpdateStatus($"Typing: {charIdx10}/{text.Length}  \"{text[..charIdx10]}\"");
@@ -306,7 +306,7 @@ internal partial class Program
                         if (typedPng != null)
                         {
                             zoomHost.UpdateImage(typedPng);
-                            zoomHost.UpdateStatus($"Typed: \"{text}\" — verifying...");
+                            zoomHost.UpdateStatus($"Typed: \"{text}\" -- verifying...");
                         }
                     }
                     catch { /* best-effort */ }
@@ -361,7 +361,7 @@ internal partial class Program
                     NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, MkLParam10(0x0D));
                     Thread.Sleep(20); // reduced from 50ms
                     NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, MkLParam10(0x0D, keyUp: true));
-                    Thread.Sleep(800); // reduced from 1500ms — data query needs time but not this much
+                    Thread.Sleep(800); // reduced from 1500ms -- data query needs time but not this much
                 }
                 perfEnter.Stop();
 
@@ -385,28 +385,28 @@ internal partial class Program
                 if (ocrOk10)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ OCR confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.WriteLine($"v OCR confirmed \"{text}\" (FOCUSLESS!)");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!string.IsNullOrEmpty(preOcr10) && preOcr10.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ pre-OCR confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.WriteLine($"v pre-OCR confirmed \"{text}\" (FOCUSLESS!)");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (wmT10.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM confirmed \"{text}\" (FOCUSLESS!)");
+                    Console.WriteLine($"v WM confirmed \"{text}\" (FOCUSLESS!)");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!string.IsNullOrEmpty(preOcr10) && FuzzyDigitMatch(preOcr10, text, 2))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ fuzzy OCR confirmed \"{text}\" (FOCUSLESS!, ocr:\"{preOcr10}\")");
+                    Console.WriteLine($"v fuzzy OCR confirmed \"{text}\" (FOCUSLESS!, ocr:\"{preOcr10}\")");
                     Console.ResetColor();
                     success = true;
                 }
@@ -430,7 +430,7 @@ internal partial class Program
                     try
                     {
                         bool zoomPass = success;
-                        string zoomText = zoomPass ? $"✓ PASS \"{text}\"" : $"? \"{preOcr10 ?? "?"}\"";
+                        string zoomText = zoomPass ? $"v PASS \"{text}\"" : $"? \"{preOcr10 ?? "?"}\"";
                         zoomHost.ShowResult(zoomPass, zoomText);
 
                         // Final control capture via PrintWindow (Z-order safe, ignores overlay on top)
@@ -441,7 +441,7 @@ internal partial class Program
                         }
                         catch { }
 
-                        // Save zoom overlay screenshot (from desktop — captures the overlay itself)
+                        // Save zoom overlay screenshot (from desktop -- captures the overlay itself)
                         try
                         {
                             NativeMethods.GetWindowRect(targetHwnd, out var zShotRect);
@@ -474,8 +474,8 @@ internal partial class Program
                         catch { }
 
                         // Fire-and-forget: overlay fades on its own STA thread
-                        // No Thread.Sleep — main thread proceeds immediately for fast successive inputs
-                        zoomHost.BeginFadeOut(1500, 400); // 1.5s hold + 0.4s fade → faster cleanup
+                        // No Thread.Sleep -- main thread proceeds immediately for fast successive inputs
+                        zoomHost.BeginFadeOut(1500, 400); // 1.5s hold + 0.4s fade -> faster cleanup
                         zoomHost = null; // hand off lifecycle to STA thread (IsBackground=true)
                     }
                     catch { zoomHost?.Dispose(); zoomHost = null; }
@@ -488,14 +488,14 @@ internal partial class Program
                 zoomHost = null;
 
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 6: EM_SETSEL + EM_REPLACESEL ──
+    // -- Method 6: EM_SETSEL + EM_REPLACESEL --
     static InputResult TryInputMethod6(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -559,28 +559,28 @@ internal partial class Program
                 if (newText.Contains(text) || ocrOk)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")}");
+                    Console.WriteLine($"v WM=\"{newText}\" {(ocrOk ? "OCR=v" : "")}");
                     Console.ResetColor();
                     success = true;
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")} (expected \"{text}\")");
+                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=v" : "")} (expected \"{text}\")");
                     Console.ResetColor();
                 }
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 7: WM_SETTEXT + WM_COMMAND(EN_CHANGE) ──
+    // -- Method 7: WM_SETTEXT + WM_COMMAND(EN_CHANGE) --
     static InputResult TryInputMethod7(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -652,28 +652,28 @@ internal partial class Program
                 if (newText.Contains(text) || ocrOk)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")}");
+                    Console.WriteLine($"v WM=\"{newText}\" {(ocrOk ? "OCR=v" : "")}");
                     Console.ResetColor();
                     success = true;
                 }
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=✓" : "")} (expected \"{text}\")");
+                    Console.WriteLine($"? WM=\"{newText}\" {(ocrOk ? "OCR=v" : "")} (expected \"{text}\")");
                     Console.ResetColor();
                 }
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 3: WM_SETTEXT + VK_RETURN ──
+    // -- Method 3: WM_SETTEXT + VK_RETURN --
     static InputResult TryInputMethod3(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -722,7 +722,7 @@ internal partial class Program
                 if (newText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ \"{newText}\"");
+                    Console.WriteLine($"v \"{newText}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -736,7 +736,7 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 

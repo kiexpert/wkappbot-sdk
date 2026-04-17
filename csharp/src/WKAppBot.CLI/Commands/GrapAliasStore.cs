@@ -5,7 +5,7 @@ using WKAppBot.Win32.Window;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Named GRAP alias store — persisted to wkappbot.hq/profiles/grap_aliases.json.
+/// Named GRAP alias store -- persisted to wkappbot.hq/profiles/grap_aliases.json.
 /// Supports @name expansion and self-healing for stale hwnd fields.
 /// </summary>
 internal static class GrapAliasStore
@@ -19,7 +19,7 @@ internal static class GrapAliasStore
 
     static string StorePath => Path.Combine(Program.DataDir, "profiles", "grap_aliases.json");
 
-    // ── CRUD ──────────────────────────────────────────────────────────────────
+    // -- CRUD ------------------------------------------------------------------
 
     internal static List<GrapAlias> LoadAll()
     {
@@ -62,7 +62,7 @@ internal static class GrapAliasStore
         return true;
     }
 
-    // ── @name expansion ───────────────────────────────────────────────────────
+    // -- @name expansion ------------------------------------------------------─
 
     /// <summary>
     /// Expand @name references in a grap string.
@@ -79,7 +79,7 @@ internal static class GrapAliasStore
         var alias = Get(name);
         if (alias == null)
         {
-            healNote = $"[GRAP-ALIAS] @{name} not found — check `wkappbot grap list`";
+            healNote = $"[GRAP-ALIAS] @{name} not found -- check `wkappbot grap list`";
             return grap; // return original so error surfaces
         }
 
@@ -99,7 +99,7 @@ internal static class GrapAliasStore
                 // Fix dangling commas / empty braces
                 stripped = System.Text.RegularExpressions.Regex.Replace(stripped, @",\s*\}", "}");
                 resolved = stripped;
-                healNote = $"[GRAP-ALIAS] @{name} hwnd stale — stripped, using: {resolved}";
+                healNote = $"[GRAP-ALIAS] @{name} hwnd stale -- stripped, using: {resolved}";
             }
         }
 

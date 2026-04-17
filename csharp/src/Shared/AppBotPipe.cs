@@ -1,10 +1,10 @@
-// AppBotPipe.cs — shared between Launcher (NativeAOT) and Core.
+// AppBotPipe.cs -- shared between Launcher (NativeAOT) and Core.
 // Linked via csproj: <Compile Include="..\..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
-// No project dependencies — pure kernel32 P/Invoke only.
+// No project dependencies -- pure kernel32 P/Invoke only.
 //
 // ALL process creation MUST go through this class:
-//   Low-level:  AppBotPipe.CreateProcess(...)   — raw CreateProcessW with null-CWD guard
-//   High-level: AppBotPipe.Spawn(...)           — Process.Start replacement, also uses CreateProcessW guard
+//   Low-level:  AppBotPipe.CreateProcess(...)   -- raw CreateProcessW with null-CWD guard
+//   High-level: AppBotPipe.Spawn(...)           -- Process.Start replacement, also uses CreateProcessW guard
 
 using System.Runtime.InteropServices;
 
@@ -19,12 +19,12 @@ internal static class AppBotPipe
     static readonly bool _verbose = Environment.GetEnvironmentVariable("WKAPPBOT_PROFILE") == "1"
                                  && Environment.GetEnvironmentVariable("WKAPPBOT_QUIET_FIND") != "1";
 
-    // ── Structs ──────────────────────────────────────────────
+    // -- Structs ----------------------------------------------
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct STARTUPINFOW
     {
-        public int cb, _res0; // explicit padding for NativeAOT safety (int=4B → IntPtr=8B on x64)
+        public int cb, _res0; // explicit padding for NativeAOT safety (int=4B -> IntPtr=8B on x64)
         public IntPtr lpReserved, lpDesktop, lpTitle;
         public uint dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute;
         public uint dwFlags; public ushort wShowWindow, cbReserved2; public IntPtr lpReserved2;
@@ -37,7 +37,7 @@ internal static class AppBotPipe
         public IntPtr hProcess, hThread; public uint dwProcessId, dwThreadId;
     }
 
-    // ── Constants ────────────────────────────────────────────
+    // -- Constants --------------------------------------------
 
     internal const uint DETACHED_PROCESS          = 0x00000008;
     internal const uint CREATE_NO_WINDOW          = 0x08000000;
@@ -47,7 +47,7 @@ internal static class AppBotPipe
     internal const uint STARTF_USESHOWWINDOW      = 0x1;
     internal const uint HANDLE_FLAG_INHERIT        = 0x1;
 
-    // ── P/Invoke ─────────────────────────────────────────────
+    // -- P/Invoke --------------------------------------------─
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateProcessW")]
     private static extern bool RawCreateProcessW(string? app, char[] cmd, IntPtr pa, IntPtr ta,
@@ -66,8 +66,8 @@ internal static class AppBotPipe
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
-    // ── Focus Launch Callbacks ───────────────────────────────
-    // Wired by WKAppBot.CLI at startup. null in Launcher (NativeAOT) — no-op.
+    // -- Focus Launch Callbacks ------------------------------─
+    // Wired by WKAppBot.CLI at startup. null in Launcher (NativeAOT) -- no-op.
 #pragma warning disable CS0649 // fields wired at runtime by WKAppBot.CLI, always null in NativeAOT Launcher
     /// <summary>Called before launching a known/declared focus-requiring exe. Returns true = approved.</summary>
     internal static Func<string, string, bool>? OnFocusApprovalRequired;
@@ -79,10 +79,10 @@ internal static class AppBotPipe
     internal static Func<string, bool>? OnIsKnownFocusStealer;
 #pragma warning restore CS0649
 
-    // ── Low-level: guarded CreateProcessW ────────────────────
+    // -- Low-level: guarded CreateProcessW --------------------
 
     /// <summary>
-    /// Guarded CreateProcessW — blocks null/empty CWD to prevent system32 zombie processes.
+    /// Guarded CreateProcessW -- blocks null/empty CWD to prevent system32 zombie processes.
     /// </summary>
     internal static bool CreateProcess(string? app, char[] cmd, IntPtr pa, IntPtr ta,
         bool inh, uint flags, IntPtr env, string? cwd,
@@ -92,20 +92,20 @@ internal static class AppBotPipe
         lastError = 0;
         var cmdStr = new string(cmd).TrimEnd('\0');
 
-        // ── FOCUSLESS GUARD ─────────────────────────────────────
+        // -- FOCUSLESS GUARD ------------------------------------─
         // wShowWindow > 0 without SW_HIDE = potential focus steal
-        // Exception: SW_SHOWNOACTIVATE(4) is safe — shows window without stealing focus
+        // Exception: SW_SHOWNOACTIVATE(4) is safe -- shows window without stealing focus
         if ((si.dwFlags & STARTF_USESHOWWINDOW) != 0 && si.wShowWindow > 0 && si.wShowWindow != 4)
         {
-            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED — wShowWindow={si.wShowWindow} violates focusless! cmd={Trunc(cmdStr, 60)}"); } catch { }
+            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED -- wShowWindow={si.wShowWindow} violates focusless! cmd={Trunc(cmdStr, 60)}"); } catch { }
             pi = default;
             return false;
         }
 
-        // ── NULL CWD GUARD ──────────────────────────────────────
+        // -- NULL CWD GUARD --------------------------------------
         if (string.IsNullOrEmpty(cwd))
         {
-            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED — null CWD! cmd={Trunc(cmdStr, 60)}"); } catch { }
+            try { Console.Error.WriteLine($"[{caller}:BUG] CreateProcessW BLOCKED -- null CWD! cmd={Trunc(cmdStr, 60)}"); } catch { }
             pi = default;
             return false;
         }
@@ -123,7 +123,7 @@ internal static class AppBotPipe
             {
                 bool retriableBreakawayDenied = lastError == 5 && (flags & CREATE_BREAKAWAY_FROM_JOB) != 0;
                 if (retriableBreakawayDenied)
-                    Console.Error.WriteLine($"[{caller}:WARN] CreateProcessW breakaway denied err=5 — retry without breakaway");
+                    Console.Error.WriteLine($"[{caller}:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway");
                 else
                     Console.Error.WriteLine($"[{caller}] CreateProcessW FAILED err={lastError}");
             }
@@ -132,10 +132,10 @@ internal static class AppBotPipe
         return ok;
     }
 
-    // ── High-level: Spawn() — Process.Start replacement ─────
+    // -- High-level: Spawn() -- Process.Start replacement ----─
 
     /// <summary>
-    /// Spawn result — process handle + optional redirected streams.
+    /// Spawn result -- process handle + optional redirected streams.
     /// Dispose closes all handles. Use WaitForExit/ExitCode as needed.
     /// </summary>
     internal sealed class SpawnResult : IDisposable
@@ -186,8 +186,8 @@ internal static class AppBotPipe
     }
 
     /// <summary>
-    /// High-level process spawn — replaces Process.Start, goes through CreateProcessW guard.
-    /// CWD is REQUIRED — null/empty CWD is blocked (same as CreateProcess guard).
+    /// High-level process spawn -- replaces Process.Start, goes through CreateProcessW guard.
+    /// CWD is REQUIRED -- null/empty CWD is blocked (same as CreateProcess guard).
     /// env: optional environment variables to set in child (set before CreateProcess, restored after).
     /// </summary>
     internal static SpawnResult? Spawn(string exe, string args, string cwd,
@@ -197,7 +197,7 @@ internal static class AppBotPipe
         bool showNoActivate = false,
         string caller = "PROC")
     {
-        // ── Focus Launch Guard ───────────────────────────────────
+        // -- Focus Launch Guard ----------------------------------─
         var exeName = Path.GetFileName(exe);
         bool needsApproval = requiresFocus || (OnIsKnownFocusStealer?.Invoke(exeName) == true);
         if (needsApproval)
@@ -208,7 +208,7 @@ internal static class AppBotPipe
             }
             if (OnFocusApprovalRequired?.Invoke(exeName, caller) == false)
             {
-                try { Console.Error.WriteLine($"[{caller}] Spawn BLOCKED — focus approval denied for {exeName}"); } catch { }
+                try { Console.Error.WriteLine($"[{caller}] Spawn BLOCKED -- focus approval denied for {exeName}"); } catch { }
                 return null;
             }
         }
@@ -227,8 +227,8 @@ internal static class AppBotPipe
         }
 
         var cmdLine = $"\"{exe}\" {args}\0".ToCharArray();
-        // showNoActivate=true → SW_SHOWNOACTIVATE(4): visible but no focus steal (WPF overlays)
-        // showNoActivate=false → SW_HIDE(0): invisible background process
+        // showNoActivate=true -> SW_SHOWNOACTIVATE(4): visible but no focus steal (WPF overlays)
+        // showNoActivate=false -> SW_HIDE(0): invisible background process
         var si = new STARTUPINFOW
         {
             cb = Marshal.SizeOf<STARTUPINFOW>(),
@@ -269,7 +269,7 @@ internal static class AppBotPipe
             CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB, IntPtr.Zero, cwd,
             ref si, out var pi, out var cpErr, caller);
 
-        // err=5 (ACCESS_DENIED): job object may not allow breakaway — retry without that flag
+        // err=5 (ACCESS_DENIED): job object may not allow breakaway -- retry without that flag
         if (!ok && cpErr == 5)
             ok = CreateProcess(null, cmdLine, IntPtr.Zero, IntPtr.Zero,
                 needPipes, CREATE_NO_WINDOW, IntPtr.Zero, cwd,
@@ -300,9 +300,9 @@ internal static class AppBotPipe
             hStdInWrite, hStdOutRead, hStdErrRead);
     }
 
-    // ── StartTracked: Process.Start with CWD enforcement ───────
+    // -- StartTracked: Process.Start with CWD enforcement ------─
     /// <summary>
-    /// Process.Start with mandatory CWD — prevents system32 default.
+    /// Process.Start with mandatory CWD -- prevents system32 default.
     /// Use for cases that need .NET Process (async StreamReader, UseShellExecute=true/runas, CreateNoWindow=false).
     /// All other cases should use Spawn() which routes through CreateProcessW guard.
     /// </summary>
@@ -313,12 +313,12 @@ internal static class AppBotPipe
     {
         if (string.IsNullOrEmpty(cwd))
         {
-            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked BLOCKED — null CWD! exe={psi.FileName}"); } catch { }
+            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked BLOCKED -- null CWD! exe={psi.FileName}"); } catch { }
             return null;
         }
         psi.WorkingDirectory = cwd;
 
-        // ── Focus Launch Guard ───────────────────────────────────
+        // -- Focus Launch Guard ----------------------------------─
         var exeName = Path.GetFileName(psi.FileName);
         bool needsApproval = requiresFocus || (OnIsKnownFocusStealer?.Invoke(exeName) == true);
         if (needsApproval)
@@ -327,34 +327,34 @@ internal static class AppBotPipe
                 OnPostLaunchFocusMonitor?.Invoke(psi.FileName, 0); // register immediately
             if (OnFocusApprovalRequired?.Invoke(exeName, caller) == false)
             {
-                try { Console.Error.WriteLine($"[{caller}] StartTracked BLOCKED — focus approval denied for {exeName}"); } catch { }
+                try { Console.Error.WriteLine($"[{caller}] StartTracked BLOCKED -- focus approval denied for {exeName}"); } catch { }
                 return null;
             }
         }
         nint prevFg = needsApproval ? 0 : GetForegroundWindow();
 
-        // ── FOCUSLESS GUARD ──────────────────────────────────────
-        // UseShellExecute=true is only allowed for Verb="runas" (UAC elevation — OS-mandated).
+        // -- FOCUSLESS GUARD --------------------------------------
+        // UseShellExecute=true is only allowed for Verb="runas" (UAC elevation -- OS-mandated).
         // All other cases must use UseShellExecute=false to stay within our CreateProcessW guard.
         if (psi.UseShellExecute && string.IsNullOrEmpty(psi.Verb))
         {
-            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked — UseShellExecute=true without Verb BLOCKED (focusless violation). Use Spawn() or set UseShellExecute=false. exe={psi.FileName}"); } catch { }
+            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked -- UseShellExecute=true without Verb BLOCKED (focusless violation). Use Spawn() or set UseShellExecute=false. exe={psi.FileName}"); } catch { }
             return null;
         }
 
-        // ── FOCUSLESS RE-ADJUSTMENT ──────────────────────────────
-        // Ignore any caller-supplied focus-requesting options — always enforce focusless.
-        // WindowStyle=Normal/Maximized → Hidden; CreateNoWindow → true
+        // -- FOCUSLESS RE-ADJUSTMENT ------------------------------
+        // Ignore any caller-supplied focus-requesting options -- always enforce focusless.
+        // WindowStyle=Normal/Maximized -> Hidden; CreateNoWindow -> true
         if (!psi.UseShellExecute)
         {
             if (!psi.CreateNoWindow)
             {
-                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing CreateNoWindow=true (was false) exe={psi.FileName}"); } catch { }
+                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked -- enforcing CreateNoWindow=true (was false) exe={psi.FileName}"); } catch { }
                 psi.CreateNoWindow = true;
             }
             if (psi.WindowStyle != System.Diagnostics.ProcessWindowStyle.Hidden)
             {
-                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked — enforcing WindowStyle=Hidden (was {psi.WindowStyle}) exe={psi.FileName}"); } catch { }
+                try { Console.Error.WriteLine($"[{caller}:WARN] StartTracked -- enforcing WindowStyle=Hidden (was {psi.WindowStyle}) exe={psi.FileName}"); } catch { }
                 psi.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
             }
         }
@@ -366,10 +366,10 @@ internal static class AppBotPipe
         return proc;
     }
 
-    // ── SpawnMcp: DETACHED_PROCESS + stdin/stdout/stderr pipes ──
+    // -- SpawnMcp: DETACHED_PROCESS + stdin/stdout/stderr pipes --
     /// <summary>
     /// Spawn MCP subprocess with DETACHED_PROCESS flag and full pipe I/O.
-    /// cwd is required — prevents system32 default.
+    /// cwd is required -- prevents system32 default.
     /// envBlock: pre-built Unicode env block (IntPtr.Zero = inherit parent env).
     /// </summary>
     internal static bool SpawnMcp(string exe, string cwd, IntPtr envBlock,

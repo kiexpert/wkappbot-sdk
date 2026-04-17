@@ -83,7 +83,7 @@ internal partial class Program
                     ? $"knowhow-{actionName.ToLowerInvariant()}.md"
                     : "knowhow.md";
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Error.WriteLine($"  [KNOWHOW] record knowhow here → {Path.Combine(ctrlDir, suggestedFile)}");
+                Console.Error.WriteLine($"  [KNOWHOW] record knowhow here -> {Path.Combine(ctrlDir, suggestedFile)}");
                 Console.ResetColor();
             }
         }

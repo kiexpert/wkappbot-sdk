@@ -9,7 +9,7 @@ namespace WKAppBot.Core.Runner;
 /// <summary>
 /// Orchestrates scenario execution: launch app, run steps, teardown.
 /// Background watcher runs passively, outputting [WATCH] lines interleaved
-/// with [RUN] step execution — like a shell background process with foreground prompt.
+/// with [RUN] step execution -- like a shell background process with foreground prompt.
 /// </summary>
 public sealed class ScenarioRunner
 {
@@ -33,7 +33,7 @@ public sealed class ScenarioRunner
     /// <summary>
     /// Optional Vision AI ask delegate for blob identification.
     /// CLI wires this to Gemini/Claude for labeling unreadable UI elements.
-    /// Parameters: (formScreenshot, elementDescription) → OcrSegment with coords, or null.
+    /// Parameters: (formScreenshot, elementDescription) -> OcrSegment with coords, or null.
     /// </summary>
     public Func<System.Drawing.Bitmap, string, Task<WKAppBot.Vision.OcrSegment?>>? VisionAskFn { get; set; }
 
@@ -112,11 +112,11 @@ public sealed class ScenarioRunner
                     }
                     catch (Exception ex)
                     {
-                        LogRun($"Simple OCR init failed: {ex.Message} — OCR tier skipped");
+                        LogRun($"Simple OCR init failed: {ex.Message} -- OCR tier skipped");
                         simpleOcr = null;
                     }
 
-                    // Claude Vision API (expensive fallback — only if vision_enabled AND API key available)
+                    // Claude Vision API (expensive fallback -- only if vision_enabled AND API key available)
                     if (ctx.VisionEnabled)
                     {
                         try
@@ -128,7 +128,7 @@ public sealed class ScenarioRunner
                         }
                         catch (Exception ex)
                         {
-                            LogRun($"Vision API not available: {ex.Message} — Claude fallback disabled");
+                            LogRun($"Vision API not available: {ex.Message} -- Claude fallback disabled");
                             visionAnalyzer = null;
                         }
                     }
@@ -138,7 +138,7 @@ public sealed class ScenarioRunner
                 }
                 catch (Exception ex)
                 {
-                    LogRun($"Vision init failed: {ex.Message} — continuing without Vision");
+                    LogRun($"Vision init failed: {ex.Message} -- continuing without Vision");
                     visionCache = null;
                     visionAnalyzer = null;
                     simpleOcr = null;
@@ -160,7 +160,7 @@ public sealed class ScenarioRunner
                     Console.Write("[WATCH] ");
                     Console.ForegroundColor = ConsoleColor.Cyan;
                     var ocrTag = simpleOcr != null ? " + OCR" : "";
-                    Console.WriteLine($"Started — tracking test action points (mouse fallback{ocrTag})");
+                    Console.WriteLine($"Started -- tracking test action points (mouse fallback{ocrTag})");
                     Console.ResetColor();
                 }
             }
@@ -175,23 +175,23 @@ public sealed class ScenarioRunner
             {
                 var step = doc.Steps[i];
 
-                // ── Step header: separator + step name ─────────────
+                // -- Step header: separator + step name ------------─
                 lock (_consoleLock ?? new object())
                 {
                     Console.Write("\r" + new string(' ', SafeWindowWidth() - 1) + "\r");
 
                     Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"─── [{i + 1}/{doc.Steps.Count}] {step.Name} " + new string('─', Math.Max(0, SafeWindowWidth() - 20 - step.Name.Length)));
+                    Console.WriteLine($"--─ [{i + 1}/{doc.Steps.Count}] {step.Name} " + new string('─', Math.Max(0, SafeWindowWidth() - 20 - step.Name.Length)));
                     Console.ResetColor();
                 }
 
-                // ── Pre-nudge: current state before action ─────────
+                // -- Pre-nudge: current state before action --------─
                 watcher?.Nudge();
 
-                // ── Execute the action ─────────────────────────────
+                // -- Execute the action ----------------------------─
                 StepResult stepResult = ExecuteWithRetry(executor, step, doc.Config);
 
-                // ── Show what was done ─────────────────────────────
+                // -- Show what was done ----------------------------─
                 lock (_consoleLock ?? new object())
                 {
                     Console.Write("\r" + new string(' ', SafeWindowWidth() - 1) + "\r");
@@ -205,13 +205,13 @@ public sealed class ScenarioRunner
                     }
                 }
 
-                // ── Post-nudge: state after action ─────────────────
+                // -- Post-nudge: state after action ----------------─
                 watcher?.Nudge();
 
-                // ── Result line ────────────────────────────────────
+                // -- Result line ------------------------------------
                 ctx.StepResults.Add(stepResult);
 
-                // ── ActionState IPC: share step info with AppBotEye ──
+                // -- ActionState IPC: share step info with AppBotEye --
                 WriteActionState(doc, step, stepResult, ctx, i, doc.Steps.Count);
                 var statusStr = stepResult.Status == StepStatus.Pass ? "PASS" : "FAIL";
                 var color = stepResult.Status == StepStatus.Pass ? ConsoleColor.Green : ConsoleColor.Red;
@@ -222,7 +222,7 @@ public sealed class ScenarioRunner
 
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.Write("[RUN] ");
-                    WriteColored($"→ {statusStr}", color);
+                    WriteColored($"-> {statusStr}", color);
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write($" ({stepResult.ElapsedMs:F0}ms)");
                     if (!string.IsNullOrEmpty(stepResult.Message))
@@ -322,7 +322,7 @@ public sealed class ScenarioRunner
 
     private void LaunchApp(AppConfig app, RuntimeContext ctx)
     {
-        // Start the process — split "cmd.exe /c echo ok" into FileName + Arguments
+        // Start the process -- split "cmd.exe /c echo ok" into FileName + Arguments
         var launchParts = app.Launch.Split(' ', 2, StringSplitOptions.TrimEntries);
         var psi = new ProcessStartInfo
         {
@@ -356,7 +356,7 @@ public sealed class ScenarioRunner
                         // Scenario runner is user-initiated: mark readiness so BringToFront
                     // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
                     // proper path, but ScenarioRunner may run without a wired ReadinessInstance
-                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // (CLI direct mode). Fallback: set the static flag directly -- this IS an
                     // authorized caller, not a rogue background worker.
                     if (ReadinessInstance != null)
                         try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
@@ -374,7 +374,7 @@ public sealed class ScenarioRunner
                     // Scenario runner is user-initiated: mark readiness so BringToFront
                     // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
                     // proper path, but ScenarioRunner may run without a wired ReadinessInstance
-                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // (CLI direct mode). Fallback: set the static flag directly -- this IS an
                     // authorized caller, not a rogue background worker.
                     if (ReadinessInstance != null)
                         try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
@@ -398,11 +398,11 @@ public sealed class ScenarioRunner
                     ctx.AppTitle = windows[0].Title;
                     if (_verbose)
                         LogRun($"  Found via title search: 0x{ctx.MainWindowHandle:X8} \"{ctx.AppTitle}\"");
-                    // [READINESS] Probe before BringToFront — focus-steal guard requires it
+                    // [READINESS] Probe before BringToFront -- focus-steal guard requires it
                     // Scenario runner is user-initiated: mark readiness so BringToFront
                     // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
                     // proper path, but ScenarioRunner may run without a wired ReadinessInstance
-                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // (CLI direct mode). Fallback: set the static flag directly -- this IS an
                     // authorized caller, not a rogue background worker.
                     if (ReadinessInstance != null)
                         try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }
@@ -425,7 +425,7 @@ public sealed class ScenarioRunner
                     // Scenario runner is user-initiated: mark readiness so BringToFront
                     // doesn't trip the NO-READINESS guard. Probe() with target hwnd is the
                     // proper path, but ScenarioRunner may run without a wired ReadinessInstance
-                    // (CLI direct mode). Fallback: set the static flag directly — this IS an
+                    // (CLI direct mode). Fallback: set the static flag directly -- this IS an
                     // authorized caller, not a rogue background worker.
                     if (ReadinessInstance != null)
                         try { ReadinessInstance.Probe(new WKAppBot.Win32.Input.InputReadinessRequest { TargetHwnd = ctx.MainWindowHandle }); } catch { }

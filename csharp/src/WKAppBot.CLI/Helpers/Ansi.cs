@@ -11,7 +11,7 @@ internal static class Ansi
         && Environment.GetEnvironmentVariable("NO_COLOR") == null
         && Environment.GetEnvironmentVariable("TERM") != "dumb";
 
-    // ── Foreground colors ─────────────────────────────────────────────────────
+    // -- Foreground colors ----------------------------------------------------─
     public static string Green(string s)   => _enabled ? $"\x1b[92m{s}\x1b[0m" : s;
     public static string Red(string s)     => _enabled ? $"\x1b[91m{s}\x1b[0m" : s;
     public static string Yellow(string s)  => _enabled ? $"\x1b[93m{s}\x1b[0m" : s;
@@ -21,7 +21,7 @@ internal static class Ansi
     public static string Dim(string s)     => _enabled ? $"\x1b[2m{s}\x1b[0m"  : s;
     public static string Magenta(string s) => _enabled ? $"\x1b[95m{s}\x1b[0m" : s;
 
-    // ── Composite helpers ─────────────────────────────────────────────────────
+    // -- Composite helpers ----------------------------------------------------─
 
     /// Format a [MARK] badge: [OK]=green, [MISS]=red, [?]=dim
     public static string Mark(string mark) => mark switch
@@ -31,7 +31,7 @@ internal static class Ansi
         _      => _enabled ? $"\x1b[2m[{mark}]\x1b[0m" : $"[{mark}]",
     };
 
-    /// Section header (━━━ CURSOR ━━━…)
+    /// Section header (━━━ CURSOR ━━━...)
     public static string Header(string text) => _enabled ? $"\x1b[36m{text}\x1b[0m" : text;
 
     /// # TARGET / # FOCUS prefix line

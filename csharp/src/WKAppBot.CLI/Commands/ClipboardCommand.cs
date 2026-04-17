@@ -11,7 +11,7 @@ internal partial class Program
         {
             Console.WriteLine("Usage:");
             Console.WriteLine("  wkappbot clipboard read");
-            Console.WriteLine("      Read clipboard text with automatic CP949→UTF-8 conversion.");
+            Console.WriteLine("      Read clipboard text with automatic CP949->UTF-8 conversion.");
             Console.WriteLine("      Detects encoding: if CF_UNICODETEXT available, use it;");
             Console.WriteLine("      otherwise read CF_TEXT and convert from CP949.");
             return 0;
@@ -74,7 +74,7 @@ internal partial class Program
                 }
             }
 
-            // Fallback: CF_TEXT (ANSI — likely CP949 on Korean Windows)
+            // Fallback: CF_TEXT (ANSI -- likely CP949 on Korean Windows)
             if (IsClipboardFormatAvailable(CF_TEXT))
             {
                 var hMem = GetClipboardData(CF_TEXT);

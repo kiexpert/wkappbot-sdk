@@ -1,4 +1,4 @@
-// WhisperRingStandaloneCommand.cs — Standalone Whisper Ring process
+// WhisperRingStandaloneCommand.cs -- Standalone Whisper Ring process
 // Usage: wkappbot whisper-ring [x] [y]
 // Self-contained: WhisperEngine + WhisperRing + ExpDB in own process.
 
@@ -41,7 +41,7 @@ internal partial class Program
             engine = new WhisperEngine();
             if (!engine.Start())
             {
-                Console.WriteLine("[WHISPER-RING] No microphone — exiting");
+                Console.WriteLine("[WHISPER-RING] No microphone -- exiting");
                 engine.Dispose();
                 return;
             }
@@ -75,7 +75,7 @@ internal partial class Program
                 });
             };
 
-            // OnFrame → dispatch to WPF thread
+            // OnFrame -> dispatch to WPF thread
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             int frameCount = 0;
             engine.OnFrame += (frame) =>
@@ -109,7 +109,7 @@ internal partial class Program
                 catch { }
             };
 
-            // Parent PID watchdog — timer on dispatcher
+            // Parent PID watchdog -- timer on dispatcher
             if (ppid > 0)
             {
                 var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
@@ -118,7 +118,7 @@ internal partial class Program
                     try { System.Diagnostics.Process.GetProcessById(ppid); }
                     catch
                     {
-                        Console.WriteLine("[WHISPER-RING] Parent gone — closing");
+                        Console.WriteLine("[WHISPER-RING] Parent gone -- closing");
                         window.Close();
                     }
                 };

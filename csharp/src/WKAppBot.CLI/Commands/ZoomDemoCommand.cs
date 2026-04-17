@@ -5,7 +5,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: zoom-demo — Quick demo of adaptive zoom on any window
+// partial class: zoom-demo -- Quick demo of adaptive zoom on any window
 // Usage: wkappbot zoom-demo <window-title> [text]
 // Types text into the foreground window and shows the appropriate zoom overlay.
 internal partial class Program
@@ -17,7 +17,7 @@ internal partial class Program
 
         string text = args.Length >= 2 ? args[1] : "Hello World!";
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        // Resolve grap: "window/child#uiaScope" -- '/' and '#' are equivalent separators
         using var automation = new FlaUI.UIA3.UIA3Automation();
         automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
         automation.TransactionTimeout = TimeSpan.FromSeconds(5);
@@ -129,7 +129,7 @@ internal partial class Program
             _ => "?"
         };
 
-        Console.WriteLine($"  Zoom: {mode} ({modeName}) → {zW}x{zH} @({zX},{zY})");
+        Console.WriteLine($"  Zoom: {mode} ({modeName}) -> {zW}x{zH} @({zX},{zY})");
 
         // Create zoom overlay
         InputZoomHost? zoomHost = null;
@@ -215,7 +215,7 @@ internal partial class Program
             Console.WriteLine($"  Typed: \"{text}\"");
 
             // Show result
-            zoomHost.ShowResult(true, $"✓ DONE \"{text}\"");
+            zoomHost.ShowResult(true, $"v DONE \"{text}\"");
             Thread.Sleep(500);
 
             // Save desktop screenshot (captures overlay appearance)

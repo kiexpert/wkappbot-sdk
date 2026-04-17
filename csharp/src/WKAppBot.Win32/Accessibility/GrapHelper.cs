@@ -9,63 +9,63 @@ namespace WKAppBot.Win32.Accessibility;
 /// <summary>
 /// Grap pattern helper: '/' for Win32 hierarchy, '#' switches to UIA scope.
 ///
-/// ═══ Separator semantics ═══
+/// === Separator semantics ===
 ///   Before first '#':  '/' = Win32 child window separator
 ///   After first '#':   '/' and '#' are both UIA scope separators (equivalent)
 ///
-/// ═══ Synthesized full-path examples ═══
-///   "영웅문/실시간계좌"                → Win32: 영웅문 → child "실시간계좌"
-///   "영웅문#실시간계좌"                → UIA scope "실시간계좌" within 영웅문
-///   "영웅문/실시간계좌#aid1000"        → Win32 child → UIA scope "aid1000"
-///   "영웅문/child#uia1/uia2"          → Win32 child → UIA "uia1" → "uia2"
+/// === Synthesized full-path examples ===
+///   "영웅문/실시간계좌"                -> Win32: 영웅문 -> child "실시간계좌"
+///   "영웅문#실시간계좌"                -> UIA scope "실시간계좌" within 영웅문
+///   "영웅문/실시간계좌#aid1000"        -> Win32 child -> UIA scope "aid1000"
+///   "영웅문/child#uia1/uia2"          -> Win32 child -> UIA "uia1" -> "uia2"
 ///
-/// ═══ Browser tab portal (v2.1) ═══
+/// === Browser tab portal (v2.1) ===
 /// When a '#' segment matches a TabItem (browser tab), the grap engine:
 ///   1. Calls SelectionItem.Select() to switch to that tab (focusless!)
 ///   2. Waits for web content to load
-///   3. Jumps to the sibling Document[RootWebArea] — the tab's web content
+///   3. Jumps to the sibling Document[RootWebArea] -- the tab's web content
 ///   4. Continues matching remaining segments inside the web page
 ///
-/// This enables unified Win32 → browser tab → web element paths:
-///   "Chrome#ChatGPT#모델"     → Chrome window → switch to ChatGPT tab → find "모델" button
-///   "Edge#YouTube#재생"       → Edge window → switch to YouTube tab → find "재생" button
-///   "Chrome#Gemini#새 채팅"   → Chrome → Gemini tab → "새 채팅" button in web page
+/// This enables unified Win32 -> browser tab -> web element paths:
+///   "Chrome#ChatGPT#모델"     -> Chrome window -> switch to ChatGPT tab -> find "모델" button
+///   "Edge#YouTube#재생"       -> Edge window -> switch to YouTube tab -> find "재생" button
+///   "Chrome#Gemini#새 채팅"   -> Chrome -> Gemini tab -> "새 채팅" button in web page
 ///
 /// The same path works for Electron apps (Claude, VS Code) where UIA exposes
 /// web content directly under Document[RootWebArea] without needing CDP.
 ///
-/// ═══ Pattern matching ═══
+/// === Pattern matching ===
 /// Each segment supports PatternMatcher syntax:
 ///   plain text = substring Contains match (no wildcards needed!)
 ///   * / ? = glob wildcards
 ///   regex: prefix = regular expression
 /// Container-first: prefers Window/Pane/Group elements over leaf elements (TabItem/Button).
 ///
-/// ═══ Public API (v2.1) ═══
+/// === Public API (v2.1) ===
 /// All core search/portal functions are public for reuse by other commands:
-///   FindUiaScope()         — multi-segment UIA path resolution with tab portal
-///   FindByNameOrAid()      — single element search by Name or AutomationId
-///   FindRootWebArea()      — locate Document[RootWebArea] for web content access
-///   SwitchToTab()          — focusless tab switch via SelectionItem/Invoke
-///   IsTabItem()            — check if element is a browser tab
-///   WalkTree()             — generic predicate-based tree walk
-///   SplitGrap()            — parse grap into Win32 + UIA segments
-///   ResolveFullGrap()      — end-to-end grap → (hwnd, element) resolution
+///   FindUiaScope()         -- multi-segment UIA path resolution with tab portal
+///   FindByNameOrAid()      -- single element search by Name or AutomationId
+///   FindRootWebArea()      -- locate Document[RootWebArea] for web content access
+///   SwitchToTab()          -- focusless tab switch via SelectionItem/Invoke
+///   IsTabItem()            -- check if element is a browser tab
+///   WalkTree()             -- generic predicate-based tree walk
+///   SplitGrap()            -- parse grap into Win32 + UIA segments
+///   ResolveFullGrap()      -- end-to-end grap -> (hwnd, element) resolution
 /// </summary>
 public static class GrapHelper
 {
-    // ── 공용 a11y 노드 포맷터 ──────────────────────────────────────────────
+    // -- 공용 a11y 노드 포맷터 ----------------------------------------------
 
     /// <summary>
     /// Short tag for overlay/console labels: "Type_aid" / "Type_N" / "Type".
-    /// No text/Name — only AutomationId or sibling index as fallback.
-    /// isDynamic=true → prefix "Dy" (experience DB only, no system UIA).
+    /// No text/Name -- only AutomationId or sibling index as fallback.
+    /// isDynamic=true -> prefix "Dy" (experience DB only, no system UIA).
     /// </summary>
     public static string FormatNodeTag(string controlType, string? automationId, int siblingIndex = 0, bool isDynamic = false)
     {
         var prefix = isDynamic ? "Dy" : "";
         var aid = automationId;
-        // Truncate long hyphenated IDs to first segment: "active-frame" → "active", UUID → first 8 chars
+        // Truncate long hyphenated IDs to first segment: "active-frame" -> "active", UUID -> first 8 chars
         if (!string.IsNullOrWhiteSpace(aid))
         {
             var dashIdx = aid.IndexOf('-');
@@ -79,7 +79,7 @@ public static class GrapHelper
 
     /// <summary>
     /// Coordinate-based temp tag for UIA-blind elements: "NodeXY(cx,cy)".
-    /// Used when ControlType is completely inaccessible — center coords identify the element.
+    /// Used when ControlType is completely inaccessible -- center coords identify the element.
     /// </summary>
     public static string FormatNodeTag(int cx, int cy) => $"FindNodeXY({cx},{cy})";
 
@@ -98,7 +98,7 @@ public static class GrapHelper
             try { ct = node.ControlType.ToString(); } catch { }
             try { aid = node.AutomationId ?? ""; } catch { }
             if (ct == "Window") break;
-            // Abbreviate type to 3 chars — resolution uses AID after '_', type prefix is cosmetic
+            // Abbreviate type to 3 chars -- resolution uses AID after '_', type prefix is cosmetic
             if (ct.Length > 3) ct = ct[..3];
 
             int sibIdx = 0;
@@ -131,8 +131,8 @@ public static class GrapHelper
         }
         if (parts.Count == 0) return FormatNodeTag("?", null);
         parts.Reverse();
-        // Compress consecutive identical bare types: Gro/Gro/Gro/Gro → Gro**/
-        // ** means "any depth of same type" — reuses existing ** glob wildcard in grap path search.
+        // Compress consecutive identical bare types: Gro/Gro/Gro/Gro -> Gro**/
+        // ** means "any depth of same type" -- reuses existing ** glob wildcard in grap path search.
         var sb = new System.Text.StringBuilder();
         for (int i = 0; i < parts.Count; i++)
         {
@@ -159,22 +159,22 @@ public static class GrapHelper
     /// <summary>String-based overload for pre-extracted info (ElementAtPointInfo etc.)</summary>
     /// <summary>
     /// Canonical tag format: &lt;TypeIdOrName attrs&gt;
-    ///   automationId present → &lt;ButtonOK&gt;
-    ///   name only            → &lt;Button'확인'&gt;
-    ///   neither              → &lt;Button2&gt; (siblingIndex)
+    ///   automationId present -> &lt;ButtonOK&gt;
+    ///   name only            -> &lt;Button'확인'&gt;
+    ///   neither              -> &lt;Button2&gt; (siblingIndex)
     ///   attrs: ltwh=x,y,w,h  actions="Invoke,..."  text="..."
     /// </summary>
     public static string FormatNodeLabel(string controlType, string? automationId, string? name,
         int siblingIndex = 0, System.Drawing.Rectangle? rect = null, List<string>? actions = null, string? text = null)
     {
         var idx = siblingIndex > 0 ? siblingIndex.ToString() : "";
-        // "Type name" format — no XML angle brackets; name quoted, aid unquoted, number when nameless
+        // "Type name" format -- no XML angle brackets; name quoted, aid unquoted, number when nameless
         string label;
         if (!string.IsNullOrEmpty(automationId))
             label = $"{controlType} {automationId}";
         else if (!string.IsNullOrEmpty(name))
         {
-            var n = name.Length > 40 ? name[..37] + "…" : name;
+            var n = name.Length > 40 ? name[..37] + "..." : name;
             label = $"{controlType} \"{n}\"";
         }
         else
@@ -191,7 +191,7 @@ public static class GrapHelper
         return string.Join(" ", parts);
     }
 
-    /// <summary>AutomationElement overload — delegates to canonical string overload.</summary>
+    /// <summary>AutomationElement overload -- delegates to canonical string overload.</summary>
     public static string FormatNodeLabel(AutomationElement el, int siblingIndex = 0, bool includeRect = false, bool includeText = false)
     {
         var ct  = el.Properties.ControlType.ValueOrDefault.ToString();
@@ -295,7 +295,7 @@ public static class GrapHelper
                     if (sameTypeCount <= 1 && siblings.Length > 0)
                     {
                         int total = siblings.Count(s => s.Properties.ControlType.ValueOrDefault == ct);
-                        if (total <= 1) sibIdx = 0; // unique → no number
+                        if (total <= 1) sibIdx = 0; // unique -> no number
                     }
                 }
             }
@@ -320,7 +320,7 @@ public static class GrapHelper
 
     /// <summary>
     /// Find the keyboard-focused LEAF element under a root.
-    /// Strategy: (1) Foreground → FocusedElement (accurate). (2) Background → TreeWalker HasKeyboardFocus.
+    /// Strategy: (1) Foreground -> FocusedElement (accurate). (2) Background -> TreeWalker HasKeyboardFocus.
     /// </summary>
     public static AutomationElement? FindFocusedLeaf(FlaUI.UIA3.UIA3Automation uia, AutomationElement root, IntPtr hwnd = default)
     {
@@ -336,7 +336,7 @@ public static class GrapHelper
         }
         catch { }
 
-        // Strategy 2: TreeWalker — walk children for HasKeyboardFocus
+        // Strategy 2: TreeWalker -- walk children for HasKeyboardFocus
         try
         {
             if (root.Properties.HasKeyboardFocus.ValueOrDefault) return root;
@@ -389,9 +389,9 @@ public static class GrapHelper
         ControlType.Tab, ControlType.Document, ControlType.Custom
     };
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // CSS vs UIA pattern detection
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Determine if a '#' scope pattern looks like a CSS selector rather than a UIA Name.
@@ -420,7 +420,7 @@ public static class GrapHelper
             return false;
 
         // Tag-like selectors: bare word with no spaces (div, button, input, a, span, etc.)
-        // But only common HTML tags — otherwise default to UIA Name
+        // But only common HTML tags -- otherwise default to UIA Name
         var lower = firstSeg.ToLowerInvariant();
         var htmlTags = new HashSet<string> {
             "div", "span", "button", "input", "textarea", "select", "a", "form",
@@ -435,9 +435,9 @@ public static class GrapHelper
         return false;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Public API: Grap parsing
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Split grap into Win32 path (before first '#') and UIA path (after first '#').
@@ -485,7 +485,7 @@ public static class GrapHelper
     /// <summary>
     /// Parse full grap and resolve to (hwnd, uiaRoot).
     /// windowIndex: 0-based index into matching windows (default 0 = first match).
-    /// matchCount: out parameter — total matching windows found.
+    /// matchCount: out parameter -- total matching windows found.
     /// </summary>
     public static (IntPtr hwnd, AutomationElement root, string? error)? ResolveFullGrap(
         string grap, UIA3Automation automation, int windowIndex, out int matchCount)
@@ -498,7 +498,7 @@ public static class GrapHelper
         if (win32Segments.Length == 0)
             return (IntPtr.Zero, null!, "No window title before '#'");
 
-        // First segment = main window title — may match multiple windows
+        // First segment = main window title -- may match multiple windows
         var windows = Window.WindowFinder.FindWindows(win32Segments[0]);
         matchCount = windows.Count;
         if (windows.Count == 0)
@@ -510,8 +510,8 @@ public static class GrapHelper
         var targetHwnd = windows[windowIndex].Handle;
 
         // Trailing '/' (no UIA path) or trailing '#' (empty UIA scope) = drill to focused child + UIA leaf
-        // e.g. "*메모장*/"  → focused child hwnd + focused UIA element
-        //      "*메모장*#"  → same (# with empty scope = focus drill)
+        // e.g. "*메모장*/"  -> focused child hwnd + focused UIA element
+        //      "*메모장*#"  -> same (# with empty scope = focus drill)
         bool drillFocused = (grap.TrimEnd().EndsWith('/') && uiaPath == null)
                          || (uiaPath != null && uiaPath.Length == 0);
 
@@ -532,7 +532,7 @@ public static class GrapHelper
             NativeMethods.GetGUIThreadInfo(tid, ref gti);
             if (gti.hwndFocus != IntPtr.Zero)
                 targetHwnd = gti.hwndFocus;
-            Console.WriteLine($"[GRAP] focus-drill → hwnd=0x{targetHwnd:X8}");
+            Console.WriteLine($"[GRAP] focus-drill -> hwnd=0x{targetHwnd:X8}");
 
             try
             {
@@ -542,7 +542,7 @@ public static class GrapHelper
                     var fname = focusedEl.Properties.Name.ValueOrDefault ?? "";
                     var ftype = "?";
                     try { ftype = focusedEl.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                    Console.WriteLine($"[GRAP] focus-drill → UIA [{ftype}] \"{fname}\"");
+                    Console.WriteLine($"[GRAP] focus-drill -> UIA [{ftype}] \"{fname}\"");
                     return (targetHwnd, focusedEl, null);
                 }
             }
@@ -564,32 +564,32 @@ public static class GrapHelper
         return (targetHwnd, root, null);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Public API: UIA scope resolution (with tab portal)
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Find UIA element by name path within a root element.
     /// Supports multi-level paths with '/' or '#' separator (both equivalent).
     ///
-    /// ═══ Browser Tab Portal ═══
+    /// === Browser Tab Portal ===
     /// When a segment matches a TabItem (browser tab), the engine:
-    ///   1. SelectionItem.Select() → switch tab (focusless)
+    ///   1. SelectionItem.Select() -> switch tab (focusless)
     ///   2. Navigate back to the window root
-    ///   3. Find Document[RootWebArea] → the newly-active tab's web content
+    ///   3. Find Document[RootWebArea] -> the newly-active tab's web content
     ///   4. Continue matching remaining segments inside that Document
     ///
     /// Why? In Chrome/Edge UIA tree, TabItem and RootWebArea are siblings,
     /// not parent-child. TabItem lives under [Tab], web content under [Pane]:
     ///   Pane (browser frame)
-    ///   ├── Pane → Document "Google Gemini" [RootWebArea]  ← web content
-    ///   ├── Tab
-    ///   │   ├── TabItem "ChatGPT"    ← tab UI (only has Close button)
-    ///   │   └── TabItem "Gemini"
-    ///   └── ToolBar (address bar)
+    ///   +-- Pane -> Document "Google Gemini" [RootWebArea]  <- web content
+    ///   +-- Tab
+    ///   |   +-- TabItem "ChatGPT"    <- tab UI (only has Close button)
+    ///   |   +-- TabItem "Gemini"
+    ///   +-- ToolBar (address bar)
     ///
     /// So "Chrome#ChatGPT#Send" means:
-    ///   find TabItem "ChatGPT" → select it → jump to RootWebArea → find "Send"
+    ///   find TabItem "ChatGPT" -> select it -> jump to RootWebArea -> find "Send"
     /// </summary>
     public static AutomationElement? FindUiaScope(
         AutomationElement root, string uiaPath, int maxDepth = 25)
@@ -604,14 +604,14 @@ public static class GrapHelper
         var current = root;
         foreach (var segment in segments)
         {
-            // "?" = unknown segment from hack-hover path capture → skip narrowing, keep current scope
+            // "?" = unknown segment from hack-hover path capture -> skip narrowing, keep current scope
             if (segment == "?") continue;
 
             var found = FindByNameOrAid(current, segment, maxDepth);
             if (found == null)
                 return null;
 
-            // ═══ Tab Portal: TabItem → select tab → jump to RootWebArea ═══
+            // === Tab Portal: TabItem -> select tab -> jump to RootWebArea ===
             if (IsTabItem(found))
             {
                 var webRoot = SwitchToTabAndGetWebRoot(found, windowRoot);
@@ -626,9 +626,9 @@ public static class GrapHelper
         return current;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Public API: Element search
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Find first UIA element matching a name/aid pattern string.
@@ -646,7 +646,7 @@ public static class GrapHelper
     {
         var matcher = PatternMatcher.Create(pattern);
 
-        // Fast path: plain literal (no wildcards/regex) → native UIA FindFirst, O(log n) vs BFS O(n)
+        // Fast path: plain literal (no wildcards/regex) -> native UIA FindFirst, O(log n) vs BFS O(n)
         if (!PatternMatcher.IsPattern(pattern))
         {
             var fast = TryNativeFastFind(root, pattern);
@@ -668,7 +668,7 @@ public static class GrapHelper
 
     /// <summary>
     /// Native UIA FindFirst fast-path for plain literal patterns.
-    /// Tries: exact Name → AID portion of "Type_aid" tag → exact AID.
+    /// Tries: exact Name -> AID portion of "Type_aid" tag -> exact AID.
     /// Falls through returning null if nothing found (caller does BFS).
     /// </summary>
     private static AutomationElement? TryNativeFastFind(AutomationElement root, string pattern)
@@ -679,7 +679,7 @@ public static class GrapHelper
             var byName = root.FindFirstDescendant(cf => cf.ByName(pattern));
             if (byName != null) return byName;
 
-            // FormatNodeTag format: "Type_aid" → extract AID portion after first '_'
+            // FormatNodeTag format: "Type_aid" -> extract AID portion after first '_'
             var uidx = pattern.IndexOf('_');
             if (uidx > 0)
             {
@@ -702,7 +702,7 @@ public static class GrapHelper
 
     /// <summary>
     /// Find ALL UIA elements matching a name/aid pattern string, sorted by coverage descending.
-    /// Coverage = key length / matched text length — shorter/exact name = higher coverage.
+    /// Coverage = key length / matched text length -- shorter/exact name = higher coverage.
     /// Used for --nth element selection: --nth 1 = best coverage (most specific match).
     /// </summary>
     public static List<(AutomationElement el, double coverage, string matchedText)> FindAllByNameOrAid(
@@ -783,9 +783,9 @@ public static class GrapHelper
         catch { }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Public API: Browser tab portal
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Check if element is a browser TabItem (Chrome/Edge tab strip).
@@ -886,9 +886,9 @@ public static class GrapHelper
         });
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Public API: Generic tree walk
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     /// <summary>
     /// Generic predicate-based UIA tree walk. Recursively searches children
@@ -909,9 +909,9 @@ public static class GrapHelper
         return WalkTreeInternal(root, maxDepth, depth: 0, predicate);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
     // Internal: tree walk implementations
-    // ═══════════════════════════════════════════════════════════════════════
+    // =======================================================================
 
     private static AutomationElement? WalkTreeInternal(
         AutomationElement parent, int maxDepth, int depth,
@@ -979,7 +979,7 @@ public static class GrapHelper
         return null;
     }
 
-    // ── FindNodeXY: screen coordinate → deepest UIA element ──
+    // -- FindNodeXY: screen coordinate -> deepest UIA element --
 
     /// <summary>
     /// Result of FindNodeXY: the deepest UIA element at screen (x, y) + parent chain info.
@@ -1080,7 +1080,7 @@ public static class GrapHelper
                         focusHwnd = gti.hwndFocus;
                         if (gti.rcCaret.Right > gti.rcCaret.Left && gti.rcCaret.Bottom > gti.rcCaret.Top)
                         {
-                            // rcCaret is client coords of hwndFocus → convert to screen
+                            // rcCaret is client coords of hwndFocus -> convert to screen
                             var caretPt = new POINT { X = gti.rcCaret.Left, Y = gti.rcCaret.Top };
                             NativeMethods.ClientToScreen(gti.hwndFocus, ref caretPt);
                             caretRect = new System.Drawing.Rectangle(
@@ -1123,7 +1123,7 @@ public static class GrapHelper
             if (!NativeMethods.GetGUIThreadInfo(0, ref gti)) return null;
             if (gti.hwndFocus == IntPtr.Zero) return null;
 
-            // rcCaret is client coords → convert to screen
+            // rcCaret is client coords -> convert to screen
             var pt = new POINT { X = gti.rcCaret.Left, Y = gti.rcCaret.Top };
             NativeMethods.ClientToScreen(gti.hwndFocus, ref pt);
             int caretW = gti.rcCaret.Right - gti.rcCaret.Left;
@@ -1133,7 +1133,7 @@ public static class GrapHelper
             var result = FindNodeXY(pt.X, pt.Y, uia, containWidth: caretW, containHeight: caretH);
             if (result == null) return null;
 
-            // Query TextPattern selection rects → union rect → re-find if selection is larger
+            // Query TextPattern selection rects -> union rect -> re-find if selection is larger
             var selRects = Array.Empty<System.Drawing.Rectangle>();
             var selBounds = System.Drawing.Rectangle.Empty;
             try
@@ -1154,7 +1154,7 @@ public static class GrapHelper
                             selBounds = new System.Drawing.Rectangle(minX, minY, maxX - minX, maxY - minY);
 
                             // Selection info is captured for callers but node search
-                            // always uses caret rect — most reliable anchor point.
+                            // always uses caret rect -- most reliable anchor point.
                         }
                     }
                 }

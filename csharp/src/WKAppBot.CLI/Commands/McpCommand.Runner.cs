@@ -21,7 +21,7 @@ internal partial class Program
         Console.SetError(capture);
 
         // Set CWD to caller's working directory so relative paths resolve correctly.
-        // Restore on exit — Environment.CurrentDirectory is process-wide.
+        // Restore on exit -- Environment.CurrentDirectory is process-wide.
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
         var prevCwd = Environment.CurrentDirectory;
         if (!string.IsNullOrEmpty(callerCwd) && Directory.Exists(callerCwd))
@@ -84,7 +84,7 @@ internal partial class Program
 
         var sb = new StringBuilder();
         object gate = new();
-        int pushedPid = 0; // child PID — set after proc.Start()
+        int pushedPid = 0; // child PID -- set after proc.Start()
 
         void PushLine(string line)
         {
@@ -137,10 +137,10 @@ internal partial class Program
     /// 모든 스레드가 Wait 상태일 때 MCP 콜러에 즉시 통보 + 콘솔 출력 + Slack 알림.
     ///
     /// WaitReason별 태그:
-    ///   UserRequest  → [WAIT_INPUT]  (stdin/콘솔 읽기 대기 — e.g. cmd.exe 무인수 실행)
-    ///   LpcReply     → [WAIT_IPC]    (IPC 대기)
-    ///   Executive    → [WAIT_KERNEL] (커널 객체 대기)
-    ///   기타         → [WAIT_OTHER]
+    ///   UserRequest  -> [WAIT_INPUT]  (stdin/콘솔 읽기 대기 -- e.g. cmd.exe 무인수 실행)
+    ///   LpcReply     -> [WAIT_IPC]    (IPC 대기)
+    ///   Executive    -> [WAIT_KERNEL] (커널 객체 대기)
+    ///   기타         -> [WAIT_OTHER]
     /// </summary>
     static async Task McpToolWaitWatchdog(int pid, string cmdLabel, Action<string>? onOutputLine, CancellationToken cancel)
     {
@@ -192,19 +192,19 @@ internal partial class Program
 
                     if (reported.Add(tag))
                     {
-                        var msg = $"{tag} 툴 프로세스 블로킹! {desc} — pid={pid} cmd={cmdLabel}";
-                        Console.Error.WriteLine($"[MCP] ⚠ {msg}");
-                        onOutputLine?.Invoke($"\x00{statusVal}\x00⚠ {msg}");
+                        var msg = $"{tag} 툴 프로세스 블로킹! {desc} -- pid={pid} cmd={cmdLabel}";
+                        Console.Error.WriteLine($"[MCP] ! {msg}");
+                        onOutputLine?.Invoke($"\x00{statusVal}\x00! {msg}");
                     }
                 }
                 else
                 {
                     if (isBlocking)
                     {
-                        // 블로킹 해제 → 재개 알림 + 재알림 허용
+                        // 블로킹 해제 -> 재개 알림 + 재알림 허용
                         isBlocking = false;
                         reported.Clear();
-                        onOutputLine?.Invoke($"\x00running\x00[RESUMED] 툴 프로세스 재개됨 — pid={pid}");
+                        onOutputLine?.Invoke($"\x00running\x00[RESUMED] 툴 프로세스 재개됨 -- pid={pid}");
                     }
                 }
             }
@@ -254,9 +254,9 @@ internal partial class Program
         }
     }
 
-    // ────────────────────────────────────────────────────────────────
+    // ----------------------------------------------------------------
     // MCP 앱봇관리 콘솔 호스트
-    // ────────────────────────────────────────────────────────────────
+    // ----------------------------------------------------------------
 
     // 콘솔 호스트 고정 위치: 맨오른쪽 모니터 우측경계 - 1610, 모니터 상측 + 10, 800x600
     const int McpWtOffsetFromRight = 1610;
@@ -264,7 +264,7 @@ internal partial class Program
     const int McpWtWidth           = 800;
     const int McpWtHeight          = 600;
 
-    // ── P/Invoke: 모니터 위치 + WT 창 찾기 ──────────────────────────
+    // -- P/Invoke: 모니터 위치 + WT 창 찾기 --------------------------
     [DllImport("ntdll.dll")]
     static extern int NtQueryInformationProcess(
         IntPtr hProcess, int processInfoClass,
@@ -321,7 +321,7 @@ internal partial class Program
         catch { return -1; }
     }
 
-    // EnumDisplayMonitors callback — delegate with ref parameter can't be a lambda
+    // EnumDisplayMonitors callback -- delegate with ref parameter can't be a lambda
     static McpRect? _monitorEnumBest;
     static bool MonitorEnumCallback(IntPtr hMon, IntPtr hdcMon, ref McpRect lprc, IntPtr dwData)
     {
@@ -351,8 +351,8 @@ internal partial class Program
     }
 
     /// <summary>
-    /// WT 창 찾기 (CASCADIA_HOSTING_WINDOW_CLASS) → SetWindowPos(SWP_NOACTIVATE).
-    /// 딜레이 후 비동기 실행 — 창이 뜨기 전에 호출하면 실패하므로.
+    /// WT 창 찾기 (CASCADIA_HOSTING_WINDOW_CLASS) -> SetWindowPos(SWP_NOACTIVATE).
+    /// 딜레이 후 비동기 실행 -- 창이 뜨기 전에 호출하면 실패하므로.
     /// wtPid > 0 이면 해당 프로세스 소유 창만 이동 (Eye WT 창 오이동 방지).
     /// </summary>
     static void ScheduleWtWindowPosition(int delayMs = 900, int wtPid = 0)
@@ -380,8 +380,8 @@ internal partial class Program
                     }, IntPtr.Zero);
                 }
 
-                // Pass 2: fallback — wt.exe가 기존 창에 탭 추가 후 즉시 종료 시 PID 없음
-                // → 임의의 WT 창 중 apbot-mcp 창(이미 존재)에 위치 적용
+                // Pass 2: fallback -- wt.exe가 기존 창에 탭 추가 후 즉시 종료 시 PID 없음
+                // -> 임의의 WT 창 중 apbot-mcp 창(이미 존재)에 위치 적용
                 if (found == IntPtr.Zero)
                 {
                     WKAppBot.Win32.Native.NativeMethods.EnumWindows((hWnd, _) =>
@@ -402,7 +402,7 @@ internal partial class Program
 
     /// <summary>
     /// MCP 시작 시 앱봇관리 콘솔 탭 설정.
-    /// - stderr → TeeTextWriter → log 파일 (FileShare.ReadWrite)
+    /// - stderr -> TeeTextWriter -> log 파일 (FileShare.ReadWrite)
     /// - WT 탭으로 열기 (hot-swap 시 lock file로 중복 방지)
     /// - 열린 후 고정 위치로 이동 (맨오른쪽 모니터 기준)
     /// - --no-wt 플래그로 비활성화 가능
@@ -418,7 +418,7 @@ internal partial class Program
             var lockFile = Path.Combine(tmpDir, $"wkappbot-mcp-wt-{sessionKey}.lock");
             var logFile  = Path.Combine(tmpDir, $"wkappbot-mcp-{sessionKey}.log");
 
-            // Tee Console.Error → real stderr + log file (항상, hot-swap 포함)
+            // Tee Console.Error -> real stderr + log file (항상, hot-swap 포함)
             var tee = new TeeTextWriter(Console.Error, logFile, moveToOldOnDispose: false);
             Console.SetError(tee);
 
@@ -426,11 +426,11 @@ internal partial class Program
             {
                 File.WriteAllText(lockFile, sessionKey);
                 // Eye FSW가 logFile 생성을 감지해서 WT 탭 자동 오픈
-                Console.Error.WriteLine($"[MCP] 콘솔 로그 시작 → {logFile} (Eye가 WT 탭 오픈)");
+                Console.Error.WriteLine($"[MCP] 콘솔 로그 시작 -> {logFile} (Eye가 WT 탭 오픈)");
             }
             else
             {
-                Console.Error.WriteLine($"[MCP] hot-swap — 기존 콘솔 탭 재사용 (session={sessionKey})");
+                Console.Error.WriteLine($"[MCP] hot-swap -- 기존 콘솔 탭 재사용 (session={sessionKey})");
             }
         }
         catch (Exception ex)

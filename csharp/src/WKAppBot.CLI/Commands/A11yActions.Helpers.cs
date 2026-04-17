@@ -32,17 +32,17 @@ internal partial class Program
         return null;
     }
 
-    // FLUTTERVIEW child = direct Flutter input pipeline (focusless, ~0ms) — no class whitelist needed
+    // FLUTTERVIEW child = direct Flutter input pipeline (focusless, ~0ms) -- no class whitelist needed
     static IntPtr FindFlutterViewChild(IntPtr hwnd) =>
         NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "FLUTTERVIEW", null);
 
     // TODO: when nullMs >= 100 (window lagging), skip verbose UIA tree/prop output in inspect/find
-    //       GetNullMs() is already available — just gate heavy output behind nullMs < 100 check
+    //       GetNullMs() is already available -- just gate heavy output behind nullMs < 100 check
 
     // Hollow invoke detection via Win32 SetProp/GetProp:
-    //   GetPropW(elHwnd, InvokeHollowProp) != 0  →  UIA Invoke is hollow for this hwnd
-    //   Prop is auto-cleaned when the window closes — no stale data.
-    //   On hollow confirmed: SetProp stamps the hwnd + fires ActionApi.OnInvokeHollow → knowhow
+    //   GetPropW(elHwnd, InvokeHollowProp) != 0  ->  UIA Invoke is hollow for this hwnd
+    //   Prop is auto-cleaned when the window closes -- no stale data.
+    //   On hollow confirmed: SetProp stamps the hwnd + fires ActionApi.OnInvokeHollow -> knowhow
 
     // WM_NULL baseline cache: pre-measured during read/find, reused by invoke (TTL = 3s)
     static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, (long nullMs, long ticks)> _nullCache = new();
@@ -66,14 +66,14 @@ internal partial class Program
             if (System.Diagnostics.Stopwatch.GetTimestamp() - entry.ticks < NullCacheTtlTicks)
                 return entry.nullMs; // fresh cache
         }
-        // Cache miss or stale — measure now
+        // Cache miss or stale -- measure now
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var ret = NativeMethods.SendMessageTimeoutW(hwnd, NativeMethods.WM_NULL,
             IntPtr.Zero, IntPtr.Zero, NativeMethods.SMTO_ABORTIFHUNG, 100, out _);
         sw.Stop();
         var ms = sw.ElapsedMilliseconds;
         _nullCache[hwnd] = (ms, System.Diagnostics.Stopwatch.GetTimestamp());
-        return ret == IntPtr.Zero ? 100 : ms; // timeout → treat as 100ms (lagging)
+        return ret == IntPtr.Zero ? 100 : ms; // timeout -> treat as 100ms (lagging)
     }
 
     // Returns true = confirmed hollow (no paint after 50ms), false = paint detected (real invoke)
@@ -88,7 +88,7 @@ internal partial class Program
 
     /// <summary>
     /// Returns true if UIPI would silently drop PostMessage/SendMessage to hwnd.
-    /// Target process IL > current process IL → Win32 cross-integrity messages silently dropped.
+    /// Target process IL > current process IL -> Win32 cross-integrity messages silently dropped.
     /// </summary>
     static bool IsUipiBlocked(IntPtr hwnd)
     {
@@ -102,7 +102,7 @@ internal partial class Program
             if (targetIL > currentIL)
             {
                 string ilName(uint il) => il switch { 0x1000 => "Low", 0x2000 => "Medium", 0x3000 => "High", 0x4000 => "System", _ => $"0x{il:X}" };
-                Console.Error.WriteLine($"[A11Y] UIPI: target={ilName(targetIL)} > current={ilName(currentIL)} → PostMessage tiers skipped");
+                Console.Error.WriteLine($"[A11Y] UIPI: target={ilName(targetIL)} > current={ilName(currentIL)} -> PostMessage tiers skipped");
                 return true;
             }
         }
@@ -112,7 +112,7 @@ internal partial class Program
 
     /// <summary>
     /// Ensure target element's tab is active. Walks up UIA parent chain looking for
-    /// unselected TabItem ancestors → auto-select them (focusless UIA SelectionItem).
+    /// unselected TabItem ancestors -> auto-select them (focusless UIA SelectionItem).
     /// Returns true if a tab was activated (caller may need to re-resolve scope).
     /// </summary>
     static bool EnsureTabActive(AutomationElement el)

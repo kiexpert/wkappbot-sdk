@@ -9,14 +9,14 @@ namespace WKAppBot.Win32.Window;
 /// identifies which known form type it matches in the Experience DB.
 ///
 /// Matching priority:
-///   Level 1: Title pattern "[NNNN] 폼이름" → exact match (confidence 1.0)
-///   Level 2: Structural fingerprint hash → exact match (confidence 0.95)
-///   Level 3: OCR keyword intersection → ratio-based match (confidence 0.8 × matchRatio)
+///   Level 1: Title pattern "[NNNN] 폼이름" -> exact match (confidence 1.0)
+///   Level 2: Structural fingerprint hash -> exact match (confidence 0.95)
+///   Level 3: OCR keyword intersection -> ratio-based match (confidence 0.8 × matchRatio)
 ///
 /// Designed for progressive capability:
-///   - Win32 API available → all three levels usable
-///   - Image-only (remote desktop) → Level 2 (if controls detected) + Level 3 (OCR keywords)
-///   - OCR-only (no structure) → Level 3 only
+///   - Win32 API available -> all three levels usable
+///   - Image-only (remote desktop) -> Level 2 (if controls detected) + Level 3 (OCR keywords)
+///   - OCR-only (no structure) -> Level 3 only
 /// </summary>
 public static class FormTypeIdentifier
 {
@@ -26,9 +26,9 @@ public static class FormTypeIdentifier
     /// Identify a form's type using up to three matching levels.
     /// Returns the best match, or null if no match found.
     /// </summary>
-    /// <param name="windowTitle">Window title (e.g., "[1101] 현재가") — null if image-only</param>
-    /// <param name="fingerprintHash">Structural fingerprint hash — null if not computed</param>
-    /// <param name="ocrWords">OCR-extracted words from the form — null if no OCR</param>
+    /// <param name="windowTitle">Window title (e.g., "[1101] 현재가") -- null if image-only</param>
+    /// <param name="fingerprintHash">Structural fingerprint hash -- null if not computed</param>
+    /// <param name="ocrWords">OCR-extracted words from the form -- null if no OCR</param>
     /// <param name="expDb">Experience DB with known form types</param>
     /// <returns>Best match with confidence, or null</returns>
     public static FormTypeMatch? Identify(
@@ -37,21 +37,21 @@ public static class FormTypeIdentifier
         IReadOnlyList<string>? ocrWords,
         ExperienceDb expDb)
     {
-        // Level 1: Title pattern — fastest and most reliable
+        // Level 1: Title pattern -- fastest and most reliable
         if (!string.IsNullOrEmpty(windowTitle))
         {
             var match = MatchByTitle(windowTitle, expDb);
             if (match != null) return match;
         }
 
-        // Level 2: Structural fingerprint hash — structural identity
+        // Level 2: Structural fingerprint hash -- structural identity
         if (!string.IsNullOrEmpty(fingerprintHash))
         {
             var match = MatchByFingerprint(fingerprintHash, expDb);
             if (match != null) return match;
         }
 
-        // Level 3: OCR keyword matching — works with image-only input
+        // Level 3: OCR keyword matching -- works with image-only input
         if (ocrWords != null && ocrWords.Count > 0)
         {
             var match = MatchByOcrKeywords(ocrWords, expDb);

@@ -3,7 +3,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot knowhow <subcommand> — per-control/web knowhow management
+// partial class: wkappbot knowhow <subcommand> -- per-control/web knowhow management
 internal partial class Program
 {
     static string WebProfilesDir => Path.Combine(DataDir, "web_profiles");
@@ -69,11 +69,11 @@ internal partial class Program
             return 1;
         }
 
-        // Find profile directory — --profile 지정 시 직접 매칭, 없으면 스마트 매칭
+        // Find profile directory -- --profile 지정 시 직접 매칭, 없으면 스마트 매칭
         var profileDir = FindProfileExpDir(profileName, formId);
         if (profileDir == null)
         {
-            // No profile — use a default location
+            // No profile -- use a default location
             profileDir = Path.Combine(DataDir, "profiles", "_default_exp");
             Directory.CreateDirectory(profileDir);
         }
@@ -235,7 +235,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// wkappbot knowhow web-list — list domains with knowhow
+    /// wkappbot knowhow web-list -- list domains with knowhow
     /// </summary>
     static int KnowhowWebListCommand()
     {
@@ -261,9 +261,9 @@ internal partial class Program
 
     /// <summary>
     /// Find the matching profile _exp directory.
-    /// --profile name: 이름 직접 매칭 (예: --profile nkrunlite → nkrunlite_exp)
+    /// --profile name: 이름 직접 매칭 (예: --profile nkrunlite -> nkrunlite_exp)
     /// formId 있으면: 해당 form 폴더가 존재하는 프로파일 우선
-    /// 그래도 모호하면: ActionState에서 마지막 프로세스명 → 프로파일 매칭
+    /// 그래도 모호하면: ActionState에서 마지막 프로세스명 -> 프로파일 매칭
     /// 최종 폴백: 첫 번째 *_exp 디렉토리
     /// </summary>
     static string? FindProfileExpDir(string? profileName = null, string? formId = null)
@@ -283,7 +283,7 @@ internal partial class Program
             if (match != null) return match;
         }
 
-        // ActionState에서 마지막 프로세스명 → 프로파일 매칭
+        // ActionState에서 마지막 프로세스명 -> 프로파일 매칭
         try
         {
             var actionStatePath = Path.Combine(DataDir, "runtime", "action_state.json");

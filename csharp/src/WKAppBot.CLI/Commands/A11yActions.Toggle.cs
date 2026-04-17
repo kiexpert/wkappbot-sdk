@@ -18,11 +18,11 @@ internal partial class Program
         if (UiaLocator.TryToggle(el))
         {
             var after = UiaLocator.GetToggleState(el);
-            Console.Error.WriteLine($"[A11Y] toggle — UIA Toggle (now: {after})");
+            Console.Error.WriteLine($"[A11Y] toggle -- UIA Toggle (now: {after})");
             return true;
         }
 
-        Console.WriteLine("[A11Y] toggle — UIA not supported, falling back to invoke");
+        Console.WriteLine("[A11Y] toggle -- UIA not supported, falling back to invoke");
         return A11yInvoke(el, hwnd);
     }
 
@@ -31,10 +31,10 @@ internal partial class Program
     {
         if (UiaLocator.TryExpand(el))
         {
-            Console.WriteLine("[A11Y] expand — UIA ExpandCollapse");
+            Console.WriteLine("[A11Y] expand -- UIA ExpandCollapse");
             return true;
         }
-        Console.Error.WriteLine("[A11Y] expand — not supported on this element");
+        Console.Error.WriteLine("[A11Y] expand -- not supported on this element");
         return false;
     }
 
@@ -42,10 +42,10 @@ internal partial class Program
     {
         if (UiaLocator.TryCollapse(el))
         {
-            Console.WriteLine("[A11Y] collapse — UIA ExpandCollapse");
+            Console.WriteLine("[A11Y] collapse -- UIA ExpandCollapse");
             return true;
         }
-        Console.Error.WriteLine("[A11Y] collapse — not supported on this element");
+        Console.Error.WriteLine("[A11Y] collapse -- not supported on this element");
         return false;
     }
 }

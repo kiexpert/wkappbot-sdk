@@ -11,7 +11,7 @@ internal partial class Program
 {
     /// <summary>
     /// Focusless TreeView navigation: expand, select, list TreeItems.
-    /// Uses UIA patterns (ExpandCollapse, SelectionItem, ScrollItem) — NO focus stealing!
+    /// Uses UIA patterns (ExpandCollapse, SelectionItem, ScrollItem) -- NO focus stealing!
     ///
     /// Usage:
     ///   wkappbot tree-select "영웅문4" --aid 10003 --select "상7하7돈7순위"
@@ -47,7 +47,7 @@ internal partial class Program
         if (string.IsNullOrEmpty(treeAid))
             return Error("--aid is required. Use inspect to find the Tree control's AutomationId.");
 
-        // Resolve grap: "window/child#uiaScope" — '/' and '#' are equivalent separators
+        // Resolve grap: "window/child#uiaScope" -- '/' and '#' are equivalent separators
         UIA3Automation automation;
         AutomationElement root;
         IntPtr mainHwnd;
@@ -259,7 +259,7 @@ internal partial class Program
 
     static int ListTreeItems(AutomationElement tree, int maxDepth)
     {
-        Console.WriteLine($"\n── TreeItems (depth={maxDepth}) ──\n");
+        Console.WriteLine($"\n-- TreeItems (depth={maxDepth}) --\n");
         ListTreeItemsRecursive(tree, 0, maxDepth);
         return 0;
     }

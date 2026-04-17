@@ -13,12 +13,12 @@ public sealed partial class ClaudePromptHelper
     /// <summary>
     /// Try to submit the prompt focuslessly using multiple strategies:
     ///   1. UIA: Invoke pattern on Submit/Send button (most reliable!)
-    ///   2. MSAA: Walk tree to find Send button → accDoDefaultAction
+    ///   2. MSAA: Walk tree to find Send button -> accDoDefaultAction
     ///   3. PostMessage VK_RETURN to Chrome renderer hwnd
     ///   4. Fallback: brief focus steal for Enter key
     /// </summary>
     /// <summary>
-    /// Unified submit logic: find "제출" button → check state → invoke → verify → retry.
+    /// Unified submit logic: find "제출" button -> check state -> invoke -> verify -> retry.
     /// Returns true only if submit is VERIFIED (button disappeared or "중단" appeared).
     /// </summary>
     private bool TryFocuslessSubmit(PromptInfo prompt, AutomationElement turnForm)
@@ -66,7 +66,7 @@ public sealed partial class ClaudePromptHelper
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
         Thread.Sleep(200);
 
-        // Nudge React: End → Space → Backspace (triggers input event without changing text)
+        // Nudge React: End -> Space -> Backspace (triggers input event without changing text)
         KeyboardInput.PressKey("end");
         Thread.Sleep(50);
         KeyboardInput.PressKey("space");
@@ -96,7 +96,7 @@ public sealed partial class ClaudePromptHelper
 
         RestoreFocus(prevFg, prompt.WindowHandle);
         Console.WriteLine("  [PROMPT] Submit FAILED (focus+Enter, 3x retry, unverified)");
-        return false; // 3x Enter failed verification — likely rate-limited or UI blocked
+        return false; // 3x Enter failed verification -- likely rate-limited or UI blocked
     }
 
     /// <summary>
@@ -146,7 +146,7 @@ public sealed partial class ClaudePromptHelper
                     }
                 }
 
-                // Button still visible after 2s — submit likely failed, re-press
+                // Button still visible after 2s -- submit likely failed, re-press
                 Console.WriteLine($"  [PROMPT] [{tag}] Submit NOT verified after invoke (attempt {attempt + 1}), retrying...");
             }
             catch (Exception ex)
@@ -182,7 +182,7 @@ public sealed partial class ClaudePromptHelper
             }
             return submitVisible ? SubmitButtonState.Visible : SubmitButtonState.Gone;
         }
-        catch { return SubmitButtonState.Gone; } // Element stale → likely submitted
+        catch { return SubmitButtonState.Gone; } // Element stale -> likely submitted
     }
 
     /// <summary>
@@ -260,7 +260,7 @@ public sealed partial class ClaudePromptHelper
     }
 
     /// <summary>
-    /// Try to submit via MSAA: find Send button in MSAA tree → accDoDefaultAction.
+    /// Try to submit via MSAA: find Send button in MSAA tree -> accDoDefaultAction.
     /// Note: accDoDefaultAction("활성화") on contentEditable only activates/focuses the element,
     /// it does NOT submit. So we must find the actual Send button.
     /// </summary>
@@ -279,7 +279,7 @@ public sealed partial class ClaudePromptHelper
             {
                 if (acc is not IAccessibleVtbl selfV) return false;
 
-                // Navigate up to turn-form level (grandparent → great-grandparent)
+                // Navigate up to turn-form level (grandparent -> great-grandparent)
                 // and search the MSAA tree for a Send/Submit button
                 selfV.get_accParent(out object? parentObj);
                 if (parentObj is not IAccessibleVtbl parentV) return false;
@@ -359,7 +359,7 @@ public sealed partial class ClaudePromptHelper
                     nameLower.Contains("opus") || nameLower.Contains("sonnet") || nameLower.Contains("haiku") ||
                     nameLower.Contains("권한") || nameLower.Contains("permission"))
                 {
-                    // Don't return false — continue to children
+                    // Don't return false -- continue to children
                 }
                 else
                 {

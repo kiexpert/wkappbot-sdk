@@ -16,10 +16,10 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Focus theft stack capture (set by OnFocusTheft callback before LogError) ──
+    // -- Focus theft stack capture (set by OnFocusTheft callback before LogError) --
     [ThreadStatic] static string? _lastFocusTheftStack;
 
-    // ── Common error logging ──
+    // -- Common error logging --
     static void LogError(string tag, Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Red;
@@ -54,7 +54,7 @@ internal partial class Program
                 Console.Error.WriteLine($"[{tag}] HotLine: {hotLine}");
             }
         }
-        catch { /* UIA/Win32 may fail — non-critical */ }
+        catch { /* UIA/Win32 may fail -- non-critical */ }
 
         // Auto bug report via suggest command (Slack + suggestions.jsonl handled by suggest)
         Task.Run(() =>
@@ -267,7 +267,7 @@ Options:
   --model 4.1     Model/version hint for remote AI (provider remains ask <ai>)
   --triad         Add triad-planning hints to loop persona
   --intercept ""msg""  훈수두기: post to existing thread without starting new AI session
-                       triad → last triad thread / gemini|gpt|claude → per-page thread
+                       triad -> last triad thread / gemini|gpt|claude -> per-page thread
 
 File attachment:
   Any argument that matches an existing file path is auto-attached.
@@ -294,7 +294,7 @@ Examples:
 
     /// <summary>
     /// Run Gemini, GPT, Claude in parallel with per-AI output prefixes ([gemini], [gpt], [claude]).
-    /// Pre-creates a single unified Slack thread before spawning tasks — all three AIs post replies
+    /// Pre-creates a single unified Slack thread before spawning tasks -- all three AIs post replies
     /// to the same thread (AsyncLocal _slackSessionThreadTs inheritance).
     /// If an AI fails, RunTriadAiWithRecovery retries once with context from the other AIs.
     /// </summary>
@@ -306,7 +306,7 @@ Examples:
         // User can still raise via --timeout N; we only enforce the floor here.
         if (timeoutSec < 120) timeoutSec = 120;
 
-        // Triad always starts fresh per-AI — prevents stale session cross-contamination.
+        // Triad always starts fresh per-AI -- prevents stale session cross-contamination.
         var freshSession = newSession; // --new-session only when explicitly requested
         Interlocked.Exchange(ref _slackPersonaPostedFlag, 0); // reset: only first AI posts persona
         if (debateMode && !loopMode) _suppressLoopPersona.Value = true; // debate: game rules replace persona (unless --use-tools enables loopMode)
@@ -314,17 +314,17 @@ Examples:
         ResetEmojis(); // 🦊🐬🐙 fresh race!
         // Game ID will be set after thread creation (uses thread ts)
 
-        // ── Unified Slack thread ──────────────────────────────────────────────────────────
+        // -- Unified Slack thread ----------------------------------------------------------
         // Set _slackSessionThreadTs.Value BEFORE spawning Task.Run children.
         // AsyncLocal inheritance: each child task sees this value from the moment it starts.
-        // EnsureSlackThread inside each AI is idempotent — returns immediately if already set.
+        // EnsureSlackThread inside each AI is idempotent -- returns immediately if already set.
         {
             var config = LoadSlackConfig();
             var botToken = config?["bot_token"]?.GetValue<string>();
             var channel  = config?["channel"]?.GetValue<string>();
             if (!string.IsNullOrEmpty(botToken) && !string.IsNullOrEmpty(channel))
             {
-                // Use SlackSendWithThread: auto-splits long messages (header → channel, overflow → thread)
+                // Use SlackSendWithThread: auto-splits long messages (header -> channel, overflow -> thread)
                 var toolTag = loopMode ? "+🔧" : "";
                 var slackHeader = debateMode
                     ? $"🎙️⚔️ *[정반합{toolTag}]* {question}"
@@ -355,15 +355,15 @@ Examples:
             hints.Add(dbInfo);
         }
         else
-            hints.Add("정반합 OFF — add --debate");
+            hints.Add("정반합 OFF -- add --debate");
         // tools status (ask = always dry-run; use `agent` command for write access)
-        if (loopMode) hints.Add("🔧 tools ON (dry-run — use agent cmd for writes)");
-        else hints.Add("tools OFF — add --use-tools");
+        if (loopMode) hints.Add("🔧 tools ON (dry-run -- use agent cmd for writes)");
+        else hints.Add("tools OFF -- add --use-tools");
         var debateHint = $" ({string.Join(" | ", hints)})";
         Console.Error.WriteLine($"[{modeLabel}] Game {gameId}: Launching Gemini + GPT + Claude in parallel...{debateHint}");
 
-        // ── Shared context for recovery (in-memory + JSONL files) ────────────────────────
-        // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} — one folder per triad run.
+        // -- Shared context for recovery (in-memory + JSONL files) ------------------------
+        // Session folder: {DataDir}/triad/{yyyyMMdd_HHmmss} -- one folder per triad run.
         // Each AI writes its steps to {sessionDir}/{ai}.jsonl for crash-safe recovery.
         var sessionId = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
         var sessionDir = Path.Combine(DataDir, "triad", sessionId);
@@ -371,7 +371,7 @@ Examples:
         _triadLastSessionDir = sessionDir;
         Console.Error.WriteLine($"[TRIAD] Session dir: {sessionDir}");
 
-        // ── Live MD minutes: auto-generate debate transcript ──
+        // -- Live MD minutes: auto-generate debate transcript --
         ctx.InitLiveMinutes(question);
         _activeTriadCtx = ctx; // enable MD recording for all SlackPostToThread calls
         if (ctx.MdPath != null)
@@ -406,12 +406,12 @@ Examples:
             results[idx] = done.Result;
             pending.Remove(done);
 
-            // Emoji already assigned on first chunk arrival (UpdateChunk) — handle nudging only
+            // Emoji already assigned on first chunk arrival (UpdateChunk) -- handle nudging only
             if (done.Result == 0)
             {
                 var doneAi = aiNames[idx];
 
-                // AI done + others still working → moderator nudge
+                // AI done + others still working -> moderator nudge
                 if (pending.Count > 0)
                 {
                     var nudge = $"[MODERATOR]: {AiDisplayName(doneAi)} has finished. Please wrap up your answer promptly.";
@@ -419,11 +419,11 @@ Examples:
                     {
                         var pIdx = Array.IndexOf(tasks, p);
                         var peerAi = aiNames[pIdx];
-                        // DM nudge directly — NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
+                        // DM nudge directly -- NOT UpdateChunk (pollutes peer chunk stream with moderator messages)
                         ctx.InjectToSingle(peerAi, nudge);
-                        SlackPostToThread($"📩 *[DM→{peerAi}]* {nudge}", "🦉 Moderator");
+                        SlackPostToThread($"📩 *[DM->{peerAi}]* {nudge}", "🦉 Moderator");
                     }
-                    Console.Error.WriteLine($"[{modeLabel}] {AiDisplayName(doneAi)} done → moderator nudging {pending.Count} remaining");
+                    Console.Error.WriteLine($"[{modeLabel}] {AiDisplayName(doneAi)} done -> moderator nudging {pending.Count} remaining");
                     SlackPostToThread($"⏰ *{AiDisplayName(doneAi)}* finished! Moderator: wrap up, {pending.Count} AI(s) remaining.", "🦉 Moderator");
 
                     // Follow-up after 1 second
@@ -431,17 +431,17 @@ Examples:
                     {
                         await Task.Delay(1000);
                         var followUp = $"[MODERATOR]: Once all answers are in, we begin Round 1 of 정반합 debate. Prepare your [DEBATE_JSON] with STANCE points.";
-                        // Broadcast to all AIs via DM — NOT UpdateChunk (keeps chunk stream clean for peer content only)
+                        // Broadcast to all AIs via DM -- NOT UpdateChunk (keeps chunk stream clean for peer content only)
                         foreach (var broadcastAi in aiNames)
                             ctx.InjectToSingle(broadcastAi, followUp);
-                        SlackPostToThread($"📢 *[Moderator→ALL]* {followUp}", "🦉 Moderator");
+                        SlackPostToThread($"📢 *[Moderator->ALL]* {followUp}", "🦉 Moderator");
                     });
                 }
             }
         }
-        Console.Error.WriteLine($"[{modeLabel}] R1 Done — gemini={results[0]} gpt={results[1]} claude={results[2]}");
+        Console.Error.WriteLine($"[{modeLabel}] R1 Done -- gemini={results[0]} gpt={results[1]} claude={results[2]}");
 
-        // ── 정반합 사회자 루프 (--debate 플래그 시에만) ──
+        // -- 정반합 사회자 루프 (--debate 플래그 시에만) --
         if (debateMode && !noWait && results.Count(r => r == 0) >= 2)
         {
             // Off-topic detection: check if each AI's answer addresses the original question
@@ -454,37 +454,37 @@ Examples:
                 var aKeywords = TriadDebateLoop.Tokenize(answer);
                 var overlap = qKeywords.Intersect(aKeywords, StringComparer.OrdinalIgnoreCase).Count();
                 var ratio = qKeywords.Count > 0 ? (double)overlap / qKeywords.Count : 1.0;
-                if (ratio < 0.15) // less than 15% keyword overlap → likely off-topic
+                if (ratio < 0.15) // less than 15% keyword overlap -> likely off-topic
                 {
-                    var redirect = $"[MODERATOR]: ⚠️ Your response appears off-topic. The question is: \"{rawQuestion}\"\n" +
+                    var redirect = $"[MODERATOR]: !️ Your response appears off-topic. The question is: \"{rawQuestion}\"\n" +
                         $"Please answer the ACTUAL question directly. Do not explore tools or help menus.";
                     ctx.InjectToSingle(ai, redirect);
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Error.WriteLine($"[정반합] {ai} off-topic detected (keyword overlap {overlap}/{qKeywords.Count} = {ratio:P0}) → redirect sent");
+                    Console.Error.WriteLine($"[정반합] {ai} off-topic detected (keyword overlap {overlap}/{qKeywords.Count} = {ratio:P0}) -> redirect sent");
                     Console.ResetColor();
-                    SlackPostToThread($"⚠️ *[Moderator→{ai}]* Off-topic detected! Redirect sent.", "🦉 Moderator");
+                    SlackPostToThread($"!️ *[Moderator->{ai}]* Off-topic detected! Redirect sent.", "🦉 Moderator");
                 }
             }
 
-            // R0 done → enable moderator for debate rounds
+            // R0 done -> enable moderator for debate rounds
             ctx.ModeratorEnabled = true;
             Console.Error.WriteLine($"[정반합] R0 complete. Cross-prompting ON. Moderator starting R1...");
-            SlackPostToThread("═══ *R0 자유 답변 완료! 정반합 게임 시작!* ═══\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "🦉 Moderator");
+            SlackPostToThread("=== *R0 자유 답변 완료! 정반합 게임 시작!* ===\n📋 DEBATE_JSON + STANCE 포맷으로 응답해주세요.", "🦉 Moderator");
             SlackPostToThread($"📋 *Debate Rules:*\n```\n{BuildDebateOnlyPersona()}\n```", "🦉 Moderator");
             try { RunDebateLoop(question, timeoutSec, ctx); }
             catch (Exception ex) { Console.Error.WriteLine($"[DEBATE] Error: {ex.Message}"); }
         }
         else if (debateMode && !noWait)
         {
-            Console.WriteLine("[정반합] Skipping moderator — need at least 2 successful AIs");
+            Console.WriteLine("[정반합] Skipping moderator -- need at least 2 successful AIs");
         }
 
-        // ── Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` ──
+        // -- Schedule reminder into caller's Claude Code prompt via `wkappbot prompt send` --
         // Uses the scheduler (independent process) so TeeTextWriter lifetime is irrelevant.
         var threadTs = _slackSessionThreadTs.Value;
         var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
         var replyCmd = string.IsNullOrEmpty(threadTs) ? "" :
-            $" → 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
+            $" -> 슬랙 쓰레드에 reply: wkappbot slack reply \"종합의견...\" --msg {threadTs}";
         var promptMsg = $"YOU MUST 위 삼두 답변을 꼼꼼히 읽고 반드시 한국어로 종합 의견을 작성하세요! 각 AI별 핵심 차이점과 본인 의견 포함{replyCmd}";
         try
         {
@@ -502,12 +502,12 @@ Examples:
             psi.ArgumentList.Add("--after");
             psi.ArgumentList.Add("5s");
             AppBotPipe.StartTracked(psi, callerCwd, "TRIAD-PROMPT");
-            Console.Error.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) → {cwdTag}");
+            Console.Error.WriteLine($"[TRIAD] Reminder scheduled (prompt send --after 5s) -> {cwdTag}");
         }
         catch (Exception ex) { LogWarning("TRIAD", "Reminder schedule error", ex); }
         if (!string.IsNullOrEmpty(threadTs))
         {
-            var body = $"🔔 *삼두 완료* — 종합의견 리마인더 예약됨 (5s)\n📌 `--msg {threadTs}`";
+            var body = $"🔔 *삼두 완료* -- 종합의견 리마인더 예약됨 (5s)\n📌 `--msg {threadTs}`";
             SlackPostToThread(body, "앱봇아이");
         }
 

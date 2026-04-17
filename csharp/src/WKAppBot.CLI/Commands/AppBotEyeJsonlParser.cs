@@ -136,7 +136,7 @@ internal partial class Program
     }
 
     // ExtractCwdFromVsCodeTitle / GetContextInfoForCwd(Ex) / ReadClotThoughtForCwd /
-    // GetLastOutputLine / GetPromptDisplayInfo → AppBotEyePromptInfo.cs
+    // GetLastOutputLine / GetPromptDisplayInfo -> AppBotEyePromptInfo.cs
 
     static bool TryExtractRoleAndText(string jsonLine, out string role, out string text)
     {
@@ -165,7 +165,7 @@ internal partial class Program
                             if (!string.IsNullOrWhiteSpace(text)) return true;
                         }
                     }
-                    // tool_use → abbreviated summary: "Bash: wkappbot ..." / "Read: file.cs"
+                    // tool_use -> abbreviated summary: "Bash: wkappbot ..." / "Read: file.cs"
                     if (type == "tool_use" && toolSummary == null && c.TryGetProperty("name", out var nameEl))
                     {
                         var toolName = nameEl.GetString() ?? "";
@@ -206,7 +206,7 @@ internal partial class Program
                     }
                 }
             }
-            // No text found — use tool_use summary as fallback
+            // No text found -- use tool_use summary as fallback
             if (toolSummary != null) { text = toolSummary; return true; }
             return false;
         }
@@ -218,7 +218,7 @@ internal partial class Program
     static string NormalizePrompt(string s)
     {
         if (string.IsNullOrWhiteSpace(s)) return "";
-        // Collapse all whitespace (newlines, tabs, consecutive spaces) → single space
+        // Collapse all whitespace (newlines, tabs, consecutive spaces) -> single space
         var t = _multiSpaceRx.Replace(s, " ").Trim();
         if (t.Equals("NO_REPLY", StringComparison.OrdinalIgnoreCase)) return "";
         if (t.Contains("send ㄱㄱ", StringComparison.OrdinalIgnoreCase)) return "";

@@ -20,7 +20,7 @@ public static class KeyboardInput
         public IntPtr  Foreground    { get; init; }  // OS foreground window (SetForegroundWindow target)
         public IntPtr  FocusedCtl   { get; init; }  // keyboard-focused control inside Foreground
         public uint    FgThreadId   { get; init; }  // thread owning Foreground (for AttachThreadInput)
-        public uint    ImeConversion { get; init; } // IME conversion mode (0=English, 1=Korean/Hangul …)
+        public uint    ImeConversion { get; init; } // IME conversion mode (0=English, 1=Korean/Hangul ...)
         public uint    ImeSentence  { get; init; }  // IME sentence mode
         public bool    ImeValid     { get; init; }  // true if IME state was captured
         public string? ImeComposing { get; init; }  // 조합중 문자열 (e.g. "하" mid-automata), null=없음
@@ -66,7 +66,7 @@ public static class KeyboardInput
             };
 
             // 프롭 캐시: 포커스 컨트롤 hwnd를 포그라운드 윈도우에 스탬프
-            // → MidInputCheck abort 시 UIA 없이 빠르게 읽기 가능 (cross-invocation 증거보존)
+            // -> MidInputCheck abort 시 UIA 없이 빠르게 읽기 가능 (cross-invocation 증거보존)
             if (fg != IntPtr.Zero && gti.hwndFocus != IntPtr.Zero)
             {
                 try { NativeMethods.SetPropW(fg, "WKAppBot_FocusedCtl", gti.hwndFocus); } catch { }
@@ -77,10 +77,10 @@ public static class KeyboardInput
 
         /// <summary>
         /// Restore OS foreground AND keyboard focus control AND IME mode AND 조합중 상태.
-        /// 1) SetForegroundWindow — activates the window
-        /// 2) AttachThreadInput + SetFocus — restores the focused control inside it
-        /// 3) ImmSetConversionStatus — restores Korean/CJK input mode (한/영)
-        /// 4) ImmSetCompositionString — re-injects mid-automata composition string
+        /// 1) SetForegroundWindow -- activates the window
+        /// 2) AttachThreadInput + SetFocus -- restores the focused control inside it
+        /// 3) ImmSetConversionStatus -- restores Korean/CJK input mode (한/영)
+        /// 4) ImmSetCompositionString -- re-injects mid-automata composition string
         /// Returns true if foreground was actually different (= focus had drifted).
         /// </summary>
         public bool Restore()
@@ -88,7 +88,7 @@ public static class KeyboardInput
             if (IsEmpty) return false;
             bool drifted = NativeMethods.GetForegroundWindow() != Foreground;
 
-            // Step 1: restore foreground window (raw — this is a restore, not new acquisition)
+            // Step 1: restore foreground window (raw -- this is a restore, not new acquisition)
             NativeMethods.SetForegroundWindowRaw(Foreground);
 
             // Step 2: restore keyboard focus control via AttachThreadInput
@@ -120,14 +120,14 @@ public static class KeyboardInput
         }
     }
 
-    // ── 중간체크 abort 콜백 (CLI 레이어에서 설정 → UIA 노드 덤프) ──────────────
+    // -- 중간체크 abort 콜백 (CLI 레이어에서 설정 -> UIA 노드 덤프) --------------
     /// <summary>
     /// CLI 레이어에서 설정하는 콜백. MidInputCheck/MidInputFocusCheck 이상 감지 시 호출됨.
-    /// 인자: (reason, context, intendedHwnd) — CLI 레이어가 UIA automation으로 포커스 노드 덤프.
+    /// 인자: (reason, context, intendedHwnd) -- CLI 레이어가 UIA automation으로 포커스 노드 덤프.
     /// </summary>
     public static Action<string, string, IntPtr>? OnMidInputAbort { get; set; }
 
-    // ── IME injection (focusless text input via IMM32) ─────────────────────
+    // -- IME injection (focusless text input via IMM32) --------------------─
     private const uint SCS_SETSTR = 0x0002;
     private const uint GCS_COMPSTR_IME = 0x0008;
     private const uint NI_COMPOSITIONSTR = 0x0015;
@@ -189,7 +189,7 @@ public static class KeyboardInput
                 var afterLen = NativeMethods.ImmGetCompositionStringW(hIMC, GCS_COMPSTR_IME, null, 0);
                 if (afterLen > 0)
                 {
-                    // Composition stuck — cancel and report failure
+                    // Composition stuck -- cancel and report failure
                     NativeMethods.ImmNotifyIME(hIMC, NI_COMPOSITIONSTR, CPS_CANCEL, 0);
                     // Restore previous state
                     NativeMethods.ImmSetConversionStatus(hIMC, savedConv, savedSent);
@@ -199,7 +199,7 @@ public static class KeyboardInput
                     return false;
                 }
 
-                // Restore IME mode (한/영) — injection may have changed it
+                // Restore IME mode (한/영) -- injection may have changed it
                 NativeMethods.ImmSetConversionStatus(hIMC, savedConv, savedSent);
                 return true;
             }
@@ -214,7 +214,7 @@ public static class KeyboardInput
         }
     }
 
-    // ── Global keyboard input lock ────────────────────────────────────────────
+    // -- Global keyboard input lock --------------------------------------------
     // Cross-process named Mutex: "먼저 잡은 넘이 우선권" (first grabber wins).
     // While any wkappbot session is sending keystrokes, others skip SmartSetForegroundWindow.
     private const string InputLockName = "Global\\WKAppBot_KeyboardInputLock";
@@ -224,7 +224,7 @@ public static class KeyboardInput
     /// Acquire the global keyboard input lock (cross-process named Mutex).
     /// Returns true if acquired (this session now owns typing priority).
     /// Other sessions will detect the lock via IsInputLockedByOther() and yield focus.
-    /// timeoutMs=0 → immediate try only (non-blocking).
+    /// timeoutMs=0 -> immediate try only (non-blocking).
     /// </summary>
     public static bool AcquireInputLock(int timeoutMs = 0)
     {
@@ -257,7 +257,7 @@ public static class KeyboardInput
     /// </summary>
     public static bool IsInputLockedByOther()
     {
-        if (_inputLock != null) return false; // we hold it — not "other"
+        if (_inputLock != null) return false; // we hold it -- not "other"
         try
         {
             using var probe = new Mutex(false, InputLockName);
@@ -286,7 +286,7 @@ public static class KeyboardInput
     /// Mid-input focus check: verifies the OS foreground window matches the intended target,
     /// then fully restores both the foreground window AND the keyboard focus control inside it.
     /// Called per-keystroke during SendInput-based typing.
-    /// intendedHwnd=Zero → skip check.
+    /// intendedHwnd=Zero -> skip check.
     /// snapshot: pre-captured state for keyboard-focus control restoration.
     /// </summary>
     public static bool MidInputFocusCheck(IntPtr intendedHwnd, string context,
@@ -296,7 +296,7 @@ public static class KeyboardInput
         var cur = NativeMethods.GetForegroundWindow();
         if (cur == intendedHwnd) return false;
 
-        var msg = $"[FOCUS] ⚠ mid-input drift @ {context}: intended={intendedHwnd:X8} now={cur:X8} — restoring";
+        var msg = $"[FOCUS] ! mid-input drift @ {context}: intended={intendedHwnd:X8} now={cur:X8} -- restoring";
         onWarning?.Invoke(msg);
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.WriteLine(msg);
@@ -306,24 +306,24 @@ public static class KeyboardInput
         {
             // Full restore: foreground + keyboard focus control
             snapshot.Restore();
-            Console.WriteLine($"[FOCUS] keyboard focus restored → ctl={snapshot.FocusedCtl:X8}");
+            Console.WriteLine($"[FOCUS] keyboard focus restored -> ctl={snapshot.FocusedCtl:X8}");
         }
         else
         {
-            NativeMethods.SetForegroundWindowRaw(intendedHwnd); // restore — no guard needed
+            NativeMethods.SetForegroundWindowRaw(intendedHwnd); // restore -- no guard needed
         }
         Thread.Sleep(30); // brief delay for focus to settle before next key
         return true;
     }
 
     /// <summary>
-    /// Unified mid-input liveness check — call inside typing loops between each keystroke/token.
+    /// Unified mid-input liveness check -- call inside typing loops between each keystroke/token.
     /// Replaces the separate CheckUserActivity + MidInputFocusCheck call pattern.
     ///
     /// Checks (in order):
-    ///   1. Competing input lock — another wkappbot process holds Global keyboard lock → abort
-    ///   2. User activity → yield popup if TypeInputContext.UserInputWait is configured
-    ///   3. Focus drift → restore foreground + keyboard focus control if drifted
+    ///   1. Competing input lock -- another wkappbot process holds Global keyboard lock -> abort
+    ///   2. User activity -> yield popup if TypeInputContext.UserInputWait is configured
+    ///   3. Focus drift -> restore foreground + keyboard focus control if drifted
     ///
     /// Returns false if input should be aborted (competing lock or user cancelled).
     /// </summary>
@@ -338,7 +338,7 @@ public static class KeyboardInput
         if (IsInputLockedByOther())
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[IDLE\u26a0 LOCK-CONFLICT:{context}] another wkappbot holds input lock — aborting input");
+            Console.WriteLine($"[IDLE\u26a0 LOCK-CONFLICT:{context}] another wkappbot holds input lock -- aborting input");
             Console.ResetColor();
             PrintMidInputAbortWin32("LOCK-CONFLICT", intendedHwnd);
             OnMidInputAbort?.Invoke("LOCK-CONFLICT", context, intendedHwnd);
@@ -353,11 +353,11 @@ public static class KeyboardInput
             return false;
         }
 
-        // 3. Focus drift → abort immediately + stamp stealing window for next-run yield popup
+        // 3. Focus drift -> abort immediately + stamp stealing window for next-run yield popup
         if (MidInputFocusCheck(intendedHwnd, context, snapshot))
         {
             // Stamp the ROOT window (not just intendedHwnd child control!) so
-            // InputReadiness.Probe() — which checks mainHwnd (root) — finds the prop.
+            // InputReadiness.Probe() -- which checks mainHwnd (root) -- finds the prop.
             if (intendedHwnd != IntPtr.Zero)
             {
                 try
@@ -369,13 +369,13 @@ public static class KeyboardInput
             }
             PrintMidInputAbortWin32("FOCUS-DRIFT", intendedHwnd);
             OnMidInputAbort?.Invoke("FOCUS-DRIFT", context, intendedHwnd);
-            return false;  // abort — next retry will require user approval via yield popup
+            return false;  // abort -- next retry will require user approval via yield popup
         }
 
         return true;
     }
 
-    /// <summary>Win32 수준 포그라운드 상태 출력 — UIA 없이 키보드 레이어에서 즉시 출력.</summary>
+    /// <summary>Win32 수준 포그라운드 상태 출력 -- UIA 없이 키보드 레이어에서 즉시 출력.</summary>
     private static void PrintMidInputAbortWin32(string reason, IntPtr intendedHwnd)
     {
         try
@@ -393,7 +393,7 @@ public static class KeyboardInput
             if (intendedHwnd != IntPtr.Zero)
             {
                 Console.ForegroundColor = same ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine($"  [WIN32] intended   : 0x{intendedHwnd.ToInt64():X8}  {(same ? "✓ 일치" : "✗ 포커스 강탈!")}");
+                Console.WriteLine($"  [WIN32] intended   : 0x{intendedHwnd.ToInt64():X8}  {(same ? "v 일치" : "X 포커스 강탈!")}");
                 Console.ResetColor();
             }
         }
@@ -409,17 +409,17 @@ public static class KeyboardInput
     /// </summary>
     public static bool CheckUserActivity(ref uint lastInputBaseline, TypeInputContext? ctx)
     {
-        if (ctx?.UserInputWait == null) return true; // no yield configured — always continue
+        if (ctx?.UserInputWait == null) return true; // no yield configured -- always continue
 
         var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
         if (!NativeMethods.GetLastInputInfo(ref lii)) return true;
 
-        if (lii.dwTime == lastInputBaseline) return true; // no new input — continue
+        if (lii.dwTime == lastInputBaseline) return true; // no new input -- continue
 
         // User activity detected during input!
         lastInputBaseline = lii.dwTime; // update baseline so we don't re-trigger immediately
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"[FOCUS] 유저 입력 감지 — 포커스 양보 팝업");
+        Console.WriteLine($"[FOCUS] 유저 입력 감지 -- 포커스 양보 팝업");
         Console.ResetColor();
 
         var yieldResult = ctx.UserInputWait.WaitForUserYield(
@@ -428,13 +428,13 @@ public static class KeyboardInput
         if (!yieldResult.Approved)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine($"[FOCUS] 유저 취소 — 키스트로크 중단");
+            Console.WriteLine($"[FOCUS] 유저 취소 -- 키스트로크 중단");
             Console.ResetColor();
             return false;
         }
 
         // After approval: restore focus + keyboard focus control
-        Console.WriteLine($"[FOCUS] 승인됨 — 포커스 복원 후 재개");
+        Console.WriteLine($"[FOCUS] 승인됨 -- 포커스 복원 후 재개");
         var snapshot = FocusSnapshot.Capture();
         if (ctx.IntendedHwnd != IntPtr.Zero)
         {
@@ -463,7 +463,7 @@ public static class KeyboardInput
         InputReadiness.AssertReadiness("KeyboardInput.TypeText");
         if (!InputReadiness.CheckActiveGuard("SendInput:TypeText")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
-        // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
+        // Acquire global input lock -- first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
         try
         {
@@ -503,7 +503,7 @@ public static class KeyboardInput
 
     /// <summary>
     /// Type text by posting WM_CHAR messages to target window's message queue.
-    /// Cross-process capable — messages go directly to the target window's queue,
+    /// Cross-process capable -- messages go directly to the target window's queue,
     /// bypassing UIPI issues that affect SendInput.
     ///
     /// Best for: MFC CMaskEdit, owner-drawn inputs, admin-to-user process input.
@@ -636,10 +636,10 @@ public static class KeyboardInput
     /// <summary>
     /// Send a sequence of key actions with +/- modifier notation.
     /// Tokens (space-separated):
-    ///   +Shift   → KeyDown (push to held stack)
-    ///   -Shift   → KeyUp (pop from stack)
-    ///   F5       → PressKey (down+up)
-    ///   hello    → per-char keystroke via VkKeyScanW (auto Shift wrap)
+    ///   +Shift   -> KeyDown (push to held stack)
+    ///   -Shift   -> KeyUp (pop from stack)
+    ///   F5       -> PressKey (down+up)
+    ///   hello    -> per-char keystroke via VkKeyScanW (auto Shift wrap)
     /// Unreleased modifiers auto-released in LIFO order at end.
     /// BLOCKED by FocuslessGuard (SendInput).
     /// </summary>
@@ -649,11 +649,11 @@ public static class KeyboardInput
         InputReadiness.AssertReadiness("KeyboardInput.SendKeys");
         if (!InputReadiness.CheckActiveGuard("SendInput:SendKeys")) return;
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
-        // Acquire global input lock — first grabber wins, others yield SmartSetForegroundWindow
+        // Acquire global input lock -- first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
         try
         {
-        // Capture full focus snapshot once — restored per-token if focus drifts
+        // Capture full focus snapshot once -- restored per-token if focus drifts
         var snapshot = effectiveHwnd != IntPtr.Zero ? FocusSnapshot.Capture() : default;
         // Capture last-input baseline for user activity detection
         var lii = new NativeMethods.LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<NativeMethods.LASTINPUTINFO>() };
@@ -670,7 +670,7 @@ public static class KeyboardInput
 
             if (token.StartsWith('+') && token.Length > 1)
             {
-                // +Key → hold down
+                // +Key -> hold down
                 var vk = NameToVk(token[1..]);
                 KeyDown(vk);
                 heldStack.Push(vk);
@@ -678,7 +678,7 @@ public static class KeyboardInput
             }
             else if (token.StartsWith('-') && token.Length > 1)
             {
-                // -Key → release
+                // -Key -> release
                 var vk = NameToVk(token[1..]);
                 KeyUp(vk);
                 // Remove from stack if present
@@ -704,7 +704,7 @@ public static class KeyboardInput
                 }
                 catch (ArgumentException)
                 {
-                    // Not a known key → type as character sequence via VkKeyScanW
+                    // Not a known key -> type as character sequence via VkKeyScanW
                     foreach (char ch in token)
                     {
                         short vkScan = NativeMethods.VkKeyScanW(ch);

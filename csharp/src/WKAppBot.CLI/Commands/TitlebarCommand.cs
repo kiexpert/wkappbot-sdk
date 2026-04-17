@@ -14,14 +14,14 @@ internal partial class Program
     /// <summary>
     /// Probe and click custom-drawn titlebar buttons in HTS MDI child frames.
     /// ETK_CHILDFRAME_WINDOW has owner-drawn titlebar buttons with no HWND/UIA.
-    /// Discovery: WM_LBUTTONDOWN/UP with negative client-y → PostMessage focusless click!
+    /// Discovery: WM_LBUTTONDOWN/UP with negative client-y -> PostMessage focusless click!
     /// </summary>
     static int TitlebarCommand(string[] args)
     {
         if (args.Length < 2)
             return Error(@"Usage: wkappbot titlebar <window-title> <form-id> [button-index]
   Probe and click custom-drawn titlebar buttons in HTS MDI child frames.
-  These buttons have no HWND, no UIA, no class name — they're owner-drawn in non-client area.
+  These buttons have no HWND, no UIA, no class name -- they're owner-drawn in non-client area.
   Clicking uses PostMessage with negative client-y coordinates (fully focusless!).
 
 Options:
@@ -183,7 +183,7 @@ Examples:
         }
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"── Titlebar Buttons ({buttons.Count} custom + {ncButtons.Count} standard) ────────────────────");
+        Console.WriteLine($"-- Titlebar Buttons ({buttons.Count} custom + {ncButtons.Count} standard) --------------------");
         Console.ResetColor();
 
         // Save titlebar screenshot (3x upscale) for button identification
@@ -268,7 +268,7 @@ Examples:
             if (clickIndex.Value < 0 || clickIndex.Value >= buttons.Count)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"\n  ✗ Button index {clickIndex.Value} out of range (0..{buttons.Count - 1})");
+                Console.WriteLine($"\n  X Button index {clickIndex.Value} out of range (0..{buttons.Count - 1})");
                 Console.ResetColor();
                 return 1;
             }
@@ -279,7 +279,7 @@ Examples:
 
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write($"  → Clicking [{clickIndex.Value}] \"{label}\"");
+            Console.Write($"  -> Clicking [{clickIndex.Value}] \"{label}\"");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.Write($" via PostMessage WM_LBUTTON at client=({target.ClientCenterX},{target.ClientCenterY})");
             Console.ResetColor();
@@ -304,7 +304,7 @@ Examples:
             zoom?.ShowPass($"PostMessage click sent");
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("  ✓ Click sent (focusless PostMessage)");
+            Console.WriteLine("  v Click sent (focusless PostMessage)");
             Console.ResetColor();
 
             // ActionState for AppBotEye

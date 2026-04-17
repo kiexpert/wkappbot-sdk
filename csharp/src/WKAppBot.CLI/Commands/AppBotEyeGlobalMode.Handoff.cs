@@ -176,9 +176,9 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
             if (skillLines != null)
             {
                 sb.AppendLine("## 📚 참고 스킬 (작업 중 아래 스킬들을 참고서로 활용하세요):");
-                sb.AppendLine("관련 작업 전에 `wkappbot skill show <id>` 로 상세 내용 먼저 확인하면 삽질 방지!");
+                sb.AppendLine("관련 작업 전에 `wkappbot skill read <id>` 로 상세 내용 먼저 확인하면 삽질 방지!");
                 sb.Append(skillLines);
-                sb.AppendLine("→ `wkappbot skill search <키워드>` 로 관련 스킬 검색 가능");
+                sb.AppendLine("-> `wkappbot skill search <키워드>` 로 관련 스킬 검색 가능");
                 sb.AppendLine();
             }
         }
@@ -244,7 +244,7 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
         {
             sb.AppendLine($"[{group.Key}]");
             foreach (var r in group.OrderByDescending(x => x.lastActivity))
-                sb.AppendLine($"  • {r.id} — {r.title}");
+                sb.AppendLine($"  • {r.id} -- {r.title}");
         }
         return sb.ToString();
     }
@@ -302,7 +302,7 @@ Please start by reading CLAUDE.md, then summarize what you understand about the 
             : "  - (no recent messages)";
 
         return $@"
-## 🔄 Handoff — {DateTime.Now:yyyy-MM-dd HH:mm}
+## 🔄 Handoff -- {DateTime.Now:yyyy-MM-dd HH:mm}
 
 > **Previous session hit 95% context limit and was auto-relayed by AppBotEye.**
 > Read this section, continue the work, then DELETE this section when done.

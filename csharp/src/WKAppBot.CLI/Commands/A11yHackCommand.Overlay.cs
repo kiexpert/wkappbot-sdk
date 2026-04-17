@@ -1,4 +1,4 @@
-// A11yHackCommand.Overlay.cs — Overlay preview, box building, caching, text helpers
+// A11yHackCommand.Overlay.cs -- Overlay preview, box building, caching, text helpers
 // Split from A11yHackCommand.cs for maintainability (~320 lines)
 
 using System.Drawing;
@@ -161,7 +161,7 @@ internal partial class Program
                 Math.Max(1, region.Bounds.Width),
                 Math.Max(1, region.Bounds.Height));
 
-            // Role: analyzed (UIA/OCR/cache) → Known, otherwise Scope
+            // Role: analyzed (UIA/OCR/cache) -> Known, otherwise Scope
             bool hasUia = uiaAnswers != null && uiaAnswers.ContainsKey(i);
             bool hasStage = stageLabels != null && stageLabels.ContainsKey(i);
             bool analyzed = hasUia || hasStage;
@@ -186,7 +186,7 @@ internal partial class Program
             }
             else if (region.Type != ConnectedComponentAnalyzer.RegionType.DyNoise)
             {
-                // CCA region without UIA → dynamic (experience DB only)
+                // CCA region without UIA -> dynamic (experience DB only)
                 label = $"Dy{region.Type} {region.Bounds.Width}x{region.Bounds.Height}";
             }
 
@@ -228,7 +228,7 @@ internal partial class Program
         int ccaOffX = 0, int ccaOffY = 0)
     {
         if (liveOverlay == null) return;
-        // Track window movement — move overlay to follow
+        // Track window movement -- move overlay to follow
         if (_hackOverlayHwnd != IntPtr.Zero)
         {
             var rootHwnd = NativeMethods.GetAncestor(_hackOverlayHwnd, 2);

@@ -1,7 +1,7 @@
-// AnalyzeHackCommand.cs — One-shot CCA+UIA analysis (separate process for memory isolation)
+// AnalyzeHackCommand.cs -- One-shot CCA+UIA analysis (separate process for memory isolation)
 // Usage: wkappbot analyze-hack <hwnd-hex> <x> <y> [w] [h]
 // Output: JSON to stdout with fusedSummary, visualMd, dynId, grapPath
-// Process exits after analysis → memory freed instantly.
+// Process exits after analysis -> memory freed instantly.
 
 using System.Drawing;
 using System.Text;
@@ -46,7 +46,7 @@ internal partial class Program
 
         var result = new JsonObject();
 
-        // UIA element at cursor → parent = "family" scope for capture
+        // UIA element at cursor -> parent = "family" scope for capture
         string elName = "", elType = "?", elAid = "";
         FlaUI.Core.AutomationElements.AutomationElement? parentEl = null;
         try
@@ -81,7 +81,7 @@ internal partial class Program
                             if (cy + ch > wr.Bottom) ch = wr.Bottom - cy;
                             break;
                         }
-                        // Too small — go up one level
+                        // Too small -- go up one level
                         try { scanScope = scanScope.Parent; } catch { break; }
                         if (scanScope == null) break;
                     }
@@ -300,7 +300,7 @@ internal partial class Program
     /// <summary>
     /// Server mode: read JSON requests from stdin, write JSON responses to stdout.
     /// Each line = one request: {"hwnd":"hex","x":N,"y":N}
-    /// Idle 5 minutes → auto-exit (memory freed).
+    /// Idle 5 minutes -> auto-exit (memory freed).
     /// </summary>
     static int AnalyzeHackServer()
     {
@@ -313,7 +313,7 @@ internal partial class Program
         {
             if (DateTime.UtcNow - lastActivity > idleTimeout)
             {
-                Console.Error.WriteLine("[ANALYZE-HACK] Idle 5min → auto-exit");
+                Console.Error.WriteLine("[ANALYZE-HACK] Idle 5min -> auto-exit");
                 break;
             }
 
@@ -374,7 +374,7 @@ internal partial class Program
         return 0;
     }
 
-    /// <summary>Analyze keyboard focus chain — focus node → parent chain → root.</summary>
+    /// <summary>Analyze keyboard focus chain -- focus node -> parent chain -> root.</summary>
     static JsonObject AnalyzeFocusChain()
     {
         var result = new JsonObject();

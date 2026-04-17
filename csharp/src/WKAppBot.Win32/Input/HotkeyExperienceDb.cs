@@ -4,9 +4,9 @@ using WKAppBot.Win32.Accessibility;
 namespace WKAppBot.Win32.Input;
 
 /// <summary>
-/// 앱별 핫키 경험 DB — 누적 캐시.
-/// - 첫 접근 시 풀스캔 → DB에 누적 (기존 항목 유지, 새것만 추가)
-/// - 발동 전 Verify → 스태일 항목은 DB에서 제거
+/// 앱별 핫키 경험 DB -- 누적 캐시.
+/// - 첫 접근 시 풀스캔 -> DB에 누적 (기존 항목 유지, 새것만 추가)
+/// - 발동 전 Verify -> 스태일 항목은 DB에서 제거
 /// - 검증 통과한 항목만 발동
 /// - EXE 버전 키: 앱 업데이트 시 자동 무효화 (WM_COMMAND ItemId 변경 대응)
 /// 위치: wkappbot.hq/hotkeys/<processName>.hotkeys.json
@@ -18,7 +18,7 @@ public static class HotkeyExperienceDb
 
     static readonly Dictionary<string, List<HotkeyDbEntry>> _cache =
         new(StringComparer.OrdinalIgnoreCase);
-    // version cache: processName → last-known EXE version used when DB was loaded/written
+    // version cache: processName -> last-known EXE version used when DB was loaded/written
     static readonly Dictionary<string, string> _versionCache =
         new(StringComparer.OrdinalIgnoreCase);
     static readonly HashSet<string> _sessionScanned =
@@ -26,10 +26,10 @@ public static class HotkeyExperienceDb
 
     static readonly JsonSerializerOptions _jsonOpts = new() { WriteIndented = true };
 
-    // ── EXE version helper ────────────────────────────────────────
+    // -- EXE version helper ----------------------------------------
 
     /// <summary>
-    /// PID → EXE FileVersion string (e.g. "120.0.6099.71").
+    /// PID -> EXE FileVersion string (e.g. "120.0.6099.71").
     /// Returns null on any failure (access denied, no MainModule, etc.).
     /// </summary>
     public static string? GetExeVersion(uint pid)
@@ -44,25 +44,25 @@ public static class HotkeyExperienceDb
         catch { return null; }
     }
 
-    // ── Load / Merge / Persist ────────────────────────────────────
+    // -- Load / Merge / Persist ------------------------------------
 
     public static string GetDbPath(string processName) =>
         Path.Combine(HqDir, $"{processName}.hotkeys.json");
 
     /// <summary>
     /// DB 로드 (메모리 캐시 우선). 없으면 빈 리스트.
-    /// exeVersion이 제공되고 파일 버전과 불일치하면 캐시 무효화 → 재스캔 유도.
+    /// exeVersion이 제공되고 파일 버전과 불일치하면 캐시 무효화 -> 재스캔 유도.
     /// </summary>
     public static List<HotkeyDbEntry> Load(string processName, string? exeVersion = null)
     {
-        // Memory cache hit — but check version invalidation first
+        // Memory cache hit -- but check version invalidation first
         if (_cache.TryGetValue(processName, out var cached))
         {
             if (exeVersion != null &&
                 _versionCache.TryGetValue(processName, out var cachedVer) &&
                 !string.Equals(cachedVer, exeVersion, StringComparison.OrdinalIgnoreCase))
             {
-                Console.WriteLine($"[HOTKEY-DB] Version changed ({cachedVer} → {exeVersion}) — invalidating '{processName}' cache");
+                Console.WriteLine($"[HOTKEY-DB] Version changed ({cachedVer} -> {exeVersion}) -- invalidating '{processName}' cache");
                 _cache.Remove(processName);
                 _versionCache.Remove(processName);
                 _sessionScanned.Remove(processName);
@@ -82,15 +82,15 @@ public static class HotkeyExperienceDb
                 var entries = file?.Entries ?? [];
                 var storedVer = file?.ExeVersion;
 
-                // Version mismatch → discard file contents, start fresh
+                // Version mismatch -> discard file contents, start fresh
                 if (exeVersion != null && storedVer != null &&
                     !string.Equals(storedVer, exeVersion, StringComparison.OrdinalIgnoreCase))
                 {
-                    Console.WriteLine($"[HOTKEY-DB] EXE updated ({storedVer} → {exeVersion}) — discarding '{processName}' DB (will rescan)");
+                    Console.WriteLine($"[HOTKEY-DB] EXE updated ({storedVer} -> {exeVersion}) -- discarding '{processName}' DB (will rescan)");
                     entries = [];
                 }
                 else
-                    Console.WriteLine($"[HOTKEY-DB] Loaded {entries.Count} ← {Path.GetFileName(path)}{(storedVer != null ? $" v{storedVer}" : "")}");
+                    Console.WriteLine($"[HOTKEY-DB] Loaded {entries.Count} <- {Path.GetFileName(path)}{(storedVer != null ? $" v{storedVer}" : "")}");
 
                 _cache[processName] = entries;
                 if (exeVersion != null) _versionCache[processName] = exeVersion;
@@ -106,7 +106,7 @@ public static class HotkeyExperienceDb
     }
 
     /// <summary>
-    /// 누적 머지 — 기존 레이블은 유지, 새 항목만 추가.
+    /// 누적 머지 -- 기존 레이블은 유지, 새 항목만 추가.
     /// 추가된 수를 반환.
     /// </summary>
     public static int Merge(string processName, IEnumerable<HotkeyDbEntry> newEntries, string? exeVersion = null)
@@ -147,7 +147,7 @@ public static class HotkeyExperienceDb
             JsonSerializer.Serialize(file, _jsonOpts));
     }
 
-    // ── Session scan tracking ─────────────────────────────────────
+    // -- Session scan tracking ------------------------------------─
 
     public static bool IsSessionScanned(string processName) =>
         _sessionScanned.Contains(processName);
@@ -155,10 +155,10 @@ public static class HotkeyExperienceDb
     public static void MarkSessionScanned(string processName) =>
         _sessionScanned.Add(processName);
 
-    // ── Match ────────────────────────────────────────────────────
+    // -- Match ----------------------------------------------------
 
     /// <summary>
-    /// grap 패턴으로 검색 — 커버리지 최고(가장 짧은 레이블) 우선.
+    /// grap 패턴으로 검색 -- 커버리지 최고(가장 짧은 레이블) 우선.
     /// exeVersion이 제공되면 Load 시 버전 검증 포함.
     /// </summary>
     public static HotkeyDbEntry? Match(string processName, string pattern, string? exeVersion = null)
@@ -173,13 +173,13 @@ public static class HotkeyExperienceDb
     }
 }
 
-/// <summary>핫키 DB 파일 래퍼 — 버전 + 엔트리 리스트.</summary>
+/// <summary>핫키 DB 파일 래퍼 -- 버전 + 엔트리 리스트.</summary>
 public record HotkeyDbFile(
-    string? ExeVersion,         // EXE FileVersion at scan time — null = legacy file (no version)
+    string? ExeVersion,         // EXE FileVersion at scan time -- null = legacy file (no version)
     List<HotkeyDbEntry> Entries
 );
 
-/// <summary>핫키 DB 엔트리 — 레이블 + 발동 방법.</summary>
+/// <summary>핫키 DB 엔트리 -- 레이블 + 발동 방법.</summary>
 public record HotkeyDbEntry(
     string  Label,      // 표시 레이블 (& 제거)
     string  Source,     // "win32_ctrl" | "win32_menu" | "uia" | "cdp"

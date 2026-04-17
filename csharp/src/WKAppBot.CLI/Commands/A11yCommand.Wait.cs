@@ -6,7 +6,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ═══ Wait Action: poll for window/element appearance ═══
+    // === Wait Action: poll for window/element appearance ===
 
     static int A11yWaitAction(string grap, int timeoutMs, int intervalMs)
     {
@@ -25,7 +25,7 @@ internal partial class Program
         bool needsUia = !string.IsNullOrEmpty(uiaPath);
         var modeStr = waitNot ? "disappear" : "appear";
         var condStr = condition != null ? $", condition=\"{condition}\"" : "";
-        Console.Error.WriteLine($"[A11Y] wait — polling for \"{grap}\" to {modeStr} (timeout={timeoutMs}ms, interval={intervalMs}ms{condStr})");
+        Console.Error.WriteLine($"[A11Y] wait -- polling for \"{grap}\" to {modeStr} (timeout={timeoutMs}ms, interval={intervalMs}ms{condStr})");
 
         // CDP web wait: if grap contains CSS selector patterns
         bool isCdpWait = grap.Contains("#") && firstSegPatterns.Any(p =>
@@ -103,7 +103,7 @@ internal partial class Program
             {
                 if (!found)
                 {
-                    Console.Error.WriteLine($"[A11Y] wait --not — element gone after {sw.ElapsedMilliseconds}ms");
+                    Console.Error.WriteLine($"[A11Y] wait --not -- element gone after {sw.ElapsedMilliseconds}ms");
                     return 0;
                 }
             }
@@ -111,7 +111,7 @@ internal partial class Program
             {
                 if (found)
                 {
-                    Console.Error.WriteLine($"[A11Y] wait — found after {sw.ElapsedMilliseconds}ms: {foundInfo}");
+                    Console.Error.WriteLine($"[A11Y] wait -- found after {sw.ElapsedMilliseconds}ms: {foundInfo}");
                     return 0;
                 }
             }
@@ -119,7 +119,7 @@ internal partial class Program
             Thread.Sleep(intervalMs);
         }
 
-        Console.Error.WriteLine($"[A11Y] wait — timeout after {timeoutMs}ms: \"{grap}\" ({modeStr})");
+        Console.Error.WriteLine($"[A11Y] wait -- timeout after {timeoutMs}ms: \"{grap}\" ({modeStr})");
         return 1;
     }
 
@@ -127,13 +127,13 @@ internal partial class Program
     [ThreadStatic] static string? _waitCondition;
     [ThreadStatic] static bool _waitNot;
 
-    // ═══ Eval Action: execute JavaScript via CDP ═══
+    // === Eval Action: execute JavaScript via CDP ===
 
-    /// <summary>Deprecated wrapper — warns about eval removal, suggests --eval-js.</summary>
+    /// <summary>Deprecated wrapper -- warns about eval removal, suggests --eval-js.</summary>
     static bool DeprecatedEval(IntPtr hwnd, string tag, string jsExpression, string? tabHint)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.Error.WriteLine("[DEPRECATED] 'a11y eval' is scheduled for removal — target is ambiguous.");
+        Console.Error.WriteLine("[DEPRECATED] 'a11y eval' is scheduled for removal -- target is ambiguous.");
         Console.Error.WriteLine("  Use --eval-js with any a11y action (tab auto-found when no #scope given):");
         Console.Error.WriteLine("    a11y read  \"*Chrome*#chatgpt.com\" --eval-js \"document.title\"");
         Console.Error.WriteLine("    a11y read  \"*Chrome*\" --eval-js \"document.title\"   (tab found by window title)");
@@ -142,7 +142,7 @@ internal partial class Program
         Console.Error.WriteLine("    GetUrlAsync, GetTitleAsync, FocusAsync, GetTextLengthAsync,");
         Console.Error.WriteLine("    IsHiddenAsync, GetTabStateAsync, QueryCountAsync, JsClickAsync");
         Console.ResetColor();
-        AutoRegisterBug($"[USAGE-DEPRECATED] a11y eval used — scheduled for removal. tag={tag} hint={tabHint ?? "none"} expr={jsExpression[..Math.Min(60, jsExpression.Length)]}");
+        AutoRegisterBug($"[USAGE-DEPRECATED] a11y eval used -- scheduled for removal. tag={tag} hint={tabHint ?? "none"} expr={jsExpression[..Math.Min(60, jsExpression.Length)]}");
         return A11yEvalJs(hwnd, tag, jsExpression, tabHint);
     }
 
@@ -154,7 +154,7 @@ internal partial class Program
             var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
             if (port <= 0)
             {
-                Console.Error.WriteLine($"[A11Y] eval — no CDP port found for {tag}");
+                Console.Error.WriteLine($"[A11Y] eval -- no CDP port found for {tag}");
                 return false;
             }
 
@@ -185,7 +185,7 @@ internal partial class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[A11Y] eval — error: {ex.Message}");
+            Console.Error.WriteLine($"[A11Y] eval -- error: {ex.Message}");
             return false;
         }
     }

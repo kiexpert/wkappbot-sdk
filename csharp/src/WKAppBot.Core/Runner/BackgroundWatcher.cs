@@ -11,12 +11,12 @@ namespace WKAppBot.Core.Runner;
 /// <summary>
 /// Passive background element tracker with optional OCR measurement.
 ///
-/// Output layout (stable LEFT → volatile RIGHT):
+/// Output layout (stable LEFT -> volatile RIGHT):
 ///
 /// Line 1: [WATCH] [ClassPath] UIA name hierarchy path
 /// Line 2: [WATCH] [Type] "Name" aid="id" (patterns)
 /// Line 3: [WATCH] OCR="text" conf=0.95★  UIA↔OCR=90%  watch/001.png    (nudge only)
-/// Line 4: [WATCH] ← action  (x,y) HH:mm:ss.fff                        (volatile, \r)
+/// Line 4: [WATCH] <- action  (x,y) HH:mm:ss.fff                        (volatile, \r)
 ///
 /// OCR runs only on nudge (force=true) to avoid CPU waste.
 /// Screenshots saved to {VisionCacheDir}/watch/ on each nudge.
@@ -146,7 +146,7 @@ public sealed class BackgroundWatcher : IDisposable
     {
         if (_uia == null) return;
 
-        // ── Determine tracking point ────────────────────────
+        // -- Determine tracking point ------------------------
         POINT pt;
         bool isTestPoint = false;
         bool isNewAction = false;
@@ -174,7 +174,7 @@ public sealed class BackgroundWatcher : IDisposable
 
         _lastWasTestPoint = isTestPoint;
 
-        // ── Find window at point ────────────────────────────
+        // -- Find window at point ----------------------------
         IntPtr hWndTarget;
         string targetClass;
 
@@ -191,7 +191,7 @@ public sealed class BackgroundWatcher : IDisposable
             targetClass = (hWndTarget == hWndTop) ? topClass : WindowFinder.GetClassName(hWndTarget);
         }
 
-        // ── Get UIA element at point ────────────────────────
+        // -- Get UIA element at point ------------------------
         ElementAtPointInfo? elemInfo;
         bool overlayDetected = false;
 
@@ -237,7 +237,7 @@ public sealed class BackgroundWatcher : IDisposable
             }
         }
 
-        // ── Change detection ────────────────────────────────
+        // -- Change detection --------------------------------
         string elemKey = elemInfo != null
             ? $"{elemInfo.ControlType}|{elemInfo.AutomationId}|{elemInfo.Name}|0x{hWndTarget:X8}"
             : $"?|0x{hWndTarget:X8}";
@@ -264,7 +264,7 @@ public sealed class BackgroundWatcher : IDisposable
             catch { }
         }
 
-        // ── OCR: only on nudge (force) + OcrPreview enabled ──
+        // -- OCR: only on nudge (force) + OcrPreview enabled --
         OcrMatchResult? ocrResult = null;
         string? screenshotPath = null;
         bool doOcr = force && _ocr != null && _ctx?.OcrPreview == true && hWndTarget != IntPtr.Zero;
@@ -297,7 +297,7 @@ public sealed class BackgroundWatcher : IDisposable
             catch { /* OCR errors are non-fatal in watch mode */ }
         }
 
-        // ── Output ──────────────────────────────────────────
+        // -- Output ------------------------------------------
         lock (_consoleLock)
         {
             if (fullOutput)
@@ -388,7 +388,7 @@ public sealed class BackgroundWatcher : IDisposable
                     Console.WriteLine();
                 }
 
-                // Line 4 (volatile): ← action  (x,y) timestamp
+                // Line 4 (volatile): <- action  (x,y) timestamp
                 WriteActionLine(isTestPoint, actionLabel);
                 WriteVolatilePart(pt, ts);
 

@@ -2,7 +2,7 @@ using WKAppBot.Core.Runner;
 
 namespace WKAppBot.CLI;
 
-// partial class: schedule command — manage scheduled prompt injections
+// partial class: schedule command -- manage scheduled prompt injections
 internal partial class Program
 {
     /// <summary>
@@ -73,7 +73,7 @@ internal partial class Program
         }
         else if (!string.IsNullOrEmpty(everyDay))
         {
-            // --every-day 13:00 → daily recurring at fixed time
+            // --every-day 13:00 -> daily recurring at fixed time
             if (!TimeOnly.TryParse(everyDay, out var dailyTime))
                 return Error($"Invalid time for --every-day: {everyDay} (use HH:mm like 13:00)");
             item.Type = "recurring";
@@ -151,7 +151,7 @@ internal partial class Program
         Console.Error.WriteLine($"[SCHEDULE] Prompt: {promptPreview}");
         Console.Error.WriteLine($"[SCHEDULE] File: {ScheduleManager.FilePath}");
 
-        // Register with Windows Task Scheduler for once/recurring — survives Eye kill
+        // Register with Windows Task Scheduler for once/recurring -- survives Eye kill
         if (item.Type is "once" or "recurring" && !string.IsNullOrEmpty(item.ExecuteAt)
             && DateTime.TryParse(item.ExecuteAt, out var schtaskDt))
         {
@@ -168,7 +168,7 @@ internal partial class Program
         var tr = $"\"{exePath}\" schedule exec {id}";
         var date = executeAt.ToString("MM/dd/yyyy");
         var time = executeAt.ToString("HH:mm");
-        // For recurring, use /sc daily as a baseline — Eye will re-register on next run
+        // For recurring, use /sc daily as a baseline -- Eye will re-register on next run
         var sc = interval != null ? "daily" : "once";
         var schtasksArgs = $"/create /tn \"{taskName}\" /tr \"{tr}\" /sc {sc} /sd {date} /st {time} /f";
         try
@@ -190,10 +190,10 @@ internal partial class Program
                 "schtasks.exe", $"/delete /tn \"WKAppBot_{id}\" /f") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true }, Environment.CurrentDirectory, "SCHEDULE")!;
             p.WaitForExit(3000);
         }
-        catch { /* schtask may not exist — ignore */ }
+        catch { /* schtask may not exist -- ignore */ }
     }
 
-    /// <summary>wkappbot schedule exec &lt;id&gt; — directly execute a scheduled item (called by schtasks, no Eye needed).</summary>
+    /// <summary>wkappbot schedule exec &lt;id&gt; -- directly execute a scheduled item (called by schtasks, no Eye needed).</summary>
     static int ScheduleExecCommand(string[] args)
     {
         if (args.Length < 2) return Error("Usage: wkappbot schedule exec <id>");
@@ -223,7 +223,7 @@ internal partial class Program
             && DateTime.TryParse(item.ExecuteAt, out var nextDt))
             RegisterSchtask(id, nextDt, item.Interval);
         else
-            DeleteSchtask(id); // one-shot — remove from schtasks
+            DeleteSchtask(id); // one-shot -- remove from schtasks
 
         return 0;
     }

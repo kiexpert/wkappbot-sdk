@@ -3,13 +3,13 @@
 **Date:** 2026-03-26
 **System:** WKAppBot v5.1.31 정반합 (Dialectical Debate)
 **Author:** Claude Code (Opus 4.6) + Will Kim
-**Method:** Use the debate system to improve itself — fix bugs as they surface during live debates
+**Method:** Use the debate system to improve itself -- fix bugs as they surface during live debates
 
 ---
 
 ## Executive Summary
 
-In a single session, we used WKAppBot's 정반합 (thesis-antithesis-synthesis) debate system to debate its own improvement, then fixed every bug we encountered in real-time. The system went from **R2: 1/3 AIs responding, R3: 0/3 (total failure)** to **R2: 3/3, R3: 3/3 with structured consensus including self-healing sections** — all within hours.
+In a single session, we used WKAppBot's 정반합 (thesis-antithesis-synthesis) debate system to debate its own improvement, then fixed every bug we encountered in real-time. The system went from **R2: 1/3 AIs responding, R3: 0/3 (total failure)** to **R2: 3/3, R3: 3/3 with structured consensus including self-healing sections** -- all within hours.
 
 The 삼두 (triad: GPT + Gemini + Claude) diagnosed their own bugs and proposed fixes, which were implemented and verified by running more debates. This is recursive self-improvement in action.
 
@@ -25,7 +25,7 @@ If you run a dialectical debate and fix every bug that appears, then run the deb
 2. Observe failures in Slack logs
 3. Ask the triad to diagnose the failures
 4. Implement the triad's recommended fix
-5. Run debate again → goto 2
+5. Run debate again -> goto 2
 
 ---
 
@@ -38,9 +38,9 @@ If you run a dialectical debate and fix every bug that appears, then run the deb
 | R0 (Free Answer) | 3/3 | OK |
 | R1 (Cross-prompt) | 1/3 content | Chunk capture failures |
 | R2 (Critique) | 1/3 (Gemini only) | GPT/Claude excluded from prompts |
-| R3 (Consensus) | 0/3 NULL | Poll timeout — no response detected |
+| R3 (Consensus) | 0/3 NULL | Poll timeout -- no response detected |
 
-**Score: ⭐⭐ (2/5)** — Game rules were solid but infrastructure couldn't support them.
+**Score: ⭐⭐ (2/5)** -- Game rules were solid but infrastructure couldn't support them.
 
 ### Round 2: 삼두 Self-Diagnosis
 
@@ -50,10 +50,10 @@ Asked the triad: *"InjectAndPollAsync fails on R2/R3. What's the fastest fix?"*
 > Root issue: `GetLastResponseTextAsync(baselineCount)` misses new nodes. Detect DOM growth, not content. Remove nudge (causes double prompts). Increase initial wait to 5-7s.
 
 **Claude (AUDITOR):**
-> Replace turn-count baseline with character-position snapshot. DOM-agnostic, works across all 3 AIs. Nudge is poisoning context — disable until fix confirmed.
+> Replace turn-count baseline with character-position snapshot. DOM-agnostic, works across all 3 AIs. Nudge is poisoning context -- disable until fix confirmed.
 
 **Gemini (EXPLORER):**
-> BUG 4 (Slack Ratelimit): Critical. Implement 800ms debounce. BUG 1 (CSS Syntax): Use [role=article]. BUG 3 (Word Limit): Option B — count only atomic items.
+> BUG 4 (Slack Ratelimit): Critical. Implement 800ms debounce. BUG 1 (CSS Syntax): Use [role=article]. BUG 3 (Word Limit): Option B -- count only atomic items.
 
 ### Round 3: Fixes Applied
 
@@ -62,7 +62,7 @@ Asked the triad: *"InjectAndPollAsync fails on R2/R3. What's the fastest fix?"*
 | R3 NULL response | Claude: pageLen snapshot | `document.body.innerText.length` before/after comparison |
 | Selector mismatch | GPT: DOM-agnostic | Fallback: if page grew but selector missed, extract via `substring(baselineLen)` |
 | Nudge poisoning | Claude+GPT consensus | Removed nudge entirely |
-| Initial wait too short | GPT: 5-7s | Changed 2s → 5s |
+| Initial wait too short | GPT: 5-7s | Changed 2s -> 5s |
 | CSS quote nesting | Gemini: [role=article] | Removed quotes from attribute selectors |
 | Slack ratelimit | Gemini: 800ms debounce | Added `_lastSlackPostTicks` throttle |
 | 99-word too strict | All: Option B | R2-only word limit; R3 unrestricted |
@@ -91,11 +91,11 @@ The critical fix was replacing turn-count-based response detection with a DOM-ag
 ```
 BEFORE (broken):
   baseline = count(model-response nodes)        // selector-dependent!
-  poll: if count > baseline → read last node    // fails when selector doesn't match
+  poll: if count > baseline -> read last node    // fails when selector doesn't match
 
 AFTER (working):
   baseline = document.body.innerText.length     // DOM-agnostic
-  poll: if pageLen > baseline + 50 → extract substring(baseline)
+  poll: if pageLen > baseline + 50 -> extract substring(baseline)
         even if selector fails, page growth = AI responded
 ```
 
@@ -110,20 +110,20 @@ Each AI must admit what they got wrong in prior rounds:
 ```
 [셀프힐링]: "R2에서 X를 주장했으나, 상대 반박을 수용하여 Y로 수정"
 ```
-Validated in live debate — Claude wrote: *"Parallel Draft 누락 인정 — Gemini 기여 채택"*
+Validated in live debate -- Claude wrote: *"Parallel Draft 누락 인정 -- Gemini 기여 채택"*
 
 ### P-Number Atomic Cascading
 Prior AI's consensus items get P1, P2, P3... numbers. Next AI must explicitly accept/reject each:
 ```
-P1. [🦊 GPT] Jaccard→NLI 대체 (9)
-→ AI-B: "P1. 동의하되 BM25 병행 권고 (7)"
-→ AI-C: "P1. NLI 비용 과다 → 거부" → [미합의]
+P1. [🦊 GPT] Jaccard->NLI 대체 (9)
+-> AI-B: "P1. 동의하되 BM25 병행 권고 (7)"
+-> AI-C: "P1. NLI 비용 과다 -> 거부" -> [미합의]
 ```
 
 ### Round Scope Enforcement
 Using wrong round's format = ANSWER REJECTED + forced retry:
 ```
-R2: ❌ BANNED: [합의], [CONCLUSION_KR] — these are R3 only
+R2: ❌ BANNED: [합의], [CONCLUSION_KR] -- these are R3 only
 R3: [DISPUTE] optional, focus on synthesis
 ```
 
@@ -132,7 +132,7 @@ When [미합의] remains, moderator lists specific items and demands new evidenc
 ```
 🔴 1. [GPT] NLI 비용 과다
 🔴 2. [Claude] 근거 부족
-→ "설득할 근거 제시 OR 상대 의견 수용. 단순 반복 금지!"
+-> "설득할 근거 제시 OR 상대 의견 수용. 단순 반복 금지!"
 ```
 
 ---
@@ -159,8 +159,8 @@ When [미합의] remains, moderator lists specific items and demands new evidenc
 ## Architecture Changes
 
 ### New Files
-- `DebateRunner.Messages.cs` — All moderator message templates (`DebateMsg` class)
-- `DebateRunner.Emoji.cs` — Speed-based emoji assignment (🦊🐬🐙)
+- `DebateRunner.Messages.cs` -- All moderator message templates (`DebateMsg` class)
+- `DebateRunner.Emoji.cs` -- Speed-based emoji assignment (🦊🐬🐙)
 
 ### Transparency
 - All moderator DMs now posted to Slack (6 locations added)
@@ -177,9 +177,9 @@ When [미합의] remains, moderator lists specific items and demands new evidenc
 
 3. **DOM-agnostic design**: The pageLen snapshot approach transcends individual AI platform DOM changes. No more selector whack-a-mole.
 
-4. **Session continuity**: Debates reuse existing sessions (no reset). Each round builds on prior context — R2 critiques R0 answers, R3 synthesizes R2 critiques. Reset would break the game.
+4. **Session continuity**: Debates reuse existing sessions (no reset). Each round builds on prior context -- R2 critiques R0 answers, R3 synthesizes R2 critiques. Reset would break the game.
 
-5. **Structured format enforcement**: [CLAIM], [DISPUTE], [STANCE], [CONCLUSION_KR], [합의], [미합의], [셀프힐링] — each section serves a purpose and is machine-parseable.
+5. **Structured format enforcement**: [CLAIM], [DISPUTE], [STANCE], [CONCLUSION_KR], [합의], [미합의], [셀프힐링] -- each section serves a purpose and is machine-parseable.
 
 ---
 
@@ -201,7 +201,7 @@ As Will Kim put it:
 > (I was about to quit and leave it for someone else via suggest,
 > but Will Kim said to delegate to the triad, so I happily dumped it on them!)
 
-This is the meta-lesson: **the debate system is not just for consensus — it's a delegation tool for hard problems.**
+This is the meta-lesson: **the debate system is not just for consensus -- it's a delegation tool for hard problems.**
 
 ---
 
@@ -235,11 +235,11 @@ Additional features implemented:
 
 ## Conclusion
 
-정반합 went from a broken prototype to a functioning dialectical debate system in one session. The key insight: **let the AIs debug their own system**. When GPT says "detect DOM growth, not content" and Claude says "replace turn-count with character-position snapshot," those aren't theoretical suggestions — they're battle-tested solutions from AIs who just experienced the failure firsthand.
+정반합 went from a broken prototype to a functioning dialectical debate system in one session. The key insight: **let the AIs debug their own system**. When GPT says "detect DOM growth, not content" and Claude says "replace turn-count with character-position snapshot," those aren't theoretical suggestions -- they're battle-tested solutions from AIs who just experienced the failure firsthand.
 
 This is self-healing in the truest sense: the system used itself to fix itself, and each iteration made it stronger.
 
-**Final Score: ⭐⭐ → ⭐⭐⭐⭐ in one session.**
+**Final Score: ⭐⭐ -> ⭐⭐⭐⭐ in one session.**
 
 ---
 

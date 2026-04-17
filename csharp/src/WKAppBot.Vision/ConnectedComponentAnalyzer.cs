@@ -53,7 +53,7 @@ public sealed class ConnectedComponentAnalyzer
         public double AspectRatio => Bounds.Height == 0 ? 0 : (double)Bounds.Width / Bounds.Height;
         public double Density => Bounds.Width * Bounds.Height == 0 ? 0
             : (double)PixelCount / (Bounds.Width * Bounds.Height);
-        /// <summary>Perimeter/Area ratio — high = thin border, low = solid fill.</summary>
+        /// <summary>Perimeter/Area ratio -- high = thin border, low = solid fill.</summary>
         public double Thinness => PixelCount == 0 ? 0 : (double)Perimeter / PixelCount;
     }
 
@@ -67,7 +67,7 @@ public sealed class ConnectedComponentAnalyzer
 
     /// <summary>
     /// Detect table grid from separator regions.
-    /// Horizontal separators → row boundaries, vertical separators → column boundaries.
+    /// Horizontal separators -> row boundaries, vertical separators -> column boundaries.
     /// Returns null if no table structure detected (need ≥2 rows or ≥2 cols).
     /// </summary>
     public TableGrid? DetectTable(List<Region> regions, int imgW, int imgH)
@@ -180,7 +180,7 @@ public sealed class ConnectedComponentAnalyzer
         // Expand each region outward into background until hitting a border/edge
         var expanded = ExpandRegionsToBorders(merged, binary, w, h);
 
-        // Merge expanded text regions that overlap or touch (→ paragraph blocks)
+        // Merge expanded text regions that overlap or touch (-> paragraph blocks)
         expanded = MergeOverlappingTextRegions(expanded);
 
         return expanded.OrderBy(r => r.Bounds.Y).ThenBy(r => r.Bounds.X).ToList();
@@ -323,7 +323,7 @@ public sealed class ConnectedComponentAnalyzer
         return merged;
     }
 
-    // ── Grayscale ──────────────────────────────────────────────────────────
+    // -- Grayscale ----------------------------------------------------------
 
     private static byte[] ToGrayscale(Bitmap bmp, int w, int h)
     {
@@ -346,7 +346,7 @@ public sealed class ConnectedComponentAnalyzer
         return gray;
     }
 
-    // ── Adaptive Threshold (Sauvola-like) ──────────────────────────────────
+    // -- Adaptive Threshold (Sauvola-like) ----------------------------------
 
     private static bool[] AdaptiveThreshold(byte[] gray, int w, int h)
     {
@@ -397,7 +397,7 @@ public sealed class ConnectedComponentAnalyzer
         return binary;
     }
 
-    // ── Two-pass Connected Component Labeling (union-find) ─────────────────
+    // -- Two-pass Connected Component Labeling (union-find) ----------------─
 
     private static (int[] labels, int count) LabelComponents(bool[] binary, int w, int h)
     {
@@ -449,7 +449,7 @@ public sealed class ConnectedComponentAnalyzer
         return (labels, finalCount);
     }
 
-    // ── Extract bounding rects per component ───────────────────────────────
+    // -- Extract bounding rects per component ------------------------------─
 
     private static List<Region> ExtractRegions(int[] labels, int w, int h, int count)
     {
@@ -496,7 +496,7 @@ public sealed class ConnectedComponentAnalyzer
         return regions;
     }
 
-    // ── Classification ─────────────────────────────────────────────────────
+    // -- Classification ----------------------------------------------------─
 
     private List<Region> Classify(List<Region> regions, int imgW, int imgH)
     {
@@ -578,7 +578,7 @@ public sealed class ConnectedComponentAnalyzer
         if (w > imgW * 0.6 && h <= 3) return RegionType.DySeparator;
         if (h > imgH * 0.6 && w <= 3) return RegionType.DySeparator;
 
-        // Container: round border / frame — high thinness (mostly perimeter, little fill)
+        // Container: round border / frame -- high thinness (mostly perimeter, little fill)
         // Large component with perimeter/area ratio > 0.6 = hollow frame
         if (r.Thinness > 0.6 && (w > 20 || h > 20) && r.Density < 0.3)
             return RegionType.DyContainer;

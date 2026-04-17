@@ -23,7 +23,7 @@ internal partial class Program
 
         if (titleFilter != null)
         {
-            // Direct title search — no delay needed
+            // Direct title search -- no delay needed
             var windows = WindowFinder.FindWindows(titleFilter);
             if (windows.Count == 0)
                 return Error($"No window found matching: \"{titleFilter}\"");
@@ -57,9 +57,9 @@ internal partial class Program
 
         // Header
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  WKAppBot Focus — Active Window Inspector                 ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+==========================================================+");
+        Console.WriteLine("|  WKAppBot Focus -- Active Window Inspector                 |");
+        Console.WriteLine("+==========================================================+");
         Console.ResetColor();
 
         Console.WriteLine();
@@ -166,7 +166,7 @@ internal partial class Program
 
         // Full tree output (optional, always print)
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine($"\n  ── Full UIA Tree ──");
+        Console.WriteLine($"\n  -- Full UIA Tree --");
         Console.ResetColor();
         Console.Write(tree);
 
@@ -177,7 +177,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── watch ──────────────────────────────────────────────────
+    // -- watch --------------------------------------------------
 
     static int WatchCommand(string[] args)
     {
@@ -190,21 +190,21 @@ internal partial class Program
 
         // Header
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("╔══════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║  WKAppBot Watch — Real-time Element Tracker               ║");
+        Console.WriteLine("+==========================================================+");
+        Console.WriteLine("|  WKAppBot Watch -- Real-time Element Tracker               |");
         if (durationSec > 0)
-            Console.WriteLine($"║  Tracking for {durationSec}s. Move mouse over UI elements.    ║");
+            Console.WriteLine($"|  Tracking for {durationSec}s. Move mouse over UI elements.    |");
         else
-            Console.WriteLine("║  Move mouse over UI elements. Press Ctrl+C to stop.     ║");
+            Console.WriteLine("|  Move mouse over UI elements. Press Ctrl+C to stop.     |");
         if (hoverAnalyze)
-            Console.WriteLine("║  [HOVER] 1s still → auto UIA tree dump                  ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════╝");
+            Console.WriteLine("|  [HOVER] 1s still -> auto UIA tree dump                  |");
+        Console.WriteLine("+==========================================================+");
         Console.ResetColor();
         Console.WriteLine();
 
         using var uia = new UiaLocator();
-        string lastElemKey = "";       // element identity (type+aid+name) — detect real element change
-        string lastFocusKey = "";      // keyboard focus identity — detect focus change
+        string lastElemKey = "";       // element identity (type+aid+name) -- detect real element change
+        string lastFocusKey = "";      // keyboard focus identity -- detect focus change
         var logEntries = new List<string>();
         var stopwatch = Stopwatch.StartNew();
         bool running = true;
@@ -213,7 +213,7 @@ internal partial class Program
 
         Console.CancelKeyPress += (_, e) =>
         {
-            e.Cancel = true;  // don't kill immediately — let cleanup run
+            e.Cancel = true;  // don't kill immediately -- let cleanup run
             running = false;
         };
 
@@ -245,7 +245,7 @@ internal partial class Program
         {
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("  Time         Pos          Element");
-            Console.WriteLine("  ──────────── ──────────── ─────────────────────────────────────────");
+            Console.WriteLine("  ------------ ------------ ----------------------------------------─");
             Console.ResetColor();
         }
 
@@ -277,7 +277,7 @@ internal partial class Program
 
                 if (overlayDetected)
                 {
-                    // Win32 Z-order detected overlay → use real window's UIA tree
+                    // Win32 Z-order detected overlay -> use real window's UIA tree
                     elemInfo = uia.GetElementAtPointInWindow(pt.X, pt.Y, hWndUnder);
                 }
                 else
@@ -331,7 +331,7 @@ internal partial class Program
 
                     if (elementChanged)
                     {
-                        // Element changed → finalize current line, start new one
+                        // Element changed -> finalize current line, start new one
                         lastElemKey = elemKey;
                         changeCount++;
                         seenElements.Add(elemKey);
@@ -430,7 +430,7 @@ internal partial class Program
                     }
                     else if (posChanged && !liveMode && lineHasContent)
                     {
-                        // Same element, mouse moved → overwrite position on current line with \r
+                        // Same element, mouse moved -> overwrite position on current line with \r
                         // We re-render the whole line at the same position
                         ClearCurrentLine();
 
@@ -449,7 +449,7 @@ internal partial class Program
                     }
                 }
 
-                // ── Hover-analyze: dump UIA tree after 1s of no movement ──
+                // -- Hover-analyze: dump UIA tree after 1s of no movement --
                 if (hoverAnalyze)
                 {
                     if (posChanged)
@@ -503,11 +503,11 @@ internal partial class Program
         // Finalize last line
         if (lineHasContent) Console.WriteLine();
 
-        // ── Summary ──
+        // -- Summary --
         stopwatch.Stop();
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  ────────────────────────────────────────────────");
+        Console.WriteLine("  ------------------------------------------------");
         Console.ForegroundColor = ConsoleColor.White;
         Console.WriteLine($"  Duration    : {stopwatch.Elapsed:mm\\:ss\\.f}");
         Console.WriteLine($"  Changes     : {changeCount}");
@@ -665,6 +665,6 @@ internal partial class Program
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "...";
 
-    // ── capture ────────────────────────────────────────────────
+    // -- capture ------------------------------------------------
 
 }

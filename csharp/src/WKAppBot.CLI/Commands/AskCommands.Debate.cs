@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// 정반합 (正反合) Debate Loop — structured multi-AI dialectical reasoning.
+/// 정반합 (正反合) Debate Loop -- structured multi-AI dialectical reasoning.
 ///
 /// R1 (Diversity):  Each AI answers independently with structured claims.
 /// R2 (Critique):   AIs see anonymized peer answers, critique assumptions.
@@ -30,7 +30,7 @@ internal sealed class TriadDebateLoop
         _ctx = ctx;
     }
 
-    // ── Prompt Templates ──
+    // -- Prompt Templates --
 
     /// <summary>R1: Independent answer with structured claims.</summary>
     public static string BuildR1Prompt(string question)
@@ -44,9 +44,9 @@ internal sealed class TriadDebateLoop
 
             Guidelines:
             - Provide 2-5 claims covering different aspects
-            - Confidence: 0.0 (uncertain) to 1.0 (certain) — be honest
+            - Confidence: 0.0 (uncertain) to 1.0 (certain) -- be honest
             - List key assumptions that could be challenged
-            - Other AIs WILL see and critique your claims — be defensible
+            - Other AIs WILL see and critique your claims -- be defensible
 
             Question: {{question}}
             """;
@@ -56,9 +56,9 @@ internal sealed class TriadDebateLoop
     public static string BuildR2Prompt(string question, List<RoundResult> r1Results, string selfAi)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("[MODERATOR — Round 2: Cross-Critique]");
-        sb.AppendLine("⚠️ THIS IS R2. Follow R2 rules ONLY. Using other round's format = ANSWER REJECTED + forced retry.");
-        sb.AppendLine("   ❌ BANNED in R2: [합의], [미합의], [CONCLUSION_KR], [셀프힐링] — these are R3 only.");
+        sb.AppendLine("[MODERATOR -- Round 2: Cross-Critique]");
+        sb.AppendLine("!️ THIS IS R2. Follow R2 rules ONLY. Using other round's format = ANSWER REJECTED + forced retry.");
+        sb.AppendLine("   ❌ BANNED in R2: [합의], [미합의], [CONCLUSION_KR], [셀프힐링] -- these are R3 only.");
         sb.AppendLine();
         sb.AppendLine("You answered this question in Round 1. Now it's time to critique your peers.");
         sb.AppendLine("Below are anonymized peer responses. Read them carefully, then respond.");
@@ -69,7 +69,7 @@ internal sealed class TriadDebateLoop
         foreach (var r in r1Results)
         {
             if (r.Ai.Equals(selfAi, StringComparison.OrdinalIgnoreCase)) continue;
-            sb.AppendLine($"═══ Peer AI-{label} ═══");
+            sb.AppendLine($"=== Peer AI-{label} ===");
             sb.AppendLine(r.Summary);
             if (r.Claims.Count > 0)
             {
@@ -92,38 +92,38 @@ internal sealed class TriadDebateLoop
             ━━ Required output format ━━
             • For each of your points (2-5 total):
               [CLAIM]{"claim":"your position","confidence":0.85,"key_assumptions":["assumption1"]}[/CLAIM]
-            • At least ONE [DISPUTE] tag (this is a critique round — you MUST challenge something)
+            • At least ONE [DISPUTE] tag (this is a critique round -- you MUST challenge something)
             • End with: [STANCE N=? R=? C=? E=? D=?] (sum must equal 9, D must be >= 1)
 
-            ⚠️ WORD LIMIT: 답변 1회당 99단어 이하 (백단어). 초과 시 답변 거부됨. Be concise — claims over filler.
-            Be direct. Be honest. Don't just agree to be nice — real disagreement makes better answers.
+            !️ WORD LIMIT: 답변 1회당 99단어 이하 (백단어). 초과 시 답변 거부됨. Be concise -- claims over filler.
+            Be direct. Be honest. Don't just agree to be nice -- real disagreement makes better answers.
             """);
 
         return sb.ToString();
     }
 
-    /// <summary>R3: Synthesis — propose unified answer.</summary>
+    /// <summary>R3: Synthesis -- propose unified answer.</summary>
     public static string BuildR3Prompt(string question, List<RoundResult> r2Results,
         List<string>? priorConsensusItems = null, string? currentAi = null)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("[MODERATOR — Round 3: Final Synthesis]");
-        sb.AppendLine("⚠️ THIS IS R3. Follow R3 rules ONLY. Using other round's format = ANSWER REJECTED + forced retry.");
+        sb.AppendLine("[MODERATOR -- Round 3: Final Synthesis]");
+        sb.AppendLine("!️ THIS IS R3. Follow R3 rules ONLY. Using other round's format = ANSWER REJECTED + forced retry.");
         sb.AppendLine("   R3 필수: [CONCLUSION_KR] + [합의]/[미합의]/[셀프힐링]/[개인의견]. R2의 [DISPUTE] 필수 규칙은 해제.");
         sb.AppendLine();
         sb.AppendLine("All AIs have critiqued each other. Now it's time to find common ground.");
         sb.AppendLine($"\nOriginal question: {question}");
 
-        // Cascading: prior AIs' atomic consensus items — each must be explicitly addressed
+        // Cascading: prior AIs' atomic consensus items -- each must be explicitly addressed
         if (priorConsensusItems?.Count > 0)
         {
             sb.AppendLine();
-            sb.AppendLine("═══ PRIOR AIs' ATOMIC CONSENSUS ITEMS ═══");
-            sb.AppendLine("⚠️ You MUST address EVERY item below by its P-number.");
+            sb.AppendLine("=== PRIOR AIs' ATOMIC CONSENSUS ITEMS ===");
+            sb.AppendLine("!️ You MUST address EVERY item below by its P-number.");
             sb.AppendLine("Each item is ONE atomic proposition. Interpret its core meaning, then:");
-            sb.AppendLine("  • AGREE → include in YOUR [합의] as: \"P{N}. {your rewording} ({score})\"");
-            sb.AppendLine("  • DISAGREE → include in YOUR [미합의] as: \"P{N}. {reason for rejection}\"");
-            sb.AppendLine("  • REVISE → reword the proposition and include with adjusted score");
+            sb.AppendLine("  • AGREE -> include in YOUR [합의] as: \"P{N}. {your rewording} ({score})\"");
+            sb.AppendLine("  • DISAGREE -> include in YOUR [미합의] as: \"P{N}. {reason for rejection}\"");
+            sb.AppendLine("  • REVISE -> reword the proposition and include with adjusted score");
             sb.AppendLine("You may also ADD new items (use N+1, N+2, ...) not listed here.");
             sb.AppendLine("Skipping any P-number is a format violation!");
             sb.AppendLine();
@@ -137,7 +137,7 @@ internal sealed class TriadDebateLoop
 
         foreach (var r in r2Results)
         {
-            sb.AppendLine($"\n═══ {r.Ai} (revised position) ═══");
+            sb.AppendLine($"\n=== {r.Ai} (revised position) ===");
             if (r.Claims.Count > 0)
                 foreach (var c in r.Claims)
                     sb.AppendLine($"  • [{c.Confidence:F2}] {c.Text}");
@@ -156,8 +156,8 @@ internal sealed class TriadDebateLoop
             • Your final claims (2-4):
               [CLAIM]{"claim":"...","confidence":0.95,"key_assumptions":["..."]}[/CLAIM]
 
-            Step 2: Korean conclusion (REQUIRED — this is the main output!)
-            Write a thorough conclusion IN KOREAN (max 2000 chars total — fits one Slack message).
+            Step 2: Korean conclusion (REQUIRED -- this is the main output!)
+            Write a thorough conclusion IN KOREAN (max 2000 chars total -- fits one Slack message).
             Use this exact format:
 
             [CONCLUSION_KR]
@@ -166,29 +166,29 @@ internal sealed class TriadDebateLoop
             [Claude/AUDITOR의 판단]: (이 AI의 핵심 주장 2-3줄 + 근거)
             [합의]: Each item must be ATOMIC (one clear proposition per line) with your agreement score (0-9).
             Score 7+ = genuine agreement. Below 7 = move to [미합의].
-            Format: "P1. 구체적 합의 내용 (8)" — 한국어, 항목당 한 문장.
+            Format: "P1. 구체적 합의 내용 (8)" -- 한국어, 항목당 한 문장.
             Example:
               1. Jaccard 키워드 겹침을 NLI 의미론적 함의로 대체한다 (9)
-              2. 원자적 명제 분해가 의미 분석보다 선행한다 (6) ← 7미만이면 [미합의]로!
-            [미합의]: (남은 이견 + 점수 7 미만 항목. ⚠️ 다른 AI가 [합의]에 넣었지만 동의 안 하면 반드시 여기에! 없으면 "없음")
+              2. 원자적 명제 분해가 의미 분석보다 선행한다 (6) <- 7미만이면 [미합의]로!
+            [미합의]: (남은 이견 + 점수 7 미만 항목. !️ 다른 AI가 [합의]에 넣었지만 동의 안 하면 반드시 여기에! 없으면 "없음")
             [셀프힐링]: (이전 라운드에서 내가 틀렸거나 수정한 부분을 솔직히 인정. 예:
               - "R2에서 X를 주장했으나, 상대 반박을 수용하여 Y로 수정"
-              - "confidence 0.9 → 0.6으로 하향 — 근거 부족 인정"
+              - "confidence 0.9 -> 0.6으로 하향 -- 근거 부족 인정"
               없으면 "수정 없음")
-            [개인의견]: (당신의 솔직한 본심 — 합의와 다를 수 있음, 20단어 이상)
+            [개인의견]: (당신의 솔직한 본심 -- 합의와 다를 수 있음, 20단어 이상)
             [/CONCLUSION_KR]
 
             Step 3: End with [STANCE N=? R=? C=? E=? D=?] (sum=9)
 
-            ⚠ The Korean conclusion IS the deliverable. Don't skip it or make it brief.
-            ⚠️ WORD LIMIT: 답변 1회당 99단어 이하 (백단어). 초과 시 답변 거부됨. Atomic items, not essays.
+            ! The Korean conclusion IS the deliverable. Don't skip it or make it brief.
+            !️ WORD LIMIT: 답변 1회당 99단어 이하 (백단어). 초과 시 답변 거부됨. Atomic items, not essays.
             Mark complete with: [SYNTHESIS_COMPLETE]
             """);
 
         return sb.ToString();
     }
 
-    // ── DEBATE_JSON parsing ──
+    // -- DEBATE_JSON parsing --
 
     private static readonly Regex DebateJsonRegex = new(@"\[DEBATE_JSON\](.*?)\[/DEBATE_JSON\]", RegexOptions.Singleline);
 
@@ -200,7 +200,7 @@ internal sealed class TriadDebateLoop
         catch { return null; }
     }
 
-    // ── Stance Points (N=Novelty R=Rigor C=Consensus E=Evidence D=Dissent, sum=9) ──
+    // -- Stance Points (N=Novelty R=Rigor C=Consensus E=Evidence D=Dissent, sum=9) --
 
     public record Stance(int Novelty, int Rigor, int Consensus, int Evidence, int Dissent)
     {
@@ -220,7 +220,7 @@ internal sealed class TriadDebateLoop
                 int.Parse(m.Groups[3].Value), int.Parse(m.Groups[4].Value),
                 int.Parse(m.Groups[5].Value));
 
-        // Tier 2: DEBATE_JSON → "stance":{"N":2,"R":3,"C":1,"E":2,"D":1}
+        // Tier 2: DEBATE_JSON -> "stance":{"N":2,"R":3,"C":1,"E":2,"D":1}
         var json = ParseDebateJson(text);
         var stanceNode = json?["stance"];
         if (stanceNode != null)
@@ -247,7 +247,7 @@ internal sealed class TriadDebateLoop
         return stances.All(s => s.stance.Consensus >= 3 && s.stance.Dissent <= 1);
     }
 
-    // ── Dispute tracking ──
+    // -- Dispute tracking --
 
     public record Dispute(string TargetAssumption, string Reason);
 
@@ -288,7 +288,7 @@ internal sealed class TriadDebateLoop
         return true; // TODO: refine with actual dispute tracking
     }
 
-    // ── Claim Parsing ──
+    // -- Claim Parsing --
 
     private static readonly Regex ClaimRegex = new(@"\[CLAIM\](.*?)\[/CLAIM\]", RegexOptions.Singleline);
 
@@ -311,7 +311,7 @@ internal sealed class TriadDebateLoop
             }
             catch { }
         }
-        // Tier 2: DEBATE_JSON → "claims" array (Gemini often puts claims inside DEBATE_JSON)
+        // Tier 2: DEBATE_JSON -> "claims" array (Gemini often puts claims inside DEBATE_JSON)
         if (claims.Count == 0)
         {
             var debateJson = ParseDebateJson(text);
@@ -336,7 +336,7 @@ internal sealed class TriadDebateLoop
         return claims;
     }
 
-    // ── Convergence Detection ──
+    // -- Convergence Detection --
 
     /// <summary>
     /// Jaccard overlap of claim keywords across all AIs.
@@ -397,7 +397,7 @@ internal sealed class TriadDebateLoop
         return false;
     }
 
-    // ── Summary Compression ──
+    // -- Summary Compression --
 
     /// <summary>Compress response to ~300 tokens (rough: 1 token ≈ 4 chars).</summary>
     public static string CompressSummary(string text, int maxChars = 1200)
@@ -417,7 +417,7 @@ internal sealed class TriadDebateLoop
         return result.Length > maxChars ? result[..maxChars] + "..." : result;
     }
 
-    // ── Tokenizer ──
+    // -- Tokenizer --
 
     private static readonly Regex WordRegex = new(@"\b\w{2,}\b");  // 2글자 이상 (한국어 단어 포함)
     private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
@@ -427,7 +427,7 @@ internal sealed class TriadDebateLoop
         "they", "been", "said", "each", "which", "their", "will", "other", "about",
         "should", "would", "could", "these", "than", "into", "some", "when", "there"
     };
-    // Korean particles to strip (조사 제거 — improves cross-AI matching)
+    // Korean particles to strip (조사 제거 -- improves cross-AI matching)
     private static readonly string[] KoreanParticles = ["은", "는", "이", "가", "을", "를", "의", "에", "에서", "로", "으로", "와", "과", "도", "만", "까지", "부터", "에게", "한테"];
 
     public static HashSet<string> Tokenize(string text)

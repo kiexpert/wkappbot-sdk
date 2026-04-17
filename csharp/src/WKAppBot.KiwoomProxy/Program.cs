@@ -1,4 +1,4 @@
-// Program.cs — KiwoomProxy 32-bit main entry point.
+// Program.cs -- KiwoomProxy 32-bit main entry point.
 // [STAThread] is required for COM apartment threading.
 // WinForms message pump (Application.DoEvents) is needed for ActiveX event delivery.
 // Named Pipe server runs on a background thread, marshaling requests to STA.
@@ -14,7 +14,7 @@ internal static class Program
     private static PipeServer? _pipeServer;
     private static readonly CancellationTokenSource _cts = new();
 
-    // Experience DB base path — one level up from proxy dir (= wkappbot.hq/kiwoom_exp/)
+    // Experience DB base path -- one level up from proxy dir (= wkappbot.hq/kiwoom_exp/)
     // This way both the proxy and the CLI share the same experience DB location.
     private static string ExpDbPath => Path.Combine(
         Path.GetDirectoryName(Path.GetDirectoryName(Environment.ProcessPath) ?? ".") ?? ".",
@@ -67,9 +67,9 @@ internal static class Program
             _pipeServer.OnRequest += HandlePipeRequest;
             var pipeTask = Task.Run(() => _pipeServer.ListenAsync(_cts.Token));
 
-            Console.WriteLine("[KIWOOM] Ready — waiting for pipe commands...");
+            Console.WriteLine("[KIWOOM] Ready -- waiting for pipe commands...");
 
-            // 4. STA message pump — required for COM event delivery
+            // 4. STA message pump -- required for COM event delivery
             // Application.DoEvents() processes Windows messages (WM_*) that COM needs
             while (!_cts.Token.IsCancellationRequested)
             {
@@ -189,7 +189,7 @@ internal static class Program
         SaveMethodExperience(record);
     }
 
-    // ── Experience DB persistence (JSON files) ──
+    // -- Experience DB persistence (JSON files) --
 
     private static void SaveMethodExperience(MethodCallRecord record)
     {
@@ -285,7 +285,7 @@ internal static class Program
     }
 }
 
-// ── Experience DB models ──
+// -- Experience DB models --
 
 public class MethodExperience
 {

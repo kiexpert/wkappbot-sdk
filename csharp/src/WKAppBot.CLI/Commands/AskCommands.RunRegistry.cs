@@ -59,7 +59,7 @@ internal partial class Program
         "git", "curl", "wget",
     };
 
-    // External binary: .exe/.bat/.cmd/.ps1, path separator, or known tool → run directly
+    // External binary: .exe/.bat/.cmd/.ps1, path separator, or known tool -> run directly
     static bool IsExternalExe(string name) =>
         name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
         name.EndsWith(".bat", StringComparison.OrdinalIgnoreCase) ||
@@ -78,8 +78,8 @@ internal partial class Program
         var runId = GenerateRunId();
         var askControlPipeName = root == "ask" ? GenerateAskControlPipeName(runId) : null;
 
-        // External exe (cmd.exe, python.exe, etc.) → run directly
-        // WKAppBot command (a11y, inspect, etc.) → run via wkappbot-core.exe
+        // External exe (cmd.exe, python.exe, etc.) -> run directly
+        // WKAppBot command (a11y, inspect, etc.) -> run via wkappbot-core.exe
         string exe;
         string[] exeArgs;
         if (IsExternalExe(cmdArgv[0]))
@@ -167,8 +167,8 @@ internal partial class Program
             entry.Process.StandardInput.Write(stdin);
             entry.Process.StandardInput.Flush();
             var preview = stdin.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\u0003", "^C");
-            Console.Error.WriteLine($"[RUN] stdin → {runId}  data={preview}");
-            return (0, $"stdin → {runId} ({stdin.Length} chars: {preview})", "");
+            Console.Error.WriteLine($"[RUN] stdin -> {runId}  data={preview}");
+            return (0, $"stdin -> {runId} ({stdin.Length} chars: {preview})", "");
         }
         catch (Exception ex) { return (1, "", $"stdin inject failed: {ex.Message}"); }
     }

@@ -4,7 +4,7 @@ using NAudio.Wave;
 namespace WKAppBot.CLI;
 
 /// <summary>
-/// Whisper Keyboard Engine — standalone FFT spectrum analyzer + 32-bit tokenizer.
+/// Whisper Keyboard Engine -- standalone FFT spectrum analyzer + 32-bit tokenizer.
 /// Can run headless (no console) as a subsystem inside AppBotEye or standalone via CLI.
 ///
 /// Usage:
@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 /// </summary>
 internal sealed class WhisperEngine : IDisposable
 {
-    // ── 8-band articulatory: 4bit per band = 32bit token ──
+    // -- 8-band articulatory: 4bit per band = 32bit token --
     // Non-integer-multiple boundaries verified: 0 pairs within 3% (Monte Carlo 200K iter)
     private static readonly (int Lo, int Hi, string Name)[] Bands = [
         (   70,  1021, "VxLip"),  // 0: vocal cord + lip burst
@@ -31,7 +31,7 @@ internal sealed class WhisperEngine : IDisposable
     private const int BandCount = 8;
     private const int BitsPerBand = 4;
     private const int MaxLevel = 15;
-    private const int FftSize = 512;       // 32ms window — optimal for Korean phoneme detection (10-30ms)
+    private const int FftSize = 512;       // 32ms window -- optimal for Korean phoneme detection (10-30ms)
     private const int HalfFft = FftSize / 2;
     private const int SampleRate = 16000;
     private const float PreEmphasis = 0.97f; // high-freq boost for consonant clarity
@@ -41,7 +41,7 @@ internal sealed class WhisperEngine : IDisposable
     private Thread? _analysisThread;
     private CancellationTokenSource? _cts;
 
-    // Ring buffers — stereo (L/R) for DUET spatial analysis
+    // Ring buffers -- stereo (L/R) for DUET spatial analysis
     private readonly float[] _ringL = new float[FftSize];
     private readonly float[] _ringR = new float[FftSize];
     private readonly float[] _ringBuffer = new float[FftSize]; // mono mix (backward compat)
@@ -53,27 +53,27 @@ internal sealed class WhisperEngine : IDisposable
     // Hann window (precomputed)
     private readonly float[] _hannWindow;
 
-    // ── Method B: Noise Average + Signal Mid ──
+    // -- Method B: Noise Average + Signal Mid --
     // Noise = 10s rolling EMA of all frames (per-band)
     // Signal Mid = rolling EMA of frames where energy > 2× noise (per-band)
-    // Quantize: energy / mid × 7 → 0~15 (mid = level 7~8)
+    // Quantize: energy / mid × 7 -> 0~15 (mid = level 7~8)
     private readonly double[] _noiseAvg = new double[BandCount];   // 10s EMA (all frames)
     private readonly double[] _signalMid = new double[BandCount];  // EMA of >2×noise frames only
     private int _warmupFrames;
     private const int WarmupWindow = 30;          // ~1s seed period
-    private const double NoiseAlpha = 0.01;       // ~3s at 33fps (speech excluded → fast OK)
+    private const double NoiseAlpha = 0.01;       // ~3s at 33fps (speech excluded -> fast OK)
     private const double SignalAlpha = 0.02;       // faster adapt for speech reference
     private const double NoiseGateMultiplier = 2.0; // frames > noise×2 = signal
 
     // State
     private readonly List<ushort> _recentTokens = new(); // soundCode; 0xFFFF = syllable boundary
-    private bool _pendingSyllableBoundary; // set when OnSyllableToken fires → insert space on next frame
+    private bool _pendingSyllableBoundary; // set when OnSyllableToken fires -> insert space on next frame
     private int _frameCount;
     private bool _inWhisper; // hysteresis state for WHSPR detection
     private double[] _prevBandEnergies = new double[BandCount]; // for spectral flux
     private double[] _prevOrigMag = new double[HalfFft]; // previous frame FFT magnitudes (for DUET kill gate)
 
-    // Syllable-window sound code confirmation: N consecutive same code → confirmed
+    // Syllable-window sound code confirmation: N consecutive same code -> confirmed
     private ushort _scRunCode;    // current running sound code
     private int _scRunCount;      // consecutive frames with same code
     private ushort _confirmedSc;  // last confirmed (stable) sound code
@@ -187,10 +187,10 @@ internal sealed class WhisperEngine : IDisposable
         _waveIn = null;
     }
 
-    // ── DUET source tracking: cached source directions across frames ──
+    // -- DUET source tracking: cached source directions across frames --
     private readonly List<SourceInfo> _sourcesCache = new();
     private const int MaxSources = 8;
-    private const double SourceMergeAngle = 0.15; // radians (~8.6°) — merge if within this
+    private const double SourceMergeAngle = 0.15; // radians (~8.6°) -- merge if within this
     private const int WarmInterval = 5; // reflection hunt + cache expiry every N frames
 
     private void AnalysisLoop()
@@ -200,7 +200,7 @@ internal sealed class WhisperEngine : IDisposable
         try { AnalysisLoopCore(); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[WHISPER:FATAL] AnalysisLoop unhandled — Eye continues without audio analysis: {ex.GetType().Name}: {ex.Message}");
+            Console.WriteLine($"[WHISPER:FATAL] AnalysisLoop unhandled -- Eye continues without audio analysis: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -222,10 +222,10 @@ internal sealed class WhisperEngine : IDisposable
         {
             try
             {
-            Thread.Sleep(10); // ~100fps — 10ms sliding window for Korean phoneme capture
+            Thread.Sleep(10); // ~100fps -- 10ms sliding window for Korean phoneme capture
             if (!_bufferReady) continue;
 
-            // ── Noise gate: compute RMS (dBFS), skip if below threshold ──
+            // -- Noise gate: compute RMS (dBFS), skip if below threshold --
             float rmsSum;
             lock (_fftLock)
             {
@@ -281,17 +281,17 @@ internal sealed class WhisperEngine : IDisposable
                 _bufferReady = false;
             }
 
-            // FFT — mono + stereo L/R
+            // FFT -- mono + stereo L/R
             Fft(fftBuffer);
             if (_isStereo) { Fft(fftL); Fft(fftR); }
 
             // Preserve original mono magnitudes BEFORE DUET zeroing
-            // (DUET kills noise bins → rawEnergies must use original spectrum for mode detection)
+            // (DUET kills noise bins -> rawEnergies must use original spectrum for mode detection)
             var origMag = new double[HalfFft];
             for (int k = 0; k < HalfFft; k++)
                 origMag[k] = fftBuffer[k].Magnitude;
 
-            // ── DUET spatial analysis: per-bin ILD + IPD ──
+            // -- DUET spatial analysis: per-bin ILD + IPD --
             int killedBins = 0;
             int voiceClusters = 0, noiseClusters = 0;
             if (_isStereo)
@@ -310,7 +310,7 @@ internal sealed class WhisperEngine : IDisposable
                 // Step 2: DUET-style direction clustering
                 var frameSources = ClusterSources(binIPD, binILD, binEnergy);
 
-                // Step 3+4: 집중감시 우선 → 분류 → 킬
+                // Step 3+4: 집중감시 우선 -> 분류 -> 킬
                 // 이미 알려진 음성방향은 스펙트럼 계산 건너뜀 (빠르고 정확)
                 var killed = new HashSet<int>();
                 for (int ci = 0; ci < frameSources.Count; ci++)
@@ -318,9 +318,9 @@ internal sealed class WhisperEngine : IDisposable
                     if (killed.Contains(ci)) continue;
                     var src = frameSources[ci];
 
-                    // ① 캐시 히트 체크 (최우선 — 방향만으로 즉시 판정, 스펙트럼 불필요)
+                    // ① 캐시 히트 체크 (최우선 -- 방향만으로 즉시 판정, 스펙트럼 불필요)
                     double trackedConf = GetTrackedVoiceConfidence(src.Angle);
-                    if (trackedConf >= 1.0) // 집중감시방향 → 즉시 보호
+                    if (trackedConf >= 1.0) // 집중감시방향 -> 즉시 보호
                     {
                         src.IsVoiceLike = true;
                         // Warm: 5프레임마다 프로파일 계산 (음악 감지용 stability 추적)
@@ -340,7 +340,7 @@ internal sealed class WhisperEngine : IDisposable
                             if (!EnableHardKill) continue;
                         }
                     }
-                    else if (trackedConf <= 0.0) // 척살집중대상 → 즉시 킬
+                    else if (trackedConf <= 0.0) // 척살집중대상 -> 즉시 킬
                     {
                         src.IsVoiceLike = false;
                         noiseClusters++;
@@ -349,7 +349,7 @@ internal sealed class WhisperEngine : IDisposable
                     }
                     else
                     {
-                        // ② 신규/불확실 방향 → 스펙트럼 분석 후 판정
+                        // ② 신규/불확실 방향 -> 스펙트럼 분석 후 판정
                         src.SpectralProfile = ComputeSpectralProfile(src.BinIndices, fftBuffer);
                         src.IsVoiceLike = IsVoiceLikeCluster(src.SpectralProfile)
                                           || trackedConf > 0.6;
@@ -366,7 +366,7 @@ internal sealed class WhisperEngine : IDisposable
                         }
                     }
 
-                    // ③ 킬원음: hard zero kill bins (skip weak bins — preserve distant voice)
+                    // ③ 킬원음: hard zero kill bins (skip weak bins -- preserve distant voice)
                     foreach (int k in src.BinIndices)
                     {
                         // Kill gate: skip if bin energy dropped to <20% of previous frame
@@ -380,11 +380,11 @@ internal sealed class WhisperEngine : IDisposable
                     killed.Add(ci);
                 }
 
-                // ── Warm path (every 5 frames): reflection hunt + cache maintenance ──
+                // -- Warm path (every 5 frames): reflection hunt + cache maintenance --
                 if (_frameCount % WarmInterval == 0)
                 {
                     // Reflection hunt: find weaker clusters with similar spectral shape to killed ones
-                    // Snapshot killed set — we add new entries during iteration
+                    // Snapshot killed set -- we add new entries during iteration
                     var killedSnapshot = killed.ToArray();
                     foreach (int ki in killedSnapshot)
                     {
@@ -440,7 +440,7 @@ internal sealed class WhisperEngine : IDisposable
                 postDuetEnergies[b] = postEnergy / binCount;
             }
 
-            // ── Method B: Noise Average + Signal Mid quantization ──
+            // -- Method B: Noise Average + Signal Mid quantization --
             // Stage 1: Update noise average (10s EMA, all frames)
             if (_warmupFrames < WarmupWindow)
             {
@@ -461,8 +461,8 @@ internal sealed class WhisperEngine : IDisposable
             }
             else
             {
-                // Noise: only update on quiet frames (< 2× noise) — speech doesn't pollute noise
-                // Signal mid: only update on loud frames (≥ 2× noise) — noise doesn't dilute signal
+                // Noise: only update on quiet frames (< 2× noise) -- speech doesn't pollute noise
+                // Signal mid: only update on loud frames (≥ 2× noise) -- noise doesn't dilute signal
                 for (int b = 0; b < BandCount; b++)
                 {
                     double gate = _noiseAvg[b] * NoiseGateMultiplier;
@@ -474,7 +474,7 @@ internal sealed class WhisperEngine : IDisposable
                 }
             }
 
-            // Stage 3: Quantize — mid maps to level ~7, scale 0~15
+            // Stage 3: Quantize -- mid maps to level ~7, scale 0~15
             double maxEnergy = 0;
             uint token = 0;
             var levels = new int[BandCount];
@@ -483,7 +483,7 @@ internal sealed class WhisperEngine : IDisposable
             {
                 double clean = Math.Max(0, rawEnergies[b] - _noiseAvg[b]);
                 double midClean = Math.Max(_signalMid[b] - _noiseAvg[b], 0.001);
-                int level = (int)(clean / midClean * 7); // mid → 7, 2×mid → 14~15
+                int level = (int)(clean / midClean * 7); // mid -> 7, 2×mid -> 14~15
                 level = Math.Clamp(level, 0, MaxLevel);
                 levels[b] = level;
                 token |= (uint)level << (32 - (b + 1) * BitsPerBand);
@@ -498,8 +498,8 @@ internal sealed class WhisperEngine : IDisposable
                 }
             }
 
-            // ── 음코드 (SoundCode): top 5 bands by energy, 3bit index each = 15bit ──
-            // Band indices sorted by clean energy descending → pack top 5 into ushort
+            // -- 음코드 (SoundCode): top 5 bands by energy, 3bit index each = 15bit --
+            // Band indices sorted by clean energy descending -> pack top 5 into ushort
             // MSB first: rank1(bit14-12) | rank2(bit11-9) | rank3(bit8-6) | rank4(bit5-3) | rank5(bit2-0)
             var cleanEnergies = new double[BandCount];
             for (int b = 0; b < BandCount; b++)
@@ -531,7 +531,7 @@ internal sealed class WhisperEngine : IDisposable
             bool isSilence = maxEnergy < 0.001;
 
             // Upper energy gate: if maxEnergy exceeds whisper ceiling, it's external noise
-            // (car horn, YouTube, music, etc.) — whisper physically can't produce this much energy.
+            // (car horn, YouTube, music, etc.) -- whisper physically can't produce this much energy.
             // Ceiling = 4× signal mid average (whisper rarely exceeds 2× mid)
             double midAvg = 0;
             for (int b = 0; b < BandCount; b++) midAvg += _signalMid[b];
@@ -554,7 +554,7 @@ internal sealed class WhisperEngine : IDisposable
             // Hysteresis: start requires >8, sustain requires >4
             int whisperGate = _inWhisper ? 4 : 8;
             // Spectral flux gate: low flux = stationary noise, not speech
-            // Only block if flux is very low (< 1% of midAvg) — don't over-filter
+            // Only block if flux is very low (< 1% of midAvg) -- don't over-filter
             bool hasFlux = spectralFlux > midAvg * 0.01;
             bool isWhisper = !isVoiced && !isSilence && !isTooLoud && whisperSum > whisperGate && hasFlux;
             _inWhisper = isWhisper;
@@ -566,7 +566,7 @@ internal sealed class WhisperEngine : IDisposable
                 : "NOISE";
 
             // Gate sound code: need meaningful energy above noise floor
-            // Mode alone isn't enough — weak WHSPR with low energy = random band rankings
+            // Mode alone isn't enough -- weak WHSPR with low energy = random band rankings
             // Require at least one band with clean energy ≥ 30% of its signal mid
             bool hasStrongBand = false;
             for (int b = 0; b < BandCount; b++)
@@ -578,7 +578,7 @@ internal sealed class WhisperEngine : IDisposable
             if (!hasStrongBand || (mode != "VOICE" && mode != "WHSPR"))
                 soundCode = 0;
 
-            // Syllable-window confirmation: same code N frames in a row → confirmed
+            // Syllable-window confirmation: same code N frames in a row -> confirmed
             if (soundCode != 0 && SyllableFrames > 0)
             {
                 if (soundCode == _scRunCode)
@@ -595,7 +595,7 @@ internal sealed class WhisperEngine : IDisposable
                 _scRunCount = 0; // silence resets run
             }
 
-            // Phase 1-B: Syllable tokenization — compress confirmed stream to {code, frames} tokens
+            // Phase 1-B: Syllable tokenization -- compress confirmed stream to {code, frames} tokens
             if (_confirmedSc != 0)
             {
                 if (_syllableCode == 0 || _syllableCode != _confirmedSc)
@@ -633,7 +633,7 @@ internal sealed class WhisperEngine : IDisposable
             {
                 if (_pendingSyllableBoundary)
                 {
-                    _recentTokens.Add(0xFFFF); // syllable boundary marker → space in display
+                    _recentTokens.Add(0xFFFF); // syllable boundary marker -> space in display
                     _pendingSyllableBoundary = false;
                 }
                 if (soundCode != 0)
@@ -647,7 +647,7 @@ internal sealed class WhisperEngine : IDisposable
             Array.Copy(origMag, _prevOrigMag, HalfFft);
 
             // Build recent tokens string: top-3 code (3 hex chars) concatenated, space at syllable boundary
-            // Format: "ABC1FFDEF GHI" — no separator between tokens, space = syllable boundary
+            // Format: "ABC1FFDEF GHI" -- no separator between tokens, space = syllable boundary
             int start = Math.Max(0, _recentTokens.Count - 48); // ~48 entries ≈ ~12 syllables
             var sb = new System.Text.StringBuilder();
             foreach (var t in _recentTokens.Skip(start))
@@ -684,7 +684,7 @@ internal sealed class WhisperEngine : IDisposable
             {
                 Console.WriteLine($"[WHISPER:CRASH] AnalysisLoop exception: {ex.GetType().Name}: {ex.Message}");
                 Console.WriteLine($"[WHISPER:CRASH] {ex.StackTrace}");
-                // Don't rethrow — keep the loop alive
+                // Don't rethrow -- keep the loop alive
             }
         }
     }
@@ -746,7 +746,7 @@ internal sealed class WhisperEngine : IDisposable
         return ranks;
     }
 
-    // ── DUET clustering: group TF bins by IPD direction ──
+    // -- DUET clustering: group TF bins by IPD direction --
 
     private List<SourceCluster> ClusterSources(double[] ipd, double[] ild, double[] energy)
     {
@@ -760,7 +760,7 @@ internal sealed class WhisperEngine : IDisposable
         for (int k = 1; k < HalfFft; k++)
         {
             if (energy[k] < 1e-8) continue; // skip silence bins
-            // Map IPD [-π,π] → [0, NumDirBins)
+            // Map IPD [-π,π] -> [0, NumDirBins)
             int dir = (int)((ipd[k] + Math.PI) / (2 * Math.PI) * NumDirBins);
             dir = Math.Clamp(dir, 0, NumDirBins - 1);
             dirBins[dir].Add(k);
@@ -799,7 +799,7 @@ internal sealed class WhisperEngine : IDisposable
             }
         }
 
-        // Sort descending by energy — peel strongest first
+        // Sort descending by energy -- peel strongest first
         clusters.Sort((a, b) => b.TotalEnergy.CompareTo(a.TotalEnergy));
         return clusters;
     }
@@ -808,9 +808,9 @@ internal sealed class WhisperEngine : IDisposable
     {
         // If explicit kill level set (dBFS), convert to linear energy
         if (KillLevelDb < 0)
-            return Math.Pow(10, KillLevelDb / 10.0); // dBFS → linear
+            return Math.Pow(10, KillLevelDb / 10.0); // dBFS -> linear
 
-        // Auto: noise floor average × 10 — only kill clearly loud sources
+        // Auto: noise floor average × 10 -- only kill clearly loud sources
         double noiseSum = 0;
         for (int b = 0; b < BandCount; b++) noiseSum += _noiseAvg[b];
         return Math.Max(noiseSum / BandCount * 10.0, 0.01);
@@ -830,7 +830,7 @@ internal sealed class WhisperEngine : IDisposable
                 cached.Energy = src.TotalEnergy;
                 cached.FramesSeen++;
                 cached.LastSeenFrame = _frameCount;
-                // Voice confidence EMA — 0.1 alpha ≈ 0.5s convergence at 100fps
+                // Voice confidence EMA -- 0.1 alpha ≈ 0.5s convergence at 100fps
                 cached.VoiceConfidence += (voiceVote - cached.VoiceConfidence) * 0.1;
                 // Spectral stability: cosine similarity between consecutive profiles
                 if (src.SpectralProfile != null && cached.LastProfile != null)
@@ -840,7 +840,7 @@ internal sealed class WhisperEngine : IDisposable
                 }
                 if (src.SpectralProfile != null)
                     cached.LastProfile = src.SpectralProfile;
-                // 음악 의심: 스펙트럼 안정 + 충분한 관찰 → 음성처럼 보여도 음악
+                // 음악 의심: 스펙트럼 안정 + 충분한 관찰 -> 음성처럼 보여도 음악
                 // Music has stable harmonics (sim ~0.9), voice changes formants (sim ~0.5)
                 if (cached.SpectralStability > 0.85 && cached.FramesSeen > 15)
                 {
@@ -850,21 +850,21 @@ internal sealed class WhisperEngine : IDisposable
                     cached.EverVoice = false;       // 집중감시 해제
                     cached.ConfirmedNoise = true;   // 척살집중 전환
                 }
-                // 음악→음성 복귀: stability가 떨어지면 (사람이 말하기 시작) 음악 의심 해제
+                // 음악->음성 복귀: stability가 떨어지면 (사람이 말하기 시작) 음악 의심 해제
                 else if (cached.SuspectedMusic && cached.SpectralStability < 0.7)
                 {
                     LogDecisionChange(cached, "VOICE_BACK", $"stability={cached.SpectralStability:F2}");
                     cached.SuspectedMusic = false;
-                    cached.ConfirmedNoise = false;  // 척살 해제 → 재분석 대상
+                    cached.ConfirmedNoise = false;  // 척살 해제 -> 재분석 대상
                 }
-                // 집중감시: 한 번이라도 음성 → 방향 기억 (단, 음악 의심 시 제외)
+                // 집중감시: 한 번이라도 음성 -> 방향 기억 (단, 음악 의심 시 제외)
                 if (src.IsVoiceLike && !cached.SuspectedMusic)
                 {
                     if (!cached.EverVoice)
                         LogDecisionChange(cached, "VOICE", $"conf={cached.VoiceConfidence:F2}");
                     cached.EverVoice = true; cached.ConfirmedNoise = false;
                 }
-                // 척살집중: EMA 안정 + 충분한 관찰 → 소음 확정
+                // 척살집중: EMA 안정 + 충분한 관찰 -> 소음 확정
                 if (!cached.EverVoice && cached.VoiceConfidence < 0.2 && cached.FramesSeen > 10)
                 {
                     if (!cached.ConfirmedNoise)
@@ -890,7 +890,7 @@ internal sealed class WhisperEngine : IDisposable
     }
 
     /// <summary>Get voice confidence for a tracked source near the given angle.
-    /// 집중감시 (EverVoice) → 1.0, 척살집중 (ConfirmedNoise) → 0.0.</summary>
+    /// 집중감시 (EverVoice) -> 1.0, 척살집중 (ConfirmedNoise) -> 0.0.</summary>
     private double GetTrackedVoiceConfidence(double angle)
     {
         foreach (var cached in _sourcesCache)
@@ -902,7 +902,7 @@ internal sealed class WhisperEngine : IDisposable
                      : cached.ConfirmedNoise ? 0.0
                      : cached.VoiceConfidence;
         }
-        return 0.5; // unknown → neutral
+        return 0.5; // unknown -> neutral
     }
 
     /// <summary>Log decision changes for parameter tuning. Outputs angle, energy, confidence, stability.</summary>
@@ -931,7 +931,7 @@ internal sealed class WhisperEngine : IDisposable
         get { try { return _sourcesCache.ToList(); } catch { return Array.Empty<SourceInfo>(); } }
     }
 
-    // ── Voice/Noise classifier for 각음원 clusters (킬원음 판별) ──
+    // -- Voice/Noise classifier for 각음원 clusters (킬원음 판별) --
 
     /// <summary>
     /// Classify a direction cluster as voice-like or noise (킬원음).
@@ -956,7 +956,7 @@ internal sealed class WhisperEngine : IDisposable
         bool lowBandDominant = voiceSum / total > 0.55;
 
         // Criterion 2: Spectral Peakiness (voice has formant peaks, noise/click is flat)
-        // max(profile) / mean(profile) — voice > 1.3, broadband impulse ≈ 1.0
+        // max(profile) / mean(profile) -- voice > 1.3, broadband impulse ≈ 1.0
         double max = 0, sum = 0;
         for (int b = 0; b < profile.Length; b++)
         {
@@ -969,7 +969,7 @@ internal sealed class WhisperEngine : IDisposable
         return lowBandDominant && hasPeaks;
     }
 
-    // ── Reflection detection helpers ──
+    // -- Reflection detection helpers --
 
     private double[] ComputeSpectralProfile(List<int> binIndices, Complex[] fft)
     {
@@ -1009,7 +1009,7 @@ internal sealed class WhisperEngine : IDisposable
         return denom > 1e-10 ? dot / denom : 0;
     }
 
-    // ── Cooley-Tukey radix-2 FFT ──
+    // -- Cooley-Tukey radix-2 FFT --
     internal static void Fft(Complex[] data)
     {
         int n = data.Length;
@@ -1061,16 +1061,16 @@ internal sealed class SourceInfo
     public int LastSeenFrame { get; set; }       // for staleness detection
     /// <summary>Voice confidence EMA: 0.0=킬원음(noise/각음원 제거대상), 1.0=음성(voice).</summary>
     public double VoiceConfidence { get; set; }
-    /// <summary>집중감시방향: 한 번이라도 음성 판정 → true (만료 전까지 음성 우선 보호).</summary>
+    /// <summary>집중감시방향: 한 번이라도 음성 판정 -> true (만료 전까지 음성 우선 보호).</summary>
     public bool EverVoice { get; set; }
-    /// <summary>척살집중대상: VoiceConfidence가 0.2 이하로 안정 → true (즉시 킬, 분석 건너뜀).</summary>
+    /// <summary>척살집중대상: VoiceConfidence가 0.2 이하로 안정 -> true (즉시 킬, 분석 건너뜀).</summary>
     public bool ConfirmedNoise { get; set; }
-    /// <summary>Previous frame's spectral profile — for stability comparison.</summary>
+    /// <summary>Previous frame's spectral profile -- for stability comparison.</summary>
     public double[]? LastProfile { get; set; }
     /// <summary>Spectral stability EMA (cosine similarity between consecutive profiles).
     /// Music ~0.9 (stable harmonics), voice ~0.5 (changing formants), clicks ~0.2 (random).</summary>
     public double SpectralStability { get; set; } = 0.5;
-    /// <summary>음악 의심: SpectralStability > 0.85 AND FramesSeen > 15 → voice→noise 강등.</summary>
+    /// <summary>음악 의심: SpectralStability > 0.85 AND FramesSeen > 15 -> voice->noise 강등.</summary>
     public bool SuspectedMusic { get; set; }
 }
 
@@ -1103,8 +1103,8 @@ internal sealed class WhisperFrame
 }
 
 /// <summary>
-/// Phase 1-B: Syllable token — a stable sound code + its duration in frames.
-/// Compresses the raw 100fps confirmed stream: consecutive same codes → one token.
+/// Phase 1-B: Syllable token -- a stable sound code + its duration in frames.
+/// Compresses the raw 100fps confirmed stream: consecutive same codes -> one token.
 /// Code uses Gray-encoded band indices (see WhisperEngine.GrayDecode to recover original).
 /// </summary>
 internal sealed class SyllableToken

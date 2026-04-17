@@ -6,7 +6,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: do command — MFC combo selection + button click
+// partial class: do command -- MFC combo selection + button click
 internal partial class Program
 {
     /// <summary>
@@ -27,7 +27,7 @@ Examples:
 
         string title = args[0];
         string targetFormId = args[1];
-        // buttonText is now optional — if missing, just MDI-activate
+        // buttonText is now optional -- if missing, just MDI-activate
         string? buttonText = args.Length >= 3 && !args[2].StartsWith("--") ? args[2] : null;
         int stepDelay = int.TryParse(GetArgValue(args, "--delay"), out var sd) ? sd : 300;
 
@@ -55,14 +55,14 @@ Examples:
             if (!weAreElevated)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("  ✗ Not elevated — physical mouse click requires admin. Re-run as admin.");
+                Console.WriteLine("  X Not elevated -- physical mouse click requires admin. Re-run as admin.");
                 Console.ResetColor();
                 return 1;
             }
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write("  ✓ Elevated");
+            Console.Write("  v Elevated");
             Console.ResetColor();
-            Console.WriteLine(" — physical mouse enabled");
+            Console.WriteLine(" -- physical mouse enabled");
         }
 
         // Load ExperienceDb from matching profile (best-effort)
@@ -81,9 +81,9 @@ Examples:
                 expDb = new ExperienceDb(expDir);
             }
         }
-        catch { /* best-effort — proceed without experience DB */ }
+        catch { /* best-effort -- proceed without experience DB */ }
 
-        // Debug images → experience DB form dir if available, else logs/ocr/
+        // Debug images -> experience DB form dir if available, else logs/ocr/
         string DebugImagePath(string tag)
         {
             string dir;
@@ -124,7 +124,7 @@ Examples:
                     if (importance == NoticeImportance.Critical)
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"  *** IMPORTANT NOTICE — NOT closing ***");
+                        Console.WriteLine($"  *** IMPORTANT NOTICE -- NOT closing ***");
                         Console.ForegroundColor = ConsoleColor.White;
                         PrintNoticeText(noticeText);
                         Console.ResetColor();
@@ -139,7 +139,7 @@ Examples:
                 Thread.Sleep(200);
                 bool gone = !NativeMethods.IsWindow(form.Handle) || !NativeMethods.IsWindowVisible(form.Handle);
                 Console.ForegroundColor = gone ? ConsoleColor.Green : ConsoleColor.Red;
-                Console.WriteLine(gone ? "  ← closed" : "  ← still visible");
+                Console.WriteLine(gone ? "  <- closed" : "  <- still visible");
                 Console.ResetColor();
             }
         }
@@ -161,7 +161,7 @@ Examples:
             ShowFormExperienceHints(expDb, targetFormId, actionName: "click");
         }
 
-        // ── Focusless MDI Activate: bring child to front without stealing focus ──
+        // -- Focusless MDI Activate: bring child to front without stealing focus --
         if (scanResult.MdiHandle != IntPtr.Zero)
         {
             NativeMethods.SendMessageW(scanResult.MdiHandle, 0x0222 /*WM_MDIACTIVATE*/, targetForm.Handle, IntPtr.Zero);
@@ -175,7 +175,7 @@ Examples:
         if (buttonText == null)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"\n  ✓ MDI child [{targetFormId}] brought to front (focusless)");
+            Console.WriteLine($"\n  v MDI child [{targetFormId}] brought to front (focusless)");
             Console.ResetColor();
 
             // ActionState IPC
@@ -212,7 +212,7 @@ Examples:
                 break;
             }
 
-            // Button not found — could be a blocker dialog hiding/disabling UI
+            // Button not found -- could be a blocker dialog hiding/disabling UI
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"  Button \"{buttonText}\" not found (attempt {attempt + 1}/{maxRetries + 1})");
             Console.ResetColor();
@@ -230,7 +230,7 @@ Examples:
             }
 
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  ✗ Button \"{buttonText}\" not found in form [{targetFormId}]");
+            Console.WriteLine($"  X Button \"{buttonText}\" not found in form [{targetFormId}]");
             Console.ResetColor();
             return 1;
         }
@@ -238,7 +238,7 @@ Examples:
         Console.WriteLine($"  Found button: \"{targetButton!.Title}\" @({targetButton.Rect.Left},{targetButton.Rect.Top})");
         Console.ResetColor();
 
-        // ── Step 1: Find MFC custom combos ──
+        // -- Step 1: Find MFC custom combos --
         // Pattern: AfxWnd parent containing an enabled Edit child, small size, above the button
         // Direct Win32 tree walk (not UIA) to find these MFC custom controls
         var mfcCombos = new List<WindowInfo>();
@@ -248,7 +248,7 @@ Examples:
         mfcCombos.Sort((a, b) => a.Rect.Left.CompareTo(b.Rect.Left));
 
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine($"── Action Sequence ({mfcCombos.Count} combos + 1 button) ────────────────────");
+        Console.WriteLine($"-- Action Sequence ({mfcCombos.Count} combos + 1 button) --------------------");
         Console.ResetColor();
 
         if (mfcCombos.Count == 0)
@@ -271,7 +271,7 @@ Examples:
         NativeMethods.SmartSetForegroundWindow(win.Handle);
         Thread.Sleep(stepDelay);
 
-        // ── Process each combo ──
+        // -- Process each combo --
         // Click the EDIT inside the AfxWnd (more precise than clicking container)
         int comboNum = 0;
         foreach (var combo in mfcCombos)
@@ -303,7 +303,7 @@ Examples:
                 Console.Write($" (\"{currentVal}\")");
             }
             Console.ResetColor();
-            Console.Write(" → click ... ");
+            Console.Write(" -> click ... ");
 
             // Snapshot windows before click
             var preWindows = new HashSet<IntPtr>();
@@ -378,7 +378,7 @@ Examples:
                 var ddCls = WindowFinder.GetClassName(dropdownHwnd);
                 NativeMethods.GetWindowRect(dropdownHwnd, out var ddRect);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"dropdown [{ddCls}] {ddRect.Width}x{ddRect.Height} → ");
+                Console.Write($"dropdown [{ddCls}] {ddRect.Width}x{ddRect.Height} -> ");
                 Console.ResetColor();
 
                 // Click first item (top of dropdown + offset)
@@ -388,26 +388,26 @@ Examples:
                 Thread.Sleep(stepDelay);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("selected first item ✓");
+                Console.WriteLine("selected first item v");
                 Console.ResetColor();
             }
             else
             {
-                // No popup window → in-place dropdown (MFC custom)
+                // No popup window -> in-place dropdown (MFC custom)
                 // The list appears BELOW the edit. Click first item by mouse.
                 NativeMethods.GetWindowRect(clickTarget.Handle, out var editRect2);
                 int firstItemX = (editRect2.Left + editRect2.Right) / 2;
                 int firstItemY = editRect2.Bottom + 14; // first visible item
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write($"in-place dropdown → click @({firstItemX},{firstItemY}) ... ");
+                Console.Write($"in-place dropdown -> click @({firstItemX},{firstItemY}) ... ");
                 Console.ResetColor();
 
                 MouseInput.Click(firstItemX, firstItemY);
                 Thread.Sleep(stepDelay + 200);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("✓");
+                Console.WriteLine("v");
                 Console.ResetColor();
             }
 
@@ -423,14 +423,14 @@ Examples:
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write("         value: ");
                 Console.ForegroundColor = ConsoleColor.White;
-                Console.WriteLine($"\"{currentVal}\" → \"{newVal}\"");
+                Console.WriteLine($"\"{currentVal}\" -> \"{newVal}\"");
                 Console.ResetColor();
             }
 
             Thread.Sleep(stepDelay);
         }
 
-        // ── Final: Click the button (SmartClickButton with experience DB) ──
+        // -- Final: Click the button (SmartClickButton with experience DB) --
         Console.WriteLine();
 
         // Show control-level experience hints for the button being clicked
@@ -446,7 +446,7 @@ Examples:
         SmartClickButton(targetButton.Handle, targetForm.Handle,
             expDb, targetFormId, targetButton.ControlId);
 
-        // ── ActionState IPC: share do-command info with AppBotEye ──
+        // -- ActionState IPC: share do-command info with AppBotEye --
         try
         {
             ActionState.Write(new ActionState
@@ -464,7 +464,7 @@ Examples:
         // Wait and check reaction
         Thread.Sleep(500);
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n── Reaction Check ────────────────────");
+        Console.WriteLine("\n-- Reaction Check --------------------");
         Console.ResetColor();
 
         bool anyReaction = false;
@@ -495,14 +495,14 @@ Examples:
             }
         }
 
-        // Check button text change (매매시작 → 매매중지?)
+        // Check button text change (매매시작 -> 매매중지?)
         var postButtonText = WindowFinder.GetWindowText(targetButton.Handle);
         if (postButtonText != targetButton.Title)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("  Button changed: ");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"\"{targetButton.Title}\" → \"{postButtonText}\"");
+            Console.WriteLine($"\"{targetButton.Title}\" -> \"{postButtonText}\"");
             Console.ResetColor();
             anyReaction = true;
         }

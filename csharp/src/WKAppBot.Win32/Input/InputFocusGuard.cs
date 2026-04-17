@@ -9,15 +9,15 @@ namespace WKAppBot.Win32.Input;
 /// Detects interference (autocomplete dropdowns, dialogs, other apps) and
 /// supports wait-and-retry strategy for reliable input delivery.
 ///
-/// Design: "매 키스트로크 전 포커스 검증 → 간섭 감지 시 대기+재입력"
+/// Design: "매 키스트로크 전 포커스 검증 -> 간섭 감지 시 대기+재입력"
 /// Tag: [GUARD]
 /// </summary>
 public class InputFocusGuard
 {
-    // ── Interference classification ──────────────────────────────
+    // -- Interference classification ------------------------------
     public enum InterferenceType
     {
-        None,                   // All clear — focus is on target
+        None,                   // All clear -- focus is on target
         AutocompleteDropdown,   // ListBox/ComboLBox stole focus (same process)
         SameProcessDialog,      // #32770 dialog appeared (same process)
         DifferentApp,           // Another process took foreground
@@ -31,7 +31,7 @@ public class InputFocusGuard
         public static readonly GuardResult Success = new(true, InterferenceType.None, "");
     }
 
-    // ── State ────────────────────────────────────────────────────
+    // -- State ----------------------------------------------------
     private readonly IntPtr _targetHwnd;     // The control that should have focus
     private readonly IntPtr _mainWindow;     // Main/top-level window for foreground ops
     private readonly int _maxRetries;
@@ -46,7 +46,7 @@ public class InputFocusGuard
     /// <summary>Number of full restarts performed.</summary>
     public int RetryCount => _retryCount;
 
-    // ── Constructor ──────────────────────────────────────────────
+    // -- Constructor ----------------------------------------------
     public InputFocusGuard(IntPtr targetHwnd, IntPtr mainWindow, int maxRetries = 3)
     {
         _targetHwnd = targetHwnd;
@@ -55,7 +55,7 @@ public class InputFocusGuard
         _targetThreadId = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _targetPid);
     }
 
-    // ── Core API ─────────────────────────────────────────────────
+    // -- Core API ------------------------------------------------─
 
     /// <summary>
     /// Quick focus check before a keystroke. Returns immediately.
@@ -75,22 +75,22 @@ public class InputFocusGuard
                 return GuardResult.Success;
 
             // Check if focused hwnd is a CHILD of targetHwnd.
-            // CMaskEditEx (CWnd) contains a child Edit control — clicking it gives
+            // CMaskEditEx (CWnd) contains a child Edit control -- clicking it gives
             // focus to the child, not the parent. This is normal, not interference.
             if (gti.hwndFocus != IntPtr.Zero && IsChildOf(gti.hwndFocus, _targetHwnd))
                 return GuardResult.Success;
 
             // Check if focused hwnd is a SIBLING under the same parent (same dialog/form).
-            // MFC controls often share the same #32770 dialog parent — focus moving between
+            // MFC controls often share the same #32770 dialog parent -- focus moving between
             // siblings in the same form is expected when clicking (e.g., Edit inside CMaskEditEx).
             if (gti.hwndFocus != IntPtr.Zero && IsSiblingOf(gti.hwndFocus, _targetHwnd))
                 return GuardResult.Success;
 
-            // Focus is elsewhere — classify
+            // Focus is elsewhere -- classify
             return ClassifyInterference(gti.hwndFocus);
         }
 
-        // GetGUIThreadInfo failed — fall back to app-level check
+        // GetGUIThreadInfo failed -- fall back to app-level check
         return CheckAppLevel();
     }
 
@@ -111,7 +111,7 @@ public class InputFocusGuard
 
     /// <summary>
     /// Check if two hwnds share the same immediate parent.
-    /// MFC controls in the same #32770 dialog are siblings — focus moving
+    /// MFC controls in the same #32770 dialog are siblings -- focus moving
     /// between them during click is normal, not interference.
     /// Only returns true if both have valid parents and they match.
     /// </summary>
@@ -133,7 +133,7 @@ public class InputFocusGuard
         if (result.Ok) return true;
 
         _interferenceCount++;
-        Console.WriteLine($"[GUARD] Interference detected: {result.Type} — {result.Detail}");
+        Console.WriteLine($"[GUARD] Interference detected: {result.Type} -- {result.Detail}");
 
         // Try to clear the interference
         if (TryClearInterference(result.Type, result.Detail, maxWaitMs))
@@ -154,7 +154,7 @@ public class InputFocusGuard
     {
         if (_retryCount >= _maxRetries)
         {
-            Console.WriteLine($"[GUARD] Max retries ({_maxRetries}) exceeded — aborting");
+            Console.WriteLine($"[GUARD] Max retries ({_maxRetries}) exceeded -- aborting");
             return false;
         }
         _retryCount++;
@@ -163,7 +163,7 @@ public class InputFocusGuard
     }
 
     /// <summary>
-    /// Prepare for input restart: Home → Shift+End → Delete to clear existing text.
+    /// Prepare for input restart: Home -> Shift+End -> Delete to clear existing text.
     /// Uses PostMessage to avoid focus dependency for the clear operation.
     /// </summary>
     public void ClearFieldForRestart()
@@ -231,13 +231,13 @@ public class InputFocusGuard
         return check.Ok;
     }
 
-    // ── Internal detection ───────────────────────────────────────
+    // -- Internal detection --------------------------------------─
 
     private GuardResult ClassifyInterference(IntPtr actualFocusHwnd)
     {
         if (actualFocusHwnd == IntPtr.Zero)
         {
-            // No hwnd has focus in target thread — check app level
+            // No hwnd has focus in target thread -- check app level
             return CheckAppLevel();
         }
 
@@ -297,7 +297,7 @@ public class InputFocusGuard
             "same process, focus info unavailable");
     }
 
-    // ── Interference clearing ────────────────────────────────────
+    // -- Interference clearing ------------------------------------
 
     private bool TryClearInterference(InterferenceType type, string detail, int maxWaitMs)
     {
@@ -356,7 +356,7 @@ public class InputFocusGuard
 
             case InterferenceType.OverlayWindow:
                 Console.WriteLine($"[GUARD] Overlay window detected: {detail}");
-                // Can't auto-resolve overlays — just wait
+                // Can't auto-resolve overlays -- just wait
                 while (elapsed < maxWaitMs)
                 {
                     if (CheckBeforeKeystroke().Ok) return true;

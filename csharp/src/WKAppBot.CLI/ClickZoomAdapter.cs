@@ -4,7 +4,7 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Adapts ClickZoomHelper to IActionZoom interface for use in ActionExecutor.
-/// CLI layer bridge: Core calls IActionZoom → adapter forwards to ClickZoomHelper (WPF overlay).
+/// CLI layer bridge: Core calls IActionZoom -> adapter forwards to ClickZoomHelper (WPF overlay).
 ///
 /// Tag: [ZOOM]
 /// </summary>
@@ -19,7 +19,7 @@ internal sealed class ClickZoomAdapter : IActionZoom
     public void ShowPass(string detail)
     {
         _helper?.ShowPass(detail);
-        _helper = null; // release — STA thread cleans up via fade-out
+        _helper = null; // release -- STA thread cleans up via fade-out
     }
 
     public void ShowFail(string detail)

@@ -10,18 +10,18 @@ namespace WKAppBot.Core.Runner;
 /// </summary>
 public sealed class ActionState
 {
-    // ── Source identifier ──────────────────────────────────────
+    // -- Source identifier --------------------------------------
     /// <summary>
     /// Which command wrote this: "scenario"|"do"|"web"|"scan"|"input"|"dismiss"|"slack"
     /// </summary>
     public string Source { get; set; } = "";
 
-    // ── Window info ────────────────────────────────────────────
+    // -- Window info --------------------------------------------
     public string? WindowTitle { get; set; }
     public string? WindowClass { get; set; }
     public string? ProcessName { get; set; }
 
-    // ── UIA element info (핵심! — 액빌 내용) ──────────────────
+    // -- UIA element info (핵심! -- 액빌 내용) ------------------
     /// <summary>Control type tag: [Button], [Edit], [Pane], ...</summary>
     public string? ControlType { get; set; }
 
@@ -37,7 +37,7 @@ public sealed class ActionState
     /// <summary>Value pattern text (if available)</summary>
     public string? ElementValue { get; set; }
 
-    // ── Action info (핵심! — 액션 이름) ────────────────────────
+    // -- Action info (핵심! -- 액션 이름) ------------------------
     /// <summary>Action name: "click", "type_text", "assert", ...</summary>
     public string? ActionName { get; set; }
 
@@ -53,32 +53,32 @@ public sealed class ActionState
     /// <summary>How the element was found: "automation_id"|"name"|"ocr"|"vision"|"coordinate"</summary>
     public string? LocatorMethod { get; set; }
 
-    // ── Scenario progress (present only during scenario run) ──
+    // -- Scenario progress (present only during scenario run) --
     public string? ScenarioName { get; set; }
 
     /// <summary>Progress: "5/32"</summary>
     public string? Progress { get; set; }
 
-    // ── Web info (present only for web commands) ──────────────
+    // -- Web info (present only for web commands) --------------
     public string? WebUrl { get; set; }
     public string? WebTitle { get; set; }
 
-    // ── Claude Desktop status (Phase 3) ──────────────────────
+    // -- Claude Desktop status (Phase 3) ----------------------
     public string? ClaudeStatus { get; set; }
     public string? ClaudeStatusText { get; set; }
 
-    // ── Rate limit info (populated by AppBotEye when rate limit detected) ──
+    // -- Rate limit info (populated by AppBotEye when rate limit detected) --
     /// <summary>ISO 8601 datetime when rate limit resets. null = not rate limited.</summary>
     public string? RateLimitResetAt { get; set; }
 
     /// <summary>true when rate_limit state is currently active.</summary>
     public bool? IsRateLimited { get; set; }
 
-    // ── Timestamp ────────────────────────────────────────────
+    // -- Timestamp --------------------------------------------
     /// <summary>ISO 8601 timestamp of last update</summary>
     public string UpdatedAt { get; set; } = "";
 
-    // ── Static helpers ───────────────────────────────────────
+    // -- Static helpers --------------------------------------─
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -195,10 +195,10 @@ public sealed class ActionState
         if (lines.Count > 0 && !string.IsNullOrEmpty(ActionName))
             lines.Add("");
 
-        // Line 5: action → STATUS
+        // Line 5: action -> STATUS
         if (!string.IsNullOrEmpty(ActionName))
         {
-            var statusTag = !string.IsNullOrEmpty(Status) ? $" → {Status.ToUpperInvariant()}" : "";
+            var statusTag = !string.IsNullOrEmpty(Status) ? $" -> {Status.ToUpperInvariant()}" : "";
             lines.Add($"{ActionName}{statusTag}");
         }
 

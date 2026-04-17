@@ -6,9 +6,9 @@
     "steps":  [
                   "UIA Invoke OK: +(4009) -(4010) 검색(4035) 좌측토글(4000) 불러오기(4004) 수식버튼(4018-4023)",
                   "UIA Invoke NG (owner-drawn PostMessage 필요): 카테고리목록(10001) 지표목록(4014) 수식영역(4015) 조건선택(4015)",
-                  "조건목록 선택: PostMessage WM_LBUTTONDOWN/UP — SendInput 금지 (화면 방해)",
+                  "조건목록 선택: PostMessage WM_LBUTTONDOWN/UP -- SendInput 금지 (화면 방해)",
                   "검색실행: cond-add --run (do \u0027검색\u0027 쓰면 실시간검색 먼저 매칭됨 주의!)",
-                  "cid=1 중복 주의 — 여러 폼에 걸쳐 잘못된 컨트롤 타겟팅 발생"
+                  "cid=1 중복 주의 -- 여러 폼에 걸쳐 잘못된 컨트롤 타겟팅 발생"
               ],
     "tags":  [
                  "hts",

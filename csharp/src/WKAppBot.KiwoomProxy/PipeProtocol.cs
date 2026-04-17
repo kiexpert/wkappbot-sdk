@@ -1,4 +1,4 @@
-// PipeProtocol.cs — JSON-RPC models for Named Pipe communication.
+// PipeProtocol.cs -- JSON-RPC models for Named Pipe communication.
 // Length-prefixed (4-byte LE) + UTF-8 JSON messages.
 // Shared between KiwoomProxy (32-bit server) and WKAppBot.CLI (64-bit client).
 
@@ -8,7 +8,7 @@ using System.Text.Json.Serialization;
 
 namespace WKAppBot.KiwoomProxy;
 
-/// <summary>JSON-RPC request from CLI → Proxy.</summary>
+/// <summary>JSON-RPC request from CLI -> Proxy.</summary>
 public class PipeRequest
 {
     [JsonPropertyName("id")]
@@ -21,7 +21,7 @@ public class PipeRequest
     public object?[]? Params { get; set; }
 }
 
-/// <summary>JSON-RPC response from Proxy → CLI.</summary>
+/// <summary>JSON-RPC response from Proxy -> CLI.</summary>
 public class PipeResponse
 {
     [JsonPropertyName("id")]
@@ -34,7 +34,7 @@ public class PipeResponse
     public string? Error { get; set; }
 }
 
-/// <summary>JSON-RPC event from Proxy → CLI (no id, push notification).</summary>
+/// <summary>JSON-RPC event from Proxy -> CLI (no id, push notification).</summary>
 public class PipeEvent
 {
     [JsonPropertyName("event")]

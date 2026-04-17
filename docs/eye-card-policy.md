@@ -1,4 +1,4 @@
-﻿# Eye Card System — Architecture & Policy
+﻿# Eye Card System -- Architecture & Policy
 
 > How WKAppBot tracks active AI sessions and displays status cards.
 > Written for fellow Clots (Claude agents) and future contributors.
@@ -23,20 +23,20 @@ Card key priority: `PromptHwnd > SessionJsonl > CWD`
 ## Three-Layer Detection Model
 
 ```
-┌─────────────────────────────────────────────┐
-│  Layer 1: Session Registry  (authoritative) │
-│  runtime/sessions/{pid}.json                │
-│  MCP server registers on start              │
-├─────────────────────────────────────────────┤
-│  Layer 2: AI Session FSW    (discovery)     │
-│  ~/.claude/, ~/.cursor/, ~/.codex/ etc.     │
-│  JSONL mtime → reverse-map to CWD          │
-│  (planned — not yet implemented)            │
-├─────────────────────────────────────────────┤
-│  Layer 3: Eye Ticks         (legacy)        │
-│  eye_ticks.jsonl                            │
-│  Direct CLI commands append ticks           │
-└─────────────────────────────────────────────┘
+┌--------------------------------------------─┐
+|  Layer 1: Session Registry  (authoritative) |
+|  runtime/sessions/{pid}.json                |
+|  MCP server registers on start              |
++--------------------------------------------─┤
+|  Layer 2: AI Session FSW    (discovery)     |
+|  ~/.claude/, ~/.cursor/, ~/.codex/ etc.     |
+|  JSONL mtime -> reverse-map to CWD          |
+|  (planned -- not yet implemented)            |
++--------------------------------------------─┤
+|  Layer 3: Eye Ticks         (legacy)        |
+|  eye_ticks.jsonl                            |
+|  Direct CLI commands append ticks           |
++--------------------------------------------─┘
 ```
 
 Eye reads Layer 1 first; Layer 3 fills gaps for CWDs not covered by sessions.
@@ -68,16 +68,16 @@ Eye reads Layer 1 first; Layer 3 fills gaps for CWDs not covered by sessions.
 
 ### Registration Flow
 
-1. `wkappbot mcp` starts → `SessionRegister()` creates the file
-2. Each MCP tool call → `SessionUpdate()` refreshes heartbeat + command
-3. Process exit → `SessionUnregister()` deletes the file
-4. Eye reads all `*.json` in sessions dir → builds cards
+1. `wkappbot mcp` starts -> `SessionRegister()` creates the file
+2. Each MCP tool call -> `SessionUpdate()` refreshes heartbeat + command
+3. Process exit -> `SessionUnregister()` deletes the file
+4. Eye reads all `*.json` in sessions dir -> builds cards
 
 ### Lifecycle
 
 - **Heartbeat**: updated on every MCP tool call (JSON rewrite)
-- **Stale**: heartbeat > 5 min old → deleted by Eye
-- **Dead PID**: `Process.GetProcessById()` throws → deleted by Eye
+- **Stale**: heartbeat > 5 min old -> deleted by Eye
+- **Dead PID**: `Process.GetProcessById()` throws -> deleted by Eye
 - **Hot-swap**: MCP server survives binary replacement; session file persists
 
 ---
@@ -95,24 +95,24 @@ Watch session directories of all AI tools to auto-detect active sessions:
 | Continue.dev | `~/.continue/` | TBD |
 | Codeium | `~/.codeium/` | TBD |
 
-### Reverse-Map: Directory → CWD
+### Reverse-Map: Directory -> CWD
 
-Claude example: `~/.claude/projects/w--GitHub-WKAppBot/` → `D:\GitHub\WKAppBot`
+Claude example: `~/.claude/projects/w--GitHub-WKAppBot/` -> `D:\GitHub\WKAppBot`
 
 ```
 dir name: w--GitHub-WKAppBot
-decode:   w-- → D:\   (double-dash = drive separator)
-          GitHub-WKAppBot → GitHub\WKAppBot  (dash = path separator)
+decode:   w-- -> D:\   (double-dash = drive separator)
+          GitHub-WKAppBot -> GitHub\WKAppBot  (dash = path separator)
 result:   D:\GitHub\WKAppBot
 ```
 
 ### Design Principles (from Triad Debate, 2026-03-29)
 
-- **FSW supplements MCP, never replaces it** — MCP hit → skip FSW
-- **mtime only, never read content** — session files contain full conversations
-- **Polling fallback mandatory** — FSW unreliable on SMB/NFS/OneDrive
-- **Lazy activation** — watch top-level dir creation events, then drill down
-- **`FileShare.ReadWrite`** — other processes may hold locks on JSONL
+- **FSW supplements MCP, never replaces it** -- MCP hit -> skip FSW
+- **mtime only, never read content** -- session files contain full conversations
+- **Polling fallback mandatory** -- FSW unreliable on SMB/NFS/OneDrive
+- **Lazy activation** -- watch top-level dir creation events, then drill down
+- **`FileShare.ReadWrite`** -- other processes may hold locks on JSONL
 
 ---
 
@@ -139,8 +139,8 @@ Each direct CLI command (`wkappbot a11y ...`) appends a tick:
 ```
 
 Ticks are **not emitted** when:
-- `RunningInEye = true` (Eye pipe commands — Eye owns the card)
-- `WKAPPBOT_WORKER = 1` (worker processes — no card)
+- `RunningInEye = true` (Eye pipe commands -- Eye owns the card)
+- `WKAPPBOT_WORKER = 1` (worker processes -- no card)
 - `_fastExitAfterCommand = true` (grap/grep aliases)
 
 ---
@@ -151,21 +151,21 @@ MCP servers need to know which project they belong to. Detection strategies:
 
 ### Strategy 1: Parent Process Chain (VS Code specific)
 
-Walk parent PIDs → find VS Code → parse window title:
+Walk parent PIDs -> find VS Code -> parse window title:
 ```
 "Program.cs - WKAppBot - Visual Studio Code"
-                ↓
+                v
          ExtractCwdFromVsCodeTitle()
-                ↓
+                v
          "D:\GitHub\WKAppBot"
 ```
 
 ### Strategy 2: CWD Heuristic (Universal)
 
 Check `Environment.CurrentDirectory` for project markers:
-- `.mcp.json` → MCP config (most reliable)
-- `.git/` → git repository root
-- `CLAUDE.md` → Claude project instructions
+- `.mcp.json` -> MCP config (most reliable)
+- `.git/` -> git repository root
+- `CLAUDE.md` -> Claude project instructions
 
 Works for **any** IDE (VS Code, Claude Desktop, Codex, Copilot, Cursor).
 
@@ -195,9 +195,9 @@ Eye spawns child processes that must **not** create cards:
 | `slack route` | Message delivery | `WKAPPBOT_WORKER=1` |
 
 When `WKAPPBOT_WORKER=1` is set:
-- `RunningInEye = true` → ticks suppressed
-- TeeWriter skipped → no log duplication
-- LaunchEye skipped → no cascade spawn
+- `RunningInEye = true` -> ticks suppressed
+- TeeWriter skipped -> no log duplication
+- LaunchEye skipped -> no cascade spawn
 
 ---
 
@@ -212,15 +212,15 @@ Eye renders cards in Slack. Each card shows:
 클롣 생각: 🔧mcp__wkappbot__wkappbot_cli
 ```
 
-- `[WG-WKAppBot]` — abbreviated CWD (`D:\GitHub\WKAppBot`)
-- `클롣 작업` — last command
-- `클롣 상태` — last status + context usage %
-- `클롣 생각` — latest thought from AI session JSONL
+- `[WG-WKAppBot]` -- abbreviated CWD (`D:\GitHub\WKAppBot`)
+- `클롣 작업` -- last command
+- `클롣 상태` -- last status + context usage %
+- `클롣 생각` -- latest thought from AI session JSONL
 
 ### Card Key Rules
 
-1. **PromptHwnd wins** — each IDE window = unique card
-2. **CWD fallback** — same project folder = one card (survives PID restart)
+1. **PromptHwnd wins** -- each IDE window = unique card
+2. **CWD fallback** -- same project folder = one card (survives PID restart)
 3. **Never create cards for**:
    - Empty CWD
    - `C:\Windows\system32` (unresolved CWD)
@@ -234,8 +234,8 @@ Eye renders cards in Slack. Each card shows:
 |------|---------|
 | `SessionRegistry.cs` | Session register/update/heartbeat/cleanup |
 | `McpCommand.cs` | `DetectMcpParentCwd()`, `DetectHostType()` |
-| `McpCommand.Helpers.cs` | `RunToolCore()` — session update per tool call |
-| `AppBotEyeHealthCheck.cs` | `ReadEyeCards()` — session + tick merger |
+| `McpCommand.Helpers.cs` | `RunToolCore()` -- session update per tool call |
+| `AppBotEyeHealthCheck.cs` | `ReadEyeCards()` -- session + tick merger |
 | `AppBotEyeCardBuilder.cs` | `BuildEyeSummary()`, `AbbreviateCwd()` |
 | `AppBotEyePromptInfo.cs` | `ExtractCwdFromVsCodeTitle()`, `FindSessionJsonl()` |
 | `Program.cs` | `EmitEyeTick()`, `WKAPPBOT_WORKER` check |
@@ -246,13 +246,13 @@ Eye renders cards in Slack. Each card shows:
 
 Three AI architects (GPT, Gemini, Claude) agreed on:
 
-1. **MCP Registry = Truth** — registered sessions are authoritative
-2. **FSW = Discovery** — detects "shadow AI" not using MCP
-3. **Eye Ticks = Fallback** — legacy compatibility for direct CLI
-4. **Generic FSW + thin adapters** — `ISessionAdapter { ParseSessionId, IsActive }`
-5. **Security: mtime only** — never read session content
-6. **Polling fallback** — FSW unreliable on network drives
-7. **mtime liveness score** — `1.0 / (1 + seconds / 30)` for continuous ranking
+1. **MCP Registry = Truth** -- registered sessions are authoritative
+2. **FSW = Discovery** -- detects "shadow AI" not using MCP
+3. **Eye Ticks = Fallback** -- legacy compatibility for direct CLI
+4. **Generic FSW + thin adapters** -- `ISessionAdapter { ParseSessionId, IsActive }`
+5. **Security: mtime only** -- never read session content
+6. **Polling fallback** -- FSW unreliable on network drives
+7. **mtime liveness score** -- `1.0 / (1 + seconds / 30)` for continuous ranking
 
 Recommended implementation order:
 1. ✅ MCP Registry (done)

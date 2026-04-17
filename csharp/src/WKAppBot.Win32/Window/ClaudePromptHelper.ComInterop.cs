@@ -5,7 +5,7 @@ namespace WKAppBot.Win32.Window;
 
 public sealed partial class ClaudePromptHelper
 {
-    // ═══════════════════════════════════════════════════════════════
+    // ===============================================================
     // MSAA/IA2 COM Interop for focusless text insertion
     //
     // Discovery (2026-02-26):
@@ -14,16 +14,16 @@ public sealed partial class ClaudePromptHelper
     //   put_accValue() on the parent element (name="입력하세요") works!
     //
     //   Why it works when FlaUI's LegacyIAccessible.SetValue returns E_NOTIMPL:
-    //   FlaUI goes through UIA→MSAA proxy bridge which adds validation.
+    //   FlaUI goes through UIA->MSAA proxy bridge which adds validation.
     //   Direct MSAA COM vtable call bypasses the proxy entirely.
     //
     // MSAA tree structure (Claude Desktop prompt):
     //   grandparent: GROUPING, name=null
-    //     └─ parent: GROUPING, name="입력하세요"  ← put_accValue target!
-    //          └─ self: GROUPING, name=null       ← AccessibleObjectFromPoint hit
-    //               ├─ child: GROUPING or TEXT
-    //               └─ child: WHITESPACE, name="\n"
-    // ═══════════════════════════════════════════════════════════════
+    //     +─ parent: GROUPING, name="입력하세요"  <- put_accValue target!
+    //          +─ self: GROUPING, name=null       <- AccessibleObjectFromPoint hit
+    //               +─ child: GROUPING or TEXT
+    //               +─ child: WHITESPACE, name="\n"
+    // ===============================================================
 
     [DllImport("oleacc.dll")]
     private static extern int AccessibleObjectFromPoint(
@@ -31,7 +31,7 @@ public sealed partial class ClaudePromptHelper
         [MarshalAs(UnmanagedType.Interface)] out object ppacc,
         [MarshalAs(UnmanagedType.Struct)] out object pvarChild);
 
-    // OLE IServiceProvider — used to QueryService for IA2 from IAccessible
+    // OLE IServiceProvider -- used to QueryService for IA2 from IAccessible
     [ComImport, Guid("6D5140C1-7436-11CE-8034-00AA006009FA"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IOleServiceProvider
@@ -41,7 +41,7 @@ public sealed partial class ClaudePromptHelper
             [MarshalAs(UnmanagedType.IUnknown)] out object ppvObject);
     }
 
-    // IAccessibleEditableText — the IA2 interface for text input
+    // IAccessibleEditableText -- the IA2 interface for text input
     // vtable order MUST match the IA2 IDL exactly!
     [ComImport, Guid("A59AA09A-7011-4b65-939D-32B1FB5547E3"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
@@ -63,20 +63,20 @@ public sealed partial class ClaudePromptHelper
         int setAttributes(int startOffset, int endOffset, [MarshalAs(UnmanagedType.BStr)] string attributes);
     }
 
-    // IAccessible via vtable — for MSAA tree navigation (role probing + child access)
-    // Chromium doesn't support IDispatch late binding → must use vtable (InterfaceIsIUnknown)
+    // IAccessible via vtable -- for MSAA tree navigation (role probing + child access)
+    // Chromium doesn't support IDispatch late binding -> must use vtable (InterfaceIsIUnknown)
     // Vtable order: IUnknown(3) + IDispatch(4) + IAccessible(21) = 28 slots
     [ComImport, Guid("618736E0-3C3D-11CF-810C-00AA00389B71"),
      InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IAccessibleVtbl
     {
-        // ── IDispatch (4 slots, never called — consuming vtable positions) ──
+        // -- IDispatch (4 slots, never called -- consuming vtable positions) --
         void _QueryInfoCount_slot();
         void _GetTypeInfo_slot();
         void _GetIDsOfNames_slot();
         void _Invoke_slot();
 
-        // ── IAccessible (21 methods) ──
+        // -- IAccessible (21 methods) --
         [PreserveSig]
         int get_accParent([MarshalAs(UnmanagedType.IDispatch)] out object? ppdispParent);
         [PreserveSig]
@@ -143,7 +143,7 @@ public sealed partial class ClaudePromptHelper
     /// Try to insert text focuslessly using MSAA put_accValue (direct vtable).
     /// Priority 1: put_accValue on parent MSAA element (proven working on Claude Desktop)
     /// Priority 2: IAccessibleEditableText.insertText (IA2, not available for contentEditable)
-    /// Strategy: AccessibleObjectFromPoint → navigate to parent → put_accValue
+    /// Strategy: AccessibleObjectFromPoint -> navigate to parent -> put_accValue
     /// </summary>
     private bool TryIA2InsertText(PromptInfo prompt, string text)
     {
@@ -386,7 +386,7 @@ public sealed partial class ClaudePromptHelper
 
     /// <summary>
     /// Try all approaches to get IAccessibleEditableText and call insertText on a COM object.
-    /// Tries: Direct QI → QueryService(IA2)→QI → QueryService(IAccessibleEditableText)
+    /// Tries: Direct QI -> QueryService(IA2)->QI -> QueryService(IAccessibleEditableText)
     /// </summary>
     private bool TryInsertOnObject(object acc, string text, string label)
     {
@@ -415,7 +415,7 @@ public sealed partial class ClaudePromptHelper
             {
                 if (ia2Obj is IAccessibleEditableText ia2Edit)
                 {
-                    Console.WriteLine($"  [PROMPT] IA2 [{label}]: IA2→EditableText QI succeeded! Calling insertText...");
+                    Console.WriteLine($"  [PROMPT] IA2 [{label}]: IA2->EditableText QI succeeded! Calling insertText...");
                     hr = ia2Edit.insertText(0, text);
                     if (hr == 0)
                     {
@@ -428,7 +428,7 @@ public sealed partial class ClaudePromptHelper
                 hr = sp.QueryService(ref guidIAcc, ref guidET, out object? etObj);
                 if (hr == 0 && etObj is IAccessibleEditableText serviceEdit)
                 {
-                    Console.WriteLine($"  [PROMPT] IA2 [{label}]: ServiceProvider→EditableText succeeded! Calling insertText...");
+                    Console.WriteLine($"  [PROMPT] IA2 [{label}]: ServiceProvider->EditableText succeeded! Calling insertText...");
                     hr = serviceEdit.insertText(0, text);
                     if (hr == 0)
                     {
@@ -467,7 +467,7 @@ public sealed partial class ClaudePromptHelper
                 object? role = null; try { v.get_accRole(0, out role); } catch { }
                 string? name = null; try { v.get_accName(0, out name); } catch { }
                 int ri = role is int r ? r : -1;
-                Console.Write($"    L{level}: role={ri}(0x{ri:X2}) name=\"{name ?? "(null)"}\" → put_accValue...");
+                Console.Write($"    L{level}: role={ri}(0x{ri:X2}) name=\"{name ?? "(null)"}\" -> put_accValue...");
                 try
                 {
                     int pvHr = v.put_accValue(0, text);
@@ -533,11 +533,11 @@ public sealed partial class ClaudePromptHelper
                     try
                     {
                         int pvHr = v.put_accValue(0, "__PROBE_TEST__");
-                        Console.WriteLine($"    L{level}: put_accValue → hr=0x{pvHr:X8} {(pvHr == 0 ? "★ WRITABLE!" : "")}");
+                        Console.WriteLine($"    L{level}: put_accValue -> hr=0x{pvHr:X8} {(pvHr == 0 ? "★ WRITABLE!" : "")}");
                         if (pvHr == 0)
                             v.put_accValue(0, "");
                     }
-                    catch (Exception ex) { Console.WriteLine($"    L{level}: put_accValue → {ex.GetType().Name}"); }
+                    catch (Exception ex) { Console.WriteLine($"    L{level}: put_accValue -> {ex.GetType().Name}"); }
                 }
 
                 try { v.get_accParent(out current); } catch { current = null; }

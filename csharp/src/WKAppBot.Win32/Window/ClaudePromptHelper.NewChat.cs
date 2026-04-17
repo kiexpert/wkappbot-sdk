@@ -80,15 +80,15 @@ public sealed partial class ClaudePromptHelper
             catch { }
         }
 
-        // turn-form still not found after retries → brute-force paste (no click!)
-        // ★ New-chat landing page already has cursor focused in input — clicking risks UNFOCUSING it!
+        // turn-form still not found after retries -> brute-force paste (no click!)
+        // ★ New-chat landing page already has cursor focused in input -- clicking risks UNFOCUSING it!
         Console.WriteLine("  [PROMPT] turn-form not found after 3 retries. Brute-force paste (no click)...");
 
         var prevFg = NativeMethods.GetForegroundWindow();
         NativeMethods.SmartSetForegroundWindow(claudeHwnd);
         Thread.Sleep(300);
 
-        // Paste text directly — cursor is already in the input field
+        // Paste text directly -- cursor is already in the input field
         SetClipboardText(text);
         Thread.Sleep(100);
         KeyboardInput.Hotkey(new[] { "ctrl", "v" });
@@ -112,7 +112,7 @@ public sealed partial class ClaudePromptHelper
 
     /// <summary>
     /// Open a new chat in Claude Desktop via UIA sidebar "새 대화" button (fully Focusless!).
-    /// Flow: Toggle sidebar open → Invoke "새 대화" Hyperlink → verify new JSONL → Toggle sidebar closed.
+    /// Flow: Toggle sidebar open -> Invoke "새 대화" Hyperlink -> verify new JSONL -> Toggle sidebar closed.
     /// Falls back to Ctrl+N (focus steal) if UIA approach fails.
     /// Verification: checks that a new JSONL session file was created (= new chat confirmed).
     /// </summary>
@@ -150,7 +150,7 @@ public sealed partial class ClaudePromptHelper
             var (beforePath, beforeCreation) = GetLatestJsonlInfo();
             Console.WriteLine($"  [PROMPT] OpenNewChat: Before JSONL = {Path.GetFileName(beforePath ?? "(none)")} created={beforeCreation:HH:mm:ss}");
 
-            // === Strategy 1: UIA Focusless — sidebar toggle + "새 대화" button ===
+            // === Strategy 1: UIA Focusless -- sidebar toggle + "새 대화" button ===
             bool uiaTriggered = false;
             try
             {
@@ -276,7 +276,7 @@ public sealed partial class ClaudePromptHelper
                     Console.ResetColor();
                     return true;
                 }
-                Console.WriteLine("  [PROMPT] OpenNewChat: FAILED — no new JSONL and no prompt found");
+                Console.WriteLine("  [PROMPT] OpenNewChat: FAILED -- no new JSONL and no prompt found");
                 return false;
             }
 
@@ -315,7 +315,7 @@ public sealed partial class ClaudePromptHelper
         catch { return (null, DateTime.MinValue); }
     }
 
-    /// <summary>Backward compat wrapper — returns just the path.</summary>
+    /// <summary>Backward compat wrapper -- returns just the path.</summary>
     private static string? GetLatestJsonlPath()
         => GetLatestJsonlInfo().path;
 

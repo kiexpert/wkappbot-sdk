@@ -10,15 +10,15 @@ internal partial class Program
 
     static void CreateHardLinkNative(string linkPath, string targetPath) =>
         CreateHardLink(linkPath, targetPath, IntPtr.Zero);
-    /// <summary>Full help text — single source of truth for CLI help AND MCP tool description.</summary>
+    /// <summary>Full help text -- single source of truth for CLI help AND MCP tool description.</summary>
     internal static string GetUsageText()
     {
         var ver = typeof(Program).Assembly.GetName().Version;
         var verStr = ver != null ? $" v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
         return $@"
 WKAppBot{verStr} - Windows App Automation Test Framework
-Give AI eyes and hands — operate any app, help any human. No API, no rewrite needed.
-All AI agents welcome — Claude, GPT, Gemini, Copilot, and beyond.
+Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
+All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
 
 Usage:
@@ -27,11 +27,11 @@ Usage:
 === Public Commands ===================================================
 
   a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
-      Universal accessibility interface — 31 standard actions for ANY window.
-      3-tier fallback: UIA → Win32 → SendInput. Busybox: symlink `a11y.exe` works.
+      Universal accessibility interface -- 31 standard actions for ANY window.
+      3-tier fallback: UIA -> Win32 -> SendInput. Busybox: symlink `a11y.exe` works.
 
-      Auto-pipeline per action: blocker dismiss → minimize restore → tab activate
-        → zoom/magnifier → execute (3-tier) → result feedback (green/amber) → fade
+      Auto-pipeline per action: blocker dismiss -> minimize restore -> tab activate
+        -> zoom/magnifier -> execute (3-tier) -> result feedback (green/amber) -> fade
 
       Window (8):  close  kill  minimize  maximize  restore  focus  move  resize
       Element (13): read  find  highlight  invoke  click  toggle
@@ -47,11 +47,11 @@ Usage:
                First exact match stops interactive actions fast.
                Arrays are for lookups; actions consume the highest-priority target.
                ';' = OR   # = scope drill-down
-               Ex: ""*Notepad*#*File*"" → Notepad's File menu
+               Ex: ""*Notepad*#*File*"" -> Notepad's File menu
 
       a11y find ""*app*"" --depth 5       # MUD: look (Win32 + UIA children)
       a11y highlight ""*app*#*button*""   # visualize target with zoom overlay
-      a11y invoke ""*app*#*button*""      # click (UIA Invoke → BM_CLICK → SendInput)
+      a11y invoke ""*app*#*button*""      # click (UIA Invoke -> BM_CLICK -> SendInput)
       a11y close ""*Chrome*"" --nth 2~    # close 2nd window onwards
       a11y type ""*app*#*edit*"" ""hello""
 
@@ -80,10 +80,10 @@ Usage:
   whisper slice [--in <dir>] [--min-ms N] [--max-ms N]
       Slice long audio into word-level MP3 segments.
   whisper clean [--wav-dir <dir>] [--dry-run]
-      Sort wav/ root: voice→_unknown, noise→Recycle Bin.
+      Sort wav/ root: voice->_unknown, noise->Recycle Bin.
   whisper index [--in <slices-dir>] [--out <db-dir>] [--move] [--dry-run]
-      Extract first-syllable soundCode → phoneme_db/<octal>/word.mp3.
-      Files with <9 voiced frames (~90ms) → Recycle Bin automatically.
+      Extract first-syllable soundCode -> phoneme_db/<octal>/word.mp3.
+      Files with <9 voiced frames (~90ms) -> Recycle Bin automatically.
   mcp
       Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).
       Add to .mcp.json: {{ ""wkappbot"": {{ ""command"": ""wkappbot"", ""args"": [""mcp""] }} }}
@@ -91,7 +91,7 @@ Usage:
       Chrome DevTools Protocol web automation (open/click/type/eval).
       Type 'wkappbot web help' for all subcommands.
   web fetch <url> [--max-chars N]
-      HTTP GET — returns response body (no browser needed).
+      HTTP GET -- returns response body (no browser needed).
   web search <query> [--limit N]
       Google search via Chrome CDP (no API key required).
   web read <url> [--max-chars N] [--speak]
@@ -99,15 +99,15 @@ Usage:
   web html <url>
       Capture raw HTML of browser tab via CDP.
   file read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
-      Read file with line numbers. .pdf → auto-routes to read-pdf.
+      Read file with line numbers. .pdf -> auto-routes to read-pdf.
   file read-pdf <path> [--ocr] [--page N] [--pages N-M]
       Extract text from PDF. --ocr: Windows.Media.Ocr fallback for scanned PDFs.
   file grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
       Regex search across files. -i=case-insensitive, -C=context lines.
   file glob <pattern> [--path <dir>]
-      Find files by ** glob pattern. ⚠ ALWAYS use **/ prefix (e.g. **/*.cs).
+      Find files by ** glob pattern. ! ALWAYS use **/ prefix (e.g. **/*.cs).
   eye [--interval N] [--size WxH] [--pos X,Y]
-      WK AppBot Eye — live overlay + Slack daemon (always on).
+      WK AppBot Eye -- live overlay + Slack daemon (always on).
       ctx=N% in tick output, auto-deletes stale idle messages on restart.
   newchat ""prompt"" [--file prompt.txt]
       Open new Claude Desktop chat + submit prompt (all focusless UIA).
@@ -182,14 +182,14 @@ Utility:
       -v -l -c -m N     Invert, filenames-only, count, max-matches
       -i / -n           Case-insensitive / line numbers
       Grap patterns: wildcards, regex: prefix, ';' OR, path-segment ';' expansion.
-  grep / grap  <pattern> [files]   (logcat aliases, grep-compat arg order — run `grap --help` for details)
+  grep / grap  <pattern> [files]   (logcat aliases, grep-compat arg order -- run `grap --help` for details)
   ask gpt|gemini|claude ""question"" [file.png] [--slack] [--new-tab]
       Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
   ask triad ""question"" [--debate [N]]
       Parallel GPT + Gemini + Claude. --debate: dialectic loop (max 3 rounds, cross-prompting).
       --debate N: early exit at N consensus. Without --debate: R0 only (one answer each).
   chat [""question""] [-p] [--no-fallback]
-      Claude Code CLI passthrough. On rate-limit markers → auto-fallback to ask triad.
+      Claude Code CLI passthrough. On rate-limit markers -> auto-fallback to ask triad.
       No args: exec claude interactively (inherits stdio).
   agent gemini|gpt|claude|triad ""task"" [--max-steps N] [--fresh]
       Autonomous sub-agent loop with filesystem + web tools.
@@ -197,7 +197,7 @@ Utility:
       Save mid-session snapshot of all tracked files (before compile / risky change).
       Tracked: every a11y file-write is registered in agent-session.json (persistent).
   agent dump-patch [--out file.patch] [--apply]
-      git diff HEAD → unified patch + per-checkpoint diffs saved to repo root.
+      git diff HEAD -> unified patch + per-checkpoint diffs saved to repo root.
       Patch header includes: apply / reverse / checkpoint-restore / original-restore hints.
   agent session-status
       Show tracked files + checkpoints in current agent session.
@@ -213,7 +213,7 @@ Utility:
       Send message via Telegram (A11Y-first).
   suggest ""text"" [file.png]
       Send suggestion/feature request to Slack (auto-tags CWD workspace).
-      ⚠ Write in ENGLISH — Korean = 2-3x token cost. Short & precise wins.
+      ! Write in ENGLISH -- Korean = 2-3x token cost. Short & precise wins.
   suggest resolve <ts> ""note""
       Mark suggestion resolved + Slack thread reply.
   claude-usage
@@ -248,7 +248,7 @@ Data Directory:
     }
 
     /// <summary>
-    /// Lightweight tick emitter — advertise work being done on the card.
+    /// Lightweight tick emitter -- advertise work being done on the card.
     /// Usage: wkappbot tick <tag> [status] [--find-host]
     /// --find-host: auto-detect the most recent Claude session from eye_ticks.jsonl
     ///   (for PostPublish where process tree doesn't reach Claude Desktop)
@@ -292,7 +292,7 @@ Data Directory:
 
     static int Error(string msg)
     {
-        // In Eye pipe mode, Console.Error is not forwarded to the pipe client — use Console.Out instead.
+        // In Eye pipe mode, Console.Error is not forwarded to the pipe client -- use Console.Out instead.
         if (Program.RunningInEye)
         {
             Console.WriteLine(msg);
@@ -333,7 +333,7 @@ Data Directory:
 
     /// <summary>
     /// Busybox-style: detect command from exe name (symlink-friendly).
-    /// e.g. "a11y" → "a11y", "inspect" → "inspect", "wka11y" → "a11y"
+    /// e.g. "a11y" -> "a11y", "inspect" -> "inspect", "wka11y" -> "a11y"
     /// </summary>
     static string? DetectCommandFromExeName(string exeBaseName)
     {
@@ -366,8 +366,8 @@ Data Directory:
     {
         var isgrap = alias == "grap";
         Console.WriteLine($"""
-            {alias} — WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
-            Internally: {alias} <pattern> [files...] → logcat <files> <pattern>
+            {alias} -- WKAppBot log search ({(isgrap ? "grab accessible pattern, official WKAppBot name" : "legacy grep alias")})
+            Internally: {alias} <pattern> [files...] -> logcat <files> <pattern>
 
             Usage:
               {alias} <pattern> [files...] [options]
@@ -413,7 +413,7 @@ Data Directory:
     /// grep:   grap [opts] pattern [file/dir...]
     /// logcat: logcat fileFilter pattern [opts]
     ///
-    /// Transformation: swap positional order — pattern (first) ↔ fileFilter (rest joined with ';')
+    /// Transformation: swap positional order -- pattern (first) ↔ fileFilter (rest joined with ';')
     /// Flags (-v, -l, -c, -r, -A, -B, -C, -m, -i) pass through unchanged (logcat already supports them).
     /// </summary>
     static string[] GrapArgsToLogcat(string[] args)
@@ -440,7 +440,7 @@ Data Directory:
         // grep positionals: [pattern, file1, file2, ...]
         // logcat positionals: [fileFilter, pattern]
         if (positional.Count == 0)
-            return flags.ToArray(); // no positionals — pass through as-is
+            return flags.ToArray(); // no positionals -- pass through as-is
 
         // Auto-detect if first arg looks like a file glob (contains * ? or looks like *.ext)
         // and swap to [fileFilter, pattern] order. Handles common mistake: grap *.log error
@@ -451,13 +451,13 @@ Data Directory:
         string pattern, fileFilter;
         if (positional.Count == 1 && IsGlobLike(positional[0]))
         {
-            // grap *.log → fileFilter=*.log, pattern=* (show all)
+            // grap *.log -> fileFilter=*.log, pattern=* (show all)
             fileFilter = positional[0];
             pattern    = "";
         }
         else if (positional.Count >= 2 && IsGlobLike(positional[0]) && !IsGlobLike(positional[1]))
         {
-            // grap *.log error → auto-swap: fileFilter=*.log, pattern=error
+            // grap *.log error -> auto-swap: fileFilter=*.log, pattern=error
             fileFilter = string.Join(";", positional.Take(positional.Count - 1));
             pattern    = positional[positional.Count - 1];
         }
@@ -466,15 +466,15 @@ Data Directory:
             // Normal grep order: pattern first, files second
             pattern    = positional[0];
             fileFilter = positional.Count > 1
-                ? string.Join(";", positional.Skip(1))  // multiple files → ';' OR glob
-                : "*.log";                               // no file arg → default logcat filter
+                ? string.Join(";", positional.Skip(1))  // multiple files -> ';' OR glob
+                : "*.log";                               // no file arg -> default logcat filter
         }
 
         // If fileFilter contains path separators, extract --basedir so logcat searches the right dir.
         bool hasBasedir = flags.Any(f => f == "--basedir");
         if (!hasBasedir && (fileFilter.Contains('/') || fileFilter.Contains('\\')))
         {
-            // Case 1: directory path (e.g. /tmp/testdir/) → use as basedir, filter=*
+            // Case 1: directory path (e.g. /tmp/testdir/) -> use as basedir, filter=*
             if (System.IO.Directory.Exists(fileFilter.TrimEnd('/', '\\')))
             {
                 flags.Add("--basedir");
@@ -513,7 +513,7 @@ Data Directory:
         }
 
         // Translate grep BRE special sequences to .NET regex equivalents
-        // \| (BRE OR) → | ; \( \) (BRE groups) → ( )
+        // \| (BRE OR) -> | ; \( \) (BRE groups) -> ( )
         if (!string.IsNullOrEmpty(pattern))
             pattern = pattern.Replace("\\|", "|").Replace("\\(", "(").Replace("\\)", ")");
 
@@ -529,14 +529,14 @@ Data Directory:
 
     /// <summary>
     /// Ensure busybox-style symlinks exist next to wkappbot.exe.
-    /// Called once at startup — silently skips on permission error or if already present.
+    /// Called once at startup -- silently skips on permission error or if already present.
     ///
     /// Fallback chain:
-    ///   1. Symlink (preferred) — follows filename across hot-swap
-    ///   2. Hardlink (fallback when no permission) — stale after hot-swap; re-upgraded next run
+    ///   1. Symlink (preferred) -- follows filename across hot-swap
+    ///   2. Hardlink (fallback when no permission) -- stale after hot-swap; re-upgraded next run
     ///
     /// Stale hardlink detection: after hot-swap wkappbot.exe is a new file (different size/time)
-    /// while the hardlink still points to the old inode. We detect this by comparing file sizes —
+    /// while the hardlink still points to the old inode. We detect this by comparing file sizes --
     /// if they diverge, delete the hardlink and retry as symlink.
     /// </summary>
     internal static void EnsureBusyboxAliases()
@@ -558,7 +558,7 @@ Data Directory:
             // Symlink target is always wkappbot.exe (the wrapper), regardless of which exe is running
             var targetName = "wkappbot.exe";
             var targetPath = Path.Combine(dir, targetName);
-            if (!File.Exists(targetPath)) return; // wrapper not present yet — skip
+            if (!File.Exists(targetPath)) return; // wrapper not present yet -- skip
 
             long targetSize = new FileInfo(targetPath).Length;
 
@@ -566,17 +566,17 @@ Data Directory:
             {
                 var linkPath = Path.Combine(dir, alias + ".exe");
 
-                // Check for stale hardlink: no symlink target + size mismatch → delete and recreate
+                // Check for stale hardlink: no symlink target + size mismatch -> delete and recreate
                 if (File.Exists(linkPath))
                 {
                     var linkTarget = File.ResolveLinkTarget(linkPath, returnFinalTarget: false)?.ToString();
                     if (linkTarget != null)
                     {
-                        // Symlink exists — verify it points to the correct target
+                        // Symlink exists -- verify it points to the correct target
                         var linkTargetName = Path.GetFileName(linkTarget);
                         if (string.Equals(linkTargetName, targetName, StringComparison.OrdinalIgnoreCase))
                             continue; // correct symlink, keep it
-                        // Wrong target (e.g. wkappbot-core.exe instead of wkappbot.exe) — recreate
+                        // Wrong target (e.g. wkappbot-core.exe instead of wkappbot.exe) -- recreate
                         try { File.Delete(linkPath); } catch { continue; }
                     }
                     else
@@ -585,7 +585,7 @@ Data Directory:
                         long linkSize = new FileInfo(linkPath).Length;
                         if (linkSize != targetSize)
                         {
-                            // Stale hardlink — delete and fall through to recreate
+                            // Stale hardlink -- delete and fall through to recreate
                             try { File.Delete(linkPath); } catch { continue; }
                         }
                         else continue; // hardlink still matches, keep it
@@ -604,7 +604,7 @@ Data Directory:
                 }
                 catch (UnauthorizedAccessException)
                 {
-                    // No symlink permission — create hardlink as temporary fallback.
+                    // No symlink permission -- create hardlink as temporary fallback.
                     // Will be upgraded to symlink on next run if permission is granted.
                     try { CreateHardLinkNative(linkPath, targetPath); } catch { }
                 }
@@ -615,7 +615,7 @@ Data Directory:
     }
 
     /// <summary>
-    /// enc-test — outputs known Korean text + hex bytes for encoding diagnosis.
+    /// enc-test -- outputs known Korean text + hex bytes for encoding diagnosis.
     /// Core has activeCodePage UTF-8, so pipe bytes are always UTF-8.
     /// Launcher must transcode to terminal CP if not UTF-8 (e.g. CP949 CMD).
     /// </summary>

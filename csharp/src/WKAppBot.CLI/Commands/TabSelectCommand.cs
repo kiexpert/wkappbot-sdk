@@ -10,7 +10,7 @@ internal partial class Program
 {
     /// <summary>
     /// Focusless Tab control navigation: list tabs, select TabItem.
-    /// Uses UIA SelectionItem pattern — NO focus stealing!
+    /// Uses UIA SelectionItem pattern -- NO focus stealing!
     ///
     /// Usage:
     ///   wkappbot tab-select "영웅문4" --aid 3019 --select "조건식"
@@ -72,7 +72,7 @@ internal partial class Program
         var cls = WindowFinder.GetClassName(mainHwnd);
         BroadcastInspectKnowhow(mainHwnd, cls, null, WindowFinder.GetWindowText(mainHwnd));
 
-        // Find Tab control — search for Tab and TabItem control types
+        // Find Tab control -- search for Tab and TabItem control types
         AutomationElement? tab = null;
         try
         {
@@ -197,7 +197,7 @@ internal partial class Program
         var wasSel = UiaLocator.IsSelected(tabItem);
         Console.WriteLine($"  Before: IsSelected={wasSel}");
 
-        // Try SelectionItem.Select() — focusless! (with auto-zoom via ActionApi)
+        // Try SelectionItem.Select() -- focusless! (with auto-zoom via ActionApi)
         var selected = ActionApi.Select(tabItem, mainHwnd, $"[{index}] {name}");
         Console.WriteLine($"  SelectionItem.Select(): {selected} (focusless!)");
 
@@ -215,12 +215,12 @@ internal partial class Program
 
         if (nowSel == true)
         {
-            Console.WriteLine($"  ✓ Tab \"{name}\" selected successfully!");
+            Console.WriteLine($"  v Tab \"{name}\" selected successfully!");
             return 0;
         }
         else
         {
-            Console.WriteLine($"  ✗ Tab selection may have failed (IsSelected={nowSel})");
+            Console.WriteLine($"  X Tab selection may have failed (IsSelected={nowSel})");
             return selected ? 0 : 1; // return success if Select() succeeded even if IsSelected is unclear
         }
     }

@@ -1,7 +1,7 @@
-// ScreenSaverStandaloneCommand.cs — Standalone screensaver process
+// ScreenSaverStandaloneCommand.cs -- Standalone screensaver process
 // Usage: wkappbot screensaver
 // Self-contained: own idle detection, own WPF, own process.
-// Eye spawns this → WPF memory isolated from Eye.
+// Eye spawns this -> WPF memory isolated from Eye.
 
 namespace WKAppBot.CLI;
 
@@ -26,10 +26,10 @@ internal partial class Program
                 if (parentPid > 0 && ++parentCheck % 50 == 0)
                 {
                     try { System.Diagnostics.Process.GetProcessById(parentPid); }
-                    catch { Console.WriteLine("[SCREENSAVER] Parent gone — exiting"); break; }
+                    catch { Console.WriteLine("[SCREENSAVER] Parent gone -- exiting"); break; }
                 }
             }
-            if (ss.ShouldExit) Console.WriteLine("[SCREENSAVER] User input — process exiting (memory freed)");
+            if (ss.ShouldExit) Console.WriteLine("[SCREENSAVER] User input -- process exiting (memory freed)");
             ss.Dispose();
         }
         catch (Exception ex)

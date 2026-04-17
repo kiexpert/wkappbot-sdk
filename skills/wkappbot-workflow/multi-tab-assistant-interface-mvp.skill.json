@@ -2,20 +2,19 @@
   "id": "multi-tab-assistant-interface-mvp",
   "app": "wkappbot-workflow",
   "title": "Multi-tab assistant interface MVP (Claude Codex Copilot)",
-  "desc": "Design a VS Code extension style multi-tab assistant interface that supports Claude, Codex, and Copilot tabs with a unified chat experience, while limiting scope to interface and orchestration behavior comparable to existing extension workflows.",
+  "desc": "Design a VS Code extension style multi-tab assistant interface as an integration reference for AppBot, focusing on provider adapters, shared event flow, and isolated sessions for Claude, Codex, and Copilot. Use when translating a multi-provider chat experience into AppBot or when porting only the orchestration layer, session model, and provider boundaries without cloning a private backend.",
   "steps": [
-    "Define product boundary first: replicate interface behavior and orchestration only; do not attempt private backend cloning.",
-    "Use a three-pane layout: provider tabs on top, conversation thread center, composer and tool status footer.",
-    "Support provider tabs with isolated session state per provider and per workspace so users can switch tabs without context bleed.",
-    "Implement a shared message model with provider-specific adapters; keep one canonical event schema for user message, assistant delta, tool call, tool result, and final response.",
-    "Implement streaming UX parity: incremental token rendering, cancel button, retry last turn, and regenerate response per provider tab.",
-    "Provide workspace-aware context injection: active folder, selected files, and recent command history, with explicit user visibility and opt-out toggles.",
-    "Implement tool orchestration layer with permission gates for shell and file actions, plus non-blocking progress events in the UI timeline.",
-    "Provide robust failure UX: rate limit notices, provider timeout handling, reconnect retry policy, and clear fallback prompts instead of silent failures.",
-    "Implement cost and limit guardrails: estimated token usage per turn, session budget indicator, and configurable hard stop thresholds.",
-    "Track sessions in local structured storage keyed by workspace and provider; include compact summary snapshots for fast resume.",
-    "Define extension APIs as stable internal interfaces so UI and provider adapters can evolve independently without breaking chat state.",
-    "Deliver in phases: phase 1 UI skeleton and local mock streaming, phase 2 real provider adapters, phase 3 tool permissions and session resume, phase 4 polish and telemetry review."
+    "Define the porting boundary first: reuse the orchestration and session model, not the private backend or UI chrome.",
+    "Use a three-pane layout only as a reference shape: provider tabs, conversation thread, and composer or status footer.",
+    "Keep provider sessions isolated per workspace and per provider so tab switches never leak context.",
+    "Use one canonical event schema for user message, assistant delta, tool call, tool result, and final response.",
+    "Keep provider-specific behavior inside adapters; the UI should only speak to the shared contract.",
+    "Support streaming parity, cancel, retry last turn, and regenerate response at the adapter boundary.",
+    "Inject workspace context explicitly and visibly, including active folder, selected files, and recent command history.",
+    "Gate tool actions through permissions and show progress events in the timeline instead of hiding them.",
+    "Surface rate limit, timeout, reconnect, and offline states as first-class UX states.",
+    "Persist compact session snapshots locally by workspace and provider so resume stays cheap and deterministic.",
+    "Deliver in phases: skeleton, adapters, permissions and resume, then polish and observability."
   ],
   "tags": [
     "interface",
@@ -26,12 +25,13 @@
     "mvp",
     "architecture",
     "orchestration",
+    "appbot",
     "project"
   ],
   "source_refs": null,
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-17T08:32:42.667564Z",
-  "updated": "2026-04-17T08:32:42.6675732Z",
-  "version": "1.0"
+  "updated": "2026-04-17T09:23:15.3743868Z",
+  "version": "1.1"
 }

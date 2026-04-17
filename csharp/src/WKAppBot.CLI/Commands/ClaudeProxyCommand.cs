@@ -1,4 +1,4 @@
-// ClaudeProxyCommand.cs — Local Anthropic API proxy for Claude Code
+// ClaudeProxyCommand.cs -- Local Anthropic API proxy for Claude Code
 // Usage: wkappbot claude-proxy [--port 7788] [--inject-context] [--verbose]
 //   Set ANTHROPIC_BASE_URL=http://localhost:7788 in Claude Code settings or env.
 //   Proxies all requests to https://api.anthropic.com with optional injection.
@@ -100,7 +100,7 @@ internal partial class Program
 
         listener?.Close();
         Console.Error.WriteLine("[PROXY] Stopped.");
-        return cleanExit ? 0 : 1; // non-clean exit → AppBotExit(1) flushes error log
+        return cleanExit ? 0 : 1; // non-clean exit -> AppBotExit(1) flushes error log
     }
 
     static async Task HandleProxyRequest(HttpListenerContext ctx, HttpClient http, bool injectContext, bool verbose)
@@ -171,10 +171,10 @@ internal partial class Program
 
             if (isSSE)
             {
-                // Stream SSE — buffer to detect context limit before forwarding
+                // Stream SSE -- buffer to detect context limit before forwarding
                 resp.ContentType = "text/event-stream";
                 resp.Headers["Cache-Control"] = "no-cache";
-                Console.Error.WriteLine($"[PROXY] ← 200 SSE stream started ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[PROXY] <- 200 SSE stream started ({sw.ElapsedMilliseconds}ms)");
 
                 var upstreamStream = await upstreamResp.Content.ReadAsStreamAsync();
                 using var reader = new StreamReader(upstreamStream, Encoding.UTF8);
@@ -185,7 +185,7 @@ internal partial class Program
                 {
                     if (line.StartsWith("data:") && IsAnthropicLimitError(line))
                     {
-                        Console.Error.WriteLine("[PROXY] Limit hit in SSE — handing off to Gemini agent...");
+                        Console.Error.WriteLine("[PROXY] Limit hit in SSE -- handing off to Gemini agent...");
                         var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
                         await WriteFakeSseResponseAsync(writer, handoffMsg);
                         return;
@@ -193,7 +193,7 @@ internal partial class Program
                     await writer.WriteLineAsync(line);
                     await writer.FlushAsync();
                 }
-                Console.Error.WriteLine($"[PROXY] ← SSE done ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[PROXY] <- SSE done ({sw.ElapsedMilliseconds}ms)");
             }
             else if (isError)
             {
@@ -201,7 +201,7 @@ internal partial class Program
 
                 if (IsAnthropicLimitError(errorBody))
                 {
-                    Console.Error.WriteLine($"[PROXY] Limit hit ({(int)upstreamResp.StatusCode}) — handing off to Gemini agent...");
+                    Console.Error.WriteLine($"[PROXY] Limit hit ({(int)upstreamResp.StatusCode}) -- handing off to Gemini agent...");
                     var handoffMsg = await SpawnGeminiAgentHandoffAsync(requestBody, verbose);
 
                     resp.StatusCode = 200;
@@ -223,7 +223,7 @@ internal partial class Program
                     return;
                 }
 
-                Console.Error.WriteLine($"[PROXY] ← {(int)upstreamResp.StatusCode} error ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[PROXY] <- {(int)upstreamResp.StatusCode} error ({sw.ElapsedMilliseconds}ms)");
                 if (verbose) Console.Error.WriteLine($"[PROXY] error body: {errorBody[..Math.Min(200, errorBody.Length)]}");
                 var errorBytes = Encoding.UTF8.GetBytes(errorBody);
                 resp.ContentLength64 = errorBytes.Length;
@@ -232,7 +232,7 @@ internal partial class Program
             }
             else
             {
-                Console.Error.WriteLine($"[PROXY] ← {(int)upstreamResp.StatusCode} ({sw.ElapsedMilliseconds}ms)");
+                Console.Error.WriteLine($"[PROXY] <- {(int)upstreamResp.StatusCode} ({sw.ElapsedMilliseconds}ms)");
                 // Pass through response body directly
                 var bodyStream = await upstreamResp.Content.ReadAsStreamAsync();
                 await bodyStream.CopyToAsync(resp.OutputStream);
@@ -270,7 +270,7 @@ internal partial class Program
             var system = node["system"];
             if (system is JsonArray sysArr)
             {
-                // Array-style system — prepend a text block
+                // Array-style system -- prepend a text block
                 var newBlock = JsonNode.Parse($"{{\"type\":\"text\",\"text\":{JsonSerializer.Serialize(contextLines)}}}");
                 sysArr.Insert(0, newBlock);
             }
@@ -379,7 +379,7 @@ internal partial class Program
     static string BuildHandoffNote()
     {
         var sb = new StringBuilder();
-        sb.AppendLine("── WKAppBot Context Limit Handoff ──");
+        sb.AppendLine("-- WKAppBot Context Limit Handoff --");
         sb.AppendLine("Run: wkappbot newchat \"<brief summary of current work>\"");
 
         try
@@ -416,7 +416,7 @@ internal partial class Program
 
     /// <summary>
     /// Spawn wkappbot agent gemini --new-session with CLAUDE.md + MEMORY.md + last user prompt.
-    /// No Anthropic API calls — works even when weekly limit is hit.
+    /// No Anthropic API calls -- works even when weekly limit is hit.
     /// Returns a status message to show in Claude Code while Gemini agent starts.
     /// </summary>
     static async Task<string> SpawnGeminiAgentHandoffAsync(string? requestBody, bool verbose)
@@ -442,7 +442,7 @@ internal partial class Program
             }
             catch { }
 
-            // Build context: CLAUDE.md + MEMORY.md + last prompt → temp file → agent gemini --file
+            // Build context: CLAUDE.md + MEMORY.md + last prompt -> temp file -> agent gemini --file
             var claudeMdPath = Path.Combine(AppContext.BaseDirectory, "../../../../../../CLAUDE.md");  // project CLAUDE.md
             var globalClaudeMd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "CLAUDE.md");
             var memoryMd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "projects", "w--GitHub-WKAppBot", "memory", "MEMORY.md");
@@ -482,12 +482,12 @@ internal partial class Program
             if (verbose) Console.Error.WriteLine($"[PROXY] Gemini agent spawned with {sb.Length}ch context");
 
             return $"""
-                ## Anthropic Limit Reached — Handed off to Gemini Agent
+                ## Anthropic Limit Reached -- Handed off to Gemini Agent
 
                 Your session has been forwarded to `wkappbot agent gemini --new-session`.
                 Context included: CLAUDE.md + MEMORY.md + your prompt.
 
-                Gemini is starting up — check the Gemini browser tab or Slack for the response.
+                Gemini is starting up -- check the Gemini browser tab or Slack for the response.
                 Subsequent messages here will be relayed to the Gemini session via `--interrupt`.
 
                 *(Prompt: {lastPrompt[..Math.Min(lastPrompt.Length, 100)]}...)*

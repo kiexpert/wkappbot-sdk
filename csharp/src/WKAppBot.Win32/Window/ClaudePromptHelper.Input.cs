@@ -11,7 +11,7 @@ public sealed partial class ClaudePromptHelper
     /// <summary>
     /// Inject text into prompt without submitting. Focusless-only.
     /// Codex: WM_CHAR to renderer. Claude Desktop: MSAA put_accValue.
-    /// VS Code Claude Code: TextPattern2 (truly focusless) → clipboard paste fallback.
+    /// VS Code Claude Code: TextPattern2 (truly focusless) -> clipboard paste fallback.
     /// Returns false if focusless injection not possible for this host.
     /// </summary>
     public bool InjectTextOnly(PromptInfo prompt, string text)
@@ -24,7 +24,7 @@ public sealed partial class ClaudePromptHelper
             if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
                 return true;
 
-            Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 inject failed — fallback focus-steal paste");
+            Console.WriteLine("  [PROMPT:VSCODE-CC] TP2 inject failed -- fallback focus-steal paste");
             using var clipGuard = new ClipboardGuard();
             if (!clipGuard.CanProceed) return false;
             SetClipboardText(text);
@@ -45,7 +45,7 @@ public sealed partial class ClaudePromptHelper
     /// Type text into the Claude prompt and submit with Enter.
     /// Strategy (2-tier):
     ///   1. Focusless: MSAA put_accValue via direct vtable (no focus steal!)
-    ///   2. Fallback: SetForegroundWindow → Click → Paste → Enter → Restore previous foreground
+    ///   2. Fallback: SetForegroundWindow -> Click -> Paste -> Enter -> Restore previous foreground
     /// </summary>
     /// <summary>
     /// Type text into prompt and (by default) submit it.
@@ -62,7 +62,7 @@ public sealed partial class ClaudePromptHelper
             Console.WriteLine($"  [PROMPT] DeliveryCtx: {ctx}");
             if (decision == PromptDeliveryDecision.Skip || decision == PromptDeliveryDecision.Abort)
             {
-                Console.WriteLine($"  [PROMPT] Delivery decision={decision} — abort");
+                Console.WriteLine($"  [PROMPT] Delivery decision={decision} -- abort");
                 return false;
             }
             focusStealAllowed = decision == PromptDeliveryDecision.FocusSteal;
@@ -130,7 +130,7 @@ public sealed partial class ClaudePromptHelper
     }
 
     /// <summary>
-    /// Option 3: TextPattern2.InsertTextAtSelection — truly focusless for VS Code Claude Code.
+    /// Option 3: TextPattern2.InsertTextAtSelection -- truly focusless for VS Code Claude Code.
     /// Finds [Edit] "Message input" by ControlType+Name, then InsertTextAtSelection.
     /// Submit (if requested) via renderer WM_KEYDOWN Enter.
     /// Returns false if TextPattern2 not supported or element not found.
@@ -160,7 +160,7 @@ public sealed partial class ClaudePromptHelper
                 return false;
             }
 
-            // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection — call via reflection
+            // FlaUI 4.0 IText2Pattern interface omits InsertTextAtSelection -- call via reflection
             var insertMethod = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
                 System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
             if (insertMethod == null)
@@ -173,7 +173,7 @@ public sealed partial class ClaudePromptHelper
 
             if (!submit) return true;
 
-            // Submit via renderer WM_KEYDOWN Enter — no focus steal needed
+            // Submit via renderer WM_KEYDOWN Enter -- no focus steal needed
             var rendHwnd = GetRendererHwnd(prompt.WindowHandle);
             if (rendHwnd == IntPtr.Zero)
             {
@@ -200,7 +200,7 @@ public sealed partial class ClaudePromptHelper
 
     /// <summary>
     /// VS Code Claude Code extension: TextPattern2 focusless first, then focus-steal fallback.
-    /// UIA turn-form 없음 → 키보드 단축키로 입력 영역 포커싱.
+    /// UIA turn-form 없음 -> 키보드 단축키로 입력 영역 포커싱.
     /// Escape: Claude Code 입력창 포커스 (VS Code 확장 기본 동작).
     /// 입력위치확보(Probe) 승인 후 호출되므로 포커스 전환 허용됨.
     /// </summary>
@@ -212,17 +212,17 @@ public sealed partial class ClaudePromptHelper
             Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR+Enter focusless OK");
             return true;
         }
-        Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed — trying TP2");
+        Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed -- trying TP2");
 
         // Option 2: TextPattern2.InsertTextAtSelection (truly focusless!)
         if (TryVSCodeTextPattern2Insert(prompt, text, submit: true))
             return true;
 
-        Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed — falling back to focus-steal");
+        Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed -- falling back to focus-steal");
 
         if (!focusStealAllowed && !AllowFocusSteal)
         {
-            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus steal not allowed — abort");
+            Console.WriteLine("  [PROMPT:VSCODE-CC] Focus steal not allowed -- abort");
             return false;
         }
 
@@ -230,8 +230,8 @@ public sealed partial class ClaudePromptHelper
         if (!clipGuardVscc.CanProceed) return false;
         var prevForeground = NativeMethods.GetForegroundWindow();
 
-        // 항상 타이틀바 클릭으로 윈도우 활성화 — GetForegroundWindow 결과 무관
-        // 같은 프로세스(Electron) 다중 창은 API로 키보드 포커스 전환 불가 → 클릭 필수
+        // 항상 타이틀바 클릭으로 윈도우 활성화 -- GetForegroundWindow 결과 무관
+        // 같은 프로세스(Electron) 다중 창은 API로 키보드 포커스 전환 불가 -> 클릭 필수
         NativeMethods.SmartSetForegroundWindow(prompt.WindowHandle);
         NativeMethods.GetWindowRect(prompt.WindowHandle, out var wr);
         var titleX = wr.Left + wr.Width / 2;
@@ -239,7 +239,7 @@ public sealed partial class ClaudePromptHelper
         MouseInput.Click(titleX, titleY);
         Thread.Sleep(150);
 
-        // ── Foreground verification — confirm this window actually got focus ──
+        // -- Foreground verification -- confirm this window actually got focus --
         // Multiple VS Code windows share the same process; if focus steal fails,
         // keystrokes go to the wrong window. Verify before pasting.
         var actualFg = NativeMethods.GetForegroundWindow();
@@ -249,16 +249,16 @@ public sealed partial class ClaudePromptHelper
             NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint targetPid);
             if (actualPid != targetPid)
             {
-                // Completely wrong process — abort
-                Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus steal FAILED (fg=0x{actualFg:X} vs target=0x{prompt.WindowHandle:X}) — abort");
+                // Completely wrong process -- abort
+                Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus steal FAILED (fg=0x{actualFg:X} vs target=0x{prompt.WindowHandle:X}) -- abort");
                 return false;
             }
-            // Same process but different window — might still be OK (VS Code internal focus)
-            Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus on sibling window (same process) — proceeding");
+            // Same process but different window -- might still be OK (VS Code internal focus)
+            Console.WriteLine($"  [PROMPT:VSCODE-CC] Focus on sibling window (same process) -- proceeding");
         }
         Console.WriteLine($"  [PROMPT:VSCODE-CC] Window activated via click ({titleX},{titleY})");
 
-        // Escape → 입력창 포커스 → Paste → Enter (갭 최소화)
+        // Escape -> 입력창 포커스 -> Paste -> Enter (갭 최소화)
         KeyboardInput.PressKey("escape");
         Thread.Sleep(100);
 
@@ -332,7 +332,7 @@ public sealed partial class ClaudePromptHelper
     {
         try
         {
-            // [FOCUS-GUARD] 타겟 렌더러 확인 — prompt.PromptRect와 겹치는 렌더러만 사용
+            // [FOCUS-GUARD] 타겟 렌더러 확인 -- prompt.PromptRect와 겹치는 렌더러만 사용
             // VS Code에는 Chrome_RenderWidgetHostHWND가 다수 (에디터/사이드바/터미널 등)
             // 첫 번째가 코드 에디터일 수 있으므로 rect 기반으로 올바른 패널 선택
             var rendererHwnd = prompt.PromptRect != System.Drawing.Rectangle.Empty
@@ -349,12 +349,12 @@ public sealed partial class ClaudePromptHelper
             // 크롬 창 전체가 아니라 Claude 패널 rect 기준으로 판단 (에디터/터미널 방지)
             //
             // 폴백 체인:
-            //   1. UIA TextPattern caret → PromptRect 포함 여부
-            //   2. Win32 GetCaretPos     → PromptRect 포함 여부
-            //   3. 캐럿 없음 + IsIconic  → SW_SHOWNOACTIVATE 복원 → 재시도
-            //   4. 캐럿 없음 + thread focus == renderer → 안전 (백그라운드)
-            //   5. 캐럿 없음 + 위 모두 실패 → FocusPromptFocusless (WM_LBUTTON) → 재시도
-            //   6. 그래도 없으면 → abort
+            //   1. UIA TextPattern caret -> PromptRect 포함 여부
+            //   2. Win32 GetCaretPos     -> PromptRect 포함 여부
+            //   3. 캐럿 없음 + IsIconic  -> SW_SHOWNOACTIVATE 복원 -> 재시도
+            //   4. 캐럿 없음 + thread focus == renderer -> 안전 (백그라운드)
+            //   5. 캐럿 없음 + 위 모두 실패 -> FocusPromptFocusless (WM_LBUTTON) -> 재시도
+            //   6. 그래도 없으면 -> abort
             var kbFocus = NativeMethods.GetKeyboardFocusHwnd();
             if (prompt.PromptRect != System.Drawing.Rectangle.Empty)
             {
@@ -362,7 +362,7 @@ public sealed partial class ClaudePromptHelper
                     return false;
             }
             else if (kbFocus != IntPtr.Zero && kbFocus != rendererHwnd)
-                Console.WriteLine($"  [PROMPT] WM_CHAR: no PromptRect, renderer=0x{rendererHwnd:X8} kbFocus=0x{kbFocus:X8} — trying anyway");
+                Console.WriteLine($"  [PROMPT] WM_CHAR: no PromptRect, renderer=0x{rendererHwnd:X8} kbFocus=0x{kbFocus:X8} -- trying anyway");
 
             const int WM_CHAR = 0x0102;
             var ok = true;
@@ -405,12 +405,12 @@ public sealed partial class ClaudePromptHelper
 
     /// <summary>
     /// Try to input text into the Claude prompt WITHOUT stealing focus.
-    /// Priority: MSAA put_accValue (direct vtable) → LegacyIAccessible.SetValue (UIA bridge).
+    /// Priority: MSAA put_accValue (direct vtable) -> LegacyIAccessible.SetValue (UIA bridge).
     /// Returns true if text was successfully inserted AND submitted.
     /// </summary>
     private bool TryFocuslessInputNoSubmit(PromptInfo prompt, string text)
     {
-        // IA2 insertText — focusless, no submit
+        // IA2 insertText -- focusless, no submit
         if (TryIA2InsertText(prompt, text))
         {
             Console.WriteLine("  [PROMPT] IA2 insert (no submit) OK");
@@ -491,7 +491,7 @@ public sealed partial class ClaudePromptHelper
             {
                 legacy.Pattern.SetValue(text);
                 Console.WriteLine($"  [PROMPT] LegacyIA.SetValue succeeded! ({text.Length} chars, focusless!)");
-                // If we get here, text was set — try to submit and return
+                // If we get here, text was set -- try to submit and return
                 return TryFocuslessSubmit(prompt, turnForm);
             }
             catch (Exception ex)
@@ -500,7 +500,7 @@ public sealed partial class ClaudePromptHelper
             }
 
             // NOTE: LegacyIAccessible.SetValue returns E_NOTIMPL for Electron contentEditable
-            // because FlaUI's UIA→MSAA bridge adds extra validation.
+            // because FlaUI's UIA->MSAA bridge adds extra validation.
             // Direct MSAA vtable put_accValue works! (handled above via TryIA2InsertText)
             // PostMessage WM_PASTE also doesn't work (Chrome ignores when not foreground).
 
@@ -547,7 +547,7 @@ public sealed partial class ClaudePromptHelper
         KeyboardInput.Hotkey(new[] { "ctrl", "v" });
         Thread.Sleep(200);
 
-        // NO Enter key — dry run!
+        // NO Enter key -- dry run!
         Console.WriteLine("  [PROMPT] Text pasted (no Enter, dry-run)");
 
         // Restore previous foreground
@@ -575,7 +575,7 @@ public sealed partial class ClaudePromptHelper
                 Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR focusless OK");
                 return true;
             }
-            Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed — trying TP2");
+            Console.WriteLine("  [PROMPT:VSCODE-CC] WM_CHAR failed -- trying TP2");
             if (TryVSCodeTextPattern2Insert(prompt, text, submit: false))
                 return true;
             Console.WriteLine("  [PROMPT:VSCODE-CC] focusless all paths failed");
@@ -647,8 +647,8 @@ public sealed partial class ClaudePromptHelper
 
     /// <summary>
     /// Read current text in the prompt input area (focusless).
-    /// VS Code: [Edit] "Message input" → Text pattern DocumentRange.
-    /// Claude Desktop/others: turn-form inputGroup → Value pattern.
+    /// VS Code: [Edit] "Message input" -> Text pattern DocumentRange.
+    /// Claude Desktop/others: turn-form inputGroup -> Value pattern.
     /// Returns null if unable to read.
     /// </summary>
     public string? ReadCurrentInputText(PromptInfo prompt)
@@ -667,8 +667,8 @@ public sealed partial class ClaudePromptHelper
                     new PropertyCondition(_automation.PropertyLibrary.Element.Name, "Message input")));
                 if (editEl == null) return null;
 
-                // Value pattern first — empty string = no content (placeholder NOT included)
-                // TextPattern.GetText() returns placeholder text even when input is empty → skip
+                // Value pattern first -- empty string = no content (placeholder NOT included)
+                // TextPattern.GetText() returns placeholder text even when input is empty -> skip
                 var vp = editEl.Patterns.Value;
                 if (vp.IsSupported)
                 {
@@ -687,7 +687,7 @@ public sealed partial class ClaudePromptHelper
                 return null;
             }
 
-            // Claude Desktop path: turn-form → inputGroup
+            // Claude Desktop path: turn-form -> inputGroup
             var turnForm2 = root.FindFirstDescendant(
                 new PropertyCondition(_automation.PropertyLibrary.Element.AutomationId, "turn-form"));
             if (turnForm2 == null) return null;
@@ -711,7 +711,7 @@ public sealed partial class ClaudePromptHelper
                     if (lower.Contains("type your message") || lower.Contains("입력하세요")
                         || lower.Contains("message claude") || lower.Contains("ask anything")
                         || lower.Contains("reply to") || lower.Contains("what can i"))
-                        return null; // placeholder → treat as empty
+                        return null; // placeholder -> treat as empty
                 }
                 return text;
             }
@@ -758,7 +758,7 @@ public sealed partial class ClaudePromptHelper
                 // Fallback: focus-steal + Escape + Ctrl+A + Delete
                 if (!AllowFocusSteal)
                 {
-                    Console.WriteLine("  [PROMPT] ClearCurrentInput: focusless failed, AllowFocusSteal=false — skip");
+                    Console.WriteLine("  [PROMPT] ClearCurrentInput: focusless failed, AllowFocusSteal=false -- skip");
                     return false;
                 }
 
@@ -808,14 +808,14 @@ public sealed partial class ClaudePromptHelper
         // Clipboard operations require STA thread
         var thread = new Thread(() =>
         {
-            // P/Invoke clipboard: OpenClipboard → EmptyClipboard → SetClipboardData → CloseClipboard
+            // P/Invoke clipboard: OpenClipboard -> EmptyClipboard -> SetClipboardData -> CloseClipboard
             if (!NativeMethods.OpenClipboard(IntPtr.Zero)) return;
             try
             {
                 NativeMethods.EmptyClipboard();
                 var hGlobal = System.Runtime.InteropServices.Marshal.StringToHGlobalUni(text);
                 NativeMethods.SetClipboardData(13 /* CF_UNICODETEXT */, hGlobal);
-                // Don't free hGlobal — clipboard takes ownership
+                // Don't free hGlobal -- clipboard takes ownership
             }
             finally
             {
@@ -857,7 +857,7 @@ public sealed partial class ClaudePromptHelper
     /// <summary>
     /// Saves clipboard content on construction, restores it on Dispose.
     /// Use with 'using' around any SetClipboardText + paste sequence to protect user's clipboard.
-    /// If save fails (clipboard locked etc.) → blocks SetClipboardText to avoid silent data loss.
+    /// If save fails (clipboard locked etc.) -> blocks SetClipboardText to avoid silent data loss.
     /// </summary>
     internal sealed class ClipboardGuard : IDisposable
     {
@@ -884,7 +884,7 @@ public sealed partial class ClaudePromptHelper
                 SetClipboardText(_saved);
                 Console.WriteLine($"  [CLIPBOARD] Restored ({_saved.Length} chars)");
             }
-            // null = was empty → leave clipboard as-is (don't clear user's new copy if they pasted fast)
+            // null = was empty -> leave clipboard as-is (don't clear user's new copy if they pasted fast)
         }
     }
 }

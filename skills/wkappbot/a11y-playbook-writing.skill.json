@@ -5,14 +5,14 @@
   "desc": "Create and revise executable WKAppBot playbooks/scenarios for focusless desktop automation. Use when drafting or updating YAML scenarios, Notepad-style demos, save-dialog recovery flows, or any target-heavy automation that should prefer \u0060a11y find\u0060, paste-ready grap targets, UTF-8-safe files, and graceful close behavior over brittle clicks or taskkill.",
   "steps": [
     "Read the shared repo guidance first: AGENTS.md, CLAUDE.md, and README.md. Keep any new prose English-first and UTF-8 encoded; only UI-localized labels may stay localized when the target app requires them.",
-    "Reuse existing skills before inventing new flow: \u0060wkappbot skill list\u0060, then \u0060wkappbot skill show a11y-find\u0060, \u0060grap-target\u0060, and \u0060control-ui-without-stealing-focus-3-tier-focusless-strategy\u0060.",
+    "Reuse existing skills before inventing new flow: \u0060wkappbot skill list\u0060, then \u0060wkappbot skill read a11y-find\u0060, \u0060grap-target\u0060, and \u0060control-ui-without-stealing-focus-3-tier-focusless-strategy\u0060.",
     "Write the playbook as a runnable scenario: \u0060scenario\u0060, \u0060config\u0060, \u0060app\u0060, \u0060steps\u0060, optional \u0060teardown\u0060. Prefer \u0060prefer_focusless: true\u0060 and \u0060focus_check: false\u0060 when the goal is background automation.",
     "Discover exact targets with \u0060a11y find\u0060 and copy the emitted \u0060# TARGET\u0060 grap. Prefer node-tag / grap-path resolution over raw \u0060name\u0060 matching for buttons and modal controls.",
     "For Notepad close flows, prefer \u0060window_close\u0060 first. If a save prompt appears, dismiss it by invoking the button found through the a11y node tag path. Keep \u0060press_key\u0060 only as fallback, not as the primary path.",
     "Avoid destructive process-kill shortcuts for Notepad. Use graceful close, prompt dismissal, and only narrow fallback logic when the UI path fails.",
     "Prefer stable selectors in scenarios: \u0060control_type\u0060, \u0060automation_id\u0060, and \u0060description\u0060 over fragile visible text. Use localized text only where the OS/app label itself is localized.",
     "Validate the playbook after edits with the official binary on PATH: \u0060wkappbot validate \u003Cfile\u003E\u0060 and, when relevant, \u0060wkappbot run \u003Cfile\u003E\u0060. If validation fails with log or lock issues, inspect runtime state before assuming the YAML is wrong.",
-    "After creating or updating the skill, verify it with \u0060wkappbot skill show \u003Cid\u003E\u0060 and keep the skill body short, imperative, and reusable.",
+    "After creating or updating the skill, verify it with \u0060wkappbot skill read \u003Cid\u003E\u0060 and keep the skill body short, imperative, and reusable.",
     "Use wkappbot skill contribute / wkappbot skill edit for all skill changes; never hand-edit .skill.json files."
   ],
   "tags": [

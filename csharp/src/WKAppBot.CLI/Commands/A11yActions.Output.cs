@@ -23,11 +23,11 @@ internal partial class Program
     // Print TARGET code-fence block (stdout, cyan).
     // titleHeading : window title used as ## heading
     // paste        : quoted grap expression
-    // action       : "find" / "read" / "click" etc. — used in command hint line
+    // action       : "find" / "read" / "click" etc. -- used in command hint line
     // extraArgs    : appended to command hint line (e.g. --eval-js "...")
     // okMiss       : "OK" / "MISS"
     // ms           : verify round-trip time
-    // matchNote    : e.g. "  ← cmd: chatgpt.com" or "" for clean match
+    // matchNote    : e.g. "  <- cmd: chatgpt.com" or "" for clean match
     // leafTag      : leaf node XML tag, e.g. <Edit ltwh=... aid='prompt'>텍스트</Edit>
     static void PrintTargetBlock(string titleHeading, string paste, string action,
         string[]? extraArgs, string okMiss, long ms, string matchNote = "", string leafTag = "")
@@ -70,12 +70,12 @@ internal partial class Program
             catch { }
 
             if (!string.IsNullOrEmpty(aid))  sb.Append($" aid='{aid}'");
-            if (!string.IsNullOrEmpty(name)) sb.Append($" name='{(name.Length > 40 ? name[..37] + "…" : name)}'");
+            if (!string.IsNullOrEmpty(name)) sb.Append($" name='{(name.Length > 40 ? name[..37] + "..." : name)}'");
 
             // Value pattern
             string? val = null;
             try { val = el.Patterns.Value.PatternOrDefault?.Value.ValueOrDefault; } catch { }
-            if (val != null) sb.Append($" val='{(val.Length > 40 ? val[..37] + "…" : val)}'");
+            if (val != null) sb.Append($" val='{(val.Length > 40 ? val[..37] + "..." : val)}'");
 
             // Supported patterns
             var pats = GetSupportedPatternNames(el);
@@ -96,7 +96,7 @@ internal partial class Program
             if (!string.IsNullOrEmpty(body))
             {
                 var escaped = body.Replace("<", "&lt;").Replace(">", "&gt;");
-                if (escaped.Length > 60) escaped = escaped[..57] + "…";
+                if (escaped.Length > 60) escaped = escaped[..57] + "...";
                 sb.Append($">{escaped}</{ct}>");
             }
             else

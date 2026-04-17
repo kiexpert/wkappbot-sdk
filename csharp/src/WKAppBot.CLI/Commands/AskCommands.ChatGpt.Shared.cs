@@ -52,7 +52,7 @@ internal partial class Program
 
     static async Task<bool> WaitWhileStopButtonVisible(CdpClient cdp, int maxWaitMs = 12000)
     {
-        // Legacy overload — wrap in a generic AskSession for provider-aware stop detection.
+        // Legacy overload -- wrap in a generic AskSession for provider-aware stop detection.
         // Uses ChatGpt provider as default since this was originally GPT-only.
         using var session = new AskSession(AiProvider.ChatGpt, cdp);
         return await WaitWhileStopButtonVisible(session, maxWaitMs);
@@ -76,8 +76,8 @@ internal partial class Program
         }
 
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
-        // Timed out — click stop to cancel ongoing generation, then wait briefly and proceed
-        Console.Error.WriteLine($"[ASK] {session.Provider.Name} stop still visible — clicking stop to cancel generation...");
+        // Timed out -- click stop to cancel ongoing generation, then wait briefly and proceed
+        Console.Error.WriteLine($"[ASK] {session.Provider.Name} stop still visible -- clicking stop to cancel generation...");
         await session.ClickStopAsync();
         await Task.Delay(1500);
         return true;
@@ -132,7 +132,7 @@ internal partial class Program
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, CdpClient> _waitingTabs = new();
 
     /// <summary>
-    /// Register this AI's tab as "waiting for response" — eligible for tab handoff.
+    /// Register this AI's tab as "waiting for response" -- eligible for tab handoff.
     /// </summary>
     static void RegisterWaitingTab(string aiName, CdpClient cdp)
     {
@@ -148,15 +148,15 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Tab handoff disabled — BringToFront steals OS focus.
+    /// Tab handoff disabled -- BringToFront steals OS focus.
     /// CDP works fine on background tabs, no handoff needed.
     /// </summary>
     static Task HandoffTabToPeer(string myName) => Task.CompletedTask;
 
     // ★★ Chrome Tab Lock ★★
     // Per-AI tab lock: each AI provider (gemini, gpt, claude) gets its own semaphore.
-    // This allows Gemini, GPT, and Claude to send/receive in parallel → different tabs,
-    // different CDP connections → no shared browser resource that needs serialization.
+    // This allows Gemini, GPT, and Claude to send/receive in parallel -> different tabs,
+    // different CDP connections -> no shared browser resource that needs serialization.
     // Only operations on the SAME AI tab are serialized (send vs concurrent send).
     // Acquired before prompt input, auto-released after 9s or when first byte arrives.
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim>
@@ -164,7 +164,7 @@ internal partial class Program
 
     static SemaphoreSlim GetTabSemaphore(string aiName)
     {
-        // Normalize key: "Gemini/persona" → "gemini", "Claude" → "claude", "ChatGPT" → "chatgpt"
+        // Normalize key: "Gemini/persona" -> "gemini", "Claude" -> "claude", "ChatGPT" -> "chatgpt"
         var key = aiName.Split('/')[0].ToLowerInvariant();
         return _tabSemaphores.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
     }
@@ -180,7 +180,7 @@ internal partial class Program
         {
             _aiName = aiName;
             _sem = sem;
-            // Auto-release after 60 seconds (safety net → prevents deadlock)
+            // Auto-release after 60 seconds (safety net -> prevents deadlock)
             // NOTE: must be > approval popup timeout (30s) + input time
             _autoRelease = new Timer(_ => Release("auto-60s"), null, 60000, Timeout.Infinite);
         }

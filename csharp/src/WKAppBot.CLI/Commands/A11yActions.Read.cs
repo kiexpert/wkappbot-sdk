@@ -98,11 +98,11 @@ internal partial class Program
         }
         else if (clsMatch.Success)
         {
-            // legacy app — no a11y tree, cls is essential for targeting
+            // legacy app -- no a11y tree, cls is essential for targeting
             f.Append($",cls:'{clsMatch.Groups[1].Value.Replace("'", "\\'")}'");
         }
 
-        // matched search field — always include if not already covered above
+        // matched search field -- always include if not already covered above
         if (hit != null && !string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
         {
             bool alreadyCovered = hit.MatchedVia switch
@@ -112,7 +112,7 @@ internal partial class Program
                 "file"    => hasDomainOrFile,
                 "proc"    => true, // already in proc field
                 "cls"     => clsMatch.Success,
-                "context" => true, // internal heuristic (foreground host) — not a real grap field
+                "context" => true, // internal heuristic (foreground host) -- not a real grap field
                 _         => false
             };
             if (!alreadyCovered)
@@ -144,7 +144,7 @@ internal partial class Program
         var compactGrap = BuildCompactWinGrap(hwnd);
         var fullGrap = BuildTargetGrapWithFocusPath(hwnd);
 
-        // ── FOCUS section ──────────────────────────────────────
+        // -- FOCUS section --------------------------------------
         if (printFocus && focInfo != null)
         {
             var gti2 = new NativeMethods.GUITHREADINFO
@@ -188,7 +188,7 @@ internal partial class Program
         if (!string.IsNullOrEmpty(multiHeader))
             Console.WriteLine(Ansi.Dim(multiHeader));
 
-        // ── TARGET section ─────────────────────────────────────
+        // -- TARGET section ------------------------------------─
         var sw = System.Diagnostics.Stopwatch.StartNew();
         string verifyMark = "?";
         var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
@@ -219,9 +219,9 @@ internal partial class Program
         var matchNote = originalHit?.MatchedVia switch
         {
             null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
-            "uia"       => $"  ← uia: {originalHit.MatchedSnippet}",
-            "child-cmd" => "",  // proc/cmd already in grap — no extra annotation needed
-            _ => $"  ← {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
+            "uia"       => $"  <- uia: {originalHit.MatchedSnippet}",
+            "child-cmd" => "",  // proc/cmd already in grap -- no extra annotation needed
+            _ => $"  <- {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
         } ?? "";
 
         var leafTag = GetFocusedLeafTag(hwnd);

@@ -15,7 +15,7 @@ internal partial class Program
 {
     static void InitFileWatchers()
     {
-        // ── 1. Tick file watcher (eye_ticks.jsonl) ──
+        // -- 1. Tick file watcher (eye_ticks.jsonl) --
         try
         {
             var tickPath = EyeTicksPath;
@@ -40,7 +40,7 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE][FSW] Tick watcher init failed: {ex.Message}");
         }
 
-        // ── 2. OpenClaw sessions watcher (*.jsonl) ──
+        // -- 2. OpenClaw sessions watcher (*.jsonl) --
         try
         {
             var sessionsDir = Path.Combine(
@@ -66,9 +66,9 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE][FSW] Prompt watcher init failed: {ex.Message}");
         }
 
-        // Claude Code JSONL: 1s polling only — FSW removed (per-instance watermark sufficient)
+        // Claude Code JSONL: 1s polling only -- FSW removed (per-instance watermark sufficient)
 
-        // ── 4. EXE file watcher (hot-swap: instant binary change detection) ──
+        // -- 4. EXE file watcher (hot-swap: instant binary change detection) --
         try
         {
             var selfExe = Environment.ProcessPath ?? "";
@@ -99,7 +99,7 @@ internal partial class Program
                 var newExeOnStart = Path.Combine(exeDir, Path.GetFileNameWithoutExtension(exeFile) + ".new.exe");
                 if (File.Exists(newExeOnStart))
                 {
-                    Console.WriteLine("[EYE][FSW] .new.exe already present at startup — triggering hot-swap");
+                    Console.WriteLine("[EYE][FSW] .new.exe already present at startup -- triggering hot-swap");
                     _fswExeDirty = true;
                 }
                 Console.Error.WriteLine($"[EYE][FSW] Hot-swap watcher: {exeDir}/{exeFile}");
@@ -110,19 +110,19 @@ internal partial class Program
             Console.Error.WriteLine($"[EYE][FSW] Hot-swap watcher init failed: {ex.Message}");
         }
 
-        // ── 4. 앱봇관리 log file watcher (temp dir) ──
-        // Eye/MCP가 wkappbot-*.log 생성 → Eye가 감지해서 apbot-mcp WT 탭 자동 오픈
+        // -- 4. 앱봇관리 log file watcher (temp dir) --
+        // Eye/MCP가 wkappbot-*.log 생성 -> Eye가 감지해서 apbot-mcp WT 탭 자동 오픈
         try
         {
             var tempDir = Path.GetTempPath();
             // Eye 재시작 시 기존 로그 파일 처리:
-            // - PID 살아있는 것 → 탭 오픈
-            // - 죽은 세션 로그 → 삭제 (탭 폭발 방지)
+            // - PID 살아있는 것 -> 탭 오픈
+            // - 죽은 세션 로그 -> 삭제 (탭 폭발 방지)
             foreach (var f in Directory.GetFiles(tempDir, "wkappbot-*.log"))
             {
                 var stem  = Path.GetFileNameWithoutExtension(f);
                 var parts = stem.Split('-');
-                // wkappbot-eye-{pid} or wkappbot-mcp-{pid} → 마지막 파트가 숫자이면 PID
+                // wkappbot-eye-{pid} or wkappbot-mcp-{pid} -> 마지막 파트가 숫자이면 PID
                 if (int.TryParse(parts[^1], out var logPid))
                 {
                     bool alive = false;
@@ -155,13 +155,13 @@ internal partial class Program
     /// <summary>
     /// 앱봇관리 로그 파일 생성 감지 시 apbot-mcp WT 탭 오픈.
     /// 파일명 규칙:
-    ///   wkappbot-eye-{pid}.log              → [앱봇관리] Eye
-    ///   wkappbot-mcp-{session}.log          → [앱봇관리] MCP
-    ///   wkappbot-mcp-tool-{name}-{id}.log   → [앱봇관리] {name} #{id}
+    ///   wkappbot-eye-{pid}.log              -> [앱봇관리] Eye
+    ///   wkappbot-mcp-{session}.log          -> [앱봇관리] MCP
+    ///   wkappbot-mcp-tool-{name}-{id}.log   -> [앱봇관리] {name} #{id}
     /// </summary>
     static void EyeOpenConsoleWtTab(string logFilePath)
     {
-        // wt.exe 자동 탭 오픈 비활성화 — 포커스 간섭 없이 필요할 때 수동으로 열어서 사용
+        // wt.exe 자동 탭 오픈 비활성화 -- 포커스 간섭 없이 필요할 때 수동으로 열어서 사용
         return;
 #pragma warning disable CS0162 // unreachable (intentionally disabled, restore when re-enabling wt auto-tab)
         try
@@ -178,7 +178,7 @@ internal partial class Program
                 wtTitle = "앱봇아이";
             else
             {
-                // wkappbot-mcp-{sessionPid}.log → 대화명 조회
+                // wkappbot-mcp-{sessionPid}.log -> 대화명 조회
                 var sessionPart = fileName["wkappbot-mcp-".Length..];
                 if (int.TryParse(sessionPart, out var sessionPid))
                 {
@@ -188,7 +188,7 @@ internal partial class Program
                 else wtTitle = "MCP";
             }
 
-            // 프로세스 종료 감시 — 킬당해도 로그에 찍힘
+            // 프로세스 종료 감시 -- 킬당해도 로그에 찍힘
             if (watchPid > 0)
             {
                 var logPath = logFilePath;
@@ -216,7 +216,7 @@ internal partial class Program
 
             var logEsc = logFilePath.Replace("'", "''");
             var psCmd  = $"Get-Content -Wait -Path '{logEsc}'";
-            // [FOCUS-GUARD] GuardedStart: wt.exe (Windows Terminal) 실행 — 포커스 강탈 자동 감지+복원
+            // [FOCUS-GUARD] GuardedStart: wt.exe (Windows Terminal) 실행 -- 포커스 강탈 자동 감지+복원
             var wtProc = WKAppBot.Win32.Input.ProcessLaunchGuard.GuardedStart(new ProcessStartInfo
             {
                 FileName        = "wt.exe",
@@ -268,7 +268,7 @@ internal partial class Program
                     File.Delete(oldExe);
                     Console.Error.WriteLine($"[EYE:HOT-SWAP] Cleaned up {Path.GetFileName(oldExe)}");
                 }
-                catch { } // still locked — 10s polling will retry
+                catch { } // still locked -- 10s polling will retry
             }
         }
         catch { }
@@ -285,18 +285,18 @@ internal partial class Program
     }
 
 
-    // EyeTickCommand + BuildIpcTickResponse → AppBotEyeTickCommand.cs
+    // EyeTickCommand + BuildIpcTickResponse -> AppBotEyeTickCommand.cs
 
-    // EyeTickForwardSlackInbox + EyeTickCheckThreadReplies → AppBotEyeSlackMonitor.cs
+    // EyeTickForwardSlackInbox + EyeTickCheckThreadReplies -> AppBotEyeSlackMonitor.cs
 
-    // BuildEyeSummary + AbbreviateCwd + CardCache + GetRightmostMonitorAnchor → AppBotEyeCardBuilder.cs
+    // BuildEyeSummary + AbbreviateCwd + CardCache + GetRightmostMonitorAnchor -> AppBotEyeCardBuilder.cs
 
     // ReadLatestTick + ReadLatestOpenClawPromptPreview + TryExtractRoleAndText + NormalizePrompt
     // CompressPlanTitle + ExtractPlanOutlineItems + ExtractRecentPlanItems
-    // ReadLatestActionTriplet + ReadTailLinesShared → AppBotEyeJsonlParser.cs
+    // ReadLatestActionTriplet + ReadTailLinesShared -> AppBotEyeJsonlParser.cs
 
     // _idleSkipCommands + GetClaudeCodeSessionAge + GetLastTickTag + BuildKroStatus3
-    // IsMetaTag + CheckAndReportDeadCards + SupplementCardsFromPrompts + ReadEyeCards → AppBotEyeHealthCheck.cs
+    // IsMetaTag + CheckAndReportDeadCards + SupplementCardsFromPrompts + ReadEyeCards -> AppBotEyeHealthCheck.cs
 
 #pragma warning restore CS0162
 }

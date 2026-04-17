@@ -1,6 +1,6 @@
-// A11yHackWorkers.cs — Standalone hack-hover worker
+// A11yHackWorkers.cs -- Standalone hack-hover worker
 // Usage: wkappbot a11y hack-hover [--parent-pid N]
-// Monitors mouse/focus → analyze-hack server via pipe → console output + overlay
+// Monitors mouse/focus -> analyze-hack server via pipe -> console output + overlay
 // Runs until: Ctrl+C, parent dies, or server pipe breaks.
 
 using System.Text;
@@ -14,7 +14,7 @@ internal partial class Program
 {
     static volatile int _hackHoverDebounceSeq;
     static volatile bool _hackHoverAnalyzing;
-    static volatile bool _hackHoverBlindMode; // blind hack in progress — don't cancel on mouse move
+    static volatile bool _hackHoverBlindMode; // blind hack in progress -- don't cancel on mouse move
     static CancellationTokenSource? _hackHoverAnalyzeCts;
 
     static int A11yHackHoverWorker(string[] args)
@@ -56,7 +56,7 @@ internal partial class Program
         EnsureHackServer();
         if (_hackServerProcess is not { HasExited: false } || _hackServerStdin == null)
         {
-            Log("Server failed to start — exiting");
+            Log("Server failed to start -- exiting");
             return 1;
         }
         Log($"Server ready (PID={_hackServerProcess.Pid})");
@@ -72,15 +72,15 @@ internal partial class Program
                 {
                     Thread.Sleep(5000);
                     try { System.Diagnostics.Process.GetProcessById(parentPid); }
-                    catch { Log($"Parent gone — exiting"); cts.Cancel(); break; }
+                    catch { Log($"Parent gone -- exiting"); cts.Cancel(); break; }
                 }
             });
         }
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
         if (timeoutSec > 0)
-            Task.Run(async () => { await Task.Delay(timeoutSec * 1000); Log($"Timeout {timeoutSec}s — exiting"); cts.Cancel(); });
+            Task.Run(async () => { await Task.Delay(timeoutSec * 1000); Log($"Timeout {timeoutSec}s -- exiting"); cts.Cancel(); });
 
-        // Main loop: mouse/focus → UIA → console output
+        // Main loop: mouse/focus -> UIA -> console output
         string lastResult = "";
         string lastGrap = "";
         IntPtr lastRootHwnd = IntPtr.Zero;
@@ -90,13 +90,13 @@ internal partial class Program
         string _lastOverlayHash = "";
         int loopCount = 0;
         int lastMouseX = -1, lastMouseY = -1;
-        using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse — avoid 4s init per loop
+        using var uia = new FlaUI.UIA3.UIA3Automation(); // reuse -- avoid 4s init per loop
 
         // Hot-swap: detect .new.exe via shared TryRenameSwap
         var corePath = Environment.ProcessPath ?? "";
         int swapCheckCounter = 0;
 
-        // Experience DB FSW: file changes → overlay refresh
+        // Experience DB FSW: file changes -> overlay refresh
         var expDir = Path.Combine(DataDir, "experience");
         Directory.CreateDirectory(expDir);
         int _expDirty = 0;
@@ -110,7 +110,7 @@ internal partial class Program
         expWatcher.Changed += (_, _) => Interlocked.Exchange(ref _expDirty, 1);
         Log($"ExpDB watcher: {expDir}");
 
-        Log("Loop started — monitoring mouse/focus");
+        Log("Loop started -- monitoring mouse/focus");
 
         while (!cts.IsCancellationRequested)
         {
@@ -128,7 +128,7 @@ internal partial class Program
                         var swapResult = TryRenameSwap(corePath, "HOVER:HOTSWAP");
                         if (swapResult == HotSwapResult.Swapped)
                         {
-                            Log("[HOTSWAP] Binary swapped — exit 99 → Launcher will re-spawn Core");
+                            Log("[HOTSWAP] Binary swapped -- exit 99 -> Launcher will re-spawn Core");
                             Console.Error.WriteLine($"\n[HOTSWAP] Restarting with new version...");
                             return 99; // Signal Launcher to re-spawn Core (same terminal, no new window)
                         }
@@ -148,7 +148,7 @@ internal partial class Program
                 // Recursively drill to deepest child at cursor (RealChildWindowFromPoint is NOT recursive)
                 hwnd = DrillToDeepestChild(rootHwndEarly, pt);
 
-                // Mouse moved? → reset debounce + cancel running analysis (but not blind hack)
+                // Mouse moved? -> reset debounce + cancel running analysis (but not blind hack)
                 if (pt.X != lastMouseX || pt.Y != lastMouseY)
                 {
                     lastMouseX = pt.X; lastMouseY = pt.Y;
@@ -212,13 +212,13 @@ internal partial class Program
                 bool verified = verifyHits.Any(v => v.Handle == bestHwnd || v.Handle == rootHwndEarly);
                 var mark = verified ? "OK" : "MISS";
 
-                // Build tag path: walk parent chain → "Pane/Group_1th/Edit_1052"
+                // Build tag path: walk parent chain -> "Pane/Group_1th/Edit_1052"
                 // Absolute tag path via shared helper
                 var tagPath = curEl != null
                     ? WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(curEl, uia.TreeWalkerFactory.GetRawViewWalker())
                     : WKAppBot.Win32.Accessibility.GrapHelper.FormatNodeTag(elType, elAid);
 
-                // '?' tagPath = UIA completely blind → look up experience DB first, then coord fallback
+                // '?' tagPath = UIA completely blind -> look up experience DB first, then coord fallback
                 if (tagPath == "?")
                 {
                     var expTag = TryLookupExpDbTag(rootHwndEarly, proc, pt, elBounds);
@@ -240,16 +240,16 @@ internal partial class Program
 
                 bool changed = result != lastResult;
                 if (changed) lastResult = result;
-                // grapChanged = root window switched (different app) — bestHwnd alone stays same inside Electron/WPF
+                // grapChanged = root window switched (different app) -- bestHwnd alone stays same inside Electron/WPF
                 bool grapChanged = rootHwndEarly != lastRootHwnd;
                 lastRootHwnd = rootHwndEarly;
                 lastGrap = shortWin;
                 if (RunningInEye && !changed) continue; // Eye: change-only
-                if (grapChanged) Console.WriteLine(); // different target pattern → new line
+                if (grapChanged) Console.WriteLine(); // different target pattern -> new line
                 Console.Write($"\"{shortWin}#{tagPath}\" [{mark}] {elMs}ms          \r");
                 Console.Out.Flush();
 
-                // ── Live overlay: root window size, known nodes as dashed boxes ──
+                // -- Live overlay: root window size, known nodes as dashed boxes --
                 if (!_hackHoverAnalyzing) // don't interfere with hack analysis overlay
                 {
                     try
@@ -275,7 +275,7 @@ internal partial class Program
                                             elBounds.Width, elBounds.Height),
                                         $"{elTag} {elBounds.Width}x{elBounds.Height}", null, HackBoxRole.Target));
                                 }
-                                // Parent chain → root (Scope = 2x thick dashed)
+                                // Parent chain -> root (Scope = 2x thick dashed)
                                 if (curEl != null)
                                 {
                                     try
@@ -306,7 +306,7 @@ internal partial class Program
                                     }
                                     catch { }
                                 }
-                                // Quick UIA children of root (depth 1 — lightweight)
+                                // Quick UIA children of root (depth 1 -- lightweight)
                                 // Refresh on: window change OR experience DB file change
                                 bool expRefresh = Interlocked.Exchange(ref _expDirty, 0) != 0;
                                 if (grapChanged || expRefresh)
@@ -328,11 +328,11 @@ internal partial class Program
                                                     // Skip elements entirely outside root window
                                                     if (cr.X + cr.Width < rootWr.Left || cr.Y + cr.Height < rootWr.Top ||
                                                         cr.X > rootWr.Right + 10 || cr.Y > rootWr.Bottom + 10) return;
-                                                    // Skip near-fullsize elements (>90% of root) — wrapper layers
+                                                    // Skip near-fullsize elements (>90% of root) -- wrapper layers
                                                     var rootW2 = rootWr.Right - rootWr.Left;
                                                     var rootH2 = rootWr.Bottom - rootWr.Top;
                                                     if (rootW2 > 0 && rootH2 > 0 && cr.Width > rootW2 * 0.9 && cr.Height > rootH2 * 0.9) return;
-                                                    // Clamp to root bounds (elements partially outside → show visible part)
+                                                    // Clamp to root bounds (elements partially outside -> show visible part)
                                                     double ox = cr.X - rootWr.Left, oy = cr.Y - rootWr.Top;
                                                     double ow = cr.Width, oh = cr.Height;
                                                     if (ox < 0) { ow += ox; ox = 0; }
@@ -444,7 +444,7 @@ internal partial class Program
                                                         {
                                                             var cr = ch[ci].BoundingRectangle;
                                                             if (cr.Width < 5 || cr.Height < 5) continue;
-                                                            string ct2 = "Node", aid2 = ""; // "Node" → DyNode if type unreadable
+                                                            string ct2 = "Node", aid2 = ""; // "Node" -> DyNode if type unreadable
                                                             try { ct2 = ch[ci].ControlType.ToString(); } catch { }
                                                             try { aid2 = ch[ci].AutomationId ?? ""; } catch { }
                                                             ctrls.Add(new WKAppBot.Win32.Window.ControlExperience
@@ -496,7 +496,7 @@ internal partial class Program
                                 }
                                 boxes.AddRange(_hoverUiaBoxes);
 
-                                // ── Keyboard focus chain overlay ──
+                                // -- Keyboard focus chain overlay --
                                 try
                                 {
                                     var focusEl = uia.FocusedElement();
@@ -550,13 +550,13 @@ internal partial class Program
                                         {
                                             string fDbg = "?";
                                             try { fDbg = $"{focusEl.ControlType}|{focusEl.Name}|{focusEl.BoundingRectangle}"; } catch { }
-                                            Log($"[FOCUS-DBG] 0 boxes — el={fDbg} rootWr={rootWr.Left},{rootWr.Top},{rootWr.Right},{rootWr.Bottom}");
+                                            Log($"[FOCUS-DBG] 0 boxes -- el={fDbg} rootWr={rootWr.Left},{rootWr.Top},{rootWr.Right},{rootWr.Bottom}");
                                         }
                                     }
                                 }
                                 catch (Exception fex) { if (!RunningInEye) Log($"[FOCUS-DBG] ex={fex.Message}"); }
 
-                                // ── Experience DB overlay: Cached boxes from form_*.json ──
+                                // -- Experience DB overlay: Cached boxes from form_*.json --
                                 if (grapChanged || expRefresh || proc != _lastExpProc)
                                 {
                                     _hoverExpBoxes.Clear();
@@ -592,7 +592,7 @@ internal partial class Program
                                     }
                                     catch { }
                                 }
-                                // Hybrid: Cached(경험DB) + Known(UIA) — UIA가 커버하는 영역은 Cached 억제
+                                // Hybrid: Cached(경험DB) + Known(UIA) -- UIA가 커버하는 영역은 Cached 억제
                                 // UIA-blind 영역만 Cached로 채움 (DyGroup_3th 등)
                                 if (_hoverExpBoxes.Count > 0)
                                 {
@@ -620,7 +620,7 @@ internal partial class Program
                                              i <= Math.Min(sorted.Count - 1, bestIdx + ExpSpan); i++)
                                         {
                                             var cb = sorted[i];
-                                            // UIA가 이미 커버하면 억제 — Cached 중심점이 Known 박스 안에 있으면 스킵
+                                            // UIA가 이미 커버하면 억제 -- Cached 중심점이 Known 박스 안에 있으면 스킵
                                             var ccx = cb.Bounds.X + cb.Bounds.Width / 2;
                                             var ccy = cb.Bounds.Y + cb.Bounds.Height / 2;
                                             bool covered = knownBoxes.Any(k =>
@@ -653,7 +653,7 @@ internal partial class Program
                 }
 
                 // Blind = no UIA info OR no experience DB layout for this window
-                // → immediate hack (experience DB build, uncancellable)
+                // -> immediate hack (experience DB build, uncancellable)
                 // tagPath containing '@' = was '?' (coord-temp name) = fully UIA-blind
                 bool uiaBlind = (string.IsNullOrEmpty(elLabel) && string.IsNullOrEmpty(elPatterns))
                     || tagPath.StartsWith("FindNodeXY(");
@@ -712,7 +712,7 @@ internal partial class Program
     /// </summary>
     /// <summary>
     /// Recursively drill from parent down to the deepest visible child window containing the screen point.
-    /// RealChildWindowFromPoint is NOT recursive — this calls it repeatedly until no deeper child exists.
+    /// RealChildWindowFromPoint is NOT recursive -- this calls it repeatedly until no deeper child exists.
     /// </summary>
     static IntPtr DrillToDeepestChild(IntPtr parent, POINT screenPt)
     {

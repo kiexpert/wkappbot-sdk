@@ -9,15 +9,15 @@ namespace WKAppBot.CLI;
 // Program infrastructure: log rotation, command routing, exit machinery, sync stdout setup.
 internal partial class Program
 {
-    // ── Log tag / subdir computation ─────────────────────────────────────
+    // -- Log tag / subdir computation ------------------------------------─
 
     /// <summary>
     /// Compute cmdTag and oldSubDir from args for log file naming.
-    ///   a11y &lt;action&gt;       → tag=action,          dir=action
-    ///   web fetch/read &lt;url&gt; → tag=web-fetch-{host}, dir=web-{host}
-    ///   ask/agent &lt;ai&gt;       → tag=ask-gpt etc,      dir=ask-gpt
-    ///   slack/file/…         → tag=cmd-sub,           dir=cmd(-sub)
-    ///   others               → tag=cmd,               dir=cmd
+    ///   a11y &lt;action&gt;       -> tag=action,          dir=action
+    ///   web fetch/read &lt;url&gt; -> tag=web-fetch-{host}, dir=web-{host}
+    ///   ask/agent &lt;ai&gt;       -> tag=ask-gpt etc,      dir=ask-gpt
+    ///   slack/file/...         -> tag=cmd-sub,           dir=cmd(-sub)
+    ///   others               -> tag=cmd,               dir=cmd
     /// </summary>
     static (string cmdTag, string oldSubDir) ComputeCmdTagAndSubDir(string[] args)
     {
@@ -25,7 +25,7 @@ internal partial class Program
         return (dir.Replace(" ", "-"), dir);
     }
 
-    /// <summary>Public accessor for EyeCmdPipeServer — computes "old {cmd} {sub}" directory name.</summary>
+    /// <summary>Public accessor for EyeCmdPipeServer -- computes "old {cmd} {sub}" directory name.</summary>
     internal static string ComputeOldSubDirPublic(string[] args) => ComputeOldSubDir(args);
 
     static string ComputeOldSubDir(string[] args)
@@ -121,7 +121,7 @@ internal partial class Program
         catch { return null; }
     }
 
-    // ── Log rotation ──────────────────────────────────────────────────────
+    // -- Log rotation ------------------------------------------------------
 
     static void RotateOldLogs(string logDir, int staleHours = 24)
     {
@@ -189,7 +189,7 @@ internal partial class Program
         return int.TryParse(fileName[idx..end], out pid);
     }
 
-    // ── Command dispatch ──────────────────────────────────────────────────
+    // -- Command dispatch --------------------------------------------------
 
     static int RunCommand(string[] args)
     {
@@ -247,9 +247,9 @@ internal partial class Program
         }
     }
 
-    // ── P/Invoke exit machinery ───────────────────────────────────────────
+    // -- P/Invoke exit machinery ------------------------------------------─
 
-    // TerminateProcess: bypass ExitProcess / DLL detach / managed finalizers → immediate exit.
+    // TerminateProcess: bypass ExitProcess / DLL detach / managed finalizers -> immediate exit.
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
 
@@ -280,7 +280,7 @@ internal partial class Program
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
     private static extern IntPtr CreateFileW(string lpFileName, uint dwDesiredAccess, uint dwShareMode, IntPtr lpSecurityAttributes, uint dwCreationDisposition, uint dwFlagsAndAttributes, IntPtr hTemplateFile);
 
-    // ── Stdout / exit helpers ─────────────────────────────────────────────
+    // -- Stdout / exit helpers --------------------------------------------─
 
     /// <summary>
     /// No-op: sync FileStream on overlapped pipe handles throws ArgumentException.
@@ -290,7 +290,7 @@ internal partial class Program
 
     /// <summary>
     /// Write exit-file sentinel for Launcher's IOCP poll. Uses Win32 API directly.
-    /// Does NOT call TerminateProcess — caller returns normally from Main.
+    /// Does NOT call TerminateProcess -- caller returns normally from Main.
     /// </summary>
     static void WriteExitFile(int code)
     {
@@ -341,7 +341,7 @@ internal partial class Program
 
     /// <summary>
     /// FastExit for grap/grep: flush stdout pipe to kernel buffer, then TerminateProcess.
-    /// Avoids ExitProcess → DLL_PROCESS_DETACH → loader lock deadlock (~28s).
+    /// Avoids ExitProcess -> DLL_PROCESS_DETACH -> loader lock deadlock (~28s).
     /// </summary>
     static void FastExit(int code = 0)
     {

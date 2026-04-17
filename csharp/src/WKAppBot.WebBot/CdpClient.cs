@@ -43,7 +43,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     public async Task ReconnectAsync(int timeoutMs = 5000)
     {
         if (string.IsNullOrEmpty(WebSocketUrl))
-            throw new InvalidOperationException("No WebSocketUrl saved — cannot reconnect");
+            throw new InvalidOperationException("No WebSocketUrl saved -- cannot reconnect");
 
         // Dispose old WebSocket
         try { _receiveCts?.Cancel(); } catch { }
@@ -73,19 +73,19 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     public bool EnableFocusTheftMonitoring { get; set; }
     public Action<string, nint, nint>? OnFocusTheft { get; set; }
 
-    /// <summary>Chrome main window handle — set by caller for accurate focus theft detection.</summary>
+    /// <summary>Chrome main window handle -- set by caller for accurate focus theft detection.</summary>
     public nint ChromeWindowHandle { get; set; }
 
     /// <summary>Current high-level operation context (e.g. "ask-gemini:wait-response") for focus theft diagnostics.</summary>
     public string? OperationContext { get; set; }
 
-    /// <summary>Callback for JS errors — caller can route to Slack. Args: (errorMsg, expression, pageUrl, contextDump).</summary>
+    /// <summary>Callback for JS errors -- caller can route to Slack. Args: (errorMsg, expression, pageUrl, contextDump).</summary>
     public Action<string>? OnJsError { get; set; }
 
     /// <summary>
     /// Called once when CDP session starts active operations on a non-foreground Chrome window.
     /// Caller should show magnifier on the target. Returns IDisposable to dismiss when done.
-    /// Signature: (chromeHwnd) → IDisposable? zoom
+    /// Signature: (chromeHwnd) -> IDisposable? zoom
     /// </summary>
     public Func<IntPtr, IDisposable?>? OnZoomRequired { get; set; }
 
@@ -93,7 +93,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// Connect to Chrome's DevTools WebSocket.
     /// Chrome must be running with --remote-debugging-port=PORT.
     /// </summary>
-    /// <summary>CDP reliability notice — printed once per process.</summary>
+    /// <summary>CDP reliability notice -- printed once per process.</summary>
     private static int _cdpWarningShown;
 
     /// <summary>
@@ -137,7 +137,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         // 1-in-9 random failure injection
         if (_fallbackRng.Next(9) == 0)
         {
-            Console.Error.WriteLine($"[CDP-TRAINING] Injected failure at {callSite} — implement fallback! (1-in-9 probe)");
+            Console.Error.WriteLine($"[CDP-TRAINING] Injected failure at {callSite} -- implement fallback! (1-in-9 probe)");
             throw new InvalidOperationException($"[CDP-TRAINING] Simulated CDP failure at {callSite}. Implement retry+fallback to handle real failures.");
         }
     }
@@ -263,7 +263,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
     /// <summary>
     /// Send Runtime.enable + Page.enable + DOM.enable with exponential backoff retry.
     /// Retries up to maxRetries times with increasing delays before giving up.
-    /// Called from ConnectAsync/ReconnectAsync — prevents premature Chrome restart.
+    /// Called from ConnectAsync/ReconnectAsync -- prevents premature Chrome restart.
     /// </summary>
     internal async Task EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)
     {
@@ -281,11 +281,11 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
             catch (TimeoutException) when (attempt < maxRetries)
             {
                 var delay = baseDelayMs * (1 << attempt); // 500, 1000, 2000ms
-                Console.Error.WriteLine($"[CDP] Runtime.enable timeout (attempt {attempt + 1}/{maxRetries + 1}) — retry in {delay}ms");
+                Console.Error.WriteLine($"[CDP] Runtime.enable timeout (attempt {attempt + 1}/{maxRetries + 1}) -- retry in {delay}ms");
                 await Task.Delay(delay);
             }
         }
-        // Final attempt failed — throw so caller can handle (e.g., restart Chrome)
+        // Final attempt failed -- throw so caller can handle (e.g., restart Chrome)
         throw new TimeoutException($"CDP Runtime.enable failed after {maxRetries + 1} attempts");
     }
 
@@ -314,7 +314,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
         await MaybeLogFocusRiskBeforeAsync(method, parameters, prevFg);
 
-        // CDP Input.* is delivered via DevTools protocol directly to the renderer —
+        // CDP Input.* is delivered via DevTools protocol directly to the renderer --
         // does NOT require Chrome to be foreground or visible. No minimize needed.
         // Only pre-minimize for methods that genuinely trigger OS-level focus theft:
         if (IsFocusStealingMethod(method) && ChromeWindowHandle != 0
@@ -355,7 +355,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         }
 
         // Focus theft check: only fire when CHROME stole focus (became foreground unexpectedly).
-        // User switching to other apps is normal behavior — never yank focus back.
+        // User switching to other apps is normal behavior -- never yank focus back.
         if (prevFg != 0 && OnFocusTheft != null)
         {
             var curFg = (nint)GetForegroundWindow();
@@ -366,18 +366,18 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
                 GetWindowThreadProcessId((IntPtr)ChromeWindowHandle, out int chromePid);
                 if (curPid == chromePid)
                 {
-                    // Chrome process stole focus → report + restore user's window
+                    // Chrome process stole focus -> report + restore user's window
                     await LogFocusRiskAsync("focus-theft", method, parameters, prevFg, curFg, "chrome-became-foreground");
                     OnFocusTheft(method + (OperationContext != null ? $"[{OperationContext}]" : ""), prevFg, curFg);
                     // ForceForegroundWindow: AttachThreadInput trick bypasses Windows foreground lock
                     ForceForegroundWindow((IntPtr)prevFg);
                 }
-                // else: user switched windows naturally → do nothing
+                // else: user switched windows naturally -> do nothing
             }
         }
 
         // Post-restore: if we pre-minimized for a focus-stealing method, restore Chrome
-        // to its previous state (SW_SHOWNOACTIVATE=4 — visible but no focus steal).
+        // to its previous state (SW_SHOWNOACTIVATE=4 -- visible but no focus steal).
         if (IsFocusStealingMethod(method) && ChromeWindowHandle != 0
             && IsIconic((IntPtr)ChromeWindowHandle))
         {
@@ -390,7 +390,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
 
     /// <summary>
     /// Methods that trigger Chrome OS-level focus theft (window activation/restoration).
-    /// Input.* is NOT in this list — CDP sends Input events directly to the renderer.
+    /// Input.* is NOT in this list -- CDP sends Input events directly to the renderer.
     /// </summary>
     private static bool IsFocusStealingMethod(string method) => method is
         "Page.bringToFront" or "Target.activateTarget" or "Browser.setWindowBounds";
@@ -696,7 +696,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
         {
             try
             {
-                // 2-second timeout — prevents indefinite block if Chrome ignores the close frame.
+                // 2-second timeout -- prevents indefinite block if Chrome ignores the close frame.
                 // This can happen when running in pipe mode (CreateNoWindow=true) or when Chrome
                 // is busy. CancellationToken.None here would cause Dispose() to hang forever.
                 using var closeCts = new CancellationTokenSource(2000);

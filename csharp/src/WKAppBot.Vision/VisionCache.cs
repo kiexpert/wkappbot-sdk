@@ -7,7 +7,7 @@ namespace WKAppBot.Vision;
 
 /// <summary>
 /// 2-level Vision cache: memory (session) + disk (persistent JSON).
-/// "경험치 축적 시스템" — each element location is learned and reused.
+/// "경험치 축적 시스템" -- each element location is learned and reused.
 ///
 /// Cache key = SHA256(class_path | description | WxH)
 ///   - class_path: Win32 window class hierarchy (e.g., "ApplicationFrameWindow/...")
@@ -19,7 +19,7 @@ namespace WKAppBot.Vision;
 ///   - success_count / fail_count: outcome tracking for future ML
 ///   - Entries with high fail rate get lower effective confidence
 ///
-/// TTL: entries expire after ttl_days (default 7) — app updates may change UI.
+/// TTL: entries expire after ttl_days (default 7) -- app updates may change UI.
 /// </summary>
 public sealed class VisionCache : IDisposable
 {
@@ -91,7 +91,7 @@ public sealed class VisionCache : IDisposable
             entry.LastUsed = DateTime.UtcNow;
 
             // Adjust effective confidence by success rate
-            // (future ML hook — for now just return the entry)
+            // (future ML hook -- for now just return the entry)
             return entry;
         }
 
@@ -149,7 +149,7 @@ public sealed class VisionCache : IDisposable
 
     /// <summary>
     /// Record that a cached location led to a failed action.
-    /// Increments fail_count. High fail rate → entry may need refresh.
+    /// Increments fail_count. High fail rate -> entry may need refresh.
     /// </summary>
     public void RecordFailure(string classPath, string description, int windowWidth, int windowHeight)
     {
@@ -226,7 +226,7 @@ public sealed class VisionCache : IDisposable
         return removed;
     }
 
-    // ── Private helpers ─────────────────────────────────────
+    // -- Private helpers ------------------------------------─
 
     private bool IsExpired(VisionCacheEntry entry)
     {
@@ -294,7 +294,7 @@ public sealed class VisionCache : IDisposable
                 catch { /* Skip corrupt entries */ }
             }
         }
-        catch { /* Directory read failure — start with empty cache */ }
+        catch { /* Directory read failure -- start with empty cache */ }
     }
 
     public void Dispose()

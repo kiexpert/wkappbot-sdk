@@ -15,7 +15,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Gemini ──
+    // -- Gemini --
     static readonly string[] GeminiStopNoticeKeywords =
     [
         "응답 생성이 중지되었습니다",
@@ -128,7 +128,7 @@ internal partial class Program
         return WKAppBot.Vision.OcrSegmentCache.ParseA11yJson(raw);
     }
 
-    // ── Prompt builders (verbose -- Gemini tokens are free) ──────────────────────
+    // -- Prompt builders (verbose -- Gemini tokens are free) ----------------------
 
     static string BuildVisionElementPrompt(string description) => $$"""
         You are an accessibility inspector analyzing a Windows application screenshot.
@@ -206,7 +206,7 @@ internal partial class Program
         Include every element you can see ? the more detail the better.
         """;
 
-    // ── Shared CDP vision transport ─────────────────────────────────────────────
+    // -- Shared CDP vision transport --------------------------------------------─
 
     static async Task<string?> AskGeminiVisionRawAsync(
         System.Drawing.Bitmap screenshot, string prompt, int timeoutMs = 20000)

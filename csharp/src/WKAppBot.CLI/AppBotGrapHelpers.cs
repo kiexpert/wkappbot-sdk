@@ -7,13 +7,13 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// Compact window grap for # TARGET / hack-hover lines — copy-paste ready, noise-free.
-    /// Rules: no hwnd/pid; browser→domain or file:'name'; non-browser→{proc,cls}; no title/url.
+    /// Compact window grap for # TARGET / hack-hover lines -- copy-paste ready, noise-free.
+    /// Rules: no hwnd/pid; browser->domain or file:'name'; non-browser->{proc,cls}; no title/url.
     /// </summary>
     internal static string BuildCompactWinGrap(IntPtr hwnd) => _BuildCompactWinGrapCore(hwnd);
 
     /// <summary>
-    /// Inject hwnd:0x... into any compact grap string — shared helper for # FOCUS / # TARGET.
+    /// Inject hwnd:0x... into any compact grap string -- shared helper for # FOCUS / # TARGET.
     /// Always produces a JSON5 object with hwnd as last field.
     /// </summary>
     internal static string InjectHwnd(string grap, IntPtr hwnd)

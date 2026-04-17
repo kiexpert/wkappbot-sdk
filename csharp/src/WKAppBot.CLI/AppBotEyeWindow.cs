@@ -75,8 +75,8 @@ internal sealed class AppBotEyeOverlay : Window
         {
             Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
             BorderBrush = new SolidColorBrush(ElevationHelper.IsElevated()
-                ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber — admin Eye
-                : Color.FromRgb(0x21, 0x96, 0xF3)), // blue — normal Eye
+                ? Color.FromRgb(0xFF, 0x8C, 0x00)   // amber -- admin Eye
+                : Color.FromRgb(0x21, 0x96, 0xF3)), // blue -- normal Eye
             BorderThickness = new Thickness(1.5),
             CornerRadius = new CornerRadius(6),
             Padding = new Thickness(0),
@@ -229,7 +229,7 @@ internal sealed class AppBotEyeOverlay : Window
         var helper = new WindowInteropHelper(this);
 
         // WS_EX_NOACTIVATE: clicking won't steal focus
-        // WS_EX_TRANSPARENT: click-through — mouse events pass to window below (Chrome)
+        // WS_EX_TRANSPARENT: click-through -- mouse events pass to window below (Chrome)
         var exStyle = GetWindowLongPtrCompat(helper.Handle, GWL_EXSTYLE);
         SetWindowLongPtr(helper.Handle, GWL_EXSTYLE,
             new IntPtr(exStyle.ToInt64() | WS_EX_NOACTIVATE | WS_EX_TRANSPARENT));
@@ -331,7 +331,7 @@ internal sealed class AppBotEyeOverlay : Window
         _chromeHwnd = hwnd;
     }
 
-    /// <summary>Dynamically update border color — amber when admin proxy is available, blue otherwise.</summary>
+    /// <summary>Dynamically update border color -- amber when admin proxy is available, blue otherwise.</summary>
     public void SetElevatedBorder(bool elevated)
     {
         if (_rootBorder == null) return;

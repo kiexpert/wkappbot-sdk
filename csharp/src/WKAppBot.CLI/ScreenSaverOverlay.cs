@@ -12,9 +12,9 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Sunset screensaver: per-monitor overlay windows with independent X-ray control.
-/// Click-through (WS_EX_TRANSPARENT) — does not block any input.
-/// 10s → golden hour, 1min → red sunset, 2min → purple twilight, 3min → night sky.
-/// Each monitor gets its own Window — allows independent transparency/X-ray per monitor.
+/// Click-through (WS_EX_TRANSPARENT) -- does not block any input.
+/// 10s -> golden hour, 1min -> red sunset, 2min -> purple twilight, 3min -> night sky.
+/// Each monitor gets its own Window -- allows independent transparency/X-ray per monitor.
 /// </summary>
 internal sealed class ScreenSaverOverlay : IDisposable
 {
@@ -39,7 +39,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
         public Window Window = null!;
         public int X, Y, W, H;
         public bool XRayActive; // independent X-ray per monitor
-        public double LastT;    // per-monitor visual throttle (was global _lastT → only first monitor updated)
+        public double LastT;    // per-monitor visual throttle (was global _lastT -> only first monitor updated)
     }
 
     private Thread? _thread;
@@ -50,9 +50,9 @@ internal sealed class ScreenSaverOverlay : IDisposable
     private volatile bool _disposed;
     private double _currentOpacity;
     private DateTime _lastTopmostUtc = DateTime.MinValue;
-    /// <summary>Set when user input detected while visible — process should self-terminate.</summary>
+    /// <summary>Set when user input detected while visible -- process should self-terminate.</summary>
     public volatile bool ShouldExit;
-    // _lastT removed — now per-monitor (MonitorWindow.LastT)
+    // _lastT removed -- now per-monitor (MonitorWindow.LastT)
 
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW   = 0x00000080;
@@ -135,7 +135,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
                     try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
                 }
                 // Dispatcher liveness ping: send WM_NULL to STA thread's message pump.
-                // If Dispatcher is frozen/deadlocked, SendMessageTimeout returns 0 → kill.
+                // If Dispatcher is frozen/deadlocked, SendMessageTimeout returns 0 -> kill.
                 if (_isVisible && _monitors.Count > 0)
                 {
                     try
@@ -148,7 +148,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
                                 0x0002 /*SMTO_ABORTIFHUNG*/, 100, out _);
                             if (ok == IntPtr.Zero)
                             {
-                                Console.WriteLine("[SS:MASTER] Dispatcher frozen (WM_NULL timeout 100ms) — force kill!");
+                                Console.WriteLine("[SS:MASTER] Dispatcher frozen (WM_NULL timeout 100ms) -- force kill!");
                                 foreach (var mwin in _monitors)
                                 {
                                     try
@@ -369,12 +369,12 @@ internal sealed class ScreenSaverOverlay : IDisposable
         if (_disposed || _dispatcher == null || _monitors.Count == 0) return;
 
         // Suppress screensaver while Eye has active automation (CDP/MCP commands)
-        // Eye writes runtime/eye_busy when executing commands — screensaver checks this
+        // Eye writes runtime/eye_busy when executing commands -- screensaver checks this
         var busyFile = Path.Combine(
             Path.GetDirectoryName(Environment.ProcessPath) ?? ".", "wkappbot.hq", "runtime", "eye_busy");
         if (File.Exists(busyFile))
         {
-            // Eye is busy with automation — don't activate screensaver
+            // Eye is busy with automation -- don't activate screensaver
             // If already visible, force hide (same as user input detection)
             if (_isVisible)
             {
@@ -447,7 +447,7 @@ internal sealed class ScreenSaverOverlay : IDisposable
         }
         else if (_isVisible)
         {
-            // ── 9-layer user input safety: IMMEDIATELY vanish on ANY user activity ──
+            // -- 9-layer user input safety: IMMEDIATELY vanish on ANY user activity --
             // 1) State flags
             _isVisible = false;
             _currentOpacity = 0;

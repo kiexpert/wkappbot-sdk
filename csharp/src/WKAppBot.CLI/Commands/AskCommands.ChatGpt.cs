@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── ChatGPT ──
+    // -- ChatGPT --
     // Shared persona for external AI agents (ChatGPT, Gemini).
     // Injected on fresh conversations to stabilize output format.
     // Single-line to avoid ProseMirror/Quill multiline issues.
@@ -39,11 +39,11 @@ internal partial class Program
         "(6b) IDENTITY DISCIPLINE: when the prompt contains [G:<gameId>] or [Q:<questionId>] or run identifiers, preserve them across follow-up reasoning, tool calls, and debate replies. Reuse active IDs; do not invent replacements unless the host explicitly requests new IDs. " +
         "(6c) QUESTION TRACKING: if multiple questions or rounds are active, treat [Q:*] as the stable question identity and never mix evidence, chunks, or conclusions across different question IDs. " +
         "(7) Be concise and action-oriented. Prefer structured actions over explanations. " +
-        "EXECUTION MODEL: User Request → analyze → Thought (what I know / what is missing) → Action (tool call) → Observation (wait for tool_result) → continue or finish. " +
+        "EXECUTION MODEL: User Request -> analyze -> Thought (what I know / what is missing) -> Action (tool call) -> Observation (wait for tool_result) -> continue or finish. " +
         "For tasks requiring >3 tool calls: generate a numbered Execution Plan first. Mark steps [DONE] as you complete them. " +
         "DECISION: Use a tool if the request involves filesystem ops, source code, device/UI interaction, system commands, app automation, external data, repo inspection, or debugging. " +
         "STATE: Read the last tool_result before deciding the next move. Explicitly reference previous tool_result values in reasoning. " +
-        "CODING MODE: Search files → read implementation → understand → plan → modify minimal code → verify correctness. Never write code without inspecting existing files first. " +
+        "CODING MODE: Search files -> read implementation -> understand -> plan -> modify minimal code -> verify correctness. Never write code without inspecting existing files first. " +
         "CODE RULES: Edit existing files, minimal diffs, maintain style, avoid abstractions, no speculative changes, no unrelated modifications. " +
         "VERIFICATION: After any file modification, make a verification tool call (read file back, run test, or lint) to confirm the change persists as intended. " +
         "ERROR HANDLING: If a tool returns an error, analyze it, correct parameters, retry once. If it fails twice, stop and explain the blocker. " +
@@ -100,7 +100,7 @@ internal partial class Program
         {
             try
             {
-                // ──?Phase 1: Navigate (iconified OK) ──?                PulseStep.Mark("phase1-navigate");
+                // --?Phase 1: Navigate (iconified OK) --?                PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
                 if (newSession || !currentUrl.Contains("chatgpt.com"))
@@ -255,7 +255,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // A11y-first selector chain for ChatGPT editor (most stable → least stable)
+    // A11y-first selector chain for ChatGPT editor (most stable -> least stable)
     static readonly string[] ChatGptEditorSelectors =
     [
         "#prompt-textarea",                              // Stable ID
@@ -373,7 +373,7 @@ internal partial class Program
         }
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
         Console.WriteLine("[ASK] Editor not found (a11y selector chain exhausted)");
-        // Diagnostic dump: URL + title + visible editables — actionable clue for suggest queue
+        // Diagnostic dump: URL + title + visible editables -- actionable clue for suggest queue
         try
         {
             var diag = await cdp.EvalAsync("""

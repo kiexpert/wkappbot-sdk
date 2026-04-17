@@ -3,20 +3,20 @@ using Microsoft.VisualBasic.FileIO;
 
 namespace WKAppBot.CLI;
 
-// wkappbot whisper clean — analyze _unknown/ MP3s offline, trash noise, keep speech
+// wkappbot whisper clean -- analyze _unknown/ MP3s offline, trash noise, keep speech
 //
 // Usage:
 //   wkappbot whisper clean [--threshold N] [--dry-run] [--wav-dir]
 //
 // For each MP3 in _unknown/ without _stt_ tag:
 //   - Decode PCM, compute RMS-based voice activity per 64ms frame
-//   - If voice ratio < threshold → Recycle Bin
-//   - If voice ratio >= threshold → keep in _unknown/ (wait for Gemini)
+//   - If voice ratio < threshold -> Recycle Bin
+//   - If voice ratio >= threshold -> keep in _unknown/ (wait for Gemini)
 //
 // For each MP3 in wav/ root (old files without _stt_ tag):
 //   - Same analysis
-//   - If speech → move to _unknown/ for Gemini
-//   - If noise → Recycle Bin
+//   - If speech -> move to _unknown/ for Gemini
+//   - If noise -> Recycle Bin
 //
 //   --threshold N   voice frame ratio % to consider speech (default: 15)
 //   --dry-run       print decisions without moving/deleting
@@ -45,7 +45,7 @@ internal partial class Program
 
         int trashed = 0, kept = 0, movedToUnknown = 0, errors = 0;
 
-        // ── Scan _unknown/: no _stt_ tag → analyze → trash or keep ──
+        // -- Scan _unknown/: no _stt_ tag -> analyze -> trash or keep --
         if (Directory.Exists(unknownDir))
         {
             var files = Directory.GetFiles(unknownDir, "*.mp3")
@@ -83,7 +83,7 @@ internal partial class Program
             }
         }
 
-        // ── Scan wav/ root: speech without tag → move to _unknown/ ──
+        // -- Scan wav/ root: speech without tag -> move to _unknown/ --
         if (scanWav && Directory.Exists(wavDir))
         {
             var files = Directory.GetFiles(wavDir, "*.mp3")
@@ -105,7 +105,7 @@ internal partial class Program
                     {
                         movedToUnknown++;
                         var dest = Path.Combine(unknownDir, name);
-                        Console.Error.WriteLine($"[CLEAN] →_unknown {name} ({voicePct:F0}% voice)");
+                        Console.Error.WriteLine($"[CLEAN] ->_unknown {name} ({voicePct:F0}% voice)");
                         if (!dryRun && !File.Exists(dest))
                             File.Move(mp3, dest);
                     }
@@ -125,7 +125,7 @@ internal partial class Program
             }
         }
 
-        Console.WriteLine($"\n[CLEAN] Done — kept={kept} trashed={trashed} →_unknown={movedToUnknown} errors={errors}");
+        Console.WriteLine($"\n[CLEAN] Done -- kept={kept} trashed={trashed} ->_unknown={movedToUnknown} errors={errors}");
         return errors > 0 ? 1 : 0;
     }
 

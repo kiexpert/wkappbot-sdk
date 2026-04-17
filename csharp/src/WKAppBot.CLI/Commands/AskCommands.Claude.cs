@@ -16,7 +16,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── Claude.ai ──
+    // -- Claude.ai --
 
     // Claude.ai uses ProseMirror editor --innerHTML/execCommand fail, must use ClipboardEvent paste
     static readonly string[] ClaudeEditorSelectors =
@@ -171,7 +171,7 @@ internal partial class Program
         {
             try
             {
-                // ── Phase 1: Navigate ──
+                // -- Phase 1: Navigate --
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
@@ -189,7 +189,7 @@ internal partial class Program
                 // NOTE: BringToFront removed --steals OS focus. CDP works on background tabs.
                 await Task.Delay(1000);
 
-                // ── Phase 2: Find editor ──
+                // -- Phase 2: Find editor --
                 var editorSel = await WaitForClaudeEditorA11y(cdp);
                 if (editorSel == null)
                     return (false, (string?)null);
@@ -202,7 +202,7 @@ internal partial class Program
                 Console.Error.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
-                // ── Phase 3: Check existing turns ──
+                // -- Phase 3: Check existing turns --
                 int existingTurns = await CountClaudeTurns(cdp);
                 if (existingTurns > 0)
                     Console.Error.WriteLine($"[ASK] Reusing session ({existingTurns} turns)");
@@ -260,7 +260,7 @@ internal partial class Program
                         question = BuildHostHandshake() + question;
                 }
 
-                // ── Phase 4: Insert text + send ──
+                // -- Phase 4: Insert text + send --
                 using var chatLock = ChromeTabLock.Acquire("Claude");
                 if (chatLock == null) return (false, (string?)null);
 
@@ -268,7 +268,7 @@ internal partial class Program
                 // Pattern mirrors Gemini: capture at phase 4 entry so restore target is fresh.
                 var prevFgClaude = NativeMethods.GetForegroundWindow();
 
-                // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
+                // -- CDP InputReadiness: blocker check + minimize restore + zoom + focus guard --
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Claude", prevFgHint: prevFgClaude);
                 using var focusWatchdog = StartFocusWatchdog(prevFg, cdp, "claude-send");
 
@@ -289,7 +289,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ── Send ──
+                // -- Send --
                 // Wait for any active response to finish (stop button = Claude is generating/tool-running).
                 // Clicking the send button during tool execution would interrupt it --Enter key is safer
                 // because Claude queues it in the editor without firing until generation completes.
@@ -365,7 +365,7 @@ internal partial class Program
                     return (true, BuildNoWaitQueuedMessage("Claude"));
                 }
 
-                // ── Phase 5: Wait for response ──
+                // -- Phase 5: Wait for response --
                 var sw = Stopwatch.StartNew();
                 bool responseStarted = false;
                 while (sw.Elapsed.TotalSeconds < Math.Min(timeoutSec, 30))
@@ -433,7 +433,7 @@ internal partial class Program
                     return (false, (string?)null);
                 }
 
-                // ── Phase 6: Poll for completion ──
+                // -- Phase 6: Poll for completion --
                 int lastFlushedLen = 0;
                 bool liveHeaderPrinted = false;
                 var lastFlushTime = DateTime.UtcNow;
@@ -476,7 +476,7 @@ internal partial class Program
                             if (!liveHeaderPrinted)
                             {
                                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                                Console.WriteLine("── Claude streaming ──");
+                                Console.WriteLine("-- Claude streaming --");
                                 Console.ResetColor();
                                 liveHeaderPrinted = true;
                             }
@@ -498,7 +498,7 @@ internal partial class Program
                         }
 
                         // Early-exit: only when STREAMING is idle for 10s (section pauses < 3s)
-                        // 1s was too aggressive — caused partial MD captures on long responses
+                        // 1s was too aggressive -- caused partial MD captures on long responses
                         if (lastFlushedLen > 50 && state == "STREAMING"
                             && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 10.0)
                         {

@@ -7,7 +7,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Click ─────────────────────────────────────────────
+    // -- Click --------------------------------------------─
 
     static int AdbClick(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -27,7 +27,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Read ──────────────────────────────────────────────
+    // -- Read ----------------------------------------------
 
     static int AdbRead(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -73,7 +73,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Highlight (print bounds info for AI/MCP) ──────────
+    // -- Highlight (print bounds info for AI/MCP) ----------
 
     static int AdbHighlight(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -103,7 +103,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Toggle (tap + verify checked state) ───────────────
+    // -- Toggle (tap + verify checked state) --------------─
 
     static int AdbToggle(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -112,7 +112,7 @@ internal partial class Program
         VerifyInputFocus(adb, serial, node);
 
         var beforeChecked = node.Checked;
-        Console.Write($"[ADB] Toggle ({(beforeChecked ? "ON→OFF" : "OFF→ON")}) {node.DisplayName}... ");
+        Console.Write($"[ADB] Toggle ({(beforeChecked ? "ON->OFF" : "OFF->ON")}) {node.DisplayName}... ");
 
         var r = adb.Tap(node.CenterX, node.CenterY, serial);
         if (!r.IsOk)
@@ -135,7 +135,7 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"OK (checked={afterNode.Checked})");
             Console.ResetColor();
-            LogAdbAction("toggle", node, grap, serial, true, $"checked: {beforeChecked}→{afterNode.Checked}");
+            LogAdbAction("toggle", node, grap, serial, true, $"checked: {beforeChecked}->{afterNode.Checked}");
         }
         else
         {
@@ -147,7 +147,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Expand / Collapse (tap + verify subtree change) ───
+    // -- Expand / Collapse (tap + verify subtree change) --─
 
     static int AdbExpandCollapse(AdbClient adb, string serial, AdbGrapInfo grap, bool expand)
     {
@@ -182,10 +182,10 @@ internal partial class Program
             var verified = expand ? delta > 0 : delta < 0;
             Console.ForegroundColor = verified ? ConsoleColor.Green : ConsoleColor.Yellow;
             Console.WriteLine(verified
-                ? $"OK (children: {beforeChildren}→{afterChildren})"
-                : $"OK (tap sent, children: {beforeChildren}→{afterChildren})");
+                ? $"OK (children: {beforeChildren}->{afterChildren})"
+                : $"OK (tap sent, children: {beforeChildren}->{afterChildren})");
             Console.ResetColor();
-            LogAdbAction(actionName, node, grap, serial, true, $"children: {beforeChildren}→{afterChildren}");
+            LogAdbAction(actionName, node, grap, serial, true, $"children: {beforeChildren}->{afterChildren}");
         }
         else
         {
@@ -197,7 +197,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── Select (tap target item) ──────────────────────────
+    // -- Select (tap target item) --------------------------
 
     static int AdbSelect(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -232,7 +232,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Scroll ────────────────────────────────────────────
+    // -- Scroll --------------------------------------------
 
     static int AdbScroll(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -267,7 +267,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Type (text input) ─────────────────────────────────
+    // -- Type (text input) --------------------------------─
 
     static int AdbType(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -303,7 +303,7 @@ internal partial class Program
         return AdbInputText(adb, serial, text, node, grap, "type");
     }
 
-    // ── Set-Value (clear existing + type new text) ────────
+    // -- Set-Value (clear existing + type new text) --------
 
     static int AdbSetValue(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -348,7 +348,7 @@ internal partial class Program
         return AdbInputText(adb, serial, text, node, grap, "set-value");
     }
 
-    // ── Set-Range (seekbar: calculate position + tap) ─────
+    // -- Set-Range (seekbar: calculate position + tap) ----─
 
     static int AdbSetRange(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -379,7 +379,7 @@ internal partial class Program
         var targetX = node.BoundsLeft + (int)(node.Width * ratio);
         var targetY = node.CenterY;
 
-        Console.Write($"[ADB] Set range {ratio:P0} → tap ({targetX},{targetY})... ");
+        Console.Write($"[ADB] Set range {ratio:P0} -> tap ({targetX},{targetY})... ");
         var r = adb.Tap(targetX, targetY, serial);
         var ok = r.IsOk;
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
@@ -391,7 +391,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Focus (tap element center) ────────────────────────
+    // -- Focus (tap element center) ------------------------
 
     static int AdbFocus(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -411,7 +411,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Wait (poll until element appears) ─────────────────
+    // -- Wait (poll until element appears) ----------------─
 
     static int AdbWait(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
@@ -513,7 +513,7 @@ internal partial class Program
         return 1;
     }
 
-    // ── Eval (adb shell command execution) ────────────────
+    // -- Eval (adb shell command execution) ----------------
 
     static int AdbEval(AdbClient adb, string serial, string[] args)
     {
@@ -551,13 +551,13 @@ internal partial class Program
         return r.ExitCode;
     }
 
-    // ── Long-press ────────────────────────────────────────
+    // -- Long-press ----------------------------------------
 
     static int AdbLongPress(AdbClient adb, string serial, AdbGrapInfo grap, string[] args)
     {
         var node = ResolveAdbTarget(adb, serial, grap);
         if (node == null) return 1;
-        VerifyInputFocus(adb, serial, node); // warn only — coordinate action
+        VerifyInputFocus(adb, serial, node); // warn only -- coordinate action
 
         var durationMs = 1000;
         for (int i = 0; i < args.Length; i++)
@@ -576,7 +576,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Close (force-stop app) ────────────────────────────
+    // -- Close (force-stop app) ----------------------------
 
     static int AdbClose(AdbClient adb, string serial, AdbGrapInfo grap)
     {
@@ -615,7 +615,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Key action helper (back/home/recent/minimize) ─────
+    // -- Key action helper (back/home/recent/minimize) ----─
 
     static int AdbKeyAction(AdbClient adb, string serial, string keyName, string actionName, Func<AdbResult> action)
     {
@@ -629,7 +629,7 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Move / Resize (DeX freeform via am task resize) ──
+    // -- Move / Resize (DeX freeform via am task resize) --
 
     /// <summary>Find task ID for package via dumpsys activity recents</summary>
     static int? FindTaskId(AdbClient adb, string serial, string packagePattern)
@@ -658,7 +658,7 @@ internal partial class Program
             if (aIdx >= 0)
             {
                 var pkg = trimmed[(aIdx + 2)..].TrimEnd('}').Trim();
-                // A=10254:com.android.chrome → extract package after ':'
+                // A=10254:com.android.chrome -> extract package after ':'
                 var colonIdx = pkg.IndexOf(':');
                 if (colonIdx >= 0) pkg = pkg[(colonIdx + 1)..];
                 if (matcher.IsMatch(pkg)) return taskId;
@@ -746,7 +746,7 @@ internal partial class Program
         var newL = x ?? cl;
         var newT = y ?? ct;
 
-        Console.Write($"[ADB] Move task {taskId} → ({newL},{newT}) {w}x{h}... ");
+        Console.Write($"[ADB] Move task {taskId} -> ({newL},{newT}) {w}x{h}... ");
         var r = adb.Shell($"am task resize {taskId} {newL} {newT} {newL + w} {newT + h}", serial);
         var ok = r.IsOk;
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
@@ -795,7 +795,7 @@ internal partial class Program
         var newW = w ?? (cr - cl);
         var newH = h ?? (cb - ct);
 
-        Console.Write($"[ADB] Resize task {taskId} → {newW}x{newH} at ({cl},{ct})... ");
+        Console.Write($"[ADB] Resize task {taskId} -> {newW}x{newH} at ({cl},{ct})... ");
         var r = adb.Shell($"am task resize {taskId} {cl} {ct} {cl + newW} {ct + newH}", serial);
         var ok = r.IsOk;
         Console.ForegroundColor = ok ? ConsoleColor.Green : ConsoleColor.Red;
@@ -804,13 +804,13 @@ internal partial class Program
         return ok ? 0 : 1;
     }
 
-    // ── Window stubs (not meaningful on Android) ──────────
+    // -- Window stubs (not meaningful on Android) ----------
 
     static int AdbWindowStub(string action)
     {
         Console.ForegroundColor = ConsoleColor.Yellow;
         Console.Error.WriteLine($"[ADB] '{action}' is not supported on Android (apps are fullscreen)");
         Console.ResetColor();
-        return 0; // Not an error — just no-op
+        return 0; // Not an error -- just no-op
     }
 }

@@ -1,15 +1,15 @@
 ﻿{
     "id":  "web-command-cheatsheet",
     "app":  "wkappbot-workflow",
-    "title":  "web — Fetch/Search/Read Cheatsheet",
+    "title":  "web -- Fetch/Search/Read Cheatsheet",
     "desc":  "wkappbot web tools for HTTP and browser access. fetch = raw HTTP GET. search = Google via Chrome CDP. read = navigate + rendered text (JS executed). search needs Chrome running.",
     "steps":  [
-                  "FETCH: wkappbot web fetch \u003curl\u003e [--max-chars 5000] — raw HTTP GET",
-                  "SEARCH: wkappbot web search \"query\" [--limit 10] — Google via Chrome CDP",
-                  "READ: wkappbot web read \u003curl\u003e [--max-chars N] — navigate + rendered text",
-                  "OPEN: wkappbot web open \u003curl\u003e — open in browser (tab dedup by URL)",
-                  "⚠ search requires Chrome running with CDP port open",
-                  "⚠ read executes JS — use for SPAs, NOT for static HTML (use fetch)"
+                  "FETCH: wkappbot web fetch \u003curl\u003e [--max-chars 5000] -- raw HTTP GET",
+                  "SEARCH: wkappbot web search \"query\" [--limit 10] -- Google via Chrome CDP",
+                  "READ: wkappbot web read \u003curl\u003e [--max-chars N] -- navigate + rendered text",
+                  "OPEN: wkappbot web open \u003curl\u003e -- open in browser (tab dedup by URL)",
+                  "! search requires Chrome running with CDP port open",
+                  "! read executes JS -- use for SPAs, NOT for static HTML (use fetch)"
               ],
     "tags":  [
                  "web",

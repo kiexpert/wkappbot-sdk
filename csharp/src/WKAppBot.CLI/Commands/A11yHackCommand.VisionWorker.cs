@@ -1,4 +1,4 @@
-// A11yHackCommand.VisionWorker.cs — Background Vision API worker for hack analysis
+// A11yHackCommand.VisionWorker.cs -- Background Vision API worker for hack analysis
 // Runs Gemini/GPT/Claude vision on OCR-failed segments (gaps).
 // Called after OCR worker completes, only if gaps remain.
 

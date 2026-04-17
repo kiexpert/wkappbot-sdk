@@ -10,7 +10,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── Method 9: Pure PostMessage pipeline ──
+    // -- Method 9: Pure PostMessage pipeline --
     static InputResult TryInputMethod9(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -66,7 +66,7 @@ internal partial class Program
                 Console.Write($"[SetFocus prev={prevFocus:X8}] ");
                 Console.ResetColor();
 
-                // Step 2: Home → move cursor to position 0 (PostMessage, not physical)
+                // Step 2: Home -> move cursor to position 0 (PostMessage, not physical)
                 NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x24 /*VK_HOME*/,
                     MakeCharLParam(0x24, extended: true));
                 Thread.Sleep(10);
@@ -77,7 +77,7 @@ internal partial class Program
                 // Step 3: Type each char via WM_CHAR ONLY (no WM_KEYDOWN/UP for digits!)
                 // CRITICAL: TranslateMessage in target's message loop auto-generates WM_CHAR
                 // from WM_KEYDOWN. If we also send explicit WM_CHAR, each char is entered TWICE.
-                // For digits: WM_CHAR only → single entry into m_strBuffer
+                // For digits: WM_CHAR only -> single entry into m_strBuffer
                 // For Home/Enter: WM_KEYDOWN+WM_KEYUP needed (cursor nav / m_bKeyDown flag)
                 foreach (char ch in text)
                 {
@@ -85,7 +85,7 @@ internal partial class Program
                     byte vk = (byte)(vkScan & 0xFF);
                     IntPtr downLp = MakeCharLParam(vk);
 
-                    // WM_CHAR only — no WM_KEYDOWN/UP to avoid TranslateMessage doubling
+                    // WM_CHAR only -- no WM_KEYDOWN/UP to avoid TranslateMessage doubling
                     NativeMethods.PostMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, downLp);
                     Thread.Sleep(30);
                 }
@@ -128,7 +128,7 @@ internal partial class Program
                 // Step 4: Enter via PostMessage (CCtlItemCode::OnKeyUp(VK_RETURN) triggers query)
                 if (sendEnter)
                 {
-                    // Must send WM_KEYDOWN first — m_bKeyDown flag required for OnKeyUp to fire
+                    // Must send WM_KEYDOWN first -- m_bKeyDown flag required for OnKeyUp to fire
                     NativeMethods.PostMessageW(targetHwnd, 0x0100, (IntPtr)0x0D, MakeCharLParam(0x0D));
                     Thread.Sleep(50);
                     NativeMethods.PostMessageW(targetHwnd, 0x0101, (IntPtr)0x0D, MakeCharLParam(0x0D, keyUp: true));
@@ -154,29 +154,29 @@ internal partial class Program
                 if (ocrOk9)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.WriteLine($"v OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!string.IsNullOrEmpty(preOcr9) && preOcr9.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ pre-enter OCR confirmed \"{text}\"");
+                    Console.WriteLine($"v pre-enter OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (wmT9.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM confirmed \"{text}\"");
+                    Console.WriteLine($"v WM confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!string.IsNullOrEmpty(preOcr9) && FuzzyDigitMatch(preOcr9, text, 2))
                 {
-                    // Tiny 130x20 MFC bitmap font OCR is unreliable — fuzzy match as fallback
+                    // Tiny 130x20 MFC bitmap font OCR is unreliable -- fuzzy match as fallback
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ fuzzy OCR confirmed \"{text}\" (ocr:\"{preOcr9}\")");
+                    Console.WriteLine($"v fuzzy OCR confirmed \"{text}\" (ocr:\"{preOcr9}\")");
                     Console.ResetColor();
                     success = true;
                 }
@@ -190,14 +190,14 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 1: SetFocus + WM_CHAR ──
+    // -- Method 1: SetFocus + WM_CHAR --
     static InputResult TryInputMethod1(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -227,14 +227,14 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard — verify focus after SetFocus
+                // InputFocusGuard -- verify focus after SetFocus
                 var guard1 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
 
                 // Bring parent window to foreground
                 NativeMethods.SmartSetForegroundWindow(win.Handle);
                 Thread.Sleep(200);
 
-                // AttachThreadInput to target thread → SetFocus → Detach
+                // AttachThreadInput to target thread -> SetFocus -> Detach
                 uint targetThread = NativeMethods.GetWindowThreadProcessId(targetHwnd, out _);
                 uint ourThread = NativeMethods.GetCurrentThreadId();
                 bool attached = false;
@@ -247,7 +247,7 @@ internal partial class Program
 
                 // [GUARD] Verify focus after SetFocus
                 // Note: Method 1 uses SendMessage (not SendInput) for WM_CHAR, so guard is
-                // advisory — SendMessage goes to specified hwnd regardless of focus.
+                // advisory -- SendMessage goes to specified hwnd regardless of focus.
                 // But SetFocus failure means the control may not process input correctly.
                 if (!guard1.CheckBeforeKeystroke().Ok)
                 {
@@ -262,7 +262,7 @@ internal partial class Program
                 NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)0x08 /*VK_BACK*/, IntPtr.Zero);
                 Thread.Sleep(50);
 
-                // Send each character via WM_CHAR (SendMessage — goes to specified hwnd)
+                // Send each character via WM_CHAR (SendMessage -- goes to specified hwnd)
                 foreach (char ch in text)
                 {
                     NativeMethods.SendMessageW(targetHwnd, 0x0102 /*WM_CHAR*/, (IntPtr)ch, IntPtr.Zero);
@@ -295,7 +295,7 @@ internal partial class Program
                     if (ocrOk)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"✓ \"{newText}\" (+OCR)");
+                        Console.WriteLine($"v \"{newText}\" (+OCR)");
                         Console.ResetColor();
                         success = true;
                     }
@@ -316,7 +316,7 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 

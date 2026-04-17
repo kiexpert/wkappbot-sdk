@@ -13,7 +13,7 @@ internal partial class Program
     /// <summary>
     /// Get age (seconds since last modification) of the most recent Claude Code session JSONL.
     /// Claude Code writes to ~/.claude/projects/{project}/*.jsonl during ALL activity
-    /// (file reads, edits, builds, tool calls) — not just wkappbot commands.
+    /// (file reads, edits, builds, tool calls) -- not just wkappbot commands.
     /// Returns 9999 if no session file found.
     /// </summary>
     static double GetClaudeCodeSessionAge()
@@ -48,7 +48,7 @@ internal partial class Program
     /// <summary>
     /// Read the last meaningful tick's tag from eye_ticks.jsonl.
     /// Skips meta tags AND communication commands (slack, eye) to find actual work.
-    /// Returns like "publish/build" or "inspect" — shown as idle-after text.
+    /// Returns like "publish/build" or "inspect" -- shown as idle-after text.
     /// </summary>
     static string? GetLastTickTag()
     {
@@ -111,7 +111,7 @@ internal partial class Program
     }
 
     // Meta tags: diagnostic/overhead commands that shouldn't hide meaningful work in cards
-    // e.g. "eye tick" checks status, "snapshot" captures state — not the real work itself
+    // e.g. "eye tick" checks status, "snapshot" captures state -- not the real work itself
     static readonly HashSet<string> _metaTags = new(StringComparer.OrdinalIgnoreCase)
     { "eye", "snapshot", "eye tick", "validate", "help" };
 
@@ -121,8 +121,8 @@ internal partial class Program
     /// <summary>
     /// Dead-card detector + WM_NULL health check.
     /// For each card:
-    ///   1. If PID/HWND is gone → [DEAD_CARD] Slack alert + zombie kill attempt.
-    ///   2. If PID exists but WM_NULL > 100ms → [SLOW_CARD] Slack alert + card marked "불량".
+    ///   1. If PID/HWND is gone -> [DEAD_CARD] Slack alert + zombie kill attempt.
+    ///   2. If PID exists but WM_NULL > 100ms -> [SLOW_CARD] Slack alert + card marked "불량".
     /// Results cached in _cardHealthCache; dead pids cached in _reportedDeadPids to suppress repeats.
     /// </summary>
     static void CheckAndReportDeadCards(List<EyeParentCard> cards)
@@ -132,7 +132,7 @@ internal partial class Program
             var pid = card.ParentPid;
             if (pid <= 0) continue;
 
-            // ── Step 1: is the process/window still alive? ──
+            // -- Step 1: is the process/window still alive? --
             bool isPromptDiscovered = card.LastTag == "prompt-discovered";
             bool alive;
             IntPtr hwnd = IntPtr.Zero;
@@ -165,7 +165,7 @@ internal partial class Program
                 {
                     var cwdTag = AbbreviateCwd(card.Cwd);
                     var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
-                    Console.Error.WriteLine($"[DEAD_CARD] {label} — process gone");
+                    Console.Error.WriteLine($"[DEAD_CARD] {label} -- process gone");
                     _cardHealthCache[pid] = "dead";
                     // Zombie cleanup attempt (no-op if already gone)
                     try { Process.GetProcessById(pid).Kill(); } catch { }
@@ -174,7 +174,7 @@ internal partial class Program
                 continue;
             }
 
-            // ── Step 2: WM_NULL health check (0 = skip if no HWND found) ──
+            // -- Step 2: WM_NULL health check (0 = skip if no HWND found) --
             if (hwnd == IntPtr.Zero) continue;
             if (_reportedDeadPids.Contains(pid)) continue;
 
@@ -186,7 +186,7 @@ internal partial class Program
                 100, out _);
             sw.Stop();
 
-            // health% = max(0, 100 - responseMs): 1ms→99%, 99ms→1%, 100ms+→0%(불량)
+            // health% = max(0, 100 - responseMs): 1ms->99%, 99ms->1%, 100ms+->0%(불량)
             var responseMs = (int)sw.ElapsedMilliseconds;
             var healthPct = Math.Max(0, 100 - responseMs);
             var health = healthPct == 0 ? "불량" : (healthPct < 50 ? "느림" : "ok");
@@ -198,11 +198,11 @@ internal partial class Program
             {
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 var label = string.IsNullOrEmpty(cwdTag) ? $"{card.ParentName}:{pid}" : $"[{cwdTag}] {card.ParentName}:{pid}";
-                Console.Error.WriteLine($"[SLOW_CARD] {label} — WM_NULL={responseMs}ms (건강{healthPct}%)");
+                Console.Error.WriteLine($"[SLOW_CARD] {label} -- WM_NULL={responseMs}ms (건강{healthPct}%)");
             }
             else if (health != "불량" && prevHealth == "불량")
             {
-                Console.Error.WriteLine($"[HEALTH] {card.ParentName}:{pid} recovered → {responseMs}ms (건강{healthPct}%)");
+                Console.Error.WriteLine($"[HEALTH] {card.ParentName}:{pid} recovered -> {responseMs}ms (건강{healthPct}%)");
             }
 
             // Annotate card for display (show health% if not perfect)
@@ -229,7 +229,7 @@ internal partial class Program
                     .Select(c => BuildCardKey(c.Cwd, c.HostType)),
                 StringComparer.OrdinalIgnoreCase);
 
-            // 1s cooldown after last scan — FindAllPrompts is fast now (per-hwnd UIA cache in ClaudePromptHelper),
+            // 1s cooldown after last scan -- FindAllPrompts is fast now (per-hwnd UIA cache in ClaudePromptHelper),
             // but EnumWindows + process name lookup still costs ~5-20ms per tick; limit to once/second.
             List<ClaudePromptHelper.PromptInfo> allPrompts;
             var now = DateTime.UtcNow;
@@ -244,7 +244,7 @@ internal partial class Program
                 sw.Stop();
                 _cachedAllPrompts = allPrompts;
                 _lastFindAllPromptsAt = DateTime.UtcNow;
-                // Cache appbot master prompt (WKAppBot VS Code — always-on relay target)
+                // Cache appbot master prompt (WKAppBot VS Code -- always-on relay target)
                 CachedAppbotMasterPrompt = allPrompts.FirstOrDefault(p =>
                     p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
                     ClaudePromptHelper.IsVsCodeHostType(p.HostType));
@@ -282,7 +282,7 @@ internal partial class Program
         var cards = new Dictionary<string, EyeParentCard>(StringComparer.OrdinalIgnoreCase);
         var now = DateTime.UtcNow;
 
-        // ── Phase 1: Session registry (primary — MCP servers) ──
+        // -- Phase 1: Session registry (primary -- MCP servers) --
         // Session files are authoritative: they have correct CWD, host type, and heartbeat.
         try
         {
@@ -292,7 +292,7 @@ internal partial class Program
                 var cwdKey = (s.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                 if (string.IsNullOrEmpty(cwdKey)) continue;
 
-                // Use SessionJsonl as primary key — deduplicates multiple PIDs sharing the same conversation.
+                // Use SessionJsonl as primary key -- deduplicates multiple PIDs sharing the same conversation.
                 var jsonlKey = !string.IsNullOrEmpty(s.SessionJsonl)
                     ? s.SessionJsonl.Replace('\\', '/').ToLowerInvariant()
                     : null;
@@ -319,7 +319,7 @@ internal partial class Program
         }
         catch { }
 
-        // ── Phase 2: Tick fallback (legacy — direct CLI commands) ──
+        // -- Phase 2: Tick fallback (legacy -- direct CLI commands) --
         // Only adds cards for CWDs not already covered by sessions.
         var path = EyeTicksPath;
         if (File.Exists(path))
@@ -340,7 +340,7 @@ internal partial class Program
                     var pname = !string.IsNullOrWhiteSpace(t.HostName) ? t.HostName : (string.IsNullOrWhiteSpace(t.ParentName) ? "unknown" : t.ParentName);
                     var ptitle = t.HostTitle ?? "";
 
-                    // Skip ticks with unresolved CWD (empty, system32) — no real session matched.
+                    // Skip ticks with unresolved CWD (empty, system32) -- no real session matched.
                     var cwdRaw = (t.Cwd ?? "").Replace('\\', '/').ToLowerInvariant().TrimEnd('/');
                     if (string.IsNullOrEmpty(cwdRaw)
                         || cwdRaw.EndsWith("/system32")

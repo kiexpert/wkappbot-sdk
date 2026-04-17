@@ -17,7 +17,7 @@ static class AgentPolicy
     static readonly string WorkspacePath = ResolveWorkspace();
 
     static readonly string PolicyFilePath =
-        Path.Combine(WorkspacePath, "agent-policy.txt"); // fixed name — no PID suffix
+        Path.Combine(WorkspacePath, "agent-policy.txt"); // fixed name -- no PID suffix
 
     static readonly TimeSpan PolicyTTL = TimeSpan.FromHours(24);
 
@@ -34,7 +34,7 @@ WKAppBot exposes itself as an MCP server. To install:
   Add to your MCP config (.mcp.json or Claude Desktop config):
   { "mcpServers": { "wkappbot": { "command": "wkappbot", "args": ["mcp"] } } }
   Or run directly: wkappbot mcp
-  MCP tool: "wkappbot_cli" — argv array maps to wkappbot CLI commands.
+  MCP tool: "wkappbot_cli" -- argv array maps to wkappbot CLI commands.
   Example: { "argv": ["a11y","invoke","*Notepad*#*OK*"] }
   Note: Use "wkappbot_cli" as the MCP tool name only in JSON-RPC calls.
         In CLI, always use the command directly: wkappbot a11y ...
@@ -43,12 +43,12 @@ WKAppBot exposes itself as an MCP server. To install:
 Execute tasks efficiently while minimizing token usage.
 
 ━━ Execution Format ━━
-Plan → Action → Result → TODO
+Plan -> Action -> Result -> TODO
 
 ━━ Language Rule (STRICT) ━━
-Korean: ONLY for final responses to the user — polite "해요체" (-요 form). NEVER informal speech.
+Korean: ONLY for final responses to the user -- polite "해요체" (-요 form). NEVER informal speech.
 English: source code, comments, all documents, CLAUDE.md, skills, memory,
-         commit messages, prompts, internal notes — NO exceptions.
+         commit messages, prompts, internal notes -- NO exceptions.
 Korean in any file = 2-3x token waste loaded on every session. Do not do it.
 
 ━━ Core Rules ━━
@@ -59,15 +59,15 @@ Korean in any file = 2-3x token waste loaded on every session. Do not do it.
 5. On failure: retry once with a different approach, then continue.
 6. Simplest correct solution wins. Minimize token usage.
 7. Tasks >60s: one-line status every 60s (file, function, line#, delta only).
-8. Multiple tasks → ordered TODO list. Mark done with ~~strikethrough~~.
+8. Multiple tasks -> ordered TODO list. Mark done with ~~strikethrough~~.
 9. Continue automatically; choose the best option when decisions are needed.
-10. No code change for 5 min → report status + blockers. No fake activity.
+10. No code change for 5 min -> report status + blockers. No fake activity.
 11. For planning: wkappbot ask gpt "Problem: <1 sentence>. Goal: <1 sentence>. Best approach?"
 
 ━━ Minor Version Bump Checklist ━━
-When bumping WKAppBotBaseVersion (e.g. 4.1 → 4.2):
-1. Edit csharp/Directory.Build.props: WKAppBotBaseVersion → new value
-2. Commit the change (no tag needed — build auto-detects via git pickaxe)
+When bumping WKAppBotBaseVersion (e.g. 4.1 -> 4.2):
+1. Edit csharp/Directory.Build.props: WKAppBotBaseVersion -> new value
+2. Commit the change (no tag needed -- build auto-detects via git pickaxe)
 3. Update CLAUDE.md header + MEMORY.md version section
 Patch = commits since the bump commit, auto-found by searching git history.
 
@@ -75,9 +75,9 @@ Patch = commits since the bump commit, auto-found by searching git history.
 - Build/publish is Claude Code's primary role. If Claude Code is active, signal it via Slack.
 - If Claude Code is unavailable (context exhausted / offline), you may publish:
     wkappbot a11y kill wkappbot; dotnet publish D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity quiet
-  ⚠ Before any code change: wkappbot agent checkpoint --label "before fix"
-  ⚠ On build failure: fix error → checkpoint → retry. Do NOT loop more than 3 times.
-  ⚠ Restore anytime: git apply --reverse agent-patch-*.patch (or git checkout HEAD -- file)
+  ! Before any code change: wkappbot agent checkpoint --label "before fix"
+  ! On build failure: fix error -> checkpoint -> retry. Do NOT loop more than 3 times.
+  ! Restore anytime: git apply --reverse agent-patch-*.patch (or git checkout HEAD -- file)
 - Do NOT report "done" until build succeeds.
 
 ━━ Destructive Change Guard ━━
@@ -94,40 +94,40 @@ Patch = commits since the bump commit, auto-found by searching git history.
 
 ━━ Accumulated Knowhow (Skills) ━━
 Project and global knowhow is stored as skills. ALWAYS check before attempting unfamiliar tasks.
-  wkappbot skill list                  — browse all skills by category
-  wkappbot skill show <id>             — full detail: steps, rationale, examples
-  wkappbot skill search <keyword>      — find relevant skills by topic
+  wkappbot skill list                  -- browse all skills by category
+  wkappbot skill read <id>             -- full detail: steps, rationale, examples
+  wkappbot skill search <keyword>      -- find relevant skills by topic
 Skills cover: grap targeting, UI automation patterns, HTS quirks, CDP edge cases, and more.
-If a task feels hard or you hit a wall → search skills first, ask triad second.
+If a task feels hard or you hit a wall -> search skills first, ask triad second.
 
 ━━ Tool Reference ━━
 PRIMARY: wkappbot a11y <action> <grap>[#scope] [options]
-  31 actions — discovery, window control, element interaction, async, clipboard, file I/O.
+  31 actions -- discovery, window control, element interaction, async, clipboard, file I/O.
   Grap: "*App*" wildcard | "regex:..." | "*a*;*b*" OR | "*hwnd=XX*" handle
-  #scope: drills into UIA — "*App*#*MenuBar*"
-  CSS auto-detected for web: "*Chrome*#button.submit" → CDP engine
-  adb:// scheme: Android ADB — "adb://*pkg*#element"
-  3-tier fallback: UIA → Win32 → SendInput (native) | CSS → CDP → UIA (web)
+  #scope: drills into UIA -- "*App*#*MenuBar*"
+  CSS auto-detected for web: "*Chrome*#button.submit" -> CDP engine
+  adb:// scheme: Android ADB -- "adb://*pkg*#element"
+  3-tier fallback: UIA -> Win32 -> SendInput (native) | CSS -> CDP -> UIA (web)
 
 FILESYSTEM (read-only, code exploration):
-  wkappbot file read <path> [--offset N] [--limit N]   — read file with line numbers
+  wkappbot file read <path> [--offset N] [--limit N]   -- read file with line numbers
   wkappbot file grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
-  wkappbot file glob <pattern> [--path <dir>]           — ⚠ ALWAYS use **/ prefix
+  wkappbot file glob <pattern> [--path <dir>]           -- ! ALWAYS use **/ prefix
     OK: "**/*.cs"  "**/*WebFetch*"   WRONG: "Commands/File.cs"  "/src/*.cs"
 
 WEB TOOLS:
-  wkappbot web fetch <url> [--max-chars N]              — HTTP GET
-  wkappbot web search <query> [--limit N]               — Google via Chrome CDP (no API key)
-  wkappbot web read <url> [--max-chars N]               — navigate + rendered text
+  wkappbot web fetch <url> [--max-chars N]              -- HTTP GET
+  wkappbot web search <query> [--limit N]               -- Google via Chrome CDP (no API key)
+  wkappbot web read <url> [--max-chars N]               -- navigate + rendered text
 
 AI DELEGATION:
   wkappbot ask gpt|gemini|claude "<question>" [file.png]
-  wkappbot ask triad "<question>"                       — parallel GPT+Gemini+Claude
-  wkappbot agent gemini|gpt|claude "<task>"             — autonomous sub-agent loop
+  wkappbot ask triad "<question>"                       -- parallel GPT+Gemini+Claude
+  wkappbot agent gemini|gpt|claude "<task>"             -- autonomous sub-agent loop
 
 SLACK:
   wkappbot slack send "<msg>" [file.png]
-  wkappbot slack reply "<msg>" --msg <ts>               — thread reply
+  wkappbot slack reply "<msg>" --msg <ts>               -- thread reply
 
 DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
 
@@ -142,14 +142,14 @@ DURATION FORMAT (--timeout, --for): 30=30s, 2m, 500ms, 1.1s, 2h
   wkappbot web search "WKAppBot MCP setup"
   wkappbot ask gpt "Problem: button not found. Goal: click OK. Best approach?"
 
-⚠ --eval-js: use exact hwnd grap from "a11y find" output — e.g. {hwnd:0x...,proc:'chrome',domain:'...'}
-⚠ close "*Chrome*" without #hint → shows tab list (safety guard)
-⚠ wkappbot_cli = MCP tool name only — not a CLI command
+! --eval-js: use exact hwnd grap from "a11y find" output -- e.g. {hwnd:0x...,proc:'chrome',domain:'...'}
+! close "*Chrome*" without #hint -> shows tab list (safety guard)
+! wkappbot_cli = MCP tool name only -- not a CLI command
 
 ━━ Eye Alive Status Message ━━
 Eye posts ":large_green_circle: Eye alive (PID=..., uptime=...)" to Slack on start and updates it in-place.
-This message is a single Slack post that Eye continuously EDITS — it is NOT a new message each time.
-⚠ Do NOT reply to the Eye alive message for conversation — Eye edits will overwrite the thread starter.
+This message is a single Slack post that Eye continuously EDITS -- it is NOT a new message each time.
+! Do NOT reply to the Eye alive message for conversation -- Eye edits will overwrite the thread starter.
   Use a separate new Slack message when you need a stable conversation thread.
 """;
 
@@ -188,8 +188,8 @@ agent-policy.txt
     {
         DateTime now = DateTime.UtcNow;
 
-        // ── 이니셜 판단: 파일 생성시간(CreationTime) 기준 ──
-        // 파일 없음 / 생성 24시간 경과 / 생성시간 미래 → INITIAL 강제 출력
+        // -- 이니셜 판단: 파일 생성시간(CreationTime) 기준 --
+        // 파일 없음 / 생성 24시간 경과 / 생성시간 미래 -> INITIAL 강제 출력
         if (!File.Exists(PolicyFilePath))
         {
             BroadcastInitial();
@@ -201,15 +201,15 @@ agent-policy.txt
 
             if (createdUtc > now || now - createdUtc > PolicyTTL)
             {
-                // 생성 24시간 경과 or 미래 → 폴리시 재생성 (INITIAL)
+                // 생성 24시간 경과 or 미래 -> 폴리시 재생성 (INITIAL)
                 BroadcastInitial();
             }
             else if (now - modifiedUtc > TimeSpan.FromMinutes(ReminderMinutes))
             {
-                // 마지막 수정(=리마인더) 후 10분 경과 → 리마인더 append
+                // 마지막 수정(=리마인더) 후 10분 경과 -> 리마인더 append
                 BroadcastReminder(now);
             }
-            // else: 최근에 출력됨 → 스킵 (노이즈 방지)
+            // else: 최근에 출력됨 -> 스킵 (노이즈 방지)
         }
     }
 
@@ -230,7 +230,7 @@ agent-policy.txt
 
         try
         {
-            // Append → 파일 변경시간 갱신 (다음 호출 시 "언제 리마인드했나" 판단 기준)
+            // Append -> 파일 변경시간 갱신 (다음 호출 시 "언제 리마인드했나" 판단 기준)
             File.AppendAllText(PolicyFilePath,
                 $"\n--- REMINDER @ {now:yyyy-MM-dd HH:mm:ss} UTC ---\n");
         }
@@ -260,7 +260,7 @@ agent-policy.txt
         if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env))
             return Path.GetFullPath(env);
 
-        // 1.5️⃣ known agent paths — check if our process tree contains a matching agent
+        // 1.5️⃣ known agent paths -- check if our process tree contains a matching agent
         try
         {
             int checkPid = System.Diagnostics.Process.GetCurrentProcess().Id;
@@ -288,7 +288,7 @@ agent-policy.txt
             int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
             int depth = 0;
             const int maxDepth = 10;
-            string? bestNonVcs = null; // agent dir without VCS — usable as fallback
+            string? bestNonVcs = null; // agent dir without VCS -- usable as fallback
 
             while (pid > 0 && depth < maxDepth)
             {
@@ -296,7 +296,7 @@ agent-policy.txt
                 var info = QueryProcess(pid);
                 if (info == null) break;
 
-                // 2️⃣ agent process CWD — if ancestor is an AI agent, use its working directory
+                // 2️⃣ agent process CWD -- if ancestor is an AI agent, use its working directory
                 if (IsAiAgentProcess(info.Name, info.CommandLine))
                 {
                     string? agentCwd = GetProcessCwd(info.ParentProcessId)
@@ -307,7 +307,7 @@ agent-policy.txt
                         if (IsVcsWorkspace(agentCwd))
                             return Path.GetFullPath(agentCwd!);
 
-                        // Non-VCS agent dir (e.g. OpenClaw) — remember as fallback
+                        // Non-VCS agent dir (e.g. OpenClaw) -- remember as fallback
                         bestNonVcs ??= Path.GetFullPath(agentCwd!);
                     }
                 }
@@ -336,7 +336,7 @@ agent-policy.txt
         {
         }
 
-        // 6️⃣ final fallback — current directory
+        // 6️⃣ final fallback -- current directory
         return Directory.GetCurrentDirectory();
     }
 

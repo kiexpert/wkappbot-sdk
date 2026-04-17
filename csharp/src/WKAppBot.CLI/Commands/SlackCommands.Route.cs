@@ -5,7 +5,7 @@ using WKAppBot.Win32.Window;
 namespace WKAppBot.CLI;
 
 // partial class: wkappbot slack route <msgJson>
-// One-shot OnMessage delivery worker — stateless, fire-and-forget via EyeCmdPipeServer.DispatchBg.
+// One-shot OnMessage delivery worker -- stateless, fire-and-forget via EyeCmdPipeServer.DispatchBg.
 // Receives a Slack message as JSON, finds matching prompt windows, injects text, sends ack.
 // Can also be run standalone for testing (no Eye required for the delivery logic itself).
 internal partial class Program
@@ -33,7 +33,7 @@ internal partial class Program
             var qp = new StepProfiler("route-queue");
             var queueDir = Path.Combine(DataDir, "runtime", "slack_queue");
             qp.Init($"start queueDir={queueDir}");
-            if (!Directory.Exists(queueDir)) { qp.Line("dir missing — exit"); return 0; }
+            if (!Directory.Exists(queueDir)) { qp.Line("dir missing -- exit"); return 0; }
             var files = Directory.GetFiles(queueDir, "*.json");
             qp.Line($"found {files.Length} file(s)");
             if (files.Length == 0) return 0;
@@ -42,7 +42,7 @@ internal partial class Program
             foreach (var file in files)
             {
                 var procFile = Path.ChangeExtension(file, ".processing");
-                qp.Line($"claim → {Path.GetFileName(procFile)}");
+                qp.Line($"claim -> {Path.GetFileName(procFile)}");
                 try { File.Move(file, procFile, overwrite: false); }
                 catch (Exception ex) { qp.Line($"claim failed: {ex.Message}"); continue; }
                 try
@@ -102,7 +102,7 @@ internal partial class Program
             EyeCmdPipeServer.CallerCwd.Value = eyeCwd;
             try { Environment.CurrentDirectory = eyeCwd; } catch { }
         }
-        // Parse per-prompt display name map from Eye (hwnd → botUsername)
+        // Parse per-prompt display name map from Eye (hwnd -> botUsername)
         var promptNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (node["promptNames"] is JsonObject pn)
         {
@@ -113,42 +113,42 @@ internal partial class Program
         var rp = new StepProfiler("route");
         rp.Init($"ts={ts} user={user} thread={threadTs ?? "none"} cwd={eyeCwd} bot={eyeBotName} promptNames={promptNameMap.Count}");
 
-        if (!File.Exists(SlackConfigPath) && !isDryRun) { rp.Line("No Slack config — skip"); return 0; }
+        if (!File.Exists(SlackConfigPath) && !isDryRun) { rp.Line("No Slack config -- skip"); return 0; }
         var cfg = File.Exists(SlackConfigPath) ? JsonNode.Parse(File.ReadAllText(SlackConfigPath)) : null;
         var botToken = cfg?["bot_token"]?.GetValue<string>();
-        if (string.IsNullOrEmpty(botToken) && !isDryRun) { rp.Line("No bot_token — skip"); return 0; }
+        if (string.IsNullOrEmpty(botToken) && !isDryRun) { rp.Line("No bot_token -- skip"); return 0; }
 
         // Clean @mention tokens
         var cleanText = Regex.Replace(text, @"<@[A-Z0-9]+>\s*", "").Trim();
-        if (string.IsNullOrEmpty(cleanText)) { rp.Line("Empty text after clean — skip"); return 0; }
+        if (string.IsNullOrEmpty(cleanText)) { rp.Line("Empty text after clean -- skip"); return 0; }
 
-        // Noise filter (skip for reactions — they have no user text)
+        // Noise filter (skip for reactions -- they have no user text)
         if (!isReaction && SlackRouteNoise.Any(n => cleanText.Equals(n, StringComparison.OrdinalIgnoreCase)))
         {
-            rp.Line($"Noise filter — skip: {cleanText}");
+            rp.Line($"Noise filter -- skip: {cleanText}");
             return 0;
         }
 
         var textLower = text.ToLowerInvariant();
 
-        // ╔══════════════════════════════════════════════════════════════════════╗
-        // ║  ★ LEGACY ROUTING LOGIC — battle-tested. DO NOT MODIFY! ★         ║
-        // ║                                                                    ║
-        // ║  This routing logic survived dozens of production bug fixes.       ║
-        // ║  Any "simplification" or "improvement" WILL introduce bugs.        ║
-        // ║  If you need changes: only swap called functions (UIA→MCP etc).    ║
-        // ║  NEVER change the flow, branches, or conditions themselves.        ║
-        // ║                                                                    ║
-        // ║  v4.9 lessons learned:                                             ║
-        // ║  - "Simplify" OnMention → broadcast bug (all prompts got msg)      ║
-        // ║  - Change thread condition → wrong Claude got the message          ║
-        // ║  - Change catch-all to workspace-scoped → ping only reached 1/4   ║
-        // ╚══════════════════════════════════════════════════════════════════════╝
+        // +======================================================================+
+        // |  ★ LEGACY ROUTING LOGIC -- battle-tested. DO NOT MODIFY! ★         |
+        // |                                                                    |
+        // |  This routing logic survived dozens of production bug fixes.       |
+        // |  Any "simplification" or "improvement" WILL introduce bugs.        |
+        // |  If you need changes: only swap called functions (UIA->MCP etc).    |
+        // |  NEVER change the flow, branches, or conditions themselves.        |
+        // |                                                                    |
+        // |  v4.9 lessons learned:                                             |
+        // |  - "Simplify" OnMention -> broadcast bug (all prompts got msg)      |
+        // |  - Change thread condition -> wrong Claude got the message          |
+        // |  - Change catch-all to workspace-scoped -> ping only reached 1/4   |
+        // +======================================================================+
 
-        // ── Step 1: Determine delivery mode ──
-        // threadTs present → thread-scoped routing (find owner Claude)
-        // threadTs absent → keyword or full broadcast (ping etc)
-        // ⚠ Changing this condition breaks thread replies (broadcast or lost)
+        // -- Step 1: Determine delivery mode --
+        // threadTs present -> thread-scoped routing (find owner Claude)
+        // threadTs absent -> keyword or full broadcast (ping etc)
+        // ! Changing this condition breaks thread replies (broadcast or lost)
         bool isTrackedThread = !string.IsNullOrEmpty(threadTs);
 
         // Keyword detection: channel messages only (not thread replies)
@@ -157,7 +157,7 @@ internal partial class Program
 
         rp.Line($"step1: thread={isTrackedThread} kw={isKeyword} text={cleanText[..Math.Min(cleanText.Length, 60)]}");
 
-        // ── Step 2: Collect thread context (previous messages for Claude) ──
+        // -- Step 2: Collect thread context (previous messages for Claude) --
         string threadContext = "";
         if (!string.IsNullOrEmpty(threadTs))
         {
@@ -167,26 +167,26 @@ internal partial class Program
             rp.Line($"step2: context len={threadContext.Length}");
         }
 
-        // ── Step 3: Discover all prompt windows ──
+        // -- Step 3: Discover all prompt windows --
         rp.Line("step3: FindAllPrompts");
         ClaudePromptHelper.AllowFocusSteal = true;
         using var promptHelper = new ClaudePromptHelper();
         var allPrompts = promptHelper.FindAllPrompts();
         var usablePrompts = allPrompts.Where(p => p.Usable).ToList();
         rp.Line($"step3: usable {usablePrompts.Count} prompt(s) => {string.Join(", ", usablePrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
-        rp.Line($"step3: found {allPrompts.Count} prompt(s) — {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
+        rp.Line($"step3: found {allPrompts.Count} prompt(s) -- {string.Join(", ", allPrompts.Select(p => $"0x{p.WindowHandle:X}({p.HostType})"))}");
 
         List<ClaudePromptHelper.PromptInfo> targets;
         string replyTs;
         string? label;
 
-        // ── Step 4: Select target prompts (CRITICAL BRANCH) ──
+        // -- Step 4: Select target prompts (CRITICAL BRANCH) --
         rp.Line($"step4: isTrackedThread={isTrackedThread} isKeyword={isKeyword} eyeBot=\"{eyeBotName}\"");
         if (isTrackedThread && !string.IsNullOrEmpty(threadTs))
         {
             // ★ Thread reply: find owning Claude via ResolveThreadScopedPrompts
             targets = ResolveThreadScopedPrompts(promptHelper, botToken ?? "", channel, threadTs, eyeBotName ?? BotUsername);
-            rp.Line($"step4: ResolveThreadScoped → {targets.Count} match(es)");
+            rp.Line($"step4: ResolveThreadScoped -> {targets.Count} match(es)");
 
             if (targets.Count == 0)
             {
@@ -195,22 +195,22 @@ internal partial class Program
                 if (own != null)
                 {
                     targets = [own];
-                    rp.Line($"step4: fallback1 → workspace: {ExtractProjectName(own)} 0x{own.WindowHandle:X}");
+                    rp.Line($"step4: fallback1 -> workspace: {ExtractProjectName(own)} 0x{own.WindowHandle:X}");
                 }
                 else
                 {
-                    // Fallback 2: appbot master (WKAppBot VS Code) — final receiver
+                    // Fallback 2: appbot master (WKAppBot VS Code) -- final receiver
                     var appbot = usablePrompts.FirstOrDefault(p =>
                         p.WindowTitle.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
                         ClaudePromptHelper.IsVsCodeHostType(p.HostType));
                     if (appbot != null)
                     {
                         targets = [appbot];
-                        rp.Line($"step4: fallback2 → appbot 0x{appbot.WindowHandle:X}");
+                        rp.Line($"step4: fallback2 -> appbot 0x{appbot.WindowHandle:X}");
                     }
                     else
                     {
-                        rp.Line($"step4: fallback2 — no appbot! allPrompts={allPrompts.Count}");
+                        rp.Line($"step4: fallback2 -- no appbot! allPrompts={allPrompts.Count}");
                     }
                 }
             }
@@ -229,12 +229,12 @@ internal partial class Program
             }
             else
             {
-                label = null; // catch-all → SlackSendSuffix
+                label = null; // catch-all -> SlackSendSuffix
             }
-            rp.Line($"step4: broadcast → {targets.Count} prompt(s) label={label ?? "catch-all"}");
+            rp.Line($"step4: broadcast -> {targets.Count} prompt(s) label={label ?? "catch-all"}");
         }
 
-        // ── Step 5: 타겟 없음 → 재시도 큐 ──
+        // -- Step 5: 타겟 없음 -> 재시도 큐 --
         targets = targets
             .Where(p => p.Usable)
             .GroupBy(p => p.WindowHandle)
@@ -244,19 +244,19 @@ internal partial class Program
 
         if (targets.Count == 0)
         {
-            rp.Line($"step5: No targets — retry #{retryCount + 1}");
+            rp.Line($"step5: No targets -- retry #{retryCount + 1}");
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
-        // ── Step 5(deliver): TypeAndSubmit to each target ──
+        // -- Step 5(deliver): TypeAndSubmit to each target --
         rp.Line($"step5: deliver to {targets.Count} target(s){(isDryRun ? " [DRY-RUN]" : "")}");
         int sent = 0;
         var results = new List<DeliveryResult>();
         foreach (var pi in targets)
         {
             var dispName = promptNameMap.TryGetValue($"0x{pi.WindowHandle.ToInt64():X}", out var n) ? n : ExtractProjectName(pi);
-            rp.Line($"step5: → {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}");
+            rp.Line($"step5: -> {dispName} 0x{pi.WindowHandle:X} host={pi.HostType}");
             if (isDryRun)
             {
                 Console.Error.WriteLine($"[DRY-RUN] would deliver to: {dispName} (0x{pi.WindowHandle:X} {pi.HostType})");
@@ -271,13 +271,13 @@ internal partial class Program
                     : $"{cleanText}{threadContext}\n{SlackReplySuffix(user, replyTs, label)}";
 
                 var ok = ProbeAndSubmit(promptHelper, pi, promptText, ts);
-                rp.Line($"step5: {dispName} → {(ok ? "OK" : "FAIL")}");
+                rp.Line($"step5: {dispName} -> {(ok ? "OK" : "FAIL")}");
                 results.Add(new DeliveryResult(dispName, ok));
                 if (ok) sent++;
             }
             catch (Exception ex)
             {
-                rp.Line($"step5: {dispName} → ERROR: {ex.Message}");
+                rp.Line($"step5: {dispName} -> ERROR: {ex.Message}");
                 results.Add(new DeliveryResult(dispName, false));
             }
         }
@@ -293,12 +293,12 @@ internal partial class Program
 
         if (sent == 0)
         {
-            rp.Line($"All failed — retry #{retryCount + 1}");
+            rp.Line($"All failed -- retry #{retryCount + 1}");
             RouteRetryQueue.Enqueue(node, retryCount + 1);
             return 0;
         }
 
-        // ── Send ack ──
+        // -- Send ack --
         SendRouteAck(botToken!, channel, replyTs, sent, targets.Count, results);
         rp.Finish($"done sent={sent}/{targets.Count}");
         return 0;
@@ -349,7 +349,7 @@ internal partial class Program
 
     /// <summary>
     /// wkappbot slack route-flush
-    /// Processes all due retry items in the queue — intended for Windows Task Scheduler.
+    /// Processes all due retry items in the queue -- intended for Windows Task Scheduler.
     /// Runs standalone (no Eye required). Eye-independent safety net.
     /// </summary>
     static int SlackRouteFlushCommand()

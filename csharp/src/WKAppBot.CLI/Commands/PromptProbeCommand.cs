@@ -216,7 +216,7 @@ internal partial class Program
             foreach (var p in allPrompts)
             {
                 var (displayName, cwdSource) = ComputeProbeDisplayName(p, null);
-                Console.WriteLine($"  [{p.HostType}] 0x{p.WindowHandle:X} → {displayName}");
+                Console.WriteLine($"  [{p.HostType}] 0x{p.WindowHandle:X} -> {displayName}");
                 Console.WriteLine($"    title=\"{TrimForLog(p.WindowTitle, 80)}\"");
                 Console.WriteLine($"    cwd-source={cwdSource}");
             }
@@ -236,7 +236,7 @@ internal partial class Program
                 NativeMethods.GetWindowThreadProcessId(p.WindowHandle, out uint pidRaw2);
                 var pid2 = (int)pidRaw2;
 
-                // Match card by PID (VS Code: all windows share one PID — use title CWD)
+                // Match card by PID (VS Code: all windows share one PID -- use title CWD)
                 string? probeCwd = null;
                 if (ClaudePromptHelper.IsVsCodeHostType(p.HostType))
                     probeCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
@@ -264,8 +264,8 @@ internal partial class Program
             }
         }
 
-        // ── --inject: focusless text injection test ──────────────────────────
-        // Only injects into --target <grap> window, or if not specified → codex-desktop only (safe default)
+        // -- --inject: focusless text injection test --------------------------
+        // Only injects into --target <grap> window, or if not specified -> codex-desktop only (safe default)
         if (!string.IsNullOrEmpty(injectText))
         {
             Console.WriteLine();
@@ -288,7 +288,7 @@ internal partial class Program
             {
                 foreach (var p in targets)
                 {
-                    Console.Write($"  [{p.HostType}] 0x{p.WindowHandle:X} \"{TrimForLog(p.WindowTitle, 40)}\" → ");
+                    Console.Write($"  [{p.HostType}] 0x{p.WindowHandle:X} \"{TrimForLog(p.WindowTitle, 40)}\" -> ");
                     bool ok = injectSubmit
                         ? helper.TypeAndSubmit(p, injectText)
                         : helper.InjectTextOnly(p, injectText);
@@ -547,9 +547,9 @@ internal partial class Program
                 ? beforeNorm + probeText
                 : probeText;
 
-            // [FOCUS-GUARD] write 전 키보드 포커스 스냅샷 — 강탈 즉시 감지
+            // [FOCUS-GUARD] write 전 키보드 포커스 스냅샷 -- 강탈 즉시 감지
             // GetForegroundWindow() 대신 GetKeyboardFocusHwnd() 사용:
-            //   같은 창 내에서도 코드에디터 → Message input 간 이동을 정밀하게 감지.
+            //   같은 창 내에서도 코드에디터 -> Message input 간 이동을 정밀하게 감지.
             var kbFocusBefore = NativeMethods.GetKeyboardFocusHwnd();
             var writeOk = focuslessOnly
                 ? helper.TryTypeWithoutSubmitFocusless(prompt, writeText)
@@ -558,10 +558,10 @@ internal partial class Program
             if (kbFocusAfterWrite != kbFocusBefore && kbFocusBefore != IntPtr.Zero)
             {
                 Console.Error.WriteLine($"    [FOCUS-GUARD] ✖ WRITE phase stole keyboard focus! before=0x{kbFocusBefore:X8} after=0x{kbFocusAfterWrite:X8}");
-                Console.Error.WriteLine($"    → 범인: TypeWithReadinessBridge write → focus-steal paste 경로 확인 필요!");
-                Console.Error.WriteLine($"    → 키보드 포커스 복원 중...");
+                Console.Error.WriteLine($"    -> 범인: TypeWithReadinessBridge write -> focus-steal paste 경로 확인 필요!");
+                Console.Error.WriteLine($"    -> 키보드 포커스 복원 중...");
                 NativeMethods.SetForegroundWindow(NativeMethods.GetForegroundWindow()); // 창 재활성
-                Console.Error.WriteLine($"    → roundtrip 중단.");
+                Console.Error.WriteLine($"    -> roundtrip 중단.");
                 return false;
             }
             Thread.Sleep(180);
@@ -590,10 +590,10 @@ internal partial class Program
             if (kbFocusAfterRestore != kbFocusBeforeRestore && kbFocusBeforeRestore != IntPtr.Zero)
             {
                 Console.Error.WriteLine($"    [FOCUS-GUARD] ✖ RESTORE phase stole keyboard focus! before=0x{kbFocusBeforeRestore:X8} after=0x{kbFocusAfterRestore:X8}");
-                Console.Error.WriteLine($"    → 범인: TypeWithReadinessBridge restore → focus-steal paste 경로 확인 필요!");
-                Console.Error.WriteLine($"    → 키보드 포커스 복원 중...");
+                Console.Error.WriteLine($"    -> 범인: TypeWithReadinessBridge restore -> focus-steal paste 경로 확인 필요!");
+                Console.Error.WriteLine($"    -> 키보드 포커스 복원 중...");
                 NativeMethods.SetForegroundWindow(NativeMethods.GetForegroundWindow());
-                Console.Error.WriteLine($"    → roundtrip 중단.");
+                Console.Error.WriteLine($"    -> roundtrip 중단.");
                 return false;
             }
             Thread.Sleep(180);
@@ -639,7 +639,7 @@ internal partial class Program
         if (mainOk) return true;
 
         // Bridge: standard a11y/input-readiness protection stage.
-        // [FOCUS-GUARD] AutoApproveYield=false — 이전 포커스 상태와 관계없이 항상 유저 승인 필요.
+        // [FOCUS-GUARD] AutoApproveYield=false -- 이전 포커스 상태와 관계없이 항상 유저 승인 필요.
         // 창이 이미 포그라운드여도 "OK" 아님. Message input이 아닌 코드 에디터에 포커스가 있을 수 있음!
         var readiness = CreateInputReadiness();
         var report = readiness.Probe(new InputReadinessRequest
@@ -678,8 +678,8 @@ internal partial class Program
             report.FormEnabled &&
             !report.FormIconic &&
             (!report.UserYieldRequested || report.UserYieldConfirmed) &&
-            // [FOCUS-GUARD] 포커스 실제 확보 여부 확인 — 유저가 타이핑 중이라 SmartSetForeground가
-            // CheckActiveGuard에 차단됐으면 FocusAcquired=false → fallback(TypeWithoutSubmit) 스킵.
+            // [FOCUS-GUARD] 포커스 실제 확보 여부 확인 -- 유저가 타이핑 중이라 SmartSetForeground가
+            // CheckActiveGuard에 차단됐으면 FocusAcquired=false -> fallback(TypeWithoutSubmit) 스킵.
             (!report.UserYieldRequested || report.UserYieldFocusAcquired);
 
         Console.WriteLine($"    input.{phase}.bridge ok={bridgeOk} visible={report.FormVisible} enabled={report.FormEnabled} iconic={report.FormIconic} elevationMismatch={report.ElevationMismatch} blocker={(report.ActiveBlocker != null)}");
@@ -715,34 +715,34 @@ internal partial class Program
 
             if (host == "claude-desktop")
             {
-                // turn-form presence is sufficient — submit button is absent when input is empty,
+                // turn-form presence is sufficient -- submit button is absent when input is empty,
                 // but the window is still fully controllable via TryTypeWithoutSubmitFocusless.
                 var ok = st.TurnFormFound && onScreen;
                 return new InputProbeCertainty(ok, ok
                     ? $"claude turn-form detected (submit={st.SubmitFound})"
-                    : !onScreen ? $"claude off-screen ({r.X},{r.Y}) — disconnected monitor?"
+                    : !onScreen ? $"claude off-screen ({r.X},{r.Y}) -- disconnected monitor?"
                     : "claude prompt uncertain (no turn-form)");
             }
 
             if (host == "codex-desktop" || host == "vscode-codex")
             {
-                // Codex: rect height >= 40 required — height=28 is Terminal input line, not the multi-line prompt.
+                // Codex: rect height >= 40 required -- height=28 is Terminal input line, not the multi-line prompt.
                 var codexRectOk = rectOk && r.Height >= 40 && onScreen;
                 return new InputProbeCertainty(codexRectOk, codexRectOk
                     ? $"{host} rect={r.Width}x{r.Height} confirmed"
                     : !onScreen ? $"codex off-screen ({r.X},{r.Y})"
-                    : r.Height < 40 ? $"codex rect too short ({r.Height}px) — terminal line, not prompt"
+                    : r.Height < 40 ? $"codex rect too short ({r.Height}px) -- terminal line, not prompt"
                     : $"codex prompt uncertain (rectOk={rectOk})");
             }
 
             if (host == "vscode-claudecode")
             {
                 // VS Code with Claude Code native extension: FindAllPrompts already confirmed this is
-                // a Chrome_WidgetWin_1 "Visual Studio Code" window — treat as fully controllable.
+                // a Chrome_WidgetWin_1 "Visual Studio Code" window -- treat as fully controllable.
                 var vsOk = rectOk && onScreen;
                 return new InputProbeCertainty(vsOk, vsOk
                     ? $"vscode-claudecode rect={r.Width}x{r.Height} confirmed"
-                    : !onScreen ? $"vscode off-screen ({r.X},{r.Y}) — virtual desktop?"
+                    : !onScreen ? $"vscode off-screen ({r.X},{r.Y}) -- virtual desktop?"
                     : "vscode-claudecode rect too small (minimized?)");
             }
 
@@ -823,9 +823,9 @@ internal partial class Program
     /// <summary>
     /// Compute the Slack display name for a detected prompt window.
     /// Uses per-type CWD detection without relying on eye cards:
-    ///   vscode-claudecode → ExtractCwdFromVsCodeTitle (window title parse)
-    ///   codex-desktop     → GetProcessCurrentDirectory (PEB read)
-    ///   claude-desktop    → GetProcessCurrentDirectory (PEB read)
+    ///   vscode-claudecode -> ExtractCwdFromVsCodeTitle (window title parse)
+    ///   codex-desktop     -> GetProcessCurrentDirectory (PEB read)
+    ///   claude-desktop    -> GetProcessCurrentDirectory (PEB read)
     /// Falls back to current process CWD when detection fails.
     /// Returns (displayName, cwdSource) for diagnostic output.
     /// </summary>
@@ -848,7 +848,7 @@ internal partial class Program
         }
         else if (host == "codex-desktop")
         {
-            // Codex: UIA app-header-portal-main button → project folder name (타이틀은 항상 "Codex")
+            // Codex: UIA app-header-portal-main button -> project folder name (타이틀은 항상 "Codex")
             cwd = ExtractCwdFromCodexWindow(prompt.WindowHandle);
             cwdSource = cwd != null ? $"codex-uia:{cwd}" : "codex-uia:failed";
         }
@@ -859,7 +859,7 @@ internal partial class Program
             cwdSource = cwd != null ? $"proc-cwd:{cwd}" : "proc-cwd:failed";
         }
 
-        // Reject system/install directories — they are not useful workspace identifiers
+        // Reject system/install directories -- they are not useful workspace identifiers
         if (!string.IsNullOrWhiteSpace(cwd) && IsSystemOrInstallDirectory(cwd))
         {
             cwdSource += $"+rejected-system-dir:{cwd}";
@@ -870,13 +870,13 @@ internal partial class Program
         {
             if (ClaudePromptHelper.IsVsCodeHostType(host))
             {
-                // VS Code: window title always has CWD → fallback to process CWD only
+                // VS Code: window title always has CWD -> fallback to process CWD only
                 cwd = Environment.CurrentDirectory;
                 cwdSource += "+fallback:current-cwd";
             }
             else
             {
-                // claude-desktop / codex-desktop: no reliable per-instance CWD → no tag
+                // claude-desktop / codex-desktop: no reliable per-instance CWD -> no tag
                 return (FormatSlackDisplayName(prompt.HostType, null), cwdSource + "+no-cwd-tag");
             }
         }

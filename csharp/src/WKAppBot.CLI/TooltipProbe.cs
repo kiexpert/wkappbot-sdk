@@ -10,7 +10,7 @@ namespace WKAppBot.CLI;
 
 /// <summary>
 /// Enumerates all top-level windows for a given process and dumps their
-/// class name, visibility, rect, text — specifically to find tooltip windows.
+/// class name, visibility, rect, text -- specifically to find tooltip windows.
 ///
 /// With --capture flag, captures visible tooltips_class32 windows as screenshots
 /// and runs OCR on them for Phase B tooltip calibration.
@@ -164,7 +164,7 @@ internal static class TooltipProbe
                         var filename = $"tooltip_{hWnd:X8}_printwin.png";
                         var path = Path.Combine(outputDir, filename);
                         bmp.Save(path, ImageFormat.Png);
-                        Console.WriteLine($"  PrintWindow → {path}");
+                        Console.WriteLine($"  PrintWindow -> {path}");
 
                         // OCR the captured image
                         RunOcr(bmp, "PrintWindow");
@@ -186,7 +186,7 @@ internal static class TooltipProbe
                     var filename = $"tooltip_{hWnd:X8}_screen.png";
                     var path = Path.Combine(outputDir, filename);
                     bmp.Save(path, ImageFormat.Png);
-                    Console.WriteLine($"  ScreenCapture → {path}");
+                    Console.WriteLine($"  ScreenCapture -> {path}");
 
                     RunOcr(bmp, "ScreenCapture");
                 }

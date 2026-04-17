@@ -6,8 +6,8 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: readiness command — probe InputReadiness on foreground/target window
-// Completely focusless — no input, no focus steal, just diagnostics + profiling.
+// partial class: readiness command -- probe InputReadiness on foreground/target window
+// Completely focusless -- no input, no focus steal, just diagnostics + profiling.
 internal partial class Program
 {
     static int ReadinessCommand(string[] args)
@@ -45,7 +45,7 @@ Options:
             }
         }
 
-        // ── Step 1: Find target window ──
+        // -- Step 1: Find target window --
         var swTotal = Stopwatch.StartNew();
         var swStep = Stopwatch.StartNew();
         IntPtr targetHwnd;
@@ -72,7 +72,7 @@ Options:
         Console.Error.WriteLine($"[PROF] FindTarget={swStep.ElapsedMilliseconds}ms");
         Console.Out.Flush();
 
-        // ── Step 2: Create InputReadiness ──
+        // -- Step 2: Create InputReadiness --
         swStep.Restart();
         var readiness = CreateInputReadiness();
         swStep.Stop();
@@ -81,7 +81,7 @@ Options:
 
         if (pointMode)
         {
-            // ── ProbeAtPoint mode ──
+            // -- ProbeAtPoint mode --
             Console.Error.WriteLine($"[READINESS] ProbeAtPoint ({pointX},{pointY})");
             Console.Out.Flush();
 
@@ -107,7 +107,7 @@ Options:
         }
         else
         {
-            // ── Probe mode (full survey) ──
+            // -- Probe mode (full survey) --
             Console.WriteLine("[READINESS] Full probe (survey)");
             Console.Out.Flush();
 
@@ -129,7 +129,7 @@ Options:
             Console.Error.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
-            // 돋보기에 결과 표시 — BeginFadeOut이 포그라운드 스레드로 승격하므로
+            // 돋보기에 결과 표시 -- BeginFadeOut이 포그라운드 스레드로 승격하므로
             // 메인 스레드 종료 후에도 돋보기가 자동 페이드아웃까지 살아남음 (유령 돋보기)
             if (report.Zoom != null)
             {

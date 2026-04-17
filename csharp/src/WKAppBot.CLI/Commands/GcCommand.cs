@@ -7,7 +7,7 @@ internal partial class Program
 {
     /// <summary>
     /// wkappbot gc [target] [--days N] [--dry-run]
-    /// Purge old files under wkappbot.hq/ — empty folders deleted automatically.
+    /// Purge old files under wkappbot.hq/ -- empty folders deleted automatically.
     /// </summary>
     static int GcCommand(string[] args)
     {
@@ -77,7 +77,7 @@ internal partial class Program
                 var folderName = Path.GetFileName(dir);
 
                 // Filter by grap pattern if target specified
-                // "exp" → "*exp*" (auto-wrap for partial match)
+                // "exp" -> "*exp*" (auto-wrap for partial match)
                 if (!string.IsNullOrEmpty(target) && target != "all")
                 {
                     var pattern = target.Contains('*') || target.Contains('?')
@@ -96,7 +96,7 @@ internal partial class Program
                 var (deleted, bytes) = PurgeOldFiles(dir, cutoff, dryRun);
                 if (deleted > 0)
                 {
-                    var action = dryRun ? "→ recycle" : "recycled";
+                    var action = dryRun ? "-> recycle" : "recycled";
                     Console.Error.WriteLine($"[GC] {folderName}/: {action} {deleted} file(s), {bytes / 1024.0:F0}KB (>{days}d)");
                 }
                 totalDeleted += deleted;
@@ -122,7 +122,7 @@ internal partial class Program
                             totalDeleted++;
                             if (!dryRun)
                                 FileSystem.DeleteFile(file, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-                            Console.Error.WriteLine($"[GC] {fi.Name}: {(dryRun ? "→ recycle" : "recycled")} {fi.Length / 1024.0:F0}KB");
+                            Console.Error.WriteLine($"[GC] {fi.Name}: {(dryRun ? "-> recycle" : "recycled")} {fi.Length / 1024.0:F0}KB");
                         }
                     }
                 }
@@ -131,7 +131,7 @@ internal partial class Program
         }
 
         if (totalDeleted == 0 && !dryRun)
-            Console.WriteLine("[GC] Nothing to clean — all files within retention period");
+            Console.WriteLine("[GC] Nothing to clean -- all files within retention period");
         else
         {
             var action = dryRun ? "would free" : "freed";
@@ -153,7 +153,7 @@ internal partial class Program
                 try
                 {
                     var fi = new FileInfo(file);
-                    // Use the LATEST of: creation, write, access — most generous retention
+                    // Use the LATEST of: creation, write, access -- most generous retention
                     var lastUsed = new[] { fi.CreationTime, fi.LastWriteTime, fi.LastAccessTime }.Max();
                     if (lastUsed < cutoff)
                     {
@@ -202,11 +202,11 @@ Empty folders are automatically deleted after sweep.
 Pattern: partial match on HQ subdirectory names (auto-wrapped with *)
   gc              All HQ subdirs (dry-run)
   gc logs         logs/ only
-  gc exp          *exp* → experience/, kiwoom_exp/, com_exp/
+  gc exp          *exp* -> experience/, kiwoom_exp/, com_exp/
   gc tri*         triad/
   gc all          Everything
 
-Retention (days, per folder — override with --days N):
+Retention (days, per folder -- override with --days N):
   logs=7  temp=14  whisper=14  triad=30  output=30  experience=90  others=30
 
 Options:

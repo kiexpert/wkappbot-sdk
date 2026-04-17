@@ -9,11 +9,11 @@ partial class Program
     /// <param name="fastExitTimeoutMs">If >0, kills Core if it doesn't exit within this time (ms) and returns exit 0.
     /// Used for fast-exit commands (help) where Core may hang 26s due to RotateOldLogs on W: drive.</param>
     /// <param name="stdoutRelayOnly">If true, redirect only stdout (not stdin/stderr) and relay it.
-    /// Used for grap/grep with args — prevents MSYS2 PTY drain (~31s) from large stdout output.
+    /// Used for grap/grep with args -- prevents MSYS2 PTY drain (~31s) from large stdout output.
     /// Core inherits stdin/stderr from Launcher (PTY) so interactive features still work.</param>
     /// <summary>
     /// Spawn Core with CreateNoWindow=true and stdin piped (no ConPTY inheritance).
-    /// stdout/stderr are NOT redirected — Core writes directly to Launcher's terminal handles.
+    /// stdout/stderr are NOT redirected -- Core writes directly to Launcher's terminal handles.
     /// This avoids ConPTY handle inheritance and unreliable pipe relay.
     /// </summary>
     static int RunCoreNoConPty(string[] args)
@@ -31,12 +31,12 @@ partial class Program
                     FileName = core,
                     UseShellExecute       = false,
                     CreateNoWindow        = true,  // no ConPTY handle inheritance
-                    RedirectStandardInput = true,  // pipe stdin → Core holds no ConPTY stdin
+                    RedirectStandardInput = true,  // pipe stdin -> Core holds no ConPTY stdin
                     RedirectStandardOutput = false, // Core writes directly to Launcher's stdout handle
                     RedirectStandardError  = false, // Core writes directly to Launcher's stderr handle
                 }
             };
-            // Strip MSYS2/Cygwin PTY env vars — AppHost deadlock prevention (same as fastExit path)
+            // Strip MSYS2/Cygwin PTY env vars -- AppHost deadlock prevention (same as fastExit path)
             foreach (var v in new[] { "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL",
                                       "ConEmuANSI", "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST",
                                       "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE" })
@@ -45,7 +45,7 @@ partial class Program
 
             proc.Start();
             try { proc.StandardInput.Close(); } catch { } // EOF stdin immediately
-            // Use WaitForExit(timeout) instead of blocking WaitForExit() — avoids potential
+            // Use WaitForExit(timeout) instead of blocking WaitForExit() -- avoids potential
             // .NET internal async-stream-completion wait that can block 27-35s in AOT builds.
             if (!proc.WaitForExit(5000)) proc.Kill(entireProcessTree: false);
             return proc.ExitCode;
@@ -72,7 +72,7 @@ partial class Program
                 return 1;
             }
 
-            // Parse --timeout N (seconds) — Launcher-level watchdog.
+            // Parse --timeout N (seconds) -- Launcher-level watchdog.
             // Works for ALL commands, including ones that don't implement their own timeout.
             // stdout/stderr inherited (no piping overhead); Launcher simply kills Core if exceeded.
             int timeoutSec  = 0;
@@ -86,7 +86,7 @@ partial class Program
             bool useFastExit   = fastExitTimeoutMs > 0;
             bool useStdoutRelay = stdoutRelayOnly && !useFastExit;
             // For grap/grep one-shot: temp file relay avoids all pipe/ConPTY handle issues.
-            // ConPTY (bash → Launcher → Core) swaps stdout/stderr handles in Core when UseShellExecute=false
+            // ConPTY (bash -> Launcher -> Core) swaps stdout/stderr handles in Core when UseShellExecute=false
             // redirects both streams; and CreateNoWindow=true prevents .NET 8 from initializing Console.
             // Solution: Core writes to a local temp file (WKAPPBOT_RELAY_FILE env var), Launcher reads after.
             // For --follow mode: run Core normally (no temp file, output goes to terminal, Ctrl+C to stop).
@@ -110,9 +110,9 @@ partial class Program
                     UseShellExecute = false,
                     // ALL 3 streams redirected + CreateNoWindow=true for ALL spawns.
                     // Root cause of bash/MSYS2 LPC deadlock: ConPTY slave handles inherited via
-                    // stdin/stderr trigger .NET 8 AppHost console init (SetConsoleMode LPC → csrss.exe).
+                    // stdin/stderr trigger .NET 8 AppHost console init (SetConsoleMode LPC -> csrss.exe).
                     // Fix: redirect stdin+stderr so Core receives pipes (not ConPTY handles).
-                    // Core detects piped stdin → Console.IsInputRedirected=true → skips interactive init.
+                    // Core detects piped stdin -> Console.IsInputRedirected=true -> skips interactive init.
                     // "\0UIT" (4 bytes, exact flush) = Core signaling Launcher to TerminateSelf immediately.
                     RedirectStandardOutput = true,
                     RedirectStandardError  = true,
@@ -120,14 +120,14 @@ partial class Program
                     StandardOutputEncoding = System.Text.Encoding.UTF8,
                     StandardErrorEncoding  = System.Text.Encoding.UTF8,
                     // CreateNoWindow=true: prevents console window creation for ALL Core spawns.
-                    // Together with all-streams-redirected, Core has zero ConPTY handles → no LPC init.
+                    // Together with all-streams-redirected, Core has zero ConPTY handles -> no LPC init.
                     CreateNoWindow         = true,
                 }
             };
             // File-based handshake: Core creates .ready BEFORE TerminateProcess (file visible immediately).
             // Launcher polls for .ready, reads relay file while Core is alive, then creates .ack.
             // Core waits for .ack (max 500ms), then calls TerminateProcess.
-            // No named kernel objects — avoids ConPTY/session namespace issues.
+            // No named kernel objects -- avoids ConPTY/session namespace issues.
 
             // Pass relay file path to Core via env var (one-shot only)
             if (relayFilePath != null)
@@ -150,17 +150,17 @@ partial class Program
             _lDiagStep = "proc-starting";
             Prof("proc.Start()");
             // Detach Launcher from ConPTY console BEFORE spawning Core.
-            // CREATE_NO_WINDOW still attaches Core to parent's ConPTY console session → LPC deadlock
-            // in .NET 8 AppHost during console init (SetConsoleMode → csrss.exe LPC → never returns).
-            // FreeConsole(): Launcher releases its console → child inherits nothing → no LPC deadlock.
+            // CREATE_NO_WINDOW still attaches Core to parent's ConPTY console session -> LPC deadlock
+            // in .NET 8 AppHost during console init (SetConsoleMode -> csrss.exe LPC -> never returns).
+            // FreeConsole(): Launcher releases its console -> child inherits nothing -> no LPC deadlock.
             // Stdout/stderr file handles (ConPTY slave) remain valid for WriteFile after FreeConsole().
             // Make Launcher's stdout/stderr non-inheritable before spawning Core.
-            // If bash's pipe write end is inheritable, Core inherits it → bash waits 30s for Core to die after Launcher exits.
+            // If bash's pipe write end is inheritable, Core inherits it -> bash waits 30s for Core to die after Launcher exits.
             try { var h = GetStdHandle(-11); if (h != IntPtr.Zero && h != (IntPtr)(-1)) SetHandleInformation(h, 0x1, 0); } catch { }
             try { var h = GetStdHandle(-12); if (h != IntPtr.Zero && h != (IntPtr)(-1)) SetHandleInformation(h, 0x1, 0); } catch { }
             FreeConsole();
             proc.Start();
-            // Close stdin immediately — Core doesn't read stdin interactively.
+            // Close stdin immediately -- Core doesn't read stdin interactively.
             // Stdin is always redirected (pipe) so Core never inherits a ConPTY stdin handle.
             try { proc.StandardInput.Close(); } catch { }
             _lDiagStep = $"proc-waitforexit(pid={proc.Id})";
@@ -171,7 +171,7 @@ partial class Program
                 // stdin already closed above.
                 // Relay Core's stdout and stderr to Launcher's stdout/stderr in background.
                 // Write bytes directly to the underlying stdout stream.
-                // If terminal is CP949 (Korean CMD), wrap with TranscodeStream: UTF-8 → CP949 on the fly.
+                // If terminal is CP949 (Korean CMD), wrap with TranscodeStream: UTF-8 -> CP949 on the fly.
                 var rawStdout = Console.OpenStandardOutput();
                 var rawStderr = Console.OpenStandardError();
                 Stream stdoutStream = _needsTranscode
@@ -213,7 +213,7 @@ partial class Program
                 _lDiagStep = exited ? "fast-exit-ok" : "fast-exit-timeout-kill";
                 Prof(exited
                     ? $"fast-exit: core exited naturally pid={proc.Id}"
-                    : $"fast-exit: timeout {fastExitTimeoutMs}ms — kill core pid={proc.Id}");
+                    : $"fast-exit: timeout {fastExitTimeoutMs}ms -- kill core pid={proc.Id}");
                 if (!exited)
                     try { proc.Kill(entireProcessTree: true); } catch { }
                 // Wait for relay to flush all output before Launcher exits
@@ -226,7 +226,7 @@ partial class Program
             }
 
             // Stdout-relay path (grap/grep with args):
-            // Fast path: named pipe — Core closes pipe early, Launcher gets EOF quickly.
+            // Fast path: named pipe -- Core closes pipe early, Launcher gets EOF quickly.
             // Fallback: relay file (WKAPPBOT_RELAY_FILE).
             // Follow mode: Core output goes directly to the terminal (Ctrl+C to stop).
             if (useStdoutRelay)
@@ -234,7 +234,7 @@ partial class Program
                 if (relayFilePath != null)
                 {
                     // File-based fast path: poll for .ready (Core creates it BEFORE TerminateProcess).
-                    // File created by live process → visible to GetFileAttributesW immediately.
+                    // File created by live process -> visible to GetFileAttributesW immediately.
                     var readyPath = relayFilePath + ".ready";
                     var ackPath   = relayFilePath + ".ack";
                     Prof($"relay: polling .ready path={readyPath}");
@@ -266,7 +266,7 @@ partial class Program
                         AppBotQuitFlush(0);
                         return 0; // unreachable
                     }
-                    Prof("relay: .ready timeout → killing Core, no output");
+                    Prof("relay: .ready timeout -> killing Core, no output");
                     try { proc.Kill(entireProcessTree: true); } catch { }
                     try { System.IO.File.Delete(relayFilePath); } catch { }
                     try { System.IO.File.Delete(readyPath); } catch { }
@@ -297,7 +297,7 @@ partial class Program
             }
 
             // Normal path: relay Core's stdout/stderr to Launcher's stdout/stderr in real-time.
-            // Sentinel \0UIT on stderr (control signal) → TerminateSelf immediately.
+            // Sentinel \0UIT on stderr (control signal) -> TerminateSelf immediately.
             // Also buffer last 20 stderr lines + capture [LOG] path for fallback errors.jsonl.
             // Raw-byte read preserves sentinel detection; text accumulation handles line extraction.
             var stderrLastLines = new System.Collections.Generic.Queue<string>(); // ring buffer last 20 lines
@@ -307,7 +307,12 @@ partial class Program
             {
                 try
                 {
-                    var rawStderr = Console.OpenStandardError();
+                    var rawStderrBase = Console.OpenStandardError();
+                    // Transcode UTF-8 core stderr to terminal code page (CP949 etc.) when needed,
+                    // so multibyte chars like '--' / '->' render correctly on non-UTF8 terminals.
+                    Stream rawStderr = _needsTranscode
+                        ? new TranscodeStream(rawStderrBase, _consoleCodePage)
+                        : rawStderrBase;
                     var sentinel = new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' };
                     var buf = new byte[4096];
                     var lineAcc = new System.Text.StringBuilder();
@@ -318,10 +323,10 @@ partial class Program
                         if (n == 4 && buf[0] == sentinel[0] && buf[1] == sentinel[1]
                                    && buf[2] == sentinel[2] && buf[3] == sentinel[3])
                         {
-                            Prof($"relay: \\0UIT sentinel (stderr) → TerminateSelf");
+                            Prof($"relay: \\0UIT sentinel (stderr) -> TerminateSelf");
                             try { CloseHandle(GetStdHandle(-11)); } catch { }
                             var ec = proc.WaitForExit(500) ? proc.ExitCode : 0;
-                            AppBotQuitFlush((uint)ec); // no stderrRelay — we ARE the relay task
+                            AppBotQuitFlush((uint)ec); // no stderrRelay -- we ARE the relay task
                             return;
                         }
                         // Relay to terminal immediately (real-time)
@@ -365,12 +370,12 @@ partial class Program
                     Console.Error.WriteLine($"[LAUNCHER] stdout pipe error: {ex.GetType().Name}: {ex.Message}");
                     break;
                 }
-                if (n == 0) break; // EOF — Core stdout closed (normal or crash)
+                if (n == 0) break; // EOF -- Core stdout closed (normal or crash)
 
                 // Timeout check (--timeout N flag)
                 if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
                 {
-                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded — killing core (pid={proc.Id})");
+                    Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s exceeded -- killing core (pid={proc.Id})");
                     try { proc.Kill(entireProcessTree: true); } catch { }
                     try { _stdout.Flush(); } catch { }
                     AppBotQuitFlush((uint)timeoutExit, stderrRelayTask, stderrWaitMs: 500);
@@ -388,7 +393,7 @@ partial class Program
             // WaitForExit with timeout: stdout EOF doesn't guarantee Core exited (e.g. crash mid-output).
             if (!proc.HasExited && !proc.WaitForExit(5000))
             {
-                Console.Error.WriteLine($"[LAUNCHER] Core still alive 5s after stdout EOF — killing (pid={proc.Id})");
+                Console.Error.WriteLine($"[LAUNCHER] Core still alive 5s after stdout EOF -- killing (pid={proc.Id})");
                 try { proc.Kill(entireProcessTree: false); } catch { }
                 proc.WaitForExit(1000);
             }
@@ -399,12 +404,12 @@ partial class Program
             // Empty stdout + non-zero exit: Core failed silently (crash before output, or ErrorScope
             // swallowed everything). Warn so the caller isn't left with just a bare exit code.
             if (coreExitCode != 0 && stdoutBytesWritten == 0)
-                Console.Error.WriteLine($"[LAUNCHER] Core exited {coreExitCode} with no stdout — check stderr log above");
+                Console.Error.WriteLine($"[LAUNCHER] Core exited {coreExitCode} with no stdout -- check stderr log above");
             // Fallback errors.jsonl: write from Launcher when Core exits non-zero.
             // Core's TeeTextWriter normally handles this, but crashes before TeeWriter setup are silent.
-            // Wait for stderr relay to finish flushing — Core's pipe closes on exit, relay exits naturally.
+            // Wait for stderr relay to finish flushing -- Core's pipe closes on exit, relay exits naturally.
             // This ensures piped-relay mode flushes error output identically to standalone Core exit.
-            // Launcher's entry uses raw last-20 stderr lines — always a useful safety net.
+            // Launcher's entry uses raw last-20 stderr lines -- always a useful safety net.
             if (coreExitCode != 0)
             {
                 try { AppendLauncherErrorRecord(coreExitCode, args, capturedLogPath, stderrLastLines, stderrLock); }
@@ -434,7 +439,7 @@ partial class Program
     }
 
     /// <summary>
-    /// Fallback errors.jsonl writer — runs in Launcher when Core exits non-zero.
+    /// Fallback errors.jsonl writer -- runs in Launcher when Core exits non-zero.
     /// Core's TeeTextWriter normally writes this, but if Core crashed before TeeWriter
     /// was set up, this is the only record. Uses last 20 stderr lines as evidence.
     /// </summary>

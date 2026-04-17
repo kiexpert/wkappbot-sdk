@@ -1,14 +1,14 @@
-﻿// AppBotEyePromptInfo.cs — Per-prompt-window CWD/display-name/last-output resolution.
-// Single source of truth for all "hwnd → who is this? what are they doing?" queries.
+﻿// AppBotEyePromptInfo.cs -- Per-prompt-window CWD/display-name/last-output resolution.
+// Single source of truth for all "hwnd -> who is this? what are they doing?" queries.
 //
 // Key API:
-//   GetPromptDisplayInfo(hwnd)  → (displayName, lastLine, cwdLabel)
-//   GetLastOutputLine(text)     → last meaningful line from JSONL text
-//   ReadClotThoughtForCwd(cwd)  → most recent assistant output from JSONL session
-//   ExtractCwdFromVsCodeTitle() → "... - WKAppBot - Visual Studio Code" → D:\GitHub\WKAppBot
-//   GetContextInfoForCwdEx()    → JSONL size → context usage %
+//   GetPromptDisplayInfo(hwnd)  -> (displayName, lastLine, cwdLabel)
+//   GetLastOutputLine(text)     -> last meaningful line from JSONL text
+//   ReadClotThoughtForCwd(cwd)  -> most recent assistant output from JSONL session
+//   ExtractCwdFromVsCodeTitle() -> "... - WKAppBot - Visual Studio Code" -> D:\GitHub\WKAppBot
+//   GetContextInfoForCwdEx()    -> JSONL size -> context usage %
 
-// FlaUI removed from Eye — ExtractCwdFromCodexWindow routed through MCP
+// FlaUI removed from Eye -- ExtractCwdFromCodexWindow routed through MCP
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
@@ -18,20 +18,20 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── JSONL last-output cache ──────────────────────────────────────────────
+    // -- JSONL last-output cache ----------------------------------------------
     // Key: CWD path. Value: (file, preview, fileLen, fileMtime)
     static readonly Dictionary<string, (string file, string? preview, long len, DateTime mtime)>
         _clotThoughtCache = new();
     static readonly Dictionary<string, string?> _projectFolderPathCache = new(StringComparer.OrdinalIgnoreCase);
     static readonly Dictionary<string, (string provider, string path)?> _aiSessionFileCache = new(StringComparer.OrdinalIgnoreCase);
 
-    // ── VS Code title → CWD ─────────────────────────────────────────────────
+    // -- VS Code title -> CWD ------------------------------------------------─
 
     /// <summary>
     /// Extract full CWD path from VS Code window title.
     /// Pattern: "filename - FolderName - Visual Studio Code"
-    ///          "# Heading — FolderName - Visual Studio Code"
-    /// Strategy: strip VSCode suffix → take last " - " segment → search known roots.
+    ///          "# Heading -- FolderName - Visual Studio Code"
+    /// Strategy: strip VSCode suffix -> take last " - " segment -> search known roots.
     /// Fallback: reverse-map from ~/.claude/projects/ dir names.
     /// </summary>
     static string? ExtractCwdFromVsCodeTitle(string title)
@@ -45,18 +45,18 @@ internal partial class Program
         return ResolveProjectFolderToPath(folderName);
     }
 
-    // ── Codex window CWD extraction ─────────────────────────────────────────
+    // -- Codex window CWD extraction ----------------------------------------─
 
     /// <summary>
     /// Extract project folder name from Codex (OpenAI) desktop window UIA tree.
     ///
     /// [KNOWHOW] Codex CWD extraction:
-    ///   Codex is an Electron app — title is always "Codex" (no folder info in title).
+    ///   Codex is an Electron app -- title is always "Codex" (no folder info in title).
     ///   UIA inspect: inside Group[aid=app-header-portal-main], the second Button holds
     ///   the currently opened project name. e.g. [Button] "WKAppBot".
-    ///   Button text → reverse-mapped to actual folder path via searchRoots.
+    ///   Button text -> reverse-mapped to actual folder path via searchRoots.
     ///
-    ///   UIA path: RootWebArea → Group[aid=app-header-portal-main] → Button[1] (project name)
+    ///   UIA path: RootWebArea -> Group[aid=app-header-portal-main] -> Button[1] (project name)
     ///   (Button[0] = thread title, Button[1] = project name)
     /// </summary>
     static string? ExtractCwdFromCodexWindow(IntPtr hwnd)
@@ -184,7 +184,7 @@ internal partial class Program
         return score;
     }
 
-    // ── JSONL context usage ──────────────────────────────────────────────────
+    // -- JSONL context usage --------------------------------------------------
 
     /// <summary>Get context usage % and JSONL age for a specific CWD's session.</summary>
     static (int pct, TimeSpan? age) GetContextInfoForCwd(string? cwd)
@@ -217,7 +217,7 @@ internal partial class Program
 
     /// <summary>
     /// Compute context % directly from a known JSONL file path (no CWD scan needed).
-    /// Bypasses _aiSessionFileCache — always uses the exact file from session registry.
+    /// Bypasses _aiSessionFileCache -- always uses the exact file from session registry.
     /// </summary>
     static (int pct, TimeSpan? age, string? jsonlPath, long fileSize) GetContextInfoForJsonl(string jsonlPath)
     {
@@ -288,12 +288,12 @@ internal partial class Program
         catch { return ""; }
     }
 
-    // ── JSONL last-output reading ────────────────────────────────────────────
+    // -- JSONL last-output reading --------------------------------------------
 
     /// <summary>
     /// Read most recent assistant output from Claude Code session JSONL for a CWD.
-    /// CWD → ~/.claude/projects/{mapped-name}/*.jsonl (most recently modified).
-    /// Reads only last 8–32 KB (tail) — session files grow to 35MB+.
+    /// CWD -> ~/.claude/projects/{mapped-name}/*.jsonl (most recently modified).
+    /// Reads only last 8–32 KB (tail) -- session files grow to 35MB+.
     /// Per-CWD cache: skips re-read when file size/mtime unchanged.
     /// </summary>
     static string? ReadClotThoughtForCwd(string? cwd, string? preferredHostType = null)
@@ -464,7 +464,7 @@ internal partial class Program
         return false;
     }
 
-    // ── Per-prompt display info ──────────────────────────────────────────────
+    // -- Per-prompt display info ----------------------------------------------
 
     /// <summary>
     /// 최근 AI 출력에서 의미 있는 마지막 한 줄 추출 (4자 이상, 최대 120자).
@@ -475,37 +475,37 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(text)) return "(empty)";
         var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var last = lines.LastOrDefault(l => l.Length >= 4) ?? text.Trim();
-        return last.Length > 120 ? last[..120] + "…" : last;
+        return last.Length > 120 ? last[..120] + "..." : last;
     }
 
     /// <summary>
     /// Returns (displayName, lastLine, cwdLabel) for a single hwnd in one call.
     /// Single entry point for standard info lookup when iterating prompt windows.
     ///
-    /// [KNOWHOW] CWD detection war stories — don't repeat these mistakes!
+    /// [KNOWHOW] CWD detection war stories -- don't repeat these mistakes!
     ///
-    ///   Problem 1 — PID-based CWD is wrong with multiple VS Code windows:
+    ///   Problem 1 -- PID-based CWD is wrong with multiple VS Code windows:
     ///     Two VS Code windows (WKAppBot, lucy_securepad) share the same PID (Code.exe 37252).
-    ///     _cachedCards.FirstOrDefault(c => c.ParentPid == pid) → always hits the first card
-    ///     → only one side's CWD ever appears, display names get swapped.
+    ///     _cachedCards.FirstOrDefault(c => c.ParentPid == pid) -> always hits the first card
+    ///     -> only one side's CWD ever appears, display names get swapped.
     ///     ★ Fix: always extract CWD from VS Code window title first (ExtractCwdFromVsCodeTitle).
     ///
-    ///   Problem 2 — GetAllCachedPrompts() missing VS Code/Codex entries:
+    ///   Problem 2 -- GetAllCachedPrompts() missing VS Code/Codex entries:
     ///     ClaudePromptHelper.FindAllPrompts() did not add VS Code/Codex items to _turnFormCache,
     ///     so GetAllCachedPrompts() returned an empty list.
-    ///     → claudeInstances empty → no status streaming at all.
+    ///     -> claudeInstances empty -> no status streaming at all.
     ///     ★ Fix: FindAllPrompts() now adds vscode-claudecode/codex-desktop to _turnFormCache too.
     ///
-    ///   Problem 3 — Display name fallback was "most recently updated card" → wrong instance:
+    ///   Problem 3 -- Display name fallback was "most recently updated card" -> wrong instance:
     ///     GetBotUsernameFromCachedCards() step 2 picked the most recent card;
     ///     if lucy_securepad ticked more recently, WKAppBot commands sent under lucy's name.
-    ///     ★ Fix: callerHwnd hint (step 0) → title-based CWD match (step 1b) → direct build (step 1c)
+    ///     ★ Fix: callerHwnd hint (step 0) -> title-based CWD match (step 1b) -> direct build (step 1c)
     ///             most-recent fallback (step 2) only when callerCwd is unknown.
     ///
-    ///   Problem 4 — Slack thread routing: matching via display name parsing was fragile:
-    ///     "클롣[WG-lucy_securepad]" → extract cwdTag → title Contains → unreliable.
+    ///   Problem 4 -- Slack thread routing: matching via display name parsing was fragile:
+    ///     "클롣[WG-lucy_securepad]" -> extract cwdTag -> title Contains -> unreliable.
     ///     ★ Fix: reverse-lookup threadTs == state.SlackStatusTs (FindHwndBySlackStatusTs)
-    ///             find hwnd directly — window handle is the authoritative key.
+    ///             find hwnd directly -- window handle is the authoritative key.
     ///
     /// displayName : Slack display name (e.g. "클롣[WG-WKAppBot]")
     /// lastLine    : last assistant output line from JSONL
@@ -521,9 +521,9 @@ internal partial class Program
                 .FirstOrDefault(p => p.WindowHandle == hwnd);
 
         // 2. CWD: 호스트 타입별 추출 우선순위
-        //   VS Code → 타이틀 우선 (PID 공유 문제, 문제1 참조)
-        //   Codex   → UIA app-header-portal-main 버튼 (타이틀은 항상 "Codex")
-        //   기타    → PID 카드 fallback
+        //   VS Code -> 타이틀 우선 (PID 공유 문제, 문제1 참조)
+        //   Codex   -> UIA app-header-portal-main 버튼 (타이틀은 항상 "Codex")
+        //   기타    -> PID 카드 fallback
         string? cwd = null;
         if (ClaudePromptHelper.IsVsCodeHostType(pi?.HostType) && !string.IsNullOrEmpty(pi?.WindowTitle))
             cwd = ExtractCwdFromVsCodeTitle(pi.WindowTitle);
@@ -536,7 +536,7 @@ internal partial class Program
             cwd = card?.Cwd;
         }
 
-        // 3. CwdLabel (시스템/설치폴더 → 태그 없음)
+        // 3. CwdLabel (시스템/설치폴더 -> 태그 없음)
         var cwdLabel = (!string.IsNullOrEmpty(cwd) && !IsSystemOrInstallDirectory(cwd))
             ? AbbreviateCwd(cwd) : "";
 

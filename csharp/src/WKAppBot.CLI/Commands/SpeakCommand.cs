@@ -12,7 +12,7 @@ using WKAppBot.Win32.Native;
 
 namespace WKAppBot.CLI;
 
-// partial class: wkappbot speak "text" — Windows TTS 카라오케 오버레이
+// partial class: wkappbot speak "text" -- Windows TTS 카라오케 오버레이
 internal partial class Program
 {
     internal record SpeakMarker(int CharPos, int CharCount, TimeSpan AudioPos);
@@ -70,17 +70,17 @@ internal partial class Program
             return 1;
         }
 
-        // Serialize concurrent speak calls — only one TTS at a time.
+        // Serialize concurrent speak calls -- only one TTS at a time.
         // Without this, parallel callers produce overlapping audio.
         using var speakMutex = new System.Threading.Mutex(false, "Global\\WKAppBotSpeak");
         try { speakMutex.WaitOne(); }
-        catch (System.Threading.AbandonedMutexException) { /* previous speaker crashed — take over */ }
+        catch (System.Threading.AbandonedMutexException) { /* previous speaker crashed -- take over */ }
 
         // 1) TTS WAV 렌더링 + 타이밍 마커 수집
         var markers = new List<SpeakMarker>();
         var tmpFile = RenderTtsWav(text, markers, gain: 3.0f);
 
-        // 2) 공유 Stopwatch — 오디오 재생 직전에 Start
+        // 2) 공유 Stopwatch -- 오디오 재생 직전에 Start
         var sharedStopwatch = new Stopwatch();
 
         // 3) 오버레이 위치 결정
@@ -108,11 +108,11 @@ internal partial class Program
         var overlayThread = ShowSpeakOverlay(text, markers, sharedStopwatch, sizePx,
             targetHwnd != IntPtr.Zero ? targetHwnd : myHwnd, panelRect, mousePos);
 
-        // 4) 오디오 재생 — Stopwatch 시작과 동시에
+        // 4) 오디오 재생 -- Stopwatch 시작과 동시에
         try
         {
             var player = new System.Media.SoundPlayer(tmpFile);
-            player.Load(); // WAV 미리 버퍼링 → PlaySync 즉시 재생
+            player.Load(); // WAV 미리 버퍼링 -> PlaySync 즉시 재생
             sharedStopwatch.Start(); // 오버레이와 동기화 포인트!
             player.PlaySync();
             player.Dispose();
@@ -130,7 +130,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── 내 클롣 창 찾기 ──
+    // -- 내 클롣 창 찾기 --
 
     static (IntPtr hwnd, System.Drawing.Rectangle? panelRect) FindMyWindow()
     {
@@ -176,7 +176,7 @@ internal partial class Program
         catch { return (IntPtr.Zero, null); }
     }
 
-    // ── TTS → WAV + 게인 증폭 + 타이밍 수집 ──
+    // -- TTS -> WAV + 게인 증폭 + 타이밍 수집 --
 
     static string RenderTtsWav(string text, List<SpeakMarker> markers, float gain = 3.0f)
     {
@@ -226,7 +226,7 @@ internal partial class Program
         return tmpFile;
     }
 
-    // ── 카라오케 오버레이 ──
+    // -- 카라오케 오버레이 --
 
     static Thread ShowSpeakOverlay(string text, List<SpeakMarker> markers,
         Stopwatch sharedStopwatch, double sizePx = 1.0, IntPtr ownerHwnd = default,
@@ -350,19 +350,19 @@ internal sealed class SpeakOverlayWindow : Window
             var exStyle = GetWindowLongW(hwnd, -20);
             SetWindowLongW(hwnd, -20, exStyle | 0x08000000); // WS_EX_NOACTIVATE
 
-            // Physical pixel coords from GetWindowRect → divide by DPI scale for WPF Left/Top (DIP)
+            // Physical pixel coords from GetWindowRect -> divide by DPI scale for WPF Left/Top (DIP)
             uint dpi_ = GetDpiForWindow(hwnd);
             double scale_ = dpi_ > 0 ? dpi_ / 96.0 : 1.0;
 
             if (_mousePos.HasValue)
             {
-                // Mouse cursor position — already in physical pixels → convert to DIP
+                // Mouse cursor position -- already in physical pixels -> convert to DIP
                 Left = _mousePos.Value.X / scale_ - Width / 2;
                 Top  = _mousePos.Value.Y / scale_ - 80;
             }
             else if (_ownerHwnd != IntPtr.Zero && NativeMethods.GetWindowRect(_ownerHwnd, out var ownerRect))
             {
-                // Center on target window (ownerRect is physical pixels → DIP)
+                // Center on target window (ownerRect is physical pixels -> DIP)
                 double cx = (ownerRect.Left + ownerRect.Right) / 2.0 / scale_;
                 double cy = (ownerRect.Top  + ownerRect.Bottom) / 2.0 / scale_;
                 Left = cx - Width / 2;
@@ -434,7 +434,7 @@ internal sealed class SpeakOverlayWindow : Window
 
         if (newIndex == _currentMarkerIndex) return;
 
-        // 이전 글자 → 발음 완료 색상
+        // 이전 글자 -> 발음 완료 색상
         if (_currentMarkerIndex >= 0)
         {
             SetChars(_currentMarkerIndex, NormalSize, DoneBrush);
@@ -442,7 +442,7 @@ internal sealed class SpeakOverlayWindow : Window
 
         _currentMarkerIndex = newIndex;
 
-        // 현재 발음 글자 → 크게 + 노란색
+        // 현재 발음 글자 -> 크게 + 노란색
         SetChars(_currentMarkerIndex, ActiveSize, ActiveBrush);
 
         // 가로 스크롤 타겟 설정 (이징은 KaraokeTick에서 매 프레임 처리)

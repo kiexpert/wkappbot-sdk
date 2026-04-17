@@ -14,15 +14,15 @@ namespace WKAppBot.Win32.Window;
 /// </summary>
 public static class WindowFinder
 {
-    // ── Grap search cache: pattern → (hwnds, timestamp) ──
+    // -- Grap search cache: pattern -> (hwnds, timestamp) --
     // Lazy cache: only caches what was searched. hwnd validity checked on hit.
     static readonly Dictionary<string, (List<IntPtr> hwnds, DateTime cachedAt)> _grapCache = new();
     static readonly TimeSpan _grapCacheTtl = TimeSpan.FromSeconds(5);
 
-    // ── Chrome URL caches (shared across FindWindows calls) ──
-    // PID → CDP tab URLs string (all tabs joined by space), 5s TTL
+    // -- Chrome URL caches (shared across FindWindows calls) --
+    // PID -> CDP tab URLs string (all tabs joined by space), 5s TTL
     static readonly Dictionary<uint, (string urls, DateTime cachedAt)> _cdpPidUrlCache = new();
-    // HWND → UIA omnibox URL (active tab), 5s TTL
+    // HWND -> UIA omnibox URL (active tab), 5s TTL
     static readonly Dictionary<IntPtr, (string url, DateTime cachedAt)> _uiaOmniboxCache = new();
     static readonly TimeSpan _urlCacheTtl = TimeSpan.FromSeconds(5);
     static UIA3Automation? _lazyUia;
@@ -45,23 +45,23 @@ public static class WindowFinder
     /// Supports: literal substring, glob (* ? **), regex: prefix, hwnd: prefix.
     /// ★ Search key: "[ClassName] Title (processName hwnd=XXXXXXXX WxH)"
     ///   Class name 절대 우선! 제목, 프로세스명, hwnd, 크기 전부 포함.
-    ///   Examples: "#32770" → finds [#32770] dialogs with empty titles
-    ///             "nkrunlite" → finds all windows from that process
-    ///             "영웅문" → finds [_NKHeroMainClass] 영웅문4
-    ///             "hwnd:0054188E" → direct handle lookup
+    ///   Examples: "#32770" -> finds [#32770] dialogs with empty titles
+    ///             "nkrunlite" -> finds all windows from that process
+    ///             "영웅문" -> finds [_NKHeroMainClass] 영웅문4
+    ///             "hwnd:0054188E" -> direct handle lookup
     /// </summary>
     public static List<WindowInfo> FindWindows(string titlePattern, bool stopOnFirstMatch = false)
     {
-        // ── Cache check: return cached if all hwnds still alive and within TTL ──
+        // -- Cache check: return cached if all hwnds still alive and within TTL --
         if (_grapCache.TryGetValue(titlePattern, out var cached)
             && DateTime.UtcNow - cached.cachedAt < _grapCacheTtl
             && cached.hwnds.All(NativeMethods.IsWindow))
         {
             return cached.hwnds.Select(WindowInfo.FromHwnd).ToList();
         }
-        // ── Multi-field JSON-like pattern: {hwnd:0xAABB,pid:1234,title:"...",domain:"..."} ──
+        // -- Multi-field JSON-like pattern: {hwnd:0xAABB,pid:1234,title:"...",domain:"..."} --
         // All specified fields must match (AND logic). Supported fields:
-        //   hwnd    hex HWND (with or without 0x) — direct lookup if sole field
+        //   hwnd    hex HWND (with or without 0x) -- direct lookup if sole field
         //   pid     decimal or hex process ID
         //   title   window title substring (PatternMatcher: glob/regex supported)
         //   cls     window class name substring
@@ -79,9 +79,9 @@ public static class WindowFinder
             }
         }
 
-        // ★ Direct HWND lookup — no enumeration, works for any HWND (root or child)
+        // ★ Direct HWND lookup -- no enumeration, works for any HWND (root or child)
         // Supported formats (all equivalent):
-        //   [001A2B3C]   ← windows/inspect output format (canonical)
+        //   [001A2B3C]   <- windows/inspect output format (canonical)
         //   hwnd:001A2B3C
         //   hwnd:0x001A2B3C
         string? hwndHex = null;
@@ -150,7 +150,7 @@ public static class WindowFinder
                 }
             }
 
-            // cmd: fallback — match against process command line args
+            // cmd: fallback -- match against process command line args
             if (!matched)
             {
                 try
@@ -205,10 +205,10 @@ public static class WindowFinder
             return true;
         }, IntPtr.Zero);
 
-        // ── Windowless process cmdLine scan: find processes with no visible window ──
+        // -- Windowless process cmdLine scan: find processes with no visible window --
         // Walk PPID chain to find host window (e.g. wkappbot running in VS Code terminal).
         {
-            // Build pid→hwnd map from all visible windows
+            // Build pid->hwnd map from all visible windows
             var pidToHwnd = new Dictionary<uint, IntPtr>();
             var alreadyMatchedPids = new HashSet<uint>(results.Select(r => {
                 NativeMethods.GetWindowThreadProcessId(r.Handle, out uint p); return p;
@@ -227,7 +227,7 @@ public static class WindowFinder
                 {
                     var pid = (uint)proc.Id;
                     if (pid <= 4) continue;
-                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window — already checked
+                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window -- already checked
                     var cmdLine = NativeMethods.GetProcessCommandLine((int)pid);
                     if (string.IsNullOrEmpty(cmdLine)) continue;
                     if (!PatternMatcher.TokenMatchAny(titlePattern, cmdLine)) continue;
@@ -254,7 +254,7 @@ public static class WindowFinder
                     var hostInfo = WindowInfo.FromHwnd(hostHwnd);
                     // "child-cmd": host window found via child process cmdline match.
                     // NOT injected as cmd: field in grap (host proc != matched proc).
-                    // MatchedSnippet = "childProc:token" → annotation "← wkappbot: chatgpt.com"
+                    // MatchedSnippet = "childProc:token" -> annotation "<- wkappbot: chatgpt.com"
                     hostInfo.MatchedVia = "child-cmd";
                     hostInfo.MatchedSnippet = $"{proc.ProcessName}:{matchToken}";
                     hostInfo.Coverage = 0.5;
@@ -295,7 +295,7 @@ public static class WindowFinder
             }
         }
 
-        // ── Fallback: owner window chain for hidden child processes ──
+        // -- Fallback: owner window chain for hidden child processes --
         // When grap matches only hidden/tiny windows (e.g. wsl PseudoConsoleWindow),
         // follow GW_OWNER chain to find the visible host window (e.g. WindowsTerminal CASCADIA).
         // This works because ConPTY/hosted windows set the owner to their host's tab window.
@@ -311,19 +311,19 @@ public static class WindowFinder
                 results.AddRange(hostFallback);
         }
 
-        // ── Cache results for repeat searches ──
+        // -- Cache results for repeat searches --
         _grapCache[titlePattern] = (results.Select(r => r.Handle).ToList(), DateTime.UtcNow);
 
         return results;
     }
 
-    // ── Owner chain cache: hidden HWND → host HWND (2s TTL) ──
+    // -- Owner chain cache: hidden HWND -> host HWND (2s TTL) --
     static readonly Dictionary<IntPtr, (IntPtr host, DateTime cachedAt)> _ownerHostCache = new();
     static readonly TimeSpan _ownerCacheTtl = TimeSpan.FromSeconds(2);
 
     /// <summary>
     /// Follow GW_OWNER chain from hidden windows to find visible host windows.
-    /// E.g. wsl PseudoConsoleWindow(owner=CASCADIA) → WindowsTerminal CASCADIA tab.
+    /// E.g. wsl PseudoConsoleWindow(owner=CASCADIA) -> WindowsTerminal CASCADIA tab.
     /// O(1) per window with 2s TTL cache. Max 3 hops on cache miss.
     /// </summary>
     static List<WindowInfo> FindHostByOwnerChain(List<WindowInfo> hiddenResults)
@@ -348,7 +348,7 @@ public static class WindowFinder
                 continue;
             }
 
-            // Cache miss — walk owner chain
+            // Cache miss -- walk owner chain
             var current = hidden.Handle;
             IntPtr foundHost = IntPtr.Zero;
             for (int hop = 0; hop < 3; hop++)
@@ -375,16 +375,16 @@ public static class WindowFinder
                 current = owner;
             }
 
-            // Cache result (even if not found — prevents re-walk)
+            // Cache result (even if not found -- prevents re-walk)
             _ownerHostCache[hidden.Handle] = (foundHost, now);
         }
 
         return hosts;
     }
 
-    // ═══════════════════════════════════════════════════════════════
+    // ===============================================================
     //  Focus state snapshot + search key builder (standard for all callers)
-    // ═══════════════════════════════════════════════════════════════
+    // ===============================================================
 
     /// <summary>
     /// Snapshot of current focus state for search key enrichment and priority sorting.
@@ -418,7 +418,7 @@ public static class WindowFinder
             }
             catch { }
 
-            // Pre-compute root ancestors once — avoids per-window GetAncestor calls
+            // Pre-compute root ancestors once -- avoids per-window GetAncestor calls
             var kbRoot = kb != IntPtr.Zero ? NativeMethods.GetAncestor(kb, NativeMethods.GA_ROOT) : IntPtr.Zero;
             var mouseRoot = mouse != IntPtr.Zero ? NativeMethods.GetAncestor(mouse, NativeMethods.GA_ROOT) : IntPtr.Zero;
 
@@ -456,7 +456,7 @@ public static class WindowFinder
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
         var flags = focus?.GetFlags(hWnd) ?? "";
-        // wkappbot.* props → "wkappbot" 딱지 + 상세 props
+        // wkappbot.* props -> "wkappbot" 딱지 + 상세 props
         var wkArgs = "";
         var isWebbot = NativeMethods.GetPropW(hWnd, "wkappbot.webbot") != IntPtr.Zero;
         var cdpPort = NativeMethods.GetPropW(hWnd, "wkappbot.cdp").ToInt32();
@@ -465,7 +465,7 @@ public static class WindowFinder
             var parts = new List<string>(3) { "wkappbot" }; // 딱지 항상 포함
             if (isWebbot) parts.Add("webbot");
             if (cdpPort > 0) parts.Add($"cdp={cdpPort}");
-            wkArgs = $" {string.Join(" ", parts)}"; // IntPtr props — auto-freed on window destroy
+            wkArgs = $" {string.Join(" ", parts)}"; // IntPtr props -- auto-freed on window destroy
         }
         return $"[{cls}] {title} ({procName} hwnd={hWnd:X8} {w}x{h}{flags}{wkArgs})";
     }
@@ -675,12 +675,12 @@ public static class WindowFinder
         return string.Join("/", parts);
     }
 
-    // ── Win32 Recursive Tree Dump (Z-order, front→back) ────────
+    // -- Win32 Recursive Tree Dump (Z-order, front->back) --------
 
     /// <summary>
     /// Dump Win32 child window tree recursively in Z-order (front to back).
     /// Windows fully occluded by siblings in front are marked [occluded].
-    /// MFC/Win32 native apps have no UIA tree — this is the only way to inspect them.
+    /// MFC/Win32 native apps have no UIA tree -- this is the only way to inspect them.
     /// </summary>
     public static string DumpWin32Tree(IntPtr hWnd, int maxDepth = 6)
     {
@@ -758,7 +758,7 @@ public static class WindowFinder
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------
 
     public static string GetWindowText(IntPtr hWnd)
         => NativeMethods.GetWindowTextSafe(hWnd, 50);
@@ -787,14 +787,14 @@ public static class WindowFinder
 
     /// <summary>
     /// Smart focus acquisition with multi-phase recovery.
-    /// Returns (success, method) — method describes how focus was obtained.
+    /// Returns (success, method) -- method describes how focus was obtained.
     ///
-    /// Phase 0: Already focused? → return immediately (0ms)
-    /// Phase 1: Alert + wait (alertDelaySec) → beep + flash, give user time to finish
-    /// Phase 2: Smart recovery (remaining timeout) → AttachThreadInput trick
-    /// Phase 3: Timeout → fail
+    /// Phase 0: Already focused? -> return immediately (0ms)
+    /// Phase 1: Alert + wait (alertDelaySec) -> beep + flash, give user time to finish
+    /// Phase 2: Smart recovery (remaining timeout) -> AttachThreadInput trick
+    /// Phase 3: Timeout -> fail
     ///
-    /// Design: "알림 후 3초 대기 → 기회 오거나 응답 없으면 즉시 입력 수행"
+    /// Design: "알림 후 3초 대기 -> 기회 오거나 응답 없으면 즉시 입력 수행"
     /// </summary>
     /// <param name="hWnd">Target window handle</param>
     /// <param name="timeoutSec">Total timeout in seconds</param>
@@ -815,7 +815,7 @@ public static class WindowFinder
         if (NativeMethods.IsWindowForeground(hWnd))
             return (true, "already_focused");
 
-        // ── Phase 1: Alert + graceful wait ─────────────────────
+        // -- Phase 1: Alert + graceful wait --------------------─
         // Beep + flash to warn user, then wait alertDelaySec for user to switch back
         lock (consoleLock)
         {
@@ -823,7 +823,7 @@ public static class WindowFinder
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.Write("[FOCUS] ");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Focus lost — alerting user...");
+            Console.WriteLine("Focus lost -- alerting user...");
             Console.ResetColor();
         }
 
@@ -840,7 +840,7 @@ public static class WindowFinder
         };
         NativeMethods.FlashWindowEx(ref flashInfo);
 
-        // Wait alertDelaySec — user might click back voluntarily
+        // Wait alertDelaySec -- user might click back voluntarily
         var alertSw = System.Diagnostics.Stopwatch.StartNew();
         while (alertSw.Elapsed.TotalSeconds < alertDelaySec)
         {
@@ -855,14 +855,14 @@ public static class WindowFinder
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("[FOCUS] ");
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"Focus restored by user ← {alertSw.ElapsedMilliseconds}ms");
+                    Console.WriteLine($"Focus restored by user <- {alertSw.ElapsedMilliseconds}ms");
                     Console.ResetColor();
                 }
                 return (true, "user_restored");
             }
         }
 
-        // ── Phase 2: Smart recovery (force) ────────────────────
+        // -- Phase 2: Smart recovery (force) --------------------
         lock (consoleLock)
         {
             ClearLine();
@@ -893,7 +893,7 @@ public static class WindowFinder
                     Console.ForegroundColor = ConsoleColor.Green;
                     Console.Write("[FOCUS] ");
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"Focus recovered ← {alertSw.ElapsedMilliseconds}ms");
+                    Console.WriteLine($"Focus recovered <- {alertSw.ElapsedMilliseconds}ms");
                     Console.ResetColor();
                 }
                 return (true, "smart_recovery");
@@ -904,7 +904,7 @@ public static class WindowFinder
                 NativeMethods.MessageBeep(NativeMethods.MB_ICONEXCLAMATION);
         }
 
-        // ── Phase 3: Timeout ───────────────────────────────────
+        // -- Phase 3: Timeout ----------------------------------─
         StopFlash(hWnd);
         lock (consoleLock)
         {
@@ -912,7 +912,7 @@ public static class WindowFinder
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Write("[FOCUS] ");
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine($"FOCUS RECOVERY FAILED — timeout after {timeoutSec:F1}s");
+            Console.WriteLine($"FOCUS RECOVERY FAILED -- timeout after {timeoutSec:F1}s");
             Console.ResetColor();
         }
 
@@ -939,12 +939,12 @@ public static class WindowFinder
         Console.Write("\r" + new string(' ', Math.Max(w - 1, 80)) + "\r");
     }
 
-    // ── Browser URL fetch — 4-tier fallback, any browser ──
+    // -- Browser URL fetch -- 4-tier fallback, any browser --
     // Tier 0: Fast give-up for non-browser windows
-    // Tier 1: CDP HTTP /json          — Chromium + --remote-debugging-port (all tabs)
-    // Tier 2: UIA known address bar IDs — omnibox_view (Chrome/Edge/Brave), urlbar-input (Firefox)
-    // Tier 3: UIA ControlType.Edit in ToolBar + URL heuristic — standard UIA, any compliant browser
-    // Tier 4: UIA ControlType.Document → LegacyIAccessible.Value — W3C a11y standard
+    // Tier 1: CDP HTTP /json          -- Chromium + --remote-debugging-port (all tabs)
+    // Tier 2: UIA known address bar IDs -- omnibox_view (Chrome/Edge/Brave), urlbar-input (Firefox)
+    // Tier 3: UIA ControlType.Edit in ToolBar + URL heuristic -- standard UIA, any compliant browser
+    // Tier 4: UIA ControlType.Document -> LegacyIAccessible.Value -- W3C a11y standard
     // Results cached per PID (Tier 1) / HWND (Tier 2-4) with 5s TTL.
     public static string GetBrowserUrl(IntPtr hWnd, uint pid)
     {
@@ -964,7 +964,7 @@ public static class WindowFinder
             return "";
         }
 
-        // Tier 0: cmdline URL extraction — works for Chromium PWAs AND Electron apps (e.g. VS Code)
+        // Tier 0: cmdline URL extraction -- works for Chromium PWAs AND Electron apps (e.g. VS Code)
         try
         {
             var cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
@@ -982,7 +982,7 @@ public static class WindowFinder
                     }
                 }
             }
-            // --folder-uri=file:// (VS Code / any Electron workspace — not Chromium-specific)
+            // --folder-uri=file:// (VS Code / any Electron workspace -- not Chromium-specific)
             var mFolder = Regex.Match(cmdLine, @"--folder-uri=(file://[^\s""']+)", RegexOptions.IgnoreCase);
             if (mFolder.Success)
             {
@@ -996,7 +996,7 @@ public static class WindowFinder
         }
         catch { }
 
-        // Tier 1: CDP HTTP — Chromium only, requires --remote-debugging-port
+        // Tier 1: CDP HTTP -- Chromium only, requires --remote-debugging-port
         if (!_cdpPidUrlCache.TryGetValue(pid, out var cdpEntry) || now - cdpEntry.cachedAt >= _urlCacheTtl)
         {
             string cdpUrls = "";
@@ -1063,7 +1063,7 @@ public static class WindowFinder
                         }
                     }
 
-                    // Tier 4: ControlType.Document → LegacyIAccessible.Value (W3C a11y standard path)
+                    // Tier 4: ControlType.Document -> LegacyIAccessible.Value (W3C a11y standard path)
                     if (string.IsNullOrEmpty(url))
                     {
                         var doc = root.FindFirstDescendant(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.Document));
@@ -1120,9 +1120,9 @@ public static class WindowFinder
         return urls;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════════
-    // JSON5 target pattern builder — usable as grap in any command
-    // ══════════════════════════════════════════════════════════════════════════════
+    // ==============================================================================
+    // JSON5 target pattern builder -- usable as grap in any command
+    // ==============================================================================
 
     /// <summary>
     /// Build a JSON5 target pattern string for <paramref name="hWnd"/>.
@@ -1153,7 +1153,7 @@ public static class WindowFinder
         try
         {
             url = GetPrimaryUrlToken(GetBrowserUrl(hWnd, pid));
-            // Skip Electron internal URLs (not real web — noise in grap pattern)
+            // Skip Electron internal URLs (not real web -- noise in grap pattern)
             if (!string.IsNullOrEmpty(url) &&
                 (url.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase) ||
                  url.StartsWith("chrome-extension://", StringComparison.OrdinalIgnoreCase) ||
@@ -1211,17 +1211,17 @@ public static class WindowFinder
         return sb.ToString();
     }
 
-    // ══════════════════════════════════════════════════════════════════════════════
+    // ==============================================================================
     // Multi-field JSON-like grap pattern  {key:value, key:"quoted", key:/regex/, key:[or1,or2]}
-    // ══════════════════════════════════════════════════════════════════════════════
+    // ==============================================================================
 
     /// <summary>
-    /// Parse {key:value,...} multi-field pattern into field→value(s) dictionary.
+    /// Parse {key:value,...} multi-field pattern into field->value(s) dictionary.
     /// Values may be:
-    ///   unquoted   →  single token (no spaces / commas)
-    ///   "quoted"   →  substring match value (may contain spaces)
-    ///   /regex/    →  regex match value (inside {} only)
-    ///   [a,b,"c"]  →  OR list of values
+    ///   unquoted   ->  single token (no spaces / commas)
+    ///   "quoted"   ->  substring match value (may contain spaces)
+    ///   /regex/    ->  regex match value (inside {} only)
+    ///   [a,b,"c"]  ->  OR list of values
     /// Returns null if the input doesn't look like a valid multi-field pattern.
     /// </summary>
     static Dictionary<string, List<string>>? ParseMultiFieldPattern(string pattern)
@@ -1238,7 +1238,7 @@ public static class WindowFinder
             while (i < inner.Length && (char.IsWhiteSpace(inner[i]) || inner[i] == ',')) i++;
             if (i >= inner.Length) break;
 
-            // Read key — supports quoted keys ("hwnd", 'hwnd') and bare keys (hwnd)
+            // Read key -- supports quoted keys ("hwnd", 'hwnd') and bare keys (hwnd)
             string key;
             if (inner[i] == '"' || inner[i] == '\'')
             {
@@ -1306,7 +1306,7 @@ public static class WindowFinder
             }
             return s[start..i];
         }
-        // Quoted value — supports both " and ' as delimiters
+        // Quoted value -- supports both " and ' as delimiters
         if (s[i] == '"' || s[i] == '\'')
         {
             char quote = s[i++];
@@ -1337,7 +1337,7 @@ public static class WindowFinder
     /// </summary>
     static List<WindowInfo> FindByMultiField(Dictionary<string, List<string>> fields, bool stopOnFirstMatch = false)
     {
-        // ── hwnd-only: direct lookup ──
+        // -- hwnd-only: direct lookup --
         if (fields.Count == 1 && fields.TryGetValue("hwnd", out var hwndOnlyVals))
         {
             var h = ParseHwndField(hwndOnlyVals[0]);
@@ -1346,7 +1346,7 @@ public static class WindowFinder
             return [];
         }
 
-        // ── Parse static filters ──
+        // -- Parse static filters --
         IntPtr hwndFilter = IntPtr.Zero;
         if (fields.TryGetValue("hwnd", out var hwndVals))
             hwndFilter = ParseHwndField(hwndVals[0]);
@@ -1370,7 +1370,7 @@ public static class WindowFinder
         var procNameCache = new Dictionary<uint, string>();
         var focus = FocusSnapshot.CaptureNow();
 
-        // ── If hwnd specified: check only that single window ──
+        // -- If hwnd specified: check only that single window --
         if (hwndFilter != IntPtr.Zero)
         {
             if (NativeMethods.IsWindow(hwndFilter) && MatchesMultiField(
@@ -1380,8 +1380,8 @@ public static class WindowFinder
             return results;
         }
 
-        // ── Enumerate all visible windows ──
-        // Build pid→hwnd map in the same pass (used by secondary windowless-proc scan below).
+        // -- Enumerate all visible windows --
+        // Build pid->hwnd map in the same pass (used by secondary windowless-proc scan below).
         var pidToHwnd = new Dictionary<uint, IntPtr>();
         NativeMethods.EnumWindows((hWnd, _) =>
         {
@@ -1398,7 +1398,7 @@ public static class WindowFinder
             return true;
         }, IntPtr.Zero);
 
-        // ── Secondary scan: windowless processes matching proc:/cmd: ──
+        // -- Secondary scan: windowless processes matching proc:/cmd: --
         // Handles processes with no own top-level window (e.g. terminal-hosted CLI tools).
         // For each matching process, walk parent PID chain to find effective host window.
         if (procMatchers != null || cmdMatchers != null)
@@ -1408,7 +1408,7 @@ public static class WindowFinder
                 try
                 {
                     var pid = (uint)proc.Id;
-                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window — already handled above
+                    if (pidToHwnd.ContainsKey(pid)) continue; // has own window -- already handled above
 
                     var procName = proc.ProcessName;
                     if (procMatchers != null && !procMatchers.Any(m => m.IsMatch(procName))) continue;
@@ -1467,7 +1467,7 @@ public static class WindowFinder
     }
 
     // Parse hwnd or pid value: auto-detects decimal vs hex.
-    // Rules: "0x..." prefix → hex; contains a-f chars → hex; digits-only → decimal.
+    // Rules: "0x..." prefix -> hex; contains a-f chars -> hex; digits-only -> decimal.
     static IntPtr ParseHwndField(string s) => new IntPtr((long)ParseNumericField(s));
 
     static ulong ParseNumericField(string s)
@@ -1478,7 +1478,7 @@ public static class WindowFinder
             ulong.TryParse(s[2..], System.Globalization.NumberStyles.HexNumber, null, out var v);
             return v;
         }
-        // No 0x prefix → always decimal
+        // No 0x prefix -> always decimal
         ulong.TryParse(s, out var dv);
         return dv;
     }
@@ -1544,7 +1544,7 @@ public static class WindowFinder
             var url = GetBrowserUrl(hWnd, pid);
             if (domainMatchers != null)
             {
-                // CDP Tier 1 returns space-separated multi-URL (all open tabs) — check ALL, not just first
+                // CDP Tier 1 returns space-separated multi-URL (all open tabs) -- check ALL, not just first
                 bool domainMatched = false;
                 foreach (var tok in (url ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 {

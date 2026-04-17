@@ -1,6 +1,6 @@
-// A11yCommand.AmbiguityGuard.cs — Target ambiguity detection & auto-find
+// A11yCommand.AmbiguityGuard.cs -- Target ambiguity detection & auto-find
 // Unified guard: prevents accidental wrong-target operations.
-// All "target miss → show alternatives" logic lives here.
+// All "target miss -> show alternatives" logic lives here.
 
 using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
@@ -13,19 +13,19 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
     /// <summary>
-    /// Target Ambiguity Guard — 6-layer protection against wrong-target operations.
+    /// Target Ambiguity Guard -- 6-layer protection against wrong-target operations.
     /// <list type="number">
-    ///   <item>Multi-window: vague pattern matches multiple windows → list + verify</item>
-    ///   <item>Modal alert: target disabled by modal dialog → show alert contents</item>
+    ///   <item>Multi-window: vague pattern matches multiple windows -> list + verify</item>
+    ///   <item>Modal alert: target disabled by modal dialog -> show alert contents</item>
     ///   <item>Focused leaf: show focused/deepest node in target window</item>
-    ///   <item>Win32 child miss: child window not found → list siblings</item>
-    ///   <item>No #scope: element action without scope → list root children</item>
-    ///   <item>UIA scope miss: scope element not found → list available elements</item>
+    ///   <item>Win32 child miss: child window not found -> list siblings</item>
+    ///   <item>No #scope: element action without scope -> list root children</item>
+    ///   <item>UIA scope miss: scope element not found -> list available elements</item>
     /// </list>
     /// </summary>
     static class TargetAmbiguityGuard
     {
-        // ── Layer 0: Pattern specificity ──
+        // -- Layer 0: Pattern specificity --
 
         /// <summary>Check if grap pattern is specific (hwnd/pid/JSON5) vs vague (wildcard).</summary>
         public static bool IsSpecificPattern(string grap) =>
@@ -35,10 +35,10 @@ internal partial class Program
             || (grap.StartsWith("[") && grap.EndsWith("]") && grap.Length <= 12)
             || (grap.StartsWith("{") && grap.Contains(":"));
 
-        // ── Layer 1: Multi-window ambiguity ──
+        // -- Layer 1: Multi-window ambiguity --
 
         /// <summary>
-        /// Vague pattern + multiple matches → show list with verified JSON5 targets.
+        /// Vague pattern + multiple matches -> show list with verified JSON5 targets.
         /// Returns true if ambiguous (action should abort).
         /// </summary>
         public static bool CheckMultiWindow(string grap, string action,
@@ -49,7 +49,7 @@ internal partial class Program
             if (IsSpecificPattern(grap) || allWindows.Count <= 1 || all || nthRaw != null)
                 return false;
 
-            Console.Error.WriteLine($"[A11Y] \"{grap}\" matched {allWindows.Count} windows — specify target:");
+            Console.Error.WriteLine($"[A11Y] \"{grap}\" matched {allWindows.Count} windows -- specify target:");
 
             Console.WriteLine(Ansi.Dim($"### TARGETS  {allWindows.Count} matches"));
 
@@ -79,7 +79,7 @@ internal partial class Program
                 {
                     null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
                     "child-cmd" => "",  // proc/cmd already in grap
-                    _ => $"  ← {w.MatchedVia}: {w.MatchedSnippet}"
+                    _ => $"  <- {w.MatchedVia}: {w.MatchedSnippet}"
                 };
 
                 var title = string.IsNullOrWhiteSpace(w.Title) ? "TARGET" : w.Title;
@@ -102,7 +102,7 @@ internal partial class Program
             return true;
         }
 
-        // ── Layer 2: Modal alert blocking ──
+        // -- Layer 2: Modal alert blocking --
 
         /// <summary>
         /// Check if target window is disabled by a modal dialog.
@@ -123,7 +123,7 @@ internal partial class Program
             var popJson5 = QuoteGrapExpression(popGrapJson);
 
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"[A11Y] ALERT: modal dialog is blocking target → \"{popTitle}\"");
+            Console.Error.WriteLine($"[A11Y] ALERT: modal dialog is blocking target -> \"{popTitle}\"");
             Console.ResetColor();
 
             // Auto-find inside the alert dialog (UIA)
@@ -171,7 +171,7 @@ internal partial class Program
             }
         }
 
-        // ── Layer 3: Focused/Leaf node suggestion ──
+        // -- Layer 3: Focused/Leaf node suggestion --
 
         /// <summary>
         /// Show the focused or deepest UIA node in the target window.
@@ -200,7 +200,7 @@ internal partial class Program
 
                 if (focLeaf != null)
                 {
-                    // OS focus is in our target window — show leaf + parent chain
+                    // OS focus is in our target window -- show leaf + parent chain
                     var fLabel = !string.IsNullOrEmpty(focLeaf.AutomationId) ? focLeaf.AutomationId : focLeaf.Name;
                     if (fLabel.Length > 40) fLabel = fLabel[..40];
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -274,16 +274,16 @@ internal partial class Program
             catch { /* best effort */ }
         }
 
-        // ── Layer 4: Win32 child window miss ──
+        // -- Layer 4: Win32 child window miss --
 
         /// <summary>
-        /// Win32 child window not found → list sibling windows (MFC/HTS apps).
+        /// Win32 child window not found -> list sibling windows (MFC/HTS apps).
         /// </summary>
         public static void ShowWin32ChildSiblings(IntPtr parentHwnd, string missingPattern,
             string grap, string action, string? uiaPath, string[] win32Segments, int segIndex)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] \"{missingPattern}\" child window not found — Win32 children:");
+            Console.Error.WriteLine($"[A11Y] \"{missingPattern}\" child window not found -- Win32 children:");
             Console.ResetColor();
             var siblings = WindowFinder.GetChildrenZOrder(parentHwnd);
             int shown = 0;
@@ -313,13 +313,13 @@ internal partial class Program
                 shown++;
             }
             if (siblings.Count == 0)
-                Console.WriteLine("     (no child windows — UIA traversal required)");
+                Console.WriteLine("     (no child windows -- UIA traversal required)");
         }
 
-        // ── Layer 5: Missing #scope on element action ──
+        // -- Layer 5: Missing #scope on element action --
 
         /// <summary>
-        /// Element action (click/invoke/type) without #scope → show root children + focused leaf.
+        /// Element action (click/invoke/type) without #scope -> show root children + focused leaf.
         /// Returns true if guard triggered (action should abort).
         /// </summary>
         public static bool CheckMissingScope(AutomationElement root, IntPtr hwnd,
@@ -330,7 +330,7 @@ internal partial class Program
                 return false;
 
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] No #scope — auto-switching to find. UIA elements in \"{title}\":");
+            Console.Error.WriteLine($"[A11Y] No #scope -- auto-switching to find. UIA elements in \"{title}\":");
             Console.ResetColor();
             try
             {
@@ -340,7 +340,7 @@ internal partial class Program
                 var winGrapJson = BuildFindGrap(hwnd, pid, proc, compact, null);
                 var winPaste = QuoteGrapExpression(winGrapJson);
 
-                // Show focused element first (leaf → parent chain)
+                // Show focused element first (leaf -> parent chain)
                 try
                 {
                     using var focLoc = new UiaLocator();
@@ -376,7 +376,7 @@ internal partial class Program
                 int shown = 0;
                 foreach (var child in children)
                 {
-                    if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown} more — use a11y find for full tree)"); break; }
+                    if (shown >= 20) { Console.WriteLine($"     ... (+{children.Length - shown} more -- use a11y find for full tree)"); break; }
                     var cType = "?"; try { cType = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
                     var cName = child.Properties.Name.ValueOrDefault ?? "";
                     var cAid = child.Properties.AutomationId.ValueOrDefault ?? "";
@@ -398,16 +398,16 @@ internal partial class Program
             return true;
         }
 
-        // ── Layer 6: UIA scope element miss ──
+        // -- Layer 6: UIA scope element miss --
 
         /// <summary>
-        /// UIA scope element not found → list available children in the current root.
+        /// UIA scope element not found -> list available children in the current root.
         /// </summary>
         public static void ShowUiaScopeMiss(AutomationElement root, IntPtr hwnd,
             string uiaPath, string action)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] \"{uiaPath}\" not found — available elements:");
+            Console.Error.WriteLine($"[A11Y] \"{uiaPath}\" not found -- available elements:");
             Console.ResetColor();
             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
             string proc = ""; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }

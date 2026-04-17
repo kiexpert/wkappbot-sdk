@@ -24,11 +24,11 @@ internal enum ZoomMode
 }
 
 /// <summary>
-/// "Input Zoom Overlay" — semi-transparent WPF magnifier that shows a 2x enlarged
+/// "Input Zoom Overlay" -- semi-transparent WPF magnifier that shows a 2x enlarged
 /// live view of the target control during input automation.
 /// Positioned directly on top of the control, like a magnifying glass.
 ///
-/// Design: "돋보기 중계방송" — see what the bot types in real-time!
+/// Design: "돋보기 중계방송" -- see what the bot types in real-time!
 /// Tag: [ZOOM]
 ///
 /// Adaptive mode for large controls (e.g., Notepad text area):
@@ -47,7 +47,7 @@ internal sealed class InputZoomWindow : Window
 
     public InputZoomWindow(int width, int height)
     {
-        // Window properties — semi-transparent overlay, never steals focus
+        // Window properties -- semi-transparent overlay, never steals focus
         Title = "InputZoom";
         Width = width;
         Height = height;
@@ -58,7 +58,7 @@ internal sealed class InputZoomWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0; // Start fully transparent — reveal on first frame load
+        Opacity = 0; // Start fully transparent -- reveal on first frame load
 
         // Build visual tree programmatically (no XAML)
         _outerBorder = new Border
@@ -128,7 +128,7 @@ internal sealed class InputZoomWindow : Window
     }
 
     /// <summary>
-    /// Update image from raw BGRA pixel bytes — no codec, direct WriteableBitmap copy.
+    /// Update image from raw BGRA pixel bytes -- no codec, direct WriteableBitmap copy.
     /// ~10x faster than PNG/BMP encode+decode round-trip. Used by live capture fast path.
     /// </summary>
     public void UpdateBitmapRaw(byte[] pixels, int width, int height, int stride)
@@ -153,12 +153,12 @@ internal sealed class InputZoomWindow : Window
             bi.BeginInit();
             bi.StreamSource = new MemoryStream(pngData);
             bi.CacheOption = BitmapCacheOption.OnLoad;
-            // NO DecodePixelWidth — keep full resolution for pixel-perfect 2x magnification
+            // NO DecodePixelWidth -- keep full resolution for pixel-perfect 2x magnification
             bi.EndInit();
             bi.Freeze(); // thread-safe
             _controlImage.Source = bi;
 
-            // Reveal on first frame — was fully transparent until now
+            // Reveal on first frame -- was fully transparent until now
             if (!_firstFrameReceived)
             {
                 _firstFrameReceived = true;
@@ -223,7 +223,7 @@ internal sealed class InputZoomWindow : Window
         catch { /* best effort */ }
     }
 
-    // ── Win32 P/Invoke ──
+    // -- Win32 P/Invoke --
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
@@ -243,11 +243,11 @@ internal sealed class InputZoomWindow : Window
 }
 
 /// <summary>
-/// "Input Highlight Box" — transparent WPF window with just a colored border
+/// "Input Highlight Box" -- transparent WPF window with just a colored border
 /// placed exactly on the target control. Used for large, foreground-visible controls
 /// where magnification is unnecessary (e.g., Notepad text area, Excel cells).
 ///
-/// Design: "여기에 입력 중!" — simple highlight border around the target control.
+/// Design: "여기에 입력 중!" -- simple highlight border around the target control.
 /// </summary>
 internal sealed class InputHighlightWindow : Window
 {
@@ -266,23 +266,23 @@ internal sealed class InputHighlightWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false; // CRITICAL: never steal focus from target app
         ResizeMode = ResizeMode.NoResize;
-        Opacity = 0.77; // 77% opaque — lucky seven, clear enough to read
+        Opacity = 0.77; // 77% opaque -- lucky seven, clear enough to read
 
-        // Just a border — transparent interior, no image/header
+        // Just a border -- transparent interior, no image/header
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) }); // status bar
 
         _outerBorder = new Border
         {
-            Background = Brushes.Transparent, // see-through — control is visible underneath
+            Background = Brushes.Transparent, // see-through -- control is visible underneath
             BorderBrush = new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7)), // cyan
             BorderThickness = new Thickness(3),
             CornerRadius = new CornerRadius(2),
         };
         Grid.SetRow(_outerBorder, 0);
 
-        // Small status tag at bottom — semi-transparent dark bg
+        // Small status tag at bottom -- semi-transparent dark bg
         var statusBorder = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(0xDD, 0x1A, 0x1A, 0x2E)),
@@ -359,7 +359,7 @@ internal sealed class InputHighlightWindow : Window
         catch { /* best effort */ }
     }
 
-    // ── Win32 P/Invoke ──
+    // -- Win32 P/Invoke --
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
     private const int WS_EX_TRANSPARENT = 0x00000020;
@@ -385,9 +385,9 @@ internal sealed class InputHighlightWindow : Window
 /// Short-lived: created before input, disposed after input completes.
 ///
 /// Supports 3 modes:
-///   Magnifier — 3x magnifier overlay (small controls)
-///   HighlightBox — border-only overlay (large + foreground)
-///   Relay — 1:1 relay overlay (large + obscured)
+///   Magnifier -- 3x magnifier overlay (small controls)
+///   HighlightBox -- border-only overlay (large + foreground)
+///   Relay -- 1:1 relay overlay (large + obscured)
 /// </summary>
 internal sealed class InputZoomHost : IDisposable
 {
@@ -431,7 +431,7 @@ internal sealed class InputZoomHost : IDisposable
                 // Fix DPI mismatch: force exact physical pixel position via Win32
                 ForceWindowPosition(_zoomWindow, screenX, screenY, width, height);
             }
-            Dispatcher.Run(); // message loop — blocks until InvokeShutdown()
+            Dispatcher.Run(); // message loop -- blocks until InvokeShutdown()
         });
         _uiThread.SetApartmentState(ApartmentState.STA);
         _uiThread.IsBackground = true;
@@ -456,7 +456,7 @@ internal sealed class InputZoomHost : IDisposable
                 SetWindowPos(helper.Handle, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE);
             }
         }
-        catch { /* best effort — WPF Left/Top is fallback */ }
+        catch { /* best effort -- WPF Left/Top is fallback */ }
     }
 
     private static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
@@ -527,7 +527,7 @@ internal sealed class InputZoomHost : IDisposable
                         if (_capturing) return; // skip if previous capture still running
                         _capturing = true;
                         var func = _captureFunc; // local copy for closure safety
-                        // Capture on ThreadPool (off UI thread!) → push result to WPF
+                        // Capture on ThreadPool (off UI thread!) -> push result to WPF
                         System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                         {
                             try
@@ -555,7 +555,7 @@ internal sealed class InputZoomHost : IDisposable
         });
     }
     /// <summary>
-    /// Start periodic live capture using raw BGRA pixels — no codec overhead.
+    /// Start periodic live capture using raw BGRA pixels -- no codec overhead.
     /// ~10x faster than PNG/BMP path; use for real-time occluded window view.
     /// Default interval: 150ms (~6fps).
     /// </summary>
@@ -627,7 +627,7 @@ internal sealed class InputZoomHost : IDisposable
     /// <summary>
     /// Close all InputZoom/InputHighlight overlay windows from OTHER processes.
     /// Call at startup to kill ghost zooms left by previous invocations that died mid-fade.
-    /// Uses FindWindowExW (kernel title index, no messaging) — fast and non-blocking.
+    /// Uses FindWindowExW (kernel title index, no messaging) -- fast and non-blocking.
     /// </summary>
     public static void CloseAllGhosts()
     {
@@ -655,12 +655,12 @@ internal sealed class InputZoomHost : IDisposable
     /// Promotes thread to foreground so the overlay survives after main thread exits.</summary>
     public void BeginFadeOut(int delayMs = 3000, int fadeDurationMs = 800)
     {
-        // Promote to foreground thread — keeps process alive until fade completes.
+        // Promote to foreground thread -- keeps process alive until fade completes.
         // Without this, IsBackground=true kills the overlay when main thread exits.
         if (_uiThread != null) try { _uiThread.IsBackground = false; } catch { }
 
         // Safety kill-timer: force shutdown if animation gets stuck (ghost magnifier guard).
-        // Budget = (delayMs + fadeDurationMs) * 3 — plenty of margin for normal fade.
+        // Budget = (delayMs + fadeDurationMs) * 3 -- plenty of margin for normal fade.
         int safetyMs = (delayMs + fadeDurationMs) * 3;
         var killTimer = new System.Threading.Timer(_ =>
         {

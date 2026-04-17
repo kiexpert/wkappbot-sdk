@@ -1,4 +1,4 @@
-// A11yHackCommand.Focus.cs — Focus resolution, auto-narrow, UIA element helpers
+// A11yHackCommand.Focus.cs -- Focus resolution, auto-narrow, UIA element helpers
 // Split from A11yHackCommand.cs for maintainability (~430 lines)
 
 using System.Drawing;

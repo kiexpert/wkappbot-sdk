@@ -9,7 +9,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// ── BlockerHandlerAdapter ─────────────────────────────────────────
+// -- BlockerHandlerAdapter ----------------------------------------─
 
 /// <summary>
 /// IBlockerHandler 구현: 기존 TryHandleBlocker + DialogHandlerManager 래핑.
@@ -31,11 +31,11 @@ internal sealed class BlockerHandlerAdapter : IBlockerHandler
     }
 }
 
-// ── KnowhowBroadcasterAdapter ─────────────────────────────────────
+// -- KnowhowBroadcasterAdapter ------------------------------------─
 
 /// <summary>
 /// IKnowhowBroadcaster 구현: 1회만 방송 보장.
-/// knowhow.md → 파일명+첫문단, knowhow-{action}.md → 파일명만.
+/// knowhow.md -> 파일명+첫문단, knowhow-{action}.md -> 파일명만.
 /// Tag: [READINESS]
 /// </summary>
 internal sealed class KnowhowBroadcasterAdapter : IKnowhowBroadcaster
@@ -46,13 +46,13 @@ internal sealed class KnowhowBroadcasterAdapter : IKnowhowBroadcaster
     {
         var key = $"{mainHwnd:X}|{formId}|{controlId}|{actionName}";
         if (!_broadcastedKeys.Add(key))
-            return; // 이미 방송함 — 1회만!
+            return; // 이미 방송함 -- 1회만!
 
         Program.BroadcastKnowhowViaReadiness(mainHwnd, formId, actionName);
     }
 }
 
-// ── UserInputWaitAdapter ─────────────────────────────────────────
+// -- UserInputWaitAdapter ----------------------------------------─
 
 /// <summary>
 /// IUserInputWait 구현: WPF 알림창으로 포커스 양보 대기.
@@ -100,7 +100,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             var actionArgs = callerArgs != null
                 ? string.Join(" ", callerArgs)
                 : string.Join(" ", Environment.GetCommandLineArgs().Skip(1));
-            // Capture call stack — WKAppBot frames only, skip internals
+            // Capture call stack -- WKAppBot frames only, skip internals
             var stackFrames = new System.Diagnostics.StackTrace(fNeedFileInfo: false).GetFrames()
                 .Select(f => f.GetMethod())
                 .Where(m => m?.DeclaringType?.Namespace?.StartsWith("WKAppBot") == true)
@@ -109,7 +109,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
                 .Distinct()
                 .Take(6)
                 .ToArray();
-            var stackInfo = stackFrames.Length > 0 ? "\n[호출] " + string.Join(" ← ", stackFrames) : "";
+            var stackInfo = stackFrames.Length > 0 ? "\n[호출] " + string.Join(" <- ", stackFrames) : "";
             // Caller display name (who triggered this approval)
             var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value;
             var callerName = callerHwnd.HasValue
@@ -120,7 +120,7 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
                 positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + callerInfo + stackInfo);
             if (deniedByUser)
-                Console.WriteLine("[READINESS] 사용자가 포커스 양보를 거부했습니다 — 중단");
+                Console.WriteLine("[READINESS] 사용자가 포커스 양보를 거부했습니다 -- 중단");
             result = new UserYieldResult(approved, focusAcquired);
             return result;
         }
@@ -130,18 +130,18 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
             dotCts.Cancel();
             dotThread.Join(200);
             var label = result.Approved ? "확인" : "취소";
-            Console.WriteLine($" → {label} ({sw.Elapsed.TotalSeconds:F1}s)");
+            Console.WriteLine($" -> {label} ({sw.Elapsed.TotalSeconds:F1}s)");
             Console.Out.Flush();
         }
     }
 
     static bool ShouldAutoApproveAll()
     {
-        // [FOCUS-GUARD] 환경변수로만 제어 — wkappbot-core.exe 자동 활성화 제거!
+        // [FOCUS-GUARD] 환경변수로만 제어 -- wkappbot-core.exe 자동 활성화 제거!
         //
         // 이전: wkappbot-core.exe 직접 실행 시 auto-approve-all=true (Eye 데몬 용도)
-        // 문제: prompt-probe --input 같은 유저 직접 실행 명령에도 적용 → yield popup 스킵
-        //        → 유저가 타이핑 중에도 포커스 강탈이 그냥 통과됨 (유저 입력 방해!)
+        // 문제: prompt-probe --input 같은 유저 직접 실행 명령에도 적용 -> yield popup 스킵
+        //        -> 유저가 타이핑 중에도 포커스 강탈이 그냥 통과됨 (유저 입력 방해!)
         //
         // 올바른 방식: 자동화 케이스는 개별 Probe() 호출에서 AutoApproveYield=true 사용.
         // 전체 프로세스 블랭킷 auto-approve는 유저 보호를 무력화하므로 금지.
@@ -160,20 +160,20 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
     }
 }
 
-// ── ElevationRequesterAdapter ────────────────────────────────────
+// -- ElevationRequesterAdapter ------------------------------------
 
 /// <summary>
 /// IElevationRequester 구현: Elevated Eye Proxy 우선, 없으면 UAC runas.
-/// 1. Elevated Eye 프록시가 살아있으면 → Pipe로 명령 위임 (투명 중계)
-/// 2. 없으면 → Elevated Eye 시작 시도 → 프록시로 명령 위임
-/// 3. UAC 취소 → false 반환 → 포커스리스 메서드로 계속
+/// 1. Elevated Eye 프록시가 살아있으면 -> Pipe로 명령 위임 (투명 중계)
+/// 2. 없으면 -> Elevated Eye 시작 시도 -> 프록시로 명령 위임
+/// 3. UAC 취소 -> false 반환 -> 포커스리스 메서드로 계속
 /// Tag: [READINESS]
 /// </summary>
 internal sealed class ElevationRequesterAdapter : IElevationRequester
 {
     public bool RequestElevation(string targetProcessName, uint targetPid)
     {
-        // MCP mode: never launch processes — proxy only, or signal Launcher
+        // MCP mode: never launch processes -- proxy only, or signal Launcher
         if (Program.IsMcpMode || Program.RunningInEye)
         {
             Console.Error.WriteLine($"[ELEVATION] MCP/Eye mode: cannot launch admin process for {targetProcessName} (pid={targetPid})");
@@ -184,24 +184,24 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
         }
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"  [ELEVATION] {targetProcessName} (PID {targetPid}) is elevated — requesting admin rights...");
+        Console.WriteLine($"  [ELEVATION] {targetProcessName} (PID {targetPid}) is elevated -- requesting admin rights...");
         Console.ResetColor();
 
         // Strategy 1: Use existing elevated Eye proxy
         if (ElevatedEyeClient.IsAvailable())
         {
-            Console.WriteLine("  [ELEVATION] Elevated Eye proxy found — delegating command");
+            Console.WriteLine("  [ELEVATION] Elevated Eye proxy found -- delegating command");
             return DelegateViaProxy();
         }
 
         // Strategy 2: Launch elevated Eye, then delegate
-        Console.WriteLine("  [ELEVATION] No elevated Eye — launching admin Eye proxy...");
+        Console.WriteLine("  [ELEVATION] No elevated Eye -- launching admin Eye proxy...");
         if (ElevationHelper.LaunchElevatedEye("Readiness: UIPI-blocked target, proxy fallback"))
         {
             return DelegateViaProxy();
         }
 
-        // Strategy 3: Fallback — relaunch self as admin (legacy)
+        // Strategy 3: Fallback -- relaunch self as admin (legacy)
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
@@ -232,7 +232,7 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
         catch (Win32Exception ex) when (ex.NativeErrorCode == 1223) // ERROR_CANCELLED
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("  [ELEVATION] UAC denied — continuing with focusless methods only");
+            Console.WriteLine("  [ELEVATION] UAC denied -- continuing with focusless methods only");
             Console.ResetColor();
         }
         catch (Exception ex)
@@ -262,12 +262,12 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             return true; // unreachable after Exit
         }
 
-        Console.WriteLine("  [ELEVATION] Proxy delegation failed — falling back to runas");
+        Console.WriteLine("  [ELEVATION] Proxy delegation failed -- falling back to runas");
         return false;
     }
 }
 
-// ── ReadinessZoomAdapter ──────────────────────────────────────────
+// -- ReadinessZoomAdapter ------------------------------------------
 
 /// <summary>
 /// IReadinessZoom 구현: ClickZoomHelper 래핑 + 이전 돋보기 재활용.
@@ -290,7 +290,7 @@ internal sealed class ReadinessZoomAdapter : IReadinessZoom
             }
             catch
             {
-                _lastZoom = null; // 죽은 돋보기 — 새로 생성
+                _lastZoom = null; // 죽은 돋보기 -- 새로 생성
             }
         }
 
@@ -306,7 +306,7 @@ internal static partial class Program
 {
     /// <summary>
     /// Strip async state machine noise from stack frame names.
-    /// "&lt;AskClaude&gt;d__409" + "MoveNext" → "AskClaude"
+    /// "&lt;AskClaude&gt;d__409" + "MoveNext" -> "AskClaude"
     /// </summary>
     internal static string? CleanAsyncMethodName(string typeName, string methodName)
     {

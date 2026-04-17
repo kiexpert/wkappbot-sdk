@@ -12,21 +12,21 @@ internal partial class Program
     {
         var sb = new StringBuilder();
 
-        // ── Action triplet (always on top — real-time accessibility probe) ──
+        // -- Action triplet (always on top -- real-time accessibility probe) --
         var (a11y, act, fallback) = ReadLatestActionTriplet();
         if (!string.IsNullOrWhiteSpace(a11y)) sb.AppendLine($"엑빌: {a11y}");
         if (!string.IsNullOrWhiteSpace(act)) sb.AppendLine($"액션: {act}");
         if (!string.IsNullOrWhiteSpace(fallback)) sb.AppendLine($"폴백: {fallback}");
 
-        // ── Build KRO section text (rendered inline with cards by recency) ──
+        // -- Build KRO section text (rendered inline with cards by recency) --
         // KRO sort time = session file mtime (= when kro last wrote to its session JSONL)
-        // CardCacheGetTimestamp had a bug: content varied due to whitespace → always UtcNow
-        // Now uses file mtime directly — more accurate indicator of kro activity
+        // CardCacheGetTimestamp had a bug: content varied due to whitespace -> always UtcNow
+        // Now uses file mtime directly -- more accurate indicator of kro activity
         string kroBlock = "";
         DateTime kroTsUtc = DateTime.MinValue;
         if (latest != null)
         {
-            // Use session file mtime — reflects actual kro write activity
+            // Use session file mtime -- reflects actual kro write activity
             kroTsUtc = kroFileWriteUtc != default ? kroFileWriteUtc
                 : CardCacheGetTimestamp("kro", prompt ?? ""); // fallback if mtime not passed
 
@@ -43,9 +43,9 @@ internal partial class Program
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
-                    kroSb.AppendLine($"- —:— {plans[i]}");
+                    kroSb.AppendLine($"- --:-- {plans[i]}");
                 if (_lastPlanItemsCache.Count > plans.Count)
-                    kroSb.AppendLine($"- —:— 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
+                    kroSb.AppendLine($"- --:-- 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
             }
 
             if (!string.IsNullOrWhiteSpace(block))
@@ -60,7 +60,7 @@ internal partial class Program
             kroBlock = kroSb.ToString().TrimEnd();
         }
 
-        // ── Apply CardCache to AI cards — sort by MAX(content change, tick activity) ──
+        // -- Apply CardCache to AI cards -- sort by MAX(content change, tick activity) --
         // CardCache tracks when card text (tag|status) actually changed.
         // HealthCheck sets LastTsUtc from eye_ticks.jsonl (real JSONL activity).
         // Using max of both ensures active sessions stay on top even when card text is unchanged.
@@ -80,10 +80,10 @@ internal partial class Program
             c.LastTsUtc = cachedTs > tickTs ? cachedTs : tickTs;
         }
 
-        // ── Sort ALL cards (including KRO) by recency — newest on top ──
+        // -- Sort ALL cards (including KRO) by recency -- newest on top --
         // KRO = Claude Code itself (~/.openclaw/), cards = individual CLI commands (each with own CWD)
-        // They share the same Claude Desktop host but are separate entities — no dedup needed
-        // Hide KRO if its tick is older than 24h (stale — KRO not active)
+        // They share the same Claude Desktop host but are separate entities -- no dedup needed
+        // Hide KRO if its tick is older than 24h (stale -- KRO not active)
         bool kroStale = kroTsUtc != DateTime.MinValue && (DateTime.UtcNow - kroTsUtc).TotalHours > 24;
         bool hasKro = !string.IsNullOrWhiteSpace(kroBlock) && !kroStale;
         var sortedCards = cards.OrderByDescending(x => x.LastTsUtc).Take(6).ToList();
@@ -121,7 +121,7 @@ internal partial class Program
                     var cwdTag = AbbreviateCwd(c.Cwd);
                     var ageText = age < 60 ? $"{age}초 전" : age < 3600 ? $"{age / 60}분 전" : $"{age / 3600}시간 전";
 
-                    // Header: display name only (no icon — icon is visual noise in Slack)
+                    // Header: display name only (no icon -- icon is visual noise in Slack)
                     var header = string.IsNullOrWhiteSpace(cwdTag)
                         ? (string.IsNullOrWhiteSpace(c.ParentTitle) ? $"{c.ParentName}:{c.ParentPid}" : c.ParentTitle)
                         : FormatSlackDisplayName(c.HostType, cwdTag);
@@ -159,7 +159,7 @@ internal partial class Program
                         : ReadClotThoughtForCwd(c.Cwd, c.HostType);
                     if (!string.IsNullOrWhiteSpace(clotThought))
                     {
-                        // May contain "💬 user\n🤖 assistant" — split into separate lines
+                        // May contain "💬 user\n🤖 assistant" -- split into separate lines
                         foreach (var thoughtLine in clotThought.Split('\n'))
                         {
                             if (string.IsNullOrWhiteSpace(thoughtLine)) continue;
@@ -197,9 +197,9 @@ internal partial class Program
     /// <summary>
     /// Abbreviate a working directory path for compact display.
     /// Drive letter + first letter of each intermediate folder + "-" + leaf folder.
-    /// e.g. "D:\GitHub\WKAppBot" → "WG-WKAppBot"
-    ///      "D:\HTS-Project\Source\Main\MainLib" → "WHSM-MainLib"
-    ///      "D:\VIGSOne" → "W-VIGSOne"
+    /// e.g. "D:\GitHub\WKAppBot" -> "WG-WKAppBot"
+    ///      "D:\HTS-Project\Source\Main\MainLib" -> "WHSM-MainLib"
+    ///      "D:\VIGSOne" -> "W-VIGSOne"
     /// </summary>
     static string AbbreviateCwd(string? cwd)
     {
@@ -224,10 +224,10 @@ internal partial class Program
         var path = cwd.Replace('\\', '/').TrimEnd('/');
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0) return "";
-        var drive = parts[0].TrimEnd(':').ToUpperInvariant();  // "W:" → "W"
+        var drive = parts[0].TrimEnd(':').ToUpperInvariant();  // "W:" -> "W"
         if (parts.Length <= 1) return drive;
         var leaf = parts[^1];
-        // Middle folders → take first char of each as uppercase initial
+        // Middle folders -> take first char of each as uppercase initial
         var initials = "";
         for (int i = 1; i < parts.Length - 1; i++)
             if (parts[i].Length > 0) initials += char.ToUpperInvariant(parts[i][0]);
@@ -274,14 +274,14 @@ internal partial class Program
         {
             if (cached.content == currentContent)
                 return cached.changedUtc;
-            // Content changed — update
+            // Content changed -- update
             var now = DateTime.UtcNow;
             _cardCache[cardKey] = (currentContent, now);
             CardCacheSave(cardKey, currentContent, now);
             return now;
         }
 
-        // Cold start — load from disk
+        // Cold start -- load from disk
         var diskEntry = CardCacheLoad(cardKey);
         if (diskEntry.HasValue)
         {
@@ -290,14 +290,14 @@ internal partial class Program
                 _cardCache[cardKey] = diskEntry.Value;
                 return diskEntry.Value.changedUtc;
             }
-            // Disk content differs from current — content changed
+            // Disk content differs from current -- content changed
             var now = DateTime.UtcNow;
             _cardCache[cardKey] = (currentContent, now);
             CardCacheSave(cardKey, currentContent, now);
             return now;
         }
 
-        // Never seen — first encounter, use MinValue (card goes to bottom)
+        // Never seen -- first encounter, use MinValue (card goes to bottom)
         _cardCache[cardKey] = (currentContent, DateTime.MinValue);
         CardCacheSave(cardKey, currentContent, DateTime.MinValue);
         return DateTime.MinValue;

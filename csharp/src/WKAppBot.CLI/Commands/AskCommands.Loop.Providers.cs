@@ -19,21 +19,21 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
-            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 -> 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0) return (true, answer);
 
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.Error.WriteLine($"[ASK:LOOP] GPT requested {requested} — clamped to {maxParallel}");
+                Console.Error.WriteLine($"[ASK:LOOP] GPT requested {requested} -- clamped to {maxParallel}");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
             Console.Error.WriteLine($"[ASK:LOOP] GPT step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
-            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"ChatGPT:step{step}");
-            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
-            // Post ⏳ placeholder per tool — will be updated in-place when result arrives
+            onReport?.Invoke($"*Step {step}/{steps}* -- {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin->{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"ChatGPT:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin -> {tc.RunId}" : string.Join(" ", tc.Argv!));
+            // Post ⏳ placeholder per tool -- will be updated in-place when result arrives
             var idToStartTs = onReport != null ? toolCalls.ToDictionary(
                 tc => tc.Id,
                 tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"ChatGPT:{tc.Id}") ?? "") : null;
@@ -41,7 +41,7 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin -> {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
@@ -72,7 +72,7 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
-            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 -> 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0)
                 return (true, answer);
@@ -80,13 +80,13 @@ internal partial class Program
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.Error.WriteLine($"[ASK:LOOP] Gemini requested {requested} calls — clamped to {maxParallel} (--max-parallel)");
+                Console.Error.WriteLine($"[ASK:LOOP] Gemini requested {requested} calls -- clamped to {maxParallel} (--max-parallel)");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
             Console.Error.WriteLine($"[ASK:LOOP] Gemini step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
-            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Gemini:step{step}");
-            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
+            onReport?.Invoke($"*Step {step}/{steps}* -- {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin->{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Gemini:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin -> {tc.RunId}" : string.Join(" ", tc.Argv!));
             var idToStartTsGemini = onReport != null ? toolCalls.ToDictionary(
                 tc => tc.Id,
                 tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"Gemini:{tc.Id}") ?? "") : null;
@@ -94,7 +94,7 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin -> {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
@@ -128,20 +128,20 @@ internal partial class Program
 
         for (int step = 1; step <= steps; step++)
         {
-            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 → 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
+            if (AgentStopFlagExists()) { Console.WriteLine("[AGENT] 🛑 --terminate 신호 -> 루프 종료"); return (true, answer + "\n[AGENT] Terminated."); }
             var toolCalls = ParseAllLoopToolCalls(answer);
             if (toolCalls.Count == 0) return (true, answer);
 
             var requested = toolCalls.Count;
             if (toolCalls.Count > maxParallel)
             {
-                Console.Error.WriteLine($"[ASK:LOOP] Claude requested {requested} — clamped to {maxParallel}");
+                Console.Error.WriteLine($"[ASK:LOOP] Claude requested {requested} -- clamped to {maxParallel}");
                 toolCalls = toolCalls.Take(maxParallel).ToList();
             }
 
             Console.Error.WriteLine($"[ASK:LOOP] Claude step {step}/{steps}: {toolCalls.Count}/{requested} tool call(s) in parallel");
-            onReport?.Invoke($"*Step {step}/{steps}* — {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin→{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Claude:step{step}");
-            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin → {tc.RunId}" : string.Join(" ", tc.Argv!));
+            onReport?.Invoke($"*Step {step}/{steps}* -- {toolCalls.Count} tool(s): {string.Join(", ", toolCalls.Select(tc => tc.IsStdinInject ? $"stdin->{tc.RunId}" : string.Join(" ", tc.Argv!.Take(2))))}", $"Claude:step{step}");
+            var idToCmd = toolCalls.ToDictionary(tc => tc.Id, tc => tc.IsStdinInject ? $"stdin -> {tc.RunId}" : string.Join(" ", tc.Argv!));
             var idToStartTsClaude = onReport != null ? toolCalls.ToDictionary(
                 tc => tc.Id,
                 tc => SlackPostToThreadAndGetTs($"⏳ `{idToCmd[tc.Id]}`", $"Claude:{tc.Id}") ?? "") : null;
@@ -149,7 +149,7 @@ internal partial class Program
             {
                 if (tc.IsStdinInject)
                 {
-                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin → {tc.RunId}");
+                    Console.Error.WriteLine($"[ASK:LOOP]   {tc.Id}: stdin -> {tc.RunId}");
                     var rs = RunStdin(tc.RunId!, tc.Stdin!);
                     var r = new ExecResult(rs.exitCode, rs.stdout, rs.stderr, 0);
                     return Task.FromResult((tc.Id, r));
@@ -187,7 +187,7 @@ internal partial class Program
         List<string>? toolLogOut = null)
     {
         var pending = execTasks.ToList();
-        // Map task → id so we can show status=running for incomplete tasks
+        // Map task -> id so we can show status=running for incomplete tasks
         var taskIds = execTasks.ToDictionary(t => t, t => t.IsCompleted ? t.Result.id : "???");
         var collected = new List<(string id, ExecResult result)>();
         var lastPromptTime = DateTime.UtcNow;
@@ -205,13 +205,13 @@ internal partial class Program
             {
                 var cmdStr = idToCmd?.GetValueOrDefault(r.id, r.id) ?? r.id;
                 var outputSnippet = r.result.Output.Length > 500 ? r.result.Output[..500] + "..." : r.result.Output;
-                var toolMsg = $"{cmdStr} → exit={r.result.ExitCode}\n{outputSnippet}";
+                var toolMsg = $"{cmdStr} -> exit={r.result.ExitCode}\n{outputSnippet}";
                 if (triadCtx != null)
                 {
                     triadCtx.PushDiscovery(provider, toolMsg);
                     triadCtx.UpdateChunk(provider, $"[TOOL] {toolMsg}");
-                    Console.Error.WriteLine($"[CROSS:TOOL] {provider} → queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
-                    SlackPostToThread($"🔧 *[{provider} tool→peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
+                    Console.Error.WriteLine($"[CROSS:TOOL] {provider} -> queued for peers: {cmdStr} (exit={r.result.ExitCode}, {r.result.Output.Length}ch)");
+                    SlackPostToThread($"🔧 *[{provider} tool->peers]* `{cmdStr}` exit={r.result.ExitCode}, {r.result.Output.Length}ch", "🦉 Moderator");
                 }
                 // Log tool results to MD: edit = full output, others = one line
                 if (toolLogOut != null)
@@ -220,11 +220,11 @@ internal partial class Program
                     if (cmdStr.Contains("edit", StringComparison.OrdinalIgnoreCase))
                     {
                         var snippet = r.result.Output.Length > 300 ? r.result.Output[..300] + "..." : r.result.Output;
-                        toolLogOut.Add($"`{cmdStr}` → {status}\n```\n{snippet}\n```");
+                        toolLogOut.Add($"`{cmdStr}` -> {status}\n```\n{snippet}\n```");
                     }
                     else
                     {
-                        toolLogOut.Add($"`{cmdStr}` → {status}");
+                        toolLogOut.Add($"`{cmdStr}` -> {status}");
                     }
                 }
             }
@@ -258,7 +258,7 @@ internal partial class Program
                     {
                         ["content"] = new JsonArray { new JsonObject { ["type"] = "text", ["text"] = exec.Output.Trim() } },
                         ["isError"] = exec.ExitCode != 0,
-                        // _meta: standard MCP extension — metrics for observability and AI reasoning
+                        // _meta: standard MCP extension -- metrics for observability and AI reasoning
                         ["_meta"] = new JsonObject
                         {
                             ["exit"]        = exec.ExitCode,
@@ -271,7 +271,7 @@ internal partial class Program
                 });
             }
             sb.AppendLine(responses.ToJsonString());
-            // MCP notifications/progress for each still-running call — emitted after the results array
+            // MCP notifications/progress for each still-running call -- emitted after the results array
             foreach (var t in pending)
             {
                 var tid = taskIds.TryGetValue(t, out var v) ? v : "tc_?";
@@ -284,21 +284,21 @@ internal partial class Program
                         ["progressToken"] = tid,
                         ["progress"] = 0,
                         ["status"] = "running",
-                        ["data"] = "still executing — partial results above, remaining results arriving each second"
+                        ["data"] = "still executing -- partial results above, remaining results arriving each second"
                     }
                 }.ToJsonString());
             }
             if (!allDone)
             {
                 sb.AppendLine();
-                sb.AppendLine($"⚠ {pending.Count} tool call(s) still running (notifications/progress above). Do NOT respond or emit new TOOL_CALLs — wait for next TOOL_RESULTS flush.");
+                sb.AppendLine($"! {pending.Count} tool call(s) still running (notifications/progress above). Do NOT respond or emit new TOOL_CALLs -- wait for next TOOL_RESULTS flush.");
             }
             else
                 sb.Append("All tool calls complete. Emit next TOOL_CALL block(s) if more actions needed, otherwise give final answer.");
 
             Console.Error.WriteLine($"[ASK:LOOP] Flushing {collected.Count} result(s) to {provider} (pending={pending.Count})");
 
-            // Log tool results to Slack thread — each tool as separate post with AI:toolId:stepN username
+            // Log tool results to Slack thread -- each tool as separate post with AI:toolId:stepN username
             if (onReport != null)
             {
                 var label = LoopProviderLabel(provider);
@@ -322,25 +322,25 @@ internal partial class Program
                     if (!string.IsNullOrWhiteSpace(exec.Stdout))
                     {
                         var cleaned = StripVerboseToolLines(exec.Stdout);
-                        var snippet = cleaned.Length > 500 ? cleaned[..500] + "…" : cleaned;
+                        var snippet = cleaned.Length > 500 ? cleaned[..500] + "..." : cleaned;
                         if (!string.IsNullOrWhiteSpace(snippet))
                             toolMsg.AppendLine($"```\n{snippet}\n```");
                     }
                     // Stderr block (if present)
                     if (!string.IsNullOrWhiteSpace(exec.Stderr))
                     {
-                        var errSnippet = exec.Stderr.Length > 200 ? exec.Stderr[..200] + "…" : exec.Stderr;
-                        toolMsg.AppendLine($"⚠ stderr:\n```\n{errSnippet}\n```");
+                        var errSnippet = exec.Stderr.Length > 200 ? exec.Stderr[..200] + "..." : exec.Stderr;
+                        toolMsg.AppendLine($"! stderr:\n```\n{errSnippet}\n```");
                     }
                     var toolMsgText = toolMsg.ToString().TrimEnd();
-                    // If we have a dedicated start-message ts → update in-place (no new message spam)
+                    // If we have a dedicated start-message ts -> update in-place (no new message spam)
                     if (idToStartTs != null && idToStartTs.TryGetValue(id, out var startTs))
                         SlackUpdateThreadMessage(startTs, toolMsgText);
                     else
                         onReport(toolMsgText, step > 0 ? $"{label}:{id}:step{step}" : $"{label}:{id}");
                 }
                 if (pending.Count > 0)
-                    onReport($"⏳ {pending.Count} still running…", $"{label}:step{step}");
+                    onReport($"⏳ {pending.Count} still running...", $"{label}:step{step}");
             }
 
             collected.Clear();
@@ -350,18 +350,18 @@ internal partial class Program
             if (!ok || string.IsNullOrWhiteSpace(next))
             {
                 Console.Error.WriteLine($"[ASK:LOOP] {provider} follow-up timed out after flush.");
-                onReport?.Invoke($"❌ *timeout* — {provider} didn't respond after tool results flush", $"{LoopProviderLabel(provider)}:error");
+                onReport?.Invoke($"❌ *timeout* -- {provider} didn't respond after tool results flush", $"{LoopProviderLabel(provider)}:error");
                 return (true, answer);
             }
             answer = next!;
 
-            // Log AI response to Slack thread — collapse blank lines (incl. whitespace-only lines)
+            // Log AI response to Slack thread -- collapse blank lines (incl. whitespace-only lines)
             var slackAnswer = NormalizeBlankLines(answer);
-            onReport?.Invoke(slackAnswer.Length > 2000 ? slackAnswer[..2000] + "…" : slackAnswer, LoopProviderLabel(provider));
+            onReport?.Invoke(slackAnswer.Length > 2000 ? slackAnswer[..2000] + "..." : slackAnswer, LoopProviderLabel(provider));
         }
 
         return (true, answer);
     }
 
-    // TryInjectGeminiResponseToSession → AppBotEyeClaudeFallback.cs
+    // TryInjectGeminiResponseToSession -> AppBotEyeClaudeFallback.cs
 }

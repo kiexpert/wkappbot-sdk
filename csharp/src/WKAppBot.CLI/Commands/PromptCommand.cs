@@ -1,4 +1,4 @@
-// PromptCommand.cs — wkappbot prompt: direct prompt delivery to named Claude/Codex windows.
+// PromptCommand.cs -- wkappbot prompt: direct prompt delivery to named Claude/Codex windows.
 //
 // Usage:
 //   wkappbot prompt send "<name>" "<message>"                  immediate delivery
@@ -29,7 +29,7 @@ internal partial class Program
         };
     }
 
-    // ── list ─────────────────────────────────────────────────────────────────
+    // -- list ----------------------------------------------------------------─
 
     static int PromptList()
     {
@@ -49,7 +49,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── send ─────────────────────────────────────────────────────────────────
+    // -- send ----------------------------------------------------------------─
 
     /// <summary>
     /// wkappbot prompt send "&lt;name&gt;" "&lt;message&gt;" [--after &lt;duration&gt;] [--when-idle &lt;duration&gt;] [--timeout &lt;duration&gt;]
@@ -115,7 +115,7 @@ internal partial class Program
                     if ((age ?? TimeSpan.MaxValue) >= whenIdle.Value)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Error.WriteLine($"[PROMPT] \"{nameQuery}\" idle {age!.Value.TotalSeconds:F0}s — delivering");
+                        Console.Error.WriteLine($"[PROMPT] \"{nameQuery}\" idle {age!.Value.TotalSeconds:F0}s -- delivering");
                         Console.ResetColor();
                         delivered = true;
                         break;
@@ -126,7 +126,7 @@ internal partial class Program
 
             if (!delivered)
             {
-                Console.Error.WriteLine($"[PROMPT] Timeout — \"{nameQuery}\" did not become idle within {timeout.TotalMinutes:F0}m");
+                Console.Error.WriteLine($"[PROMPT] Timeout -- \"{nameQuery}\" did not become idle within {timeout.TotalMinutes:F0}m");
                 return 1;
             }
         }
@@ -135,7 +135,7 @@ internal partial class Program
         return PromptDeliver(nameQuery, message);
     }
 
-    // ── deliver (core) ───────────────────────────────────────────────────────
+    // -- deliver (core) ------------------------------------------------------─
 
     static int PromptDeliver(string nameQuery, string message)
     {
@@ -168,20 +168,20 @@ internal partial class Program
         {
             var prompt   = item.p;
             var dispName = item.info.displayName;
-            Console.Error.WriteLine($"[PROMPT] → {dispName} (0x{prompt.WindowHandle:X})");
+            Console.Error.WriteLine($"[PROMPT] -> {dispName} (0x{prompt.WindowHandle:X})");
             try
             {
                 ClaudePromptHelper.AllowFocusSteal = true;
                 ph.TypeAndSubmit(prompt, message);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Error.WriteLine($"[PROMPT] ✓ Delivered to {dispName}");
+                Console.Error.WriteLine($"[PROMPT] v Delivered to {dispName}");
                 Console.ResetColor();
                 ok++;
             }
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Error.WriteLine($"[PROMPT] ✗ Failed ({dispName}): {ex.Message}");
+                Console.Error.WriteLine($"[PROMPT] X Failed ({dispName}): {ex.Message}");
                 Console.ResetColor();
             }
         }

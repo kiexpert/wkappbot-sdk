@@ -32,7 +32,7 @@ internal partial class Program
 
         try
         {
-            // ';' in path segments = OR expansion: "src/가;나;다/*.cs" → 3 patterns
+            // ';' in path segments = OR expansion: "src/가;나;다/*.cs" -> 3 patterns
             var results = ExpandGlobSegments(pattern)
                 .SelectMany(p => GlobFiles(root, p))
                 .Distinct().OrderBy(f => f).ToList();
@@ -61,7 +61,7 @@ internal partial class Program
 
         if (recursive)
         {
-            // Split on "**/" — everything before is a subdir, everything after is the file pattern
+            // Split on "**/" -- everything before is a subdir, everything after is the file pattern
             var idx = pattern.IndexOf("**/", StringComparison.Ordinal);
             var before = pattern[..idx].TrimEnd('/');
             fileExt = pattern[(idx + 3)..]; // after "**/"
@@ -89,7 +89,7 @@ internal partial class Program
                         .ToList();
     }
 
-    // ── file write ─────────────────────────────────────────────────────────
+    // -- file write --------------------------------------------------------─
     // Write Unicode content to a file, re-encoding to target charset.
     // Content sources (pick one):
     //   --stdin        read from stdin until EOF (pipe mode)
@@ -183,7 +183,7 @@ internal partial class Program
         catch (Exception ex) { return Error($"Write failed: {ex.Message}"); }
     }
 
-    // ── file read-pdf ──────────────────────────────────────────────────────
+    // -- file read-pdf ------------------------------------------------------
     // Extracts text from a PDF file page by page using PdfPig (pure .NET).
     // --ocr: also OCR-renders each page via Windows.Data.Pdf + Windows OCR,
     //        appending [+OCR: ...] for content present in OCR but missing from PdfPig
@@ -266,7 +266,7 @@ internal partial class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"[PDF] OCR init failed: {ex.Message} — continuing without OCR");
+                    Console.Error.WriteLine($"[PDF] OCR init failed: {ex.Message} -- continuing without OCR");
                     useOcr = false;
                 }
             }
@@ -282,7 +282,7 @@ internal partial class Program
                     ? string.Join(" ", words.Select(w => w.Text))
                     : page.Text;
 
-                // OCR additions: render page → full-page OCR + deep-scan OCR → diff vs PdfPig
+                // OCR additions: render page -> full-page OCR + deep-scan OCR -> diff vs PdfPig
                 // Garble detection: if PdfPig output has >20% '?' chars (custom font encoding failure),
                 // OCR text replaces the page text entirely instead of being appended as additions.
                 string ocrAdditions = "";
@@ -303,7 +303,7 @@ internal partial class Program
                         var pageOcr = await ocr.RecognizeAll(bmp);
                         Console.WriteLine($" {pageOcr.Words.Count} words");
                         var combined = pageOcr.FullText;
-                        // Pass 2: coverage-guided fallback — only for uncovered pixel regions
+                        // Pass 2: coverage-guided fallback -- only for uncovered pixel regions
                         if (deepOcr)
                         {
                             int deepHits = 0;
@@ -312,20 +312,20 @@ internal partial class Program
                             var deepText = await DeepScanOcrAsync(bmp, ocr, pageOcr, t =>
                             {
                                 if (deepHits == 0) Console.WriteLine();
-                                Console.Error.WriteLine($"[OCR-DEEP] → {t}");
+                                Console.Error.WriteLine($"[OCR-DEEP] -> {t}");
                                 deepHits++;
                             });
                             if (deepHits == 0) Console.WriteLine(" nothing new");
                             combined += " " + deepText;
                         }
 
-                        // Garble check: PdfPig custom-font failure → '?' ratio > 20%
+                        // Garble check: PdfPig custom-font failure -> '?' ratio > 20%
                         // In this case OCR is the ground truth; replace pageText entirely.
                         bool pdfGarbled = pageText.Length > 10 &&
                             (double)pageText.Count(c => c == '?') / pageText.Length > 0.20;
                         if (pdfGarbled)
                         {
-                            Console.Error.WriteLine($"[PDF+OCR] p{p} PdfPig garbled (custom font) — using OCR as primary text");
+                            Console.Error.WriteLine($"[PDF+OCR] p{p} PdfPig garbled (custom font) -- using OCR as primary text");
                             pageText = combined.Trim();
                         }
                         else
@@ -343,7 +343,7 @@ internal partial class Program
                 if (output.Length > remaining)
                 {
                     Console.Write(output[..remaining]);
-                    Console.WriteLine($"\n... (truncated at {maxChars} chars — use --max-chars to increase)");
+                    Console.WriteLine($"\n... (truncated at {maxChars} chars -- use --max-chars to increase)");
                     truncated = true;
                 }
                 else
@@ -368,8 +368,8 @@ internal partial class Program
         catch (Exception ex) { return Error($"PDF read failed: {ex.Message}"); }
     }
 
-    // Compare PdfPig text vs OCR text — return OCR-only lines (content PdfPig missed).
-    // Strategy: for each OCR line, if >40% of its words are absent from pdfText → include as addition.
+    // Compare PdfPig text vs OCR text -- return OCR-only lines (content PdfPig missed).
+    // Strategy: for each OCR line, if >40% of its words are absent from pdfText -> include as addition.
     static string ComputePdfOcrAdditions(string pdfText, string ocrText)
     {
         if (string.IsNullOrWhiteSpace(ocrText)) return "";
@@ -398,13 +398,13 @@ internal partial class Program
         return additions.Count == 0 ? "" : string.Join(" | ", additions);
     }
 
-    // ── file undo ─────────────────────────────────────────────────────────
+    // -- file undo --------------------------------------------------------─
     /// <summary>
     /// file undo --at &lt;timestamp&gt; [--path dir] [--list] [--dry-run]
     /// Batch-restore .bak files by timestamp prefix.
     /// Searches current dir (or --path) recursively for *.bak-{timestamp}*.txt files,
     /// strips the .bak-YYYYMMDD-HHmmss.fff.txt suffix to find the original path,
-    /// and copies backup → original.
+    /// and copies backup -> original.
     ///
     /// Examples:
     ///   file undo --at 20260320-1126        # restore all edits from 11:26

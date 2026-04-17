@@ -5,15 +5,15 @@ using System.Text.RegularExpressions;
 namespace WKAppBot.Win32.Window;
 
 /// <summary>
-/// Experience DB — per-form-type control knowledge learned from scanning + OCR.
+/// Experience DB -- per-form-type control knowledge learned from scanning + OCR.
 /// Stored as JSON files: {exe_dir}/profiles/{profile_name}_exp/form_{form_id}.json
 ///
 /// Key idea: "DB에 등록된 컨트롤이 나올 때까지 트리를 타고 들어간다"
 ///   - Scanner traverses the Win32 tree downward
-///   - When it hits a known control (cid match in experience DB) → STRUCTURE skip (서브트리 스킵)
-///   - BUT text collection (WM_GETTEXT) is NEVER skipped — needed for puppet pattern diff
+///   - When it hits a known control (cid match in experience DB) -> STRUCTURE skip (서브트리 스킵)
+///   - BUT text collection (WM_GETTEXT) is NEVER skipped -- needed for puppet pattern diff
 ///   - Known control's role, OCR text, etc. are immediately available
-///   - Unknown controls → OCR if requested → learn and store
+///   - Unknown controls -> OCR if requested -> learn and store
 ///
 /// Per-control detail cache:
 ///   data/experience/{profile}/form_{formId}/controls/cid_{N}/
@@ -23,8 +23,8 @@ namespace WKAppBot.Win32.Window;
 ///     - snapshots/: screenshots on text change only (disk-efficient)
 ///
 /// Puppet pattern (포펫 패턴):
-///   FormExperience.PuppetPattern — layout-preserving text fingerprint
-///   Dynamic values → {*}, fixed labels → literal text
+///   FormExperience.PuppetPattern -- layout-preserving text fingerprint
+///   Dynamic values -> {*}, fixed labels -> literal text
 ///   Built by diffing TextSnapshots across multiple scans
 ///   Use case: form identification from image-only (remote RDP), state detection, assert generation
 ///
@@ -63,7 +63,7 @@ public sealed class ExperienceDb
         .DefaultIfEmpty(DateTime.MinValue)
         .Max();
 
-    // ── Query ────────────────────────────────────────────
+    // -- Query --------------------------------------------
 
     /// <summary>
     /// Get the experience for a specific form type.
@@ -98,7 +98,7 @@ public sealed class ExperienceDb
     /// </summary>
     public IReadOnlyDictionary<string, FormExperience> GetAllForms() => _forms;
 
-    // ── Learn (update) ───────────────────────────────────
+    // -- Learn (update) ----------------------------------─
 
     /// <summary>
     /// Learn or update a control within a form type.
@@ -128,7 +128,7 @@ public sealed class ExperienceDb
                 existing.OcrConfidence = control.OcrConfidence;
             }
 
-            // Update WM_GETTEXT (always take latest — it reflects current state)
+            // Update WM_GETTEXT (always take latest -- it reflects current state)
             if (control.WmGetText != null) existing.WmGetText = control.WmGetText;
 
             // Always update class and size info
@@ -138,10 +138,10 @@ public sealed class ExperienceDb
             if (control.RelativeX > 0) existing.RelativeX = control.RelativeX;
             if (control.RelativeY > 0) existing.RelativeY = control.RelativeY;
 
-            // Update tree path if provided (overwrite — latest scan is authoritative)
+            // Update tree path if provided (overwrite -- latest scan is authoritative)
             if (treePath != null) existing.TreePath = treePath;
 
-            // Update window styles (always take latest — may be 0 for legacy data)
+            // Update window styles (always take latest -- may be 0 for legacy data)
             if (control.Style != 0) existing.Style = control.Style;
             if (control.ExStyle != 0) existing.ExStyle = control.ExStyle;
 
@@ -192,7 +192,7 @@ public sealed class ExperienceDb
         }
     }
 
-    // ── TouchControl — auto-learn on any encounter ─────
+    // -- TouchControl -- auto-learn on any encounter ----─
 
     /// <summary>
     /// Record that a control was encountered during any operation.
@@ -226,7 +226,7 @@ public sealed class ExperienceDb
                 }
                 else
                 {
-                    // Blank capture — save what's actually visible on screen for diagnostics
+                    // Blank capture -- save what's actually visible on screen for diagnostics
                     // (shows what window was covering the target area)
                     SaveFailScreenshot(formId, cid, bmp, treePath);
                 }
@@ -246,7 +246,7 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// Record control encounter using a pre-captured form bitmap (PrintWindow-safe).
-    /// Crops the control region from the form screenshot — immune to other windows covering the area.
+    /// Crops the control region from the form screenshot -- immune to other windows covering the area.
     /// Preferred over the screen-coordinate overload during scan operations.
     /// </summary>
     /// <param name="formId">Form type ID</param>
@@ -266,7 +266,7 @@ public sealed class ExperienceDb
         bool captured = false;
         treePath ??= GetTreePath(formId, cid);
 
-        // Auto-screenshot on first encounter — crop from form bitmap (skip blank captures)
+        // Auto-screenshot on first encounter -- crop from form bitmap (skip blank captures)
         if (controlRect.Width > 0 && controlRect.Height > 0 && !HasScreenshot(formId, cid, treePath))
         {
             try
@@ -283,7 +283,7 @@ public sealed class ExperienceDb
                 }
                 else
                 {
-                    // Crop was blank — capture actual screen to show what's covering the area
+                    // Crop was blank -- capture actual screen to show what's covering the area
                     try
                     {
                         using var screenBmp = Input.ScreenCapture.CaptureScreenRegion(
@@ -306,7 +306,7 @@ public sealed class ExperienceDb
         return captured;
     }
 
-    // ── Click Strategy Recording (Phase 7) ─────────────
+    // -- Click Strategy Recording (Phase 7) ------------─
 
     /// <summary>
     /// Record a click strategy attempt result for a specific control.
@@ -353,7 +353,7 @@ public sealed class ExperienceDb
             .ToList();
     }
 
-    // ── Input Method Stats (SmartInput — like SmartClickButton for input) ────
+    // -- Input Method Stats (SmartInput -- like SmartClickButton for input) ----
 
     /// <summary>
     /// Record an input method attempt result for a specific control.
@@ -418,7 +418,7 @@ public sealed class ExperienceDb
         return best.Key; // null if no successful methods
     }
 
-    // ── Puppet Pattern (Phase 5) ────────────────────────
+    // -- Puppet Pattern (Phase 5) ------------------------
 
     /// <summary>
     /// Add a text snapshot and rebuild puppet pattern if enough data.
@@ -455,10 +455,10 @@ public sealed class ExperienceDb
     ///
     /// Algorithm:
     ///   1. Pairwise LCS align baseline (snap[0]) with each subsequent snapshot
-    ///   2. Matched lines → token-level diff (stable tokens literal, changed → {*})
-    ///   3. Unmatched lines in baseline → entire line becomes {*}
-    ///   4. Consecutive {*} tokens within a line → merged to single {*}
-    ///   5. Lines that are ONLY {*} across all comparisons → marked as fully dynamic
+    ///   2. Matched lines -> token-level diff (stable tokens literal, changed -> {*})
+    ///   3. Unmatched lines in baseline -> entire line becomes {*}
+    ///   4. Consecutive {*} tokens within a line -> merged to single {*}
+    ///   5. Lines that are ONLY {*} across all comparisons -> marked as fully dynamic
     /// </summary>
     private static string BuildPuppetPattern(List<List<string>> snapshots)
     {
@@ -484,7 +484,7 @@ public sealed class ExperienceDb
 
                 if (!alignment.TryGetValue(i, out int otherIdx))
                 {
-                    // Baseline line not found in this snapshot → fully dynamic
+                    // Baseline line not found in this snapshot -> fully dynamic
                     linePatterns[i] = null;
                     continue;
                 }
@@ -495,12 +495,12 @@ public sealed class ExperienceDb
 
                 if (currentTokens.Length != otherTokens.Length)
                 {
-                    // Token count changed → try partial alignment with LCS on tokens
+                    // Token count changed -> try partial alignment with LCS on tokens
                     linePatterns[i] = DiffTokensLcs(currentTokens, otherTokens);
                 }
                 else
                 {
-                    // Same token count → compare each
+                    // Same token count -> compare each
                     for (int t = 0; t < currentTokens.Length; t++)
                     {
                         if (currentTokens[t] == "{*}") continue; // already wild
@@ -530,7 +530,7 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// LCS-based line alignment between two text snapshots.
-    /// Returns a mapping: baselineIndex → otherIndex for matched lines.
+    /// Returns a mapping: baselineIndex -> otherIndex for matched lines.
     /// Uses exact string match (trimmed) for LCS.
     /// </summary>
     private static Dictionary<int, int> LcsAlignLines(List<string> baseline, List<string> other)
@@ -584,7 +584,7 @@ public sealed class ExperienceDb
                     : Math.Max(dp[i - 1, j], dp[i, j - 1]);
             }
 
-        // Backtrack: matched tokens stay, unmatched → {*}
+        // Backtrack: matched tokens stay, unmatched -> {*}
         var result = new List<string>();
         int ci = m, oi2 = n;
         var matchedCurrent = new HashSet<int>();
@@ -614,7 +614,7 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// Merge consecutive {*} tokens into a single {*}.
-    /// Example: ["{*}", "{*}", "매도", "{*}"] → ["{*}", "매도", "{*}"]
+    /// Example: ["{*}", "{*}", "매도", "{*}"] -> ["{*}", "매도", "{*}"]
     /// </summary>
     private static string[] MergeConsecutiveWildcards(string[] tokens)
     {
@@ -637,7 +637,7 @@ public sealed class ExperienceDb
         return result.ToArray();
     }
 
-    // ── Persistence ──────────────────────────────────────
+    // -- Persistence --------------------------------------
 
     /// <summary>
     /// Save a specific form's experience to disk.
@@ -663,16 +663,16 @@ public sealed class ExperienceDb
             SaveForm(formId);
     }
 
-    // ── Control Detail Cache (Phase 6 + 6.2 tree) ──────
+    // -- Control Detail Cache (Phase 6 + 6.2 tree) ------
 
     /// <summary>
     /// Sanitize a Win32 class name for use as a filesystem folder name.
-    /// MFC Afx pattern: "Afx:00BD0000:b:00010005:..." → "Afx_00BD0000"
+    /// MFC Afx pattern: "Afx:00BD0000:b:00010005:..." -> "Afx_00BD0000"
     /// General: replace filesystem-unsafe chars with '_'.
     /// </summary>
     internal static string SanitizeClassName(string className)
     {
-        // MFC Afx pattern: "Afx:ADDR:b:STYLE:..." — keep prefix + module addr only
+        // MFC Afx pattern: "Afx:ADDR:b:STYLE:..." -- keep prefix + module addr only
         if (className.StartsWith("Afx:"))
         {
             var parts = className.Split(':');
@@ -736,7 +736,7 @@ public sealed class ExperienceDb
             var treeDir = GetControlDir(formId, cid, create: false, treePath: treePath);
             return File.Exists(Path.Combine(treeDir, "latest.png"));
         }
-        // No tree path — check legacy flat path
+        // No tree path -- check legacy flat path
         var flatDir = GetControlDir(formId, cid, create: false, treePath: null);
         return File.Exists(Path.Combine(flatDir, "latest.png"));
     }
@@ -786,7 +786,7 @@ public sealed class ExperienceDb
             var dir = GetControlDir(formId, cid, treePath: treePath);
             Input.ScreenCapture.SaveToFile(screenshot, Path.Combine(dir, ".fail.png"));
         }
-        catch { /* best-effort — don't let diagnostic save break the flow */ }
+        catch { /* best-effort -- don't let diagnostic save break the flow */ }
     }
 
     /// <summary>
@@ -807,7 +807,7 @@ public sealed class ExperienceDb
         {
             treePath ??= GetTreePath(formId, cid);
             var dir = GetControlDir(formId, cid, treePath: treePath);
-            // No logs/ subfolder — folder names reserved for class-name tree.
+            // No logs/ subfolder -- folder names reserved for class-name tree.
             // Files use "log-{action}" prefix to distinguish from control data.
             var actionToken = SanitizeToken(actionName ?? "general");
 
@@ -827,7 +827,7 @@ public sealed class ExperienceDb
     /// Saves directly in form_{id}/ with "log-{action}" prefix:
     ///   log-{action}_0.png .. log-{action}_9.png (ring buffer screenshots)
     ///   log-{action}.jsonl (metadata)
-    /// No logs/ subfolder — folder names reserved for class-name tree.
+    /// No logs/ subfolder -- folder names reserved for class-name tree.
     /// </summary>
     public void SaveFormActionLog(string formId,
         System.Drawing.Bitmap? screenshot, string? metadataJson,
@@ -884,7 +884,7 @@ public sealed class ExperienceDb
     /// <summary>
     /// Get action log summary for a form, scanning log-{action}.jsonl files in form_{id}/.
     /// File naming: log-{action}.jsonl, log-{action}_0.png .. log-{action}_9.png
-    /// No logs/ subfolder — folder names reserved for class-name tree.
+    /// No logs/ subfolder -- folder names reserved for class-name tree.
     /// Returns null if no action logs exist.
     /// </summary>
     public ActionLogSummary? GetFormActionLogSummary(string formId)
@@ -1092,7 +1092,7 @@ public sealed class ExperienceDb
                         return false; // no change
                 }
             }
-            catch { /* corrupted file — append anyway */ }
+            catch { /* corrupted file -- append anyway */ }
         }
 
         var entry = new TextHistoryEntry
@@ -1105,7 +1105,7 @@ public sealed class ExperienceDb
         return true;
     }
 
-    // ── Knowhow (per-control / per-form automation notes) ──────────────
+    // -- Knowhow (per-control / per-form automation notes) --------------
 
     /// <summary>
     /// Append a knowhow entry to a control's knowhow.md file.
@@ -1181,7 +1181,7 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// Get existing knowhow.md file paths for form + control level.
-    /// Returns (formKnowhowPath, controlKnowhowPath) — null if file doesn't exist.
+    /// Returns (formKnowhowPath, controlKnowhowPath) -- null if file doesn't exist.
     /// For console hint: "절대경로: 첫 문단" 간결 출력용.
     /// </summary>
     public (string? formPath, string? controlPath) GetKnowhowPaths(string formId, int cid, string? treePath = null)
@@ -1211,8 +1211,8 @@ public sealed class ExperienceDb
 
     /// <summary>
     /// Get action-specific knowhow file path: knowhow-{action}.md
-    /// inspect 시 → knowhow.md, 액션(input/click/do) 시 → knowhow-{action}.md
-    /// Returns (formActionPath, controlActionPath) — null if file doesn't exist.
+    /// inspect 시 -> knowhow.md, 액션(input/click/do) 시 -> knowhow-{action}.md
+    /// Returns (formActionPath, controlActionPath) -- null if file doesn't exist.
     /// </summary>
     public (string? formPath, string? controlPath) GetActionKnowhowPaths(
         string formId, int cid, string actionName, string? treePath = null)
@@ -1318,7 +1318,7 @@ public sealed class ExperienceDb
     }
 }
 
-// ── Data Models ──────────────────────────────────────────
+// -- Data Models ------------------------------------------
 
 /// <summary>
 /// Learned knowledge about a specific form type (e.g., [1101] 현재가).
@@ -1343,7 +1343,7 @@ public sealed class FormExperience
     [JsonPropertyName("controls")]
     public List<ControlExperience> Controls { get; set; } = new();
 
-    // ── Structural Fingerprint ──
+    // -- Structural Fingerprint --
 
     /// <summary>
     /// Sorted format string of control tokens: "{NormalizedClass}:{Cid}:{SizeBucket}:{PosBucket}"
@@ -1359,7 +1359,7 @@ public sealed class FormExperience
     [JsonPropertyName("fingerprint_hash")]
     public string? FingerprintHash { get; set; }
 
-    // ── OCR Keyword Pattern ──
+    // -- OCR Keyword Pattern --
 
     /// <summary>
     /// Fixed OCR keywords that appear consistently across multiple scan instances.
@@ -1370,7 +1370,7 @@ public sealed class FormExperience
     [JsonPropertyName("ocr_keywords")]
     public List<string>? OcrKeywords { get; set; }
 
-    // ── Puppet Pattern (포펫 패턴) ──
+    // -- Puppet Pattern (포펫 패턴) --
     //
     // 폼 전체 텍스트의 레이아웃 보존 패턴.
     // 시점에 따라 변하는 동적 값은 {*}로 치환, 고정 레이블은 그대로 유지.
@@ -1378,13 +1378,13 @@ public sealed class FormExperience
     // 생성 알고리즘:
     //   1. 첫 스캔: OCR 라인별 텍스트를 TextSnapshots[0]에 저장 (baseline)
     //   2. 이후 스캔: 같은 Y좌표 대역의 라인을 토큰 단위로 diff
-    //   3. 변한 토큰 → {*}, 안 변한 토큰 → 고정 텍스트
+    //   3. 변한 토큰 -> {*}, 안 변한 토큰 -> 고정 텍스트
     //   4. scan_count >= 3 이면 PuppetPattern 안정화
     //
     // 활용:
     //   - FormTypeIdentifier Level 4: 패턴 매칭으로 폼 식별
     //   - 상태 감지: 고정부 일치 확인 + 동적부 값 추출
-    //   - 변화 감지: 동적부 값 변경 → 상태 전환 이벤트
+    //   - 변화 감지: 동적부 값 변경 -> 상태 전환 이벤트
     //   - Assert 자동생성: 패턴에서 기대값 템플릿 추출
 
     /// <summary>
@@ -1462,7 +1462,7 @@ public sealed class ControlExperience
     public double SuccessRate =>
         (SuccessCount + FailCount) == 0 ? 1.0 : (double)SuccessCount / (SuccessCount + FailCount);
 
-    // ── Click Strategy Stats ──
+    // -- Click Strategy Stats --
     // SmartClickButton이 각 전략의 성공/실패를 여기에 누적.
     // 다음 클릭 시 성공률 높은 전략부터 시도하도록 순서 최적화.
 
@@ -1473,7 +1473,7 @@ public sealed class ControlExperience
     [JsonPropertyName("click_strategies")]
     public Dictionary<string, ClickStrategyStats>? ClickStrategies { get; set; }
 
-    // ── Input Method Stats ──
+    // -- Input Method Stats --
     // InputCommand가 각 입력 메서드의 성공/실패를 여기에 누적.
     // 다음 입력 시 성공률 높은 메서드부터 시도하도록 순서 최적화.
 
@@ -1493,7 +1493,7 @@ public sealed class ControlExperience
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? TreePath { get; set; }
 
-    // ── Window Style Traits (scan 시 한 번 수집, 불변 특성) ──
+    // -- Window Style Traits (scan 시 한 번 수집, 불변 특성) --
 
     /// <summary>
     /// Raw WS_* style bits from GetWindowLongW(GWL_STYLE).
@@ -1511,7 +1511,7 @@ public sealed class ControlExperience
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int ExStyle { get; set; }
 
-    // ── Derived style traits (computed from raw bits, not serialized) ──
+    // -- Derived style traits (computed from raw bits, not serialized) --
 
     [JsonIgnore] public bool HasCaption    => (Style & 0x00C00000) == 0x00C00000; // WS_CAPTION
     [JsonIgnore] public bool IsResizable   => (Style & 0x00040000) != 0;          // WS_THICKFRAME
@@ -1557,7 +1557,7 @@ public sealed class TextHistoryEntry
 }
 
 /// <summary>
-/// Summary of action logs for a form or control — used for console hints when re-accessing.
+/// Summary of action logs for a form or control -- used for console hints when re-accessing.
 /// </summary>
 public sealed class ActionLogSummary
 {

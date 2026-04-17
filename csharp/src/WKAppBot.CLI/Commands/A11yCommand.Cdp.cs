@@ -7,7 +7,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ═══ WebView CDP Fallback ═══
+    // === WebView CDP Fallback ===
 
     /// <summary>
     /// Try to perform an a11y action on a web view element via CDP.
@@ -19,11 +19,11 @@ internal partial class Program
     {
         try
         {
-            // Detect CDP port from the owning process — browsers only.
-            // Non-browser Electron apps (VS Code…) also expose CDP but must NOT be treated as browsers.
+            // Detect CDP port from the owning process -- browsers only.
+            // Non-browser Electron apps (VS Code...) also expose CDP but must NOT be treated as browsers.
             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
             if (!WKAppBot.WebBot.CdpClient.IsBrowserProcess((int)pid))
-                return null; // Not a browser — skip CDP entirely
+                return null; // Not a browser -- skip CDP entirely
             var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
             if (port <= 0)
             {
@@ -36,14 +36,14 @@ internal partial class Program
             using var cdp = new WKAppBot.WebBot.CdpClient();
             cdp.ConnectAsync(port).GetAwaiter().GetResult();
 
-            // Find the right tab — match by URL hint first (scope), then window title
+            // Find the right tab -- match by URL hint first (scope), then window title
             var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
             bool tabFound = false;
 
-            // Read-only actions don't need focus — skip browser minimize during tab switch.
+            // Read-only actions don't need focus -- skip browser minimize during tab switch.
             bool readOnly = action is "read" or "find" or "inspect" or "highlight" or "ocr" or "screenshot";
 
-            // Priority 1: if scope looks like URL (contains localhost, http, .com, :port) → match by URL
+            // Priority 1: if scope looks like URL (contains localhost, http, .com, :port) -> match by URL
             bool scopeIsUrl = cssSelector.Contains("localhost", StringComparison.OrdinalIgnoreCase)
                 || cssSelector.Contains("http", StringComparison.OrdinalIgnoreCase)
                 || cssSelector.Contains(":", StringComparison.Ordinal) && char.IsDigit(cssSelector[^1]);
@@ -53,7 +53,7 @@ internal partial class Program
                 {
                     if (tab.Url.Contains(cssSelector, StringComparison.OrdinalIgnoreCase))
                     {
-                        Console.Error.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" → {tab.Url[..Math.Min(60, tab.Url.Length)]}");
+                        Console.Error.WriteLine($"[A11Y] Tab matched by URL hint: \"{cssSelector}\" -> {tab.Url[..Math.Min(60, tab.Url.Length)]}");
                         if (tab.Id != cdp.TargetId)
                             cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                         tabFound = true;
@@ -81,11 +81,11 @@ internal partial class Program
                 }
             }
 
-            // ── Inject shared JS helpers (defA11yRead, defA11yClick, etc.) ──
+            // -- Inject shared JS helpers (defA11yRead, defA11yClick, etc.) --
             if (!string.IsNullOrEmpty(evalJs))
                 InjectA11yJsHelpers(cdp);
 
-            // ── Pre-action JS: --eval-js runs before AAR (can remove disabled, scroll, etc.) ──
+            // -- Pre-action JS: --eval-js runs before AAR (can remove disabled, scroll, etc.) --
             // For read/find: --eval-js IS the action (CdpEvalAsRead), so skip pre-hook to avoid double execution
             if (!string.IsNullOrEmpty(evalJs) && action is not ("read" or "find"))
             {
@@ -99,12 +99,12 @@ internal partial class Program
                 {
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Error.WriteLine($"[A11Y] --eval-js FAILED: {jsEx.Message}");
-                    Console.Error.WriteLine($"[A11Y] → fallback: proceeding with '{action}' on \"{cssSelector}\" without pre-hook JS");
+                    Console.Error.WriteLine($"[A11Y] -> fallback: proceeding with '{action}' on \"{cssSelector}\" without pre-hook JS");
                     Console.ResetColor();
                 }
             }
 
-            // ── AAR: Action-Aware Readiness for CDP ──
+            // -- AAR: Action-Aware Readiness for CDP --
             if (action is not ("read" or "find" or "inspect" or "highlight" or "screenshot" or "ocr" or "eval"))
             {
                 var cdpAar = new WKAppBot.WebBot.CdpActionReadiness();
@@ -120,7 +120,7 @@ internal partial class Program
                         return false;
                     }
                 }
-                // cdpTarget == null → element not found; let the action itself handle NOT_FOUND
+                // cdpTarget == null -> element not found; let the action itself handle NOT_FOUND
             }
 
             bool result = action switch
@@ -141,7 +141,7 @@ internal partial class Program
                 _ => CdpEvalAction(cdp, cssSelector, action)
             };
 
-            Console.Error.WriteLine($"[A11Y] CDP {action} → {(result ? "OK" : "FAIL")}");
+            Console.Error.WriteLine($"[A11Y] CDP {action} -> {(result ? "OK" : "FAIL")}");
 
             // --speak: TTS for CDP results too
             if (speak && result && (action == "read" || action == "find"))
@@ -206,12 +206,12 @@ internal partial class Program
 
     static bool CdpType(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
     {
-        // Auto-detect CJK text → use Input.insertText (bypasses IME composition issues)
+        // Auto-detect CJK text -> use Input.insertText (bypasses IME composition issues)
         if (text.Any(c => c >= 0x1100 && c <= 0xD7AF   // Korean (Hangul)
                        || c >= 0x3000 && c <= 0x9FFF    // CJK Unified + Japanese Kana
                        || c >= 0xF900 && c <= 0xFAFF))  // CJK Compatibility
         {
-            Console.WriteLine("[A11Y] CJK text detected → using CDP Input.insertText");
+            Console.WriteLine("[A11Y] CJK text detected -> using CDP Input.insertText");
             cdp.TypeInsertTextAsync(selector, text).GetAwaiter().GetResult();
         }
         else
@@ -223,8 +223,8 @@ internal partial class Program
 
     /// <summary>
     /// --hotkey 모드 CDP 발동:
-    /// 1. text에 '/' 포함 → aria-keyshortcuts / accesskey 직접 디스패치 (예: "Alt+S", "s")
-    /// 2. 그 외 → DOM 스캔(accesskey + aria-keyshortcuts)에서 grap 패턴으로 레이블 매칭 → 커버리지 최고 선택
+    /// 1. text에 '/' 포함 -> aria-keyshortcuts / accesskey 직접 디스패치 (예: "Alt+S", "s")
+    /// 2. 그 외 -> DOM 스캔(accesskey + aria-keyshortcuts)에서 grap 패턴으로 레이블 매칭 -> 커버리지 최고 선택
     /// </summary>
     static bool CdpHotkey(WKAppBot.WebBot.CdpClient cdp, string text)
     {
@@ -235,11 +235,11 @@ internal partial class Program
             return cdp.DispatchShortcutAsync(text, isAccessKey).GetAwaiter().GetResult();
         }
 
-        // ② DOM 핫키 맵 스캔 → grap 패턴 레이블 매칭
+        // ② DOM 핫키 맵 스캔 -> grap 패턴 레이블 매칭
         var hotkeyMap = cdp.GetHotkeyMapAsync().GetAwaiter().GetResult();
         if (hotkeyMap.Count == 0)
         {
-            Console.Error.WriteLine("[A11Y] type --hotkey CDP — no accesskey/aria-keyshortcuts found in DOM");
+            Console.Error.WriteLine("[A11Y] type --hotkey CDP -- no accesskey/aria-keyshortcuts found in DOM");
             return false;
         }
 
@@ -251,13 +251,13 @@ internal partial class Program
 
         if (matches.Count == 0)
         {
-            Console.Error.WriteLine($"[A11Y] type --hotkey CDP — no label match for '{text}'");
+            Console.Error.WriteLine($"[A11Y] type --hotkey CDP -- no label match for '{text}'");
             return false;
         }
 
         var best = matches[0];
         if (matches.Count > 1)
-            Console.Error.WriteLine($"[A11Y] type --hotkey CDP — {matches.Count} matches, best: '{best.Label}'");
+            Console.Error.WriteLine($"[A11Y] type --hotkey CDP -- {matches.Count} matches, best: '{best.Label}'");
 
         // accesskey 우선, 없으면 aria-keyshortcuts 첫 번째
         if (!string.IsNullOrEmpty(best.Accesskey))
@@ -269,7 +269,7 @@ internal partial class Program
             return cdp.DispatchShortcutAsync(first).GetAwaiter().GetResult();
         }
 
-        Console.Error.WriteLine($"[A11Y] type --hotkey CDP — '{best.Label}' has no dispatchable shortcut");
+        Console.Error.WriteLine($"[A11Y] type --hotkey CDP -- '{best.Label}' has no dispatchable shortcut");
         return false;
     }
 
@@ -283,8 +283,8 @@ internal partial class Program
 
     /// <summary>
     /// Switch CDP to the best matching tab before eval.
-    /// Priority 1: hint looks like URL/domain → match by tab URL.
-    /// Priority 2: window title from hwnd → match by tab title.
+    /// Priority 1: hint looks like URL/domain -> match by tab URL.
+    /// Priority 2: window title from hwnd -> match by tab title.
     /// No-op (stays on current tab) if no match found.
     /// </summary>
     static void CdpSwitchToTabByHint(WKAppBot.WebBot.CdpClient cdp, int port, IntPtr hwnd, string? hint, bool readOnly = true)
@@ -293,7 +293,7 @@ internal partial class Program
         {
             var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
 
-            // Priority 1: hint looks like URL/domain → match by tab URL
+            // Priority 1: hint looks like URL/domain -> match by tab URL
             bool hintIsUrl = !string.IsNullOrEmpty(hint) &&
                 (hint.Contains("localhost", StringComparison.OrdinalIgnoreCase)
                  || hint.Contains("http", StringComparison.OrdinalIgnoreCase)
@@ -307,7 +307,7 @@ internal partial class Program
                     {
                         if (tab.Id != cdp.TargetId)
                         {
-                            Console.Error.WriteLine($"[A11Y] --eval-js: tab found by hint '{hint}' → '{tab.Title}'");
+                            Console.Error.WriteLine($"[A11Y] --eval-js: tab found by hint '{hint}' -> '{tab.Title}'");
                             cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                         }
                         return;
@@ -315,7 +315,7 @@ internal partial class Program
                 }
             }
 
-            // Priority 2: window title from hwnd → match by tab title
+            // Priority 2: window title from hwnd -> match by tab title
             if (hwnd != IntPtr.Zero)
             {
                 var windowTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(hwnd);
@@ -328,7 +328,7 @@ internal partial class Program
                         {
                             if (tab.Id != cdp.TargetId)
                             {
-                                Console.Error.WriteLine($"[A11Y] --eval-js: tab found by window title '{windowTitle}' → '{tab.Title}'");
+                                Console.Error.WriteLine($"[A11Y] --eval-js: tab found by window title '{windowTitle}' -> '{tab.Title}'");
                                 cdp.SwitchToTargetAsync(tab.Id, port, skipMinimize: readOnly).GetAwaiter().GetResult();
                             }
                             return;
@@ -337,7 +337,7 @@ internal partial class Program
                 }
             }
 
-            // No match — log active tab and stay on it
+            // No match -- log active tab and stay on it
             var active = tabs.FirstOrDefault(t => t.Id == cdp.TargetId) ?? tabs.FirstOrDefault();
             if (active != null)
                 Console.Error.WriteLine($"[A11Y] --eval-js: no tab match, using active tab '{active.Title}'");
@@ -368,7 +368,7 @@ internal partial class Program
                 }
                 """).GetAwaiter().GetResult();
         }
-        catch { /* best effort — helpers unavailable won't break eval-js */ }
+        catch { /* best effort -- helpers unavailable won't break eval-js */ }
     }
 
     /// <summary>
@@ -404,10 +404,10 @@ internal partial class Program
                 continue;
             }
 
-            // ── null = streaming done signal: return previous result ──
+            // -- null = streaming done signal: return previous result --
             if (result == null && lastResult != null)
             {
-                Console.Error.WriteLine($"[A11Y] read --eval-js: null signal → streaming done");
+                Console.Error.WriteLine($"[A11Y] read --eval-js: null signal -> streaming done");
                 Console.Error.WriteLine($"[A11Y] read --eval-js: {lastResult}");
                 Console.WriteLine(lastResult);
                 return true;
@@ -418,7 +418,7 @@ internal partial class Program
                 stableCount++;
                 if (stableCount >= stableThreshold)
                 {
-                    // Result stabilized — done
+                    // Result stabilized -- done
                     Console.Error.WriteLine($"[A11Y] read --eval-js: {result}");
                     Console.WriteLine(result);
                     return result != null;
@@ -429,7 +429,7 @@ internal partial class Program
                 // First eval or result changed (streaming in progress)
                 if (lastResult == null)
                 {
-                    // First eval — if not waiting for stability, return immediately
+                    // First eval -- if not waiting for stability, return immediately
                     // (when interval is default 500ms, just return first result for speed)
                     if (intervalMs >= 500 && timeoutMs <= 10000)
                     {
@@ -448,7 +448,7 @@ internal partial class Program
             Thread.Sleep(intervalMs);
         }
 
-        // Timeout — return last result
+        // Timeout -- return last result
         if (lastResult != null)
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -471,8 +471,8 @@ internal partial class Program
 
         if (result == "NOT_FOUND")
         {
-            // Fallback: selector is domain hint, not CSS — read page summary instead
-            Console.Error.WriteLine($"[A11Y] CDP element not found: {selector} — falling back to page read");
+            // Fallback: selector is domain hint, not CSS -- read page summary instead
+            Console.Error.WriteLine($"[A11Y] CDP element not found: {selector} -- falling back to page read");
             var page = cdp.ReadPageAsync().GetAwaiter().GetResult();
             if (!string.IsNullOrEmpty(page))
             {
@@ -504,7 +504,7 @@ internal partial class Program
         return true;
     }
 
-    // ── file-read / file-write: encoding-aware file I/O for CP949 Korean sources ──
+    // -- file-read / file-write: encoding-aware file I/O for CP949 Korean sources --
     static int FileReadWrite(string action, string filePath, string? text, string? encodingArg, string[] args)
     {
         // Resolve encoding (default: UTF-8)
@@ -528,19 +528,19 @@ internal partial class Program
             catch { return Error($"Unknown encoding: {encodingArg}"); }
         }
 
-        // ── file-read ──────────────────────────────────────────────────────────
+        // -- file-read ----------------------------------------------------------
         if (action == "file-read")
         {
             if (!File.Exists(filePath))
                 return Error($"File not found: {filePath}");
             var bytes = File.ReadAllBytes(filePath);
             var unicode = enc.GetString(bytes);
-            Console.Error.WriteLine($"[FILE-READ] {filePath} ({enc.WebName}, {bytes.Length} bytes → {unicode.Length} chars)");
+            Console.Error.WriteLine($"[FILE-READ] {filePath} ({enc.WebName}, {bytes.Length} bytes -> {unicode.Length} chars)");
             Console.WriteLine(unicode);
             return 0;
         }
 
-        // ── file-write ─────────────────────────────────────────────────────────
+        // -- file-write --------------------------------------------------------─
         if (text == null && args.Length >= 3 && !args[2].StartsWith("--"))
             text = args[2];
         if (text == null)
@@ -572,12 +572,12 @@ internal partial class Program
                     var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
                     if (port > 0)
                     {
-                        Console.Error.WriteLine($"[A11Y] Browser PID={pid} CDP port={port} — reading via CDP");
+                        Console.Error.WriteLine($"[A11Y] Browser PID={pid} CDP port={port} -- reading via CDP");
                         using var cdp = new WKAppBot.WebBot.CdpClient();
                         cdp.ConnectAsync(port).GetAwaiter().GetResult();
                         CdpSwitchToTabByHint(cdp, port, hwnd, hint: null, readOnly: true);
 
-                        // Full text — no 500-char truncation
+                        // Full text -- no 500-char truncation
                         var result = cdp.EvalAsync(
                             "JSON.stringify({title:document.title,url:location.href,ready:document.readyState,text:document.body?.innerText||''})"
                         ).GetAwaiter().GetResult();
@@ -600,19 +600,19 @@ internal partial class Program
                             }
                             catch
                             {
-                                // JSON parse failed — write raw result
+                                // JSON parse failed -- write raw result
                                 Console.Error.WriteLine($"[A11Y] CDP read: {result}");
                                 Console.WriteLine(result);
                             }
                             return true;
                         }
-                        Console.Error.WriteLine("[A11Y] CDP read returned empty — fallback to UIA");
+                        Console.Error.WriteLine("[A11Y] CDP read returned empty -- fallback to UIA");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[A11Y] CDP read error: {ex.Message} — fallback to UIA");
+                Console.Error.WriteLine($"[A11Y] CDP read error: {ex.Message} -- fallback to UIA");
             }
         }
         return A11yRead(el);

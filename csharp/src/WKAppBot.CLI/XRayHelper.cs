@@ -12,11 +12,11 @@ namespace WKAppBot.CLI;
 /// Usage:
 ///   using var xray = XRayHelper.Begin(targetHwnd);
 ///   // ... perform action, user can see through ...
-///   // Dispose → auto-restore
+///   // Dispose -> auto-restore
 /// </summary>
 internal sealed class XRayHelper : IDisposable
 {
-    private const byte MagicAlpha = 13;  // 0x0D — unlucky number, nobody uses this
+    private const byte MagicAlpha = 13;  // 0x0D -- unlucky number, nobody uses this
     private const byte XRayAlpha  = 25;  // ~90% transparent (255 * 0.10 ≈ 25)
 
     private readonly List<(IntPtr hwnd, int origExStyle, bool wasLayered)> _affected = new();
@@ -50,8 +50,8 @@ internal sealed class XRayHelper : IDisposable
             // Skip invisible
             if (!IsWindowVisible(hwnd)) return true;
 
-            // Z-order stop: EnumWindows goes top→bottom, so hitting target root
-            // means everything after is BEHIND the target — no need to ghost
+            // Z-order stop: EnumWindows goes top->bottom, so hitting target root
+            // means everything after is BEHIND the target -- no need to ghost
             if (hwnd == targetRoot || GetRootOwner(hwnd) == targetRoot)
                 return false; // stop enumeration
 
@@ -114,12 +114,12 @@ internal sealed class XRayHelper : IDisposable
                 {
                     if (wasLayered)
                     {
-                        // Was already layered — restore to fully opaque but keep layered style
+                        // Was already layered -- restore to fully opaque but keep layered style
                         NativeMethods.SetLayeredWindowAttributes(hwnd, 0, 255, NativeMethods.LWA_ALPHA);
                     }
                     else
                     {
-                        // Wasn't layered — remove WS_EX_LAYERED entirely
+                        // Wasn't layered -- remove WS_EX_LAYERED entirely
                         NativeMethods.SetWindowLongW(hwnd, NativeMethods.GWL_EXSTYLE, origExStyle);
                     }
                 }
@@ -134,7 +134,7 @@ internal sealed class XRayHelper : IDisposable
     /// <summary>
     /// Global cleanup: scan ALL visible top-level windows for MagicAlpha=13 and restore them.
     /// Call on process exit / Eye shutdown to recover from leaked X-ray (Dispose not called).
-    /// Safe to call multiple times — only affects windows with the exact magic alpha value.
+    /// Safe to call multiple times -- only affects windows with the exact magic alpha value.
     /// </summary>
     public static int RestoreAll()
     {
@@ -147,7 +147,7 @@ internal sealed class XRayHelper : IDisposable
 
             if (GetLayeredWindowAttributes(hwnd, IntPtr.Zero, out byte alpha, IntPtr.Zero) && alpha == MagicAlpha)
             {
-                // Restore to fully opaque — safest option since we don't know original state
+                // Restore to fully opaque -- safest option since we don't know original state
                 NativeMethods.SetLayeredWindowAttributes(hwnd, 0, 255, NativeMethods.LWA_ALPHA);
                 restored++;
             }

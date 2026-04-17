@@ -8,7 +8,7 @@ namespace WKAppBot.CLI;
 /// <summary>
 /// Singleton broadcaster for the local web dashboard.
 /// Ring buffer (500 msgs) + WebSocket fan-out to all connected clients.
-/// Dual sink: Slack + Dashboard — add DashboardBroadcaster.Emit() alongside Slack calls.
+/// Dual sink: Slack + Dashboard -- add DashboardBroadcaster.Emit() alongside Slack calls.
 /// </summary>
 internal static class DashboardBroadcaster
 {

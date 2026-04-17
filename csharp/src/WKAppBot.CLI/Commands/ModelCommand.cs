@@ -1,4 +1,4 @@
-// ModelCommand.cs — Active fallback model configuration.
+// ModelCommand.cs -- Active fallback model configuration.
 //
 // When Claude Code hits a rate limit or server error, Eye's fallback spawns
 // the model specified here. Defaults to "gemini".
@@ -22,18 +22,18 @@ internal partial class Program
 {
     static string ActiveModelConfigPath => Path.Combine(DataDir, "active-model.json");
 
-    // ~/.claude/settings.json — Claude Code reads this for model selection
+    // ~/.claude/settings.json -- Claude Code reads this for model selection
     static string ClaudeSettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".claude", "settings.json");
 
-    // Map friendly names → Claude Code model short names (what settings.json accepts)
+    // Map friendly names -> Claude Code model short names (what settings.json accepts)
     static readonly Dictionary<string, string> ClaudeModelAliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["sonnet"]  = "sonnet",
         ["opus"]    = "opus",
         ["haiku"]   = "haiku",
-        ["claude"]  = "sonnet",   // "claude" → default claude sonnet
+        ["claude"]  = "sonnet",   // "claude" -> default claude sonnet
         ["claude-sonnet"] = "sonnet",
         ["claude-opus"]   = "opus",
         ["claude-haiku"]  = "haiku",
@@ -96,7 +96,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Write model into ~/.claude/settings.json — Claude Code picks this up on next prompt.
+    /// Write model into ~/.claude/settings.json -- Claude Code picks this up on next prompt.
     /// Preserves existing keys.
     /// </summary>
     static bool SetClaudeCodeModel(string claudeModelShort)
@@ -132,15 +132,15 @@ internal partial class Program
 
         var sub = args[0].ToLowerInvariant();
 
-        // Called by ConfigChange hook — reads ~/.claude/settings.json model and syncs active-model.json
+        // Called by ConfigChange hook -- reads ~/.claude/settings.json model and syncs active-model.json
         if (sub == "sync-from-settings")
         {
             var claudeModel = GetCurrentClaudeModel();
             if (string.IsNullOrEmpty(claudeModel)) return 0;
-            // Only sync Claude models (sonnet/opus/haiku) — external models managed separately
+            // Only sync Claude models (sonnet/opus/haiku) -- external models managed separately
             if (ClaudeModelAliases.ContainsKey(claudeModel))
             {
-                SetActiveFallbackModel("gemini"); // primary is claude → fallback stays gemini
+                SetActiveFallbackModel("gemini"); // primary is claude -> fallback stays gemini
                 Console.Error.WriteLine($"[MODEL] Synced from Claude Code settings: {claudeModel} (fallback=gemini)");
             }
             return 0;
@@ -166,7 +166,7 @@ internal partial class Program
 
             if (ExternalModels.Contains(model))
             {
-                // External AI → only update fallback config
+                // External AI -> only update fallback config
                 SetActiveFallbackModel(model);
                 Console.Error.WriteLine($"[MODEL] Fallback model set to: {model}");
                 Console.Error.WriteLine($"[MODEL] Eye will use '{model}' on next Claude error/rate-limit.");
@@ -175,10 +175,10 @@ internal partial class Program
 
             if (ClaudeModelAliases.TryGetValue(model, out var claudeShort))
             {
-                // Claude model → update fallback config + Claude Code settings.json
+                // Claude model -> update fallback config + Claude Code settings.json
                 SetActiveFallbackModel("gemini"); // reset fallback to gemini (claude is primary)
                 var ok = SetClaudeCodeModel(claudeShort);
-                Console.Error.WriteLine($"[MODEL] Claude Code model → {claudeShort}" + (ok ? "" : " (settings write failed)"));
+                Console.Error.WriteLine($"[MODEL] Claude Code model -> {claudeShort}" + (ok ? "" : " (settings write failed)"));
                 Console.Error.WriteLine($"[MODEL] Fallback model reset to: gemini");
                 Console.Error.WriteLine($"[MODEL] Restart Claude Code tab to apply new model.");
                 return 0;

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace WKAppBot.Vision;
 
 /// <summary>
-/// A cached Vision API result — "경험치" (experience point) for a UI element.
+/// A cached Vision API result -- "경험치" (experience point) for a UI element.
 /// Stored as JSON on disk, keyed by (class_path + description + window_size).
 ///
 /// Design principles:
@@ -14,7 +14,7 @@ namespace WKAppBot.Vision;
 /// </summary>
 public sealed class VisionCacheEntry
 {
-    // ── Cache key components ────────────────────────────────
+    // -- Cache key components --------------------------------
     /// <summary>Win32 class hierarchy path (e.g., "ApplicationFrameWindow/Windows.UI.Core.CoreWindow")</summary>
     [JsonPropertyName("class_path")]
     public string ClassPath { get; set; } = "";
@@ -31,7 +31,7 @@ public sealed class VisionCacheEntry
     [JsonPropertyName("window_height")]
     public int WindowHeight { get; set; }
 
-    // ── Location (relative to window) ───────────────────────
+    // -- Location (relative to window) ----------------------─
     /// <summary>Relative X position within window (0.0~1.0)</summary>
     [JsonPropertyName("relative_x")]
     public double RelativeX { get; set; }
@@ -48,7 +48,7 @@ public sealed class VisionCacheEntry
     [JsonPropertyName("element_height")]
     public int ElementHeight { get; set; }
 
-    // ── Vision API result metadata ──────────────────────────
+    // -- Vision API result metadata --------------------------
     /// <summary>Confidence score from Vision API (0.0~1.0)</summary>
     [JsonPropertyName("confidence")]
     public double Confidence { get; set; }
@@ -61,7 +61,7 @@ public sealed class VisionCacheEntry
     [JsonPropertyName("control_type")]
     public string? ControlType { get; set; }
 
-    // ── Learning / stats (per-control experience) ───────────
+    // -- Learning / stats (per-control experience) ----------─
     /// <summary>When this entry was first created</summary>
     [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -83,12 +83,12 @@ public sealed class VisionCacheEntry
 
     /// <summary>
     /// How many times the cached location led to a failed action.
-    /// High fail_count with low success_count → entry should be invalidated.
+    /// High fail_count with low success_count -> entry should be invalidated.
     /// </summary>
     [JsonPropertyName("fail_count")]
     public int FailCount { get; set; }
 
-    // ── Computed properties ─────────────────────────────────
+    // -- Computed properties --------------------------------─
 
     /// <summary>
     /// Success rate based on outcomes. Returns 1.0 if no outcomes recorded yet.

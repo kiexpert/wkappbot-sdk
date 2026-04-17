@@ -48,8 +48,8 @@ internal sealed class DbgViewListener : IDisposable
 
             if (!createdBuffer || !createdData)
             {
-                // Another listener exists (DebugView, logcat --dbg) — messages would be split
-                // between the two listeners, making [CMD] capture unreliable → bail out.
+                // Another listener exists (DebugView, logcat --dbg) -- messages would be split
+                // between the two listeners, making [CMD] capture unreliable -> bail out.
                 Cleanup();
                 return false;
             }
@@ -91,7 +91,7 @@ internal sealed class DbgViewListener : IDisposable
             if (which == 1) break;         // stop signal
             if (which == WaitHandle.WaitTimeout) continue; // periodic check
 
-            // Data is ready — read PID + message
+            // Data is ready -- read PID + message
             try
             {
                 int pid = _accessor!.ReadInt32(PidOffset);
@@ -101,7 +101,7 @@ internal sealed class DbgViewListener : IDisposable
                 int len = Array.IndexOf(msgBuf, (byte)0);
                 if (len < 0) len = DataSize;
 
-                // ANSI → string (OutputDebugStringA is ANSI; W variant also goes through ANSI path in shared memory)
+                // ANSI -> string (OutputDebugStringA is ANSI; W variant also goes through ANSI path in shared memory)
                 var message = Encoding.Default.GetString(msgBuf, 0, len).TrimEnd('\r', '\n');
 
                 // Signal buffer ready for next write ASAP

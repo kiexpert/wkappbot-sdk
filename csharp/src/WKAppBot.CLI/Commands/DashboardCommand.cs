@@ -9,7 +9,7 @@ internal partial class Program
 {
     /// <summary>
     /// wkappbot dashboard [--port 4443] [--no-browser]
-    /// Local HTTPS web dashboard — mini Slack for WKAppBot.
+    /// Local HTTPS web dashboard -- mini Slack for WKAppBot.
     /// HttpListener + WebSocket, single embedded HTML page.
     /// </summary>
     static int DashboardCommand(string[] args)
@@ -21,7 +21,7 @@ internal partial class Program
             if (args[i] == "--port" && i + 1 < args.Length && int.TryParse(args[i + 1], out var p))
                 port = p;
 
-        // ── Resolve URLs ──
+        // -- Resolve URLs --
         // Use http for now (no cert setup needed). Upgrade to https with mkcert later.
         var prefix = $"http://+:{port}/";
         var localUrl = $"http://localhost:{port}/";
@@ -39,14 +39,14 @@ internal partial class Program
         {
             // http://+:port requires netsh urlacl. Fall back to http://*:port (same but different ACL)
             // If that also fails, try localhost-only.
-            Console.Error.WriteLine($"[DASH] Access denied for {prefix} — trying http://*:{port}/");
+            Console.Error.WriteLine($"[DASH] Access denied for {prefix} -- trying http://*:{port}/");
             listener?.Close();
             listener = new HttpListener();
             prefix = $"http://*:{port}/";
             try { listener.Prefixes.Add(prefix); listener.Start(); }
             catch
             {
-                Console.Error.WriteLine($"[DASH] Also denied — falling back to 127.0.0.1");
+                Console.Error.WriteLine($"[DASH] Also denied -- falling back to 127.0.0.1");
                 listener?.Close();
                 listener = new HttpListener();
                 prefix = $"http://127.0.0.1:{port}/";
@@ -83,15 +83,15 @@ internal partial class Program
             catch { }
         }
 
-        // ── Ctrl+C graceful shutdown ──
+        // -- Ctrl+C graceful shutdown --
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-        // ── Accept loop ──
+        // -- Accept loop --
         Console.WriteLine("[DASH] Ctrl+C to stop. Waiting for connections...");
         _ = AcceptLoop(listener, cts.Token);
 
-        // ── Keep alive ──
+        // -- Keep alive --
         try { Task.Delay(-1, cts.Token).Wait(); }
         catch (AggregateException) { }
 
@@ -121,7 +121,7 @@ internal partial class Program
         var req = ctx.Request;
         var resp = ctx.Response;
 
-        // ── WebSocket upgrade ──
+        // -- WebSocket upgrade --
         if (req.IsWebSocketRequest)
         {
             var wsCtx = await ctx.AcceptWebSocketAsync(null);
@@ -131,7 +131,7 @@ internal partial class Program
             return;
         }
 
-        // ── API: /api/status ──
+        // -- API: /api/status --
         if (req.Url?.AbsolutePath == "/api/status")
         {
             resp.ContentType = "application/json";
@@ -148,7 +148,7 @@ internal partial class Program
             return;
         }
 
-        // ── Serve HTML page ──
+        // -- Serve HTML page --
         resp.ContentType = "text/html; charset=utf-8";
         var html = GetDashboardHtml();
         var htmlBytes = Encoding.UTF8.GetBytes(html);

@@ -9,83 +9,83 @@ namespace WKAppBot.Vision;
 
 /// <summary>
 /// HTS-agnostic candlestick chart pixel analyzer.
-/// Extracts OHLC + Volume from any chart screenshot — no API required.
+/// Extracts OHLC + Volume from any chart screenshot -- no API required.
 ///
-/// ── Design Intent (설계의도) ──────────────────────────────────────
+/// -- Design Intent (설계의도) --------------------------------------
 ///
 /// PURPOSE:
-///   ANY trading platform's candlestick chart screenshot → OHLC + Volume data.
+///   ANY trading platform's candlestick chart screenshot -> OHLC + Volume data.
 ///   Works offline, no OpenAPI needed. Only requires a chart image.
 ///
 /// 7-STEP PIPELINE:
-///   [1] Load       — Bitmap (file or window capture)
-///   [2] Detect     — Chart region auto-detection (panel border, Y-axis OCR position)
-///   [3] Y-Axis     — Right-edge OCR → (pixelY, price) calibration points
-///   [4] X-Axis     — Bottom-edge OCR → (pixelX, datetime) labels
-///   [5] Candles    — 3-strategy detection (A: body-first, B: column-scan, C: HTS-style)
+///   [1] Load       -- Bitmap (file or window capture)
+///   [2] Detect     -- Chart region auto-detection (panel border, Y-axis OCR position)
+///   [3] Y-Axis     -- Right-edge OCR -> (pixelY, price) calibration points
+///   [4] X-Axis     -- Bottom-edge OCR -> (pixelX, datetime) labels
+///   [5] Candles    -- 3-strategy detection (A: body-first, B: column-scan, C: HTS-style)
 ///                    Winner = strategy with most detected candles (with sanity checks)
-///   [6] Volume     — Detect volume sub-panel by horizontal gap → bar height → volume value
-///   [7] Output     — JSON (per-candle OHLC + metadata)
+///   [6] Volume     -- Detect volume sub-panel by horizontal gap -> bar height -> volume value
+///   [7] Output     -- JSON (per-candle OHLC + metadata)
 ///
-/// ── 3 Detection Strategies (캔들 탐지 3전략) ─────────────────────
+/// -- 3 Detection Strategies (캔들 탐지 3전략) --------------------─
 ///
 /// Strategy A: BODY-FIRST (default for normal-width candles)
-///   Find rectangular bodies ≥3px wide → trace wicks from body center.
-///   MA lines are 1-2px thin → filtered. Text is scattered → no solid runs.
+///   Find rectangular bodies ≥3px wide -> trace wicks from body center.
+///   MA lines are 1-2px thin -> filtered. Text is scattered -> no solid runs.
 ///   Retries with width≥2, then width≥1 if too few candles found.
 ///   Auto-triggers column-scan (B) if gap analysis shows missing candles.
 ///
 /// Strategy B: COLUMN-SCAN (fallback for ultra-thin candles)
-///   Per-column red/blue pixel counting → grouping → body estimation.
+///   Per-column red/blue pixel counting -> grouping -> body estimation.
 ///   Triggered when body-first finds large gaps or density mismatch.
 ///   Good for ~2-3px candles, but still misses HTS-specific elements.
 ///
 /// Strategy C: HTS-STYLE (specialized for 영웅문/HTS GDI rendering)
 ///   Recognizes 3 distinct HTS candle elements:
-///     Fill   — cream (246,234,214) / pale blue (214,226,239)
-///     Border — brown (134,104,53) / teal (57,154,156)
-///     Wick   — vivid red (255,0,0) / vivid blue (17,91,203)
-///   These colors DON'T pass normal red/blue checks → A/B miss them entirely.
-///   HTS renders with GDI raster — NO anti-aliasing, only ~21 unique colors.
+///     Fill   -- cream (246,234,214) / pale blue (214,226,239)
+///     Border -- brown (134,104,53) / teal (57,154,156)
+///     Wick   -- vivid red (255,0,0) / vivid blue (17,91,203)
+///   These colors DON'T pass normal red/blue checks -> A/B miss them entirely.
+///   HTS renders with GDI raster -- NO anti-aliasing, only ~21 unique colors.
 ///
 ///   Ultra-dense mode (600-day charts, ~1.04px per candle):
 ///     "캔들은 중간에 사라지지 않고 각각이 공평한 거리를 유지하며 반드시 있다"
-///     → Every column is a candle. No gaps exist.
-///     → Candle width is fractional (float-to-int boundary creates 1px vs 2px candles).
-///     → When expectedCandleCount is known from OCR, use deltaX-based placement:
-///       deltaX = pixelSpan / candleCount → each candle owns [floor(i*dX), floor((i+1)*dX))
+///     -> Every column is a candle. No gaps exist.
+///     -> Candle width is fractional (float-to-int boundary creates 1px vs 2px candles).
+///     -> When expectedCandleCount is known from OCR, use deltaX-based placement:
+///       deltaX = pixelSpan / candleCount -> each candle owns [floor(i*dX), floor((i+1)*dX))
 ///       This gives exactly N candles matching actual trading days.
 ///
 ///   Indicator line filtering (MA line removal):
-///     MA lines are drawn in wick colors (red/blue) → per-pixel indicator mask.
+///     MA lines are drawn in wick colors (red/blue) -> per-pixel indicator mask.
 ///     Key insight: MA lines form horizontal runs ≥8px at any Y level,
 ///     while real candle wicks in ultra-dense are 1-2px runs.
 ///     (Distribution: len 1-7 = real candle wick, len 8-9 = MA at candle pitch)
 ///
-/// ── 눈의 진화 (Eye Evolution) History ────────────────────────────
+/// -- 눈의 진화 (Eye Evolution) History ----------------------------
 ///
 /// This analyzer evolved through iterative discovery of HTS rendering behavior:
 ///
-/// v1-v3: Body-first only → 35 candles on normal chart (form 0606)
-/// v4:    Added column-scan fallback → helped thin-candle charts
-/// v5:    Added HTS-style detection → recognized fill/border/wick elements
-/// v6:    Y-frequency indicator filter + ultra-dense mode → 524 candles (form 0600)
-/// v7:    Horizontal-run indicator mask (replaced Y-frequency) → 554 candles
+/// v1-v3: Body-first only -> 35 candles on normal chart (form 0606)
+/// v4:    Added column-scan fallback -> helped thin-candle charts
+/// v5:    Added HTS-style detection -> recognized fill/border/wick elements
+/// v6:    Y-frequency indicator filter + ultra-dense mode -> 524 candles (form 0600)
+/// v7:    Horizontal-run indicator mask (replaced Y-frequency) -> 554 candles
 ///        Key fix: Y-frequency removed real wicks at popular price Y levels
-/// v8:    Threshold tuning (3→8) → 546 candles
+/// v8:    Threshold tuning (3->8) -> 546 candles
 ///        Key fix: threshold=3 masked clustered candle wicks at same price
-/// v9:    Post-filter skip in ultra-dense + htsScanBottom extended → 626 candles (0 gaps!)
+/// v9:    Post-filter skip in ultra-dense + htsScanBottom extended -> 626 candles (0 gaps!)
 ///        Key fix: FilterTextOverlayOutliers was deleting valid ultra-dense candles
 ///        Key fix: candleScanBottom=volumeTop-25 was cutting off real wicks at Y=360-384
-/// v10:   Border-as-body estimation → O/C approximation in ultra-dense
-/// v11:   DeltaX-based candle placement → exactly N candles from OCR count
+/// v10:   Border-as-body estimation -> O/C approximation in ultra-dense
+/// v11:   DeltaX-based candle placement -> exactly N candles from OCR count
 ///        "전체봉수는 OCR로 알고 있으니 공평한 delta로 계산하면 된다"
 ///
-/// ── Other Design Decisions ───────────────────────────────────────
+/// -- Other Design Decisions --------------------------------------─
 ///
 /// Y-AXIS OCR ISSUES:
-///   HTS price labels are small → OCR often truncates: "35,000" → "35," or "25."
-///   Solution: Detect trailing comma/period → multiply by 1000
+///   HTS price labels are small -> OCR often truncates: "35,000" -> "35," or "25."
+///   Solution: Detect trailing comma/period -> multiply by 1000
 ///   Scale consistency: If median value > 1000 and some values are < median/100, scale up ×1000
 ///
 /// LEFT BOUNDARY DETECTION:
@@ -96,11 +96,11 @@ namespace WKAppBot.Vision;
 ///   Auto-detect Korean (Red=Up, Blue=Down) vs US (Green=Up, Red=Down)
 ///   by checking presence of green candles.
 ///
-/// Phase B (DONE): Tooltip-based Y-axis recalibration — see TooltipCalibrator.cs
-///   Hover mouse on extreme candles → capture tooltips_class32 → OCR exact OHLC
-///   → rebuild Y-axis with server-accurate prices (replaces OCR-only calibration)
-///   → recalibrate Y-axis for much better accuracy (WM_MOUSEMOVE first, SendInput fallback)
-/// ──────────────────────────────────────────────────────────────────
+/// Phase B (DONE): Tooltip-based Y-axis recalibration -- see TooltipCalibrator.cs
+///   Hover mouse on extreme candles -> capture tooltips_class32 -> OCR exact OHLC
+///   -> rebuild Y-axis with server-accurate prices (replaces OCR-only calibration)
+///   -> recalibrate Y-axis for much better accuracy (WM_MOUSEMOVE first, SendInput fallback)
+/// ------------------------------------------------------------------
 /// </summary>
 public sealed class ChartAnalyzer
 {
@@ -113,20 +113,20 @@ public sealed class ChartAnalyzer
     }
 
     /// <summary>
-    /// Main analysis pipeline — works on any chart screenshot.
+    /// Main analysis pipeline -- works on any chart screenshot.
     ///
-    /// ── Pipeline Order (설계의도) ──
+    /// -- Pipeline Order (설계의도) --
     /// 1. Y-axis OCR FIRST (determines chart right boundary + price calibration)
     /// 2. Chart region detection (uses Y-axis position)
     /// 3. Refine chart top from Y-axis topmost point
     /// 4. X-axis OCR for datetime labels
     /// 5. Volume panel detection BEFORE candle scan (to exclude volume bars)
     /// 6. Filter Y-axis points inside volume area
-    /// 7. Candle detection: Strategy A (body-first) → B (column-scan) → C (HTS-style)
-    ///    - For Strategies A/B: scan price area only (top → volumeTop − 25px)
+    /// 7. Candle detection: Strategy A (body-first) -> B (column-scan) -> C (HTS-style)
+    ///    - For Strategies A/B: scan price area only (top -> volumeTop − 25px)
     ///    - For Strategy C (HTS): scan up to volumeTop (indicator mask handles noise)
     ///    - Winner = strategy with most candles (with sanity checks)
-    /// 8. Convert pixel → price using calibration (with clamp to valid range)
+    /// 8. Convert pixel -> price using calibration (with clamp to valid range)
     ///
     /// Key design choice: Y-axis OCR runs before everything else because its position
     /// determines the chart's right boundary, which is needed for all other steps.
@@ -136,7 +136,7 @@ public sealed class ChartAnalyzer
     /// expectedCandleCount: If known from chart UI OCR (e.g., "600/600"), enables
     /// deltaX-based equal-spacing candle placement in Strategy C ultra-dense mode.
     /// When 0, falls back to "every column with HTS elements = 1 candle".
-    /// ──
+    /// --
     /// </summary>
     public async Task<ChartAnalysisResult> Analyze(
         Bitmap screenshot, int expectedCandleCount = 0, CancellationToken ct = default)
@@ -147,7 +147,7 @@ public sealed class ChartAnalyzer
             ImageHeight = screenshot.Height
         };
 
-        // Step 3 first: Y-axis OCR → find price labels and chart right boundary
+        // Step 3 first: Y-axis OCR -> find price labels and chart right boundary
         // We scan the rightmost 15% of the image for price numbers
         var yAxisScan = await ScanYAxisRegion(screenshot);
         result.YAxisPoints = yAxisScan.points;
@@ -174,11 +174,11 @@ public sealed class ChartAnalyzer
 
         if (region.right - region.left < 50 || region.bottom - region.top < 30)
         {
-            // Chart region too small — can't analyze
+            // Chart region too small -- can't analyze
             return result;
         }
 
-        // Step 4: X-axis OCR → datetime labels
+        // Step 4: X-axis OCR -> datetime labels
         result.XAxisPoints = await ExtractXAxis(screenshot, region.left, region.right, region.bottom);
 
         // Step 6 (before Step 5): Detect volume panel FIRST
@@ -204,10 +204,10 @@ public sealed class ChartAnalyzer
         // Step 5: Detect candles (only in price chart area, excluding volume panel)
         //
         // Two-strategy approach:
-        //   Strategy A: Body-first (default) — finds rectangular bodies ≥3px wide.
+        //   Strategy A: Body-first (default) -- finds rectangular bodies ≥3px wide.
         //     Good for normal candle widths. Retries with width≥2, then width≥1 if too few.
-        //   Strategy B: Column-scan fallback — scans each X column for colored pixels.
-        //     Used when chart density is high (600+ candles in narrow space → ~1px per candle).
+        //   Strategy B: Column-scan fallback -- scans each X column for colored pixels.
+        //     Used when chart density is high (600+ candles in narrow space -> ~1px per candle).
         //     Triggered when body-first finds far fewer candles than the chart width suggests.
         //
         // Expected candle count estimation:
@@ -261,8 +261,8 @@ public sealed class ChartAnalyzer
             // (b) Density mismatch: candle bodies are tiny relative to candle spacing.
             // Guard: only trigger if medianGap > 5× body width (bodies < 20% of pitch)
             // AND the chart could theoretically fit 3× more candles based on body width.
-            // In normal charts: medianGap=15, minWidth=3 → 15 > 20? NO → safe.
-            // In thin charts: medianGap=16, minWidth=1-2 → 16 > 10-15? YES → triggers.
+            // In normal charts: medianGap=15, minWidth=3 -> 15 > 20? NO -> safe.
+            // In thin charts: medianGap=16, minWidth=1-2 -> 16 > 10-15? YES -> triggers.
             int minWidth = rawCandles.Min(c => Math.Max(1, c.Width));
             if (medianGap > (minWidth + 1) * 5)
             {
@@ -288,7 +288,7 @@ public sealed class ChartAnalyzer
         //   - Only wick is vivid red/blue
         // HTS-style uses its own horizontal-run indicator masking to handle MA lines,
         // so it can safely scan a wider Y range (up to volumeTop) without volume bars
-        // being misdetected — the indicator mask removes them.
+        // being misdetected -- the indicator mask removes them.
         int htsScanBottom = volumeTop ?? region.bottom;
         var htsCandles = DetectCandlesByHtsStyle(
             grid, region.left, region.top, region.right, htsScanBottom,
@@ -297,7 +297,7 @@ public sealed class ChartAnalyzer
         // it's likely picking up indicator lines as fake candles. Only accept if
         // it's a modest improvement (< 5x) or if A/B found very few.
         // Exception: when expectedCandleCount is specified (deltaX mode), trust the
-        // HTS result — the user told us the exact candle count via --candles N.
+        // HTS result -- the user told us the exact candle count via --candles N.
         bool htsPlausible = expectedCandleCount > 0 ||
             rawCandles.Count < 5 ||
             htsCandles.Count <= rawCandles.Count * 5;
@@ -383,7 +383,7 @@ public sealed class ChartAnalyzer
                 foreach (var (idx, barTopY) in barTops)
                 {
                     int barHeight = volBottom - barTopY;
-                    // Store as relative volume (0.0 ~ 1.0) — will be recalibrated by tooltip if available
+                    // Store as relative volume (0.0 ~ 1.0) -- will be recalibrated by tooltip if available
                     result.Candles[idx].Volume = maxBarHeight > 0
                         ? (double)barHeight / maxBarHeight
                         : 0;
@@ -405,18 +405,18 @@ public sealed class ChartAnalyzer
         return result;
     }
 
-    // ── Step 2: Chart Region Detection ─────────────────────────
+    // -- Step 2: Chart Region Detection ------------------------─
 
     /// <summary>
     /// Auto-detect chart drawing area.
     ///
-    /// ── Design Intent: Chart Region Detection ──
+    /// -- Design Intent: Chart Region Detection --
     /// Right boundary: determined by Y-axis OCR position (where price numbers start).
     /// Left boundary: detect the dark vertical divider line between HTS indicator panel
     ///   and chart grid. Fallback: use 8% margin + first colored-pixel column.
     /// Top boundary: refined using topmost Y-axis calibration point (−20px).
     /// Bottom boundary: last row with colored pixels (further refined by volume panel exclusion).
-    /// ──
+    /// --
     /// </summary>
     private static (int left, int top, int right, int bottom) DetectChartRegion(
         PixelGrid grid, int yAxisLeftX)
@@ -429,7 +429,7 @@ public sealed class ChartAnalyzer
         // LEFT boundary: Find where chart grid starts.
         // Strategy 1: Look for a dark vertical line (panel border) in the left 30% of image.
         //   HTS indicator panels end with a 1-2px dark vertical divider line.
-        // Strategy 2: Fallback — find columns with sustained candle-colored pixels
+        // Strategy 2: Fallback -- find columns with sustained candle-colored pixels
         //   but skip leftmost region where indicator text creates false positives.
         int left = 0;
         int scanYFrom = h / 4;
@@ -449,7 +449,7 @@ public sealed class ChartAnalyzer
                 if (r < 100 && g < 100 && b < 100) darkCount++;
             }
 
-            // Column is >50% dark → might be a panel border
+            // Column is >50% dark -> might be a panel border
             if (darkCount > sampleCount * 0.5)
             {
                 // Verify: right side of this line should be brighter (chart background)
@@ -518,19 +518,19 @@ public sealed class ChartAnalyzer
         return (left, top, right, bottom);
     }
 
-    // ── Step 3: Y-Axis OCR → Price Calibration ────────────────
+    // -- Step 3: Y-Axis OCR -> Price Calibration ----------------
 
     /// <summary>
     /// Scan rightmost region of image for Y-axis price labels.
     /// Returns calibration points AND the X position where axis starts.
     ///
-    /// ── Design Intent: Y-Axis OCR Calibration ──
-    /// 1. Crop rightmost 10% → 2× upscale (HTS fonts are tiny) → OCR
-    /// 2. ParsePriceText handles: "47,500" → 47500, "35," → 35000 (trailing separator = ×1000)
+    /// -- Design Intent: Y-Axis OCR Calibration --
+    /// 1. Crop rightmost 10% -> 2× upscale (HTS fonts are tiny) -> OCR
+    /// 2. ParsePriceText handles: "47,500" -> 47500, "35," -> 35000 (trailing separator = ×1000)
     /// 3. Scale consistency check: if median > 1000 and some values < median/100, scale up ×1000
     /// 4. Monotonicity filter: prices must decrease as Y increases (top=high price)
     /// 5. After volume panel detection, remove any calibration points inside volume area
-    /// ──
+    /// --
     /// </summary>
     private async Task<(List<AxisPoint> points, int axisLeftX)> ScanYAxisRegion(Bitmap screenshot)
     {
@@ -582,7 +582,7 @@ public sealed class ChartAnalyzer
         points.Sort((a, b) => a.Pixel.CompareTo(b.Pixel));
 
         // Scale consistency check: if some values are much smaller than others,
-        // they may need ×1000 correction. E.g. [44600, 35, 30, 25] → 35→35000
+        // they may need ×1000 correction. E.g. [44600, 35, 30, 25] -> 35->35000
         if (points.Count >= 3)
         {
             // Find the median value to determine expected scale
@@ -594,7 +594,7 @@ public sealed class ChartAnalyzer
             {
                 for (int j = 0; j < points.Count; j++)
                 {
-                    // Value is at least 100x smaller than median → likely needs ×1000
+                    // Value is at least 100x smaller than median -> likely needs ×1000
                     if (points[j].Value < median / 100 && points[j].Value > 0)
                     {
                         points[j].Value *= 1000;
@@ -602,7 +602,7 @@ public sealed class ChartAnalyzer
                     }
                 }
             }
-            // If median is small (<100) but one value is huge → the huge one might be correct
+            // If median is small (<100) but one value is huge -> the huge one might be correct
             // and the small ones need scaling. Use the largest correctly-parsed value as reference.
             else if (median < 100)
             {
@@ -641,7 +641,7 @@ public sealed class ChartAnalyzer
     }
 
     /// <summary>
-    /// Extract Y-axis price labels from right edge of chart (legacy — now uses ScanYAxisRegion).
+    /// Extract Y-axis price labels from right edge of chart (legacy -- now uses ScanYAxisRegion).
     /// </summary>
     private async Task<List<AxisPoint>> ExtractYAxis(
         Bitmap screenshot, int chartRight, int chartTop, int chartBottom)
@@ -695,7 +695,7 @@ public sealed class ChartAnalyzer
         return points;
     }
 
-    // ── Step 4: X-Axis OCR → DateTime Labels ──────────────────
+    // -- Step 4: X-Axis OCR -> DateTime Labels ------------------
 
     /// <summary>
     /// Extract X-axis date/time labels from bottom of chart.
@@ -738,27 +738,27 @@ public sealed class ChartAnalyzer
         return points;
     }
 
-    // ── Step 5: Candle Detection ──────────────────────────────
+    // -- Step 5: Candle Detection ------------------------------
 
     /// <summary>
     /// Detect candlesticks by scanning for red/blue pixel columns.
     ///
-    /// ── Design Intent: Body-First Candle Detection ──
+    /// -- Design Intent: Body-First Candle Detection --
     /// Problem: HTS charts have many overlays (MA lines, Bollinger bands, text labels)
     ///   that use the same red/blue colors as candles. Column-based scanning picks up
     ///   all colored pixels in a column, making wicks impossibly long.
     ///
     /// Solution: "Body-First" 4-phase approach
     ///   Phase 1: Scan all rows for horizontal runs of same-color pixels (width ≥ 3).
-    ///            MA lines are 1-2px thin → filtered out. Text is scattered → no solid runs.
+    ///            MA lines are 1-2px thin -> filtered out. Text is scattered -> no solid runs.
     ///   Phase 2: Cluster horizontal runs into rectangular bodies (vertically contiguous).
-    ///   Phase 3: Filter by minimum size + fill ratio → reject text fragments.
+    ///   Phase 3: Filter by minimum size + fill ratio -> reject text fragments.
     ///   Phase 4: Trace wicks from body center with MAX LENGTH CLAMP (3× body height)
-    ///            → prevents wick from connecting to MA lines below/above body.
+    ///            -> prevents wick from connecting to MA lines below/above body.
     ///
     /// Why not column-based: A single MA line crossing a candle's X position would create
-    ///   a "wick" spanning from the MA line to the actual candle body — wildly wrong.
-    /// ──
+    ///   a "wick" spanning from the MA line to the actual candle body -- wildly wrong.
+    /// --
     /// </summary>
     private static List<RawCandle> DetectCandles(
         PixelGrid grid, int left, int top, int right, int bottom,
@@ -839,7 +839,7 @@ public sealed class ChartAnalyzer
         var bodySegments = allRuns.Where(r => r.Width >= minBodyWidth).ToList();
 
         // Phase 2: Cluster body segments into candle bodies
-        // Group segments by X overlap and same color → form rectangular bodies
+        // Group segments by X overlap and same color -> form rectangular bodies
         // Sort by X position for clustering
         bodySegments.Sort((a, b) => a.X != b.X ? a.X.CompareTo(b.X) : a.Y.CompareTo(b.Y));
 
@@ -915,7 +915,7 @@ public sealed class ChartAnalyzer
             // to distinguish from scattered noise pixels
             if (minBodyWidth <= 2 && bodyW <= 2 && bodyH < 4) return false;
 
-            // Reject bodies too close to right edge — likely Y-axis price label text.
+            // Reject bodies too close to right edge -- likely Y-axis price label text.
             // Real candles end at least 10px before the chart right boundary.
             if (b.Left > right - 8) return false;
 
@@ -996,7 +996,7 @@ public sealed class ChartAnalyzer
         // Sort by X
         candles.Sort((a, b) => a.CenterX.CompareTo(b.CenterX));
 
-        // Merge candles that are too close (within 3px) — likely same candle split
+        // Merge candles that are too close (within 3px) -- likely same candle split
         candles = MergeCloseCandles(candles, minGap: 3);
 
         // Post-filter: remove remaining noise
@@ -1091,7 +1091,7 @@ public sealed class ChartAnalyzer
     /// <summary>
     /// Column-scan fallback for ultra-dense charts where body-first detection fails.
     ///
-    /// ── Design Intent: Column-Scan for 1px Candles ──
+    /// -- Design Intent: Column-Scan for 1px Candles --
     /// In 600-day charts with minimized candle width, each candle gets ~1px of horizontal space.
     /// Body-first detection requires rectangular bodies (≥2px height), which don't exist at this density.
     ///
@@ -1104,11 +1104,11 @@ public sealed class ChartAnalyzer
     ///   5. Single-column candles are valid (1px body = doji or tiny range candle)
     ///
     /// Noise handling:
-    ///   - MA lines are continuous across many columns → filter by checking if a column's
+    ///   - MA lines are continuous across many columns -> filter by checking if a column's
     ///     colored pixel count is suspiciously low (1-2 scattered pixels = MA/indicator line)
     ///   - Require at least 2 colored pixels per column to count as a candle
     ///   - Use rolling window: isolated colored columns (no neighbors) are likely noise
-    /// ──
+    /// --
     /// </summary>
     private static List<RawCandle> DetectCandlesByColumnScan(
         PixelGrid grid, int left, int top, int right, int bottom)
@@ -1265,16 +1265,16 @@ public sealed class ChartAnalyzer
         return candles;
     }
 
-    // ── Strategy C: HTS-Style Candle Detection ──────────────────
+    // -- Strategy C: HTS-Style Candle Detection ------------------
 
     /// <summary>
     /// Strategy C: Detect candles by recognizing the 3-element HTS rendering style.
     ///
-    /// ── Design Intent: HTS-Aware Multi-Element Detection ──
+    /// -- Design Intent: HTS-Aware Multi-Element Detection --
     ///
     /// WHY THIS EXISTS:
     ///   Strategies A/B use IsReddish()/IsBluish() which check for saturated red/blue.
-    ///   But HTS candle bodies are cream/pale-blue (fill) and brown/teal (border) —
+    ///   But HTS candle bodies are cream/pale-blue (fill) and brown/teal (border) --
     ///   they DON'T pass those checks! Only the wick is vivid red/blue.
     ///   This strategy uses ClassifyHts() to recognize all 4 HTS elements.
     ///
@@ -1286,35 +1286,35 @@ public sealed class ChartAnalyzer
     ///
     /// 4-PHASE ALGORITHM:
     ///   Phase 1: Build indicator mask (horizontal-run analysis per Y row)
-    ///            Wick runs ≥8px = MA line → mask those pixels.
-    ///            Real candle wicks = 1-7px runs → preserved.
+    ///            Wick runs ≥8px = MA line -> mask those pixels.
+    ///            Real candle wicks = 1-7px runs -> preserved.
     ///   Phase 2: Build per-column HTS profile using masked data
     ///   Phase 3: Ultra-dense detection + candle segmentation
-    ///            >70% columns have HTS elements → ultra-dense mode
+    ///            >70% columns have HTS elements -> ultra-dense mode
     ///   Phase 4: Post-filter (height threshold + text overlay, skipped in ultra-dense)
     ///
     /// ULTRA-DENSE MODE (600-day charts, ~1.04px per candle):
     ///   Key insight from user: "캔들은 중간에 사라지지 않고 공평한 거리를 유지한다"
-    ///   (Candles never disappear — each maintains equal spacing)
+    ///   (Candles never disappear -- each maintains equal spacing)
     ///
     ///   When expectedCandleCount > 0 (from OCR):
-    ///     → DeltaX-based placement: deltaX = pixelSpan / candleCount
-    ///     → Each candle owns columns [floor(i*dX), floor((i+1)*dX))
-    ///     → Fractional candle width: some get 1px, some 2px (mirrors HTS float rendering)
-    ///     → Gives exactly N candles matching actual trading days
+    ///     -> DeltaX-based placement: deltaX = pixelSpan / candleCount
+    ///     -> Each candle owns columns [floor(i*dX), floor((i+1)*dX))
+    ///     -> Fractional candle width: some get 1px, some 2px (mirrors HTS float rendering)
+    ///     -> Gives exactly N candles matching actual trading days
     ///
     ///   When expectedCandleCount = 0 (unknown):
-    ///     → Fallback: every column with any HTS element = 1 candle
-    ///     → May produce more candles than actual (float boundary duplicates)
+    ///     -> Fallback: every column with any HTS element = 1 candle
+    ///     -> May produce more candles than actual (float boundary duplicates)
     ///
     ///   Body estimation in ultra-dense:
-    ///     → Border pixels within wick Y range = body extent (O/C)
-    ///     → If no border, estimate body as wick midpoint ±20%
+    ///     -> Border pixels within wick Y range = body extent (O/C)
+    ///     -> If no border, estimate body as wick midpoint ±20%
     ///
     /// NORMAL-DENSITY MODE:
     ///   Wick-based segmentation: find columns with wick, extend to adjacent same-color.
     ///   Body from fill/border extent. Wick clamped to 5× body height.
-    /// ──
+    /// --
     /// </summary>
     private static List<RawCandle> DetectCandlesByHtsStyle(
         PixelGrid grid, int left, int top, int right, int bottom,
@@ -1338,7 +1338,7 @@ public sealed class ChartAnalyzer
         // indicatorRunLen threshold:
         //   HTS draws MA lines by connecting per-candle center points with LineTo.
         //   In ultra-dense charts, MA lines form runs matching the candle pitch:
-        //     e.g., 600 candles in 624px → ~9px between candle gaps.
+        //     e.g., 600 candles in 624px -> ~9px between candle gaps.
         //   Real candle wicks are 1-2px per candle (ultra-dense) or body-width (normal).
         //   At Y levels where candle wicks cluster (same price), runs can be 3-7px
         //   (consecutive candles at similar price), but NOT 8-9px (that's MA pitch).
@@ -1407,7 +1407,7 @@ public sealed class ChartAnalyzer
                     }
                 }
             }
-            // End of row — flush pending runs
+            // End of row -- flush pending runs
             if (wickRunStart >= 0)
             {
                 int runLen = rightEdge + 1 - wickRunStart;
@@ -1436,7 +1436,7 @@ public sealed class ChartAnalyzer
         // it's an indicator line (real candle wicks are 1px wide, so they can't
         // appear on the same Y in >20% of columns even in ultra-dense 600-day charts).
         // This is SAFE unlike the old Y-frequency approach because:
-        //   - Old approach: filtered ANY Y with high total pixel count → killed same-price wick clusters
+        //   - Old approach: filtered ANY Y with high total pixel count -> killed same-price wick clusters
         //   - New approach: counts COLUMNS (not pixels) and uses high threshold (20%)
         //   - Same-price wick clusters: many columns have wick at similar Y, but they
         //     span a Y RANGE (not exact same Y). Indicator lines hit exact Y rows.
@@ -1483,7 +1483,7 @@ public sealed class ChartAnalyzer
         // Phase 3: Detect ultra-dense mode and perform segmentation
         // Ultra-dense: >50% of columns have any candle element (fill/border/wick).
         // In ultra-dense, every column with any HTS element IS a candle.
-        // "Candles don't disappear in the middle — each has equal deltaX spacing."
+        // "Candles don't disappear in the middle -- each has equal deltaX spacing."
         int elementCols = 0;
         int wickCols = 0;
         for (int idx = 0; idx < profiles.Count; idx++)
@@ -1525,18 +1525,18 @@ public sealed class ChartAnalyzer
             Console.Error.WriteLine($"  [DX-DBG] WickCount: min={wickCounts.Min()} max={wickCounts.Max()} avg={wickCounts.Average():F1}");
         }
 
-        // ── DeltaX-based candle placement ──
+        // -- DeltaX-based candle placement --
         // When expectedCandleCount is known (from OCR: "600/600", "900" etc.),
         // use equal-spacing to assign exact pixel columns to each candle.
         //   deltaX = pixelSpan / candleCount  (fractional!)
         //   candle[i].centerX = startX + i * deltaX + deltaX/2
         // Each candle owns a range of columns: [floor(i*dX), floor((i+1)*dX))
-        // Collect wick/border/fill from ALL columns in that range → best H/L/O/C.
+        // Collect wick/border/fill from ALL columns in that range -> best H/L/O/C.
         //
         // Why this is better than "every column = 1 candle":
         //   - Exactly N candles (matches actual trading day count)
-        //   - Float-width candles: some get 1px, some get 2px — mirrors HTS rendering
-        //   - No duplicate candles from float→int boundary pixels
+        //   - Float-width candles: some get 1px, some get 2px -- mirrors HTS rendering
+        //   - No duplicate candles from float->int boundary pixels
         if (ultraDense && expectedCandleCount > 0 && profiles.Count > 0)
         {
             // Find first and last columns with any HTS element
@@ -1668,7 +1668,7 @@ public sealed class ChartAnalyzer
                 }
                 else
                 {
-                    // No wick or border — skip this candle slot
+                    // No wick or border -- skip this candle slot
                     wTop = (top + bottom) / 2;
                     wBot = wTop;
                     bodyTop = wTop;
@@ -1886,7 +1886,7 @@ public sealed class ChartAnalyzer
         }
 
         // Post-filter: remove spanning artifacts (indicator lines classified as wick)
-        // In ultra-dense mode, skip aggressive filtering — every column IS a candle.
+        // In ultra-dense mode, skip aggressive filtering -- every column IS a candle.
         // The horizontal-run indicator mask already handles MA lines.
         if (!ultraDense)
         {
@@ -2156,10 +2156,10 @@ public sealed class ChartAnalyzer
     /// <summary>
     /// Remove text overlay outliers from candle list.
     ///
-    /// ── Design Intent: Text Overlay Noise ──
+    /// -- Design Intent: Text Overlay Noise --
     /// HTS charts have colored text overlays that get detected as candle bodies:
-    ///   - "최고 48,700(02/13)" (peak price annotation) — red text near chart top
-    ///   - "6,253,426(1.3%)" (volume/percent annotations) — scattered colored text
+    ///   - "최고 48,700(02/13)" (peak price annotation) -- red text near chart top
+    ///   - "6,253,426(1.3%)" (volume/percent annotations) -- scattered colored text
     ///   - Price event labels: "배당락", "권리락" etc.
     ///
     /// Detection strategy:
@@ -2168,7 +2168,7 @@ public sealed class ChartAnalyzer
     ///      it's likely a text overlay (real candles don't jump that far between adjacent bars)
     ///   3. Also filter candles whose body is entirely in the top 15% of chart AND
     ///      disconnected from neighbors (isolated high-Y outlier)
-    /// ──
+    /// --
     /// </summary>
     private static List<RawCandle> FilterTextOverlayOutliers(
         List<RawCandle> candles, int chartTop, int chartBottom)
@@ -2237,7 +2237,7 @@ public sealed class ChartAnalyzer
         return result;
     }
 
-    // ── Step 5 helper: Color Convention Detection ─────────────
+    // -- Step 5 helper: Color Convention Detection ------------─
 
     /// <summary>
     /// Auto-detect bullish color convention.
@@ -2267,7 +2267,7 @@ public sealed class ChartAnalyzer
         return "red";
     }
 
-    // ── Step 6: Volume Panel Detection ────────────────────────
+    // -- Step 6: Volume Panel Detection ------------------------
 
     /// <summary>
     /// Detect volume sub-panel by finding a horizontal gap (empty row)
@@ -2315,7 +2315,7 @@ public sealed class ChartAnalyzer
     /// <summary>
     /// Extract volume bar heights for each candle by scanning the volume panel.
     ///
-    /// ── Strategy ──
+    /// -- Strategy --
     /// Volume bars share the same X position as their candle. For each candle:
     ///   1. Scan the column at candle.PixelX in the volume panel (volumeTop ~ volumeBottom)
     ///   2. Find the topmost colored pixel = bar top Y
@@ -2325,7 +2325,7 @@ public sealed class ChartAnalyzer
     /// Volume bars in HTS use the same red/blue color convention as candles.
     /// We also check HTS-specific fill/border colors for accuracy.
     ///
-    /// Returns: Dictionary of candleIndex → barTopY pixel coordinate.
+    /// Returns: Dictionary of candleIndex -> barTopY pixel coordinate.
     /// The caller converts barTopY to absolute volume using tooltip calibration.
     /// If no tooltip calibration, relative volume (0.0~1.0) is used as a ratio.
     /// </summary>
@@ -2333,7 +2333,7 @@ public sealed class ChartAnalyzer
         PixelGrid grid, List<CandleData> candles,
         int volumeTop, int volumeBottom, int chartLeft, int chartRight)
     {
-        var barTops = new Dictionary<int, int>(); // candle index → barTopY
+        var barTops = new Dictionary<int, int>(); // candle index -> barTopY
 
         // Volume panel effective area: skip separator rows near volumeTop
         int panelTop = volumeTop + 3;
@@ -2391,14 +2391,14 @@ public sealed class ChartAnalyzer
         var (r, g, b) = grid.GetPixel(x, y);
         if (r < 80 && g < 80 && b < 80 && !(r > 40 && g > 40 && b > 40 && Math.Max(r, Math.Max(g, b)) - Math.Min(r, Math.Min(g, b)) < 15))
         {
-            // Exclude grid lines (uniform gray) — only count if non-uniform
+            // Exclude grid lines (uniform gray) -- only count if non-uniform
             return false;
         }
 
         return false;
     }
 
-    // ── Utility Methods ───────────────────────────────────────
+    // -- Utility Methods --------------------------------------─
 
     /// <summary>
     /// Linear interpolation: convert pixel coordinate to price using axis calibration.
@@ -2460,14 +2460,14 @@ public sealed class ChartAnalyzer
     }
 
     /// <summary>
-    /// Parse price text from OCR: "47,500" → 47500, "35.400" → 35400, "7320" → 7320.
-    /// Handles truncated OCR: "35," → 35000, "25." → 25000 (trailing separator = ×1000).
+    /// Parse price text from OCR: "47,500" -> 47500, "35.400" -> 35400, "7320" -> 7320.
+    /// Handles truncated OCR: "35," -> 35000, "25." -> 25000 (trailing separator = ×1000).
     ///
-    /// ── Design Intent: Why trailing separator detection matters ──
+    /// -- Design Intent: Why trailing separator detection matters --
     /// HTS Y-axis price labels are very small. OCR often reads "35,000" as "35," or "25."
     /// because the trailing digits are too faint. If we parse "35," as 35 instead of 35000,
     /// all price calculations are off by 1000×. The trailing comma/period is the clue.
-    /// ──
+    /// --
     /// </summary>
     internal static double? ParsePriceText(string text)
     {
@@ -2479,7 +2479,7 @@ public sealed class ChartAnalyzer
         // Remove common OCR artifacts
         cleaned = cleaned.Replace(" ", "").Replace("l", "1").Replace("O", "0").Replace("o", "0");
 
-        // Detect trailing separator: "35," or "25." → OCR truncated the thousands part
+        // Detect trailing separator: "35," or "25." -> OCR truncated the thousands part
         // This happens when HTS price labels are small and OCR misses trailing digits
         bool hasTrailingSeparator = false;
         if (cleaned.Length >= 2 && (cleaned[^1] == ',' || cleaned[^1] == '.'))
@@ -2499,7 +2499,7 @@ public sealed class ChartAnalyzer
 
             if (hasComma && !hasPeriod)
             {
-                // "47,500" — comma is thousands separator
+                // "47,500" -- comma is thousands separator
                 cleaned = cleaned.Replace(",", "");
             }
             else if (hasPeriod && !hasComma)
@@ -2524,7 +2524,7 @@ public sealed class ChartAnalyzer
                 if (val <= 0) return null;
 
                 // If trailing separator detected and value is small (likely truncated)
-                // "35," → 35 → 35,000; "5." → 5 → 5,000
+                // "35," -> 35 -> 35,000; "5." -> 5 -> 5,000
                 if (hasTrailingSeparator && val < 1000)
                     val *= 1000;
 
@@ -2569,7 +2569,7 @@ public sealed class ChartAnalyzer
     /// <summary>
     /// Generate debug overlay image showing detected chart regions and candles.
     ///
-    /// ── Design Intent: Visual Verification ──
+    /// -- Design Intent: Visual Verification --
     /// Draws recognized OHLC candles at 50% alpha over the original chart screenshot.
     /// This lets you visually compare "what the analyzer sees" vs "what's actually there".
     ///
@@ -2582,7 +2582,7 @@ public sealed class ChartAnalyzer
     ///
     /// Also draws: chart region (lime box), volume region (cyan box),
     ///   Y-axis calibration lines (yellow), candle index labels (every 20th).
-    /// ──
+    /// --
     /// </summary>
     public static Bitmap GenerateDebugOverlay(Bitmap original, ChartAnalysisResult result)
     {
@@ -2611,7 +2611,7 @@ public sealed class ChartAnalyzer
             g.DrawString($"{yp.Value:N0}", yFont, Brushes.Yellow, result.ChartRight + 2, yp.Pixel - 6);
         }
 
-        // ── Draw recognized OHLC candles at 50% alpha ──
+        // -- Draw recognized OHLC candles at 50% alpha --
         // Bullish: lime green wick + body.  Bearish: magenta wick + body.
         // This visually shows "what the analyzer thinks the candles are"
         // overlaid on the real chart for instant verification.
@@ -2688,7 +2688,7 @@ public sealed class ChartAnalyzer
     }
 
     /// <summary>
-    /// Reverse interpolation: price → pixel Y (for debug overlay).
+    /// Reverse interpolation: price -> pixel Y (for debug overlay).
     /// </summary>
     private static int Interpolate_Reverse(double price, List<AxisPoint> axisPoints)
     {
@@ -2701,17 +2701,17 @@ public sealed class ChartAnalyzer
     }
 }
 
-// ── Internal Types ────────────────────────────────────────────
+// -- Internal Types --------------------------------------------
 
 internal enum CandleColor { None, Red, Blue, Green }
 
 /// <summary>
 /// HTS candle pixel element type.
 /// HTS renders candles with 3 distinct visual elements, each with very different colors:
-///   Fill   — light cream (246,234,214) for bullish, light blue (214,226,239) for bearish
-///   Border — dark brown (134,104,53) for bullish, dark teal (57,154,156) for bearish
-///   Wick   — vivid red (255,0,0) for bullish, vivid blue (17,91,203) for bearish
-///   Outline — near-black (57,57,52) used as general candle outline/grid
+///   Fill   -- light cream (246,234,214) for bullish, light blue (214,226,239) for bearish
+///   Border -- dark brown (134,104,53) for bullish, dark teal (57,154,156) for bearish
+///   Wick   -- vivid red (255,0,0) for bullish, vivid blue (17,91,203) for bearish
+///   Outline -- near-black (57,57,52) used as general candle outline/grid
 /// </summary>
 internal enum HtsElement { None, Fill, Border, Wick, Outline }
 
@@ -2750,7 +2750,7 @@ internal sealed class CandleBody
     public int RowCount { get; set; }
 }
 
-// ── PixelGrid: Fast pixel access via LockBits ────────────────
+// -- PixelGrid: Fast pixel access via LockBits ----------------
 
 /// <summary>
 /// High-performance pixel access wrapper using LockBits.
@@ -2829,7 +2829,7 @@ internal sealed class PixelGrid : IDisposable
         return r > 200 && g > 200 && b > 200;
     }
 
-    // ── HTS Candle Element Classification ────────────────────
+    // -- HTS Candle Element Classification --------------------
     //
     // HTS renders candles with a distinctive multi-element style:
     //   Fill:    Very light tinted background (lum ~90%, sat ~44-64%)
@@ -2841,7 +2841,7 @@ internal sealed class PixelGrid : IDisposable
     //   Wick:    Vivid saturated thin line (lum ~47%, sat >85%)
     //            Bullish: red  (255,0,0) or (231,25,9)
     //            Bearish: blue (17,91,203)
-    //   Outline: Near-black candle edge (57,57,52) — shared by both
+    //   Outline: Near-black candle edge (57,57,52) -- shared by both
     //
     // None of these pass the existing IsReddish/IsBluish checks (designed for
     // solid-color candles), which is why the old algorithm misses HTS candles.
@@ -2854,10 +2854,10 @@ internal sealed class PixelGrid : IDisposable
     {
         var (r, g, b) = GetPixel(x, y);
 
-        // ── Background / near-white → None ──
+        // -- Background / near-white -> None --
         if (r > 225 && g > 225 && b > 225) return (HtsElement.None, CandleColor.None);
 
-        // ── Outline: near-black (57,57,52) — candle edge, shared ──
+        // -- Outline: near-black (57,57,52) -- candle edge, shared --
         // All channels close together, all < 80
         if (r < 80 && g < 80 && b < 80)
         {
@@ -2866,7 +2866,7 @@ internal sealed class PixelGrid : IDisposable
             if (maxC - minC < 20) return (HtsElement.Outline, CandleColor.None);
         }
 
-        // ── Wick: high saturation, medium luminosity ──
+        // -- Wick: high saturation, medium luminosity --
         // Red wick: R dominant, very high (R > 200, G < 50, B < 50)
         if (r > 200 && g < 60 && b < 60)
             return (HtsElement.Wick, CandleColor.Red);
@@ -2874,7 +2874,7 @@ internal sealed class PixelGrid : IDisposable
         if (b > 150 && r < 80 && g < 120)
             return (HtsElement.Wick, CandleColor.Blue);
 
-        // ── Fill: very light tinted (lum > 80%) ──
+        // -- Fill: very light tinted (lum > 80%) --
         // Bullish fill: warm cream (R > G > B, R > 230, B < 225)
         if (r > 230 && g > 220 && b < 225 && r > b + 15)
             return (HtsElement.Fill, CandleColor.Red);
@@ -2882,7 +2882,7 @@ internal sealed class PixelGrid : IDisposable
         if (b > 225 && g > 215 && r < 225 && b > r + 15)
             return (HtsElement.Fill, CandleColor.Blue);
 
-        // ── Border: dark colored (lum 30-55%) ──
+        // -- Border: dark colored (lum 30-55%) --
         // Bullish border: brown/olive (R > G > B, R > 100, B < 80)
         if (r > 100 && g > 70 && b < 80 && r > g && g > b)
             return (HtsElement.Border, CandleColor.Red);
@@ -2911,11 +2911,11 @@ internal sealed class PixelGrid : IDisposable
 
     public void Dispose()
     {
-        // Pixel data is in managed byte array — nothing to release
+        // Pixel data is in managed byte array -- nothing to release
     }
 }
 
-// ── Public Data Models ────────────────────────────────────────
+// -- Public Data Models ----------------------------------------
 
 /// <summary>
 /// Per-candle OHLC + volume data extracted from chart screenshot.
@@ -2928,7 +2928,7 @@ public sealed class CandleData
     [JsonPropertyName("x")]
     public int PixelX { get; set; }
 
-    /// <summary>Pixel Y coordinates for OHLC — needed by TooltipCalibrator to recalibrate prices.</summary>
+    /// <summary>Pixel Y coordinates for OHLC -- needed by TooltipCalibrator to recalibrate prices.</summary>
     [JsonPropertyName("pixelHighY")]
     public int PixelHighY { get; set; }
 
@@ -2956,7 +2956,7 @@ public sealed class CandleData
     [JsonPropertyName("volume")]
     public double? Volume { get; set; }
 
-    /// <summary>Pixel Y of volume bar top — needed for tooltip-based volume calibration.</summary>
+    /// <summary>Pixel Y of volume bar top -- needed for tooltip-based volume calibration.</summary>
     [JsonPropertyName("volumeBarTopY")]
     public int VolumeBarTopY { get; set; }
 
@@ -3050,7 +3050,7 @@ public sealed class ChartAnalysisResult
     });
 
     /// <summary>
-    /// Serialize to columnar JSON — each field as a 1D array.
+    /// Serialize to columnar JSON -- each field as a 1D array.
     /// Output format:
     /// {
     ///   "count": 600,

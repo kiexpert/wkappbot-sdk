@@ -10,7 +10,7 @@ namespace WKAppBot.CLI;
 internal partial class Program
 {
 
-    // ── Method 8: Atomic SendInput batch ──
+    // -- Method 8: Atomic SendInput batch --
     static InputResult TryInputMethod8(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -39,7 +39,7 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard — pre/post batch focus verification with retry
+                // InputFocusGuard -- pre/post batch focus verification with retry
                 var guard8 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
                 bool m8InputDone = false;
 
@@ -69,7 +69,7 @@ internal partial class Program
                     continue; // retry from click
                 }
 
-                // Step 1: Build single INPUT array — Home + Shift+End + chars + Enter
+                // Step 1: Build single INPUT array -- Home + Shift+End + chars + Enter
                 var inputList = new System.Collections.Generic.List<INPUT>();
 
                 // Helper: add VK keydown+keyup
@@ -121,7 +121,7 @@ internal partial class Program
                 // Home (extended)
                 AddVkKey(0x24 /*VK_HOME*/, extended: true);
 
-                // Shift down → End (extended) → Shift up = select all
+                // Shift down -> End (extended) -> Shift up = select all
                 AddModDown(0x10 /*VK_SHIFT*/);
                 AddVkKey(0x23 /*VK_END*/, extended: true);
                 AddModUp(0x10);
@@ -172,14 +172,14 @@ internal partial class Program
                 if (ocrOk8)
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.WriteLine($"v OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (wmT8.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM confirmed \"{text}\"");
+                    Console.WriteLine($"v WM confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -193,14 +193,14 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 4: Physical SendInput pipeline ──
+    // -- Method 4: Physical SendInput pipeline --
     static InputResult TryInputMethod4(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -229,7 +229,7 @@ internal partial class Program
 
             try
             {
-                // InputFocusGuard — pre-batch focus verification with retry
+                // InputFocusGuard -- pre-batch focus verification with retry
                 var guard4 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
                 bool m4InputDone = false;
 
@@ -250,7 +250,7 @@ internal partial class Program
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write($"[click({m4ClickX},{m4ClickY})] ");
 
-                // Step 2: Select all (Home → Shift+End is reliable for CMaskEdit)
+                // Step 2: Select all (Home -> Shift+End is reliable for CMaskEdit)
                 KeyboardInput.PressKey("home");
                 Thread.Sleep(50);
                 KeyboardInput.Hotkey(new[] { "shift", "end" });
@@ -308,7 +308,7 @@ internal partial class Program
                     Console.ResetColor();
                 }
 
-                // Step 4: OCR verify BEFORE Enter — confirm text is displayed correctly
+                // Step 4: OCR verify BEFORE Enter -- confirm text is displayed correctly
                 string? ocrBeforeEnter = null;
                 try
                 {
@@ -352,7 +352,7 @@ internal partial class Program
                 // Step 6: Send Enter directly via PostMessage WM_KEYDOWN + WM_KEYUP
                 // to the target HWND. This ensures CCtlItemCode::OnKeyUp(VK_RETURN) fires
                 // on the correct control, regardless of where the keyboard focus actually is.
-                // OnKeyUp(VK_RETURN) → SetItemName() → RunEventCommTR() → data query
+                // OnKeyUp(VK_RETURN) -> SetItemName() -> RunEventCommTR() -> data query
                 if (sendEnter)
                 {
                     NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x0D /*VK_RETURN*/, IntPtr.Zero);
@@ -410,16 +410,16 @@ internal partial class Program
                 Console.ResetColor();
 
                 // Success check priority:
-                // 1. Post-enter OCR (most reliable — visual confirmation after Enter)
-                // 2. Pre-enter OCR (typing confirmed before Enter — CMaskEditEx doesn't update CWnd text)
-                // 3. WM_GETTEXT (CWnd buffer — only works if SetWindowText was called)
+                // 1. Post-enter OCR (most reliable -- visual confirmation after Enter)
+                // 2. Pre-enter OCR (typing confirmed before Enter -- CMaskEditEx doesn't update CWnd text)
+                // 3. WM_GETTEXT (CWnd buffer -- only works if SetWindowText was called)
                 //
                 // CMaskEditEx::OnChar() updates m_strBuffer + DrawCaption (display) but NOT SetWindowText.
                 // So WM_GETTEXT/UIA Name always show stale text. Pre-enter OCR is the real truth.
                 if (!string.IsNullOrEmpty(ocrText) && ocrText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ post-enter OCR confirmed \"{text}\"");
+                    Console.WriteLine($"v post-enter OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -428,14 +428,14 @@ internal partial class Program
                     // CMaskEditEx: display shows correct text (m_strBuffer updated via OnChar)
                     // but CWnd text (WM_GETTEXT/UIA) is stale. Trust the pre-enter OCR.
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ pre-enter OCR confirmed \"{text}\" (CWnd text stale: \"{wmText}\")");
+                    Console.WriteLine($"v pre-enter OCR confirmed \"{text}\" (CWnd text stale: \"{wmText}\")");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!string.IsNullOrEmpty(wmText) && wmText.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM_GETTEXT confirmed \"{text}\"");
+                    Console.WriteLine($"v WM_GETTEXT confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -449,14 +449,14 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 5: Click + PostMessage hybrid ──
+    // -- Method 5: Click + PostMessage hybrid --
     static InputResult TryInputMethod5(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -496,7 +496,7 @@ internal partial class Program
                     return (IntPtr)lp;
                 }
 
-                // InputFocusGuard — verify focus before SendInput portion
+                // InputFocusGuard -- verify focus before SendInput portion
                 var guard5 = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
                 bool m5InputDone = false;
 
@@ -622,14 +622,14 @@ internal partial class Program
                 if (!string.IsNullOrEmpty(ocrText5) && ocrText5.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ OCR confirmed \"{text}\"");
+                    Console.WriteLine($"v OCR confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
                 else if (!RequireOcrForNonA11y && !string.IsNullOrEmpty(wmText5) && wmText5.Contains(text))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"✓ WM_GETTEXT confirmed \"{text}\"");
+                    Console.WriteLine($"v WM_GETTEXT confirmed \"{text}\"");
                     Console.ResetColor();
                     success = true;
                 }
@@ -643,14 +643,14 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 
     return success ? InputResult.Success : InputResult.Continue;
     }
 
-    // ── Method 2: Click + VK SendInput ──
+    // -- Method 2: Click + VK SendInput --
     static InputResult TryInputMethod2(InputContext ctx)
     {
     // Unpack context -> local variables (same names as original)
@@ -684,7 +684,7 @@ internal partial class Program
                 int cx = ctlRect.Left + clickXOffset;
                 int cy = ctlRect.Top + ctlRect.Height / 2;
 
-                // InputFocusGuard — per-keystroke focus verification
+                // InputFocusGuard -- per-keystroke focus verification
                 var guard = new InputFocusGuard(targetHwnd, win.Handle, maxRetries: 3);
                 bool m2InputDone = false;
 
@@ -704,11 +704,11 @@ internal partial class Program
                     Console.Write($"[click({cx},{cy})] ");
                     Console.ResetColor();
 
-                    // Home key → move caret to start
+                    // Home key -> move caret to start
                     KeyboardInput.PressKey("home");
                     Thread.Sleep(50);
 
-                    // Shift+End → select all text
+                    // Shift+End -> select all text
                     KeyboardInput.Hotkey(new[] { "shift", "end" });
                     Thread.Sleep(100);
 
@@ -716,15 +716,15 @@ internal partial class Program
                     // IMPORTANT: Use CheckBeforeKeystroke (detect-only, no recovery).
                     // If ANY interference detected, immediately restart the entire input.
                     // Reason: Autocomplete dropdown destroys selection state (Home+Shift+End)
-                    // so even if focus is restored, cursor position is wrong — must restart.
+                    // so even if focus is restored, cursor position is wrong -- must restart.
                     bool interrupted = false;
                     foreach (char ch in text)
                     {
-                        // [GUARD] Check focus before each keystroke — detect only
+                        // [GUARD] Check focus before each keystroke -- detect only
                         var guardCheck = guard.CheckBeforeKeystroke();
                         if (!guardCheck.Ok)
                         {
-                            Console.Error.WriteLine($"[GUARD] Interrupted: {guardCheck.Type} — {guardCheck.Detail}");
+                            Console.Error.WriteLine($"[GUARD] Interrupted: {guardCheck.Type} -- {guardCheck.Detail}");
                             interrupted = true;
                             break;
                         }
@@ -743,7 +743,7 @@ internal partial class Program
 
                     if (interrupted)
                     {
-                        // Interference during typing — dismiss autocomplete + clear + retry
+                        // Interference during typing -- dismiss autocomplete + clear + retry
                         if (!guard.CanRetry()) break;
                         // Dismiss autocomplete dropdown with ESC via PostMessage
                         NativeMethods.PostMessageW(targetHwnd, 0x0100 /*WM_KEYDOWN*/, (IntPtr)0x1B /*VK_ESCAPE*/, IntPtr.Zero);
@@ -766,7 +766,7 @@ internal partial class Program
                     if (guard.EnsureBeforeKeystroke(maxWaitMs: 1000))
                         KeyboardInput.PressKey("enter");
                     else
-                        Console.WriteLine("[GUARD] Focus lost before Enter — skipping Enter key");
+                        Console.WriteLine("[GUARD] Focus lost before Enter -- skipping Enter key");
                     Thread.Sleep(500);
                 }
 
@@ -805,7 +805,7 @@ internal partial class Program
                     if (ocrOk)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine($"✓ \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")} +OCR)");
+                        Console.WriteLine($"v \"{checkText}\" (via {(!string.IsNullOrEmpty(wmText) ? "WM_GETTEXT" : "UIA")} +OCR)");
                         Console.ResetColor();
                         success = true;
                     }
@@ -828,7 +828,7 @@ internal partial class Program
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"✗ {ex.Message}");
+                Console.WriteLine($"X {ex.Message}");
                 Console.ResetColor();
             }
 

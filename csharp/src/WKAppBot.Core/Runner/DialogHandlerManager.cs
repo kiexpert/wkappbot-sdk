@@ -50,7 +50,7 @@ public sealed class DialogHandlerManager
             catch (Exception ex)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[BLOCK] Handler load error: {Path.GetFileName(file)} — {ex.Message}");
+                Console.WriteLine($"[BLOCK] Handler load error: {Path.GetFileName(file)} -- {ex.Message}");
                 Console.ResetColor();
             }
         }
@@ -87,8 +87,8 @@ public sealed class DialogHandlerManager
     {
         // Match base: classPath + "/" + title with whitespace removed (keep / as hierarchy separator)
         // e.g. classPath="_NKHeroMainClass/#32770" + title="접속 끊김"
-        //      → "_NKHeroMainClass/#32770/접속끊김"
-        // Empty title: "_NKHeroMainClass/#32770" + title="" → "_NKHeroMainClass/#32770/"
+        //      -> "_NKHeroMainClass/#32770/접속끊김"
+        // Empty title: "_NKHeroMainClass/#32770" + title="" -> "_NKHeroMainClass/#32770/"
         var matchBase = NormalizeForMatch(classPath + "/" + windowTitle);
 
         foreach (var (keyword, _, config) in _handlers)
@@ -102,7 +102,7 @@ public sealed class DialogHandlerManager
             var m = config.Match;
             if (m != null)
             {
-                // title: glob pattern → full match; literal → contains
+                // title: glob pattern -> full match; literal -> contains
                 if (m.TitleContains != null)
                 {
                     if (PatternMatcher.IsPattern(m.TitleContains))
@@ -114,7 +114,7 @@ public sealed class DialogHandlerManager
                         continue;
                 }
 
-                // class: path glob (/ or **) → match vs classPath; standard glob → match vs className; literal → exact vs className
+                // class: path glob (/ or **) -> match vs classPath; standard glob -> match vs className; literal -> exact vs className
                 if (m.Class != null)
                 {
                     if (PatternMatcher.IsPathGlob(m.Class))
@@ -131,7 +131,7 @@ public sealed class DialogHandlerManager
                         continue;
                 }
 
-                // process: glob pattern → full match; literal → exact
+                // process: glob pattern -> full match; literal -> exact
                 if (m.Process != null)
                 {
                     if (PatternMatcher.IsPattern(m.Process))
@@ -143,7 +143,7 @@ public sealed class DialogHandlerManager
                         continue;
                 }
 
-                // message: glob pattern → full match; literal → contains
+                // message: glob pattern -> full match; literal -> contains
                 if (m.MessageContains != null && messageText != null)
                 {
                     if (PatternMatcher.IsPattern(m.MessageContains))
@@ -184,7 +184,7 @@ public sealed class DialogHandlerManager
         var keyword = ExtractKeyword(windowTitle);
         if (string.IsNullOrEmpty(keyword))
         {
-            // Empty title — use leaf class name as keyword
+            // Empty title -- use leaf class name as keyword
             keyword = ExtractKeyword(className);
         }
         if (string.IsNullOrEmpty(keyword)) return null;
@@ -229,7 +229,7 @@ params:
     /// <summary>
     /// Normalize a string for keyword matching: remove whitespace only.
     /// Keeps "/" as class hierarchy separator.
-    /// e.g. "_NKHeroMainClass/#32770" + "/" + "접속 끊김" → "_NKHeroMainClass/#32770/접속끊김"
+    /// e.g. "_NKHeroMainClass/#32770" + "/" + "접속 끊김" -> "_NKHeroMainClass/#32770/접속끊김"
     /// </summary>
     private static string NormalizeForMatch(string s)
         => s.Replace(" ", "");

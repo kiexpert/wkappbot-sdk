@@ -2,7 +2,7 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: prompt-test — Test Claude prompt input (focusless vs focus-steal)
+// partial class: prompt-test -- Test Claude prompt input (focusless vs focus-steal)
 // Usage: wkappbot prompt-test ["text"] [--dry-run]
 // --dry-run: type text but don't submit (no Enter key)
 internal partial class Program
@@ -107,7 +107,7 @@ internal partial class Program
 
         if (dryRun)
         {
-            // Type without submitting — test text insertion only
+            // Type without submitting -- test text insertion only
             Console.WriteLine("[PROMPT-TEST] Dry-run: typing text without submit...");
             var result = helper.TypeWithoutSubmit(prompt, text);
             Console.Error.WriteLine($"[PROMPT-TEST] Result: {(result ? "OK" : "FAILED")}");

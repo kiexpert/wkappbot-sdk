@@ -8,10 +8,10 @@ internal partial class Program
     /// <summary>
     /// Claude Code CLI passthrough with rate-limit fallback to ask triad.
     ///
-    ///   wkappbot chat                → exec 'claude' (interactive, stdio inherited)
-    ///   wkappbot chat "<q>"          → 'claude -p <q>' capture + fallback on limit
-    ///   wkappbot chat -p "<q>"       → same as above
-    ///   wkappbot chat --no-fallback  → disable auto-fallback to ask triad
+    ///   wkappbot chat                -> exec 'claude' (interactive, stdio inherited)
+    ///   wkappbot chat "<q>"          -> 'claude -p <q>' capture + fallback on limit
+    ///   wkappbot chat -p "<q>"       -> same as above
+    ///   wkappbot chat --no-fallback  -> disable auto-fallback to ask triad
     ///
     /// Fallback triggers:
     ///   1. `claude` binary not found on PATH
@@ -43,10 +43,10 @@ internal partial class Program
             }
             if (interactive)
             {
-                Console.Error.WriteLine("[CHAT] `claude` CLI not found on PATH — interactive mode requires Claude Code. Pass a question to use ask-triad fallback.");
+                Console.Error.WriteLine("[CHAT] `claude` CLI not found on PATH -- interactive mode requires Claude Code. Pass a question to use ask-triad fallback.");
                 return 127;
             }
-            Console.Error.WriteLine("[CHAT] `claude` CLI not installed — routing to ask triad");
+            Console.Error.WriteLine("[CHAT] `claude` CLI not installed -- routing to ask triad");
             return AskTriadFallback(question);
         }
 
@@ -70,13 +70,13 @@ internal partial class Program
 
         if (noFallback)
         {
-            Console.Error.WriteLine("[CHAT] Rate-limit detected but --no-fallback set — returning claude's output");
+            Console.Error.WriteLine("[CHAT] Rate-limit detected but --no-fallback set -- returning claude's output");
             if (!string.IsNullOrEmpty(stdout)) Console.Write(stdout);
             if (!string.IsNullOrEmpty(stderr)) Console.Error.Write(stderr);
             return exit == 0 ? 1 : exit;
         }
 
-        Console.Error.WriteLine("[CHAT] Rate-limit marker detected in claude output → routing to ask triad");
+        Console.Error.WriteLine("[CHAT] Rate-limit marker detected in claude output -> routing to ask triad");
         return AskTriadFallback(question);
     }
 
@@ -91,7 +91,7 @@ internal partial class Program
         Console.WriteLine("  wkappbot chat --no-fallback  Disable auto-fallback to ask triad.");
         Console.WriteLine();
         Console.WriteLine("Fallback triggers:");
-        Console.WriteLine("  1) `claude` binary not on PATH → route to ask triad");
+        Console.WriteLine("  1) `claude` binary not on PATH -> route to ask triad");
         Console.WriteLine("  2) stdout/stderr contains: usage limit, rate limit, 5-hour limit,");
         Console.WriteLine("     session exhausted, HTTP 429, Claude is temporarily unavailable");
         Console.WriteLine("  3) exit != 0 + one of the above signatures in output");
@@ -192,7 +192,7 @@ internal partial class Program
 
     static bool DetectLimitExitSignature(string text)
     {
-        // Broader check for non-zero exits — e.g. "limit" appearing without the exact marker phrase
+        // Broader check for non-zero exits -- e.g. "limit" appearing without the exact marker phrase
         return !string.IsNullOrEmpty(text)
             && (text.Contains("limit", StringComparison.OrdinalIgnoreCase)
                 || text.Contains("429", StringComparison.Ordinal));

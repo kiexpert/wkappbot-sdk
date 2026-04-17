@@ -4,14 +4,14 @@
     "title":  "Hot-Swap Stuck? Orphan MCP Workers Kill \u0026 Force Swap",
     "desc":  "Eye hot-swap fails when old wkappbot-core processes hold a file lock on wkappbot-core.exe. Diagnosis + kill + restage procedure.",
     "steps":  [
-                  "증상: wkappbot hotswap → \u0027step1 rename→.old failed: 다른 프로세스가 파일을 사용 중\u0027 or \u0027Target not found\u0027",
+                  "증상: wkappbot hotswap -> \u0027step1 rename->.old failed: 다른 프로세스가 파일을 사용 중\u0027 or \u0027Target not found\u0027",
                   "진단: powershell -Command \"Get-Process wkappbot-core ",
-                  " Select-Object Id, Path, StartTime\" — 여러 pid가 wkappbot-core.exe를 물고 있음",
+                  " Select-Object Id, Path, StartTime\" -- 여러 pid가 wkappbot-core.exe를 물고 있음",
                   "Eye pid 식별: wkappbot a11y windows 에서 \u0027WK AppBot Eye\u0027 pid + \u0027WhisperRing\u0027 pid 메모 (이 두 개는 kill 금지!)",
                   "고아 MCP 워커 판별: Eye/WhisperRing pid 제외한 나머지 = 고아. wkappbot a11y find {pid:XXXX} 로 창/역할 확인",
                   "고아 kill: powershell -Command \"Stop-Process -Id PID1,PID2 -Force\"",
                   "restage + swap: cp D:/SDK/bin/wkappbot-core.exe D:/SDK/bin/wkappbot-core.new.exe \u0026\u0026 wkappbot hotswap",
-                  "성공 확인: wkappbot a11y windows 에서 Eye proc 이름이 \u0027wkappbot-core.old-...\u0027 아닌 \u0027wkappbot-core\u0027인지 + 메모리 급감 확인 (2400MB→800MB 등)",
+                  "성공 확인: wkappbot a11y windows 에서 Eye proc 이름이 \u0027wkappbot-core.old-...\u0027 아닌 \u0027wkappbot-core\u0027인지 + 메모리 급감 확인 (2400MB->800MB 등)",
                   "참고: 고아 워커는 Eye 재시작 루프 시절 스폰된 것들. StartTime이 Eye 현재 기동 시각보다 이전이면 고아 확정"
               ],
     "tags":  [

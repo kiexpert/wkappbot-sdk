@@ -1,4 +1,4 @@
-// KiwoomCommands.cs — CLI commands for Kiwoom OpenAPI+ proxy bot.
+// KiwoomCommands.cs -- CLI commands for Kiwoom OpenAPI+ proxy bot.
 // 64-bit CLI communicates with 32-bit KiwoomProxy via Named Pipe (JSON-RPC).
 // Experience DB (method/event/TR stats) is accumulated in kiwoom_exp/ folder.
 
@@ -12,7 +12,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    // ── Constants ──
+    // -- Constants --
 
     const string KiwoomPipeName = "wkappbot_kiwoom";
     static string KiwoomProxyDir => Path.Combine(DataDir, "kiwoom_proxy");
@@ -20,7 +20,7 @@ internal partial class Program
     static string KiwoomProxyExe => Path.Combine(KiwoomProxyDir, "WKAppBot.KiwoomProxy.exe");
     static string KiwoomProxyPidFile => Path.Combine(DataDir, "kiwoom_proxy.pid");
 
-    // ── Dispatcher ──
+    // -- Dispatcher --
 
     static int KiwoomCommand(string[] args)
     {
@@ -55,7 +55,7 @@ Subcommands:
   stop               Stop KiwoomProxy
   status             Show proxy + connection status
   login              CommConnect (auto-starts proxy if needed)
-  bootstrap          Start proxy → login wait → print account info
+  bootstrap          Start proxy -> login wait -> print account info
                      Options: --timeout N(sec, default 120), --show-account-window, --setup
   call <method> [p]  Invoke any COM method with params
   query <tr> --input key=val [--screen N]
@@ -67,7 +67,7 @@ Subcommands:
         return 1;
     }
 
-    // ── Start / Stop / Status ──
+    // -- Start / Stop / Status --
 
     static int KiwoomStartCommand(string[] rest)
     {
@@ -130,7 +130,7 @@ Subcommands:
             if (IsPipeAvailable())
             {
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("[KIWOOM] Proxy ready — pipe connected");
+                Console.WriteLine("[KIWOOM] Proxy ready -- pipe connected");
                 Console.ResetColor();
                 return 0;
             }
@@ -175,7 +175,7 @@ Subcommands:
 
     static int KiwoomStatusCommand()
     {
-        Console.WriteLine("─── Kiwoom Proxy Status ───");
+        Console.WriteLine("--─ Kiwoom Proxy Status --─");
 
         // 1. Check PID file
         var pid = GetKiwoomProxyPid();
@@ -186,11 +186,11 @@ Subcommands:
             {
                 var proc = Process.GetProcessById(pid);
                 processAlive = !proc.HasExited;
-                Console.WriteLine($"  Process: PID={pid} ({proc.ProcessName}) — {(processAlive ? "ALIVE" : "EXITED")}");
+                Console.WriteLine($"  Process: PID={pid} ({proc.ProcessName}) -- {(processAlive ? "ALIVE" : "EXITED")}");
             }
             catch
             {
-                Console.WriteLine($"  Process: PID={pid} — NOT FOUND (stale)");
+                Console.WriteLine($"  Process: PID={pid} -- NOT FOUND (stale)");
             }
         }
         else
@@ -209,13 +209,13 @@ Subcommands:
             {
                 var resp = SendPipeRequest("GetStatus");
                 if (resp.Error != null)
-                    Console.WriteLine($"  COM: ERROR — {resp.Error}");
+                    Console.WriteLine($"  COM: ERROR -- {resp.Error}");
                 else
                     Console.WriteLine($"  COM: {JsonSerializer.Serialize(resp.Result)}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  COM: pipe call failed — {ex.Message}");
+                Console.WriteLine($"  COM: pipe call failed -- {ex.Message}");
             }
         }
 
@@ -225,7 +225,7 @@ Subcommands:
         return 0;
     }
 
-    // ── Login ──
+    // -- Login --
 
     static int KiwoomLoginCommand(string[] rest)
     {
@@ -270,7 +270,7 @@ Subcommands:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Error.WriteLine($"[KIWOOM] CommConnect() → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] CommConnect() -> {resp.Result} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] Waiting for OnEventConnect event... (login dialog will appear)");
         Console.WriteLine("[KIWOOM] Use 'wkappbot kiwoom status' to check connection state after login");
@@ -436,7 +436,7 @@ Subcommands:
         return int.TryParse(result.ToString(), out var parsed) ? parsed : 0;
     }
 
-    // ── Generic COM Method Call ──
+    // -- Generic COM Method Call --
 
     static int KiwoomCallCommand(string[] rest)
     {
@@ -474,12 +474,12 @@ Subcommands:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Error.WriteLine($"[KIWOOM] {method} → {FormatResult(resp.Result)} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] {method} -> {FormatResult(resp.Result)} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         return 0;
     }
 
-    // ── TR Query (SetInputValue + CommRqData) ──
+    // -- TR Query (SetInputValue + CommRqData) --
 
     static int KiwoomQueryCommand(string[] rest)
     {
@@ -542,7 +542,7 @@ Subcommands:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Error.WriteLine($"[KIWOOM] CommRqData → {resp.Result} ({sw.ElapsedMilliseconds}ms)");
+        Console.Error.WriteLine($"[KIWOOM] CommRqData -> {resp.Result} ({sw.ElapsedMilliseconds}ms)");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] TR response will arrive via OnReceiveTrData event");
 
@@ -552,7 +552,7 @@ Subcommands:
         return 0;
     }
 
-    // ── Realtime Registration ──
+    // -- Realtime Registration --
 
     static int KiwoomRealtimeCommand(string[] rest)
     {
@@ -595,13 +595,13 @@ Subcommands:
         }
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Error.WriteLine($"[KIWOOM] SetRealReg → {resp.Result}");
+        Console.Error.WriteLine($"[KIWOOM] SetRealReg -> {resp.Result}");
         Console.ResetColor();
         Console.WriteLine("[KIWOOM] Real-time data will arrive via OnReceiveRealData event");
         return 0;
     }
 
-    // ── Knowhow (Manual COM Lesson Recording) ──
+    // -- Knowhow (Manual COM Lesson Recording) --
 
     static int KiwoomKnowhowCommand(string[] rest)
     {
@@ -622,18 +622,18 @@ Subcommands:
         File.AppendAllText(knowhowPath, entry);
 
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.Error.WriteLine($"[KIWOOM] Knowhow recorded → {knowhowPath}");
+        Console.Error.WriteLine($"[KIWOOM] Knowhow recorded -> {knowhowPath}");
         Console.ResetColor();
         return 0;
     }
 
-    // ── Experience DB Viewer ──
+    // -- Experience DB Viewer --
 
     static int KiwoomExpCommand(string[] rest)
     {
         var filter = rest.Length > 0 ? rest[0] : null;
 
-        Console.WriteLine("─── Kiwoom Experience DB ───");
+        Console.WriteLine("--─ Kiwoom Experience DB --─");
 
         // Methods
         var methodsDir = Path.Combine(KiwoomExpDir, "methods");
@@ -726,7 +726,7 @@ Subcommands:
         return 0;
     }
 
-    // ── Pipe Client Helpers ──
+    // -- Pipe Client Helpers --
 
     /// <summary>Ensure proxy is running and pipe is available.</summary>
     static bool EnsureProxy()
@@ -757,7 +757,7 @@ Subcommands:
         {
             using var client = new NamedPipeClientStream(".", KiwoomPipeName, PipeDirection.InOut, PipeOptions.None);
             client.Connect(100); // 100ms timeout
-            // Quick disconnect — just checking if pipe exists
+            // Quick disconnect -- just checking if pipe exists
             return true;
         }
         catch
@@ -867,7 +867,7 @@ Subcommands:
         return result.ToString() ?? "?";
     }
 
-    // ── Experience DB Helpers ──
+    // -- Experience DB Helpers --
 
     static void ShowExpDbSummary()
     {
@@ -922,7 +922,7 @@ Subcommands:
         }
     }
 
-    // ── JSON-RPC Models (CLI-side, independent of KiwoomProxy project) ──
+    // -- JSON-RPC Models (CLI-side, independent of KiwoomProxy project) --
 
     static readonly JsonSerializerOptions _kiwoomJsonOpts = new()
     {
@@ -945,7 +945,7 @@ Subcommands:
         [JsonPropertyName("error")] public string? Error { get; set; }
     }
 
-    // ── Experience DB Models (CLI-side readers) ──
+    // -- Experience DB Models (CLI-side readers) --
 
     class KiwoomMethodExp
     {

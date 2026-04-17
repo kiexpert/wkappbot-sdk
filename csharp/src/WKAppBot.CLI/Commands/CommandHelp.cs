@@ -225,7 +225,7 @@ internal partial class Program
         return (passed, failed);
     }
 
-    // ── Help text per command (and command+subcommand) ──────────────────────────
+    // -- Help text per command (and command+subcommand) --------------------------
     // Keep entries short (~10 lines). Focus on: what it does, key options, gotchas,
     // examples. Avoid restating obvious things.
     //
@@ -497,9 +497,9 @@ internal partial class Program
             web fetch <url>  /  web search <query>  /  web read <url>
             web run <steps-file.txt> [--port N]
 
-            Removed (use a11y instead — CSS auto-routed to CDP):
+            Removed (use a11y instead -- CSS auto-routed to CDP):
               web click/type/text/screenshot/wait/check/select/restore/eval
-              → a11y <action> "*Chrome*#<css-selector>"
+              -> a11y <action> "*Chrome*#<css-selector>"
             """,
 
         ["windows"] = """
@@ -516,11 +516,11 @@ internal partial class Program
 
         ["clipboard"] = "clipboard [read|write] [text]\nRead or write system clipboard.\nNo args: read. With text: write.",
 
-        ["hack"] = "a11y hack <grap>[#scope] [--at x,y] [--ltrb l,t,r,b] [--engine gemini|gpt]\nForce DYN-A11Y analysis: capture → CCA segmentation → OCR → Vision → dynamic a11y tree.",
+        ["hack"] = "a11y hack <grap>[#scope] [--at x,y] [--ltrb l,t,r,b] [--engine gemini|gpt]\nForce DYN-A11Y analysis: capture -> CCA segmentation -> OCR -> Vision -> dynamic a11y tree.",
 
-        ["hack-hover"] = "a11y hack-hover [--parent-pid N] [--timeout Ns]\nMouse hover analysis worker. Tracks mouse → UIA element → grap pattern + verification.\n9s idle triggers full hack analysis. Eye auto-quiets polling. Ctrl+C to stop.",
+        ["hack-hover"] = "a11y hack-hover [--parent-pid N] [--timeout Ns]\nMouse hover analysis worker. Tracks mouse -> UIA element -> grap pattern + verification.\n9s idle triggers full hack analysis. Eye auto-quiets polling. Ctrl+C to stop.",
 
-        ["hack-input"] = "a11y hack-input [--parent-pid N] [--timeout Ns]\nKeyboard focus analysis worker. Tracks focused element → input capabilities + parent chain.\nShows: patterns (Value/Text/Invoke/Toggle), grap, process info. Ctrl+C to stop.",
+        ["hack-input"] = "a11y hack-input [--parent-pid N] [--timeout Ns]\nKeyboard focus analysis worker. Tracks focused element -> input capabilities + parent chain.\nShows: patterns (Value/Text/Invoke/Toggle), grap, process info. Ctrl+C to stop.",
 
         ["speak"] = "speak \"text\" [--bg] [--mouse] [--target <grap>] [--voice <name|culture>] [--size N]\nWindows TTS voice output + karaoke overlay.\n--bg: background (return immediately).\n--mouse: overlay at cursor position.\n--target <grap>: overlay on specified window.\n--voice <name|culture>: select an installed voice.\n--size N: font size px (default 32).",
 
@@ -584,7 +584,7 @@ internal partial class Program
               wkappbot chat --no-fallback  Disable auto-fallback to ask triad
 
             Fallback triggers:
-              1) `claude` binary not on PATH  → route to ask triad
+              1) `claude` binary not on PATH  -> route to ask triad
               2) stdout/stderr contains:      usage limit, rate limit, 5-hour limit,
                                               session exhausted, HTTP 429,
                                               Claude is temporarily unavailable
@@ -593,7 +593,7 @@ internal partial class Program
 
         ["a11y hack-hover"] = """
             a11y hack-hover [--parent-pid N]
-            Standalone hover analysis worker — mouse CCA + UIA + overlay.
+            Standalone hover analysis worker -- mouse CCA + UIA + overlay.
 
             Independent process: runs until Ctrl+C or parent exits.
             Logs to eye-hack.log (consolidated).
@@ -602,20 +602,20 @@ internal partial class Program
 
         ["skill"] = """
             skill <subcommand> [options]
-            AI skill management — executable knowhow for Claude instances.
+            AI skill management -- executable knowhow for Claude instances.
             Storage: {callerCwd}/skills/ (project, git-tracked)
                      {hq}/skills/       (installed, [HQ] tag in list)
 
             Subcommands:
               list [app]                        List skills grouped by app, most recent first
-              show <id>                         Full detail: steps, refs, version
+              read <id>                         Full detail: steps, refs, version
               search <keyword> [--app X]        Search title/desc/tags/steps
               contribute --app X --title Y --desc Z
                          [--steps "s1|s2"] [--tags "t1,t2"] [--id <slug>]
                          [--refs "file:line:pattern|..."]
                                                Create or update (auto version bump)
               delete <id>                       Remove from project dir
-              install [--app X] [--force]       Copy project → HQ (runs on publish)
+              install [--app X] [--force]       Copy project -> HQ (runs on publish)
               export [--app X] [--out f.zip]    Export to zip
               import <file.zip>                 Import into project dir
               verify <id>                       Check source_refs still match code
@@ -624,7 +624,7 @@ internal partial class Program
             Examples:
               wkappbot skill list
               wkappbot skill audit
-              wkappbot skill show handoff-checklist
+              wkappbot skill read handoff-checklist
               wkappbot skill search retry
               wkappbot skill contribute --app wkappbot-webbot --title "X" --desc "Y" \\
                 --refs "csharp/src/WKAppBot.WebBot/CdpClient.cs::pattern"
@@ -644,7 +644,7 @@ internal partial class Program
         ["claude-proxy"] = """
             claude-proxy [--port 7070] [--inject-context] [--verbose]
 
-            Local Anthropic API proxy — sits between Claude Code and the real API.
+            Local Anthropic API proxy -- sits between Claude Code and the real API.
             Configure: ANTHROPIC_BASE_URL=http://localhost:7070 (in .claude/settings.json or env).
 
             Features:

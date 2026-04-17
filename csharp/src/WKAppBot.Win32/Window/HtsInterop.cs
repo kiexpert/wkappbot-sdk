@@ -73,7 +73,7 @@ public static class HtsInterop
     }
 
     // ===================================================================
-    // Pattern 1: REPEAT — simple open/close (leak_test_repeat.ps1)
+    // Pattern 1: REPEAT -- simple open/close (leak_test_repeat.ps1)
     // ===================================================================
 
     /// <summary>
@@ -151,7 +151,7 @@ public static class HtsInterop
     }
 
     // ===================================================================
-    // Pattern 2: MEMORY — asymmetric open/close + memory table (leak_test_memory.ps1)
+    // Pattern 2: MEMORY -- asymmetric open/close + memory table (leak_test_memory.ps1)
     // ===================================================================
 
     /// <summary>
@@ -234,7 +234,7 @@ public static class HtsInterop
     }
 
     // ===================================================================
-    // Pattern 3: CTX-ONLY — anchor form + repeated open/close (leak_test_ctx_only.ps1)
+    // Pattern 3: CTX-ONLY -- anchor form + repeated open/close (leak_test_ctx_only.ps1)
     // ===================================================================
 
     /// <summary>

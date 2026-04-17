@@ -12,27 +12,27 @@ namespace WKAppBot.CLI;
 // partial class: inspect, focus, watch, capture commands + watch helpers
 internal partial class Program
 {
-    // ── find (unified search — absorbs windows --uia + inspect --filter) ──
+    // -- find (unified search -- absorbs windows --uia + inspect --filter) --
 
     static int FindCommand(string[] args)
     {
         if (args.Length == 0 || (args.Length == 1 && args[0].StartsWith("--")))
             return Error("Usage: wkappbot find <keyword> [--deep] [--limit N] [--process <name>]\n" +
                          "  Unified search: window titles + UIA accessibility elements.\n" +
-                         "  Path search: find \"윈도우/UIA요소\" — / separates hierarchy levels.\n" +
+                         "  Path search: find \"윈도우/UIA요소\" -- / separates hierarchy levels.\n" +
                          "    * = any chars within one level, ** = any number of levels.\n" +
                          "    Each segment is implicitly *segment* (contains match).\n" +
-                         "  Scoped search: find \"윈도우#UIA스코프\" — # narrows UIA search root.\n" +
+                         "  Scoped search: find \"윈도우#UIA스코프\" -- # narrows UIA search root.\n" +
                          "    Combine: find \"영웅문/*실현*#*잔고*\" + keyword after #\n" +
                          "  --deep: Deeper UIA tree search (depth 12, slower but thorough).\n" +
                          "  Examples:\n" +
                          "    find \"Claude\"                       Search everywhere for 'Claude'\n" +
-                         "    find \"투혼/현재가\"                  투혼 windows → ... → 현재가 element\n" +
-                         "    find \"투혼/**/현재가\"               투혼 → any depth → 현재가\n" +
-                         "    find \"*영웅문*#*잔고확인*\"          영웅문 → UIA scope 잔고확인 → list elements\n" +
-                         "    find \"*영웅문*/*실현*#*잔고*\" 예수금  영웅문/실현* child → #잔고 scope → 예수금 검색");
+                         "    find \"투혼/현재가\"                  투혼 windows -> ... -> 현재가 element\n" +
+                         "    find \"투혼/**/현재가\"               투혼 -> any depth -> 현재가\n" +
+                         "    find \"*영웅문*#*잔고확인*\"          영웅문 -> UIA scope 잔고확인 -> list elements\n" +
+                         "    find \"*영웅문*/*실현*#*잔고*\" 예수금  영웅문/실현* child -> #잔고 scope -> 예수금 검색");
 
-        // Check for scope separators — '#' = UIA scope, '/' with 2+ segments = Win32 child hierarchy
+        // Check for scope separators -- '#' = UIA scope, '/' with 2+ segments = Win32 child hierarchy
         string firstArg = args.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
         var (w32segs, uiaP) = GrapHelper.SplitGrap(firstArg);
         if (uiaP != null || w32segs.Length >= 2)
@@ -42,7 +42,7 @@ internal partial class Program
         var forwarded = new List<string>(args);
         bool hasDeep = forwarded.Remove("--deep");
 
-        // Path search: "**" present → auto deep (hierarchy needs thorough search)
+        // Path search: "**" present -> auto deep (hierarchy needs thorough search)
         string keyword = forwarded.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
         if (keyword.Contains("**"))
             hasDeep = true;
@@ -52,7 +52,7 @@ internal partial class Program
     }
 
     /// <summary>
-    /// Scoped find: "window#uiaScope" [keyword] — narrow UIA root, then search within.
+    /// Scoped find: "window#uiaScope" [keyword] -- narrow UIA root, then search within.
     /// Without keyword: lists all elements under scope (like inspect).
     /// With keyword: searches for matching elements within scope.
     /// </summary>
@@ -152,7 +152,7 @@ internal partial class Program
         }
 
         string mode = searchKeyword != null ? $"find \"{searchKeyword}\"" : "list all";
-        Console.WriteLine($"── {mode} under #{scopeName} ({matches.Count} results) ──");
+        Console.WriteLine($"-- {mode} under #{scopeName} ({matches.Count} results) --");
         foreach (var m in matches)
         {
             var tag = GrapHelper.FormatNodeLabel(m.ControlType, m.AutomationId, m.Name);
@@ -172,7 +172,7 @@ internal partial class Program
         return 0;
     }
 
-    // ── inspect ────────────────────────────────────────────────
+    // -- inspect ------------------------------------------------
 
     static int InspectCommand(string[] args)
     {
@@ -263,9 +263,9 @@ internal partial class Program
             }
             Console.Error.WriteLine($"[PROCESS] pid={procPid} {proc.ProcessName}  Priv={privMB:F1}MB  WS={wsMB:F1}MB  handles={handles}  threads={threads}  GDI={gdi}  USER={user}");
         }
-        catch { /* best effort — skip if access denied */ }
+        catch { /* best effort -- skip if access denied */ }
 
-        // 노하우 방송: 프로파일 매칭 → 해당 폼 폴더의 knowhow.md
+        // 노하우 방송: 프로파일 매칭 -> 해당 폼 폴더의 knowhow.md
         BroadcastInspectKnowhow(mainWin.Handle, mainWin.ClassName, matchedFormId, matchedFormTitle);
 
         // Blocker detection (bug report: inspect should show blocker info)
@@ -282,9 +282,9 @@ internal partial class Program
 
         if (pathsMode)
         {
-            // --paths: flat list of absolute UIA paths — each line is a grap-ready #Node1/Node2/Button4
+            // --paths: flat list of absolute UIA paths -- each line is a grap-ready #Node1/Node2/Button4
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"── UIA Paths (depth={depth}) ──");
+            Console.WriteLine($"-- UIA Paths (depth={depth}) --");
             Console.ResetColor();
             using var uia = new UiaLocator();
             AutomationElement pathRoot;
@@ -304,7 +304,7 @@ internal partial class Program
         else if (win32Mode)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"── Win32 Window Tree (depth={depth}) ──");
+            Console.WriteLine($"-- Win32 Window Tree (depth={depth}) --");
             Console.ResetColor();
             var win32Tree = WindowFinder.DumpWin32Tree(inspectHandle, depth);
             Console.Write(win32Tree);
@@ -312,7 +312,7 @@ internal partial class Program
         else if (filter != null)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"── UIA Tree Filtered: \"{filter}\" (subtree depth={depth}) ──");
+            Console.WriteLine($"-- UIA Tree Filtered: \"{filter}\" (subtree depth={depth}) --");
             Console.ResetColor();
             using var uia = new UiaLocator();
             if (!string.IsNullOrEmpty(uiaScopePath))
@@ -374,7 +374,7 @@ internal partial class Program
     /// Triggers OCR+Gemini fallback automatically when tree is sparse.
     /// Skipped when --no-vision flag is set or output is redirected.
     /// </summary>
-    // In-process cache: hwnd → Gemini segments (survives across commands in the same session)
+    // In-process cache: hwnd -> Gemini segments (survives across commands in the same session)
     private static readonly Dictionary<IntPtr, List<WKAppBot.Vision.OcrSegment>> _dynA11yCache = new();
 
     /// <summary>Print cached DYN-A11Y segments for a window (from a previous scan in this session).</summary>
@@ -461,15 +461,15 @@ internal partial class Program
         }
 
         // Fire if hollow OR sparse:
-        // - Hollow: tree has elements (≥3) but no meaningful text labels — Flutter [Group] blobs, custom renderers
-        // - Sparse: truly tiny tree — almost nothing loaded yet
+        // - Hollow: tree has elements (≥3) but no meaningful text labels -- Flutter [Group] blobs, custom renderers
+        // - Sparse: truly tiny tree -- almost nothing loaded yet
         bool isHollow = totalElements >= 3 && leafTextCount < 2;
         bool isSparse = totalElements < 5 && maxDepth < 5 && leafTextCount < 2;
         bool isPoor = isHollow || isSparse;
         if (!isPoor) return;
 
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"\n[DYN-A11Y] Sparse UIA tree (elements={totalElements}, depth={maxDepth}, text={leafTextCount}) — auto-triggering OCR+Gemini...");
+        Console.WriteLine($"\n[DYN-A11Y] Sparse UIA tree (elements={totalElements}, depth={maxDepth}, text={leafTextCount}) -- auto-triggering OCR+Gemini...");
         Console.ResetColor();
 
         try
@@ -525,9 +525,9 @@ internal partial class Program
             var hotSegs  = segments.Where(IsFocusHit).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
             var restSegs = segments.Where(s => !IsFocusHit(s)).OrderBy(s => s.RelY).ThenBy(s => s.RelX).ToList();
 
-            // Print as virtual a11y tree — hot nodes first
+            // Print as virtual a11y tree -- hot nodes first
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"── [DYN-A11Y] Gemini Vision Tree ({segments.Count} elements) ──");
+            Console.WriteLine($"-- [DYN-A11Y] Gemini Vision Tree ({segments.Count} elements) --");
             Console.ResetColor();
 
             if (hotSegs.Count > 0)
@@ -565,9 +565,9 @@ internal partial class Program
 
     /// <summary>
     /// Find a child window (MDI children + direct children) matching a grap pattern.
-    /// ★ Search key: "[ClassName] Title (cid=N hwnd=XX WxH)" — class name 절대 우선.
+    /// ★ Search key: "[ClassName] Title (cid=N hwnd=XX WxH)" -- class name 절대 우선.
     ///   Empty-title children도 클래스명/cid로 매칭 가능.
-    ///   Examples: "#32770" → class match, "cid=4015" → control ID match, "*현재가*" → title match.
+    ///   Examples: "#32770" -> class match, "cid=4015" -> control ID match, "*현재가*" -> title match.
     /// </summary>
     static (IntPtr handle, string? formId, string title)? FindChildWindowByPattern(IntPtr hParent, string pattern)
     {
@@ -678,10 +678,10 @@ internal partial class Program
 
     /// <summary>
     /// Broadcast knowhow for the inspect target.
-    /// matchedFormId != null → 해당 폼 폴더의 knowhow.md만 방송
-    /// matchedFormId == null → 프로필 레벨 knowhow.md만 방송 (form 노하우는 생략)
-    /// 엑빌경로(A11Y) = profiles/{name}_exp/ — 플랫폼 무관, 프로필 기반
-    /// 운영경로(OS)  = experience/{process}/{class}/ — OS 종속 (Win32 class)
+    /// matchedFormId != null -> 해당 폼 폴더의 knowhow.md만 방송
+    /// matchedFormId == null -> 프로필 레벨 knowhow.md만 방송 (form 노하우는 생략)
+    /// 엑빌경로(A11Y) = profiles/{name}_exp/ -- 플랫폼 무관, 프로필 기반
+    /// 운영경로(OS)  = experience/{process}/{class}/ -- OS 종속 (Win32 class)
     /// </summary>
     static void BroadcastInspectKnowhow(IntPtr mainHandle, string mainClassName, string? matchedFormId, string? matchedFormTitle = null)
     {
@@ -691,7 +691,7 @@ internal partial class Program
             var procName = "";
             try { procName = System.Diagnostics.Process.GetProcessById((int)inspPid).ProcessName; } catch { }
 
-            // ── 경로 해석 ──
+            // -- 경로 해석 --
             var profileStore = new ProfileStore();
             var profileMatch = profileStore.FindByMatch(mainClassName, procName);
 
@@ -757,7 +757,7 @@ internal partial class Program
 
             if (a11yDir == null && osDir == null) return;
 
-            // ── A11Y 노하우 방송 ──
+            // -- A11Y 노하우 방송 --
             if (a11yDir != null)
             {
                 // Profile-level knowhow
@@ -780,7 +780,7 @@ internal partial class Program
                             if (File.Exists(kh)) ShowKnowhowBroadcast(kh, "KNOWHOW:A11Y");
                         }
 
-                        // Form-level action knowhow files (knowhow-*.md) — filename only
+                        // Form-level action knowhow files (knowhow-*.md) -- filename only
                         foreach (var khExtra in Directory.GetFiles(formDir, "knowhow-*.md").Take(5))
                         {
                             Console.ForegroundColor = ConsoleColor.Magenta;
@@ -798,13 +798,13 @@ internal partial class Program
                 }
                 else
                 {
-                    // matchedFormId == null → 프로필 레벨 knowhow.md는 이미 위에서 방송됨
-                    // form_* 폴더 무차별 방송은 노이즈 유발 → 생략
+                    // matchedFormId == null -> 프로필 레벨 knowhow.md는 이미 위에서 방송됨
+                    // form_* 폴더 무차별 방송은 노이즈 유발 -> 생략
                     // (특정 폼 작업 시 inspect/cond-add 등에서 formId 명시하면 해당 폼만 방송)
                 }
             }
 
-            // ── OS 노하우 방송 ──
+            // -- OS 노하우 방송 --
             if (osDir != null)
             {
                 var osKh = Path.Combine(osDir, "knowhow.md");
@@ -829,14 +829,14 @@ internal partial class Program
             var khPath = Path.Combine(formDir, "knowhow.md");
             if (File.Exists(khPath)) return; // already exists
 
-            // formTitle: MDI child 타이틀에서 추출 (예: "[0600] 키움종합차트" → "키움종합차트")
+            // formTitle: MDI child 타이틀에서 추출 (예: "[0600] 키움종합차트" -> "키움종합차트")
             var formJson = Path.Combine(expDir, $"form_{formId}.json");
             string formTitle = "";
             if (!string.IsNullOrEmpty(mdiTitle))
             {
-                // "[0600] 키움종합차트" → "키움종합차트", "[0150] 조건검색" → "조건검색"
+                // "[0600] 키움종합차트" -> "키움종합차트", "[0150] 조건검색" -> "조건검색"
                 formTitle = System.Text.RegularExpressions.Regex.Replace(mdiTitle, @"^\[\d+\]\s*", "").Trim();
-                // 뒤에 부가정보 제거: "키움현재가 (통합)" → 그대로 유지 (정보성)
+                // 뒤에 부가정보 제거: "키움현재가 (통합)" -> 그대로 유지 (정보성)
             }
             var uiaAccessible = new List<string>();
             var ownerDrawn = new List<string>();
@@ -889,7 +889,7 @@ internal partial class Program
                 catch { /* parse error, still generate minimal template */ }
             }
 
-            // 템플릿 생성 — 첫 문단은 ShowKnowhowBroadcast에서 방송됨!
+            // 템플릿 생성 -- 첫 문단은 ShowKnowhowBroadcast에서 방송됨!
             var sb = new System.Text.StringBuilder();
             var headerTitle = !string.IsNullOrEmpty(formTitle) ? $"{formTitle} [{formId}]" : $"[{formId}]";
             sb.AppendLine($"## {headerTitle} 자동화 노하우");
@@ -900,7 +900,7 @@ internal partial class Program
             {
                 if (uiaAccessible.Count > 0)
                 {
-                    sb.AppendLine($"### UIA 접근 가능 (Focusless) — {uiaAccessible.Count}개");
+                    sb.AppendLine($"### UIA 접근 가능 (Focusless) -- {uiaAccessible.Count}개");
                     foreach (var item in uiaAccessible.Take(15))
                         sb.AppendLine(item);
                     if (uiaAccessible.Count > 15)
@@ -910,7 +910,7 @@ internal partial class Program
 
                 if (ownerDrawn.Count > 0)
                 {
-                    sb.AppendLine($"### UIA 접근 불가 (Owner-drawn) — {ownerDrawn.Count}개");
+                    sb.AppendLine($"### UIA 접근 불가 (Owner-drawn) -- {ownerDrawn.Count}개");
                     foreach (var item in ownerDrawn.Take(10))
                         sb.AppendLine(item);
                     if (ownerDrawn.Count > 10)
@@ -927,6 +927,6 @@ internal partial class Program
         catch { /* best-effort */ }
     }
 
-    // ── focus ─────────────────────────────────────────────────
+    // -- focus ------------------------------------------------─
 
 }

@@ -62,8 +62,8 @@ internal partial class Program
         {
             try
             {
-                // ──?Phase 1: Navigate (iconified OK ??CDP works without rendering) ──?
-                // ── P1: Navigate ──
+                // --?Phase 1: Navigate (iconified OK ??CDP works without rendering) --?
+                // -- P1: Navigate --
                 PulseStep.Mark("phase1-navigate");
                 var currentUrl = await cdp.GetUrlAsync() ?? "";
                 Console.Error.WriteLine($"[ASK] Tab URL: {currentUrl}");
@@ -91,7 +91,7 @@ internal partial class Program
                     await Task.Delay(500);
                 }
 
-                // ── P2: Find editor via AskSession (uses AiProvider.Gemini selectors) ──
+                // -- P2: Find editor via AskSession (uses AiProvider.Gemini selectors) --
                 PulseStep.Mark("find-editor");
                 var editorSel = await askSession.FindEditorAsync(15);
                 if (editorSel == null)
@@ -115,7 +115,7 @@ internal partial class Program
                 capturedEditorSel = editorSel;
                 askSession.BindStreamingContext(editorSel);
 
-                // ── Persona injection on fresh Gemini conversation ──
+                // -- Persona injection on fresh Gemini conversation --
                 // If persona continuation already contains a tool call, skip question send entirely
                 string? personaEarlyToolCall = null;
                 var geminiTurnCount = (await cdp.GetResponseCountAsync()).ToString();
@@ -126,7 +126,7 @@ internal partial class Program
                     Console.WriteLine("[ASK] Loop marker found; MCP guidance will be included for fresh session persona.");
                 if (geminiTurnCount == "0" || (effectiveLoopPersona && !hasLoopPersonaState))
                 {
-                    // ── Browser exclusive: persona input → send complete ──
+                    // -- Browser exclusive: persona input -> send complete --
                     using var personaLock = ChromeTabLock.Acquire("Gemini/persona");
                     if (personaLock == null) return (false, (string?)null);
 
@@ -251,7 +251,7 @@ internal partial class Program
                         Console.WriteLine("[ASK] Non-loop ask: ignoring stale APSP tool call from previous session, proceeding with question");
                     }
                 }
-                // ── Browser exclusive: question input → send complete ──
+                // -- Browser exclusive: question input -> send complete --
                 // Prepend host handshake proof for loop sessions so Gemini trusts the host is live
                 if (effectiveLoopPersona)
                     question = BuildHostHandshake() + question;
@@ -269,13 +269,13 @@ internal partial class Program
                     prevFgGemini = prevFgNow;
                 }
 
-                // ── CDP InputReadiness: blocker check + minimize restore + zoom + focus guard ──
+                // -- CDP InputReadiness: blocker check + minimize restore + zoom + focus guard --
                 var (cdpReady, prevFg, zoom) = await EnsureCdpReadyAsync(cdp, "input-cdp", editorSel, "Gemini", prevFgHint: prevFgGemini);
 
-                // ── Focus watchdog: monitors throughout entire send+wait phase ──
+                // -- Focus watchdog: monitors throughout entire send+wait phase --
                 using var focusWatchdog = StartFocusWatchdog(prevFg, cdp, "gemini-send");
 
-                // ── File attachments (before text) ──
+                // -- File attachments (before text) --
                 // Pass prevFgGemini so native file dialog tier can restore original user focus after close
                 if (attachFiles?.Count > 0)
                 {
@@ -311,7 +311,7 @@ internal partial class Program
                     }
 
                 }
-                // ── Focus theft detection: restore if Chrome stole focus ──
+                // -- Focus theft detection: restore if Chrome stole focus --
                 GuardCdpFocusTheft(cdp, prevFg, "input-cdp");
 
                 // Send: a11y-first (CDP real click on button) ??focusless Enter fallback
@@ -456,7 +456,7 @@ internal partial class Program
                 int baseResponseCount = int.TryParse(preResponseCount, out var brc) ? brc : 0;
                 Console.Error.WriteLine($"[POLL-WAIT] start (base={baseResponseCount}, timeout={timeoutSec}s)...");
 
-                // ── P5 A/B: run new PollStreamingResponseAsync alongside legacy poll ──
+                // -- P5 A/B: run new PollStreamingResponseAsync alongside legacy poll --
                 var abPollTask = Task.Run(async () =>
                 {
                     try { return await cdp.PollStreamingResponseAsync("gemini", baseResponseCount, timeoutSec); }
@@ -557,14 +557,14 @@ internal partial class Program
                     lastTextLen = text.Length;
 
                     // Check if response is still generating
-                    // Early-exit: flush idle 1s and enough text — don't wait for full stability
+                    // Early-exit: flush idle 1s and enough text -- don't wait for full stability
                     // BUT guard with stop button check: if still visible, Gemini is still generating
                     if (lastFlushedLen > 50 && (DateTime.UtcNow - lastFlushTime).TotalSeconds >= 1.0)
                     {
                         var stopDetail = await cdp.GetStopButtonDetailAsync();
                         if (stopDetail != "NONE")
                         {
-                            // Still generating — reset flush timer so we don't spin-check every poll
+                            // Still generating -- reset flush timer so we don't spin-check every poll
                             lastFlushTime = DateTime.UtcNow;
                         }
                         else
@@ -636,7 +636,7 @@ internal partial class Program
                 // Done ??hand off tab to peer if still waiting
                 await HandoffTabToPeer("gemini");
 
-                // ── P5 A/B comparison: log difference between legacy and new poll ──
+                // -- P5 A/B comparison: log difference between legacy and new poll --
                 if (abPollTask.IsCompleted)
                 {
                     var (abOk, abText) = await abPollTask;

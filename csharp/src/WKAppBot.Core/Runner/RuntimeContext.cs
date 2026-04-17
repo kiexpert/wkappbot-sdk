@@ -13,14 +13,14 @@ public sealed class RuntimeContext
     public DateTime StartTime { get; set; }
     public DateTime EndTime { get; set; }
 
-    // ── Smart Focus config ("위치확보") ──────────────────────
+    // -- Smart Focus config ("위치확보") ----------------------
     public bool FocusCheck { get; set; } = true;
     public double FocusTimeout { get; set; } = 5.0;
     public double FocusRetryDelay { get; set; } = 0.3;
     public double FocusAlertDelay { get; set; } = 3.0;
     public bool PreferFocusless { get; set; } = true;
 
-    // ── Vision config ("경험치 축적") ────────────────────────
+    // -- Vision config ("경험치 축적") ------------------------
     public bool VisionEnabled { get; set; } = false;
     public string VisionCacheDir { get; set; } = "data/vision_cache/entries";
     public int VisionCacheTtlDays { get; set; } = 7;
@@ -34,7 +34,7 @@ public sealed class RuntimeContext
     /// </summary>
     public object? ConsoleLock { get; set; }
 
-    // ── Background watcher coordination ─────────────────────
+    // -- Background watcher coordination --------------------─
     // ActionExecutor writes the latest action point here.
     // BackgroundWatcher reads it to track test position instead of mouse cursor.
     // Thread-safe via volatile + Interlocked.

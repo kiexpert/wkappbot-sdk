@@ -1,14 +1,14 @@
-// AgentFileTracker.cs — persistent cross-process file modification tracker
+// AgentFileTracker.cs -- persistent cross-process file modification tracker
 //
 // Each wkappbot invocation is a separate process, so state is persisted to disk:
-//   agent-session.json   — list of tracked files + checkpoint index (in workspace root)
-//   agent-checkpoints/   — orig/ and cp{n}/ directories (in workspace root)
+//   agent-session.json   -- list of tracked files + checkpoint index (in workspace root)
+//   agent-checkpoints/   -- orig/ and cp{n}/ directories (in workspace root)
 //
 // Flow (across any number of processes):
-//   AgentFileTracker.Track(path)          ← before file-write: copy orig, append to session
-//   AgentFileTracker.Checkpoint("label")  ← snapshot current state of tracked files
-//   AgentFileTracker.DumpPatch()          ← git diff HEAD for cumulative diff
-//   AgentFileTracker.SessionClear()       ← delete session.json + checkpoints dir
+//   AgentFileTracker.Track(path)          <- before file-write: copy orig, append to session
+//   AgentFileTracker.Checkpoint("label")  <- snapshot current state of tracked files
+//   AgentFileTracker.DumpPatch()          <- git diff HEAD for cumulative diff
+//   AgentFileTracker.SessionClear()       <- delete session.json + checkpoints dir
 //
 // Patch file:
 //   - git diff HEAD (all tracked files, cumulative across processes)
@@ -20,7 +20,7 @@ using System.Text.Json.Serialization;
 
 static class AgentFileTracker
 {
-    // ── Session data model ────────────────────────────────────────────────────
+    // -- Session data model ----------------------------------------------------
 
     class SessionData
     {
@@ -38,7 +38,7 @@ static class AgentFileTracker
         [JsonPropertyName("dir")]   public string Dir   { get; set; } = "";
     }
 
-    // ── Workspace / session paths ─────────────────────────────────────────────
+    // -- Workspace / session paths --------------------------------------------─
 
     static readonly string? _workspace = ResolveGitRoot();
     static readonly string? _sessionFile  = _workspace is null ? null : Path.Combine(_workspace, "agent-session.json");
@@ -64,7 +64,7 @@ static class AgentFileTracker
         return null;
     }
 
-    // ── Session I/O ───────────────────────────────────────────────────────────
+    // -- Session I/O ----------------------------------------------------------─
 
     static SessionData LoadSession()
     {
@@ -92,7 +92,7 @@ static class AgentFileTracker
         catch { }
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
+    // -- Public API ------------------------------------------------------------
 
     /// <summary>
     /// Register a file before first modification.
@@ -136,7 +136,7 @@ static class AgentFileTracker
     {
         if (_cpDir is null)
         {
-            Console.WriteLine("[TRACKER] No git workspace found — checkpoint skipped.");
+            Console.WriteLine("[TRACKER] No git workspace found -- checkpoint skipped.");
             return 0;
         }
 
@@ -166,7 +166,7 @@ static class AgentFileTracker
         session.Checkpoints.Add(entry);
         SaveSession(session);
 
-        Console.WriteLine($"[TRACKER] checkpoint {id} \"{label}\" — {session.TrackedFiles.Count} files");
+        Console.WriteLine($"[TRACKER] checkpoint {id} \"{label}\" -- {session.TrackedFiles.Count} files");
         return id;
     }
 
@@ -188,21 +188,21 @@ static class AgentFileTracker
         outPath ??= Path.Combine(workspace, $"agent-patch-{DateTime.Now:yyyyMMdd_HHmmss}.patch");
 
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine($"# WKAppBot Agent Session Patch — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        sb.AppendLine($"# WKAppBot Agent Session Patch -- {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine($"# Workspace  : {workspace}");
         sb.AppendLine($"# Session    : started {session.StartTime}");
         sb.AppendLine($"# Tracked    : {session.TrackedFiles.Count} file(s)   Checkpoints: {session.Checkpoints.Count}");
         sb.AppendLine("#");
 
         // Apply hint
-        sb.AppendLine("# ── 적용 (변경사항 반영) ──────────────────────────────");
+        sb.AppendLine("# -- 적용 (변경사항 반영) ------------------------------");
         sb.AppendLine($"#   git apply {Path.GetFileName(outPath)}");
         sb.AppendLine("#");
 
         // Checkpoint restore hints
         if (session.Checkpoints.Count > 0)
         {
-            sb.AppendLine("# ── 체크포인트 복구 (시간 기준 중간 상태) ───────────");
+            sb.AppendLine("# -- 체크포인트 복구 (시간 기준 중간 상태) ----------─");
             foreach (var cp in session.Checkpoints)
             {
                 sb.AppendLine($"#   cp{cp.Id}: \"{cp.Label}\" ({cp.Time})");
@@ -221,7 +221,7 @@ static class AgentFileTracker
         var existed  = session.TrackedFiles.Where(p => { var o = TempPathFor(origDir, p); return File.Exists(o) && new FileInfo(o).Length > 0; }).ToList();
         var newFiles = session.TrackedFiles.Except(existed, StringComparer.OrdinalIgnoreCase).ToList();
 
-        sb.AppendLine("# ── 원본 복구 (세션 시작 전 상태) ──────────────────");
+        sb.AppendLine("# -- 원본 복구 (세션 시작 전 상태) ------------------");
         if (existed.Count > 0)
         {
             var rels = existed.Select(p => Path.GetRelativePath(workspace, p).Replace('\\', '/'));
@@ -236,16 +236,16 @@ static class AgentFileTracker
         }
         if (newFiles.Count > 0)
         {
-            sb.AppendLine("# ── 새 파일 삭제 ──────────────────────────────────");
+            sb.AppendLine("# -- 새 파일 삭제 ----------------------------------");
             foreach (var path in newFiles)
                 sb.AppendLine($"#     del \"{path}\"");
             sb.AppendLine("#");
         }
-        sb.AppendLine("# ═══════════════════════════════════════════════════════");
+        sb.AppendLine("# =======================================================");
         sb.AppendLine();
 
         // Main diff: git diff HEAD (cumulative across all processes)
-        sb.AppendLine("# ── diff: HEAD → current (세션 전체 누적 변경) ──────");
+        sb.AppendLine("# -- diff: HEAD -> current (세션 전체 누적 변경) ------");
         var trackedRels = session.TrackedFiles
             .Where(p => existed.Contains(p, StringComparer.OrdinalIgnoreCase))
             .Select(p => Path.GetRelativePath(workspace, p).Replace('\\', '/'))
@@ -269,7 +269,7 @@ static class AgentFileTracker
                 if (!string.IsNullOrWhiteSpace(diff))
                     sb.Append(diff);
                 else
-                    sb.AppendLine("# (no diff vs HEAD — files unchanged or not committed)");
+                    sb.AppendLine("# (no diff vs HEAD -- files unchanged or not committed)");
             }
             catch (Exception ex)
             {
@@ -333,7 +333,7 @@ static class AgentFileTracker
         Console.WriteLine("[TRACKER] Session cleared.");
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // -- Helpers --------------------------------------------------------------─
 
     static string FileKey(string path)
     {
@@ -356,11 +356,11 @@ static class AgentFileTracker
         var cpFile  = Path.Combine(workspace, $"agent-patch-cp{cp.Id}-{cp.Time.Replace(":", "")[..4]}{cpLabel}.patch");
 
         var cpSb = new System.Text.StringBuilder();
-        cpSb.AppendLine($"# WKAppBot Checkpoint {cp.Id} — {DateTime.Now:yyyy-MM-dd} {cp.Time}  \"{cp.Label}\"");
+        cpSb.AppendLine($"# WKAppBot Checkpoint {cp.Id} -- {DateTime.Now:yyyy-MM-dd} {cp.Time}  \"{cp.Label}\"");
         cpSb.AppendLine($"# Workspace: {workspace}");
         cpSb.AppendLine($"# Files: {session.TrackedFiles.Count}");
         cpSb.AppendLine("#");
-        cpSb.AppendLine("# ── 이 체크포인트로 복구 ──────────────────────────────");
+        cpSb.AppendLine("# -- 이 체크포인트로 복구 ------------------------------");
         foreach (var path in session.TrackedFiles)
         {
             var tmp = TempPathFor(cp.Dir, path);
@@ -368,7 +368,7 @@ static class AgentFileTracker
                 cpSb.AppendLine($"#   copy \"{tmp}\" \"{path}\"");
         }
         cpSb.AppendLine("#");
-        cpSb.AppendLine("# ── diff: original → this checkpoint ────────────────");
+        cpSb.AppendLine("# -- diff: original -> this checkpoint ----------------");
 
         foreach (var path in session.TrackedFiles)
         {

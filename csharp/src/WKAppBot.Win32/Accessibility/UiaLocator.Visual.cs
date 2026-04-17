@@ -32,8 +32,8 @@ public sealed partial class UiaLocator
     }
 
     /// <summary>
-    /// Render descendants as visual markdown — text only (no node types).
-    /// Groups elements by Y coordinate into rows; multi-column rows → MD table.
+    /// Render descendants as visual markdown -- text only (no node types).
+    /// Groups elements by Y coordinate into rows; multi-column rows -> MD table.
     /// </summary>
     public string RenderVisualMarkdown(IntPtr hWnd, int maxDepth = 10)
         => RenderVisualMarkdown(_automation.FromHandle(hWnd), maxDepth);
@@ -45,7 +45,7 @@ public sealed partial class UiaLocator
         CollectTextLeaves(element, leaves, 0, maxDepth);
         if (leaves.Count == 0) return "_(no text)_";
 
-        // Shorten file paths: "D:\foo\bar\baz\file.txt" → "D:\...\file.txt"
+        // Shorten file paths: "D:\foo\bar\baz\file.txt" -> "D:\...\file.txt"
         for (int i = 0; i < leaves.Count; i++)
         {
             var t = leaves[i].text;
@@ -108,7 +108,7 @@ public sealed partial class UiaLocator
             {
                 if (row.Count == 1)
                 {
-                    // Single col → close code block if open, emit as text with indent
+                    // Single col -> close code block if open, emit as text with indent
                     if (inCodeBlock) { sb.AppendLine("```"); inCodeBlock = false; }
                     int indent = (row[0].x - minX) / indentUnit;
                     var prefix = indent > 0 ? new string(' ', indent) + "- " : "";
@@ -116,7 +116,7 @@ public sealed partial class UiaLocator
                 }
                 else
                 {
-                    // Multi col → open code block if needed
+                    // Multi col -> open code block if needed
                     if (!inCodeBlock) { sb.AppendLine("```"); inCodeBlock = true; }
                     var parts = new List<string>();
                     for (int i = 0; i < tableCols; i++)
@@ -221,9 +221,9 @@ public sealed partial class UiaLocator
                                     }
                                     catch { leaves.Add((lineText, rect.X, rect.Y + li * 16, rect.Width, 16, depth)); }
                                 }
-                                // Remaining lines (no child rect) → append with estimated Y
+                                // Remaining lines (no child rect) -> append with estimated Y
                                 if (lines.Length != children.Length)
-                                    Console.Error.WriteLine($"[VISUAL-MD] Line/child mismatch: {lines.Length} lines vs {children.Length} children — partial match {matchCount}");
+                                    Console.Error.WriteLine($"[VISUAL-MD] Line/child mismatch: {lines.Length} lines vs {children.Length} children -- partial match {matchCount}");
                                 for (int li = matchCount; li < lines.Length; li++)
                                     leaves.Add((lines[li].Trim(), rect.X, rect.Y + li * 16, rect.Width, 16, depth));
                                 matched = true;
@@ -247,7 +247,7 @@ public sealed partial class UiaLocator
     }
 
     /// <summary>
-    /// Get the UIA focus chain: focused element → parent → ... → root.
+    /// Get the UIA focus chain: focused element -> parent -> ... -> root.
     /// Returns lines like: "⌨ [Button] "OK" aid="1" (100,200 80x26)"
     /// Each line is indented by depth. First line = deepest focused element.
     /// Returns empty string if no focused element or focus is outside the given window.
@@ -260,7 +260,7 @@ public sealed partial class UiaLocator
             if (focused == null) return "";
 
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine("── hot focus (UIA) ──");
+            sb.AppendLine("-- hot focus (UIA) --");
 
             void AppendElementLine(AutomationElement el, string prefix)
             {
@@ -288,7 +288,7 @@ public sealed partial class UiaLocator
             {
                 try { cur = walker.GetParent(cur); } catch { break; }
                 if (cur == null) break;
-                AppendElementLine(cur, $"{new string(' ', level * 2 + 2)}└ ");
+                AppendElementLine(cur, $"{new string(' ', level * 2 + 2)}+ ");
                 try
                 {
                     if (cur.ControlType == FlaUI.Core.Definitions.ControlType.Window)
@@ -334,7 +334,7 @@ public sealed partial class UiaLocator
             try { if (focused.Patterns.Toggle.IsSupported) patterns.Add("Toggle"); } catch { }
             try { if (focused.Patterns.Text.IsSupported) patterns.Add("Text"); } catch { }
 
-            // Parent chain → root
+            // Parent chain -> root
             var chain = new List<(string type, string name, string aid)>();
             string? winTitle = null;
             int pid = 0;
@@ -349,7 +349,7 @@ public sealed partial class UiaLocator
                 try { pName = cur.Name ?? ""; } catch { pName = ""; }
                 try { pCt = cur.ControlType.ToString(); } catch { pCt = "?"; }
                 try { pAid = cur.AutomationId ?? ""; } catch { pAid = ""; }
-                if (pName.Length > 40) pName = pName[..40] + "…";
+                if (pName.Length > 40) pName = pName[..40] + "...";
                 chain.Add((pCt, pName, pAid));
                 // Capture window title and pid from first Window-type parent
                 if (winTitle == null && pCt == "Window" && !string.IsNullOrEmpty(pName))

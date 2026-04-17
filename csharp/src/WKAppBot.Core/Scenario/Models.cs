@@ -29,7 +29,7 @@ public sealed class ScenarioConfig
     public int RetryCount { get; set; } = 2;
     public double RetryDelay { get; set; } = 1.0;
 
-    // ── Smart Focus ("위치확보") ─────────────────────────────
+    // -- Smart Focus ("위치확보") ----------------------------─
     /// <summary>
     /// Enable focus check before SendInput actions. Default: true.
     /// When true, EnsureFocus is called before mouse/keyboard SendInput.
@@ -56,14 +56,14 @@ public sealed class ScenarioConfig
 
     /// <summary>
     /// Prefer focusless input methods (UIA Invoke/Value) over SendInput.
-    /// Default: true — minimizes disruption to user's work.
+    /// Default: true -- minimizes disruption to user's work.
     /// </summary>
     public bool PreferFocusless { get; set; } = true;
 
-    // ── Vision Cache ("경험치 축적") ────────────────────────
+    // -- Vision Cache ("경험치 축적") ------------------------
     /// <summary>
     /// Enable Vision API fallback when UIA can't find elements.
-    /// Default: false (opt-in — API costs money).
+    /// Default: false (opt-in -- API costs money).
     /// </summary>
     public bool VisionEnabled { get; set; } = false;
 
@@ -91,7 +91,7 @@ public sealed class ScenarioConfig
     /// <summary>
     /// OCR preview mode: run OCR on every step even when UIA succeeds.
     /// Logs OCR results for performance testing / data collection.
-    /// Does NOT affect actual element location — just logs what OCR would find.
+    /// Does NOT affect actual element location -- just logs what OCR would find.
     /// Default: false. Set true for OCR training/benchmarking.
     /// </summary>
     public bool OcrPreview { get; set; } = false;
@@ -130,7 +130,7 @@ public sealed class StepDefinition
 }
 
 /// <summary>
-/// Expected UI state after action — polled with focusless UIA queries only.
+/// Expected UI state after action -- polled with focusless UIA queries only.
 /// No SendInput, no focus steal during polling.
 /// </summary>
 public sealed class ExpectDefinition
@@ -138,14 +138,14 @@ public sealed class ExpectDefinition
     /// <summary>
     /// UIA-aligned expect condition. Naming extends UIA property/pattern names:
     ///   element_visible / element_enabled / element_absent / element_focused
-    ///       — AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus)
+    ///       -- AutomationElement properties (IsOffscreen, IsEnabled, HasKeyboardFocus)
     ///   value_contains / value_equals
-    ///       — ValuePattern.Value string match (UIA ValuePattern)
+    ///       -- ValuePattern.Value string match (UIA ValuePattern)
     ///   window_present / window_absent
-    ///       — window enumeration via WindowFinder
-    ///   toggle_on / toggle_off — TogglePattern.ToggleState
-    ///   selected               — SelectionItemPattern.IsSelected
-    ///   expanded / collapsed   — ExpandCollapsePattern.ExpandCollapseState
+    ///       -- window enumeration via WindowFinder
+    ///   toggle_on / toggle_off -- TogglePattern.ToggleState
+    ///   selected               -- SelectionItemPattern.IsSelected
+    ///   expanded / collapsed   -- ExpandCollapsePattern.ExpandCollapseState
     /// </summary>
     public string Condition { get; set; } = "element_visible";
 
@@ -221,16 +221,16 @@ public sealed class StepParams
     public string? Direction { get; set; }
     public int? Amount { get; set; }
 
-    // toggle — desired checkbox state (true=on, false=off, null=just toggle)
+    // toggle -- desired checkbox state (true=on, false=off, null=just toggle)
     public bool? Checked { get; set; }
 
-    // expand/collapse, window_close/minimize/maximize — target state
+    // expand/collapse, window_close/minimize/maximize -- target state
     public string? State { get; set; }
 
-    // set_range — target value for slider/progress bar
+    // set_range -- target value for slider/progress bar
     public double? Value { get; set; }
 
-    // select — item text or index to select in list/combo
+    // select -- item text or index to select in list/combo
     public string? ItemText { get; set; }
     public int? ItemIndex { get; set; }
 }

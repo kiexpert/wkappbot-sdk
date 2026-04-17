@@ -4,17 +4,17 @@ using System.Text;
 namespace WKAppBot.Win32.Native;
 
 /// <summary>
-/// Announce WKAppBot as a screen reader to the OS — but only when needed.
+/// Announce WKAppBot as a screen reader to the OS -- but only when needed.
 ///
 /// Chromium/Electron apps check SPI_GETSCREENREADER to decide whether
 /// to build their accessibility tree. Native Win32/MFC apps don't need this.
 ///
-/// Strategy: "읽어보고 판단" — check the target window first.
-///   If it's Chromium/Electron → enable screen reader flag → A11Y tree appears.
-///   If it's native Win32/MFC → skip (UIA already works).
+/// Strategy: "읽어보고 판단" -- check the target window first.
+///   If it's Chromium/Electron -> enable screen reader flag -> A11Y tree appears.
+///   If it's native Win32/MFC -> skip (UIA already works).
 ///
 /// Once enabled, stays on PERMANENTLY (survives process exit).
-/// Next run: already ON → zero broadcast delay → instant A11Y access.
+/// Next run: already ON -> zero broadcast delay -> instant A11Y access.
 /// Reboot clears it, but next wkappbot run re-enables automatically.
 /// </summary>
 public static class ScreenReaderMode
@@ -24,7 +24,7 @@ public static class ScreenReaderMode
     /// <summary>
     /// Check if the target window is a modern app (Chromium/Electron) that
     /// needs the screen reader flag for UIA tree activation.
-    /// Enables once and stays on — safe for repeated calls.
+    /// Enables once and stays on -- safe for repeated calls.
     /// </summary>
     public static void EnableForWindow(IntPtr hWnd)
     {
@@ -68,7 +68,7 @@ public static class ScreenReaderMode
     /// <summary>
     /// Force enable screen reader mode (system-wide announcement).
     /// Broadcasts WM_SETTINGCHANGE so Chromium picks it up immediately.
-    /// Stays on permanently — no restore on exit.
+    /// Stays on permanently -- no restore on exit.
     /// </summary>
     public static void Enable()
     {
@@ -76,13 +76,13 @@ public static class ScreenReaderMode
 
         var sw = Stopwatch.StartNew();
 
-        // Check current state — already on? (previous run or real screen reader)
+        // Check current state -- already on? (previous run or real screen reader)
         NativeMethods.SystemParametersInfoW(
             NativeMethods.SPI_GETSCREENREADER, 0, out int current, 0);
 
         if (current != 0)
         {
-            // Already enabled (previous wkappbot run or real AT) — skip broadcast
+            // Already enabled (previous wkappbot run or real AT) -- skip broadcast
             _weEnabled = true;
             sw.Stop();
             Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader already_on={sw.ElapsedMilliseconds}ms");
@@ -99,7 +99,7 @@ public static class ScreenReaderMode
         if (ok)
         {
             _weEnabled = true;
-            Console.Error.WriteLine($"[A11Y] Screen reader mode enabled — Chromium/Electron A11Y trees activated");
+            Console.Error.WriteLine($"[A11Y] Screen reader mode enabled -- Chromium/Electron A11Y trees activated");
             Console.Error.WriteLine($"  [PROF:A11Y] ScreenReader broadcast={sw.ElapsedMilliseconds}ms (SPIF_SENDCHANGE)");
         }
         else

@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace WKAppBot.Core.Runner;
 
 /// <summary>
-/// A single scheduled task — prompt injection at a specified time.
+/// A single scheduled task -- prompt injection at a specified time.
 /// Persisted in schedule.json. Executed by AppBotEye's polling loop.
 /// </summary>
 public sealed class ScheduleItem

@@ -25,7 +25,7 @@ internal sealed record A11yHackOverlayModel(IReadOnlyList<A11yHackOverlayBox> Bo
 /// <summary>Fixed overlay slot: Input (mouse/keyboard tracking) vs Session (AI analysis).</summary>
 internal enum OverlaySlot { Input, Session }
 
-// ── Window ──────────────────────────────────────────────────────────────
+// -- Window --------------------------------------------------------------
 
 internal sealed class A11yHackOverlayWindow : Window
 {
@@ -35,7 +35,7 @@ internal sealed class A11yHackOverlayWindow : Window
     public A11yHackOverlayWindow(int width, int height)
     {
         Title = "A11yHackOverlay";
-        Width = 4000; Height = 3000; // oversized — SetWindowPos clips to actual pixel size
+        Width = 4000; Height = 3000; // oversized -- SetWindowPos clips to actual pixel size
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -43,7 +43,7 @@ internal sealed class A11yHackOverlayWindow : Window
         ShowInTaskbar = false;
         ShowActivated = false;
         ResizeMode = ResizeMode.NoResize;
-        // NOTE: DO NOT set Window.Opacity here — AllowsTransparency + Opacity<1 causes opaque-black
+        // NOTE: DO NOT set Window.Opacity here -- AllowsTransparency + Opacity<1 causes opaque-black
         // background rendering bug on some display configurations. Control transparency per-element.
         _canvas = new Canvas { Background = Brushes.Transparent, Opacity = 0.6, IsHitTestVisible = false };
         Content = _canvas;
@@ -97,7 +97,7 @@ internal sealed class A11yHackOverlayWindow : Window
 
     public void Render(A11yHackOverlayModel model)
     {
-        // Build all new elements first, then swap — no flicker
+        // Build all new elements first, then swap -- no flicker
         var newChildren = new List<UIElement>();
         var dpi = GetDpiScale();
 
@@ -108,7 +108,7 @@ internal sealed class A11yHackOverlayWindow : Window
             var bw = box.Bounds.Width / dpi;
             var bh = box.Bounds.Height / dpi;
 
-            // ── Box style: Target(neon) / Scope(blue fill) / Known(green dashed) ──
+            // -- Box style: Target(neon) / Scope(blue fill) / Known(green dashed) --
             var role = box.Role;
             Brush stroke; double thick; Brush fill;
             DoubleCollection? dash; double rx, ry; Effect? fx;
@@ -116,27 +116,27 @@ internal sealed class A11yHackOverlayWindow : Window
             thick = 1.0; fill = Brushes.Transparent; fx = null; rx = ry = 0;
             switch (role)
             {
-                case HackBoxRole.Target:    // 타겟 — 밝은 녹색 solid, 고불투명
+                case HackBoxRole.Target:    // 타겟 -- 밝은 녹색 solid, 고불투명
                     stroke = new SolidColorBrush(Color.FromArgb(230, 0x00, 0xFF, 0x88));
                     dash = null;
                     break;
-                case HackBoxRole.Scope:     // 부모 체인 — 녹색 중불투명 긴대시
+                case HackBoxRole.Scope:     // 부모 체인 -- 녹색 중불투명 긴대시
                     stroke = new SolidColorBrush(Color.FromArgb(140, 0x00, 0xFF, 0x88));
                     dash = new DoubleCollection { 6, 3 };
                     break;
-                case HackBoxRole.Focus:     // 키보드 포커스 — 하늘색 solid, 고불투명
+                case HackBoxRole.Focus:     // 키보드 포커스 -- 하늘색 solid, 고불투명
                     stroke = new SolidColorBrush(Color.FromArgb(220, 0x00, 0xBF, 0xFF));
                     dash = null;
                     break;
-                case HackBoxRole.FocusChain: // 포커스 체인 — 하늘색 중불투명 긴대시
+                case HackBoxRole.FocusChain: // 포커스 체인 -- 하늘색 중불투명 긴대시
                     stroke = new SolidColorBrush(Color.FromArgb(110, 0x00, 0xBF, 0xFF));
                     dash = new DoubleCollection { 6, 3 };
                     break;
-                case HackBoxRole.Cached:    // 경험DB — 주황 저불투명 짧은대시
+                case HackBoxRole.Cached:    // 경험DB -- 주황 저불투명 짧은대시
                     stroke = new SolidColorBrush(Color.FromArgb(70, 0xFF, 0xA5, 0x00));
                     dash = new DoubleCollection { 2, 3 };
                     break;
-                default:                    // Known — 연두 저불투명 짧은대시
+                default:                    // Known -- 연두 저불투명 짧은대시
                     stroke = new SolidColorBrush(Color.FromArgb(60, 0x00, 0xE0, 0x60));
                     dash = new DoubleCollection { 2, 3 };
                     break;
@@ -152,7 +152,7 @@ internal sealed class A11yHackOverlayWindow : Window
             Canvas.SetTop(rect, by);
             newChildren.Add(rect);
 
-            // ── Label (top-right) ──
+            // -- Label (top-right) --
             if (!string.IsNullOrWhiteSpace(box.Label))
             {
                 var (fg, bg2) = role switch
@@ -184,7 +184,7 @@ internal sealed class A11yHackOverlayWindow : Window
                 newChildren.Add(labelBg);
             }
 
-            // ── OCR text (inside box, right half, gold, marquee) ──
+            // -- OCR text (inside box, right half, gold, marquee) --
             if (!string.IsNullOrWhiteSpace(box.OcrText))
             {
                 var fontSize = Math.Clamp(bh * 0.45, 7, 12);
@@ -237,7 +237,7 @@ internal sealed class A11yHackOverlayWindow : Window
             }
         }
 
-        // Atomic swap: clear + add all at once — no flicker
+        // Atomic swap: clear + add all at once -- no flicker
         ClearCanvas();
         foreach (var child in newChildren)
             _canvas.Children.Add(child);
@@ -254,7 +254,7 @@ internal sealed class A11yHackOverlayWindow : Window
     static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 }
 
-// ── Host ────────────────────────────────────────────────────────────────
+// -- Host ----------------------------------------------------------------
 
 internal sealed class A11yHackOverlayHost : IDisposable
 {
@@ -266,7 +266,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
     int _screenX, _screenY;
     DispatcherTimer? _hoverTimer;
 
-    // ── Singleton slots ──
+    // -- Singleton slots --
     static readonly object _slotLock = new();
     static A11yHackOverlayHost? _inputSlot;
     static A11yHackOverlayHost? _sessionSlot;
@@ -287,7 +287,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
                 // Clear stale content first, then move+resize to new target
                 var host = s;
                 host.StopHoverTracking();
-                // Don't clear here — Render() does atomic swap when new content is ready
+                // Don't clear here -- Render() does atomic swap when new content is ready
                 host.Reposition(screenX, screenY, width, height);
                 host.Show();
                 return host;
@@ -313,7 +313,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
         _dispatcher?.BeginInvoke(() =>
         {
             if (_window == null) return;
-            // Use SetWindowPos only — WPF Width/Height is DPI-logical, causes mismatch on scaled displays
+            // Use SetWindowPos only -- WPF Width/Height is DPI-logical, causes mismatch on scaled displays
             ForceWindowPosition(_window, screenX, screenY, width, height);
         });
     }
@@ -363,7 +363,7 @@ internal sealed class A11yHackOverlayHost : IDisposable
         _dispatcher?.BeginInvoke(() =>
         {
             if (_window == null) return;
-            // Use SetWindowPos for pixel-accurate positioning (WPF Left/Top is DPI-logical → offset on scaled displays)
+            // Use SetWindowPos for pixel-accurate positioning (WPF Left/Top is DPI-logical -> offset on scaled displays)
             var hwnd = new WindowInteropHelper(_window).Handle;
             if (hwnd != IntPtr.Zero)
                 SetWindowPos(hwnd, HWND_TOPMOST, screenX, screenY, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE);

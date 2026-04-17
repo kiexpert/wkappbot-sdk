@@ -11,10 +11,10 @@ namespace WKAppBot.Vision;
 /// 2nd tier in Chain of Responsibility (after Accessibility, before Coordinate).
 ///
 /// Flow:
-///   1. Capture window screenshot (focusless — PrintWindow/BitBlt)
+///   1. Capture window screenshot (focusless -- PrintWindow/BitBlt)
 ///   2. Encode as base64 PNG
 ///   3. Send to Claude API with element description
-///   4. Parse JSON response → ElementLocation
+///   4. Parse JSON response -> ElementLocation
 ///   5. Cache result in VisionCache for future use
 /// </summary>
 public sealed class VisionAnalyzer : IDisposable
@@ -66,7 +66,7 @@ If the element is NOT found, respond with:
 RULES:
 - x, y are the CENTER coordinates of the element in pixels from the image top-left
 - confidence should reflect how certain you are this is the correct element
-- Be precise — a few pixels off can miss a small button";
+- Be precise -- a few pixels off can miss a small button";
 
         var requestBody = new
         {

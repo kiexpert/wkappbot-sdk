@@ -1,4 +1,4 @@
-// AppBotEyeClaudeDetector.cs — Claude Desktop UIA detection methods.
+// AppBotEyeClaudeDetector.cs -- Claude Desktop UIA detection methods.
 // Finds Claude Desktop window and detects its current status (executing, prompt ready, etc.)
 // Extracted from AppBotEyeCommands.cs for readability.
 
@@ -10,7 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-// FlaUI using kept for DetectClaudeDesktopStatus/ExtractPlanContent — these methods run
+// FlaUI using kept for DetectClaudeDesktopStatus/ExtractPlanContent -- these methods run
 // in MCP subprocess only (via claude-detect command). Eye calls ViaRoute wrappers which go through MCP.
 // The FlaUI assembly loads lazily (only when these methods are JIT-compiled), which only happens in MCP subprocess.
 using FlaUI.Core.Conditions;
@@ -32,14 +32,14 @@ internal partial class Program
 
     /// <summary>
     /// Find Claude Desktop main window by walking the parent process tree.
-    /// wkappbot → ... → claude.exe (Electron) — find its main window.
+    /// wkappbot -> ... -> claude.exe (Electron) -- find its main window.
     /// Much faster than scanning all 14+ claude.exe processes!
     /// </summary>
     private static IntPtr FindClaudeDesktopWindow()
     {
         bool verbose = !_claudeWindowSearchLogged; // log only on first call
 
-        // Walk up: wkappbot.exe → parent → grandparent → ... find claude.exe
+        // Walk up: wkappbot.exe -> parent -> grandparent -> ... find claude.exe
         var claudePids = new HashSet<int>();
         try
         {
@@ -58,7 +58,7 @@ internal partial class Program
                     {
                         claudePids.Add(parentPid);
                         // Also add siblings (Electron uses multiple processes under same parent tree)
-                        // Get the parent's parent — the root claude.exe
+                        // Get the parent's parent -- the root claude.exe
                         var rootPid = GetParentPid(parentPid);
                         if (rootPid > 0)
                         {
@@ -147,17 +147,17 @@ internal partial class Program
         return -1;
     }
 
-    // ── Plan Approval Integration ──────────────────────────────────
+    // -- Plan Approval Integration ----------------------------------
 
     /// <summary>
     /// Extract plan content. Two-tier strategy:
-    ///   1st: File read (~/.claude/plans/*.md) — fast, full content
-    ///   2nd: UIA text collection from Claude Desktop — environment-agnostic, accessibility standard
+    ///   1st: File read (~/.claude/plans/*.md) -- fast, full content
+    ///   2nd: UIA text collection from Claude Desktop -- environment-agnostic, accessibility standard
     /// Returns (source, content) or null if not found.
     /// </summary>
     static (string source, string content)? ExtractPlanContent(IntPtr claudeHwnd)
     {
-        // ── Tier 1: File read (fast, full content) ──
+        // -- Tier 1: File read (fast, full content) --
         try
         {
             var plansDir = Path.Combine(
@@ -180,7 +180,7 @@ internal partial class Program
         }
         catch { /* fall through to UIA */ }
 
-        // ── Tier 2: UIA text collection (accessibility standard, environment-agnostic) ──
+        // -- Tier 2: UIA text collection (accessibility standard, environment-agnostic) --
         if (claudeHwnd == IntPtr.Zero || !IsWindow(claudeHwnd))
             return null;
 
@@ -380,7 +380,7 @@ internal partial class Program
         return result;
     }
 
-    // ── Claude Desktop UIA Status Detection ──────────────────────
+    // -- Claude Desktop UIA Status Detection ----------------------
 
     /// <summary>
     /// Detect Claude Desktop's current status via UIA tree inspection.
@@ -399,27 +399,27 @@ internal partial class Program
 
             var cf = new ConditionFactory(new UIA3PropertyLibrary());
 
-            // 1. Check for "중단" (Stop) button → Claude is executing
+            // 1. Check for "중단" (Stop) button -> Claude is executing
             var stopButton = window.FindFirstDescendant(
                 cf.ByControlType(ControlType.Button).And(cf.ByName("중단")));
             if (stopButton != null)
             {
-                // Live response text → StatusBar fallback → generic "실행 중"
+                // Live response text -> StatusBar fallback -> generic "실행 중"
                 var liveText = GetLiveResponseText(window, cf);
                 var statusText = liveText ?? GetLatestStatusBarText(window, cf);
                 return Tuple.Create("executing", statusText ?? "실행 중");
             }
 
             // 2. Check for rate limit FIRST (before turn-form!)
-            // ★ Rate limit screen often still has turn-form visible → would be mis-detected as "prompt_ready"
+            // ★ Rate limit screen often still has turn-form visible -> would be mis-detected as "prompt_ready"
             // Text: "You've hit your limit · resets 4pm (Asia/Seoul)"
             // ★ IMPORTANT: Must filter out AppBotEye's own overlay text!
-            //   AppBotEye is a child window of Claude Desktop → its Text elements appear in FindAllDescendants
-            //   If AppBotEye displays "rate limit" text → false positive self-detection loop!
+            //   AppBotEye is a child window of Claude Desktop -> its Text elements appear in FindAllDescendants
+            //   If AppBotEye displays "rate limit" text -> false positive self-detection loop!
             //   Solution: Search only inside "RootWebArea" Document (Claude's actual web content)
             try
             {
-                // Find the RootWebArea Document first — limits search to Claude's web content only
+                // Find the RootWebArea Document first -- limits search to Claude's web content only
                 var rootWebArea = window.FindFirstDescendant(cf.ByAutomationId("RootWebArea"));
                 var searchRoot = rootWebArea ?? window; // fallback to full window if not found
                 var allTexts = searchRoot.FindAllDescendants(
@@ -437,20 +437,20 @@ internal partial class Program
                             // AppBotEye text elements are multi-line with URLs, action details, etc.
                             // Real rate limit text is a single short phrase like "You've hit your limit"
                             if (name.Contains("AppBot", StringComparison.OrdinalIgnoreCase) ||
-                                name.Contains("navigate →", StringComparison.OrdinalIgnoreCase) ||
+                                name.Contains("navigate ->", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("Claude:", StringComparison.OrdinalIgnoreCase) ||
                                 name.Length > 200) // Real rate limit text is short
                                 continue;
 
                             // Only match the exact Claude rate limit phrases
-                            // "limit" + "reset" was too broad → matched AppBotEye overlay text!
+                            // "limit" + "reset" was too broad -> matched AppBotEye overlay text!
                             if (name.Contains("hit your limit", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("You've hit your usage limit", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
                                 name.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
                             {
                                 // Log the trigger text for debugging
-                                Console.Error.WriteLine($"[EYE] Rate limit trigger text: \"{(name.Length > 80 ? name[..80] + "…" : name)}\"");
+                                Console.Error.WriteLine($"[EYE] Rate limit trigger text: \"{(name.Length > 80 ? name[..80] + "..." : name)}\"");
                                 // Try to extract reset time from this element or siblings
                                 var resetTime = ParseResetTime(name);
                                 if (resetTime == null)
@@ -471,7 +471,7 @@ internal partial class Program
                                 }
 
                                 var displayText = resetTime != null
-                                    ? $"한도 초과 — {resetTime.Value:HH:mm}에 리셋"
+                                    ? $"한도 초과 -- {resetTime.Value:HH:mm}에 리셋"
                                     : "한도 초과";
 
                                 return Tuple.Create("rate_limit", displayText);
@@ -481,7 +481,7 @@ internal partial class Program
                     }
                 }
 
-                // ★ 2b. OCR fallback — Claude Desktop sometimes exposes NO UIA Text elements
+                // ★ 2b. OCR fallback -- Claude Desktop sometimes exposes NO UIA Text elements
                 // When the UIA tree is sparse (no Text children under RootWebArea),
                 // fall back to OCR screenshot analysis to detect rate limit text.
                 // This handles Claude Desktop updates that change accessibility structure.
@@ -534,11 +534,11 @@ internal partial class Program
             }
             catch { }
 
-            // 4. ★ turn-form Name fallback — Electron webview buttons often aren't exposed as UIA buttons
+            // 4. ★ turn-form Name fallback -- Electron webview buttons often aren't exposed as UIA buttons
             // turn-form Name contains concatenated text of all child elements, e.g.:
-            //   " 메뉴 토글 권한 요청 Opus 4.6 중단"  → executing + permission prompt
-            //   " 메뉴 토글 Opus 4.6"                 → prompt ready (normal)
-            //   "계획" button visible nearby           → plan approval pending
+            //   " 메뉴 토글 권한 요청 Opus 4.6 중단"  -> executing + permission prompt
+            //   " 메뉴 토글 Opus 4.6"                 -> prompt ready (normal)
+            //   "계획" button visible nearby           -> plan approval pending
             var turnForm = window.FindFirstDescendant(
                 cf.ByAutomationId("turn-form"));
             if (turnForm != null)
@@ -547,7 +547,7 @@ internal partial class Program
                 {
                     var rect = turnForm.BoundingRectangle;
                     // Liveness: Height > 30 AND at least one child element exists (not a phantom placeholder).
-                    // Previous check relied on Height alone → false positive on collapsed/hidden turn-form.
+                    // Previous check relied on Height alone -> false positive on collapsed/hidden turn-form.
                     bool hasEditableChild = false;
                     try
                     {
@@ -559,7 +559,7 @@ internal partial class Program
                     {
                         var turnFormName = turnForm.Name ?? "";
 
-                        // 4a. "중단" in turn-form Name → executing (Button search missed it)
+                        // 4a. "중단" in turn-form Name -> executing (Button search missed it)
                         if (turnFormName.Contains("중단"))
                         {
                             // Also check for permission prompt within executing state
@@ -572,7 +572,7 @@ internal partial class Program
                             return Tuple.Create("executing", statusText ?? "실행 중");
                         }
 
-                        // 4b. "권한 요청" in turn-form Name → permission prompt
+                        // 4b. "권한 요청" in turn-form Name -> permission prompt
                         if (turnFormName.Contains("권한 요청") || turnFormName.Contains("권한요청"))
                         {
                             return Tuple.Create("permission_prompt", "권한 요청 대기");
@@ -613,7 +613,7 @@ internal partial class Program
                 catch { }
             }
 
-            // 5. Idle — no special state detected
+            // 5. Idle -- no special state detected
             return null;
         }
         catch
@@ -667,7 +667,7 @@ internal partial class Program
     /// <summary>
     /// Read the live response text from an AI conversation window (Claude Desktop / VS Code / Codex).
     /// Returns the last non-empty line of the bottommost text above the turn-form (= current response tail).
-    /// This changes in real-time as AI generates — used for streaming to Slack.
+    /// This changes in real-time as AI generates -- used for streaming to Slack.
     /// </summary>
     private static string? GetLiveResponseText(
         FlaUI.Core.AutomationElements.AutomationElement window, ConditionFactory cf)
@@ -704,16 +704,16 @@ internal partial class Program
 
             if (lastText == null) return null;
 
-            // Extract the last non-empty line — "방송" view should show the most recent output tail
+            // Extract the last non-empty line -- "방송" view should show the most recent output tail
             var lines = lastText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             var lastLine = lines.LastOrDefault(l => l.Length >= 4) ?? lastText.Trim();
             if (string.IsNullOrWhiteSpace(lastLine)) return null;
-            return lastLine.Length > 120 ? lastLine[..120] + "…" : lastLine;
+            return lastLine.Length > 120 ? lastLine[..120] + "..." : lastLine;
         }
         catch { return null; }
     }
 
-    // ── OCR-based rate limit detection ──────────────────────────────────────
+    // -- OCR-based rate limit detection --------------------------------------
     // Throttle: max once per 5 seconds to avoid performance overhead in the polling loop.
     private static DateTime _lastOcrRateLimitCheck = DateTime.MinValue;
     private static readonly TimeSpan OcrRateLimitInterval = TimeSpan.FromSeconds(5);
@@ -738,7 +738,7 @@ internal partial class Program
             if (bitmap == null || ScreenCapture.IsBlankBitmap(bitmap))
                 return null;
 
-            // Run OCR — crop upper portion only (rate limit banner is at top)
+            // Run OCR -- crop upper portion only (rate limit banner is at top)
             // Cropping to top 40% reduces OCR time significantly
             var cropHeight = Math.Min(bitmap.Height * 2 / 5, bitmap.Height);
             using var topCrop = bitmap.Clone(
@@ -758,11 +758,11 @@ internal partial class Program
                 fullText.Contains("한도를 초과", StringComparison.OrdinalIgnoreCase) ||
                 fullText.Contains("사용 한도", StringComparison.OrdinalIgnoreCase))
             {
-                Console.Error.WriteLine($"[EYE] Rate limit trigger (OCR): \"{(fullText.Length > 120 ? fullText[..120] + "…" : fullText)}\"");
+                Console.Error.WriteLine($"[EYE] Rate limit trigger (OCR): \"{(fullText.Length > 120 ? fullText[..120] + "..." : fullText)}\"");
                 // Extract reset time from OCR text
                 var resetTime = ParseResetTime(fullText);
                 var displayText = resetTime != null
-                    ? $"한도 초과 — {resetTime.Value:HH:mm}에 리셋"
+                    ? $"한도 초과 -- {resetTime.Value:HH:mm}에 리셋"
                     : "한도 초과";
 
                 return Tuple.Create("rate_limit", displayText);
@@ -815,7 +815,7 @@ internal partial class Program
 
     /// <summary>
     /// Get the parsed reset time from a rate_limit status display text.
-    /// Extracts "HH:mm" from "한도 초과 — 16:00에 리셋".
+    /// Extracts "HH:mm" from "한도 초과 -- 16:00에 리셋".
     /// Returns null if not parseable.
     /// </summary>
     static DateTime? GetResetTimeFromDisplayText(string? displayText)
@@ -825,16 +825,16 @@ internal partial class Program
         var match = Regex.Match(displayText, @"(\d{1,2}:\d{2})에 리셋");
         if (match.Success && TimeOnly.TryParse(match.Groups[1].Value, out var time))
         {
-            // ★ DO NOT roll over to next day — return today's time so callers can detect it's past
+            // ★ DO NOT roll over to next day -- return today's time so callers can detect it's past
             var resetDt = DateTime.Today.Add(time.ToTimeSpan());
             return resetDt;
         }
         return null;
     }
 
-    // ── Spinner pixel detection (idle via animation absence) ──────────────────
+    // -- Spinner pixel detection (idle via animation absence) ------------------
     // ★ Uses PrintWindow on Chrome_RenderWidgetHostHWND sub-window
-    //   → works even when Claude Desktop is covered by other windows or unfocused!
+    //   -> works even when Claude Desktop is covered by other windows or unfocused!
     //   CopyFromScreen fails when covered. PrintWindow on Electron main window captures
     //   only native chrome (title bar). But the render sub-window captures GPU web content!
 
@@ -847,7 +847,7 @@ internal partial class Program
     /// Detect Claude Desktop spinner/animation above the prompt area.
     /// Uses PrintWindow on Chrome_RenderWidgetHostHWND for focusless, Z-order-safe capture.
     /// Samples a strip of 100 pixels above turn-form. If pixels are unchanged
-    /// for 2+ consecutive calls (1s apart) → spinner stopped → Claude idle.
+    /// for 2+ consecutive calls (1s apart) -> spinner stopped -> Claude idle.
     /// Returns: true = idle detected, false = still animating or can't detect.
     /// </summary>
     static bool DetectSpinnerIdle(IntPtr claudeHwnd, ClaudeInstanceState? state = null)
@@ -910,7 +910,7 @@ internal partial class Program
             if (localX < 0 || localY < 0 || localX + sampleW > renderW || localY >= renderH)
                 return false;
 
-            // PrintWindow the full render widget → extract spinner strip
+            // PrintWindow the full render widget -> extract spinner strip
             uint hash;
             using (var fullBmp = new Bitmap(renderW, renderH, PixelFormat.Format32bppArgb))
             {
@@ -933,7 +933,7 @@ internal partial class Program
             {
                 noChange++;
                 if (noChange >= 2)
-                    return true; // 2+ consecutive same → no animation → idle
+                    return true; // 2+ consecutive same -> no animation -> idle
             }
             else
             {
@@ -966,7 +966,7 @@ internal partial class Program
         }
     }
 
-    // ── claude-detect CLI command — runs status detection in MCP subprocess ──
+    // -- claude-detect CLI command -- runs status detection in MCP subprocess --
 
     /// <summary>
     /// CLI entry: wkappbot claude-detect &lt;hwnd-hex&gt; [--plan]
@@ -1006,19 +1006,19 @@ internal partial class Program
         return 0;
     }
 
-    // ── find-prompts CLI command — runs FindAllPrompts in MCP subprocess ──
+    // -- find-prompts CLI command -- runs FindAllPrompts in MCP subprocess --
 
     /// <summary>
     /// CLI entry: wkappbot find-prompts [--all]
     /// Returns JSON array: [{"hwnd":"0x791B16","title":"...","host":"vscode-claudecode","pid":1234,"cwd":"..."}]
-    /// Uses static ClaudePromptHelper — cached UIA data persists across calls in MCP subprocess.
+    /// Uses static ClaudePromptHelper -- cached UIA data persists across calls in MCP subprocess.
     /// </summary>
     private static ClaudePromptHelper? _mcpPromptHelper;
     private static readonly object _mcpPromptHelperLock = new();
 
     static int FindPromptsCommand(string[] args)
     {
-        // Reuse static instance — UIA per-hwnd cache persists across MCP calls
+        // Reuse static instance -- UIA per-hwnd cache persists across MCP calls
         lock (_mcpPromptHelperLock)
         {
             _mcpPromptHelper ??= new ClaudePromptHelper();
@@ -1068,7 +1068,7 @@ internal partial class Program
             return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
         }
 
-        // Fire-and-forget background refresh — never blocks caller
+        // Fire-and-forget background refresh -- never blocks caller
         if (!_findPromptsRunning)
         {
             _findPromptsRunning = true;
