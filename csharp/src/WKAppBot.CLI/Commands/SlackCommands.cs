@@ -58,17 +58,17 @@ internal partial class Program
     /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" -- so 'slack reply' needs no flags.</summary>
     static string SlackReplyContextFile => Path.Combine(DataDir, "slack_reply_ctx.txt");
 
-    /// <summary>Default keywords for keyword monitoring (Korean typos + English variants).</summary>
+    /// <summary>
+    /// Default keywords for keyword monitoring. These are USER-INPUT matchers -- the user
+    /// types these in Slack and the listener triggers. Must stay Korean because the user
+    /// types in Korean. Do NOT romanize to "clode"/"clot" -- those will never match the
+    /// user's actual typing. The CLAUDE.md "English only" rule applies to identifiers and
+    /// comments, not to data strings that pattern-match real user input.
+    /// </summary>
     static readonly string[] DefaultKeywords = new[]
     {
         "클롣", "클롯", "클로드", "앱봇",          // Korean + typos (클롣 = primary)
         "claude", "appbot", "wkappbot", "클봇",    // English + mixed
-    };
-
-    /// <summary>Keywords that trigger Ctrl+Enter (accept/approve) on Claude Code prompt.</summary>
-    static readonly string[] AcceptKeywords = new[]
-    {
-        "수락", "승인", "ㅅㄹ", "accept", "approve", "yes", "ㅇㅇ",
     };
 
     /// <summary>Check if Slack listener is running.</summary>
@@ -263,7 +263,7 @@ internal partial class Program
             threadTs = ts;
             Console.Error.WriteLine($"[SLACK] Sent: {message.Split('\n')[0]}{(ts != null ? " (+thread)" : "")}");
             if (GetCustomSlackIcon(EyeCmdPipeServer.CallerCwd.Value) == null)
-                Console.WriteLine("[SLACK] 💡 Tip: 프로필 이모찌 커스텀 -> {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
+                Console.WriteLine("[SLACK] 💡 Tip: customize the profile emoji -> save :emoji: or https://... to {workspace}/.wkappbot/slack_icon.txt");
         }
 
         // Upload files (threaded to the message if we got a ts)
@@ -750,7 +750,7 @@ internal partial class Program
 
     /// <summary>
     /// Build Block Kit blocks JSON for plan approval message.
-    /// Includes plan content in a code block + [수락] [피드백] action buttons.
+    /// Includes plan content in a code block plus [accept] [feedback] action buttons.
     /// </summary>
     static string BuildPlanApprovalBlocks(string planContent, string sourceLabel)
     {
@@ -1138,8 +1138,7 @@ internal partial class Program
     /// <summary>Check if the message is an accept/approve command.</summary>
     static bool IsAcceptCommand(string text)
     {
-        var trimmed = text.Trim().ToLowerInvariant();
-        return AcceptKeywords.Any(kw => trimmed == kw.ToLowerInvariant());
+        return ApprovalPolicy.IsAcceptCommand(text);
     }
 
     /// <summary>Send Ctrl+Enter to Claude Code prompt (remote approval via Slack).</summary>
@@ -1461,7 +1460,7 @@ internal partial class Program
         Console.WriteLine();
         Console.WriteLine($"Config: {SlackConfigPath}");
         Console.WriteLine();
-        Console.WriteLine("💡 Tip: 봇 프로필 이모찌/사진 커스텀 -> {workspace}/.wkappbot/slack_icon.txt 에 :emoji: 또는 https://... 저장");
+        Console.WriteLine("💡 Tip: customize the bot profile emoji/photo -> save :emoji: or https://... to {workspace}/.wkappbot/slack_icon.txt");
         PrintRelatedSkills("slack");
         return 1;
     }

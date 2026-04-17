@@ -136,7 +136,10 @@ internal static class SudoHandler
         catch (System.ComponentModel.Win32Exception ex)
         {
             uacEx = ex;
-            PulseStep.Line($"SudoHandler: UAC cancelled err={ex.NativeErrorCode}");
+            if (unchecked((uint)ex.NativeErrorCode) == 0xC0000142u)
+                PulseStep.Line("SudoHandler: admin Eye spawn failed (STATUS_DLL_INIT_FAILED)");
+            else
+                PulseStep.Line($"SudoHandler: UAC cancelled err={ex.NativeErrorCode}");
         }
 
         // Prominent UAC outcome marker -- not just PulseStep ring buffer
@@ -159,15 +162,25 @@ internal static class SudoHandler
         if (!uacApproved)
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.Error.WriteLine($"[SUDO] UAC cancelled (err={uacEx?.NativeErrorCode}) -- no admin Eye available");
+            var err = uacEx?.NativeErrorCode;
+            var suffix = err.HasValue && unchecked((uint)err.Value) == 0xC0000142u
+                ? "spawn failed (STATUS_DLL_INIT_FAILED)"
+                : $"UAC cancelled (err={err})";
+            Console.Error.WriteLine($"[SUDO] {suffix} -- no admin Eye available");
             Console.ResetColor();
             return false;
         }
 
-        // UAC approved + our spawn in progress -- poll for pipe readiness up to 10s
-        for (int i = 0; i < 40; i++)
+        // UAC approved + our spawn in progress -- wait until the admin Eye becomes ready.
+        // Once the sudo path has been taken, do not give the caller a fallback window.
+        // BUT: if the spawned admin process dies (STATUS_DLL_INIT_FAILED 0xC0000142 is a
+        // known crash during admin-mode .NET initialization), stop waiting -- otherwise
+        // we hang forever. Liveness check happens every loop tick.
+        int tick = 0;
+        while (true)
         {
             Thread.Sleep(250);
+            tick++;
             if (ElevatedEyeClient.Ping(100))
             {
                 Console.ForegroundColor = ConsoleColor.Green;
@@ -176,12 +189,35 @@ internal static class SudoHandler
                 VerifyAndReportAdminIntegrity();
                 return true;
             }
-        }
 
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.Error.WriteLine("[SUDO] admin Eye did not respond within 10s");
-        Console.ResetColor();
-        return false;
+            // Liveness: if the spawned admin Eye process died, no amount of waiting helps.
+            // Surface the exit code so the operator can see STATUS_DLL_INIT_FAILED etc.
+            if (proc != null)
+            {
+                try
+                {
+                    if (proc.HasExited)
+                    {
+                        var exit = proc.ExitCode;
+                        var hex = unchecked((uint)exit).ToString("X8");
+                        var label = unchecked((uint)exit) == 0xC0000142u
+                            ? "STATUS_DLL_INIT_FAILED (admin .NET init crash)"
+                            : $"exit=0x{hex}";
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Error.WriteLine($"[SUDO] admin Eye process died before pipe came up -- {label}");
+                        Console.ResetColor();
+                        PulseStep.Line($"SudoHandler: admin Eye died exit=0x{hex} after {tick * 250}ms");
+                        return false;
+                    }
+                }
+                catch { /* process handle race -- keep polling */ }
+            }
+
+            // Emit a progress breadcrumb every 4 seconds so a genuinely-slow admin startup
+            // does not look like a silent hang.
+            if (tick % 16 == 0)
+                Console.Error.WriteLine($"[SUDO] still waiting for admin Eye pipe ({tick * 250 / 1000}s)...");
+        }
     }
 
     /// <summary>
