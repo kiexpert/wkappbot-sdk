@@ -118,6 +118,9 @@ internal partial class Program
     {
         try
         {
+            // Route through AppBotPipe.StartTracked so the focus-launch guard + CWD enforcement
+            // + CreateProcessW hooks apply uniformly. Admin token inheritance is automatic
+            // (StartTracked uses CreateProcessW which inherits the parent's primary token).
             var psi = new ProcessStartInfo
             {
                 FileName = claudeExe,
@@ -126,7 +129,8 @@ internal partial class Program
                 RedirectStandardOutput = false,
                 RedirectStandardError = false,
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-INTERACTIVE")
+                          ?? Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] Failed to start claude"); return 1; }
             proc.WaitForExit();
             return proc.ExitCode;
@@ -153,7 +157,8 @@ internal partial class Program
             };
             psi.ArgumentList.Add("-p");
             psi.ArgumentList.Add(question);
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-PRINT")
+                          ?? Process.Start(psi);
             if (proc == null) return (1, "", "[CHAT] Failed to start claude");
             var outSb = new StringBuilder();
             var errSb = new StringBuilder();
