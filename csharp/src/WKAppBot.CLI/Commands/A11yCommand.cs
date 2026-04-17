@@ -731,6 +731,39 @@ internal partial class Program
 
         PulseStep.Mark("uia-ready");
 
+        // Ambiguity guard for close: if grap matched >1 windows and caller did not narrow
+        // via --all / --nth / #scope / hwnd: prefix, bail out and show the candidate list
+        // so the user can pick explicitly. Prevents loose patterns from closing the wrong
+        // window (VS Code / browser / terminal -- work lost).
+        if (action == "close" && targets.Count() > 1 && !all)
+        {
+            bool explicitNarrower = args.Any(a => a == "--nth")
+                || grap.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase)
+                || grap.Contains('#');
+            if (!explicitNarrower)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Error.WriteLine($"[A11Y] close AMBIGUOUS -- \"{grap}\" matched {targets.Count()} windows. Narrow via #scope / hwnd: / --nth N / --all:");
+                Console.ResetColor();
+                foreach (var t in targets.Take(20))
+                    Console.Error.WriteLine($"  0x{t.Handle.ToInt64():X8}  \"{t.Title}\"");
+                if (targets.Count() > 20)
+                    Console.Error.WriteLine($"  ... and {targets.Count() - 20} more");
+                return 2;
+            }
+        }
+
+        // Pre-flight summary for close: show count + titles before any WM_CLOSE fires.
+        // Per-target [CLOSE-PLAN] lines (with modal detection) still print inside A11yClose.
+        if (action == "close" && targets.Count() > 1)
+        {
+            Console.Error.WriteLine($"[CLOSE-PLAN] Closing {targets.Count()} target(s):");
+            foreach (var t in targets.Take(20))
+                Console.Error.WriteLine($"  0x{t.Handle.ToInt64():X8}  \"{t.Title}\"");
+            if (targets.Count() > 20)
+                Console.Error.WriteLine($"  ... and {targets.Count() - 20} more");
+        }
+
         foreach (var win in targets)
         {
             var hwnd = win.Handle;
