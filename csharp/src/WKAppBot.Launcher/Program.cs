@@ -53,6 +53,67 @@ partial class Program
            && args[0].Equals("a11y", StringComparison.OrdinalIgnoreCase)
            && args[1].Equals("find", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Print a prominent red banner AND file a suggest entry whenever a --sudo
+    /// handshake with the admin Eye fails AFTER the pipe was reachable but before
+    /// a response came back within the probe budget. Fast-fail "pipe doesn't exist"
+    /// cases are NOT handshake failures and must not call this (Core will spawn).
+    /// Shared helper so every --sudo entry point reports identically.
+    /// </summary>
+    static void ReportHandshakeMiss(string[] args, int budgetMs, long elapsedMs, string? exMessage)
+    {
+        try
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine("");
+            Console.Error.WriteLine("");
+            Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
+            Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("██   🚨🚨🚨   --sudo HANDSHAKE MISS  -- HARD FAIL, NO FALLBACK   🚨🚨🚨   ██");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine($"██   admin Eye pipe \\\\.\\pipe\\wkappbot_elevated was REACHABLE              ██");
+            Console.Error.WriteLine($"██   but did NOT complete handshake within {budgetMs,4}ms budget                 ██");
+            Console.Error.WriteLine($"██   (actual elapsed: {elapsedMs,5}ms)                                          ██");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("██   This is a REGRESSION, not a cold start.                              ██");
+            Console.Error.WriteLine("██   Launcher is REFUSING to silently respawn admin Eye --                ██");
+            Console.Error.WriteLine("██   that would hide the bug. Exit code 126.                              ██");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("██   A bug-auto suggest has been appended to suggestions.jsonl.           ██");
+            Console.Error.WriteLine("██   Run:   wkappbot suggest list  |  grep HANDSHAKE                      ██");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("██   Recovery:                                                            ██");
+            Console.Error.WriteLine("██      1. Check if admin Eye is actually hung: tasklist | find 'core'    ██");
+            Console.Error.WriteLine("██      2. Kill it: wkappbot a11y kill 'wkappbot-core --elevated'         ██");
+            Console.Error.WriteLine("██      3. Retry: wkappbot <cmd> --sudo (will then cold-start cleanly)    ██");
+            Console.Error.WriteLine("██                                                                        ██");
+            Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
+            Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
+            Console.Error.WriteLine("");
+            Console.ResetColor();
+        }
+        catch { /* best-effort */ }
+
+        try
+        {
+            var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".";
+            var hqDir = Path.Combine(exeDir, "wkappbot.hq");
+            Directory.CreateDirectory(hqDir);
+            var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
+            var cwdEsc = Environment.CurrentDirectory.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var argsJoined = string.Join(" ", args).Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var exSuffix = exMessage != null ? $" ex=\\\"{exMessage.Replace("\\", "\\\\").Replace("\"", "\\\"")}\\\"" : "";
+            var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
+            var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\\"{argsJoined}\\\"{exSuffix}";
+            var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}\n";
+            File.AppendAllText(jsonlPath, line, new System.Text.UTF8Encoding(false));
+        }
+        catch { /* best-effort -- if we cannot even write the suggest, stay silent */ }
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
@@ -322,6 +383,19 @@ partial class Program
         if (args.Any(a => a == "--sudo"))
         {
             const int sudoProbeMs = 1500;
+            // "Fast fail" threshold: if ConnectAsync returns a failure in under this many
+            // ms, the pipe does not exist at all (admin Eye simply isn't running). That
+            // is the NORMAL "go spawn one" case and must not trigger the handshake-miss
+            // banner or bug report. Only failures that took the full budget (or nearly
+            // so) indicate "pipe exists but server stalled" -- the real regression.
+            const int fastFailMs = 100;
+
+            bool probeAlive = false;
+            bool handshakeFailure = false; // pipe existed but server didn't answer in budget
+            long elapsedMs = -1;
+            string? exMessage = null;
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 using var pipe = new System.IO.Pipes.NamedPipeClientStream(
@@ -330,13 +404,42 @@ partial class Program
                     System.IO.Pipes.PipeOptions.Asynchronous);
                 using var cts = new System.Threading.CancellationTokenSource(sudoProbeMs);
                 pipe.ConnectAsync(sudoProbeMs, cts.Token).GetAwaiter().GetResult();
-                Console.Error.WriteLine(pipe.IsConnected
-                    ? $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): alive -- Core will reuse"
-                    : $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable");
+                sw.Stop();
+                elapsedMs = sw.ElapsedMilliseconds;
+                probeAlive = pipe.IsConnected;
+                Console.Error.WriteLine(probeAlive
+                    ? $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): alive -- Core will reuse (took {elapsedMs}ms)"
+                    : $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable (took {elapsedMs}ms)");
+                if (!probeAlive && elapsedMs >= fastFailMs) handshakeFailure = true;
             }
-            catch
+            catch (Exception ex)
             {
-                Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable (fallthrough to Core)");
+                sw.Stop();
+                elapsedMs = sw.ElapsedMilliseconds;
+                exMessage = ex.Message;
+                if (elapsedMs < fastFailMs)
+                {
+                    // Fast-fail == admin Eye not running at all. Quiet fallthrough; Core
+                    // handles the UAC + spawn. Not a handshake regression.
+                    Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping: not running (fast-fail {elapsedMs}ms) -- Core will spawn");
+                }
+                else
+                {
+                    // Took the full budget before failing -> pipe existed but we could
+                    // not complete handshake. This IS the regression we want to surface.
+                    handshakeFailure = true;
+                    Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): handshake failed after {elapsedMs}ms -- ex={ex.Message}");
+                }
+            }
+
+            if (handshakeFailure)
+            {
+                ReportHandshakeMiss(args, sudoProbeMs, elapsedMs, exMessage);
+                // Do NOT fall through to Core. Handshake-miss on a reachable pipe is a
+                // bug we refuse to silently paper over by respawning admin Eye. Exit
+                // with a dedicated code so callers / CI can detect it distinctly from
+                // "no admin Eye" (which continues to Core spawn above).
+                return 126;
             }
         }
 

@@ -19,7 +19,8 @@ internal partial class Program
         string? filterProcess = GetArgValue(args, "--process");
         string? filterClass = GetArgValue(args, "--class");
         string? filterCmd = GetArgValue(args, "--cmd") ?? GetArgValue(args, "--arg"); // filter by cmdline substring; --arg is alias
-        bool showAll = args.Contains("--all"); // include zero-size/invisible (also bypasses wkappbot self-filter)
+        bool sudoActive = Environment.GetEnvironmentVariable("WKAPPBOT_SUDO_ACTIVE") == "1";
+        bool showAll = args.Contains("--all") || sudoActive; // include zero-size/invisible (also bypasses wkappbot self-filter)
         bool deep = args.Contains("--deep");   // include child windows (EnumChildWindows)
         bool uiaDeep = args.Contains("--uia-deep"); // deep UIA search (find --deep)
         bool uiaSearch = uiaDeep || args.Contains("--uia"); // also search UIA elements
@@ -781,6 +782,7 @@ internal partial class Program
                 var v = raw.Value;
                 PrintWindow(wi.Handle, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, wi.Handle == fgWnd);
                 totalCount++;
+                if (v.visible) visibleResultCount++;
             }
             Console.WriteLine();
             Console.WriteLine($"Total: {totalCount} (--uia: accessibility search, --deep: child windows)");
@@ -879,6 +881,7 @@ internal partial class Program
                 }
 
                 totalCount++;
+                if (r.visible) visibleResultCount++;
                 parentPrinted = true;
                 Console.Out.Flush();
                 if (limit > 0 && totalCount >= limit) return false;
@@ -893,6 +896,7 @@ internal partial class Program
                     var v = info.Value;
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
+                    if (v.visible) visibleResultCount++;
                     parentPrinted = true;
                     // Show cross-process children: other PIDs that injected windows into this root
                     if (_printedChildPids.Add(v.pid))
@@ -922,6 +926,7 @@ internal partial class Program
                     var v = info.Value;
                     PrintWindow(hWnd, v.title, v.className, v.process, v.pid, v.w, v.h, v.visible, false, isFg);
                     totalCount++;
+                    if (v.visible) visibleResultCount++;
                     parentPrinted = true;
                 }
                 if (ownerCandidateMatcher != null && info == null)

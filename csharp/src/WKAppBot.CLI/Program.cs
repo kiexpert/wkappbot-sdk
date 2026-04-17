@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
@@ -256,7 +256,24 @@ internal partial class Program
                     return 1;
                 }
 
-                // Normal --sudo command: ensure admin Eye, then proxy execution
+                // Normal --sudo command: ensure admin Eye, then proxy execution.
+                // Once the admin path has been reached, wait indefinitely for the
+                // elevated Eye to finish. No user-mode fallback is allowed after takeover.
+                if (args.Length == 0)
+                {
+                    PulseStep.Line("path=--sudo bootstrap (no command)");
+                    if (SudoHandler.EnsureAdminForSudo("--sudo bootstrap"))
+                    {
+                        PulseStep.Finish("admin Eye ready (bootstrap only)");
+                        Console.WriteLine("[SUDO] Admin Eye ready");
+                        return 0;
+                    }
+
+                    PulseStep.Finish("EnsureAdminForSudo FAILED (UAC cancelled or spawn timeout)");
+                    Console.Error.WriteLine("[SUDO] Failed to ensure admin Eye -- UAC cancelled or timeout");
+                    return 1;
+                }
+
                 PulseStep.Line("path=proxy-route (non-eye command)");
                 var sudoReason = args.Length > 0
                     ? $"--sudo {args[0]}"
@@ -264,20 +281,20 @@ internal partial class Program
                 if (SudoHandler.EnsureAdminForSudo(sudoReason))
                 {
                     // admin Eye is responsive -- proxy the command
-                    PulseStep.Line($"ExecuteViaProxy: {args[0]} (timeout=5s)");
-                    var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), 5000);
+                    const int sudoProxyTimeoutMs = Timeout.Infinite;
+                    PulseStep.Line("ExecuteViaProxy: sudo (timeout=∞)");
+                    var exit = ElevatedEyeClient.ExecuteViaProxy(args[0], args.Skip(1).ToArray(), sudoProxyTimeoutMs);
                     PulseStep.Line($"proxy attempt exit={exit}");
                     if (exit != -1)
                     {
                         PulseStep.Finish($"proxy OK exit={exit}");
                         return exit;
                     }
-                    // EnsureAdmin said alive but proxy comms dropped -- rare; fall through
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Error.WriteLine("[SUDO:FALLBACK] admin Eye proxy dropped request mid-execution");
-                    Console.Error.WriteLine("[SUDO:FALLBACK] continuing as regular user (admin-only ops will fail)");
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Error.WriteLine("[SUDO] admin Eye proxy failed after takeover -- aborting without fallback");
                     Console.ResetColor();
-                    PulseStep.Line("proxy drop -> fallthrough to non-admin");
+                    PulseStep.Finish("proxy failed after admin takeover");
+                    return 1;
                 }
                 else
                 {
@@ -564,3 +581,4 @@ internal partial class Program
         }
     }
 }
+
