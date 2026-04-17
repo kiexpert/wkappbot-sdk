@@ -832,7 +832,7 @@ public sealed partial class ClaudePromptHelper
                 CreateNoWindow = true,
             };
 
-            using var wmic = Process.Start(psi);
+            using var wmic = AppBotPipe.Start(psi);
             if (wmic == null) return -1;
             var output = wmic.StandardOutput.ReadToEnd();
             wmic.WaitForExit(3000);

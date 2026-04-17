@@ -477,7 +477,7 @@ internal partial class Program
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            System.Diagnostics.Process.Start(psi);
+            AppBotPipe.Start(psi);
 
             if (verbose) Console.Error.WriteLine($"[PROXY] Gemini agent spawned with {sb.Length}ch context");
 

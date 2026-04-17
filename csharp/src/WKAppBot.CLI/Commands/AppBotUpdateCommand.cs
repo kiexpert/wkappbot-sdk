@@ -202,7 +202,7 @@ internal partial class Program
                 RedirectStandardError = false,
             };
             foreach (var a in args) psi.ArgumentList.Add(a);
-            using var proc = Process.Start(psi)!;
+            using var proc = AppBotPipe.Start(psi)!;
             output = proc.StandardOutput.ReadToEnd().Trim();
             proc.WaitForExit();
             return proc.ExitCode == 0;

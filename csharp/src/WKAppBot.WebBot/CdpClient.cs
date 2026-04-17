@@ -232,7 +232,7 @@ public sealed partial class CdpClient : IAsyncDisposable, IDisposable
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
-            using var proc = Process.Start(psi);
+            using var proc = AppBotPipe.Start(psi);
             if (proc == null) return 0;
 
             var output = proc.StandardOutput.ReadToEnd();

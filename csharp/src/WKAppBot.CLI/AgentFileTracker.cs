@@ -54,7 +54,7 @@ static class AgentFileTracker
                 RedirectStandardError  = true,
                 UseShellExecute        = false,
             };
-            using var p = System.Diagnostics.Process.Start(psi)!;
+            using var p = AppBotPipe.Start(psi)!;
             var root = p.StandardOutput.ReadToEnd().Trim();
             p.WaitForExit();
             if (p.ExitCode == 0 && Directory.Exists(root))
@@ -263,7 +263,7 @@ static class AgentFileTracker
                     UseShellExecute        = false,
                     WorkingDirectory       = workspace,
                 };
-                using var p = System.Diagnostics.Process.Start(psi)!;
+                using var p = AppBotPipe.Start(psi)!;
                 var diff = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();
                 if (!string.IsNullOrWhiteSpace(diff))
@@ -388,7 +388,7 @@ static class AgentFileTracker
                     UseShellExecute        = false,
                     WorkingDirectory       = workspace,
                 };
-                using var p = System.Diagnostics.Process.Start(psi)!;
+                using var p = AppBotPipe.Start(psi)!;
                 var diff = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();
                 if (!string.IsNullOrWhiteSpace(diff))
@@ -423,7 +423,7 @@ static class AgentFileTracker
                 UseShellExecute        = false,
                 WorkingDirectory       = workspace,
             };
-            using var p = System.Diagnostics.Process.Start(psi)!;
+            using var p = AppBotPipe.Start(psi)!;
             var diff = p.StandardOutput.ReadToEnd();
             p.WaitForExit();
             if (!string.IsNullOrWhiteSpace(diff))

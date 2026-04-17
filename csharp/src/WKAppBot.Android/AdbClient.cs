@@ -259,7 +259,7 @@ public class AdbClient
 
         try
         {
-            using var proc = Process.Start(psi)!;
+            using var proc = AppBotPipe.Start(psi)!;
             var stdout = proc.StandardOutput.ReadToEnd();
             var stderr = proc.StandardError.ReadToEnd();
 

@@ -136,7 +136,7 @@ internal partial class Program
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(vbsPath) ?? Path.GetDirectoryName(corePath) ?? Environment.CurrentDirectory,
                 };
-                using var proc = Process.Start(psi);
+                using var proc = AppBotPipe.Start(psi);
                 reason = proc != null ? "vbs" : "vbs-start-null";
                 return proc != null;
             }

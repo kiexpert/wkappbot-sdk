@@ -130,7 +130,7 @@ internal partial class Program
                 RedirectStandardError = false,
             };
             using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-INTERACTIVE")
-                          ?? Process.Start(psi);
+                          ?? AppBotPipe.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] Failed to start claude"); return 1; }
             proc.WaitForExit();
             return proc.ExitCode;
@@ -158,7 +158,7 @@ internal partial class Program
             psi.ArgumentList.Add("-p");
             psi.ArgumentList.Add(question);
             using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-PRINT")
-                          ?? Process.Start(psi);
+                          ?? AppBotPipe.Start(psi);
             if (proc == null) return (1, "", "[CHAT] Failed to start claude");
             var outSb = new StringBuilder();
             var errSb = new StringBuilder();
