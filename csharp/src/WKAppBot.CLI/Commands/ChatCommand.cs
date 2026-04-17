@@ -43,8 +43,9 @@ internal partial class Program
             }
             if (interactive)
             {
-                Console.Error.WriteLine("[CHAT] `claude` CLI not found on PATH -- interactive mode requires Claude Code. Pass a question to use ask-triad fallback.");
-                return 127;
+                Console.Error.WriteLine("[CHAT] `claude` CLI not found on PATH -- entering ask-triad REPL fallback.");
+                Console.Error.WriteLine("[CHAT] Type a question and press Enter. /quit or Ctrl+D to exit. /help for tips.");
+                return RunAskTriadRepl();
             }
             Console.Error.WriteLine("[CHAT] `claude` CLI not installed -- routing to ask triad");
             return AskTriadFallback(question);
@@ -218,5 +219,59 @@ internal partial class Program
             modelHint: null,
             noWait: false,
             debateMode: false);
+    }
+
+    /// <summary>
+    /// REPL loop for interactive-mode fallback when `claude` CLI is not installed.
+    /// Reads a question per line, routes each to ask-triad, prints results. Exits on
+    /// /quit, /exit, EOF (Ctrl+D on Unix, Ctrl+Z then Enter on Windows), or empty-line+EOF.
+    /// One full cycle = user-line -> triad call -> triad reply printed -> prompt again.
+    /// </summary>
+    static int RunAskTriadRepl()
+    {
+        int cycles = 0;
+        while (true)
+        {
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write("triad> ");
+            Console.ResetColor();
+
+            string? line;
+            try { line = Console.ReadLine(); }
+            catch (IOException) { line = null; } // stdin closed
+            if (line == null)
+            {
+                Console.Error.WriteLine($"[CHAT] EOF -- leaving REPL after {cycles} cycle(s)");
+                return 0;
+            }
+
+            var q = line.Trim();
+            if (q.Length == 0) continue;
+
+            if (q is "/quit" or "/exit" or ":q")
+            {
+                Console.Error.WriteLine($"[CHAT] /quit -- leaving REPL after {cycles} cycle(s)");
+                return 0;
+            }
+            if (q is "/help" or "?")
+            {
+                Console.WriteLine("  /quit | /exit | :q   -- leave REPL");
+                Console.WriteLine("  /help | ?            -- this help");
+                Console.WriteLine("  <any question>       -- routed to ask-triad (GPT + Gemini + Claude web)");
+                Console.WriteLine("  Ctrl+Z then Enter    -- EOF (Windows)");
+                continue;
+            }
+
+            try
+            {
+                var rc = AskTriadFallback(q);
+                cycles++;
+                Console.Error.WriteLine($"[CHAT] cycle #{cycles} done (rc={rc})");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CHAT] triad error: {ex.Message} -- continuing");
+            }
+        }
     }
 }
