@@ -302,16 +302,19 @@ internal static class EyeCmdPipeServer
             var cmdLine = string.Join(" ", args);
             Console.Error.WriteLine($"[CMD-MCP] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"} hwnd=0x{callerHwnd?.ToInt64():X}");
 
-            // CWD mismatch: caller has different CWD than Eye's own CWD -> MCP worker may use wrong base path.
-            // Register as bug for path-sensitive commands (a11y, file, logcat, inspect).
+            // CWD-mismatch diagnostic (NOT a bug). The MCP chain already propagates the
+            // caller's CWD end-to-end: EyeMcpClient sends _meta.callerCwd, McpCommand
+            // receives it and sets EyeCmdPipeServer.CallerCwd.Value, then the Runner
+            // applies Environment.CurrentDirectory = callerCwd before dispatch. So a
+            // caller in D:\GitHub\WkAutoQuant hitting an Eye rooted at D:\GitHub\WKAppBot
+            // resolves relative paths against the caller's workspace correctly. The
+            // previous AutoRegisterBug() call here was filing a false-positive for every
+            // such cross-workspace request -- removed. Keep the [CMD-CWD-CORRECT] hint
+            // for the subdir-promotion case (Eye launched from a build subdir).
             var eyeCwd = Program.EyeCallerCwd;
             if (!string.IsNullOrEmpty(callerCwd) && !string.IsNullOrEmpty(eyeCwd)
-                && !string.Equals(callerCwd.TrimEnd('\\', '/'), eyeCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)
-                && (args.Length > 0 && args[0].ToLowerInvariant() is "a11y" or "file" or "logcat" or "inspect"))
+                && !string.Equals(callerCwd.TrimEnd('\\', '/'), eyeCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
             {
-                // Benign case: caller is at a parent directory of Eye's CWD.
-                // e.g. caller=D:\GitHub\WKAppBot, eye=D:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI
-                // Eye launched from a subdir (hot-swap artifact). Auto-correct EyeCallerCwd upward.
                 var callerNorm = callerCwd.TrimEnd('\\', '/').Replace('/', '\\');
                 var eyeNorm = eyeCwd.TrimEnd('\\', '/').Replace('/', '\\');
                 bool callerIsParent = eyeNorm.StartsWith(callerNorm + '\\', StringComparison.OrdinalIgnoreCase);
@@ -320,15 +323,8 @@ internal static class EyeCmdPipeServer
                     Console.Error.WriteLine($"[CMD-CWD-CORRECT] Eye CWD subdir of caller -- auto-correcting EyeCallerCwd: {eyeCwd} -> {callerCwd}");
                     Program.SetEyeCallerCwd(callerCwd);
                 }
-                else
-                {
-                    Console.Error.WriteLine($"[CMD-CWD-MISMATCH] caller={callerCwd} eye={eyeCwd}");
-                    Program.AutoRegisterBug(
-                        $"[BUG-AUTO] CWD mismatch on `{cmdLine}`\n" +
-                        $"Caller: {callerCwd}\nEye: {eyeCwd}\n" +
-                        $"MCP worker runs with Eye CWD -- relative paths in caller may resolve differently.",
-                        args, callerCwd);
-                }
+                // Cross-workspace case (caller and Eye in unrelated trees) is legitimate
+                // and fully handled by the CWD propagation chain -- no log, no bug report.
             }
 
             EyeMcpClient.CurrentCallerCwd = callerCwd;
