@@ -1,0 +1,30 @@
+﻿{
+    "id":  "suggest-workflow",
+    "app":  "wkappbot-workflow",
+    "title":  "서제스트 관리 워크플로우",
+    "desc":  "서제스트 = AI가 발견한 버그/개선 자동 기록. 쌓이면 머지로 정리, 우선순위 높은 것부터 resolve. resolve 시 반드시 evidence 스크립트 필요.",
+    "steps":  [
+                  "wkappbot suggest list — 현황 파악",
+                  "비슷한 것끼리 머지: wkappbot suggest merge \u003cts1\u003e \u003cts2\u003e --title X --root-cause Y --components Z --work Nh",
+                  "CP949 깨진 텍스트: suggestions.jsonl 직접 python3으로 수정 (encoding=\u0027utf-8\u0027로 읽어서 덮어쓰기)",
+                  "빠른 것(est≤2h) / freq 높은 것 / risk=high 우선 처리",
+                  "resolve 플래그 (길다! 그냥 외워): --i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this-script",
+                  "전체 명령: wkappbot suggest resolve \u003cts\u003e \u0027note\u0027 --i-completed-the-code-...-willkim-allowed-this-script test.sh",
+                  "evidence test.sh: exit 0 이어야 resolve 허용 (regression 자동 재실행됨)",
+                  "★ 서제스트에서 얻은 인사이트는 skill contribute 로 스킬화"
+              ],
+    "tags":  [
+                 "workflow",
+                 "suggest",
+                 "maintenance",
+                 "bug",
+                 "resolve",
+                 "operator"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T03:30:00Z",
+    "updated":  "2026-04-08T16:50:01.5733248Z",
+    "version":  "1.6"
+}

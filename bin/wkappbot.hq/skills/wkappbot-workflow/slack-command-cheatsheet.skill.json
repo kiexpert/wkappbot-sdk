@@ -1,0 +1,28 @@
+﻿{
+    "id":  "slack-command-cheatsheet",
+    "app":  "wkappbot-workflow",
+    "title":  "slack — Send \u0026 Reply Cheatsheet",
+    "desc":  "wkappbot slack send/reply for Slack communication. Eye = Slack daemon built-in (Socket Mode), no separate listener. Always reply to threads using --msg TS.",
+    "steps":  [
+                  "SEND: wkappbot slack send \"message\" [file.png]",
+                  "REPLY: wkappbot slack reply \"message\" --msg \u003cTS\u003e — thread reply",
+                  "TS format: float string e.g. \"1744023456.789012\"",
+                  "Eye integrates Slack — no need for \u0027slack listen\u0027 separately",
+                  "Claude asks: send via Slack + prompt simultaneously (Slack alone forbidden)",
+                  "Bot name = cwd-based prefix, auto-detected from active card"
+              ],
+    "tags":  [
+                 "slack",
+                 "send",
+                 "reply",
+                 "thread",
+                 "reference",
+                 "operator"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T13:00:00Z",
+    "updated":  "2026-04-08T16:49:02.9474577Z",
+    "version":  "1.5"
+}

@@ -1,0 +1,32 @@
+﻿{
+    "id":  "ask-command-cheatsheet",
+    "app":  "wkappbot-workflow",
+    "title":  "ask — AI Delegation Cheatsheet",
+    "desc":  "wkappbot ask delegates questions to GPT/Gemini/Claude. triad = all three in parallel. agent = autonomous sub-agent loop. ALWAYS ask in English — Korean wastes 3-4x tokens.",
+    "steps":  [
+                  "SINGLE: wkappbot ask gpt|gemini|claude \"question\" [file.png]",
+                  "PARALLEL: wkappbot ask triad \"question\" — GPT+Gemini+Claude, fastest wins",
+                  "AGENT: wkappbot agent gpt|gemini|claude \"task\" — autonomous loop",
+                  "⚠ ALWAYS ask in English — Korean = 3-4x token waste",
+                  "ask result = artifact in chat; DOM content needs a11y --eval-js to read",
+                  "CDP돋보기: show InputZoom overlay during CDP ask operations",
+                  "debate: ask gpt \u0027Problem: X. Goal: Y. Best approach?\u0027 for design decisions"
+              ],
+    "tags":  [
+                 "ask",
+                 "gpt",
+                 "gemini",
+                 "claude",
+                 "triad",
+                 "agent",
+                 "delegation",
+                 "reference",
+                 "operator"
+             ],
+    "source_refs":  null,
+    "regression_script":  null,
+    "author":  "claude",
+    "created":  "2026-04-07T13:00:00Z",
+    "updated":  "2026-04-08T16:50:12.2599653Z",
+    "version":  "1.7"
+}

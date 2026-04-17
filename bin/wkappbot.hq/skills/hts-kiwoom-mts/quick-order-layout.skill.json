@@ -1,0 +1,24 @@
+﻿{
+    "id":  "quick-order-layout",
+    "app":  "hts-kiwoom-mts",
+    "title":  "쾌속주문 호가창 퀵버튼 레이아웃",
+    "desc":  "퀵버튼 content-desc가 전부 \u0027정정\u0027으로 잘못 표시됨(앱 버그). text(매수/매도/정정/취소)로 구분해야 함.",
+    "steps":  [
+                  "매수/매도: a11y click \u0027adb://*heromts*#매수\u0027 (첫 매치=상단 버튼)",
+                  "퀵버튼 content-desc 전부 \u0027정정\u0027 → text 속성으로 구분 필수",
+                  "호가 탭: 호가이벤트클릭투명버튼 12개, 좌표 기반 탭",
+                  "주문 후 확인 다이얼로그 예상 — 자동 수락 처리 필요"
+              ],
+    "tags":  [
+                 "android",
+                 "adb",
+                 "heromts",
+                 "quick-order",
+                 "호가",
+                 "버그",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:06:57.9769054Z",
+    "version":  "1.2"
+}

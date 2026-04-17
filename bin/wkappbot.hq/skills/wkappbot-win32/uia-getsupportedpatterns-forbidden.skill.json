@@ -1,0 +1,30 @@
+﻿{
+    "id":  "uia-getsupportedpatterns-forbidden",
+    "app":  "wkappbot-win32",
+    "title":  "UIA GetSupportedPatterns forbidden on MFC",
+    "desc":  "Calling GetSupportedPatterns() on MFC owner-drawn controls causes COM state corruption. Use individual TryGetCurrentPattern() calls per needed pattern instead.",
+    "steps":  [
+                  "Do NOT call el.GetSupportedPatterns() on MFC controls",
+                  "Instead: try InvokePattern p; el.TryGetCurrentPattern(InvokePattern.Pattern, out p)",
+                  "Wrap each TryGetCurrentPattern in try-catch (COM exceptions possible)",
+                  "For scroll pattern specifically: use el.Patterns.Scroll.IsSupported (safe property)"
+              ],
+    "tags":  [
+                 "uia",
+                 "mfc",
+                 "hts",
+                 "com",
+                 "gotcha",
+                 "project"
+             ],
+    "source_refs":  [
+                        {
+                            "file":  "csharp/src/WKAppBot.Win32/Input/InputReadiness.cs",
+                            "line":  1030,
+                            "pattern":  "GetSupportedPatterns() COM"
+                        }
+                    ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:02:11.5125399Z",
+    "version":  "1.3"
+}

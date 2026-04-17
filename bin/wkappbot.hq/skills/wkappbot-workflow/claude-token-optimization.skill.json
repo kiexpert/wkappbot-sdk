@@ -1,0 +1,37 @@
+{
+  "id": "claude-token-optimization",
+  "app": "wkappbot-workflow",
+  "title": "Claude Code Token Optimization \u2014 3 Techniques",
+  "desc": "80-90% of tokens are spent on file exploration, not writing code. Three techniques to cut waste: (1) .claudeignore \u002B lean CLAUDE.md \u002B session management saves 30-40%. (2) Codebase pre-indexing saves 90%\u002B of exploration tokens. (3) 3-agent team (Architect/Builder/Reviewer) eliminates scope creep token waste.",
+  "steps": [
+    "[CLAUDEIGNORE] Create .claudeignore in project root. Exclude: node_modules/, dist/, bin/, obj/, .bak/, .log, .out, .wkappbot/, .dotnet/. One-time setup, no maintenance needed.",
+    "[CLAUDE-MD] Keep CLAUDE.md under 200 lines. Every conversation loads it in full. Move detailed rules to separate topic files, reference them only when needed. Saves 5-10% per conversation.",
+    "[SESSION] Use /compact when conversation grows long. Use /clear when switching to a completely new task. Check context with wkappbot claude-usage -- handoff at 8MB, urgent at 10MB.",
+    "[MCP] Only connect MCP servers you actively use. Each connected server adds tool definitions to every message. Disconnecting 3 unused servers gives immediate relief.",
+    "[PRE-INDEX] Pre-index codebase with qmd (BM25\u002Bvector). Without indexing: glob\u002Bgrep\u002Bread = 2700 tokens per lookup. With indexing: 250 tokens. 91% reduction. qmd://collection/file.cs:42 resolves directly to file\u002Bline.",
+    "[QMD-MODES] Three search modes: (1) qmd search = BM25 keyword/identifier, fast, no extra models. (2) qmd vsearch = vector semantic, concept queries, 329MB model. (3) qmd query = hybrid \u002B LLM expansion \u002B reranking, downloads 2GB models on first run. Use search for identifiers, vsearch for concepts, avoid query in daily use.",
+    "[QMD-TIPS] Search without --collection searches all collections at once (better than filtering). Exact function names return precise file:line. Natural language works best with vsearch. MCP: add qmd server to .mcp.json, available as mcp__qmd__* tools.",
+    "[3-AGENT] Split work into 3 roles: (1) Architect reads codebase, writes detailed brief. (2) Builder implements ONLY what brief specifies. (3) Reviewer validates output, returns specific failures to Builder.",
+    "[3-AGENT-WHY] Without role separation, Claude reads the entire codebase for a login feature, adds untested CSS, writes unrequested tests. Builder never reads files the Architect did not specify.",
+    "[CLAUDE-MD-RULES] 5 rules to add: (1) Never re-read a file already in context. (2) No speculative tool calls. (3) Parallelize independent tool calls. (4) Never repeat what the user already explained. (5) Use qmd search before reading files.",
+    "[PRIORITY] Apply in order: first .claudeignore \u002B lean CLAUDE.md (immediate, zero cost). Then qmd pre-indexing (5 min setup, 91% exploration savings). Then 3-agent structure when project grows large.",
+    "[IMPACT] Combined: same token budget handles 2-3x more work. For Claude Pro users with tight limits, this effectively doubles monthly task capacity."
+  ],
+  "tags": [
+    "token",
+    "optimization",
+    "claudeignore",
+    "claude.md",
+    "session",
+    "compact",
+    "pre-index",
+    "3-agent",
+    "cost"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-09T12:43:16Z",
+  "updated": "2026-04-09T04:21:22.9516986Z",
+  "version": "1.2"
+}

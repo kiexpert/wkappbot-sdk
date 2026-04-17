@@ -26,6 +26,7 @@ bin/wkappbot.hq/runtime/
 bin/wkappbot.hq/output/
 bin/wkappbot.hq/sessions/
 bin/wkappbot.hq/skills/
+!bin/wkappbot.hq/skills/
 bin/wkappbot.hq/handlers/
 !bin/wkappbot.hq/experience/
 !bin/wkappbot.hq/suggestions.jsonl

@@ -1,0 +1,23 @@
+﻿{
+    "id":  "mdi-form-targeting",
+    "app":  "hts-xingq",
+    "title":  "MDI 자식폼 타겟팅",
+    "desc":  "MDI child form 제목이 종목명으로 바뀜 — 타이틀 매칭 금지. 폼 인덱스나 class 기반으로 매칭해야 함.",
+    "steps":  [
+                  "폼 제목은 종목명으로 변경됨 → wkappbot a11y에서 제목 grap 매칭 불안정",
+                  "폼 인덱스(Z-order) 또는 class 이름으로 식별",
+                  "버튼 클릭: MFC owner-drawn → wm_lbutton 사용 (bm_click 금지)",
+                  "버튼 여러 개 있을 때 X좌표 오름차순으로 정렬해 nth 선택"
+              ],
+    "tags":  [
+                 "hts",
+                 "xingq",
+                 "mfc",
+                 "mdi",
+                 "타겟팅",
+                 "project"
+             ],
+    "author":  "claude",
+    "created":  "2026-04-06T17:07:24.7745164Z",
+    "version":  "1.2"
+}

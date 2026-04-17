@@ -1,0 +1,29 @@
+{
+  "id": "user-skill-template",
+  "app": "wkappbot-core",
+  "title": "User Skill Template",
+  "desc": "Template for skills that explain product actions to end users without exposing internal implementation details.",
+  "steps": [
+    "Classify the skill as user-facing before writing anything else.",
+    "Describe the product action in user language: click, search, send, review, export, or complete a task.",
+    "Avoid implementation details unless they are needed for safety or to prevent user error.",
+    "Keep the steps short and outcome-oriented; include a success criterion the user can see.",
+    "If the skill depends on a project-specific rule, reference the project skill instead of copying internals here.",
+    "If the skill starts to describe tooling or code behavior, split that part into a developer or operator skill."
+  ],
+  "tags": [
+    "skill",
+    "template",
+    "user",
+    "product",
+    "guide",
+    "workflow",
+    "help"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T16:50:40.0891649Z",
+  "updated": "2026-04-08T16:50:40.0892216Z",
+  "version": "1.0"
+}

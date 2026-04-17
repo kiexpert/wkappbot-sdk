@@ -1,0 +1,31 @@
+{
+  "id": "project-skill-template",
+  "app": "wkappbot-core",
+  "title": "Project Skill Template",
+  "desc": "Template for skills that capture repository-specific rules, exceptions, and local conventions so the right project-only guidance is easy to select.",
+  "steps": [
+    "Classify the skill as project-specific before writing anything else.",
+    "Keep only the rules that are specific to one repository, product, or local runtime.",
+    "Separate shared operator guidance from project exceptions so the skill stays short and reusable.",
+    "Include the minimum verification step needed to prove the project rule still holds.",
+    "Prefer project names, file paths, and commands that are valid only inside the target repository.",
+    "If a rule starts being reused elsewhere, extract the common part into an operator or developer skill and keep the project skill narrow.",
+    "Avoid generic advice that should live in an operator or developer template instead."
+  ],
+  "tags": [
+    "skill",
+    "template",
+    "project",
+    "repository",
+    "local",
+    "conventions",
+    "split",
+    "verify"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T16:46:27.3397227Z",
+  "updated": "2026-04-08T16:49:18.9758825Z",
+  "version": "1.2"
+}
