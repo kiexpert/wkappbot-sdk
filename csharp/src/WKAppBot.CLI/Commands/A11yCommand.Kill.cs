@@ -228,6 +228,21 @@ internal partial class Program
             targets = candidates;
         }
 
+        // [READINESS] Probe before destructive kill (magnifier + blocker + yield popup).
+        // Use first target's main window when available; kill is not focusless but the
+        // contract is "every a11y action runs the input-position-guard before firing."
+        if (!dryRun)
+        {
+            try
+            {
+                var firstHwnd = targets
+                    .Select(c => { try { return c.Proc.MainWindowHandle; } catch { return IntPtr.Zero; } })
+                    .FirstOrDefault(h => h != IntPtr.Zero && NativeMethods.IsWindow(h));
+                EnsureA11yReadiness(firstHwnd, "kill");
+            }
+            catch { /* best-effort */ }
+        }
+
         var killed = new List<string>();
         foreach (var c in targets)
         {

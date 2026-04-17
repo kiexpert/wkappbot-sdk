@@ -95,6 +95,11 @@ internal partial class Program
         hackLog.WriteLine($"[HACK] Target: 0x{hwnd.ToInt64():X} \"{win.Title}\" grap=\"{grapFull}\"");
         PulseStep.Mark("target-found");
 
+        // [READINESS] 입력위치확보기 (magnifier + blocker detect + yield popup).
+        // hack is read-only but the magnifier contract applies to every a11y action except find.
+        EnsureA11yReadiness(hwnd, "hack");
+        PulseStep.Mark("readiness-probed");
+
         // If #scope specified, find UIA element and use its BoundingRectangle
         NativeMethods.GetWindowRect(hwnd, out var wr);
         // Save full window rect for UIA standalone overlay (before narrowing)

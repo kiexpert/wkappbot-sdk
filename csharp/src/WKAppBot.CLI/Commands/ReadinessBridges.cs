@@ -42,6 +42,72 @@ internal partial class Program
     internal static ActionReadiness CreateActionReadiness(InputReadiness readiness)
         => new(readiness);
 
+    // -- Delegated-handler readiness gate --
+
+    /// <summary>
+    /// Shared Probe() gate for a11y actions delegated out of the main A11yCommand loop
+    /// (hack / hack-hover / hack-input / inspect / screenshot / ocr / kill).
+    /// Runs the full input-position-guard pipeline (magnifier + blocker detect + yield popup)
+    /// once the target hwnd is known. Even focusless actions must call this -- the magnifier
+    /// ("돋보기") is a first-class UX contract, not just a focus-steal guard.
+    /// Safe to call when hwnd == IntPtr.Zero (no-op).
+    /// </summary>
+    internal static void EnsureA11yReadiness(IntPtr hwnd, string action)
+    {
+        if (hwnd == IntPtr.Zero) return;
+        if (InputReadiness.ReadinessCalled) return; // already probed by caller
+        try
+        {
+            var readiness = CreateInputReadiness();
+            readiness.Probe(new InputReadinessRequest
+            {
+                TargetHwnd = hwnd,
+                IntendedAction = action,
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[READINESS] {action} probe failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Resolve a grap pattern to exactly one window for non-find a11y actions.
+    /// Enforces the two shared contracts:
+    ///   1. Ambiguity -> fall back to find-style candidate list + error (no silent first-pick).
+    ///   2. Single match -> run EnsureA11yReadiness (magnifier / blocker / yield popup).
+    /// Returns the selected WindowInfo or null when the caller should exit 1.
+    /// Intended for delegated handlers that do not pass through the main A11yCommand loop:
+    ///   inspect / screenshot / ocr / capture-style commands with a single-target grap.
+    /// </summary>
+    internal static WindowInfo? ResolveA11yTarget(string grap, string action)
+    {
+        var windows = WindowFinder.FindWindows(grap);
+        if (windows.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[A11Y] {action}: no window matching \"{grap}\"");
+            Console.ResetColor();
+            return null;
+        }
+        if (windows.Count > 1)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine(
+                $"[A11Y] {action} AMBIGUOUS -- \"{grap}\" matched {windows.Count} windows. " +
+                "Narrow via #scope / hwnd: / a more specific pattern:");
+            Console.ResetColor();
+            foreach (var w in windows.Take(20))
+                Console.Error.WriteLine($"  0x{w.Handle.ToInt64():X8}  \"{w.Title}\"");
+            if (windows.Count > 20)
+                Console.Error.WriteLine($"  ... and {windows.Count - 20} more");
+            return null;
+        }
+        var target = windows[0];
+        EnsureA11yReadiness(target.Handle, action);
+        return target;
+    }
+
     // -- 공용 입력위치확보: iconic zoom + focusless restore + blocker dismiss --
 
     /// <summary>
