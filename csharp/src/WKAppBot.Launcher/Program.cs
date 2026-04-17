@@ -92,6 +92,22 @@ partial class Program
             // EyeCmdPipeClient uses _consoleCodePage to decide encoding; normalize to 65001 for UTF-8 mode.
             _needsTranscode = !isUtf8Term;
             if (isUtf8Term) _consoleCodePage = 65001;
+
+            // Launcher's own Console.Out/Error writers must encode strings to the console's CP.
+            // Without this, .NET writes UTF-8 bytes by default (on CP949 conhost) -> `?` for any
+            // non-ASCII char in Launcher-emitted messages. `?` fallback keeps CP949 conhost stable
+            // and preserves Korean text (which CP949 supports natively).
+            try
+            {
+                var consoleEnc = isUtf8Term
+                    ? System.Text.Encoding.UTF8
+                    : System.Text.Encoding.GetEncoding(_consoleCodePage,
+                        System.Text.EncoderFallback.ReplacementFallback,
+                        System.Text.DecoderFallback.ReplacementFallback);
+                Console.OutputEncoding = consoleEnc;
+                try { if (!Console.IsInputRedirected) Console.InputEncoding = consoleEnc; } catch { }
+            }
+            catch { /* best-effort: leave default if unsupported CP */ }
         }
         prof($"encoding-recovery: sysCP={GetConsoleOutputCP()} needsTranscode={_needsTranscode}");
         bool quietFind = IsQuietFindCommand(args);
