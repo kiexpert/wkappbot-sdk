@@ -71,3 +71,4 @@ agent-policy*.txt
 agent-session.json
 agent-checkpoints/
 agent-patch-*.patch
+!bin/wkappbot.hq/suggestions_history.jsonl
