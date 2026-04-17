@@ -166,6 +166,13 @@ internal partial class Program
                 NativeMethods.GetWindowThreadProcessId(rootHwndEarly, out uint pid);
                 string proc; try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { proc = "?"; }
                 FlaUI.Core.AutomationElements.AutomationElement? curEl = null;
+
+                // [FOCUS-STEAL:hover] uia.FromPoint on Chromium/Electron can activate IAccessible
+                // and trigger a focus event. Worker runs 100ms loop so Dispose-based sentinel is
+                // unusable; inline snapshot before + after the probe instead. No restore (user is
+                // actively mousing around, always "active") -- just a bug report so regressions
+                // surface. Throttled: only report when fg actually differs from our baseline.
+                var fgBeforeProbe = NativeMethods.GetForegroundWindow();
                 try
                 {
                     curEl = uia.FromPoint(new System.Drawing.Point(pt.X, pt.Y));
@@ -180,6 +187,33 @@ internal partial class Program
                     }
                 }
                 catch { }
+
+                // [FOCUS-STEAL:hover] Post-probe fg check. If fg moved AND no mouse button is
+                // currently down (user didn't click), uia.FromPoint is the likely culprit.
+                try
+                {
+                    var fgAfterProbe = NativeMethods.GetForegroundWindow();
+                    if (fgAfterProbe != fgBeforeProbe && fgBeforeProbe != IntPtr.Zero)
+                    {
+                        const int VK_LBUTTON = 0x01, VK_RBUTTON = 0x02;
+                        bool userClicking =
+                            (NativeMethods.GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 ||
+                            (NativeMethods.GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+                        if (!userClicking)
+                        {
+                            string stolenTitle = "";
+                            try { stolenTitle = WKAppBot.Win32.Window.WindowFinder.GetWindowText(fgAfterProbe); } catch { }
+                            if (stolenTitle.Length > 40) stolenTitle = stolenTitle[..40] + "...";
+                            Log($"[FOCUS-STEAL:hover] uia.FromPoint on proc={proc} stole fg: " +
+                                $"was=0x{fgBeforeProbe.ToInt64():X8} now=0x{fgAfterProbe.ToInt64():X8} \"{stolenTitle}\"");
+                            AutoBugReport(
+                                $"FOCUS-STEAL during hack-hover uia.FromPoint on proc={proc} " +
+                                $"element={(string.IsNullOrEmpty(elAid) ? elName : elAid)} " +
+                                $"was=0x{fgBeforeProbe.ToInt64():X8} now=0x{fgAfterProbe.ToInt64():X8}");
+                        }
+                    }
+                }
+                catch { /* best-effort */ }
 
                 // Best child hwnd: UIA NativeWindowHandle > WindowFromPoint child > root
                 // UIA element knows its exact backing Win32 window (WPF/Electron host, not generic parent)
