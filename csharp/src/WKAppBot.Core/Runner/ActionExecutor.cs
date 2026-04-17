@@ -491,11 +491,14 @@ public sealed class ActionExecutor : IDisposable
 
     /// <summary>
     /// Read an element's text value: UIA ValuePattern.Value first (edit controls,
-    /// the canonical "value"), falling back to Name property for labels and buttons.
+    /// the canonical "value"), then TextPattern.DocumentRange.GetText as a fallback
+    /// for rich-text documents like Windows 11 Notepad RichEditD2DPT where
+    /// ValuePattern returns empty/stale. Name property is used as final label fallback.
     /// </summary>
     private static string ReadElementValue(AutomationElement el)
     {
-        try { if (el.Patterns.Value.IsSupported) return el.Patterns.Value.Pattern.Value.Value ?? ""; } catch { }
+        try { if (el.Patterns.Value.IsSupported) { var v = el.Patterns.Value.Pattern.Value.Value; if (!string.IsNullOrEmpty(v)) return v; } } catch { }
+        try { if (el.Patterns.Text.IsSupported) { var t = el.Patterns.Text.Pattern.DocumentRange.GetText(-1); if (!string.IsNullOrEmpty(t)) return t; } } catch { }
         return el.Properties.Name.ValueOrDefault ?? "";
     }
 

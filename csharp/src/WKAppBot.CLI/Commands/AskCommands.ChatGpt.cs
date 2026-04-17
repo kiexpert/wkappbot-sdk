@@ -259,8 +259,10 @@ internal partial class Program
     static readonly string[] ChatGptEditorSelectors =
     [
         "#prompt-textarea",                              // Stable ID
+        "[data-testid='prompt-textarea']",               // Test hook (recent ChatGPT)
         "[role='textbox'][contenteditable='true']",      // ARIA role
         ".ProseMirror[contenteditable='true']",          // ProseMirror class
+        "textarea[placeholder*='Message']",              // Plain textarea fallback
         "div[contenteditable='true']",                   // Generic fallback
     ];
 
@@ -371,6 +373,23 @@ internal partial class Program
         }
         Console.WriteLine($" {sw.Elapsed.TotalSeconds:F1}s");
         Console.WriteLine("[ASK] Editor not found (a11y selector chain exhausted)");
+        // Diagnostic dump: URL + title + visible editables — actionable clue for suggest queue
+        try
+        {
+            var diag = await cdp.EvalAsync("""
+                (() => {
+                    var u = location.href;
+                    var t = document.title;
+                    var ce = document.querySelectorAll('[contenteditable=\"true\"]').length;
+                    var ta = document.querySelectorAll('textarea').length;
+                    var tb = document.querySelectorAll('[role=\"textbox\"]').length;
+                    var login = /login|auth/i.test(location.pathname) ? 'login-page' : 'normal';
+                    return JSON.stringify({url:u, title:t, contentEditable:ce, textarea:ta, textbox:tb, nav:login});
+                })()
+                """);
+            Console.WriteLine($"[ASK] EDITOR-DIAG: {diag}");
+        }
+        catch { }
         return null;
     }
 
