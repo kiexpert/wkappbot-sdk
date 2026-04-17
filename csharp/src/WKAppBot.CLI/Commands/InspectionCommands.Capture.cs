@@ -13,6 +13,7 @@ internal partial class Program
 {
     static int CaptureCommand(string[] args)
     {
+        using var focusSentinel = new FocusStealSentinel("a11y-screenshot");
         if (args.Length == 0)
             return Error(@"Usage: appbot capture <window-title> [-o output.png] [--form <form-id>] [--no-learn]
   --form <id>: Capture a specific MDI child form (brings it to front first).
@@ -117,6 +118,7 @@ internal partial class Program
 
     static int OcrCommand(string[] args)
     {
+        using var focusSentinel = new FocusStealSentinel("a11y-ocr");
         if (args.Length == 0)
             return Error(@"Usage: wkappbot ocr <window-title|image.png> [--save] [-o output.txt]
   Runs OCR on a window screenshot or image file and prints all recognized text with coordinates.

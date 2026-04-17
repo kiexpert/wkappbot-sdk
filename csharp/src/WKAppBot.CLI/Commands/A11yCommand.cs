@@ -20,6 +20,13 @@ internal partial class Program
         if (args.Any(a => a is "--help" or "-h")) { TryPrintCommandHelp("a11y", args); return 0; }
         if (args.Any(a => a is "--regression")) { TryRunRegression("a11y", args); return 0; }
 
+        // [FOCUS-STEAL] End-of-command sentinel: snapshots foreground now, on scope exit
+        // verifies it hasn't changed -- if it did, restore + self-report via AutoBugReport.
+        // Skipped for find (read-only probing, legitimate foreground probing is expected).
+        var firstArg = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+        bool isFind = firstArg == "find";
+        using var focusSentinel = new FocusStealSentinel($"a11y-{firstArg}", skip: isFind);
+
         // === Focus Hot-Chain (lightweight -- Win32 only, no FlaUI/UIA DLL loading) ===
         // For "find": # FOCUS is deferred to A11yFind where focused element abs path is available.
         bool isFindAction = args.Length > 0 && args[0].Equals("find", StringComparison.OrdinalIgnoreCase);

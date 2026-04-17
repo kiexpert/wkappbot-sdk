@@ -72,6 +72,58 @@ internal partial class Program
     }
 
     /// <summary>
+    /// Wrap any a11y command body in `using var _ = new FocusStealSentinel("a11y-click")`
+    /// to catch focus steals that happen during the command. On Dispose, if the foreground
+    /// window changed, it is restored and a bug report is filed via AutoBugReport.
+    /// Find is exempt -- pass skip=true for the find action.
+    /// </summary>
+    internal readonly struct FocusStealSentinel : IDisposable
+    {
+        private readonly IntPtr _prevFg;
+        private readonly string _action;
+        private readonly bool _skip;
+
+        public FocusStealSentinel(string action, bool skip = false)
+        {
+            _action = action;
+            _skip = skip;
+            _prevFg = skip ? IntPtr.Zero : NativeMethods.GetForegroundWindow();
+        }
+
+        public void Dispose() => DetectAndRecover(phase: "end");
+
+        /// <summary>
+        /// Mid-action check. Call from inside long-running loops (like typing 1 char at a
+        /// time) to catch focus theft the moment it happens instead of waiting for command
+        /// exit. Returns true if theft was detected+recovered so the caller can bail out.
+        /// </summary>
+        public bool Checkpoint() => DetectAndRecover(phase: "mid");
+
+        private bool DetectAndRecover(string phase)
+        {
+            if (_skip || _prevFg == IntPtr.Zero) return false;
+            try
+            {
+                var curFg = NativeMethods.GetForegroundWindow();
+                if (curFg == _prevFg) return false;
+
+                string curTitle = "";
+                try { curTitle = WindowFinder.GetWindowText(curFg); } catch { }
+                if (curTitle.Length > 40) curTitle = curTitle[..40] + "...";
+                Console.Error.WriteLine(
+                    $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
+                    $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- restoring");
+                NativeMethods.ForceForegroundWindow(_prevFg);
+                AutoBugReport(
+                    $"FOCUS-STEAL {phase} during a11y {_action}: " +
+                    $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
+                return true;
+            }
+            catch { return false; }
+        }
+    }
+
+    /// <summary>
     /// Resolve a grap pattern to exactly one window for non-find a11y actions.
     /// Enforces the two shared contracts:
     ///   1. Ambiguity -> fall back to find-style candidate list + error (no silent first-pick).
