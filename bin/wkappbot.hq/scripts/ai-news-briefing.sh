@@ -1,93 +1,74 @@
 #!/bin/bash
-# AI News Briefing — searches recent AI news, filters for WKAppBot-relevant
-# items, registers as suggests, announces via speak + slack.
+# AI News Briefing — HTTP-based HN search, direct output (no browser dependency).
 # Scheduled: 11:00 / 18:00 daily (lunch & dinner briefing)
+# Phase 1: raw HN results → Slack + speak (no AI filter — all CDP-based)
+# Phase 2 (future): add API-based GPT/Claude filter when API key available
 
 WKAPPBOT="D:/GitHub/WKAppBot/bin/wkappbot.exe"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
-SEARCH_KEYWORDS=(
-  "AI desktop automation 2026"
-  "Windows accessibility API AI"
-  "Claude computer use update"
-  "UI automation agent framework"
-  "LLM tool use MCP update"
-)
 
 echo "[$TIMESTAMP] AI News Briefing starting"
 
-# Step 1: Search multiple keywords, collect raw results
+# Step 1: Fetch from Hacker News Algolia API
 RAW=$(mktemp)
-for kw in "${SEARCH_KEYWORDS[@]}"; do
-  $WKAPPBOT web search "$kw" --limit 3 2>/dev/null >> "$RAW"
-  echo "---" >> "$RAW"
+QUERIES=(
+  "AI+automation+agent"
+  "Claude+computer+use+MCP"
+  "Windows+UI+automation"
+  "LLM+desktop+agent"
+)
+for q in "${QUERIES[@]}"; do
+  $WKAPPBOT web fetch "https://hn.algolia.com/api/v1/search_by_date?query=${q}&tags=story&hitsPerPage=3" --max-chars 4000 2>/dev/null >> "$RAW"
 done
 
-RESULT_COUNT=$(grep -c "http" "$RAW")
-echo "[$TIMESTAMP] Found $RESULT_COUNT raw results across ${#SEARCH_KEYWORDS[@]} queries"
+# Extract titles + URLs
+ITEMS=$(mktemp)
+grep -o '"title":"[^"]*"' "$RAW" | sed 's/"title":"//;s/"$//' > "${ITEMS}.t"
+grep -o '"url":"[^"]*"' "$RAW" | sed 's/"url":"//;s/"$//' > "${ITEMS}.u"
+grep -o '"objectID":"[^"]*"' "$RAW" | sed 's/"objectID":"//;s/"$//' > "${ITEMS}.id"
 
-if [ "$RESULT_COUNT" -eq 0 ]; then
-  $WKAPPBOT speak "AI 뉴스 검색 결과가 없습니다"
-  rm -f "$RAW"
+paste -d'|' "${ITEMS}.t" "${ITEMS}.u" "${ITEMS}.id" | while IFS='|' read t u id; do
+  [ -z "$t" ] && continue
+  [ -z "$u" ] && u="https://news.ycombinator.com/item?id=$id"
+  echo "$t|$u"
+done | sort -u | head -10 > "$ITEMS"
+
+rm -f "${ITEMS}.t" "${ITEMS}.u" "${ITEMS}.id"
+ITEM_COUNT=$(wc -l < "$ITEMS")
+echo "[$TIMESTAMP] Found $ITEM_COUNT unique stories"
+
+if [ "$ITEM_COUNT" -eq 0 ]; then
+  $WKAPPBOT speak "AI news: no results" 2>/dev/null
+  $WKAPPBOT slack send ":newspaper: AI News ($TIMESTAMP) — no results from HN" 2>/dev/null
+  rm -f "$RAW" "$ITEMS"
   exit 0
 fi
 
-# Step 2: AI filter — ask Gemini to pick WKAppBot-relevant items
-FILTER_PROMPT="Below are recent AI news search results. Pick the top 3 most relevant to WKAppBot (a Windows UI automation framework using UIA/Win32/SendInput with MCP integration for AI agents). For each, output EXACTLY this format — nothing else:
-
-TITLE: <headline>
-URL: <url>
-WHY: <one sentence why this matters for WKAppBot>
-SUMMARY: <one sentence summary>
-
-If nothing is relevant, output: NONE
-
-Search results:
-$(cat "$RAW")"
-
-FILTERED=$(mktemp)
-$WKAPPBOT ask gemini "$FILTER_PROMPT" 2>/dev/null > "$FILTERED"
-
-# Step 3: Parse and register suggests
+# Step 2: Register as suggests
 SUGGEST_COUNT=0
-while IFS= read -r line; do
-  if [[ "$line" == TITLE:* ]]; then
-    TITLE="${line#TITLE: }"
-  elif [[ "$line" == WHY:* ]]; then
-    WHY="${line#WHY: }"
-  elif [[ "$line" == SUMMARY:* ]]; then
-    SUMMARY="${line#SUMMARY: }"
-    if [ -n "$TITLE" ] && [ -n "$SUMMARY" ]; then
-      $WKAPPBOT suggest "[AI-NEWS] $TITLE: $WHY" 2>/dev/null
-      SUGGEST_COUNT=$((SUGGEST_COUNT+1))
-    fi
-    TITLE="" WHY="" SUMMARY=""
-  fi
-done < "$FILTERED"
+while IFS='|' read title url; do
+  $WKAPPBOT suggest "[AI-NEWS] $title ($url)" 2>/dev/null
+  SUGGEST_COUNT=$((SUGGEST_COUNT+1))
+done < "$ITEMS"
 
-echo "[$TIMESTAMP] Registered $SUGGEST_COUNT suggests"
+# Step 3: Build Slack message
+SLACK_MSG=":newspaper: AI News Briefing ($TIMESTAMP)
+${ITEM_COUNT} stories from Hacker News
+"
+while IFS='|' read title url; do
+  SLACK_MSG+="
+• $title
+  $url"
+done < "$ITEMS"
 
-# Step 4: Build briefing message
-if [ "$SUGGEST_COUNT" -gt 0 ]; then
-  BRIEFING=$(grep -E "^(TITLE|SUMMARY):" "$FILTERED" | head -6)
-  FIRST_SUMMARY=$(grep "^SUMMARY:" "$FILTERED" | head -1 | sed 's/^SUMMARY: //')
+SLACK_MSG+="
 
-  # Speak one-line summary (TTS)
-  $WKAPPBOT speak "AI 뉴스 브리핑. ${FIRST_SUMMARY:-새로운 소식이 있습니다}" 2>/dev/null
+_${SUGGEST_COUNT} items registered as [AI-NEWS] suggests_"
 
-  # Slack full briefing
-  $WKAPPBOT slack send "$(cat <<EOF
-:newspaper: AI News Briefing ($TIMESTAMP)
-$SUGGEST_COUNT 건의 관련 뉴스 → suggest 에 등록됨
+# Step 4: Announce
+FIRST_TITLE=$(head -1 "$ITEMS" | cut -d'|' -f1)
+$WKAPPBOT speak "AI news briefing. ${FIRST_TITLE}" 2>/dev/null
+$WKAPPBOT slack send "$SLACK_MSG" 2>/dev/null
 
-$(cat "$FILTERED" | grep -E "^(TITLE|URL|WHY|SUMMARY):" | head -12)
-
-_wkappbot suggest list 로 확인_
-EOF
-)" 2>/dev/null
-else
-  $WKAPPBOT speak "AI 뉴스 브리핑. 오늘은 관련 소식이 없습니다" 2>/dev/null
-  $WKAPPBOT slack send ":newspaper: AI News Briefing ($TIMESTAMP) — 관련 뉴스 없음" 2>/dev/null
-fi
-
-rm -f "$RAW" "$FILTERED"
+rm -f "$RAW" "$ITEMS"
 echo "[$TIMESTAMP] AI News Briefing done ($SUGGEST_COUNT items)"
