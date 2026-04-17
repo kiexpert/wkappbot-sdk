@@ -1,0 +1,6 @@
+test-file-read-score-signal-module.sh
+test-file-read-detect-buildup-module.sh
+test-file-read-chart-generator-module.sh
+test-file-read-record-event-module.sh
+test-file-read-update-outcome-module.sh
+test-file-read-query-similar-module.sh
