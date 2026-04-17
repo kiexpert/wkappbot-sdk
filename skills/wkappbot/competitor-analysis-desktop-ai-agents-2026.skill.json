@@ -1,0 +1,30 @@
+{
+  "id": "competitor-analysis-desktop-ai-agents-2026",
+  "app": "wkappbot",
+  "title": "Competitor Analysis: Desktop AI Agent Frameworks (2026-04)",
+  "desc": "Competitive landscape analysis of Windows desktop AI automation frameworks: UI Automata (visioncortex), DirectShell (IamLumae). Both target the same space as WKAppBot \u2014 AI-driven Windows desktop control \u2014 using complementary but different approaches. Analysis compares architecture, element targeting, AI integration, and identifies WKAppBot unique strengths.",
+  "steps": [
+    "COMPETITOR 1: UI Automata (visioncortex, Rust, open-source, April 2026). Architecture: YAML workflow engine with CSS-like selectors for Windows UI elements. Shadow DOM cache of UIA tree (like React virtual DOM in reverse). Cross-framework: Win32/MFC/WPF/UWP/WinUI3 \u002B CDP for browsers. MCP server for AI agent integration. Action-Expect-Recovery per step with timeout (no sleeps). HWND locking for identity stability. Vision OCR fallback when UIA has no coverage. Origin: industrial CAD/CAM automation clients. GitHub stars: 5 (very early).",
+    "COMPETITOR 2: DirectShell (IamLumae, Rust, open-source, Feb 2026). Architecture: accessibility-layer-first approach (\u0027God Mode\u0027). Claims to replace all screenshot-based agents. MCP integration. SendInput rewrite. Daemon mode. Tip Engine (reinforcement learning for contextual tips). Focus: universal application control via a11y tree. Self-describes as \u0027Day 1\u0027 product \u2014 explicitly rough but conceptually bold. GitHub stars: 14.",
+    "WKAPPBOT UNIQUE ADVANTAGES vs UI Automata: (1) 5-tier element search (UIA \u2192 Vision Cache \u2192 Simple OCR \u2192 Vision API \u2192 Coordinate). UI Automata has 2 tiers (UIA \u002B Vision OCR). (2) Focusless-first design (UIA Invoke/Value/Toggle without stealing focus). UI Automata requires window focus for actions. (3) Self-healing DYN-A11Y for MFC owner-drawn controls (CCA segmentation \u002B OCR cross-validation \u002B Gemini inference). UI Automata has no equivalent. (4) Experience DB (fused_match.jsonl) \u2014 learned element mappings cached across sessions. UI Automata shadow DOM is per-session only. (5) Integrated Eye daemon with Slack/MCP/WPF overlay. UI Automata is a standalone CLI/MCP server.",
+    "WKAPPBOT UNIQUE ADVANTAGES vs DirectShell: (1) Production-hardened (v5.14, months of real-world HTS/trading automation). DirectShell is Day 1 alpha. (2) 3-tier fallback (UIA \u2192 Win32 \u2192 SendInput) vs DirectShell single-layer a11y. (3) Admin elevation support (--sudo session, admin Eye proxy). DirectShell has no elevation story. (4) Android support via ADB. DirectShell is Windows-only.",
+    "WHAT COMPETITORS DO BETTER: UI Automata: (1) CSS-like selector syntax is more familiar to web developers than grap patterns. (2) YAML workflow files with Action-Expect-Recovery is a clean declarative format. (3) Rust performance \u2014 native speed without .NET runtime overhead. (4) Shadow DOM with automatic staleness detection and subtree re-resolution. DirectShell: (1) Bold vision of community-driven app profiles repository. (2) Reinforcement learning tip engine is novel.",
+    "STRATEGIC IMPLICATIONS: (1) The \u0027Windows desktop AI automation\u0027 space is now contested \u2014 no longer WKAppBot alone. (2) UI Automata targets enterprise CAD/CAM \u2014 different vertical from WKAppBot HTS focus, but same core tech. (3) MCP is becoming the standard interface \u2014 all three frameworks support it. (4) Vision-as-fallback is consensus (UI Automata and WKAppBot both do it; DirectShell rejects it). (5) WKAppBot should publicize its 5-tier search and focusless-first as differentiators.",
+    "ACTION ITEMS: (1) Try UI Automata\u0027s CSS selector on WKAppBot targets \u2014 evaluate if grap syntax needs improvement. (2) Consider adding YAML workflow support alongside existing scenario YAML. (3) Evaluate Rust rewrite for performance-critical paths (UIA enumeration). (4) Prepare public comparison page for portfolio site. (5) Monitor GitHub stars and HN discussion for community traction."
+  ],
+  "tags": [
+    "competitor",
+    "analysis",
+    "ui-automata",
+    "directshell",
+    "desktop",
+    "automation",
+    "strategy"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T04:27:00.9379257Z",
+  "updated": "2026-04-17T04:27:00.9379348Z",
+  "version": "1.0"
+}
