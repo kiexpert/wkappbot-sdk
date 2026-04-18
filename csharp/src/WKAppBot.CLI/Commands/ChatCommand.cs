@@ -779,16 +779,56 @@ internal partial class Program
         return null; // all sessions live (or none exist) -- fork fresh
     }
 
-    // Return the user's active Claude session JSONL path so fallback AIs can
-    // receive it as a real file attachment instead of inline text.
-    static string? GetClaudeSessionAttachmentFile()
+    // Return a session-context file path for fallback AIs. Small sessions
+    // (<500KB) get attached raw so the AI has the fullest possible history.
+    // Large sessions get tail-trimmed to 80KB (last ~10 turns) and written
+    // as a .txt under %TEMP% -- AskCommand's InlineTextFiles inlines .txt
+    // <100KB into the prompt. The cap exists because CDP uploads of a
+    // 10MB+ jsonl to gemini/chatgpt flood the screen with progress scrolls
+    // and take forever; tail-only is the pragmatic default. User: "chat
+    // gemini로 직접 실행했는데 바로 초기화도 안 되고 화면에 스크롤돼서 너저분."
+    static string? GetClaudeSessionAttachmentFile(int rawCapBytes = 500 * 1024, int tailBytes = 80 * 1024)
     {
         try
         {
             var fi = FindActiveClaudeSessionJsonl();
             if (fi == null || !fi.Exists || fi.Length == 0) return null;
-            Console.Error.WriteLine($"[CHAT] attaching Claude session file: {fi.Name} ({fi.Length:N0} bytes)");
-            return fi.FullName;
+
+            if (fi.Length <= rawCapBytes)
+            {
+                Console.Error.WriteLine($"[CHAT] attaching Claude session file: {fi.Name} ({fi.Length:N0} bytes)");
+                return fi.FullName;
+            }
+
+            // Oversized: tail-trim to the configured budget and write as .txt
+            // so InlineTextFiles auto-inlines. Cwd-hashed temp path so
+            // concurrent projects don't clobber each other.
+            long start = Math.Max(0, fi.Length - tailBytes);
+            var buf = new byte[(int)Math.Min(tailBytes, fi.Length)];
+            int read;
+            using (var fs = fi.OpenRead())
+            {
+                fs.Seek(start, SeekOrigin.Begin);
+                read = fs.Read(buf, 0, buf.Length);
+            }
+            var tail = Encoding.UTF8.GetString(buf, 0, read);
+            if (start > 0)
+            {
+                int firstNl = tail.IndexOf('\n');
+                if (firstNl > 0 && firstNl + 1 < tail.Length) tail = tail[(firstNl + 1)..];
+            }
+            if (tail.Length == 0) return null;
+
+            var cwdHash = Environment.CurrentDirectory.GetHashCode().ToString("x8");
+            var path = Path.Combine(Path.GetTempPath(), $"wkappbot-claude-tail-{cwdHash}.txt");
+            var header =
+                $"# Recent Claude Code conversation (cwd: {Environment.CurrentDirectory})\n" +
+                $"# Source: {fi.FullName} ({fi.Length:N0} bytes total -- tail only)\n" +
+                $"# Tail size: {tail.Length} bytes (most recent turns)\n" +
+                $"# Format: JSONL (one Claude Code record per line)\n\n";
+            File.WriteAllText(path, header + tail, Encoding.UTF8);
+            Console.Error.WriteLine($"[CHAT] session too large ({fi.Length:N0}B) -- attaching {tail.Length:N0}B tail as {Path.GetFileName(path)}");
+            return path;
         }
         catch { return null; }
     }
