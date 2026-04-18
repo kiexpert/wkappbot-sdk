@@ -121,6 +121,13 @@ partial class Program
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
 
+        // --heal-link <linkPath> <targetPath>: internal self-dispatch used by
+        // the live-swap exit path. Polls the stale alias (up to ~1s) until the
+        // previous Launcher releases its exe lock, then deletes + re-links to
+        // wkappbot.exe. Runs early so we skip all the normal startup noise.
+        if (args.Length >= 3 && args[0] == "--heal-link")
+            return HealLinkSelfDispatch(args[1], args[2]);
+
         // Dim all Launcher stderr via ANSI codes -- MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
         Console.SetError(new DimStderrWriter(Console.Error));
 
