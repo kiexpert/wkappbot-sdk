@@ -476,26 +476,61 @@ internal partial class Program
     static bool InterceptChatOrShell(string line)
     {
         if (string.IsNullOrWhiteSpace(line)) return false;
-        bool chat = LooksLikeChatLine(line);
-        if (!chat) return false;
 
+        Action<string>? dispatch = null;
+        if (IsAppBotCommand(line))      dispatch = DispatchAppBotCommand;
+        else if (LooksLikeChatLine(line)) dispatch = l => AskSingleAiFallback(l.TrimStart(), _chatFallbackAi);
+        if (dispatch == null) return false;
+
+        // PseudoConsoleRunner already sent ESC (cmd.exe's typed line erased) and
+        // will send CR afterwards (cmd.exe emits "\r\n + fresh prompt"). We
+        // contribute one CRLF so our output starts on a fresh line, then let
+        // cmd.exe's own CRLF below handle the separator to the next prompt.
         var stdout = Console.OpenStandardOutput();
-        var sep = System.Text.Encoding.ASCII.GetBytes("\r\n");
-        stdout.Write(sep, 0, sep.Length);
+        var crlf = System.Text.Encoding.ASCII.GetBytes("\r\n");
+        stdout.Write(crlf, 0, crlf.Length);
         stdout.Flush();
 
-        try
-        {
-            AskSingleAiFallback(line.TrimStart(), _chatFallbackAi);
-        }
+        try { dispatch(line); }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
         }
-
-        stdout.Write(sep, 0, sep.Length);
-        stdout.Flush();
         return true;
+    }
+
+    // First token is "wkappbot" or "a11y" (our CLI entry points). We intercept
+    // these so cmd.exe's tokenizer never gets to touch them -- '?' as a glob,
+    // '&' as a separator, naked quotes etc. all stop being traps when we pass
+    // the raw line directly to Process.Start.
+    static bool IsAppBotCommand(string line)
+    {
+        var t = line.TrimStart();
+        return t.StartsWith("wkappbot ", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("wkappbot", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("a11y ", StringComparison.OrdinalIgnoreCase)
+            || t.Equals("a11y", StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Spawn the AppBot command as a child with inherited stdio so its output
+    // flows to the same terminal. UseShellExecute=false -> no cmd.exe layer,
+    // no re-parsing of '?' / '"' / '&'. The user's line comes in verbatim
+    // (minus the exe name) as the process arguments.
+    static void DispatchAppBotCommand(string line)
+    {
+        var t = line.TrimStart();
+        int sp = t.IndexOf(' ');
+        string exe = sp < 0 ? t : t[..sp];
+        string args = sp < 0 ? "" : t[(sp + 1)..];
+        var psi = new ProcessStartInfo
+        {
+            FileName = exe,
+            Arguments = args,
+            UseShellExecute = false,
+            WorkingDirectory = Environment.CurrentDirectory,
+        };
+        using var proc = Process.Start(psi);
+        proc?.WaitForExit();
     }
 
     // ASCII-only classification; returns true when the line should be routed

@@ -217,22 +217,41 @@ public static class PseudoConsoleRunner
                     if (!complexEdit && onLineReady != null)
                     {
                         var line = buffer.ToString();
+                        // Step 1: ESC clears cmd.exe's line buffer AND visually
+                        //         erases the user's typed text. We do this FIRST
+                        //         so the chat output doesn't appear next to a
+                        //         still-visible "haha?" that the user now knows
+                        //         isn't running.
+                        var esc = new byte[] { 0x1B };
+                        if (!WriteFile(inputWrite, esc, 1, out _, IntPtr.Zero))
+                            break;
+                        // Small pause lets cmd.exe's erase VT bytes reach the
+                        // terminal before the interceptor writes chat output.
+                        // Otherwise the erase codes can interleave with AI text.
+                        Thread.Sleep(30);
+
                         bool consumed = false;
                         try { consumed = onLineReady(line); } catch { consumed = false; }
                         if (consumed)
                         {
-                            // Clear cmd.exe's internal line buffer so the typed
-                            // text doesn't run as a shell command -- ESC is the
-                            // cmd.exe line-reset key. Then send CR to force it
-                            // to redraw a fresh prompt below whatever the
-                            // interceptor printed.
-                            var reset = new byte[] { 0x1B, (byte)'\r' };
-                            if (!WriteFile(inputWrite, reset, (uint)reset.Length, out _, IntPtr.Zero))
+                            // Step 2: a single CR drives cmd.exe to emit its
+                            //         own "\r\n + fresh prompt", which lands
+                            //         below the chat output. No extra \r\n
+                            //         needed from our side -- cmd.exe's own
+                            //         linebreak before the prompt is the
+                            //         natural separator.
+                            var cr = new byte[] { (byte)'\r' };
+                            if (!WriteFile(inputWrite, cr, 1, out _, IntPtr.Zero))
                                 break;
                             buffer.Clear();
                             complexEdit = false;
                             continue;
                         }
+                        // Not consumed after all -- we already sent ESC so the
+                        // typed line is gone from cmd.exe. Forward the original
+                        // Enter so the (now empty) command goes through, then
+                        // reset state. User sees a duplicate prompt which is a
+                        // mild price for rare false-positive chat detection.
                     }
                     buffer.Clear();
                     complexEdit = false;
