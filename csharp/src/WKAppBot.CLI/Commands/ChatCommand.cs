@@ -278,14 +278,19 @@ internal partial class Program
             _            => shellName, // caller already validated
         };
 
-        // cmd.exe specifics: UTF-8 code page (kills CP949 mojibake) + trailing
-        // space after '>' in the prompt. PROMPT env var inherits into cmd.exe;
-        // /K @chcp runs chcp silently at startup then stays interactive.
+        // cmd.exe specifics:
+        //   /Q                  ECHO OFF -- kills the pipe-mode "command line
+        //                       echoed twice" effect. Harmless in ConPTY.
+        //   /K @chcp 65001>nul  UTF-8 code page (kills CP949 mojibake both
+        //                       ways: output AND input).
+        //   PROMPT=$P$G (space) cmd.exe itself renders "D:\Foo> " with a
+        //                       trailing space, so our prompt decoration lands
+        //                       on bytes cmd.exe actually wrote.
         string? shellArgs = null;
         if (shellName == "cmd")
         {
             Environment.SetEnvironmentVariable("PROMPT", "$P$G ");
-            shellArgs = "/K @chcp 65001>nul";
+            shellArgs = "/Q /K @chcp 65001>nul";
         }
 
         var streamer = new PromptDecoratingStreamer();
@@ -326,8 +331,9 @@ internal partial class Program
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardInputEncoding  = Encoding.UTF8, // match chcp 65001: cmd.exe reads input as UTF-8
                 StandardOutputEncoding = Encoding.UTF8,
-                StandardErrorEncoding = Encoding.UTF8,
+                StandardErrorEncoding  = Encoding.UTF8,
                 CreateNoWindow = true,
                 WorkingDirectory = Environment.CurrentDirectory,
             };
