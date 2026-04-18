@@ -91,6 +91,74 @@ internal partial class Program
         Console.ResetColor();
     }
 
+    // Dispatch a one-shot question to claude CLI's -p print mode. Unlike the
+    // CDP-based AskClaude, this hits claude.exe locally: no browser, no CDP
+    // dependency, and session continuity comes from the -r/-c flag family.
+    // Output is captured, printed to the user, and recorded in
+    // .wkappbot/ask/<ts>-claude-cli-<slug>.md just like any other ask target
+    // so the session log keeps growing project-locally.
+    static int AskClaudeCli(string question, bool newSession)
+    {
+        var claudeExe = ResolveClaudeExe();
+        if (claudeExe == null)
+        {
+            Console.Error.WriteLine("[ASK] claude CLI not found on PATH. Install Claude Code or use a different AI target.");
+            return 127;
+        }
+        // Session continuity: prefer -r <exact-session-id> so we piggy-back on
+        // whatever the VSCode extension was writing; fall back to -c when we
+        // can't compute the id; skip entirely when the caller asked for a
+        // fresh session.
+        string? extraArgs = null;
+        if (!newSession)
+        {
+            var id = FindActiveClaudeSessionId();
+            extraArgs = id != null ? $"-r {id}" : "-c";
+        }
+        Console.Error.WriteLine($"[ASK] claude-cli {extraArgs ?? "(new session)"} -- \"{(question.Length > 60 ? question[..57] + "..." : question)}\"");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = claudeExe,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+        };
+        if (!string.IsNullOrEmpty(extraArgs))
+        {
+            foreach (var a in extraArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                psi.ArgumentList.Add(a);
+        }
+        psi.ArgumentList.Add("-p");
+        psi.ArgumentList.Add(question);
+
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) { Console.Error.WriteLine("[ASK] claude CLI failed to start"); return 1; }
+            var outSb = new StringBuilder();
+            var errSb = new StringBuilder();
+            proc.OutputDataReceived += (_, e) => { if (e.Data != null) outSb.AppendLine(e.Data); };
+            proc.ErrorDataReceived += (_, e) => { if (e.Data != null) errSb.AppendLine(e.Data); };
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+            proc.WaitForExit();
+            var stdout = outSb.ToString();
+            var stderr = errSb.ToString();
+            if (!string.IsNullOrEmpty(stdout)) Console.Write(stdout);
+            if (!string.IsNullOrEmpty(stderr)) Console.Error.Write(stderr);
+            try { WriteAskMd("claude-cli", question, stdout); } catch { }
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ASK] claude-cli error: {ex.Message}");
+            return 1;
+        }
+    }
+
     // Locate the most recently modified .wkappbot/ask/*-{ai}-*.md for the
     // current project (git-root scoped, same lookup as WriteAskMd). The .md
     // files are written by every ask invocation and form a natural per-project
@@ -299,8 +367,9 @@ internal partial class Program
             "gemini" => AskGemini(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "gpt" or "chatgpt" => AskChatGpt(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "claude" => AskClaude(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
+            "claude-cli" or "clicode" => AskClaudeCli(question, newSession),
             "triad" or "all" => AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, debateMode),
-            _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, or triad)")
+            _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, claude-cli, or triad)")
         };
     }
 
