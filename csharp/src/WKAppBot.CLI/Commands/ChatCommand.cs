@@ -525,7 +525,7 @@ internal partial class Program
 
         Action<string>? dispatch = null;
         if (IsAppBotCommand(line))      dispatch = DispatchAppBotCommand;
-        else if (LooksLikeChatLine(line)) dispatch = l => AskSingleAiFallback(l.TrimStart(), _chatFallbackAi);
+        else if (LooksLikeChatLine(line)) dispatch = DispatchChatToClaudeOrFallback;
         if (dispatch == null) return false;
 
         // PseudoConsoleRunner already sent ESC (cmd.exe's typed line erased) and
@@ -543,6 +543,24 @@ internal partial class Program
             Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
         }
         return true;
+    }
+
+    // Primary chat route inside an OS shell (chat cmd / chat bash etc.): send
+    // the line to Claude CLI first because it's the cheapest, most capable
+    // local agent available, and -r/-c gives us exact session continuity with
+    // whatever VSCode Claude Code is already doing. Only fall back to the
+    // CDP-based gpt/gemini/triad path when claude CLI is unreachable (not
+    // installed, exit 127). This matches the user's ask: "if the shell isn't
+    // an AI, pick claude CLI as the first agent."
+    static void DispatchChatToClaudeOrFallback(string line)
+    {
+        var q = line.TrimStart();
+        var rc = AskClaudeCli(q, newSession: false);
+        if (rc == 127)
+        {
+            Console.Error.WriteLine($"[CHAT] claude CLI unavailable -- falling back to ask {_chatFallbackAi}");
+            AskSingleAiFallback(q, _chatFallbackAi);
+        }
     }
 
     // First token is "wkappbot" or "a11y" (our CLI entry points). We intercept
