@@ -62,8 +62,14 @@ public static class ShellToolUseEncoder
             var kept = maxResultBytes;
             body = body[..kept];
             if (!body.EndsWith('\n')) body += "\n";
-            body += $"... 짤림: /out {rec.Id} 명령으로 전체 보기 ({rec.LineCount}줄 전체) ...\n";
-            truncNote = $" truncated=\"tail cut at {kept}B -- full via /out {rec.Id}\"";
+            // Page-continuation hint: tell the AI exactly how to resume reading
+            // from where we cut. /out supports --after <byte-offset> and
+            // --lines <N> for this, modeled after tail-style pagination. The
+            // underlying "file" is our captured log -- no actual source file
+            // on disk is required for the AI to request a continuation.
+            var totalB = rec.LineCount > 0 ? $"총 {rec.LineCount}줄, " : "";
+            body += $"... 짤림: {totalB}이어보기 = `/out {rec.Id} --after {kept}` (바이트) 또는 `/out {rec.Id} --lines 50` (줄수) ...\n";
+            truncNote = $" truncated=\"tail cut at {kept}B -- resume via /out {rec.Id} --after {kept}\"";
         }
 
         sb.Append("<tool_result for=\"").Append(rec.Id).Append("\" exit=\"").Append(rec.ExitCode)
