@@ -235,6 +235,31 @@ internal partial class Program
             Console.WriteLine($"shell={currentShell}  cycles={cycles}  interrupts={InterruptChannel.HasPending()}");
             return;
         }
+        // /out <id> -- show a captured shell output by id. Useful when AI mentions
+        // "see output 2501" -- operator can bring up the full body without leaving
+        // the loop. Successful commands only ship preview + id in the tool_use
+        // broadcast, so this is how you inspect the actual content.
+        if (line.StartsWith("/out ", StringComparison.OrdinalIgnoreCase))
+        {
+            var idStr = line[5..].Trim();
+            if (!int.TryParse(idStr, out var id))
+            {
+                Console.Error.WriteLine($"[CHAT:LOOP] /out: '{idStr}' is not a valid id");
+                return;
+            }
+            var body = ShellOutputStore.ReadById(id);
+            if (body == null)
+            {
+                Console.Error.WriteLine($"[CHAT:LOOP] /out: id={id} not found");
+                return;
+            }
+            Console.WriteLine($"--- output id={id} ---");
+            Console.Write(body);
+            if (!body.EndsWith('\n')) Console.WriteLine();
+            Console.WriteLine($"--- end id={id} ---");
+            return;
+        }
+
         if (line.StartsWith("/use ", StringComparison.OrdinalIgnoreCase))
         {
             var name = line[5..].Trim().ToLowerInvariant();
@@ -288,7 +313,11 @@ internal partial class Program
         Console.WriteLine("  /help | ?              show this help");
         Console.WriteLine("  /use gpt|gemini|claude|triad   switch current AI shell");
         Console.WriteLine("  /status                show shell + interrupt state");
-        Console.WriteLine("  <any text>             dispatch to the current shell");
+        Console.WriteLine("  /out <id>              display captured shell output by id");
+        Console.WriteLine("  <shell command>        auto-detected: first token = path/exe -> run");
+        Console.WriteLine("  \" <text>\" (leading space)   force chat mode (skip shell detection)");
+        Console.WriteLine("  <non-ASCII text>       always chat (Korean / CJK never run as shell)");
+        Console.WriteLine("  <any other text>       dispatch to the current AI shell");
         Console.WriteLine();
         Console.WriteLine("  Tip: you can keep typing while the shell answers -- lines are");
         Console.WriteLine("  queued locally AND via the Launcher interrupt channel, so nothing");

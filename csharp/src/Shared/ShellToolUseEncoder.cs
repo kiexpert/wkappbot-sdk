@@ -48,6 +48,25 @@ public static class ShellToolUseEncoder
         sb.Append("  </input>\n");
         sb.Append("</tool_use>\n");
 
+        // Economy-first policy:
+        //   exit == 0 -> AI sees a lightweight reference only (id, line count,
+        //                last-line preview). If it wants the full output it can
+        //                echo "/out <id>" in its response and the operator or a
+        //                future AI-driven fetcher will surface the body.
+        //   exit != 0 -> error path. Inline the full (tail-truncated) body so
+        //                the AI can diagnose without a round-trip.
+        //
+        // This keeps successful-case context spend tiny while preserving the
+        // debugging superpower for failing commands.
+        if (rec.ExitCode == 0)
+        {
+            sb.Append("<tool_result for=\"").Append(rec.Id).Append("\" exit=\"0")
+              .Append("\" lines=\"").Append(rec.LineCount)
+              .Append("\" preview=\"").Append(Xml(rec.LastLine))
+              .Append("\" body=\"omitted\"/>\n");
+            return sb.ToString();
+        }
+
         var body = ShellOutputStore.ReadById(rec.Id) ?? "";
         var truncNote = "";
         if (body.Length > maxResultBytes)
