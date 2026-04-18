@@ -253,6 +253,20 @@ internal partial class Program
     /// rate-limit fallback -- the shell manages its own lifecycle. Exit code
     /// passthrough. Used for "wkappbot chat cmd / powershell / bash".
     /// </summary>
+    /// <summary>
+    /// Launch an OS shell (cmd / powershell / bash / ...) with full bidirectional
+    /// IOCP-style pipe streaming: child stdout / stderr relayed to the user's
+    /// terminal as each line arrives (no buffering), and lines typed by the user
+    /// at the Launcher's terminal forwarded into the child's stdin.
+    ///
+    /// Why not inherited stdio? On Windows, when a child inherits a parent's
+    /// console, its output uses direct Write/WriteConsole calls that don't flow
+    /// through the parent process's Console.Out -- the messages literally draw
+    /// on screen directly, which works in a vanilla terminal but breaks when
+    /// the parent's stdio has been captured or repointed (as in our
+    /// Launcher -> Core chain and future pipe-mode wrappers). Piped redirect
+    /// + async BeginOutputReadLine is the reliable "works anywhere" path.
+    /// </summary>
     static int ExecOsShell(string shellName)
     {
         var exe = shellName switch
@@ -266,29 +280,79 @@ internal partial class Program
 
         try
         {
-            Console.Error.WriteLine($"[CHAT] launching shell: {exe}  (type 'exit' to return)");
+            Console.WriteLine($"[CHAT] launching shell: {exe}  (type 'exit' to return)");
+            Console.Out.Flush();
 
-            // Use a bare Process.Start for interactive shells -- NOT AppBotPipe.
-            // AppBotPipe.StartTracked installs CreateProcessW hooks + CREATE_NO_WINDOW
-            // flags meant for headless automation; when a child shell inherits a
-            // detached console it cannot read terminal stdin, producing the
-            // "shell launched but input goes nowhere" symptom. Bare Process.Start
-            // with UseShellExecute=false and no stdio redirect inherits the parent's
-            // console handles directly, which is exactly what an interactive shell
-            // needs to talk to the user's terminal.
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
                 UseShellExecute = false,
-                RedirectStandardInput = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError = false,
-                CreateNoWindow = false,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+                CreateNoWindow = true,
                 WorkingDirectory = Environment.CurrentDirectory,
             };
             using var proc = Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] failed to start shell"); return 1; }
+
+            // -- Output relay (stdout + stderr) --
+            // Async line-by-line reads feed straight into Console.Out/Err so each
+            // line appears as soon as the child flushes it. No buffering on our
+            // side -- the BeginOutputReadLine thread writes immediately.
+            proc.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                Console.WriteLine(e.Data);
+            };
+            proc.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data == null) return;
+                Console.Error.WriteLine(e.Data);
+            };
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+
+            // -- Input forwarder --
+            // User types at the Launcher's terminal; NonBlockingLineReader picks
+            // each line up and we pipe it into the child's stdin. Closing stdin
+            // on EOF tells the shell to exit (natural Ctrl+Z / Ctrl+D behavior).
+            using var userReader = new WKAppBot.Shared.NonBlockingLineReader();
+            var inputCts = new CancellationTokenSource();
+            var inputThread = new Thread(() =>
+            {
+                try
+                {
+                    while (!proc.HasExited && !inputCts.IsCancellationRequested)
+                    {
+                        if (!userReader.TryTake(out var line, timeoutMs: 250, inputCts.Token))
+                            continue;
+                        if (line == null)
+                        {
+                            try { proc.StandardInput.Close(); } catch { }
+                            break;
+                        }
+                        try
+                        {
+                            proc.StandardInput.WriteLine(line);
+                            proc.StandardInput.Flush();
+                        }
+                        catch { break; }
+                    }
+                }
+                catch { /* best effort */ }
+            })
+            {
+                IsBackground = true,
+                Name = "chat-shell-stdin",
+            };
+            inputThread.Start();
+
             proc.WaitForExit();
+            inputCts.Cancel();
+            try { inputThread.Join(500); } catch { }
             return proc.ExitCode;
         }
         catch (Exception ex)
