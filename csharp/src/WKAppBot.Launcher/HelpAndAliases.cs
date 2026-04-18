@@ -70,13 +70,12 @@ partial class Program
     static string? _pendingHealTarget;
 
     /// <summary>
-    /// Call from AppBotExit (or whenever we're about to TerminateSelf). Only
-    /// does anything if MaybeLiveSwap recorded the alias path on entry; if
-    /// the link is still stale at this moment, schedule a detached PowerShell
-    /// helper that polls the link for up to ~1s, deletes it once the exe
-    /// lock releases (after we TerminateSelf), and creates a fresh hardlink
-    /// to wkappbot.exe. PowerShell instead of cmd because the retry loop
-    /// with sleep reads much cleaner as a one-liner there.
+    /// Call from AppBotExit. If MaybeLiveSwap recorded a stale alias path,
+    /// fire a detached Launcher self-dispatch (`wkappbot.exe --heal-link
+    /// &lt;link&gt; &lt;target&gt;`) that polls the alias until our exe lock
+    /// releases, then deletes + re-links. Keeping this in-binary avoids any
+    /// PowerShell / cmd dependency and keeps the lock-wait logic in one
+    /// language we already own.
     /// </summary>
     static void RunPendingHardlinkHealOnExit()
     {
@@ -86,44 +85,84 @@ partial class Program
 
         try
         {
-            // Bail if, by some miracle, the link is already healed (e.g., a
-            // concurrent wkappbot.exe invocation already ran
-            // EnsureBusyboxAliases). Compare mtimes as a cheap is-it-stale
-            // check; within 2s tolerance counts as already-fresh.
+            // Cheap is-it-still-stale check: matching mtimes (within 2s)
+            // means someone else already healed it while we were running.
             var linkTime = System.IO.File.GetLastWriteTimeUtc(linkPath);
             var targetTime = System.IO.File.GetLastWriteTimeUtc(targetPath);
             if (System.Math.Abs((targetTime - linkTime).TotalMilliseconds) < 2000) return;
 
-            // PowerShell retry loop: try delete + re-link up to 10 times with
-            // 100ms sleep between attempts (total budget ~1s). Works because
-            // by the second or third attempt our parent process has called
-            // TerminateSelf and released the exe lock.
-            var ps =
-                "$link='" + linkPath.Replace("'", "''") + "';" +
-                "$target='" + targetPath.Replace("'", "''") + "';" +
-                "for($i=0;$i -lt 10 -and (Test-Path -LiteralPath $link);$i++){" +
-                "  try{Remove-Item -Force -LiteralPath $link -ErrorAction Stop}catch{}" +
-                "  Start-Sleep -Milliseconds 100" +
-                "};" +
-                "if(-not (Test-Path -LiteralPath $link)){" +
-                "  cmd /c mklink /H `\"$link`\" `\"$target`\" | Out-Null" +
-                "}";
+            Console.Error.WriteLine($"[SWAP] heal scheduled: {System.IO.Path.GetFileName(linkPath)} (polling ~1s for lock release)");
+            try { Console.Out.Flush(); Console.Error.Flush(); } catch { }
 
+            // Spawn the canonical wkappbot.exe with the --heal-link internal
+            // flag. Redirect child stdio + close our ends so the user's outer
+            // shell doesn't hold a pipe to the helper after we TerminateSelf.
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName  = "powershell.exe",
-                Arguments = "-NoProfile -NonInteractive -Command \"" + ps.Replace("\"", "\\\"") + "\"",
+                FileName  = targetPath,
                 UseShellExecute = false,
                 CreateNoWindow  = true,
                 WindowStyle     = System.Diagnostics.ProcessWindowStyle.Hidden,
+                RedirectStandardInput  = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError  = true,
             };
-            using var _ = System.Diagnostics.Process.Start(psi);
-            Console.Error.WriteLine($"[SWAP] heal scheduled: {System.IO.Path.GetFileName(linkPath)} (polling ~1s for lock release)");
+            psi.ArgumentList.Add("--heal-link");
+            psi.ArgumentList.Add(linkPath);
+            psi.ArgumentList.Add(targetPath);
+            var p = System.Diagnostics.Process.Start(psi);
+            if (p != null)
+            {
+                try { p.StandardInput.Close();  } catch { }
+                try { p.StandardOutput.Close(); } catch { }
+                try { p.StandardError.Close();  } catch { }
+            }
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[SWAP] heal schedule failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Entry point for the `--heal-link &lt;link&gt; &lt;target&gt;` internal
+    /// subcommand. Tries to delete the stale alias for up to ~1s (the
+    /// previous Launcher's exe lock has to drop first), then recreates a
+    /// fresh hardlink to the current wkappbot.exe. No console output -- this
+    /// helper runs in the background after the user's session has already
+    /// returned a prompt.
+    /// </summary>
+    static int HealLinkSelfDispatch(string linkPath, string targetPath)
+    {
+        try
+        {
+            // Already fresh (mtimes match): someone else healed it.
+            if (System.IO.File.Exists(linkPath) && System.IO.File.Exists(targetPath))
+            {
+                var lt = System.IO.File.GetLastWriteTimeUtc(linkPath);
+                var tt = System.IO.File.GetLastWriteTimeUtc(targetPath);
+                if (System.Math.Abs((tt - lt).TotalMilliseconds) < 2000) return 0;
+            }
+
+            // Poll up to 10 x 100ms for the exe lock to release.
+            for (int i = 0; i < 10 && System.IO.File.Exists(linkPath); i++)
+            {
+                try { System.IO.File.Delete(linkPath); }
+                catch { /* lock still held, retry */ }
+                if (!System.IO.File.Exists(linkPath)) break;
+                System.Threading.Thread.Sleep(100);
+            }
+            if (System.IO.File.Exists(linkPath)) return 1; // gave up
+
+            // Recreate as hardlink (no admin required on same NTFS volume).
+            try
+            {
+                CreateHardLink(linkPath, targetPath, IntPtr.Zero);
+                return 0;
+            }
+            catch { return 2; }
+        }
+        catch { return 3; }
     }
 
     /// <summary>
