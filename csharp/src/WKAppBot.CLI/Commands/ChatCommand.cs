@@ -130,7 +130,7 @@ internal partial class Program
         {
             _chatFallbackAi = shell;
             var aq = string.Join(' ', qParts).Trim();
-            if (!string.IsNullOrEmpty(aq)) return AskSingleAiFallback(aq, shell);
+            if (!string.IsNullOrEmpty(aq)) return AskWithAutoFallback(aq, shell);
             Console.Error.WriteLine($"[CHAT] shell=ask-{shell} -- loop mode. /help for commands, /quit to exit.");
             return ChatLoopCommand(args);
         }
@@ -174,7 +174,7 @@ internal partial class Program
                 return ChatLoopCommand(args);
             }
             Console.Error.WriteLine($"[CHAT] `claude` CLI not installed -- routing to ask {_chatFallbackAi}");
-            return AskTriadFallback(question);
+            return AskWithAutoFallback(question, _chatFallbackAi);
         }
 
         if (interactive)
@@ -208,7 +208,7 @@ internal partial class Program
         }
 
         Console.Error.WriteLine("[CHAT] Rate-limit marker detected in claude output -> routing to ask triad");
-        return AskTriadFallback(question);
+        return AskWithAutoFallback(question, _chatFallbackAi);
     }
 
     static void PrintChatHelp()
@@ -543,8 +543,14 @@ internal partial class Program
         return () =>
         {
             var stdout = Console.OpenStandardOutput();
+            // \b\b overwrites the prompt's "> " with our marker glyph (user's
+            // intended prompt-compacting hack). Trailing \r\n -- not just \n --
+            // so the dispatch output that follows starts at column 0. With LF
+            // alone some terminals keep the column (or worse, skip rows with
+            // cursor-stretch VT), making the AI reply look like it landed
+            // "above" the user's echoed line.
             var echo = System.Text.Encoding.UTF8.GetBytes(
-                $"\r\n{echoStyle}{echoPrefix}{line}\x1b[0m\r\n");
+                $"\b\b{echoStyle}{echoPrefix}{line}\x1b[0m\r\n");
             stdout.Write(echo, 0, echo.Length);
             stdout.Flush();
             try { dispatch(line); }
@@ -565,11 +571,16 @@ internal partial class Program
     static void DispatchChatToClaudeOrFallback(string line)
     {
         var q = line.TrimStart();
-        var rc = AskClaudeCli(q, newSession: false);
-        if (rc == 127)
+        var rc = AskClaudeCli(q, newSession: false, out bool limitHit);
+        // Fall back when: (a) CLI not installed (rc=127), OR (b) rate-limit
+        // marker detected in claude-cli's output. Previous version only
+        // handled (a), so a rate-limited claude kept spamming errors without
+        // rotating to the next AI.
+        if (rc == 127 || limitHit)
         {
-            Console.Error.WriteLine($"[CHAT] claude CLI unavailable -- falling back to ask {_chatFallbackAi}");
-            AskSingleAiFallback(q, _chatFallbackAi);
+            var reason = rc == 127 ? "claude CLI unavailable" : "claude rate-limited";
+            Console.Error.WriteLine($"[CHAT] {reason} -- falling back to ask {_chatFallbackAi}");
+            AskWithAutoFallback(q, _chatFallbackAi);
         }
     }
 
@@ -768,53 +779,16 @@ internal partial class Program
         return null; // all sessions live (or none exist) -- fork fresh
     }
 
-    // Write the last <tailBytes> of the user's active Claude session JSONL
-    // to a temp .txt file and return its path, so AskCommand's existing
-    // InlineTextFiles (<100 KB .txt/.md) logic auto-inlines it into the
-    // fallback AI's prompt. The file lives under %TEMP% keyed by cwd hash so
-    // repeated fallbacks overwrite rather than accumulate. 80 KB tail covers
-    // roughly the last ~10 turns of a coding session without blowing the
-    // downstream ask inline cap.
-    static string? WriteClaudeSessionTailFile(int tailBytes = 80 * 1024)
+    // Return the user's active Claude session JSONL path so fallback AIs can
+    // receive it as a real file attachment instead of inline text.
+    static string? GetClaudeSessionAttachmentFile()
     {
         try
         {
             var fi = FindActiveClaudeSessionJsonl();
             if (fi == null || !fi.Exists || fi.Length == 0) return null;
-
-            long start = Math.Max(0, fi.Length - tailBytes);
-            var bufLen = (int)Math.Min(tailBytes, fi.Length);
-            var buf = new byte[bufLen];
-            int read;
-            using (var fs = fi.OpenRead())
-            {
-                fs.Seek(start, SeekOrigin.Begin);
-                read = fs.Read(buf, 0, buf.Length);
-            }
-            var tail = Encoding.UTF8.GetString(buf, 0, read);
-            // If we cut mid-line, drop the first partial record so the AI
-            // only sees complete JSONL entries.
-            if (start > 0)
-            {
-                int firstNl = tail.IndexOf('\n');
-                if (firstNl > 0 && firstNl + 1 < tail.Length) tail = tail[(firstNl + 1)..];
-            }
-            if (tail.Length == 0) return null;
-
-            // cwd-scoped filename so concurrent chat fallbacks in different
-            // projects don't clobber each other.
-            var cwdHash = Environment.CurrentDirectory
-                .GetHashCode()
-                .ToString("x8");
-            var tempDir = Path.GetTempPath();
-            var path = Path.Combine(tempDir, $"wkappbot-claude-tail-{cwdHash}.txt");
-
-            var header = $"# Recent Claude Code conversation (cwd: {Environment.CurrentDirectory})\n"
-                       + $"# Source: {fi.FullName}\n"
-                       + $"# Tail size: {tail.Length} bytes (most recent turns)\n"
-                       + $"# Format: JSONL (one Claude Code record per line)\n\n";
-            File.WriteAllText(path, header + tail, Encoding.UTF8);
-            return path;
+            Console.Error.WriteLine($"[CHAT] attaching Claude session file: {fi.Name} ({fi.Length:N0} bytes)");
+            return fi.FullName;
         }
         catch { return null; }
     }
@@ -960,6 +934,107 @@ internal partial class Program
                 || text.Contains("429", StringComparison.Ordinal));
     }
 
+    static readonly string[] ChatAiRotation =
+        ["gemini", "gpt", "claude", "triad"];
+
+    static readonly Dictionary<string, DateTimeOffset> _chatAiDisabledUntilUtc =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    static void DisableChatAiUntilReset(string ai, string reason)
+    {
+        var until = DateTimeOffset.Now.AddMinutes(15);
+        _chatAiDisabledUntilUtc[ai] = until;
+        Console.Error.WriteLine($"[CHAT] temporarily disabling {ai} for 15m ({reason})");
+    }
+
+    static void CleanupExpiredChatAiDisables()
+    {
+        var now = DateTimeOffset.Now;
+        foreach (var kv in _chatAiDisabledUntilUtc.ToArray())
+            if (kv.Value <= now)
+                _chatAiDisabledUntilUtc.Remove(kv.Key);
+    }
+
+    static bool IsChatAiDisabled(string ai)
+    {
+        CleanupExpiredChatAiDisables();
+        return _chatAiDisabledUntilUtc.TryGetValue(ai, out var until) && until > DateTimeOffset.Now;
+    }
+
+    static string? ResolveNextEnabledChatAi(string preferredAi)
+    {
+        CleanupExpiredChatAiDisables();
+        var start = Array.FindIndex(ChatAiRotation, ai => ai.Equals(preferredAi, StringComparison.OrdinalIgnoreCase));
+        if (start < 0) start = 0;
+        for (int i = 0; i < ChatAiRotation.Length; i++)
+        {
+            var candidate = ChatAiRotation[(start + i) % ChatAiRotation.Length];
+            if (!IsChatAiDisabled(candidate))
+                return candidate;
+        }
+        return null;
+    }
+
+    sealed class ChatLimitTeeTextWriter : TextWriter
+    {
+        readonly TextWriter _primary;
+        readonly TextWriter _secondary;
+        readonly object _lock = new();
+
+        public ChatLimitTeeTextWriter(TextWriter primary, TextWriter secondary)
+        {
+            _primary = primary;
+            _secondary = secondary;
+        }
+
+        public override Encoding Encoding => _primary.Encoding;
+
+        public override void Write(char value)
+        {
+            lock (_lock)
+            {
+                _primary.Write(value);
+                _secondary.Write(value);
+            }
+        }
+
+        public override void Write(string? value)
+        {
+            lock (_lock)
+            {
+                _primary.Write(value);
+                _secondary.Write(value);
+            }
+        }
+
+        public override void Write(char[] buffer, int index, int count)
+        {
+            lock (_lock)
+            {
+                _primary.Write(buffer, index, count);
+                _secondary.Write(buffer, index, count);
+            }
+        }
+
+        public override void WriteLine()
+        {
+            lock (_lock)
+            {
+                _primary.WriteLine();
+                _secondary.WriteLine();
+            }
+        }
+
+        public override void WriteLine(string? value)
+        {
+            lock (_lock)
+            {
+                _primary.WriteLine(value);
+                _secondary.WriteLine(value);
+            }
+        }
+    }
+
     // Default fallback AI. Triad (GPT+Gemini+Claude parallel debate) is overkill for
     // a casual chat and has known bugs + long runtimes -- bad UX for a first-response
     // path. Gemini is the current default: fastest to reply, single stream to read,
@@ -967,22 +1042,23 @@ internal partial class Program
     static string _chatFallbackAi = "gemini";
 
     static int AskSingleAiFallback(string question, string ai)
+        => AskSingleAiFallback(question, ai, out _);
+
+    static int AskSingleAiFallback(string question, string ai, out bool limitHit)
     {
         var preview = question.Length > 80 ? question[..77] + "..." : question;
         Console.Error.WriteLine($"[CHAT:FALLBACK] ask {ai} \"{preview}\"");
 
-        // Per-project continuity: attach a trimmed tail of the user's active
-        // Claude Code session (.jsonl) so the alternate AI gets the same
-        // conversational context Claude had. Saved as a .txt tail file under
-        // the ask InlineTextFiles size cap so it's inlined into the prompt
-        // (kept to 80KB of the JSONL tail = roughly last 5-10 turns).
-        // Returns null when no session can be found.
-        var contextFile = WriteClaudeSessionTailFile();
+        // Per-project continuity: attach the active Claude Code session
+        // (.jsonl) directly so fallback AIs can ingest it as a real file
+        // attachment instead of a text-inline surrogate.
+        var contextFile = GetClaudeSessionAttachmentFile();
         var attachList = new List<string>();
         if (contextFile != null) attachList.Add(contextFile);
 
         if (ai == "triad")
         {
+            limitHit = false;
             return AskTriadParallel(
                 question,
                 timeoutSec: 180,
@@ -1003,10 +1079,58 @@ internal partial class Program
         var args = contextFile != null
             ? new[] { ai, question, contextFile }
             : new[] { ai, question };
-        return AskCommand(args);
+
+        var originalOut = Console.Out;
+        var originalErr = Console.Error;
+        var outCapture = new StringWriter();
+        var errCapture = new StringWriter();
+        try
+        {
+            Console.SetOut(new ChatLimitTeeTextWriter(originalOut, outCapture));
+            Console.SetError(new ChatLimitTeeTextWriter(originalErr, errCapture));
+            var rc = AskCommand(args);
+            var combined = outCapture.ToString() + "\n" + errCapture.ToString();
+            limitHit = DetectRateLimitMarker(combined) || (rc != 0 && DetectLimitExitSignature(combined));
+            return rc;
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Console.SetError(originalErr);
+        }
     }
 
-    static int AskTriadFallback(string question) => AskSingleAiFallback(question, _chatFallbackAi);
+    static int AskTriadFallback(string question) => AskWithAutoFallback(question, _chatFallbackAi);
+
+    static int AskWithAutoFallback(string question, string preferredAi, Action<string>? onAiChanged = null)
+    {
+        var current = ResolveNextEnabledChatAi(preferredAi);
+        if (current == null)
+        {
+            Console.Error.WriteLine("[CHAT] no enabled AI fallback remains");
+            return 1;
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (current != null && seen.Add(current))
+        {
+            bool limitHit;
+            var rc = AskSingleAiFallback(question, current, out limitHit);
+            if (!limitHit)
+                return rc;
+
+            DisableChatAiUntilReset(current, "rate limit");
+            var next = ResolveNextEnabledChatAi(current);
+            if (next == null || seen.Contains(next))
+                return rc;
+
+            Console.Error.WriteLine($"[CHAT] {current} hit a rate limit -> falling back to {next}");
+            current = next;
+            onAiChanged?.Invoke(current);
+        }
+
+        return 1;
+    }
 
     /// <summary>
     /// REPL loop for interactive-mode fallback when `claude` CLI is not installed.
@@ -1029,6 +1153,7 @@ internal partial class Program
         int cycles = 0, pending = 0;
         while (true)
         {
+            EnsurePromptStartsOnFreshLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
             var depthTag = reader.PendingCount > 0 ? $" (buffered={reader.PendingCount})" : "";
             Console.Write($"{_chatFallbackAi}>{depthTag} ");
@@ -1064,7 +1189,7 @@ internal partial class Program
             try
             {
                 pending = reader.PendingCount;
-                var rc = AskSingleAiFallback(q, _chatFallbackAi);
+                var rc = AskWithAutoFallback(q, _chatFallbackAi);
                 cycles++;
                 var picked = reader.PendingCount;
                 var lagNote = picked > pending
