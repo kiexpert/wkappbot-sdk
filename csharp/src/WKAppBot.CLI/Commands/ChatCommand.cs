@@ -648,10 +648,10 @@ internal partial class Program
     //
     // That file is almost certainly the session the VSCode Claude Code
     // extension is writing to right now (extensions append on every message
-    // turn, so its mtime is freshest). Returning its bare name (without the
-    // ".jsonl" suffix) gives the session id claude CLI's -r flag expects.
-    // Returns null on any failure -- caller falls back to -c.
-    static string? FindActiveClaudeSessionId()
+    // turn, so its mtime is freshest). Returns the FileInfo so callers can
+    // use either the session id (bare name) or the full path/content.
+    // Returns null on any failure.
+    static FileInfo? FindActiveClaudeSessionJsonl()
     {
         try
         {
@@ -666,12 +666,64 @@ internal partial class Program
             var sessionDir = Path.Combine(home, ".claude", "projects", slug);
             if (!Directory.Exists(sessionDir)) return null;
 
-            var newest = new DirectoryInfo(sessionDir)
+            return new DirectoryInfo(sessionDir)
                 .GetFiles("*.jsonl")
                 .OrderByDescending(f => f.LastWriteTimeUtc)
                 .FirstOrDefault();
-            if (newest == null) return null;
-            return Path.GetFileNameWithoutExtension(newest.Name);
+        }
+        catch { return null; }
+    }
+
+    static string? FindActiveClaudeSessionId() =>
+        FindActiveClaudeSessionJsonl()?.Name is string n ? Path.GetFileNameWithoutExtension(n) : null;
+
+    // Write the last <tailBytes> of the user's active Claude session JSONL
+    // to a temp .txt file and return its path, so AskCommand's existing
+    // InlineTextFiles (<100 KB .txt/.md) logic auto-inlines it into the
+    // fallback AI's prompt. The file lives under %TEMP% keyed by cwd hash so
+    // repeated fallbacks overwrite rather than accumulate. 80 KB tail covers
+    // roughly the last ~10 turns of a coding session without blowing the
+    // downstream ask inline cap.
+    static string? WriteClaudeSessionTailFile(int tailBytes = 80 * 1024)
+    {
+        try
+        {
+            var fi = FindActiveClaudeSessionJsonl();
+            if (fi == null || !fi.Exists || fi.Length == 0) return null;
+
+            long start = Math.Max(0, fi.Length - tailBytes);
+            var bufLen = (int)Math.Min(tailBytes, fi.Length);
+            var buf = new byte[bufLen];
+            int read;
+            using (var fs = fi.OpenRead())
+            {
+                fs.Seek(start, SeekOrigin.Begin);
+                read = fs.Read(buf, 0, buf.Length);
+            }
+            var tail = Encoding.UTF8.GetString(buf, 0, read);
+            // If we cut mid-line, drop the first partial record so the AI
+            // only sees complete JSONL entries.
+            if (start > 0)
+            {
+                int firstNl = tail.IndexOf('\n');
+                if (firstNl > 0 && firstNl + 1 < tail.Length) tail = tail[(firstNl + 1)..];
+            }
+            if (tail.Length == 0) return null;
+
+            // cwd-scoped filename so concurrent chat fallbacks in different
+            // projects don't clobber each other.
+            var cwdHash = Environment.CurrentDirectory
+                .GetHashCode()
+                .ToString("x8");
+            var tempDir = Path.GetTempPath();
+            var path = Path.Combine(tempDir, $"wkappbot-claude-tail-{cwdHash}.txt");
+
+            var header = $"# Recent Claude Code conversation (cwd: {Environment.CurrentDirectory})\n"
+                       + $"# Source: {fi.FullName}\n"
+                       + $"# Tail size: {tail.Length} bytes (most recent turns)\n"
+                       + $"# Format: JSONL (one Claude Code record per line)\n\n";
+            File.WriteAllText(path, header + tail, Encoding.UTF8);
+            return path;
         }
         catch { return null; }
     }
@@ -777,12 +829,23 @@ internal partial class Program
     {
         var preview = question.Length > 80 ? question[..77] + "..." : question;
         Console.Error.WriteLine($"[CHAT:FALLBACK] ask {ai} \"{preview}\"");
+
+        // Per-project continuity: attach a trimmed tail of the user's active
+        // Claude Code session (.jsonl) so the alternate AI gets the same
+        // conversational context Claude had. Saved as a .txt tail file under
+        // the ask InlineTextFiles size cap so it's inlined into the prompt
+        // (kept to 80KB of the JSONL tail = roughly last 5-10 turns).
+        // Returns null when no session can be found.
+        var contextFile = WriteClaudeSessionTailFile();
+        var attachList = new List<string>();
+        if (contextFile != null) attachList.Add(contextFile);
+
         if (ai == "triad")
         {
             return AskTriadParallel(
                 question,
                 timeoutSec: 180,
-                attachFiles: null,
+                attachFiles: attachList.Count > 0 ? attachList : null,
                 newSession: false,
                 loopMode: false,
                 loopMaxSteps: 3,
@@ -792,10 +855,14 @@ internal partial class Program
                 noWait: false,
                 debateMode: false);
         }
-        // Delegate to `wkappbot ask <ai> <question>` which is the same code path an
-        // operator would hit typing the ask command by hand -- keeps the fallback in
-        // sync with any future improvements to single-AI ask flows.
-        return AskCommand(new[] { ai, question });
+        // Delegate to `wkappbot ask <ai> <question> [file]` which is the same
+        // code path an operator would hit typing the ask command by hand --
+        // keeps the fallback in sync with any future improvements. A third
+        // positional arg is read as an attachment by ParseTextAndFilesWithMarkers.
+        var args = contextFile != null
+            ? new[] { ai, question, contextFile }
+            : new[] { ai, question };
+        return AskCommand(args);
     }
 
     static int AskTriadFallback(string question) => AskSingleAiFallback(question, _chatFallbackAi);
