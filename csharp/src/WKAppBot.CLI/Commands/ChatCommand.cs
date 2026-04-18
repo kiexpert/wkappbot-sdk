@@ -515,30 +515,30 @@ internal partial class Program
     // When consumed, print a blank line for visual separation, dispatch to
     // the fallback AI, then another blank line so the fresh cmd.exe prompt
     // (forced by PseudoConsoleRunner's Enter-replacement) lands cleanly.
-    static bool InterceptChatOrShell(string line)
+    static Action? InterceptChatOrShell(string line)
     {
-        if (string.IsNullOrWhiteSpace(line)) return false;
+        if (string.IsNullOrWhiteSpace(line)) return null;
 
         Action<string>? dispatch = null;
-        if (IsAppBotCommand(line))      dispatch = DispatchAppBotCommand;
+        if (IsAppBotCommand(line))        dispatch = DispatchAppBotCommand;
         else if (LooksLikeChatLine(line)) dispatch = DispatchChatToClaudeOrFallback;
-        if (dispatch == null) return false;
+        if (dispatch == null) return null;
 
-        // PseudoConsoleRunner already sent ESC (cmd.exe's typed line erased) and
-        // will send CR afterwards (cmd.exe emits "\r\n + fresh prompt"). We
-        // contribute one CRLF so our output starts on a fresh line, then let
-        // cmd.exe's own CRLF below handle the separator to the next prompt.
-        var stdout = Console.OpenStandardOutput();
-        var crlf = System.Text.Encoding.ASCII.GetBytes("\r\n");
-        stdout.Write(crlf, 0, crlf.Length);
-        stdout.Flush();
-
-        try { dispatch(line); }
-        catch (Exception ex)
+        // Return the work as a closure; PseudoConsoleRunner runs it between
+        // its ESC (clear child's line) and CR (trigger fresh prompt). One
+        // CRLF before the dispatch output lands below the now-empty prompt.
+        return () =>
         {
-            Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
-        }
-        return true;
+            var stdout = Console.OpenStandardOutput();
+            var crlf = System.Text.Encoding.ASCII.GetBytes("\r\n");
+            stdout.Write(crlf, 0, crlf.Length);
+            stdout.Flush();
+            try { dispatch(line); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
+            }
+        };
     }
 
     // Primary chat route inside an OS shell (chat cmd / chat bash etc.): send
@@ -865,21 +865,21 @@ internal partial class Program
     // job and flow through unmodified. Think of claude as the chat agent
     // and wkappbot/a11y as side-channel tool invocations the user can mix
     // in without leaving the conversation.
-    static bool InterceptAppBotOnly(string line)
+    static Action? InterceptAppBotOnly(string line)
     {
-        if (!IsAppBotCommand(line)) return false;
-
-        var stdout = Console.OpenStandardOutput();
-        var crlf = Encoding.ASCII.GetBytes("\r\n");
-        stdout.Write(crlf, 0, crlf.Length);
-        stdout.Flush();
-
-        try { DispatchAppBotCommand(line); }
-        catch (Exception ex)
+        if (!IsAppBotCommand(line)) return null;
+        return () =>
         {
-            Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
-        }
-        return true;
+            var stdout = Console.OpenStandardOutput();
+            var crlf = Encoding.ASCII.GetBytes("\r\n");
+            stdout.Write(crlf, 0, crlf.Length);
+            stdout.Flush();
+            try { DispatchAppBotCommand(line); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
+            }
+        };
     }
 
     static (int exit, string stdout, string stderr) RunClaudePrint(string claudeExe, string question, bool printMode)

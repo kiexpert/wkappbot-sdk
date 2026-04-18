@@ -49,19 +49,29 @@ public static class PseudoConsoleRunner
     /// </summary>
     /// <summary>
     /// Optional Enter-key interceptor. Called with the best-effort local line
-    /// buffer whenever the user presses Enter -- returns true if the caller
-    /// consumed the line (don't forward Enter to the child; the caller is
-    /// responsible for whatever should happen next). The local buffer tracks
-    /// printables + Backspace only; arrow keys / Home / End / Tab taint the
-    /// line (complex edit) and Enter on a tainted line is always forwarded
-    /// unmodified, so interactive line editing keeps working.
+    /// buffer whenever the user presses Enter. It must return EITHER null
+    /// ("do not intercept -- forward Enter to the child unmodified") OR an
+    /// <see cref="Action"/> that performs the intercept work ("I will consume
+    /// this line"). The runner commits to intercept ONLY when a non-null
+    /// Action is returned: it sends ESC to the child (clearing its line
+    /// buffer so the typed text doesn't run as a shell command), pauses
+    /// briefly so the ESC-erase bytes reach the terminal, invokes the Action
+    /// (which typically prints its own output), then sends CR so the child
+    /// draws a fresh prompt below. This two-phase decide/commit avoids the
+    /// earlier bug where ESC was sent eagerly and dropped non-intercepted
+    /// commands like "dir /w".
+    ///
+    /// The local buffer tracks printables + Backspace only; arrow keys /
+    /// Home / End / Tab taint the line (complex edit) and Enter on a tainted
+    /// line is always forwarded unmodified, so interactive line editing
+    /// keeps working.
     /// </summary>
     public static int Run(
         string exe,
         string? args = null,
         string? cwd = null,
         Action<byte[], int>? onOutput = null,
-        Func<string, bool>? onLineReady = null,
+        Func<string, Action?>? onLineReady = null,
         bool mirrorToTerminal = true)
     {
         if (!IsSupported)
@@ -192,7 +202,7 @@ public static class PseudoConsoleRunner
     private static void RelayInput(
         IntPtr inputWrite,
         IntPtr hPC,
-        Func<string, bool>? onLineReady,
+        Func<string, Action?>? onLineReady,
         CancellationToken ct)
     {
         // Local line buffer: shadows what the user has typed since the last
@@ -217,29 +227,24 @@ public static class PseudoConsoleRunner
                     if (!complexEdit && onLineReady != null)
                     {
                         var line = buffer.ToString();
-                        // Step 1: ESC clears cmd.exe's line buffer AND visually
-                        //         erases the user's typed text. We do this FIRST
-                        //         so the chat output doesn't appear next to a
-                        //         still-visible "haha?" that the user now knows
-                        //         isn't running.
-                        var esc = new byte[] { 0x1B };
-                        if (!WriteFile(inputWrite, esc, 1, out _, IntPtr.Zero))
-                            break;
-                        // Small pause lets cmd.exe's erase VT bytes reach the
-                        // terminal before the interceptor writes chat output.
-                        // Otherwise the erase codes can interleave with AI text.
-                        Thread.Sleep(30);
-
-                        bool consumed = false;
-                        try { consumed = onLineReady(line); } catch { consumed = false; }
-                        if (consumed)
+                        Action? dispatch = null;
+                        try { dispatch = onLineReady(line); } catch { dispatch = null; }
+                        if (dispatch != null)
                         {
-                            // Step 2: a single CR drives cmd.exe to emit its
-                            //         own "\r\n + fresh prompt", which lands
-                            //         below the chat output. No extra \r\n
-                            //         needed from our side -- cmd.exe's own
-                            //         linebreak before the prompt is the
-                            //         natural separator.
+                            // Phase 1 -- ESC clears the child's line buffer
+                            // AND visually erases what the user typed.
+                            var esc = new byte[] { 0x1B };
+                            if (!WriteFile(inputWrite, esc, 1, out _, IntPtr.Zero))
+                                break;
+                            // Small pause so ESC-erase VT bytes reach the
+                            // terminal BEFORE the dispatch writes its output;
+                            // otherwise the erase codes interleave with it.
+                            Thread.Sleep(30);
+                            // Phase 2 -- run the intercept work.
+                            try { dispatch(); }
+                            catch { /* dispatch logged its own error */ }
+                            // Phase 3 -- single CR to drive the child to emit
+                            // its own "\r\n + fresh prompt" below the dispatch.
                             var cr = new byte[] { (byte)'\r' };
                             if (!WriteFile(inputWrite, cr, 1, out _, IntPtr.Zero))
                                 break;
@@ -247,11 +252,11 @@ public static class PseudoConsoleRunner
                             complexEdit = false;
                             continue;
                         }
-                        // Not consumed after all -- we already sent ESC so the
-                        // typed line is gone from cmd.exe. Forward the original
-                        // Enter so the (now empty) command goes through, then
-                        // reset state. User sees a duplicate prompt which is a
-                        // mild price for rare false-positive chat detection.
+                        // dispatch == null -> NOT intercepted, fall through to
+                        // the normal Enter forwarding below. Critically, we
+                        // have NOT sent ESC yet, so the child still has the
+                        // user's typed text in its line buffer and runs it
+                        // normally (e.g. "dir /w" keeps working).
                     }
                     buffer.Clear();
                     complexEdit = false;
