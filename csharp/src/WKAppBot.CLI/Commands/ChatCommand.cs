@@ -521,18 +521,31 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(line)) return null;
 
         Action<string>? dispatch = null;
-        if (IsAppBotCommand(line))        dispatch = DispatchAppBotCommand;
-        else if (LooksLikeChatLine(line)) dispatch = DispatchChatToClaudeOrFallback;
+        string echoPrefix = "";     // glyph shown before the user's text on redraw
+        string echoStyle = "";      // ANSI style for that redraw
+        if (IsAppBotCommand(line))
+        {
+            dispatch = DispatchAppBotCommand;
+            echoPrefix = "$ ";
+            echoStyle = "\x1b[1;33m"; // bold yellow -- "command dispatched"
+        }
+        else if (LooksLikeChatLine(line))
+        {
+            dispatch = DispatchChatToClaudeOrFallback;
+            echoPrefix = "» ";
+            echoStyle = "\x1b[1;36m"; // bold cyan -- "user chat message"
+        }
         if (dispatch == null) return null;
 
-        // Return the work as a closure; PseudoConsoleRunner runs it between
-        // its ESC (clear child's line) and CR (trigger fresh prompt). One
-        // CRLF before the dispatch output lands below the now-empty prompt.
+        // PseudoConsoleRunner's ESC wiped the user's typed line from cmd.exe's
+        // display. Redraw it here in a distinct color+glyph so the user still
+        // sees what they asked before the dispatch output appears below.
         return () =>
         {
             var stdout = Console.OpenStandardOutput();
-            var crlf = System.Text.Encoding.ASCII.GetBytes("\r\n");
-            stdout.Write(crlf, 0, crlf.Length);
+            var echo = System.Text.Encoding.UTF8.GetBytes(
+                $"\r\n{echoStyle}{echoPrefix}{line}\x1b[0m\r\n");
+            stdout.Write(echo, 0, echo.Length);
             stdout.Flush();
             try { dispatch(line); }
             catch (Exception ex)
@@ -872,9 +885,11 @@ internal partial class Program
         if (!IsAppBotCommand(line)) return null;
         return () =>
         {
+            // Same redraw-in-yellow convention as the cmd-shell path so the
+            // user sees which AppBot command they invoked before its output.
             var stdout = Console.OpenStandardOutput();
-            var crlf = Encoding.ASCII.GetBytes("\r\n");
-            stdout.Write(crlf, 0, crlf.Length);
+            var echo = Encoding.UTF8.GetBytes($"\r\n\x1b[1;33m$ {line}\x1b[0m\r\n");
+            stdout.Write(echo, 0, echo.Length);
             stdout.Flush();
             try { DispatchAppBotCommand(line); }
             catch (Exception ex)
