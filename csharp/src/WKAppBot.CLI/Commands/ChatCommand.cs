@@ -289,55 +289,116 @@ internal partial class Program
 
     /// <summary>
     /// REPL loop for interactive-mode fallback when `claude` CLI is not installed.
-    /// Reads a question per line, routes each to ask-triad, prints results. Exits on
-    /// /quit, /exit, EOF (Ctrl+D on Unix, Ctrl+Z then Enter on Windows), or empty-line+EOF.
-    /// One full cycle = user-line -> triad call -> triad reply printed -> prompt again.
+    /// Uses a background reader thread so the user can type the NEXT question while
+    /// the AI is still answering the current one -- their keystrokes land in a
+    /// thread-safe queue and are consumed on the next iteration with no visible lag.
+    ///
+    /// This is non-blocking BUFFERED input (lines pre-queued). A future enhancement
+    /// will stream characters in real time so long answers can show live while the
+    /// user types; the buffered approach here is the first step.
+    ///
+    /// Exits on /quit, /exit, :q, EOF (Ctrl+D / Ctrl+Z+Enter), or stdin close.
     /// </summary>
     static int RunAskTriadRepl()
     {
-        int cycles = 0;
-        while (true)
+        // Thread-safe queue. Background reader pushes, main loop pulls. Null entry
+        // signals EOF / stdin close; the main loop uses that to break cleanly.
+        var inputQueue = new System.Collections.Concurrent.BlockingCollection<string?>(
+            boundedCapacity: 64);
+
+        var readerCts = new CancellationTokenSource();
+        var readerThread = new Thread(() =>
         {
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write("triad> ");
-            Console.ResetColor();
-
-            string? line;
-            try { line = Console.ReadLine(); }
-            catch (IOException) { line = null; } // stdin closed
-            if (line == null)
-            {
-                Console.Error.WriteLine($"[CHAT] EOF -- leaving REPL after {cycles} cycle(s)");
-                return 0;
-            }
-
-            var q = line.Trim();
-            if (q.Length == 0) continue;
-
-            if (q is "/quit" or "/exit" or ":q")
-            {
-                Console.Error.WriteLine($"[CHAT] /quit -- leaving REPL after {cycles} cycle(s)");
-                return 0;
-            }
-            if (q is "/help" or "?")
-            {
-                Console.WriteLine("  /quit | /exit | :q   -- leave REPL");
-                Console.WriteLine("  /help | ?            -- this help");
-                Console.WriteLine("  <any question>       -- routed to ask-triad (GPT + Gemini + Claude web)");
-                Console.WriteLine("  Ctrl+Z then Enter    -- EOF (Windows)");
-                continue;
-            }
-
             try
             {
-                var rc = AskTriadFallback(q);
-                cycles++;
-                Console.Error.WriteLine($"[CHAT] cycle #{cycles} done (rc={rc})");
+                while (!readerCts.IsCancellationRequested)
+                {
+                    string? line;
+                    try { line = Console.ReadLine(); }
+                    catch (IOException) { line = null; }
+                    if (line == null)
+                    {
+                        inputQueue.Add(null); // EOF sentinel
+                        break;
+                    }
+                    inputQueue.Add(line);
+                }
             }
-            catch (Exception ex)
+            catch { /* swallow -- shutting down */ }
+            finally
             {
-                Console.Error.WriteLine($"[CHAT] triad error: {ex.Message} -- continuing");
+                try { inputQueue.CompleteAdding(); } catch { }
             }
+        })
+        {
+            IsBackground = true,
+            Name = "chat-repl-reader",
+        };
+        readerThread.Start();
+
+        int cycles = 0, pending = 0;
+        try
+        {
+            while (true)
+            {
+                // Show prompt with queue depth so the user sees if lines are stacked.
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                var depthTag = inputQueue.Count > 0 ? $" (buffered={inputQueue.Count})" : "";
+                Console.Write($"{_chatFallbackAi}>{depthTag} ");
+                Console.ResetColor();
+
+                string? line;
+                try { line = inputQueue.Take(); }
+                catch (InvalidOperationException) { line = null; } // CompleteAdding + empty
+                if (line == null)
+                {
+                    Console.Error.WriteLine($"[CHAT] EOF -- leaving REPL after {cycles} cycle(s)");
+                    return 0;
+                }
+
+                var q = line.Trim();
+                if (q.Length == 0) continue;
+
+                if (q is "/quit" or "/exit" or ":q")
+                {
+                    Console.Error.WriteLine($"[CHAT] /quit -- leaving REPL after {cycles} cycle(s)");
+                    return 0;
+                }
+                if (q is "/help" or "?")
+                {
+                    Console.WriteLine("  /quit | /exit | :q   -- leave REPL");
+                    Console.WriteLine("  /help | ?            -- this help");
+                    Console.WriteLine("  <any question>       -- routed to ask " + _chatFallbackAi);
+                    Console.WriteLine("  Ctrl+Z then Enter    -- EOF (Windows)");
+                    Console.WriteLine();
+                    Console.WriteLine("  Tip: you can keep typing while the AI answers --");
+                    Console.WriteLine("  lines are queued and the prompt shows (buffered=N).");
+                    continue;
+                }
+
+                try
+                {
+                    // While AskSingleAiFallback is running synchronously, the background
+                    // reader keeps draining Console.In so any lines the user types during
+                    // the wait land in inputQueue and are picked up next iteration.
+                    pending = inputQueue.Count;
+                    var rc = AskSingleAiFallback(q, _chatFallbackAi);
+                    cycles++;
+                    var picked = inputQueue.Count;
+                    var lagNote = picked > pending
+                        ? $" +{picked - pending} queued during this run"
+                        : "";
+                    Console.Error.WriteLine($"[CHAT] cycle #{cycles} done (rc={rc}){lagNote}");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[CHAT] {_chatFallbackAi} error: {ex.Message} -- continuing");
+                }
+            }
+        }
+        finally
+        {
+            readerCts.Cancel();
         }
     }
 }
