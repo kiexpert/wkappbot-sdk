@@ -44,6 +44,7 @@
     <Compile Include="..\Shared\AppBotPipe.Admin.cs" Link="Shared\AppBotPipe.Admin.cs" />
     <Compile Include="..\Shared\AppBotPipe.HotSwap.cs" Link="Shared\AppBotPipe.HotSwap.cs" />
     <Compile Include="..\Shared\NonBlockingLineReader.cs" Link="Shared\NonBlockingLineReader.cs" />
+    <Compile Include="..\Shared\InterruptChannel.cs" Link="Shared\InterruptChannel.cs" />
   </ItemGroup>
 
   <!-- Dashboard HTML embedded resource -->

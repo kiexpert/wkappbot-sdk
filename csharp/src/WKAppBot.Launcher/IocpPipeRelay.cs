@@ -189,6 +189,40 @@ partial class Program
         CloseHandle(pi.hThread);
         Prof($"IOCP: Core spawned pid={pi.dwProcessId}");
 
+        // [INTERRUPT] Wire Launcher's stdin into InterruptChannel so the user can
+        // push directives into a long-running Core operation without killing the
+        // process. Launcher reads its own stdin via NonBlockingLineReader, appends
+        // each line to wkappbot-interrupt-{corePid}.txt. Core opt-ins poll
+        // InterruptChannel.Drain() between safe checkpoints (e.g. ask-loop steps,
+        // agent iterations). Fire-and-forget background thread; stops when Core
+        // exits via the outer stopFlag/loop.
+        var corePidForInterrupt = (int)pi.dwProcessId;
+        var interruptCts = new System.Threading.CancellationTokenSource();
+        var interruptThread = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                using var reader = new WKAppBot.Shared.NonBlockingLineReader();
+                while (!interruptCts.IsCancellationRequested)
+                {
+                    if (!reader.TryTake(out var line, timeoutMs: 250, interruptCts.Token))
+                        continue;
+                    if (line == null) break; // EOF
+                    WKAppBot.Shared.InterruptChannel.Write(corePidForInterrupt, line);
+                }
+            }
+            catch { /* best-effort */ }
+            finally
+            {
+                try { WKAppBot.Shared.InterruptChannel.Cleanup(corePidForInterrupt); } catch { }
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "launcher-interrupt-forwarder",
+        };
+        interruptThread.Start();
+
         // 6. IOCP read loop + process handle wait
         // Strategy: IOCP thread relays pipe output. Main thread waits on process handle.
         // When Core exits, WaitForSingleObject signals immediately (kernel object, no FS delay).
@@ -273,6 +307,12 @@ partial class Program
         // Event signaled -- drain remaining pipe data (buffered output may still be in transit)
         System.Threading.Interlocked.Exchange(ref stopFlag, 1);
         iocpThread.Join(2000);
+        // Stop the interrupt forwarder too. Thread is daemonic but cancelling
+        // releases the NonBlockingLineReader cleanly and removes the stale
+        // interrupt file so a subsequent run with the same PID sees a clean slate.
+        try { interruptCts.Cancel(); } catch { }
+        try { interruptThread.Join(500); } catch { }
+        try { interruptCts.Dispose(); } catch { }
 
         // Get exit code: process handle may show STILL_ACTIVE (259) since Core hasn't fully exited
         uint exitCode = 0;
