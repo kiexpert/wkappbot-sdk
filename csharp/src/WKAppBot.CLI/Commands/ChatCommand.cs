@@ -807,11 +807,36 @@ internal partial class Program
 
     static int ExecClaudeInteractive(string claudeExe, string args = "")
     {
+        // ConPTY path: wraps claude CLI with our Enter-intercept so that
+        // lines beginning with "wkappbot" or "a11y" are caught BEFORE reaching
+        // claude and routed to the corresponding local CLI. Everything else
+        // (Korean chat, natural-language queries, slash commands) flows to
+        // claude untouched -- claude is the shell, we're the side-channel for
+        // our own tools.
+        if (WKAppBot.Shared.PseudoConsoleRunner.IsSupported)
+        {
+            try
+            {
+                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {Path.GetFileName(claudeExe)} {args}  (wkappbot/a11y lines intercepted)");
+                Console.Out.Flush();
+                var streamer = new PromptDecoratingStreamer();
+                return WKAppBot.Shared.PseudoConsoleRunner.Run(
+                    exe: claudeExe,
+                    args: args,
+                    cwd: Environment.CurrentDirectory,
+                    onOutput: streamer.OnBytes,
+                    onLineReady: InterceptAppBotOnly,
+                    mirrorToTerminal: false);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CHAT] ConPTY failed ({ex.Message}); falling back to inherited stdio");
+            }
+        }
+
+        // Fallback: inherited stdio, no intercept. Works on older Windows.
         try
         {
-            // Bare Process.Start -- same rationale as ExecOsShell: interactive shells
-            // need the real terminal handles, not a CreateProcessW-hooked detached
-            // console that swallows stdin.
             var psi = new ProcessStartInfo
             {
                 FileName = claudeExe,
@@ -833,6 +858,28 @@ internal partial class Program
             Console.Error.WriteLine($"[CHAT] interactive error: {ex.Message}");
             return 1;
         }
+    }
+
+    // Claude-shell interceptor: ONLY AppBot commands are captured; natural-
+    // language / non-ASCII / trailing-?/! lines are the claude shell's own
+    // job and flow through unmodified. Think of claude as the chat agent
+    // and wkappbot/a11y as side-channel tool invocations the user can mix
+    // in without leaving the conversation.
+    static bool InterceptAppBotOnly(string line)
+    {
+        if (!IsAppBotCommand(line)) return false;
+
+        var stdout = Console.OpenStandardOutput();
+        var crlf = Encoding.ASCII.GetBytes("\r\n");
+        stdout.Write(crlf, 0, crlf.Length);
+        stdout.Flush();
+
+        try { DispatchAppBotCommand(line); }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
+        }
+        return true;
     }
 
     static (int exit, string stdout, string stderr) RunClaudePrint(string claudeExe, string question, bool printMode)
