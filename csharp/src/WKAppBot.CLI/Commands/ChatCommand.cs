@@ -283,13 +283,20 @@ internal partial class Program
         //                       echoed twice" effect. Harmless in ConPTY.
         //   /K @chcp 65001>nul  UTF-8 code page (kills CP949 mojibake both
         //                       ways: output AND input).
-        //   PROMPT=$P$G (space) cmd.exe itself renders "D:\Foo> " with a
-        //                       trailing space, so our prompt decoration lands
-        //                       on bytes cmd.exe actually wrote.
+        //   PROMPT=[WK]-badge   The PROMPT env var is the *right* place to
+        //                       brand the prompt because cmd.exe counts its
+        //                       rendered width when tracking the cursor --
+        //                       Home/End/arrows/Backspace all remain correctly
+        //                       positioned. $E is cmd.exe's literal ESC.
+        //                       Layout: magenta [WK] badge, space, bold-green
+        //                       path + '>', trailing space. End with a reset
+        //                       so user input and command output render plain.
         string? shellArgs = null;
         if (shellName == "cmd")
         {
-            Environment.SetEnvironmentVariable("PROMPT", "$P$G ");
+            Environment.SetEnvironmentVariable(
+                "PROMPT",
+                "$E[1;7;95m[WK]$E[0m $E[1;32m$P$G$E[0m ");
             shellArgs = "/Q /K @chcp 65001>nul";
         }
 
@@ -422,19 +429,14 @@ internal partial class Program
         catch { /* pipe closed on child exit */ }
     }
 
-    // Decorate ONLY the prompt, nothing else. A chunk whose trailing line (bytes
-    // after the last '\n') ends with "> " is assumed to be a cmd.exe prompt --
-    // we emit the pre-prompt part verbatim, then dim-cyan the prompt body up to
-    // and including '>', bright-white the trailing space, then RESET so the
-    // next chunk (user input echo / command output) renders in the terminal's
-    // default color. Any chunk that doesn't match the prompt pattern passes
-    // through raw. This eliminates the "color bleeds into every line" bug that
-    // a state machine had: because state never persists between chunks.
+    // Pure byte-pass-through to the real console. Prompt branding/coloring
+    // lives in the PROMPT env var now (cmd.exe renders [WK] badge + bold-green
+    // path itself, which keeps cursor tracking correct for Home/End/arrows).
+    // This class still exists as the shared hook point for future tee-to-
+    // ToolOutputStore capture, but today it does nothing fancy.
     sealed class PromptDecoratingStreamer
     {
-        static readonly byte[] PromptStyle = Encoding.ASCII.GetBytes("\x1b[2;36m");      // dim cyan
-        static readonly byte[] InputStyle  = Encoding.ASCII.GetBytes("\x1b[0m\x1b[97m"); // reset + bright white
-        static readonly byte[] ResetStyle  = Encoding.ASCII.GetBytes("\x1b[0m");
+        static readonly byte[] ResetStyle = Encoding.ASCII.GetBytes("\x1b[0m");
 
         readonly Stream _stdout = Console.OpenStandardOutput();
         readonly object _lock = new();
@@ -444,35 +446,7 @@ internal partial class Program
             if (len <= 0) return;
             lock (_lock)
             {
-                // Is the trailing line a cmd.exe-style prompt? Require the chunk
-                // to end in "> " with at least one '>' somewhere in the tail.
-                bool trailingPrompt =
-                    len >= 2 && buf[len - 1] == (byte)' ' && buf[len - 2] == (byte)'>';
-
-                if (!trailingPrompt)
-                {
-                    _stdout.Write(buf, 0, len);
-                    _stdout.Flush();
-                    return;
-                }
-
-                // Find last '\n' to separate pre-prompt output from the prompt.
-                int lastNewline = -1;
-                for (int i = len - 1; i >= 0; i--) { if (buf[i] == (byte)'\n') { lastNewline = i; break; } }
-
-                int tailStart = lastNewline + 1;            // first byte of the prompt
-                int gtPos = len - 2;                         // the '>' (guaranteed by trailingPrompt)
-                // Pre-prompt: write raw.
-                if (tailStart > 0) _stdout.Write(buf, 0, tailStart);
-                // Prompt body (everything up to and including '>'): dim cyan.
-                _stdout.Write(PromptStyle, 0, PromptStyle.Length);
-                _stdout.Write(buf, tailStart, gtPos - tailStart + 1);
-                // Trailing space (the input-zone prefix): bright white.
-                _stdout.Write(InputStyle, 0, InputStyle.Length);
-                _stdout.WriteByte(buf[len - 1]);
-                // Reset so subsequent chunks (user keystroke echo, command output)
-                // render in the terminal's default color, not bleed into cyan.
-                _stdout.Write(ResetStyle, 0, ResetStyle.Length);
+                _stdout.Write(buf, 0, len);
                 _stdout.Flush();
             }
         }
