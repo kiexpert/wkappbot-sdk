@@ -158,12 +158,15 @@ internal partial class Program
         if (interactive)
         {
             // Interactive: replace stdio, inherit TTY. No output capture (cannot detect limit mid-stream).
-            // Pass -c so claude CLI resumes the most recent session in the current
-            // project dir -- user's ask: "여기 세션이랑 다르네?" meaning a fresh
-            // wkchat should drop them into the VSCode extension's ongoing chat
-            // instead of spawning an unrelated session. claude CLI silently
-            // starts a new session if nothing to continue, so always safe.
-            return ExecClaudeInteractive(claudeExe, "-c");
+            // Try to resume the EXACT same session the VSCode Claude Code
+            // extension is currently writing to (most recent .jsonl in this
+            // project's session dir). `-r <id>` is more precise than `-c`
+            // because it doesn't depend on claude CLI's "most recent" heuristic
+            // agreeing with the extension's. Falls back to -c if we can't
+            // locate the project session dir.
+            var activeId = FindActiveClaudeSessionId();
+            var resumeArg = activeId != null ? $"-r {activeId}" : "-c";
+            return ExecClaudeInteractive(claudeExe, resumeArg);
         }
 
         // Print mode: capture output, scan for limit markers
@@ -584,6 +587,42 @@ internal partial class Program
         })
             if (File.Exists(p)) return p;
         return null;
+    }
+
+    // Locate the most recently modified .jsonl under
+    //   %USERPROFILE%\.claude\projects\<slug>\
+    // where <slug> is Claude Code's cwd-slug convention: lowercase the drive
+    // letter, turn ':' and '\' into '-'. For "D:\GitHub\WKAppBot" that's
+    // "d--GitHub-WKAppBot" (observed in memory paths).
+    //
+    // That file is almost certainly the session the VSCode Claude Code
+    // extension is writing to right now (extensions append on every message
+    // turn, so its mtime is freshest). Returning its bare name (without the
+    // ".jsonl" suffix) gives the session id claude CLI's -r flag expects.
+    // Returns null on any failure -- caller falls back to -c.
+    static string? FindActiveClaudeSessionId()
+    {
+        try
+        {
+            var home = Environment.GetEnvironmentVariable("USERPROFILE");
+            if (string.IsNullOrEmpty(home)) return null;
+
+            var cwd = Environment.CurrentDirectory;
+            var chars = cwd.ToCharArray();
+            if (chars.Length > 0) chars[0] = char.ToLowerInvariant(chars[0]);
+            var slug = new string(chars).Replace(':', '-').Replace('\\', '-');
+
+            var sessionDir = Path.Combine(home, ".claude", "projects", slug);
+            if (!Directory.Exists(sessionDir)) return null;
+
+            var newest = new DirectoryInfo(sessionDir)
+                .GetFiles("*.jsonl")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault();
+            if (newest == null) return null;
+            return Path.GetFileNameWithoutExtension(newest.Name);
+        }
+        catch { return null; }
     }
 
     static int ExecClaudeInteractive(string claudeExe, string args = "")
