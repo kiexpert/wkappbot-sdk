@@ -416,61 +416,57 @@ internal partial class Program
         catch { /* pipe closed on child exit */ }
     }
 
-    // Writes child stdout bytes straight to our real console with a small
-    // state machine for visual separation:
-    //   AfterNewline : just saw \n -- next non-\n byte starts a prompt line
-    //   PromptBody   : dim cyan -- the "D:\Foo>" half of the prompt
-    //   UserInput    : bright white -- after the prompt's trailing '>', this is
-    //                  cmd.exe's echo of what the user is typing, which should
-    //                  look like primary content, not decoration
-    // Newline resets back to AfterNewline and closes any open style.
+    // Decorate ONLY the prompt, nothing else. A chunk whose trailing line (bytes
+    // after the last '\n') ends with "> " is assumed to be a cmd.exe prompt --
+    // we emit the pre-prompt part verbatim, then dim-cyan the prompt body up to
+    // and including '>', bright-white the trailing space, then RESET so the
+    // next chunk (user input echo / command output) renders in the terminal's
+    // default color. Any chunk that doesn't match the prompt pattern passes
+    // through raw. This eliminates the "color bleeds into every line" bug that
+    // a state machine had: because state never persists between chunks.
     sealed class PromptDecoratingStreamer
     {
-        static readonly byte[] PromptStyle = Encoding.ASCII.GetBytes("\x1b[2;36m");     // dim cyan
+        static readonly byte[] PromptStyle = Encoding.ASCII.GetBytes("\x1b[2;36m");      // dim cyan
         static readonly byte[] InputStyle  = Encoding.ASCII.GetBytes("\x1b[0m\x1b[97m"); // reset + bright white
         static readonly byte[] ResetStyle  = Encoding.ASCII.GetBytes("\x1b[0m");
 
-        enum State { AfterNewline, PromptBody, UserInput }
-
         readonly Stream _stdout = Console.OpenStandardOutput();
         readonly object _lock = new();
-        State _state = State.AfterNewline;
 
         public void OnBytes(byte[] buf, int len)
         {
             if (len <= 0) return;
             lock (_lock)
             {
-                for (int i = 0; i < len; i++)
+                // Is the trailing line a cmd.exe-style prompt? Require the chunk
+                // to end in "> " with at least one '>' somewhere in the tail.
+                bool trailingPrompt =
+                    len >= 2 && buf[len - 1] == (byte)' ' && buf[len - 2] == (byte)'>';
+
+                if (!trailingPrompt)
                 {
-                    byte b = buf[i];
-                    if (b == (byte)'\n')
-                    {
-                        if (_state != State.AfterNewline)
-                        {
-                            _stdout.Write(ResetStyle, 0, ResetStyle.Length);
-                            _state = State.AfterNewline;
-                        }
-                        _stdout.WriteByte(b);
-                        continue;
-                    }
-                    if (_state == State.AfterNewline)
-                    {
-                        _stdout.Write(PromptStyle, 0, PromptStyle.Length);
-                        _state = State.PromptBody;
-                    }
-                    _stdout.WriteByte(b);
-                    // The '>' in a cmd.exe prompt marks the boundary between
-                    // directory display and the user-input area. Switch style
-                    // right AFTER emitting the '>' so the input-zone space
-                    // (from PROMPT=$P$G ) and the user's typed chars render
-                    // bright, not dim.
-                    if (_state == State.PromptBody && b == (byte)'>')
-                    {
-                        _stdout.Write(InputStyle, 0, InputStyle.Length);
-                        _state = State.UserInput;
-                    }
+                    _stdout.Write(buf, 0, len);
+                    _stdout.Flush();
+                    return;
                 }
+
+                // Find last '\n' to separate pre-prompt output from the prompt.
+                int lastNewline = -1;
+                for (int i = len - 1; i >= 0; i--) { if (buf[i] == (byte)'\n') { lastNewline = i; break; } }
+
+                int tailStart = lastNewline + 1;            // first byte of the prompt
+                int gtPos = len - 2;                         // the '>' (guaranteed by trailingPrompt)
+                // Pre-prompt: write raw.
+                if (tailStart > 0) _stdout.Write(buf, 0, tailStart);
+                // Prompt body (everything up to and including '>'): dim cyan.
+                _stdout.Write(PromptStyle, 0, PromptStyle.Length);
+                _stdout.Write(buf, tailStart, gtPos - tailStart + 1);
+                // Trailing space (the input-zone prefix): bright white.
+                _stdout.Write(InputStyle, 0, InputStyle.Length);
+                _stdout.WriteByte(buf[len - 1]);
+                // Reset so subsequent chunks (user keystroke echo, command output)
+                // render in the terminal's default color, not bleed into cyan.
+                _stdout.Write(ResetStyle, 0, ResetStyle.Length);
                 _stdout.Flush();
             }
         }
@@ -479,12 +475,8 @@ internal partial class Program
         {
             lock (_lock)
             {
-                if (_state != State.AfterNewline)
-                {
-                    _stdout.Write(ResetStyle, 0, ResetStyle.Length);
-                    _stdout.Flush();
-                    _state = State.AfterNewline;
-                }
+                _stdout.Write(ResetStyle, 0, ResetStyle.Length);
+                _stdout.Flush();
             }
         }
     }
