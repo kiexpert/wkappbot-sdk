@@ -278,22 +278,28 @@ internal partial class Program
             _            => shellName, // caller already validated
         };
 
+        // Shared output streamer: decorates trailing-no-newline bytes (the shell
+        // prompt by convention) with subtle color so the user can tell the
+        // prompt from regular output. Also ensures every byte is flushed as it
+        // arrives -- no line buffering anywhere, prompts show up immediately.
+        var streamer = new PromptDecoratingStreamer();
+
         // ConPTY path: gives the child shell a real terminal so cmd.exe's
         // native line-editing (Tab complete, arrow keys, F7/F8 history) works.
         // Requires Win10 1809+. On older Windows or on failure we fall through
-        // to the pipe-based async relay below.
+        // to the pipe-based byte relay below.
         if (WKAppBot.Shared.PseudoConsoleRunner.IsSupported)
         {
             try
             {
-                Console.WriteLine($"[CHAT] launching shell (ConPTY): {exe}  (type 'exit' to return)");
+                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {exe}  (type 'exit' to return)");
                 Console.Out.Flush();
                 return WKAppBot.Shared.PseudoConsoleRunner.Run(
                     exe: exe,
                     args: null,
                     cwd: Environment.CurrentDirectory,
-                    onOutput: null, // TODO: tee to ToolOutputStore once chat-loop wiring lands
-                    mirrorToTerminal: true);
+                    onOutput: streamer.OnBytes, // write to stdout with prompt decoration
+                    mirrorToTerminal: false);   // streamer handles mirroring
             }
             catch (Exception ex)
             {
@@ -303,7 +309,7 @@ internal partial class Program
 
         try
         {
-            Console.WriteLine($"[CHAT] launching shell (pipe): {exe}  (type 'exit' to return)");
+            Console.WriteLine($"[CHAT] [MODE=pipe] shell: {exe}  (type 'exit' to return)");
             Console.Out.Flush();
 
             var psi = new ProcessStartInfo
@@ -321,22 +327,17 @@ internal partial class Program
             using var proc = Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] failed to start shell"); return 1; }
 
-            // -- Output relay (stdout + stderr) --
-            // Async line-by-line reads feed straight into Console.Out/Err so each
-            // line appears as soon as the child flushes it. No buffering on our
-            // side -- the BeginOutputReadLine thread writes immediately.
-            proc.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                Console.WriteLine(e.Data);
-            };
-            proc.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data == null) return;
-                Console.Error.WriteLine(e.Data);
-            };
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
+            // -- Byte-level output relay (stdout + stderr) --
+            // OutputDataReceived line-buffers and swallows partial lines (the
+            // prompt!). Read raw bytes from BaseStream instead so prompts like
+            // "D:\> " reach the terminal before the user types anything.
+            var outCts = new CancellationTokenSource();
+            var outThread = new Thread(() => ReadBytesToStreamer(proc.StandardOutput.BaseStream, streamer, outCts.Token))
+            { IsBackground = true, Name = "chat-shell-stdout" };
+            var errThread = new Thread(() => ReadBytesToStreamer(proc.StandardError.BaseStream, streamer, outCts.Token))
+            { IsBackground = true, Name = "chat-shell-stderr" };
+            outThread.Start();
+            errThread.Start();
 
             // -- Input forwarder --
             // User types at the Launcher's terminal; NonBlockingLineReader picks
@@ -374,14 +375,97 @@ internal partial class Program
             inputThread.Start();
 
             proc.WaitForExit();
+            outCts.Cancel();
             inputCts.Cancel();
+            try { outThread.Join(500); } catch { }
+            try { errThread.Join(500); } catch { }
             try { inputThread.Join(500); } catch { }
+            streamer.CloseStyle(); // reset any lingering ANSI color state
             return proc.ExitCode;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[CHAT] shell '{shellName}' error: {ex.Message}");
             return 1;
+        }
+    }
+
+    // Raw-byte reader for the pipe fallback path. BeginOutputReadLine buffers
+    // by line and hides the shell prompt (no trailing \n); we read bytes ourselves
+    // and hand them off to the same streamer the ConPTY path uses, so prompts and
+    // decoration are identical across both modes.
+    static void ReadBytesToStreamer(Stream input, PromptDecoratingStreamer streamer, CancellationToken ct)
+    {
+        var buf = new byte[4096];
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                int n = input.Read(buf, 0, buf.Length);
+                if (n <= 0) break;
+                streamer.OnBytes(buf, n);
+            }
+        }
+        catch { /* pipe closed on child exit */ }
+    }
+
+    // Writes child stdout bytes straight to our real console with one lightweight
+    // transformation: a chunk with no trailing newline is treated as the shell
+    // prompt (cmd.exe / bash / pwsh all flush the prompt without \n before
+    // waiting for input) and wrapped in a subtle ANSI style. Gives the user a
+    // visual cue for "I'm at a prompt" without interfering with the child's own
+    // VT output.
+    sealed class PromptDecoratingStreamer
+    {
+        static readonly byte[] OpenStyle  = Encoding.ASCII.GetBytes("\x1b[2;36m"); // dim cyan
+        static readonly byte[] ResetStyle = Encoding.ASCII.GetBytes("\x1b[0m");
+
+        readonly Stream _stdout = Console.OpenStandardOutput();
+        readonly object _lock = new();
+        bool _inPrompt;
+
+        public void OnBytes(byte[] buf, int len)
+        {
+            if (len <= 0) return;
+            lock (_lock)
+            {
+                int start = 0;
+                for (int i = 0; i < len; i++)
+                {
+                    if (buf[i] != (byte)'\n') continue;
+                    if (_inPrompt)
+                    {
+                        // Close the prompt style right before the newline.
+                        _stdout.Write(ResetStyle, 0, ResetStyle.Length);
+                        _inPrompt = false;
+                    }
+                    _stdout.Write(buf, start, i - start + 1);
+                    start = i + 1;
+                }
+                if (start < len)
+                {
+                    if (!_inPrompt)
+                    {
+                        _stdout.Write(OpenStyle, 0, OpenStyle.Length);
+                        _inPrompt = true;
+                    }
+                    _stdout.Write(buf, start, len - start);
+                }
+                _stdout.Flush();
+            }
+        }
+
+        public void CloseStyle()
+        {
+            lock (_lock)
+            {
+                if (_inPrompt)
+                {
+                    _stdout.Write(ResetStyle, 0, ResetStyle.Length);
+                    _stdout.Flush();
+                    _inPrompt = false;
+                }
+            }
         }
     }
 

@@ -9,8 +9,8 @@ namespace WKAppBot.Shared;
 /// MCP-invoked tool call, ...) with a human-readable tool-scoped id.
 ///
 /// Addressed as "&lt;tool&gt;/&lt;slug&gt;" so the id itself hints at the content:
-///     shell/git-status
-///     shell/npm-build-3
+///     con/git-status
+///     con/npm-build-3
 ///     ask-gemini/why-build-failed
 ///     a11y/invoke-ok-button
 /// Easier to skim in logs, easier for the AI to remember across turns, easier
@@ -20,8 +20,9 @@ public sealed class ToolOutputRecord
 {
     /// <summary>Human-readable per-tool id (slug). Unique within the tool folder.</summary>
     public string Slug { get; init; } = "";
-    /// <summary>Tool family name: "shell", "ask-gemini", "a11y", "mcp", ....
-    /// Each tool gets its own subfolder + its own slug space.</summary>
+    /// <summary>Tool family name: "con" (any console -- cmd/pwsh/bash/CLI),
+    /// "ask-gemini", "a11y", "mcp", .... Each tool gets its own subfolder and
+    /// its own slug space.</summary>
     public string Tool { get; init; } = "tool";
     /// <summary>"&lt;tool&gt;/&lt;slug&gt;" convenience address.</summary>
     public string Address => $"{Tool}/{Slug}";
@@ -42,9 +43,9 @@ public sealed class ToolOutputRecord
 ///
 /// Layout:
 ///   wkappbot.hq/runtime/tool-out/
-///     shell/
+///     con/
 ///       index.jsonl          -- append-only index of ToolOutputRecord
-///       git-status.log       -- raw output for "shell/git-status"
+///       git-status.log       -- raw output for "con/git-status"
 ///       npm-build.log
 ///       npm-build-2.log      -- collision suffix
 ///     ask-gemini/
