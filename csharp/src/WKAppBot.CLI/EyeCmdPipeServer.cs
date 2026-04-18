@@ -401,7 +401,7 @@ internal static class EyeCmdPipeServer
             // Print delegation header: name=... cmd=... cwd=...  (goes to pipe+log, easy to grep)
             var delegName = Program.GetSendReplyUsername();
             var cmdLine = string.Join(" ", args);
-            Console.WriteLine($"[CMD] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
+            Console.Error.WriteLine($"[CMD] name={delegName ?? "?"} cmd={cmdLine} cwd={callerCwd ?? "(none)"}");
             var memBefore2 = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
             try { code = Program.Main(args); }
             catch (Exception ex) { tee.WriteLine($"[EYECMD] error: {ex.Message}"); code = 1; }
@@ -421,8 +421,11 @@ internal static class EyeCmdPipeServer
 
         tee.ExitCode = code;
         tee.Dispose(); // moves log to old/, updates tee.LogPath
-        // "Log saved:" goes through pipeWriter directly (tee already disposed)
-        pipeWriter.WriteLine($"Log saved: {tee.LogPath}");
+        // "Log saved:" is a diagnostic trailer -- belongs to stderr, not the command's
+        // stdout result. Write through the process's own Console.Error (goes to Eye log
+        // when in pipe mode; goes to terminal stderr otherwise). Callers that need the
+        // path can still retrieve it via `wkappbot logcat --past Nm` or from Eye's log.
+        Console.Error.WriteLine($"Log saved: {tee.LogPath}");
         return code;
     }
 }
