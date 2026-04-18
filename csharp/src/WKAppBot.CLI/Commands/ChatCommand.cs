@@ -278,10 +278,16 @@ internal partial class Program
             _            => shellName, // caller already validated
         };
 
-        // Shared output streamer: decorates trailing-no-newline bytes (the shell
-        // prompt by convention) with subtle color so the user can tell the
-        // prompt from regular output. Also ensures every byte is flushed as it
-        // arrives -- no line buffering anywhere, prompts show up immediately.
+        // cmd.exe specifics: UTF-8 code page (kills CP949 mojibake) + trailing
+        // space after '>' in the prompt. PROMPT env var inherits into cmd.exe;
+        // /K @chcp runs chcp silently at startup then stays interactive.
+        string? shellArgs = null;
+        if (shellName == "cmd")
+        {
+            Environment.SetEnvironmentVariable("PROMPT", "$P$G ");
+            shellArgs = "/K @chcp 65001>nul";
+        }
+
         var streamer = new PromptDecoratingStreamer();
 
         // ConPTY path: gives the child shell a real terminal so cmd.exe's
@@ -296,7 +302,7 @@ internal partial class Program
                 Console.Out.Flush();
                 return WKAppBot.Shared.PseudoConsoleRunner.Run(
                     exe: exe,
-                    args: null,
+                    args: shellArgs,
                     cwd: Environment.CurrentDirectory,
                     onOutput: streamer.OnBytes, // write to stdout with prompt decoration
                     mirrorToTerminal: false);   // streamer handles mirroring
@@ -315,6 +321,7 @@ internal partial class Program
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
+                Arguments = shellArgs ?? "",
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
@@ -409,47 +416,60 @@ internal partial class Program
         catch { /* pipe closed on child exit */ }
     }
 
-    // Writes child stdout bytes straight to our real console with one lightweight
-    // transformation: a chunk with no trailing newline is treated as the shell
-    // prompt (cmd.exe / bash / pwsh all flush the prompt without \n before
-    // waiting for input) and wrapped in a subtle ANSI style. Gives the user a
-    // visual cue for "I'm at a prompt" without interfering with the child's own
-    // VT output.
+    // Writes child stdout bytes straight to our real console with a small
+    // state machine for visual separation:
+    //   AfterNewline : just saw \n -- next non-\n byte starts a prompt line
+    //   PromptBody   : dim cyan -- the "D:\Foo>" half of the prompt
+    //   UserInput    : bright white -- after the prompt's trailing '>', this is
+    //                  cmd.exe's echo of what the user is typing, which should
+    //                  look like primary content, not decoration
+    // Newline resets back to AfterNewline and closes any open style.
     sealed class PromptDecoratingStreamer
     {
-        static readonly byte[] OpenStyle  = Encoding.ASCII.GetBytes("\x1b[2;36m"); // dim cyan
-        static readonly byte[] ResetStyle = Encoding.ASCII.GetBytes("\x1b[0m");
+        static readonly byte[] PromptStyle = Encoding.ASCII.GetBytes("\x1b[2;36m");     // dim cyan
+        static readonly byte[] InputStyle  = Encoding.ASCII.GetBytes("\x1b[0m\x1b[97m"); // reset + bright white
+        static readonly byte[] ResetStyle  = Encoding.ASCII.GetBytes("\x1b[0m");
+
+        enum State { AfterNewline, PromptBody, UserInput }
 
         readonly Stream _stdout = Console.OpenStandardOutput();
         readonly object _lock = new();
-        bool _inPrompt;
+        State _state = State.AfterNewline;
 
         public void OnBytes(byte[] buf, int len)
         {
             if (len <= 0) return;
             lock (_lock)
             {
-                int start = 0;
                 for (int i = 0; i < len; i++)
                 {
-                    if (buf[i] != (byte)'\n') continue;
-                    if (_inPrompt)
+                    byte b = buf[i];
+                    if (b == (byte)'\n')
                     {
-                        // Close the prompt style right before the newline.
-                        _stdout.Write(ResetStyle, 0, ResetStyle.Length);
-                        _inPrompt = false;
+                        if (_state != State.AfterNewline)
+                        {
+                            _stdout.Write(ResetStyle, 0, ResetStyle.Length);
+                            _state = State.AfterNewline;
+                        }
+                        _stdout.WriteByte(b);
+                        continue;
                     }
-                    _stdout.Write(buf, start, i - start + 1);
-                    start = i + 1;
-                }
-                if (start < len)
-                {
-                    if (!_inPrompt)
+                    if (_state == State.AfterNewline)
                     {
-                        _stdout.Write(OpenStyle, 0, OpenStyle.Length);
-                        _inPrompt = true;
+                        _stdout.Write(PromptStyle, 0, PromptStyle.Length);
+                        _state = State.PromptBody;
                     }
-                    _stdout.Write(buf, start, len - start);
+                    _stdout.WriteByte(b);
+                    // The '>' in a cmd.exe prompt marks the boundary between
+                    // directory display and the user-input area. Switch style
+                    // right AFTER emitting the '>' so the input-zone space
+                    // (from PROMPT=$P$G ) and the user's typed chars render
+                    // bright, not dim.
+                    if (_state == State.PromptBody && b == (byte)'>')
+                    {
+                        _stdout.Write(InputStyle, 0, InputStyle.Length);
+                        _state = State.UserInput;
+                    }
                 }
                 _stdout.Flush();
             }
@@ -459,11 +479,11 @@ internal partial class Program
         {
             lock (_lock)
             {
-                if (_inPrompt)
+                if (_state != State.AfterNewline)
                 {
                     _stdout.Write(ResetStyle, 0, ResetStyle.Length);
                     _stdout.Flush();
-                    _inPrompt = false;
+                    _state = State.AfterNewline;
                 }
             }
         }
