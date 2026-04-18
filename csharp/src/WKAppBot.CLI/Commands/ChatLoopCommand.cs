@@ -33,7 +33,7 @@ internal partial class Program
     // next AI dispatch as MCP-style tool_use/tool_result blocks so the fallback
     // model sees the user's shell interactions in the same shape its own
     // tool-use protocol would deliver. Cleared after each AI dispatch.
-    static readonly List<ShellOutputRecord> _chatToolUseBuffer = new();
+    static readonly List<ToolOutputRecord> _chatToolUseBuffer = new();
 
     static int ChatLoopCommand(string[] args)
     {
@@ -186,10 +186,15 @@ internal partial class Program
             sb.AppendLine($"(shell error: {ex.Message})");
         }
 
-        var rec = ShellOutputStore.Store(command, cwd, exit, sb.ToString());
+        var rec = ToolOutputStore.Store(
+            tool: "shell",
+            command: command,
+            cwd: cwd,
+            exitCode: exit,
+            output: sb.ToString());
         _chatToolUseBuffer.Add(rec);
         Console.Error.WriteLine(
-            $"[CHAT:LOOP] stored as output={rec.Id} exit={rec.ExitCode} lines={rec.LineCount} -- will include in next AI prompt");
+            $"[CHAT:LOOP] stored as {rec.Address} exit={rec.ExitCode} lines={rec.LineCount} -- will include in next AI prompt");
     }
 
     /// <summary>
@@ -247,11 +252,12 @@ internal partial class Program
         if (line.StartsWith("/out ", StringComparison.OrdinalIgnoreCase))
         {
             var tokens = line[5..].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length == 0 || !int.TryParse(tokens[0], out var id))
+            if (tokens.Length == 0 || !tokens[0].Contains('/'))
             {
-                Console.Error.WriteLine("[CHAT:LOOP] /out <id> [--after <bytes>] [--lines <N>]");
+                Console.Error.WriteLine("[CHAT:LOOP] /out <tool>/<slug> [--after <bytes>] [--lines <N>]");
                 return;
             }
+            var addr = tokens[0];
             int afterBytes = 0;
             int maxLines = 0; // 0 = unlimited
             for (int i = 1; i < tokens.Length - 1; i++)
@@ -260,14 +266,13 @@ internal partial class Program
                 else if (tokens[i] == "--lines" && int.TryParse(tokens[i + 1], out var ml)) { maxLines = Math.Max(0, ml); i++; }
             }
 
-            var body = ShellOutputStore.ReadById(id);
+            var body = ToolOutputStore.ReadByAddress(addr);
             if (body == null)
             {
-                Console.Error.WriteLine($"[CHAT:LOOP] /out: id={id} not found");
+                Console.Error.WriteLine($"[CHAT:LOOP] /out: '{addr}' not found");
                 return;
             }
 
-            // Byte-offset skip. Clamp into range so --after past EOF becomes empty.
             var slice = afterBytes >= body.Length ? "" : body[afterBytes..];
             if (maxLines > 0)
             {
@@ -278,15 +283,15 @@ internal partial class Program
 
             var suffix = afterBytes > 0 ? $" --after={afterBytes}B" : "";
             suffix += maxLines > 0 ? $" --lines={maxLines}" : "";
-            Console.WriteLine($"--- output id={id}{suffix} ---");
+            Console.WriteLine($"--- output {addr}{suffix} ---");
             Console.Write(slice);
             if (!slice.EndsWith('\n')) Console.WriteLine();
             var shown = afterBytes + slice.Length;
             var more = body.Length - shown;
             if (more > 0)
-                Console.WriteLine($"--- end id={id} (shown {slice.Length}B, {more}B more; continue: /out {id} --after {shown}) ---");
+                Console.WriteLine($"--- end {addr} (shown {slice.Length}B, {more}B more; continue: /out {addr} --after {shown}) ---");
             else
-                Console.WriteLine($"--- end id={id} ---");
+                Console.WriteLine($"--- end {addr} ---");
             return;
         }
 

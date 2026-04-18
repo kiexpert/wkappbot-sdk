@@ -45,7 +45,7 @@
     <Compile Include="..\Shared\AppBotPipe.HotSwap.cs" Link="Shared\AppBotPipe.HotSwap.cs" />
     <Compile Include="..\Shared\NonBlockingLineReader.cs" Link="Shared\NonBlockingLineReader.cs" />
     <Compile Include="..\Shared\InterruptChannel.cs" Link="Shared\InterruptChannel.cs" />
-    <Compile Include="..\Shared\ShellOutputStore.cs" Link="Shared\ShellOutputStore.cs" />
+    <Compile Include="..\Shared\ToolOutputStore.cs" Link="Shared\ToolOutputStore.cs" />
     <Compile Include="..\Shared\ShellToolUseEncoder.cs" Link="Shared\ShellToolUseEncoder.cs" />
   </ItemGroup>
 
