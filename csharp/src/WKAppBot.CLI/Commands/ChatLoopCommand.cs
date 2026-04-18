@@ -186,8 +186,12 @@ internal partial class Program
             sb.AppendLine($"(shell error: {ex.Message})");
         }
 
+        // Tool identifier: "con" (console) -- works for cmd, pwsh, bash, WSL,
+        // Claude CLI, gemini CLI, etc. They're all just things-that-talk-to-a-
+        // console from our POV. Keeping a generic name avoids the tool_use XML
+        // fragmenting by shell flavor.
         var rec = ToolOutputStore.Store(
-            tool: "shell",
+            tool: "con",
             command: command,
             cwd: cwd,
             exitCode: exit,
@@ -316,8 +320,9 @@ internal partial class Program
         }
 
         // -- plain dispatch to current AI shell ------------------------------
-        // Prepend accumulated shell tool_use/tool_result blocks so the AI sees
-        // the user's recent shell activity as conversation context (MCP style).
+        // Prepend accumulated console (con) tool_use/tool_result blocks so the
+        // AI sees the user's recent console activity as conversation context
+        // (MCP style).
         try
         {
             var toolUseCtx = ShellToolUseEncoder.Encode(_chatToolUseBuffer);
@@ -327,7 +332,7 @@ internal partial class Program
             var rc = AskSingleAiFallback(question, currentShell);
             cycles++;
             var attachedTag = _chatToolUseBuffer.Count > 0
-                ? $" (attached {_chatToolUseBuffer.Count} shell tool_use block(s))"
+                ? $" (attached {_chatToolUseBuffer.Count} con tool_use block(s))"
                 : "";
             Console.Error.WriteLine($"[CHAT:LOOP] cycle #{cycles} done (rc={rc}){attachedTag}");
             // Clear buffer AFTER successful dispatch -- if the call threw, keep the
@@ -348,7 +353,7 @@ internal partial class Program
         Console.WriteLine("  /help | ?              show this help");
         Console.WriteLine("  /use gpt|gemini|claude|triad   switch current AI shell");
         Console.WriteLine("  /status                show shell + interrupt state");
-        Console.WriteLine("  /out <id>              display captured shell output by id");
+        Console.WriteLine("  /out <id>              display captured console (con) output by id");
         Console.WriteLine("  <shell command>        auto-detected: first token = path/exe -> run");
         Console.WriteLine("  \" <text>\" (leading space)   force chat mode (skip shell detection)");
         Console.WriteLine("  <non-ASCII text>       always chat (Korean / CJK never run as shell)");
