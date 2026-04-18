@@ -53,11 +53,52 @@ partial class Program
             if (proc == null) return; // spawn failed -- fall through to normal path
             Console.Error.WriteLine($"[SWAP] new-pid={proc.Id} running");
             proc.WaitForExit();
+            ScheduleDetachedHardlinkHeal(myPath, target);
             TerminateSelf((uint)proc.ExitCode);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[SWAP] failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// After the live-swap respawn has run, the stale hardlink at
+    /// <paramref name="linkPath"/> is still present (and still pointing at the
+    /// old inode). We can't replace it from within our own process because
+    /// Windows holds an exec lock on our running binary. Solution: spawn a
+    /// detached cmd.exe that sleeps ~1s (enough for our TerminateSelf to
+    /// release the lock), deletes the stale link, and creates a fresh
+    /// hardlink to the current wkappbot.exe. Next invocation of the alias
+    /// skips the live-swap path entirely because mtimes will match.
+    /// </summary>
+    static void ScheduleDetachedHardlinkHeal(string linkPath, string targetPath)
+    {
+        try
+        {
+            // CMD is fussy about quotes; escape embedded double-quotes, wrap
+            // the whole command in /c "...". `ping -n 2 127.0.0.1` = ~1s
+            // portable sleep. `>nul` suppresses console output in both pings
+            // and mklink. del /F forces removal of the hardlink file.
+            string q(string s) => s.Replace("\"", "\\\"");
+            var inner = $"ping 127.0.0.1 -n 2 >nul & del /F /Q \"{q(linkPath)}\" >nul 2>&1 & mklink /H \"{q(linkPath)}\" \"{q(targetPath)}\" >nul";
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c " + inner,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                RedirectStandardInput  = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError  = false,
+            };
+            using var _ = System.Diagnostics.Process.Start(psi);
+            Console.Error.WriteLine($"[SWAP] scheduled hardlink heal: {System.IO.Path.GetFileName(linkPath)} -> wkappbot.exe");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SWAP] heal schedule failed: {ex.Message}");
         }
     }
 
