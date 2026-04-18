@@ -15,7 +15,7 @@ internal partial class Program
         {
             killTimer = new System.Threading.Timer(_ =>
             {
-                Console.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded -- exiting");
+                Console.Error.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded -- exiting");
                 Console.Out.Flush();
                 Environment.Exit(2);
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
@@ -46,17 +46,22 @@ internal partial class Program
                 : EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
             if (ipc != null)
             {
-                Console.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
-                Console.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
-                Console.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
-                Console.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
+                // Diagnostic/meta lines go to stderr -- buffered by Launcher and shown only
+                // on error exit (or with --stderr flag). Cards are the user-facing result
+                // so they stay on stdout. Pipe mode currently drops stderr entirely; the
+                // Launcher smart-stderr handler is a separate enhancement to plumb it.
+                Console.Error.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
+                Console.Error.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
+                Console.Error.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
+                Console.Error.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
                 if (!string.IsNullOrWhiteSpace(ipc.Prompt))
-                    Console.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
+                    Console.Error.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
                 foreach (var plan in ipc.Plans)
-                    Console.WriteLine($"[EYE_PLAN] -> {plan}");
-                if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
-                Console.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
-                Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
+                    Console.Error.WriteLine($"[EYE_PLAN] -> {plan}");
+                if (ipc.Plans.Length > 3) Console.Error.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
+                Console.Error.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
+                Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
+                // "-- card display --" separator: stdout because it precedes the card content.
                 Console.WriteLine("-- card display --");
                 foreach (var line in ipc.Summary.Split('\n'))
                     Console.WriteLine(line.TrimEnd('\r'));
@@ -71,7 +76,7 @@ internal partial class Program
             // Eye는 간접 런칭만! tick에서 직접 spawn하지 않음.
             // 다음 일반 명령(inspect, a11y 등) 실행 시 자동 spawn됨.
             PulseStep.Mark("ipc-failed-legacy");
-            Console.WriteLine("[EYE] IPC query failed -- falling back to legacy scan");
+            Console.Error.WriteLine("[EYE] IPC query failed -- falling back to legacy scan");
 
             // -- Phase 1: ReadLatestTick --
             var swPhase = Stopwatch.StartNew();
@@ -79,8 +84,7 @@ internal partial class Program
             var latest = ReadLatestTick(out tickRead, out tickParse);
             swPhase.Stop();
             var msReadTick = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
 
             // -- Phase 2: ReadLatestOpenClawPromptPreview --
             swPhase.Restart();
@@ -88,8 +92,7 @@ internal partial class Program
             var prompt = ReadLatestOpenClawPromptPreview(promptDiag);
             swPhase.Stop();
             var msPrompt = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
 
             // -- Phase 3: ReadEyeCards + prompt-based discovery --
             swPhase.Restart();
@@ -98,8 +101,7 @@ internal partial class Program
             CheckAndReportDeadCards(cards);
             swPhase.Stop();
             var msCards = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
             _lastPromptSource = promptDiag.Source;
 
             // -- Phase 4: Context % check --
@@ -124,54 +126,50 @@ internal partial class Program
             catch { }
             swPhase.Stop();
             var msCtx = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
 
             // -- Phase 5: ExtractRecentPlanItems --
             swPhase.Restart();
             var plans = ExtractRecentPlanItems(maxItems: 3);
             swPhase.Stop();
             var msPlans = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
 
             // -- Phase 6: BuildEyeSummary --
             swPhase.Restart();
             var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
             swPhase.Stop();
             var msSummary = swPhase.ElapsedMilliseconds;
-            Console.WriteLine($"[PROF] BuildSummary={msSummary}ms");
-            Console.Out.Flush();
+            Console.Error.WriteLine($"[PROF] BuildSummary={msSummary}ms");
 
             // -- Print results --
             var ctxInfo = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
-            Console.WriteLine("[EYE] one-shot tick");
-            Console.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
-            Console.Out.Flush();
-            Console.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
-            Console.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
+            Console.Error.WriteLine("[EYE] one-shot tick");
+            Console.Error.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
+            Console.Error.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
+            Console.Error.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
             if (!string.IsNullOrWhiteSpace(prompt))
-                Console.WriteLine($"[EYE_TICK] recent={prompt}");
+                Console.Error.WriteLine($"[EYE_TICK] recent={prompt}");
 
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
-                    Console.WriteLine($"[EYE_PLAN] -> {plans[i]}");
+                    Console.Error.WriteLine($"[EYE_PLAN] -> {plans[i]}");
                 if (_lastPlanItemsCache.Count > plans.Count)
-                    Console.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
+                    Console.Error.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
             }
 
             var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
             var aiIdle = (DateTime.UtcNow - _lastAiActivityUtc).TotalSeconds;
             var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (DateTime.UtcNow - _lastAutoGogoUtc).TotalSeconds;
             var armed = execIdle >= 60 && aiIdle >= 60 && cooldown >= 600;
-            Console.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
+            Console.Error.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
 
             var latestAge = -1.0;
             if (latest != null && DateTime.TryParse(latest.Ts, out var ts))
                 latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
-            Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
+            Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
             Console.WriteLine("-- card display --");
             foreach (var line in summary.Split('\n'))
@@ -191,7 +189,7 @@ internal partial class Program
                 if (retryItems.Count > 0)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
+                    Console.Error.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
                     Console.ResetColor();
                     foreach (var item in retryItems)
                         SlackRouteCommand([item]);
@@ -202,17 +200,17 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
+                Console.Error.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
             }
 
-            Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+            Console.Error.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             return 0;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EYE_TICK] error={ex.Message}");
+            Console.Error.WriteLine($"[EYE_TICK] error={ex.Message}");
             Console.Out.Flush();
             return 1;
         }
@@ -220,51 +218,13 @@ internal partial class Program
         {
             killTimer?.Dispose();
 
-            // -- atexit: Eye 살아있나 체크 -> 없으면 spawn --
-            // tick이 할 일 다 하고 퇴근 직전에 Eye 생존 확인.
-            // 워치독(10분)이 이걸 호출하므로 Eye 사망 시 최대 10분 안에 자동 복구.
-            PulseStep.Mark("eye-check");
-            try
-            {
-                using var probe = new System.Threading.Mutex(false, EyeAliveMutexName);
-                if (probe.WaitOne(0))
-                {
-                    probe.ReleaseMutex();
-                    // Eye is dead -- spawn and WAIT until confirmed alive
-                    PulseStep.Mark("eye-dead-spawning");
-                    LaunchAppBotEyeIfNeededCore("");
-                    // Wait up to 10s for Eye to acquire mutex (= alive)
-                    for (int wi = 0; wi < 100; wi++)
-                    {
-                        Thread.Sleep(100);
-                        using var check = new System.Threading.Mutex(false, EyeAliveMutexName);
-                        if (!check.WaitOne(0)) { PulseStep.Mark("eye-confirmed-alive"); break; }
-                        check.ReleaseMutex();
-                    }
-                }
-                else
-                {
-                    PulseStep.Mark("eye-alive-ok");
-                }
-            }
-            catch (System.Threading.AbandonedMutexException)
-            {
-                // Eye crashed -- spawn and wait
-                PulseStep.Mark("eye-crashed-spawning");
-                LaunchAppBotEyeIfNeededCore("");
-                for (int wi = 0; wi < 100; wi++)
-                {
-                    Thread.Sleep(100);
-                    using var check = new System.Threading.Mutex(false, EyeAliveMutexName);
-                    if (!check.WaitOne(0)) { PulseStep.Mark("eye-confirmed-alive"); break; }
-                    check.ReleaseMutex();
-                }
-            }
-            catch { }
-            // -- Safety net: always schedule next watchdog tick --
-            // Even if Eye spawn fails, next tick will try again in 5 min.
-            PulseStep.Mark("watchdog-schedule");
-            try { EnsureEyeWatchdogTask(); } catch { }
+            // tick is READ-ONLY. Recovery (Eye spawn, watchdog re-arm) used to run here,
+            // but its output -- including the two "[EYE] Guardian startup run-key: armed" /
+            // "Schedulerless guardian mode active" lines -- leaked onto the user's stdout
+            // via the Eye pipe's TeeTextWriter, making the command output noisy on every
+            // invocation. Recovery is the Watchdog/Task Scheduler's job, not tick's.
+            // Keep the pulse marker for telemetry but take no recovery action.
+            PulseStep.Mark("eye-check-skipped");
             PulseStep.Done();
         }
     }
