@@ -532,7 +532,13 @@ partial class Program
         // --sudo must always go to a fresh Core (stale in-memory user Eye can't do admin work
         // and may bypass new --sudo logic added to Core).
         var isSudoRequest = forwardArgs.Any(a => a == "--sudo");
-        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest
+        // chat launches interactive subprocesses (claude, cmd.exe, bash, AI REPL).
+        // Those need direct terminal stdio -- NOT the Eye pipe, which would trap
+        // the child's stdin/stdout inside a unidirectional pipe to the Eye process.
+        // Route chat straight to Core so ProcessStartInfo with inherited stdio
+        // points at the user's actual terminal.
+        var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
+        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
@@ -685,9 +691,67 @@ partial class Program
             return code; // unreachable
         }
 
+        // chat launches interactive subprocesses (cmd.exe, claude CLI, bash, AI REPL).
+        // Those require REAL terminal stdio -- the default RunCoreDetachedNormal wraps
+        // stdout/stderr in IOCP named pipes to capture output, which means every child
+        // the Core spawns would inherit PIPES instead of the user's console. Result:
+        // cmd.exe starts, prints nothing visible, and the user's keystrokes go to a
+        // dead handle. Fix: spawn Core with fully inherited stdio, no redirection.
+        if (isChatCmd)
+        {
+            int chatCode = RunCoreInheritedStdio(relayArgs);
+            AppBotExit(chatCode);
+            return chatCode; // unreachable
+        }
+
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
         AppBotExit(finalCode);
         return finalCode; // unreachable
+    }
+
+    /// <summary>
+    /// Spawn Core with full stdio inheritance -- no pipe redirection, no ConPTY
+    /// decoupling. Used exclusively by interactive commands like `chat` where the
+    /// child process must see the user's actual terminal so its own subprocess
+    /// (claude CLI, cmd.exe, bash, ...) can read keystrokes and render output live.
+    ///
+    /// Accepts the LPC/MSYS2 deadlock risk because the command is BY DEFINITION
+    /// running inside an interactive console session; the conditions that trigger
+    /// the deadlock (non-interactive ConPTY + single-file AppHost) don't apply.
+    /// </summary>
+    static int RunCoreInheritedStdio(string[] args)
+    {
+        try
+        {
+            var core = ResolveCoreExe();
+            if (!System.IO.File.Exists(core))
+            {
+                Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}");
+                return 1;
+            }
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = core,
+                UseShellExecute = false,
+                // NOT redirected -- child gets the real console stdio.
+                RedirectStandardOutput = false,
+                RedirectStandardError  = false,
+                RedirectStandardInput  = false,
+                CreateNoWindow = false,
+            };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) { Console.Error.WriteLine("[LAUNCHER] chat: failed to start Core"); return 1; }
+            proc.WaitForExit();
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[LAUNCHER] chat inherited-stdio spawn error: {ex.Message}");
+            return 1;
+        }
     }
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
