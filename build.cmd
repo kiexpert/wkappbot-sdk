@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-rem ═══════════════════════════════════════════════════════════════════════════
-rem  WKAppBot build.cmd  —  Publish, copy, and hot-swap deploy
+rem ===========================================================================
+rem  WKAppBot build.cmd  -  Publish, copy, and hot-swap deploy
 rem
 rem  Usage:
 rem    build.cmd               Full build: compile + publish + copy + hot-swap
@@ -18,14 +18,14 @@ rem                                  handles hot-swap trigger)
 rem    wkappbot-core.exe  Core      (single-file ~25 MB; all CLI logic + Eye loop)
 rem
 rem  Hot-swap flow (Eye is running):
-rem    1. csproj post-publish target copies core  → wkappbot-core.new.exe
-rem    2. build.cmd copies launcher               → wkappbot.new.exe
+rem    1. csproj post-publish target copies core  -> wkappbot-core.new.exe
+rem    2. build.cmd copies launcher               -> wkappbot.new.exe
 rem    3. Eye tick triggers self-detect: drains in-flight pipes, self-replaces
-rem    4. Watchdog (below): if .new.exe survives 3 s → taskkill + force-promote
+rem    4. Watchdog (below): if .new.exe survives 3 s -> taskkill + force-promote
 rem
 rem  AI note: never pass --no-verify or skip hooks; never force-push; always
 rem    use hot-swap path (do NOT taskkill manually before building).
-rem ═══════════════════════════════════════════════════════════════════════════
+rem ===========================================================================
 
 rem ROOT_DIR: auto-detect from this script's location (works on any machine)
 set "ROOT_DIR=%~dp0"
@@ -53,7 +53,7 @@ set "DOTNET_CLI_TELEMETRY_OPTOUT=1"
 set "MSBuildEnableWorkloadResolver=false"
 
 rem AOT (Launcher) requires vswhere.exe so MSVC linker can be located.
-rem Unconditionally prepend VS Installer dir — harmless if already present.
+rem Unconditionally prepend VS Installer dir - harmless if already present.
 if exist "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" (
   set "PATH=C:\Program Files (x86)\Microsoft Visual Studio\Installer;%PATH%"
 )
@@ -97,10 +97,10 @@ rem Running launcher can be renamed on Windows NTFS; new connections use the new
 set "TS=%date:~0,4%%date:~5,2%%date:~8,2%-%time:~0,2%%time:~3,2%"
 set "TS=!TS: =0!"
 if exist "%BIN_DIR%\wkappbot.exe" (
-  echo [BUILD]   rename launcher: wkappbot.exe → wkappbot.old-!TS!.exe
+  echo [BUILD]   rename launcher: wkappbot.exe -> wkappbot.old-!TS!.exe
   move /y "%BIN_DIR%\wkappbot.exe" "%BIN_DIR%\wkappbot.old-!TS!.exe" >nul 2>nul
 )
-echo [BUILD]   copy launcher: %LAUNCHER_OUT%\wkappbot.exe → %BIN_DIR%\wkappbot.exe
+echo [BUILD]   copy launcher: %LAUNCHER_OUT%\wkappbot.exe -> %BIN_DIR%\wkappbot.exe
 copy /y "%LAUNCHER_OUT%\wkappbot.exe" "%BIN_DIR%\wkappbot.exe" >nul
 if errorlevel 1 (
   echo [BUILD] launcher copy failed
@@ -141,7 +141,7 @@ call "%BIN_DIR%\wkappbot-core.exe" eye tick --timeout 15 >nul 2>nul
 
 rem Hot-swap watchdog:
 rem If *.new.exe is still present after 3s, treat as failure, kill all, and promote .new -> .exe.
-rem Launcher: no .new.exe watchdog needed — deployed directly to wkappbot.exe
+rem Launcher: no .new.exe watchdog needed - deployed directly to wkappbot.exe
 rem Old launcher (.old-*.exe) cleanup: delete anything older than current
 for %%F in ("%BIN_DIR%\wkappbot.old-*.exe") do (
   del /q "%%F" >nul 2>nul
