@@ -45,9 +45,9 @@ internal partial class Program
     static int SetDefaultShell(string shell)
     {
         shell = shell.Trim().ToLowerInvariant();
-        if (shell != "claude" && !_shellAis.Contains(shell) && !_shellOsNames.Contains(shell))
+        if (shell != "claude" && shell != "codex" && !_shellAis.Contains(shell) && !_shellOsNames.Contains(shell))
         {
-            Console.Error.WriteLine($"[CHAT] --set-default: unknown shell '{shell}'. Valid: claude | cmd | powershell | bash | gemini | gpt | triad");
+            Console.Error.WriteLine($"[CHAT] --set-default: unknown shell '{shell}'. Valid: claude | codex | cmd | powershell | bash | gemini | gpt | triad");
             return 2;
         }
         try
@@ -94,7 +94,9 @@ internal partial class Program
             // First positional arg as shell-name shortcut: "wkappbot chat cmd" / "chat gemini".
             // Only when it exactly matches a known shell AND no question-like args preceded it.
             else if (explicitShell == null && qParts.Count == 0 &&
-                     (_shellAis.Contains(a) || _shellOsNames.Contains(a) || a.Equals("claude", StringComparison.OrdinalIgnoreCase)))
+                     (_shellAis.Contains(a) || _shellOsNames.Contains(a)
+                      || a.Equals("claude", StringComparison.OrdinalIgnoreCase)
+                      || a.Equals("codex",  StringComparison.OrdinalIgnoreCase)))
                 explicitShell = a.ToLowerInvariant();
             else qParts.Add(a);
         }
@@ -131,6 +133,26 @@ internal partial class Program
             if (!string.IsNullOrEmpty(aq)) return AskSingleAiFallback(aq, shell);
             Console.Error.WriteLine($"[CHAT] shell=ask-{shell} -- loop mode. /help for commands, /quit to exit.");
             return ChatLoopCommand(args);
+        }
+
+        // Codex CLI route -- same "resume last session" convenience as claude:
+        // with no args we enter `codex resume --last` which lands the user
+        // back in whatever conversation codex was last handling (typically
+        // the VSCode Codex extension's active session). Codex binary often
+        // isn't on PATH, so we fall back to the known ~/.codex install dir.
+        if (shell == "codex")
+        {
+            var codexExe = ResolveCodexExe();
+            if (codexExe == null)
+            {
+                Console.Error.WriteLine("[CHAT] codex CLI not found. Expected on PATH or at %USERPROFILE%\\.codex\\.sandbox-bin\\codex.exe");
+                return 127;
+            }
+            var cq = string.Join(' ', qParts).Trim();
+            if (string.IsNullOrEmpty(cq))
+                return ExecClaudeInteractive(codexExe, "resume --last");
+            // One-shot prompt: forward verbatim to codex's default (new-session) CLI.
+            return ExecClaudeInteractive(codexExe, $"\"{cq.Replace("\"", "\\\"")}\"");
         }
 
         // Default: claude shell (rate-limit-aware passthrough, existing behavior).
@@ -586,6 +608,35 @@ internal partial class Program
             @"C:\Windows\System32\bash.exe", // WSL wrapper
         })
             if (File.Exists(p)) return p;
+        return null;
+    }
+
+    // PATH lookup first (in case the user added codex to PATH after install),
+    // then the OpenAI-installer's canonical location at
+    // %USERPROFILE%\.codex\.sandbox-bin\codex.exe.
+    static string? ResolveCodexExe()
+    {
+        try
+        {
+            var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var dir in pathEnv.Split(Path.PathSeparator))
+            {
+                if (string.IsNullOrWhiteSpace(dir)) continue;
+                var candidate = Path.Combine(dir, "codex.exe");
+                if (File.Exists(candidate)) return candidate;
+            }
+        }
+        catch { }
+        try
+        {
+            var home = Environment.GetEnvironmentVariable("USERPROFILE");
+            if (!string.IsNullOrEmpty(home))
+            {
+                var fallback = Path.Combine(home, ".codex", ".sandbox-bin", "codex.exe");
+                if (File.Exists(fallback)) return fallback;
+            }
+        }
+        catch { }
         return null;
     }
 
