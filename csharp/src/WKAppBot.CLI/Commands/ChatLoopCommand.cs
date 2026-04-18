@@ -235,28 +235,58 @@ internal partial class Program
             Console.WriteLine($"shell={currentShell}  cycles={cycles}  interrupts={InterruptChannel.HasPending()}");
             return;
         }
-        // /out <id> -- show a captured shell output by id. Useful when AI mentions
-        // "see output 2501" -- operator can bring up the full body without leaving
-        // the loop. Successful commands only ship preview + id in the tool_use
-        // broadcast, so this is how you inspect the actual content.
+        // /out <id> [--after <bytes>] [--lines <N>]
+        //   Show a captured shell output. Pagination matches the hint emitted
+        //   by ShellToolUseEncoder when the body was truncated in the AI
+        //   broadcast -- the AI (or operator) can resume reading from the
+        //   cut point without re-sending the full log.
+        //     /out 2501                         full body
+        //     /out 2501 --after 4096            start at byte 4096
+        //     /out 2501 --lines 80              first 80 lines (from --after offset)
+        //     /out 2501 --after 4096 --lines 40 combined: skip + line cap
         if (line.StartsWith("/out ", StringComparison.OrdinalIgnoreCase))
         {
-            var idStr = line[5..].Trim();
-            if (!int.TryParse(idStr, out var id))
+            var tokens = line[5..].Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length == 0 || !int.TryParse(tokens[0], out var id))
             {
-                Console.Error.WriteLine($"[CHAT:LOOP] /out: '{idStr}' is not a valid id");
+                Console.Error.WriteLine("[CHAT:LOOP] /out <id> [--after <bytes>] [--lines <N>]");
                 return;
             }
+            int afterBytes = 0;
+            int maxLines = 0; // 0 = unlimited
+            for (int i = 1; i < tokens.Length - 1; i++)
+            {
+                if (tokens[i] == "--after" && int.TryParse(tokens[i + 1], out var ab)) { afterBytes = Math.Max(0, ab); i++; }
+                else if (tokens[i] == "--lines" && int.TryParse(tokens[i + 1], out var ml)) { maxLines = Math.Max(0, ml); i++; }
+            }
+
             var body = ShellOutputStore.ReadById(id);
             if (body == null)
             {
                 Console.Error.WriteLine($"[CHAT:LOOP] /out: id={id} not found");
                 return;
             }
-            Console.WriteLine($"--- output id={id} ---");
-            Console.Write(body);
-            if (!body.EndsWith('\n')) Console.WriteLine();
-            Console.WriteLine($"--- end id={id} ---");
+
+            // Byte-offset skip. Clamp into range so --after past EOF becomes empty.
+            var slice = afterBytes >= body.Length ? "" : body[afterBytes..];
+            if (maxLines > 0)
+            {
+                var split = slice.Split('\n');
+                var take = Math.Min(maxLines, split.Length);
+                slice = string.Join('\n', split.AsEnumerable().Take(take));
+            }
+
+            var suffix = afterBytes > 0 ? $" --after={afterBytes}B" : "";
+            suffix += maxLines > 0 ? $" --lines={maxLines}" : "";
+            Console.WriteLine($"--- output id={id}{suffix} ---");
+            Console.Write(slice);
+            if (!slice.EndsWith('\n')) Console.WriteLine();
+            var shown = afterBytes + slice.Length;
+            var more = body.Length - shown;
+            if (more > 0)
+                Console.WriteLine($"--- end id={id} (shown {slice.Length}B, {more}B more; continue: /out {id} --after {shown}) ---");
+            else
+                Console.WriteLine($"--- end id={id} ---");
             return;
         }
 
