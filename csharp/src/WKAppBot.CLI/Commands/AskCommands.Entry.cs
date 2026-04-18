@@ -105,16 +105,10 @@ internal partial class Program
             Console.Error.WriteLine("[ASK] claude CLI not found on PATH. Install Claude Code or use a different AI target.");
             return 127;
         }
-        // Session continuity: prefer -r <exact-session-id> so we piggy-back on
-        // whatever the VSCode extension was writing; fall back to -c when we
-        // can't compute the id; skip entirely when the caller asked for a
-        // fresh session.
-        string? extraArgs = null;
-        if (!newSession)
-        {
-            var id = FindActiveClaudeSessionId();
-            extraArgs = id != null ? $"-r {id}" : "-c";
-        }
+        // Session continuity via PickClaudeResumeArg: newest idle session wins,
+        // live (VSCode-held) ones are skipped in favor of the previous idle
+        // session, nothing left -> fresh. Newsession=true forces fresh.
+        string? extraArgs = PickClaudeResumeArg(newSession);
         Console.Error.WriteLine($"[ASK] claude-cli {extraArgs ?? "(new session)"} -- \"{(question.Length > 60 ? question[..57] + "..." : question)}\"");
 
         var psi = new ProcessStartInfo

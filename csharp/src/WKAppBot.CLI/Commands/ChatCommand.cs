@@ -180,15 +180,11 @@ internal partial class Program
         if (interactive)
         {
             // Interactive: replace stdio, inherit TTY. No output capture (cannot detect limit mid-stream).
-            // Try to resume the EXACT same session the VSCode Claude Code
-            // extension is currently writing to (most recent .jsonl in this
-            // project's session dir). `-r <id>` is more precise than `-c`
-            // because it doesn't depend on claude CLI's "most recent" heuristic
-            // agreeing with the extension's. Falls back to -c if we can't
-            // locate the project session dir.
-            var activeId = FindActiveClaudeSessionId();
-            var resumeArg = activeId != null ? $"-r {activeId}" : "-c";
-            return ExecClaudeInteractive(claudeExe, resumeArg);
+            // PickClaudeResumeArg walks newest -> oldest and returns -r <id>
+            // for the first idle session, skipping any that VSCode or another
+            // CLI is currently writing to. Null means "everything's live or
+            // no history yet" -- fork fresh.
+            return ExecClaudeInteractive(claudeExe, PickClaudeResumeArg(newSession: false) ?? "");
         }
 
         // Print mode: capture output, scan for limit markers
@@ -694,6 +690,69 @@ internal partial class Program
 
     static string? FindActiveClaudeSessionId() =>
         FindActiveClaudeSessionJsonl()?.Name is string n ? Path.GetFileNameWithoutExtension(n) : null;
+
+    // Heuristic: is another process actively using this session file right now?
+    // We try an exclusive open -- if any process (VSCode Claude Code extension,
+    // another claude CLI, etc.) has it open for writing with FileShare other
+    // than None, the CreateFile fails with a sharing violation. Treat that as
+    // "session is live; do NOT second-attach via -r".
+    //
+    // False negatives (file rotated, closed but we couldn't test): we just end
+    // up resuming as before. False positives (anti-virus / indexer briefly
+    // opening the file): we skip resume for that one invocation, which is
+    // harmless -- the user can still --resume explicitly.
+    static bool IsSessionFileActive(string path)
+    {
+        try
+        {
+            using var _ = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            return false; // got exclusive write access -> nobody else holds it for write
+        }
+        catch (IOException) { return true; }
+        catch { return false; }
+    }
+
+    // Pick the resume strategy for claude CLI:
+    //   -r <id> : prefer the newest session if idle; if newest is LIVE
+    //             (VSCode Code extension writing to it), fall back to the
+    //             2nd-newest idle session so we preserve the previous
+    //             context instead of forking cold. User: "아니면 그 직전
+    //             세션이랑 연결해도 되고."
+    //   null    : nothing idle to resume -- start FRESH.
+    static string? PickClaudeResumeArg(bool newSession)
+    {
+        if (newSession) return null;
+        try
+        {
+            var home = Environment.GetEnvironmentVariable("USERPROFILE");
+            if (string.IsNullOrEmpty(home)) return null;
+            var cwd = Environment.CurrentDirectory;
+            var chars = cwd.ToCharArray();
+            if (chars.Length > 0) chars[0] = char.ToLowerInvariant(chars[0]);
+            var slug = new string(chars).Replace(':', '-').Replace('\\', '-');
+            var sessionDir = Path.Combine(home, ".claude", "projects", slug);
+            if (!Directory.Exists(sessionDir)) return null;
+
+            // Walk newest -> oldest, return the first idle one.
+            var ordered = new DirectoryInfo(sessionDir).GetFiles("*.jsonl")
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .ToArray();
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                var f = ordered[i];
+                if (IsSessionFileActive(f.FullName))
+                {
+                    Console.Error.WriteLine($"[CHAT] {f.Name} is in use -- trying previous session...");
+                    continue;
+                }
+                if (i > 0)
+                    Console.Error.WriteLine($"[CHAT] resuming previous session (skipped {i} live one(s)): {f.Name}");
+                return $"-r {Path.GetFileNameWithoutExtension(f.Name)}";
+            }
+        }
+        catch { }
+        return null; // all sessions live (or none exist) -- fork fresh
+    }
 
     // Write the last <tailBytes> of the user's active Claude session JSONL
     // to a temp .txt file and return its path, so AskCommand's existing
