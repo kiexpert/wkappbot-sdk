@@ -18,10 +18,57 @@ internal partial class Program
     ///   2. stdout/stderr contains rate-limit markers
     ///   3. claude exits non-zero with a known limit signature
     /// </summary>
+    // Supported shell targets. AI entries run as REPL via NonBlockingLineReader;
+    // OS shells (cmd/powershell/bash) are stdio-inherited subprocesses.
+    static readonly HashSet<string> _shellAis =
+        new(StringComparer.OrdinalIgnoreCase) { "gpt", "gemini", "triad" };
+    static readonly HashSet<string> _shellOsNames =
+        new(StringComparer.OrdinalIgnoreCase) { "cmd", "powershell", "pwsh", "bash" };
+
+    /// <summary>Path of persisted default-shell pointer. One line, shell name.</summary>
+    static string ChatDefaultShellFile => Path.Combine(DataDir, "chat-default.txt");
+
+    static string GetDefaultShell()
+    {
+        try
+        {
+            if (File.Exists(ChatDefaultShellFile))
+            {
+                var v = File.ReadAllText(ChatDefaultShellFile).Trim().ToLowerInvariant();
+                if (!string.IsNullOrEmpty(v)) return v;
+            }
+        }
+        catch { }
+        return "claude"; // bootstrap default
+    }
+
+    static int SetDefaultShell(string shell)
+    {
+        shell = shell.Trim().ToLowerInvariant();
+        if (shell != "claude" && !_shellAis.Contains(shell) && !_shellOsNames.Contains(shell))
+        {
+            Console.Error.WriteLine($"[CHAT] --set-default: unknown shell '{shell}'. Valid: claude | cmd | powershell | bash | gemini | gpt | triad");
+            return 2;
+        }
+        try
+        {
+            Directory.CreateDirectory(DataDir);
+            File.WriteAllText(ChatDefaultShellFile, shell + "\n");
+            Console.WriteLine($"[CHAT] default shell set to '{shell}' -> {ChatDefaultShellFile}");
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[CHAT] --set-default failed: {ex.Message}");
+            return 1;
+        }
+    }
+
     static int ChatCommand(string[] args)
     {
         bool printMode = false;
         bool noFallback = false;
+        string? explicitShell = null;
         var qParts = new List<string>();
         for (int i = 0; i < args.Length; i++)
         {
@@ -29,6 +76,10 @@ internal partial class Program
             if (a is "-p" or "--print") printMode = true;
             else if (a is "--no-fallback") noFallback = true;
             else if (a is "--help" or "-h") { PrintChatHelp(); return 0; }
+            else if (a == "--shell" && i + 1 < args.Length)
+                explicitShell = args[++i].ToLowerInvariant();
+            else if (a == "--set-default" && i + 1 < args.Length)
+                return SetDefaultShell(args[++i]);
             else if (a == "--ai" && i + 1 < args.Length)
             {
                 var picked = args[++i].ToLowerInvariant();
@@ -40,8 +91,33 @@ internal partial class Program
                     return 2;
                 }
             }
+            // First positional arg as shell-name shortcut: "wkappbot chat cmd" / "chat gemini".
+            // Only when it exactly matches a known shell AND no question-like args preceded it.
+            else if (explicitShell == null && qParts.Count == 0 &&
+                     (_shellAis.Contains(a) || _shellOsNames.Contains(a) || a.Equals("claude", StringComparison.OrdinalIgnoreCase)))
+                explicitShell = a.ToLowerInvariant();
             else qParts.Add(a);
         }
+
+        // Resolve target shell: explicit flag > positional > persisted default.
+        var shell = explicitShell ?? GetDefaultShell();
+
+        // OS-shell route: stdio-inherited subprocess. No question mode, no fallback.
+        if (_shellOsNames.Contains(shell))
+            return ExecOsShell(shell);
+
+        // AI-REPL route: reuse the existing ask-* REPL.
+        if (_shellAis.Contains(shell))
+        {
+            _chatFallbackAi = shell;
+            // Accept a one-shot question through the AI route too.
+            var aq = string.Join(' ', qParts).Trim();
+            if (!string.IsNullOrEmpty(aq)) return AskSingleAiFallback(aq, shell);
+            Console.Error.WriteLine($"[CHAT] shell=ask-{shell} -- REPL mode. /quit or Ctrl+D to exit.");
+            return RunAskTriadRepl();
+        }
+
+        // Default: claude shell (rate-limit-aware passthrough, existing behavior).
         var question = string.Join(' ', qParts).Trim();
         bool interactive = string.IsNullOrEmpty(question);
 
@@ -95,24 +171,31 @@ internal partial class Program
 
     static void PrintChatHelp()
     {
-        Console.WriteLine("chat [<question>] [-p] [--no-fallback] [--ai gpt|gemini|claude|triad]");
-        Console.WriteLine("  Claude Code CLI passthrough with auto-fallback to a single AI on rate-limit.");
+        Console.WriteLine("chat [<shell>|<question>] [-p] [--no-fallback] [--shell S] [--ai AI] [--set-default S]");
+        Console.WriteLine("  Unified shell router: pick a shell target to pipe into.");
         Console.WriteLine();
-        Console.WriteLine("  wkappbot chat                   Interactive Claude Code session (inherits stdio).");
-        Console.WriteLine("  wkappbot chat \"<q>\"             Non-interactive: claude -p <q>, fallback on limit.");
-        Console.WriteLine("  wkappbot chat -p \"<q>\"          Same as above (explicit print mode).");
-        Console.WriteLine("  wkappbot chat --no-fallback     Disable auto-fallback.");
-        Console.WriteLine("  wkappbot chat --ai gemini       Pick fallback AI (default: gemini).");
-        Console.WriteLine("                                  Options: gpt | gemini | claude | triad.");
+        Console.WriteLine("Shell targets:");
+        Console.WriteLine("  claude           Claude Code CLI (rate-limit-aware, fallback on limit).");
+        Console.WriteLine("  cmd              Windows cmd.exe (stdio inherited).");
+        Console.WriteLine("  powershell|pwsh  Windows PowerShell.");
+        Console.WriteLine("  bash             Git Bash or WSL bash.");
+        Console.WriteLine("  gemini|gpt|triad AI REPL via NonBlockingLineReader (type-ahead works).");
         Console.WriteLine();
-        Console.WriteLine("Fallback triggers:");
-        Console.WriteLine("  1) `claude` binary not on PATH -> route to configured fallback AI.");
-        Console.WriteLine("  2) stdout/stderr contains: usage limit, rate limit, 5-hour limit,");
-        Console.WriteLine("     session exhausted, HTTP 429, Claude is temporarily unavailable");
-        Console.WriteLine("  3) exit != 0 + one of the above signatures in output");
+        Console.WriteLine("Examples:");
+        Console.WriteLine("  wkappbot chat                   Use persisted default shell (init=claude).");
+        Console.WriteLine("  wkappbot chat cmd               Launch cmd.exe.");
+        Console.WriteLine("  wkappbot chat gemini            Gemini REPL loop.");
+        Console.WriteLine("  wkappbot chat \"<q>\"             One-shot: claude -p <q>, fallback on limit.");
+        Console.WriteLine("  wkappbot chat gemini \"<q>\"      One-shot via Gemini.");
+        Console.WriteLine("  wkappbot chat --shell bash      Force bash shell (disambiguates arg vs shell).");
+        Console.WriteLine("  wkappbot chat --set-default cmd Persist cmd as default shell.");
+        Console.WriteLine("  wkappbot chat --ai gpt          Claude fallback AI override (default gemini).");
+        Console.WriteLine("  wkappbot chat --no-fallback     Disable auto-fallback on claude rate-limit.");
         Console.WriteLine();
-        Console.WriteLine("Default fallback is single-AI (gemini) -- fastest, simplest, easiest to");
-        Console.WriteLine("debug. Use --ai triad only when you want full GPT+Gemini+Claude debate.");
+        Console.WriteLine("Rate-limit fallback (claude shell only):");
+        Console.WriteLine("  Triggered by: 'usage limit', 'rate limit', '5-hour limit',");
+        Console.WriteLine("                'session exhausted', 'HTTP 429'");
+        Console.WriteLine("  Routes to: ask <--ai>  (default gemini; cheap single-AI, not triad).");
     }
 
     static string? ResolveClaudeExe()
@@ -162,6 +245,58 @@ internal partial class Program
             }
         }
 
+        return null;
+    }
+
+    /// <summary>
+    /// Launch an OS-shell subprocess with inherited stdio. No question mode, no
+    /// rate-limit fallback -- the shell manages its own lifecycle. Exit code
+    /// passthrough. Used for "wkappbot chat cmd / powershell / bash".
+    /// </summary>
+    static int ExecOsShell(string shellName)
+    {
+        var exe = shellName switch
+        {
+            "cmd"        => "cmd.exe",
+            "powershell" => "powershell.exe",
+            "pwsh"       => "pwsh.exe",
+            "bash"       => ResolveBashExe() ?? "bash.exe",
+            _            => shellName, // caller already validated
+        };
+
+        try
+        {
+            Console.Error.WriteLine($"[CHAT] launching shell: {exe}  (Ctrl+D / exit to return)");
+            var psi = new ProcessStartInfo
+            {
+                FileName = exe,
+                UseShellExecute = false,
+                RedirectStandardInput = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
+            };
+            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-SHELL")
+                          ?? AppBotPipe.Start(psi);
+            if (proc == null) { Console.Error.WriteLine("[CHAT] failed to start shell"); return 1; }
+            proc.WaitForExit();
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[CHAT] shell '{shellName}' error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    static string? ResolveBashExe()
+    {
+        foreach (var p in new[]
+        {
+            @"C:\Program Files\Git\bin\bash.exe",
+            @"C:\Program Files\Git\usr\bin\bash.exe",
+            @"C:\Windows\System32\bash.exe", // WSL wrapper
+        })
+            if (File.Exists(p)) return p;
         return null;
     }
 
