@@ -98,7 +98,11 @@ internal partial class Program
     // .wkappbot/ask/<ts>-claude-cli-<slug>.md just like any other ask target
     // so the session log keeps growing project-locally.
     static int AskClaudeCli(string question, bool newSession)
+        => AskClaudeCli(question, newSession, out _);
+
+    static int AskClaudeCli(string question, bool newSession, out bool limitHit)
     {
+        limitHit = false;
         var claudeExe = ResolveClaudeExe();
         if (claudeExe == null)
         {
@@ -143,6 +147,12 @@ internal partial class Program
             var stderr = errSb.ToString();
             if (!string.IsNullOrEmpty(stdout)) Console.Write(stdout);
             if (!string.IsNullOrEmpty(stderr)) Console.Error.Write(stderr);
+            // Rate-limit detection on claude-cli output, symmetric to
+            // RunClaudePrint's inspection: flip limitHit so the caller's
+            // fallback rotation sees this as "try next AI, not fatal exit".
+            var combined = stdout + "\n" + stderr;
+            limitHit = DetectRateLimitMarker(combined)
+                    || (proc.ExitCode != 0 && DetectLimitExitSignature(combined));
             try { WriteAskMd("claude-cli", question, stdout); } catch { }
             return proc.ExitCode;
         }
