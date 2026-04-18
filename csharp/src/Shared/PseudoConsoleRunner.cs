@@ -312,7 +312,13 @@ public static class PseudoConsoleRunner
     [StructLayout(LayoutKind.Sequential)]
     private struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
 
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr LoadLibraryW(string name);
+    // LoadLibraryW takes LPCWSTR -- must marshal the name as Unicode. Without
+    // CharSet.Unicode the default (Ansi) would push "kernel32.dll" as ANSI bytes
+    // into a wide-char parameter; LoadLibraryW then reads "k\0e\0..." as
+    // "k"/garbage and returns NULL, making IsSupported permanently false. That's
+    // exactly why ConPTY silently wasn't engaging.
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern IntPtr LoadLibraryW(string name);
+    // GetProcAddress takes LPCSTR (ANSI) -- default marshalling is correct here.
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GetProcAddress(IntPtr h, string name);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GetStdHandle(int nStdHandle);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CloseHandle(IntPtr h);
