@@ -352,7 +352,8 @@ internal partial class Program
         {
             try
             {
-                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {exe}  (type 'exit' to return; leading-space or ?/! routes to chat)");
+                Console.WriteLine($"\x1b[1;7;95m WKAPPBOT CHAT \x1b[0m \x1b[1;32m{exe}\x1b[0m (ConPTY)");
+                Console.WriteLine("  \x1b[2mexit\x1b[0m leave  \x1b[2m•\x1b[0m  \x1b[2m?!/leading-space\x1b[0m AI chat  \x1b[2m•\x1b[0m  \x1b[2mwkappbot/a11y\x1b[0m direct dispatch");
                 Console.Out.Flush();
                 return WKAppBot.Shared.PseudoConsoleRunner.Run(
                     exe: exe,
@@ -817,7 +818,8 @@ internal partial class Program
         {
             try
             {
-                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {Path.GetFileName(claudeExe)} {args}  (wkappbot/a11y lines intercepted)");
+                Console.WriteLine($"\x1b[1;7;95m WKAPPBOT CHAT \x1b[0m \x1b[1;32m{Path.GetFileName(claudeExe)}\x1b[0m \x1b[2m{args}\x1b[0m (ConPTY)");
+                Console.WriteLine("  \x1b[2mexit\x1b[0m leave claude  \x1b[2m•\x1b[0m  \x1b[2mwkappbot/a11y\x1b[0m direct dispatch (chat flows to claude)");
                 Console.Out.Flush();
                 var streamer = new PromptDecoratingStreamer();
                 return WKAppBot.Shared.PseudoConsoleRunner.Run(
