@@ -89,14 +89,19 @@ internal partial class Program
     {
         if (string.IsNullOrWhiteSpace(line)) return false;
 
-        // Trailing "?" (ASCII or fullwidth '?') -> almost certainly a question
-        // for the AI, not a shell invocation. Covers "how do I fix X?",
-        // "why did this fail?", even one-word prompts like "git?".
+        // Trailing sentence-terminator -> chat:
+        //   ? ? (U+FF1F) : questions ("how do I fix X?", "git?")
+        //   ! ! (U+FF01) : exclamations ("빨리 해줘!", "done!")
+        // NOT the period '.' -- "cd .", "git add .", "cp src ." are all
+        // legitimate shell commands that end with '.'. Same reason we keep
+        // '~' and '*' unmarked: they're globs/paths, not sentence ends.
+        // History expansion `!!` / `!42` is normally at the start, not the
+        // end of the command, so trailing '!' staying chat is safe.
         var trimmedEnd = line.TrimEnd();
         if (trimmedEnd.Length > 0)
         {
             char last = trimmedEnd[^1];
-            if (last == '?' || last == '\uFF1F') return false;
+            if (last is '?' or '!' or '\uFF1F' or '\uFF01') return false;
         }
 
         // Non-ASCII (e.g. Korean hangul/jamo) -> chat, never a shell command.
