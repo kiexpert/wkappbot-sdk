@@ -141,14 +141,6 @@ internal partial class Program
                         var sizeTag = sizeMB >= 1.0 ? $"{sizeMB:F0}MB" : $"{jsonlFileSize / 1024}KB";
                         ctxTag = $" ctx={cardCtx}% ({sizeTag})";
                     }
-                    // Session JSONL filename -- helps operators find the exact log.
-                    // Truncate to last 44 chars so long UUID-style names stay on one line.
-                    if (!string.IsNullOrEmpty(jsonlPath))
-                    {
-                        var fname = Path.GetFileName(jsonlPath);
-                        if (fname.Length > 44) fname = "..." + fname[^41..];
-                        sb.AppendLine($"세션: {fname}");
-                    }
                     // For prompt-discovered cards, use JSONL age instead of tick age
                     if (c.LastTag == "prompt-discovered" && jsonlAge != null)
                     {
@@ -178,6 +170,16 @@ internal partial class Program
                             var trunc = thoughtLine.Length > 120 ? thoughtLine[..120] + "..." : thoughtLine;
                             sb.AppendLine($"생각: {trunc}");
                         }
+                    }
+                    // Session JSONL filename -- placed at the bottom because the UUID-style
+                    // name is cryptographic noise the eye bounces past while reading the card.
+                    // Truncated to last 41 chars with a "..." prefix so a long path still fits
+                    // on one line.
+                    if (!string.IsNullOrEmpty(jsonlPath))
+                    {
+                        var fname = Path.GetFileName(jsonlPath);
+                        if (fname.Length > 44) fname = "..." + fname[^41..];
+                        sb.AppendLine($"세션: {fname}");
                     }
                     sb.AppendLine("----");
                 }
