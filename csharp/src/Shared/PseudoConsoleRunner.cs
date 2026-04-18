@@ -47,11 +47,21 @@ public static class PseudoConsoleRunner
     /// Console in real time; bytes are also delivered to <paramref name="onOutput"/>
     /// so callers can tee to ToolOutputStore etc.
     /// </summary>
+    /// <summary>
+    /// Optional Enter-key interceptor. Called with the best-effort local line
+    /// buffer whenever the user presses Enter -- returns true if the caller
+    /// consumed the line (don't forward Enter to the child; the caller is
+    /// responsible for whatever should happen next). The local buffer tracks
+    /// printables + Backspace only; arrow keys / Home / End / Tab taint the
+    /// line (complex edit) and Enter on a tainted line is always forwarded
+    /// unmodified, so interactive line editing keeps working.
+    /// </summary>
     public static int Run(
         string exe,
         string? args = null,
         string? cwd = null,
         Action<byte[], int>? onOutput = null,
+        Func<string, bool>? onLineReady = null,
         bool mirrorToTerminal = true)
     {
         if (!IsSupported)
@@ -119,7 +129,7 @@ public static class PseudoConsoleRunner
                 { IsBackground = true, Name = "conpty-reader" };
             readerThread.Start();
 
-            inputThread = new Thread(() => RelayInput(inputWrite, hPC, cts.Token))
+            inputThread = new Thread(() => RelayInput(inputWrite, hPC, onLineReady, cts.Token))
                 { IsBackground = true, Name = "conpty-stdin" };
             inputThread.Start();
 
@@ -179,24 +189,94 @@ public static class PseudoConsoleRunner
 
     // --- Input relay (Console.ReadKey -> VT input sequences) ------------------
 
-    private static void RelayInput(IntPtr inputWrite, IntPtr hPC, CancellationToken ct)
+    private static void RelayInput(
+        IntPtr inputWrite,
+        IntPtr hPC,
+        Func<string, bool>? onLineReady,
+        CancellationToken ct)
     {
+        // Local line buffer: shadows what the user has typed since the last
+        // Enter (as far as we can track). Printable chars append, Backspace
+        // pops, Enter triggers the interceptor. Arrow keys / Home / End / Tab
+        // set `complexEdit` and we stop trusting the buffer for this line --
+        // interactive editing via cmd.exe's own line editor keeps working,
+        // we just skip the interceptor on Enter.
+        var buffer = new System.Text.StringBuilder();
+        bool complexEdit = false;
+
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                // Console.KeyAvailable is non-blocking -- honors CT quickly.
                 if (!Console.KeyAvailable) { Thread.Sleep(20); continue; }
                 var key = Console.ReadKey(intercept: true);
+
+                // -- Buffer accounting BEFORE we forward the key to cmd.exe --
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    if (!complexEdit && onLineReady != null)
+                    {
+                        var line = buffer.ToString();
+                        bool consumed = false;
+                        try { consumed = onLineReady(line); } catch { consumed = false; }
+                        if (consumed)
+                        {
+                            // Clear cmd.exe's internal line buffer so the typed
+                            // text doesn't run as a shell command -- ESC is the
+                            // cmd.exe line-reset key. Then send CR to force it
+                            // to redraw a fresh prompt below whatever the
+                            // interceptor printed.
+                            var reset = new byte[] { 0x1B, (byte)'\r' };
+                            if (!WriteFile(inputWrite, reset, (uint)reset.Length, out _, IntPtr.Zero))
+                                break;
+                            buffer.Clear();
+                            complexEdit = false;
+                            continue;
+                        }
+                    }
+                    buffer.Clear();
+                    complexEdit = false;
+                }
+                else if (key.Key == ConsoleKey.Backspace)
+                {
+                    if (buffer.Length > 0) buffer.Length--;
+                }
+                else if (IsComplexEditKey(key.Key))
+                {
+                    complexEdit = true;
+                }
+                else if (key.KeyChar != '\0' && !char.IsControl(key.KeyChar))
+                {
+                    buffer.Append(key.KeyChar);
+                }
+                // else: other control keys (Esc, Ctrl+X etc) -- forward but
+                // don't touch the buffer. If the user clears the cmd.exe line
+                // manually (Esc), our buffer will be stale, but the next
+                // complex-edit or fresh Enter resets it anyway.
+
                 var seq = EncodeKeyToVt(key);
                 if (seq == null || seq.Length == 0) continue;
-
                 if (!WriteFile(inputWrite, seq, (uint)seq.Length, out _, IntPtr.Zero))
                     break;
             }
         }
         catch { /* best effort */ }
     }
+
+    // Keys that mutate the cmd.exe line buffer in ways our naive append/pop
+    // shadow can't follow. When we see any of these, mark the current line as
+    // "complex edit" and let Enter pass through without interception.
+    private static bool IsComplexEditKey(ConsoleKey k) => k switch
+    {
+        ConsoleKey.LeftArrow or ConsoleKey.RightArrow or
+        ConsoleKey.UpArrow or ConsoleKey.DownArrow or
+        ConsoleKey.Home or ConsoleKey.End or
+        ConsoleKey.Tab or ConsoleKey.Delete or
+        ConsoleKey.PageUp or ConsoleKey.PageDown or
+        ConsoleKey.F1 or ConsoleKey.F2 or ConsoleKey.F3 or ConsoleKey.F4 or
+        ConsoleKey.F5 or ConsoleKey.F6 or ConsoleKey.F7 or ConsoleKey.F8 => true,
+        _ => false,
+    };
 
     /// <summary>
     /// Translate a <see cref="ConsoleKeyInfo"/> into the UTF-8 / VT input bytes

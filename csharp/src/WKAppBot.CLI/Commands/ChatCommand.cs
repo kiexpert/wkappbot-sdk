@@ -310,14 +310,15 @@ internal partial class Program
         {
             try
             {
-                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {exe}  (type 'exit' to return)");
+                Console.WriteLine($"[CHAT] [MODE=ConPTY] shell: {exe}  (type 'exit' to return; leading-space or ?/! routes to chat)");
                 Console.Out.Flush();
                 return WKAppBot.Shared.PseudoConsoleRunner.Run(
                     exe: exe,
                     args: shellArgs,
                     cwd: Environment.CurrentDirectory,
-                    onOutput: streamer.OnBytes, // write to stdout with prompt decoration
-                    mirrorToTerminal: false);   // streamer handles mirroring
+                    onOutput: streamer.OnBytes,           // write to stdout
+                    onLineReady: InterceptChatOrShell,    // Enter-key chat detector
+                    mirrorToTerminal: false);
             }
             catch (Exception ex)
             {
@@ -459,6 +460,62 @@ internal partial class Program
                 _stdout.Flush();
             }
         }
+    }
+
+    // Enter-key interceptor handed to PseudoConsoleRunner. Returns true to
+    // CONSUME the Enter (line handled here, don't run in shell); false to let
+    // the shell execute it normally. Routing mirrors ChatLoopCommand's
+    // LooksLikeShellCommand ladder:
+    //   - leading space                 -> force chat
+    //   - trailing ? or ! (+ fullwidth) -> chat
+    //   - any non-ASCII                 -> chat
+    //   - otherwise                     -> shell (return false)
+    // When consumed, print a blank line for visual separation, dispatch to
+    // the fallback AI, then another blank line so the fresh cmd.exe prompt
+    // (forced by PseudoConsoleRunner's Enter-replacement) lands cleanly.
+    static bool InterceptChatOrShell(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return false;
+        bool chat = LooksLikeChatLine(line);
+        if (!chat) return false;
+
+        var stdout = Console.OpenStandardOutput();
+        var sep = System.Text.Encoding.ASCII.GetBytes("\r\n");
+        stdout.Write(sep, 0, sep.Length);
+        stdout.Flush();
+
+        try
+        {
+            AskSingleAiFallback(line.TrimStart(), _chatFallbackAi);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
+        }
+
+        stdout.Write(sep, 0, sep.Length);
+        stdout.Flush();
+        return true;
+    }
+
+    // ASCII-only classification; returns true when the line should be routed
+    // to the AI rather than the shell. Kept local to ChatCommand because
+    // ChatLoopCommand's own LooksLikeShellCommand is the inverse (and does
+    // additional PATH probing which isn't needed here: inside `chat cmd` the
+    // user is already past the "is this a shell command?" gate, so we only
+    // pull out the clear chat signals).
+    static bool LooksLikeChatLine(string line)
+    {
+        if (line.Length > 0 && line[0] == ' ') return true;
+        var trimmed = line.TrimEnd();
+        if (trimmed.Length > 0)
+        {
+            char last = trimmed[^1];
+            if (last is '?' or '!' or '\uFF1F' or '\uFF01') return true;
+        }
+        foreach (var ch in line)
+            if (ch > 0x7F) return true;
+        return false;
     }
 
     static string? ResolveBashExe()
