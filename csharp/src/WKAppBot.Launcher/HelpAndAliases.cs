@@ -148,8 +148,15 @@ partial class Program
             // running exe (loader holds the file by inode -- the directory
             // entry is renameable). DELETE would fail until the owning PID
             // terminates, so we don't try yet.
-            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            var renamedPath = linkPath + $".old-{stamp}.exe";
+            // Rename target: ms precision + helper PID, with an "existence"
+            // loop as final insurance so parallel heals (same ms, same PID
+            // impossible, but keep belt+suspenders) never MoveFile onto an
+            // existing file and fail.
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+            var pid = Environment.ProcessId;
+            string renamedPath = linkPath + $".old-{stamp}-{pid}.exe";
+            for (int seq = 2; System.IO.File.Exists(renamedPath) && seq < 100; seq++)
+                renamedPath = linkPath + $".old-{stamp}-{pid}-{seq}.exe";
             try { System.IO.File.Move(linkPath, renamedPath); }
             catch { return 1; }
 
