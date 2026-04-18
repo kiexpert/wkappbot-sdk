@@ -106,15 +106,15 @@ internal partial class Program
         if (_shellOsNames.Contains(shell))
             return ExecOsShell(shell);
 
-        // AI-REPL route: reuse the existing ask-* REPL.
+        // AI-REPL route: enters the new ChatLoopCommand (MVP router + interrupt channel).
+        // MCP loop is untouched; the experimental dispatcher lives only in ChatLoopCommand.
         if (_shellAis.Contains(shell))
         {
             _chatFallbackAi = shell;
-            // Accept a one-shot question through the AI route too.
             var aq = string.Join(' ', qParts).Trim();
             if (!string.IsNullOrEmpty(aq)) return AskSingleAiFallback(aq, shell);
-            Console.Error.WriteLine($"[CHAT] shell=ask-{shell} -- REPL mode. /quit or Ctrl+D to exit.");
-            return RunAskTriadRepl();
+            Console.Error.WriteLine($"[CHAT] shell=ask-{shell} -- loop mode. /help for commands, /quit to exit.");
+            return ChatLoopCommand(args);
         }
 
         // Default: claude shell (rate-limit-aware passthrough, existing behavior).
@@ -131,9 +131,9 @@ internal partial class Program
             }
             if (interactive)
             {
-                Console.Error.WriteLine($"[CHAT] `claude` CLI not found on PATH -- entering ask-{_chatFallbackAi} REPL fallback.");
-                Console.Error.WriteLine("[CHAT] Type a question and press Enter. /quit or Ctrl+D to exit. /help for tips.");
-                return RunAskTriadRepl();
+                Console.Error.WriteLine($"[CHAT] `claude` CLI not found on PATH -- entering ask-{_chatFallbackAi} chat loop.");
+                Console.Error.WriteLine("[CHAT] /help for commands, /quit or Ctrl+D to exit.");
+                return ChatLoopCommand(args);
             }
             Console.Error.WriteLine($"[CHAT] `claude` CLI not installed -- routing to ask {_chatFallbackAi}");
             return AskTriadFallback(question);
