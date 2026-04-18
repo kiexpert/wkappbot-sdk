@@ -64,9 +64,17 @@ internal partial class Program
             try { Console.Out.Flush(); } catch { }
             try
             {
-                var raw = Console.OpenStandardError();
-                raw.Write(new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' });
-                raw.Flush();
+                // \0UIT sentinel tells the Launcher's stderr relay to
+                // TerminateSelf immediately. Only meaningful when stderr is a
+                // pipe (Launcher reading) -- in chat-cmd mode Launcher spawned
+                // us with inherited stdio, so stderr is a real console and
+                // the sentinel bytes would surface to the user as "UIT" noise.
+                if (Console.IsErrorRedirected)
+                {
+                    var raw = Console.OpenStandardError();
+                    raw.Write(new byte[] { 0, (byte)'U', (byte)'I', (byte)'T' });
+                    raw.Flush();
+                }
             }
             catch { }
             TerminateProcess(GetCurrentProcess(), (uint)_exitCode);
@@ -575,7 +583,12 @@ internal partial class Program
             if (!_fastExitAfterCommand) WriteExitFile(exitCode);
             if (tee != null) Console.SetOut(tee.OriginalConsole);
             tee?.Dispose();
-            if (tee != null) Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
+            // Skip the "Log saved" diagnostic in inherited-stdio chat mode --
+            // same reason as the \0UIT sentinel above: stderr is the user's
+            // real terminal, and log noise after an interactive session looks
+            // like a broken exit. Launcher-relayed runs still print it.
+            if (tee != null && Console.IsErrorRedirected)
+                Console.Error.WriteLine($"Log saved: {tee.LogPath}  [{_mainStarted.Elapsed:m\\:ss\\.fff}  {DateTime.Now:HH:mm:ss}]");
             timeoutTimer?.Dispose();
             if (_fastExitAfterCommand) FastExit(exitCode);
         }
