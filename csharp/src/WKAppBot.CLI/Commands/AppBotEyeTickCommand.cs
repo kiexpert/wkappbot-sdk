@@ -57,9 +57,9 @@ internal partial class Program
                 if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
                 Console.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
                 Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
-                Console.WriteLine($"[EYE_TICK] -- card display --");
+                Console.WriteLine("-- card display --");
                 foreach (var line in ipc.Summary.Split('\n'))
-                    Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                    Console.WriteLine(line.TrimEnd('\r'));
                 Console.Out.Flush();
                 // Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll on tick)
                 PulseStep.Mark("ipc-done");
@@ -173,9 +173,9 @@ internal partial class Program
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
             Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
-            Console.WriteLine($"[EYE_TICK] -- card display --");
+            Console.WriteLine("-- card display --");
             foreach (var line in summary.Split('\n'))
-                Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                Console.WriteLine(line.TrimEnd('\r'));
             Console.Out.Flush();
 
             // Phase 7: Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll)
