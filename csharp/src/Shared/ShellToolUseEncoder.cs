@@ -48,35 +48,22 @@ public static class ShellToolUseEncoder
         sb.Append("  </input>\n");
         sb.Append("</tool_use>\n");
 
-        // Body policy: ALWAYS include stdout/stderr, but truncate smartly by exit code.
-        //   exit == 0  -> keep the HEAD (first N bytes). Successful commands are
-        //                 usually listings / reports where the top is most
-        //                 informative. Append "... truncated ..." marker so the
-        //                 AI knows there's more via `/out <id>`.
-        //   exit != 0  -> keep the TAIL. Errors live at the bottom of a build log,
-        //                 so preserving the tail gives the AI the actual failure
-        //                 message. Prepend a "... truncated from head ..." marker.
+        // Body policy: always show the AI the same text the user saw, in the
+        // same reading order (head first). When the body exceeds the cap,
+        // keep the head and append a single "... 짤림 ..." marker that tells
+        // the AI (and operator) which tool surfaces the full content. No
+        // success/failure branching -- same rule everywhere, simpler to
+        // reason about, and the head-first order preserves the narrative
+        // the user experienced at their terminal.
         var body = ShellOutputStore.ReadById(rec.Id) ?? "";
         var truncNote = "";
         if (body.Length > maxResultBytes)
         {
-            if (rec.ExitCode == 0)
-            {
-                // Keep head; tail is the cut.
-                var kept = maxResultBytes;
-                body = body[..kept];
-                if (!body.EndsWith('\n')) body += "\n";
-                body += $"... (truncated: original {rec.LineCount} lines, {rec.LineCount - body.Count(c => c == '\n')}+ more hidden; /out {rec.Id} for full) ...\n";
-                truncNote = $" truncated=\"tail cut at {kept}B\"";
-            }
-            else
-            {
-                // Keep tail; head is the cut.
-                var cut = body.Length - maxResultBytes;
-                body = body[cut..];
-                body = $"... (truncated from head: {cut} bytes hidden; /out {rec.Id} for full) ...\n" + body;
-                truncNote = $" truncated=\"head cut at {cut}B\"";
-            }
+            var kept = maxResultBytes;
+            body = body[..kept];
+            if (!body.EndsWith('\n')) body += "\n";
+            body += $"... 짤림: /out {rec.Id} 명령으로 전체 보기 ({rec.LineCount}줄 전체) ...\n";
+            truncNote = $" truncated=\"tail cut at {kept}B -- full via /out {rec.Id}\"";
         }
 
         sb.Append("<tool_result for=\"").Append(rec.Id).Append("\" exit=\"").Append(rec.ExitCode)
