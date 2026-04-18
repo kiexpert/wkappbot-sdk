@@ -51,7 +51,7 @@ public static class ShellToolUseEncoder
 
         // Body policy: always show the AI the same text the user saw, in the
         // same reading order (head first). When the body exceeds the cap,
-        // keep the head and append a single "... 짤림 ..." marker that tells
+        // keep the head and append a single "... truncated ..." marker that tells
         // the AI (and operator) which tool surfaces the full content.
         var body = ToolOutputStore.ReadBySlug(rec.Tool, rec.Slug) ?? "";
         var truncNote = "";
@@ -60,8 +60,8 @@ public static class ShellToolUseEncoder
             var kept = maxResultBytes;
             body = body[..kept];
             if (!body.EndsWith('\n')) body += "\n";
-            var totalB = rec.LineCount > 0 ? $"총 {rec.LineCount}줄, " : "";
-            body += $"... 짤림: {totalB}이어보기 = `/out {addr} --after {kept}` (바이트) 또는 `/out {addr} --lines 50` (줄수) ...\n";
+            var lineInfo = rec.LineCount > 0 ? $"{rec.LineCount} lines total; " : "";
+            body += $"... truncated: {lineInfo}resume with `/out {addr} --after {kept}` (bytes) or `/out {addr} --lines 50` (line count) ...\n";
             truncNote = $" truncated=\"tail cut at {kept}B -- resume via /out {addr} --after {kept}\"";
         }
 
