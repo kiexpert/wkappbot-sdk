@@ -158,7 +158,12 @@ internal partial class Program
         if (interactive)
         {
             // Interactive: replace stdio, inherit TTY. No output capture (cannot detect limit mid-stream).
-            return ExecClaudeInteractive(claudeExe);
+            // Pass -c so claude CLI resumes the most recent session in the current
+            // project dir -- user's ask: "여기 세션이랑 다르네?" meaning a fresh
+            // wkchat should drop them into the VSCode extension's ongoing chat
+            // instead of spawning an unrelated session. claude CLI silently
+            // starts a new session if nothing to continue, so always safe.
+            return ExecClaudeInteractive(claudeExe, "-c");
         }
 
         // Print mode: capture output, scan for limit markers
@@ -581,7 +586,7 @@ internal partial class Program
         return null;
     }
 
-    static int ExecClaudeInteractive(string claudeExe)
+    static int ExecClaudeInteractive(string claudeExe, string args = "")
     {
         try
         {
@@ -591,6 +596,7 @@ internal partial class Program
             var psi = new ProcessStartInfo
             {
                 FileName = claudeExe,
+                Arguments = args,
                 UseShellExecute = false,
                 RedirectStandardInput = false,
                 RedirectStandardOutput = false,
