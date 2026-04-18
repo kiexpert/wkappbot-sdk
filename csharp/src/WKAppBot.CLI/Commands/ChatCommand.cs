@@ -23,11 +23,23 @@ internal partial class Program
         bool printMode = false;
         bool noFallback = false;
         var qParts = new List<string>();
-        foreach (var a in args)
+        for (int i = 0; i < args.Length; i++)
         {
+            var a = args[i];
             if (a is "-p" or "--print") printMode = true;
             else if (a is "--no-fallback") noFallback = true;
             else if (a is "--help" or "-h") { PrintChatHelp(); return 0; }
+            else if (a == "--ai" && i + 1 < args.Length)
+            {
+                var picked = args[++i].ToLowerInvariant();
+                if (picked is "gpt" or "gemini" or "claude" or "triad")
+                    _chatFallbackAi = picked;
+                else
+                {
+                    Console.Error.WriteLine($"[CHAT] --ai {picked} invalid. Use gpt|gemini|claude|triad.");
+                    return 2;
+                }
+            }
             else qParts.Add(a);
         }
         var question = string.Join(' ', qParts).Trim();
@@ -43,11 +55,11 @@ internal partial class Program
             }
             if (interactive)
             {
-                Console.Error.WriteLine("[CHAT] `claude` CLI not found on PATH -- entering ask-triad REPL fallback.");
+                Console.Error.WriteLine($"[CHAT] `claude` CLI not found on PATH -- entering ask-{_chatFallbackAi} REPL fallback.");
                 Console.Error.WriteLine("[CHAT] Type a question and press Enter. /quit or Ctrl+D to exit. /help for tips.");
                 return RunAskTriadRepl();
             }
-            Console.Error.WriteLine("[CHAT] `claude` CLI not installed -- routing to ask triad");
+            Console.Error.WriteLine($"[CHAT] `claude` CLI not installed -- routing to ask {_chatFallbackAi}");
             return AskTriadFallback(question);
         }
 
@@ -83,19 +95,24 @@ internal partial class Program
 
     static void PrintChatHelp()
     {
-        Console.WriteLine("chat [<question>] [-p] [--no-fallback]");
-        Console.WriteLine("  Claude Code CLI passthrough with auto-fallback to ask triad on rate-limit.");
+        Console.WriteLine("chat [<question>] [-p] [--no-fallback] [--ai gpt|gemini|claude|triad]");
+        Console.WriteLine("  Claude Code CLI passthrough with auto-fallback to a single AI on rate-limit.");
         Console.WriteLine();
-        Console.WriteLine("  wkappbot chat                Interactive Claude Code session (inherits stdio).");
-        Console.WriteLine("  wkappbot chat \"<q>\"          Non-interactive: claude -p <q>, fallback on limit.");
-        Console.WriteLine("  wkappbot chat -p \"<q>\"       Same as above (explicit print mode).");
-        Console.WriteLine("  wkappbot chat --no-fallback  Disable auto-fallback to ask triad.");
+        Console.WriteLine("  wkappbot chat                   Interactive Claude Code session (inherits stdio).");
+        Console.WriteLine("  wkappbot chat \"<q>\"             Non-interactive: claude -p <q>, fallback on limit.");
+        Console.WriteLine("  wkappbot chat -p \"<q>\"          Same as above (explicit print mode).");
+        Console.WriteLine("  wkappbot chat --no-fallback     Disable auto-fallback.");
+        Console.WriteLine("  wkappbot chat --ai gemini       Pick fallback AI (default: gemini).");
+        Console.WriteLine("                                  Options: gpt | gemini | claude | triad.");
         Console.WriteLine();
         Console.WriteLine("Fallback triggers:");
-        Console.WriteLine("  1) `claude` binary not on PATH -> route to ask triad");
+        Console.WriteLine("  1) `claude` binary not on PATH -> route to configured fallback AI.");
         Console.WriteLine("  2) stdout/stderr contains: usage limit, rate limit, 5-hour limit,");
         Console.WriteLine("     session exhausted, HTTP 429, Claude is temporarily unavailable");
         Console.WriteLine("  3) exit != 0 + one of the above signatures in output");
+        Console.WriteLine();
+        Console.WriteLine("Default fallback is single-AI (gemini) -- fastest, simplest, easiest to");
+        Console.WriteLine("debug. Use --ai triad only when you want full GPT+Gemini+Claude debate.");
     }
 
     static string? ResolveClaudeExe()
@@ -237,22 +254,38 @@ internal partial class Program
                 || text.Contains("429", StringComparison.Ordinal));
     }
 
-    static int AskTriadFallback(string question)
+    // Default fallback AI. Triad (GPT+Gemini+Claude parallel debate) is overkill for
+    // a casual chat and has known bugs + long runtimes -- bad UX for a first-response
+    // path. Gemini is the current default: fastest to reply, single stream to read,
+    // simplest to debug when something goes wrong. Override with --ai gpt|claude|triad.
+    static string _chatFallbackAi = "gemini";
+
+    static int AskSingleAiFallback(string question, string ai)
     {
-        Console.Error.WriteLine($"[CHAT:FALLBACK] ask triad \"{(question.Length > 80 ? question[..77] + "..." : question)}\"");
-        return AskTriadParallel(
-            question,
-            timeoutSec: 180,
-            attachFiles: null,
-            newSession: false,
-            loopMode: false,
-            loopMaxSteps: 3,
-            loopRetry: 1,
-            loopMaxParallel: 7,
-            modelHint: null,
-            noWait: false,
-            debateMode: false);
+        var preview = question.Length > 80 ? question[..77] + "..." : question;
+        Console.Error.WriteLine($"[CHAT:FALLBACK] ask {ai} \"{preview}\"");
+        if (ai == "triad")
+        {
+            return AskTriadParallel(
+                question,
+                timeoutSec: 180,
+                attachFiles: null,
+                newSession: false,
+                loopMode: false,
+                loopMaxSteps: 3,
+                loopRetry: 1,
+                loopMaxParallel: 7,
+                modelHint: null,
+                noWait: false,
+                debateMode: false);
+        }
+        // Delegate to `wkappbot ask <ai> <question>` which is the same code path an
+        // operator would hit typing the ask command by hand -- keeps the fallback in
+        // sync with any future improvements to single-AI ask flows.
+        return AskCommand(new[] { ai, question });
     }
+
+    static int AskTriadFallback(string question) => AskSingleAiFallback(question, _chatFallbackAi);
 
     /// <summary>
     /// REPL loop for interactive-mode fallback when `claude` CLI is not installed.
