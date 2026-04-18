@@ -15,7 +15,7 @@ internal partial class Program
         {
             killTimer = new System.Threading.Timer(_ =>
             {
-                Console.Error.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded -- exiting");
+                Console.WriteLine($"[EYE_TICK] hard timeout {timeoutSec}s exceeded -- exiting");
                 Console.Out.Flush();
                 Environment.Exit(2);
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
@@ -46,20 +46,20 @@ internal partial class Program
                 : EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
             if (ipc != null)
             {
-                Console.Error.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
-                Console.Error.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
-                Console.Error.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
-                Console.Error.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
+                Console.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
+                Console.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
+                Console.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
+                Console.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
                 if (!string.IsNullOrWhiteSpace(ipc.Prompt))
-                    Console.Error.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
+                    Console.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
                 foreach (var plan in ipc.Plans)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> {plan}");
-                if (ipc.Plans.Length > 3) Console.Error.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
-                Console.Error.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
-                Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
-                Console.Error.WriteLine($"[EYE_TICK] -- card display --");
+                    Console.WriteLine($"[EYE_PLAN] -> {plan}");
+                if (ipc.Plans.Length > 3) Console.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
+                Console.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
+                Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
+                Console.WriteLine($"[EYE_TICK] -- card display --");
                 foreach (var line in ipc.Summary.Split('\n'))
-                    Console.Error.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                    Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
                 Console.Out.Flush();
                 // Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll on tick)
                 PulseStep.Mark("ipc-done");
@@ -79,7 +79,7 @@ internal partial class Program
             var latest = ReadLatestTick(out tickRead, out tickParse);
             swPhase.Stop();
             var msReadTick = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
+            Console.WriteLine($"[PROF] ReadLatestTick={msReadTick}ms (read={tickRead}ms,parse={tickParse}ms)");
             Console.Out.Flush();
 
             // -- Phase 2: ReadLatestOpenClawPromptPreview --
@@ -88,7 +88,7 @@ internal partial class Program
             var prompt = ReadLatestOpenClawPromptPreview(promptDiag);
             swPhase.Stop();
             var msPrompt = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
+            Console.WriteLine($"[PROF] PromptPreview={msPrompt}ms (stat={promptDiag.StatMs}ms,read={promptDiag.ReadMs}ms,scan={promptDiag.ScanMs}ms,parse={promptDiag.ParseMs}ms,norm={promptDiag.NormMs}ms,cache={promptDiag.CacheMs}ms)");
             Console.Out.Flush();
 
             // -- Phase 3: ReadEyeCards + prompt-based discovery --
@@ -98,7 +98,7 @@ internal partial class Program
             CheckAndReportDeadCards(cards);
             swPhase.Stop();
             var msCards = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
+            Console.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
             Console.Out.Flush();
             _lastPromptSource = promptDiag.Source;
 
@@ -124,7 +124,7 @@ internal partial class Program
             catch { }
             swPhase.Stop();
             var msCtx = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
+            Console.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
             Console.Out.Flush();
 
             // -- Phase 5: ExtractRecentPlanItems --
@@ -132,7 +132,7 @@ internal partial class Program
             var plans = ExtractRecentPlanItems(maxItems: 3);
             swPhase.Stop();
             var msPlans = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
+            Console.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
             Console.Out.Flush();
 
             // -- Phase 6: BuildEyeSummary --
@@ -140,42 +140,42 @@ internal partial class Program
             var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
             swPhase.Stop();
             var msSummary = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] BuildSummary={msSummary}ms");
+            Console.WriteLine($"[PROF] BuildSummary={msSummary}ms");
             Console.Out.Flush();
 
             // -- Print results --
             var ctxInfo = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
             Console.WriteLine("[EYE] one-shot tick");
-            Console.Error.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
+            Console.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
             Console.Out.Flush();
-            Console.Error.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
-            Console.Error.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
+            Console.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
+            Console.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
             if (!string.IsNullOrWhiteSpace(prompt))
-                Console.Error.WriteLine($"[EYE_TICK] recent={prompt}");
+                Console.WriteLine($"[EYE_TICK] recent={prompt}");
 
             if (plans.Count > 0)
             {
                 for (int i = 0; i < plans.Count; i++)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> {plans[i]}");
+                    Console.WriteLine($"[EYE_PLAN] -> {plans[i]}");
                 if (_lastPlanItemsCache.Count > plans.Count)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
+                    Console.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
             }
 
             var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
             var aiIdle = (DateTime.UtcNow - _lastAiActivityUtc).TotalSeconds;
             var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (DateTime.UtcNow - _lastAutoGogoUtc).TotalSeconds;
             var armed = execIdle >= 60 && aiIdle >= 60 && cooldown >= 600;
-            Console.Error.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
+            Console.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
 
             var latestAge = -1.0;
             if (latest != null && DateTime.TryParse(latest.Ts, out var ts))
                 latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
             var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
-            Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
+            Console.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
 
-            Console.Error.WriteLine($"[EYE_TICK] -- card display --");
+            Console.WriteLine($"[EYE_TICK] -- card display --");
             foreach (var line in summary.Split('\n'))
-                Console.Error.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
+                Console.WriteLine($"[EYE_TICK] {line.TrimEnd('\r')}");
             Console.Out.Flush();
 
             // Phase 7: Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll)
@@ -191,7 +191,7 @@ internal partial class Program
                 if (retryItems.Count > 0)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Error.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
+                    Console.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
                     Console.ResetColor();
                     foreach (var item in retryItems)
                         SlackRouteCommand([item]);
@@ -202,17 +202,17 @@ internal partial class Program
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
+                Console.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
             }
 
-            Console.Error.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
+            Console.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
             Console.Out.Flush();
 
             return 0;
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[EYE_TICK] error={ex.Message}");
+            Console.WriteLine($"[EYE_TICK] error={ex.Message}");
             Console.Out.Flush();
             return 1;
         }
