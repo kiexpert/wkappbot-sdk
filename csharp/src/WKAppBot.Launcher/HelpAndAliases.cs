@@ -144,23 +144,33 @@ partial class Program
                 if (System.Math.Abs((tt - lt).TotalMilliseconds) < 2000) return 0;
             }
 
-            // Poll up to 10 x 100ms for the exe lock to release.
-            for (int i = 0; i < 10 && System.IO.File.Exists(linkPath); i++)
+            // Step 1: rename the stale alias. Windows allows MoveFile on a
+            // running exe (loader holds the file by inode -- the directory
+            // entry is renameable). DELETE would fail until the owning PID
+            // terminates, so we don't try yet.
+            var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+            var renamedPath = linkPath + $".old-{stamp}.exe";
+            try { System.IO.File.Move(linkPath, renamedPath); }
+            catch { return 1; }
+
+            // Step 2: fresh hardlink to current wkappbot.exe -- instant.
+            // Next invocation of the alias is now on the new binary.
+            try { CreateHardLink(linkPath, targetPath, IntPtr.Zero); }
+            catch { return 2; }
+
+            // Step 3: best-effort delete of the renamed corpse. The previous
+            // Launcher is about to / has just TerminateSelf'd, so its exe
+            // lock drops within one or two poll intervals. Max 10 x 100ms
+            // = 1s total; on failure the orphan stays and a later invocation
+            // can sweep it.
+            for (int i = 0; i < 10 && System.IO.File.Exists(renamedPath); i++)
             {
-                try { System.IO.File.Delete(linkPath); }
-                catch { /* lock still held, retry */ }
-                if (!System.IO.File.Exists(linkPath)) break;
+                try { System.IO.File.Delete(renamedPath); }
+                catch { /* still locked, retry */ }
+                if (!System.IO.File.Exists(renamedPath)) break;
                 System.Threading.Thread.Sleep(100);
             }
-            if (System.IO.File.Exists(linkPath)) return 1; // gave up
-
-            // Recreate as hardlink (no admin required on same NTFS volume).
-            try
-            {
-                CreateHardLink(linkPath, targetPath, IntPtr.Zero);
-                return 0;
-            }
-            catch { return 2; }
+            return 0;
         }
         catch { return 3; }
     }
