@@ -266,7 +266,16 @@ internal partial class Program
 
         try
         {
-            Console.Error.WriteLine($"[CHAT] launching shell: {exe}  (Ctrl+D / exit to return)");
+            Console.Error.WriteLine($"[CHAT] launching shell: {exe}  (type 'exit' to return)");
+
+            // Use a bare Process.Start for interactive shells -- NOT AppBotPipe.
+            // AppBotPipe.StartTracked installs CreateProcessW hooks + CREATE_NO_WINDOW
+            // flags meant for headless automation; when a child shell inherits a
+            // detached console it cannot read terminal stdin, producing the
+            // "shell launched but input goes nowhere" symptom. Bare Process.Start
+            // with UseShellExecute=false and no stdio redirect inherits the parent's
+            // console handles directly, which is exactly what an interactive shell
+            // needs to talk to the user's terminal.
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
@@ -274,9 +283,10 @@ internal partial class Program
                 RedirectStandardInput = false,
                 RedirectStandardOutput = false,
                 RedirectStandardError = false,
+                CreateNoWindow = false,
+                WorkingDirectory = Environment.CurrentDirectory,
             };
-            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-SHELL")
-                          ?? AppBotPipe.Start(psi);
+            using var proc = Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] failed to start shell"); return 1; }
             proc.WaitForExit();
             return proc.ExitCode;
@@ -304,9 +314,9 @@ internal partial class Program
     {
         try
         {
-            // Route through AppBotPipe.StartTracked so the focus-launch guard + CWD enforcement
-            // + CreateProcessW hooks apply uniformly. Admin token inheritance is automatic
-            // (StartTracked uses CreateProcessW which inherits the parent's primary token).
+            // Bare Process.Start -- same rationale as ExecOsShell: interactive shells
+            // need the real terminal handles, not a CreateProcessW-hooked detached
+            // console that swallows stdin.
             var psi = new ProcessStartInfo
             {
                 FileName = claudeExe,
@@ -314,9 +324,10 @@ internal partial class Program
                 RedirectStandardInput = false,
                 RedirectStandardOutput = false,
                 RedirectStandardError = false,
+                CreateNoWindow = false,
+                WorkingDirectory = Environment.CurrentDirectory,
             };
-            using var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "CHAT-INTERACTIVE")
-                          ?? AppBotPipe.Start(psi);
+            using var proc = Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[CHAT] Failed to start claude"); return 1; }
             proc.WaitForExit();
             return proc.ExitCode;
