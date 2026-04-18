@@ -715,6 +715,12 @@ partial class Program
     /// child process must see the user's actual terminal so its own subprocess
     /// (claude CLI, cmd.exe, bash, ...) can read keystrokes and render output live.
     ///
+    /// MCP-style hot-swap loop: if Core exits with code 99 (hot-swap signal), the
+    /// Launcher re-resolves the core binary path (Core was just swapped on disk)
+    /// and respawns without the user noticing -- same terminal, same session, new
+    /// binary. Lets `chat` sessions survive Core updates instead of dying whenever
+    /// the user publishes a new build mid-conversation.
+    ///
     /// Accepts the LPC/MSYS2 deadlock risk because the command is BY DEFINITION
     /// running inside an interactive console session; the conditions that trigger
     /// the deadlock (non-interactive ConPTY + single-file AppHost) don't apply.
@@ -730,22 +736,42 @@ partial class Program
                 return 1;
             }
 
-            var psi = new System.Diagnostics.ProcessStartInfo
+            while (true)
             {
-                FileName = core,
-                UseShellExecute = false,
-                // NOT redirected -- child gets the real console stdio.
-                RedirectStandardOutput = false,
-                RedirectStandardError  = false,
-                RedirectStandardInput  = false,
-                CreateNoWindow = false,
-            };
-            foreach (var a in args) psi.ArgumentList.Add(a);
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = core,
+                    UseShellExecute = false,
+                    // NOT redirected -- child gets the real console stdio.
+                    RedirectStandardOutput = false,
+                    RedirectStandardError  = false,
+                    RedirectStandardInput  = false,
+                    CreateNoWindow = false,
+                };
+                foreach (var a in args) psi.ArgumentList.Add(a);
 
-            using var proc = System.Diagnostics.Process.Start(psi);
-            if (proc == null) { Console.Error.WriteLine("[LAUNCHER] chat: failed to start Core"); return 1; }
-            proc.WaitForExit();
-            return proc.ExitCode;
+                int code;
+                using (var proc = System.Diagnostics.Process.Start(psi))
+                {
+                    if (proc == null) { Console.Error.WriteLine("[LAUNCHER] chat: failed to start Core"); return 1; }
+                    proc.WaitForExit();
+                    code = proc.ExitCode;
+                }
+
+                if (code != 99) return code;
+
+                // Exit 99 = hot-swap restart. Re-resolve Core (binary was just swapped)
+                // and respawn in the SAME Launcher process -- same terminal, same console,
+                // no new window. Session continuity is preserved from the user's POV.
+                Prof("chat: exit code 99 -- hot-swap restart, re-spawning Core");
+                Console.Error.WriteLine("[LAUNCHER] chat: Core hot-swapped, restarting session with new binary...");
+                core = ResolveCoreExe();
+                if (!System.IO.File.Exists(core))
+                {
+                    Console.Error.WriteLine("[LAUNCHER] chat: new Core not found after hot-swap, aborting");
+                    return 1;
+                }
+            }
         }
         catch (Exception ex)
         {
