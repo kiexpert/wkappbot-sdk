@@ -48,33 +48,35 @@ public static class ShellToolUseEncoder
         sb.Append("  </input>\n");
         sb.Append("</tool_use>\n");
 
-        // Economy-first policy:
-        //   exit == 0 -> AI sees a lightweight reference only (id, line count,
-        //                last-line preview). If it wants the full output it can
-        //                echo "/out <id>" in its response and the operator or a
-        //                future AI-driven fetcher will surface the body.
-        //   exit != 0 -> error path. Inline the full (tail-truncated) body so
-        //                the AI can diagnose without a round-trip.
-        //
-        // This keeps successful-case context spend tiny while preserving the
-        // debugging superpower for failing commands.
-        if (rec.ExitCode == 0)
-        {
-            sb.Append("<tool_result for=\"").Append(rec.Id).Append("\" exit=\"0")
-              .Append("\" lines=\"").Append(rec.LineCount)
-              .Append("\" preview=\"").Append(Xml(rec.LastLine))
-              .Append("\" body=\"omitted\"/>\n");
-            return sb.ToString();
-        }
-
+        // Body policy: ALWAYS include stdout/stderr, but truncate smartly by exit code.
+        //   exit == 0  -> keep the HEAD (first N bytes). Successful commands are
+        //                 usually listings / reports where the top is most
+        //                 informative. Append "... truncated ..." marker so the
+        //                 AI knows there's more via `/out <id>`.
+        //   exit != 0  -> keep the TAIL. Errors live at the bottom of a build log,
+        //                 so preserving the tail gives the AI the actual failure
+        //                 message. Prepend a "... truncated from head ..." marker.
         var body = ShellOutputStore.ReadById(rec.Id) ?? "";
         var truncNote = "";
         if (body.Length > maxResultBytes)
         {
-            // Keep the tail -- that's where error messages typically live.
-            var cut = body.Length - maxResultBytes;
-            body = body[cut..];
-            truncNote = $" truncated=\"{cut} bytes dropped from head\"";
+            if (rec.ExitCode == 0)
+            {
+                // Keep head; tail is the cut.
+                var kept = maxResultBytes;
+                body = body[..kept];
+                if (!body.EndsWith('\n')) body += "\n";
+                body += $"... (truncated: original {rec.LineCount} lines, {rec.LineCount - body.Count(c => c == '\n')}+ more hidden; /out {rec.Id} for full) ...\n";
+                truncNote = $" truncated=\"tail cut at {kept}B\"";
+            }
+            else
+            {
+                // Keep tail; head is the cut.
+                var cut = body.Length - maxResultBytes;
+                body = body[cut..];
+                body = $"... (truncated from head: {cut} bytes hidden; /out {rec.Id} for full) ...\n" + body;
+                truncNote = $" truncated=\"head cut at {cut}B\"";
+            }
         }
 
         sb.Append("<tool_result for=\"").Append(rec.Id).Append("\" exit=\"").Append(rec.ExitCode)
