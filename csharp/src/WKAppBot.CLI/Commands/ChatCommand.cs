@@ -278,9 +278,32 @@ internal partial class Program
             _            => shellName, // caller already validated
         };
 
+        // ConPTY path: gives the child shell a real terminal so cmd.exe's
+        // native line-editing (Tab complete, arrow keys, F7/F8 history) works.
+        // Requires Win10 1809+. On older Windows or on failure we fall through
+        // to the pipe-based async relay below.
+        if (WKAppBot.Shared.PseudoConsoleRunner.IsSupported)
+        {
+            try
+            {
+                Console.WriteLine($"[CHAT] launching shell (ConPTY): {exe}  (type 'exit' to return)");
+                Console.Out.Flush();
+                return WKAppBot.Shared.PseudoConsoleRunner.Run(
+                    exe: exe,
+                    args: null,
+                    cwd: Environment.CurrentDirectory,
+                    onOutput: null, // TODO: tee to ToolOutputStore once chat-loop wiring lands
+                    mirrorToTerminal: true);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CHAT] ConPTY failed ({ex.Message}); falling back to pipe mode");
+            }
+        }
+
         try
         {
-            Console.WriteLine($"[CHAT] launching shell: {exe}  (type 'exit' to return)");
+            Console.WriteLine($"[CHAT] launching shell (pipe): {exe}  (type 'exit' to return)");
             Console.Out.Flush();
 
             var psi = new ProcessStartInfo
