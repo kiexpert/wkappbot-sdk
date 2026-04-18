@@ -1092,6 +1092,14 @@ partial class Program
 
     static void AppBotExit(int code)
     {
+        // If MaybeLiveSwap recorded a stale alias path on entry, spawn the
+        // detached heal task now. The helper polls the link until our exe
+        // lock drops (inevitable when we TerminateSelf below) and then
+        // replaces the hardlink. Done here rather than inline in
+        // MaybeLiveSwap so every exit path through the centralized exit
+        // point triggers it.
+        RunPendingHardlinkHealOnExit();
+
         // Restore original stderr FIRST (bypass buffer), then write error log
         if (_originalStderr != null) Console.SetError(_originalStderr);
         if (code != 0 && _stderrBuf != null && _stderrBuf.Count > 0)

@@ -53,8 +53,11 @@ partial class Program
             if (proc == null) return; // spawn failed -- fall through to normal path
             Console.Error.WriteLine($"[SWAP] new-pid={proc.Id} running");
             proc.WaitForExit();
-            ScheduleDetachedHardlinkHeal(myPath, target);
-            TerminateSelf((uint)proc.ExitCode);
+            // Heal runs from AppBotExit (the centralized exit point) so it
+            // fires on every exit path from here on, not just this one.
+            _pendingHealLink  = myPath;
+            _pendingHealTarget = target;
+            AppBotExit(proc.ExitCode);
         }
         catch (Exception ex)
         {
@@ -62,39 +65,60 @@ partial class Program
         }
     }
 
+    // Remembered by MaybeLiveSwap; consumed by AppBotExit.
+    static string? _pendingHealLink;
+    static string? _pendingHealTarget;
+
     /// <summary>
-    /// After the live-swap respawn has run, the stale hardlink at
-    /// <paramref name="linkPath"/> is still present (and still pointing at the
-    /// old inode). We can't replace it from within our own process because
-    /// Windows holds an exec lock on our running binary. Solution: spawn a
-    /// detached cmd.exe that sleeps ~1s (enough for our TerminateSelf to
-    /// release the lock), deletes the stale link, and creates a fresh
-    /// hardlink to the current wkappbot.exe. Next invocation of the alias
-    /// skips the live-swap path entirely because mtimes will match.
+    /// Call from AppBotExit (or whenever we're about to TerminateSelf). Only
+    /// does anything if MaybeLiveSwap recorded the alias path on entry; if
+    /// the link is still stale at this moment, schedule a detached PowerShell
+    /// helper that polls the link for up to ~1s, deletes it once the exe
+    /// lock releases (after we TerminateSelf), and creates a fresh hardlink
+    /// to wkappbot.exe. PowerShell instead of cmd because the retry loop
+    /// with sleep reads much cleaner as a one-liner there.
     /// </summary>
-    static void ScheduleDetachedHardlinkHeal(string linkPath, string targetPath)
+    static void RunPendingHardlinkHealOnExit()
     {
+        var linkPath   = _pendingHealLink;
+        var targetPath = _pendingHealTarget;
+        if (string.IsNullOrEmpty(linkPath) || string.IsNullOrEmpty(targetPath)) return;
+
         try
         {
-            // CMD is fussy about quotes; escape embedded double-quotes, wrap
-            // the whole command in /c "...". `ping -n 2 127.0.0.1` = ~1s
-            // portable sleep. `>nul` suppresses console output in both pings
-            // and mklink. del /F forces removal of the hardlink file.
-            string q(string s) => s.Replace("\"", "\\\"");
-            var inner = $"ping 127.0.0.1 -n 2 >nul & del /F /Q \"{q(linkPath)}\" >nul 2>&1 & mklink /H \"{q(linkPath)}\" \"{q(targetPath)}\" >nul";
+            // Bail if, by some miracle, the link is already healed (e.g., a
+            // concurrent wkappbot.exe invocation already ran
+            // EnsureBusyboxAliases). Compare mtimes as a cheap is-it-stale
+            // check; within 2s tolerance counts as already-fresh.
+            var linkTime = System.IO.File.GetLastWriteTimeUtc(linkPath);
+            var targetTime = System.IO.File.GetLastWriteTimeUtc(targetPath);
+            if (System.Math.Abs((targetTime - linkTime).TotalMilliseconds) < 2000) return;
+
+            // PowerShell retry loop: try delete + re-link up to 10 times with
+            // 100ms sleep between attempts (total budget ~1s). Works because
+            // by the second or third attempt our parent process has called
+            // TerminateSelf and released the exe lock.
+            var ps =
+                "$link='" + linkPath.Replace("'", "''") + "';" +
+                "$target='" + targetPath.Replace("'", "''") + "';" +
+                "for($i=0;$i -lt 10 -and (Test-Path -LiteralPath $link);$i++){" +
+                "  try{Remove-Item -Force -LiteralPath $link -ErrorAction Stop}catch{}" +
+                "  Start-Sleep -Milliseconds 100" +
+                "};" +
+                "if(-not (Test-Path -LiteralPath $link)){" +
+                "  cmd /c mklink /H `\"$link`\" `\"$target`\" | Out-Null" +
+                "}";
+
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = "/c " + inner,
+                FileName  = "powershell.exe",
+                Arguments = "-NoProfile -NonInteractive -Command \"" + ps.Replace("\"", "\\\"") + "\"",
                 UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                RedirectStandardInput  = false,
-                RedirectStandardOutput = false,
-                RedirectStandardError  = false,
+                CreateNoWindow  = true,
+                WindowStyle     = System.Diagnostics.ProcessWindowStyle.Hidden,
             };
             using var _ = System.Diagnostics.Process.Start(psi);
-            Console.Error.WriteLine($"[SWAP] scheduled hardlink heal: {System.IO.Path.GetFileName(linkPath)} -> wkappbot.exe");
+            Console.Error.WriteLine($"[SWAP] heal scheduled: {System.IO.Path.GetFileName(linkPath)} (polling ~1s for lock release)");
         }
         catch (Exception ex)
         {
