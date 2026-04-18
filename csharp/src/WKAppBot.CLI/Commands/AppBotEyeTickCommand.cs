@@ -21,11 +21,13 @@ internal partial class Program
             }, null, timeoutSec * 1000, System.Threading.Timeout.Infinite);
         }
 
-        // eye tick auto-launch: if Eye is not running, start it (guardian/reboot recovery).
-        if (!RunningInEye)
-        {
-            try { LaunchAppBotEyeIfNeeded(); } catch { }
-        }
+        // NOTE: Previously auto-launched Eye via LaunchAppBotEyeIfNeeded() here, but that
+        // spawns a fresh Eye daemon whose "[EYE] Guardian startup run-key: armed" +
+        // "Schedulerless guardian mode active" lines appeared on our stdout/stderr,
+        // polluting the tick output and making the command look hung. tick is a
+        // READ-ONLY diagnostic. If Eye is dead, just say so -- the next normal command
+        // (any a11y/inspect/etc. via Launcher) will auto-spawn Eye through the regular
+        // fast-exit path in Program.cs. Tick never performs recovery.
 
         PulseStep.Init("eye-tick");
         try
