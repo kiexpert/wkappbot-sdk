@@ -315,6 +315,18 @@ partial class Program
             prof($"busybox-prepend={prependCmd}");
         }
 
+        // Live-swap: if the user invoked us via a stale alias (hardlink
+        // pointing at an older wkappbot.exe inode), respawn the CURRENT
+        // wkappbot.exe with the same args + inherited stdio and forward its
+        // exit code. Lets "wkchat" etc. ride every build without having to
+        // manually recreate symlinks. One-way: the canonical wkappbot.exe
+        // never self-swaps, so no loops.
+        {
+            var myPath = Environment.ProcessPath;
+            if (exeBase != "wkappbot" && !string.IsNullOrEmpty(myPath))
+                MaybeLiveSwap(args, myPath);
+        }
+
 
         // -- FAST EXITS ----------------------------------------------------------------------------
         // Encoding is set by app.manifest activeCodePage=UTF-8 (OS load, no runtime API call needed).

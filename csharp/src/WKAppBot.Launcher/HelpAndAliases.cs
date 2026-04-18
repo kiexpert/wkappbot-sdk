@@ -6,6 +6,62 @@ namespace WKAppBot.Launcher;
 partial class Program
 {
     /// <summary>
+    /// Live-swap: if the user invoked us via a stale alias (typically a
+    /// hardlink whose inode points at an older wkappbot.exe binary because a
+    /// rebuild rotated the original to wkappbot.old-*.exe), respawn the
+    /// CURRENT wkappbot.exe in-place with inherited stdio, wait for it, and
+    /// TerminateSelf with its exit code. The user sees a single session --
+    /// only the PID changes, and a one-line "[SWAP]" banner is logged to
+    /// stderr. Pipes / ConPTY aren't involved at Launcher level, so stdio
+    /// inheritance is enough for continuity. The canonical wkappbot.exe
+    /// never enters this path (caller guards exeBase != "wkappbot"), so
+    /// there's no respawn loop.
+    /// </summary>
+    static void MaybeLiveSwap(string[] args, string myPath)
+    {
+        try
+        {
+            var dir = System.IO.Path.GetDirectoryName(myPath);
+            if (string.IsNullOrEmpty(dir)) return;
+            var target = System.IO.Path.Combine(dir, "wkappbot.exe");
+            if (!System.IO.File.Exists(target)) return;
+
+            // Heuristic: if mtimes match (within 2s tolerance) we assume this
+            // alias is a genuine hardlink to the current wkappbot.exe and
+            // skip. If target is older than us, also skip (we're the newer
+            // one somehow). Only swap when target is meaningfully newer.
+            var myTime = System.IO.File.GetLastWriteTimeUtc(myPath);
+            var targetTime = System.IO.File.GetLastWriteTimeUtc(target);
+            if (System.Math.Abs((targetTime - myTime).TotalMilliseconds) < 2000) return;
+            if (targetTime <= myTime) return;
+
+            Console.Error.WriteLine(
+                $"[SWAP] stale {System.IO.Path.GetFileName(myPath)} ({myTime:HH:mm:ss}) -> wkappbot.exe ({targetTime:HH:mm:ss}) pid={Environment.ProcessId}");
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = false,
+                RedirectStandardInput = false,
+                RedirectStandardOutput = false,
+                RedirectStandardError = false,
+                CreateNoWindow = false,
+                WorkingDirectory = Environment.CurrentDirectory,
+            };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) return; // spawn failed -- fall through to normal path
+            Console.Error.WriteLine($"[SWAP] new-pid={proc.Id} running");
+            proc.WaitForExit();
+            TerminateSelf((uint)proc.ExitCode);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SWAP] failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Auto-create busybox symlinks (a11y.exe, wka11y.exe -> wkappbot.exe) if missing.
     /// Symlink preferred; falls back to hardlink if no permission.
     /// Stale hardlinks (size mismatch after hot-swap) are deleted and recreated.
