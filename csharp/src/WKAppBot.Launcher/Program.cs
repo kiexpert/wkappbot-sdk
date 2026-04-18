@@ -34,6 +34,7 @@ partial class Program
         ("grap",   "logcat"), // grap -> logcat alias (GRab Accessible Pattern)
         ("scan",   "scan"),
         ("wkedit", "file"),   // wkedit.exe -> file edit (busybox-style)
+        ("wkchat", "chat"),   // wkchat.exe -> chat REPL (ConPTY + Enter intercept)
     };
 
     // Aliases that bypass Launcher and point directly to Core (no relay needed)
