@@ -80,6 +80,7 @@ internal partial class Program
     internal readonly struct FocusStealSentinel : IDisposable
     {
         private readonly IntPtr _prevFg;
+        private readonly IntPtr _prevFocusCtl; // keyboard focus control inside _prevFg
         private readonly string _action;
         private readonly bool _skip;
 
@@ -87,7 +88,21 @@ internal partial class Program
         {
             _action = action;
             _skip = skip;
-            _prevFg = skip ? IntPtr.Zero : NativeMethods.GetForegroundWindow();
+            if (skip)
+            {
+                _prevFg = IntPtr.Zero;
+                _prevFocusCtl = IntPtr.Zero;
+            }
+            else
+            {
+                _prevFg = NativeMethods.GetForegroundWindow();
+                // Capture keyboard-focus control too. Distinct from _prevFg for
+                // shells like Windows Terminal where the outer window hosts a
+                // tab bar + a separate content control -- ForceForegroundWindow
+                // alone lands on the outer window but the caret stays lost
+                // unless we also SetFocus on the original inner control.
+                _prevFocusCtl = NativeMethods.GetKeyboardFocusHwnd();
+            }
         }
 
         public void Dispose() => DetectAndRecover(phase: "end");
@@ -119,37 +134,89 @@ internal partial class Program
             try
             {
                 var curFg = NativeMethods.GetForegroundWindow();
-                if (curFg == _prevFg) return false;
+                var curFocus = NativeMethods.GetKeyboardFocusHwnd();
+
+                // Three cases:
+                //   (1) outer window changed  -> full restore + bug report
+                //   (2) outer same, focus ctl changed -> inner focus slid (Windows
+                //       Terminal tab bar etc.) -- restore focus ctl, report softly
+                //   (3) nothing changed -> no-op
+                bool outerStolen = curFg != _prevFg;
+                bool innerSlid   = !outerStolen
+                                && _prevFocusCtl != IntPtr.Zero
+                                && curFocus != _prevFocusCtl;
+                if (!outerStolen && !innerSlid) return false;
 
                 string curTitle = "";
-                try { curTitle = WindowFinder.GetWindowText(curFg); } catch { }
+                try { curTitle = WindowFinder.GetWindowText(outerStolen ? curFg : _prevFg); } catch { }
                 if (curTitle.Length > 40) curTitle = curTitle[..40] + "...";
 
-                // User-active guard: if the user is currently typing/clicking on the new
-                // foreground (e.g. interacting with a save-dialog raised by WM_CLOSE),
-                // ripping focus back would destroy their input. Report but do NOT restore.
-                var idleMs = NativeMethods.GetUserIdleMs();
-                if (idleMs < 2000)
+                if (outerStolen)
                 {
+                    // User-active guard: only for OUTER steals. If the user clicked
+                    // somewhere else, don't rip focus back. Inner slides (same outer)
+                    // never trigger this -- we're restoring to where the user WAS.
+                    var idleMs = NativeMethods.GetUserIdleMs();
+                    if (idleMs < 2000)
+                    {
+                        Console.Error.WriteLine(
+                            $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
+                            $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- user active ({idleMs}ms), NOT restoring");
+                        AutoBugReport(
+                            $"FOCUS-STEAL {phase} during a11y {_action} (user active, not restored): " +
+                            $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
+                        return true;
+                    }
+
                     Console.Error.WriteLine(
                         $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
-                        $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- user active ({idleMs}ms), NOT restoring");
-                    AutoBugReport(
-                        $"FOCUS-STEAL {phase} during a11y {_action} (user active, not restored): " +
-                        $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
-                    return true;
+                        $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- restoring");
+                    NativeMethods.ForceForegroundWindow(_prevFg);
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"[FOCUS-STEAL:{phase}] {_action} inner-slide in \"{curTitle}\": " +
+                        $"focusCtl was=0x{_prevFocusCtl.ToInt64():X8} now=0x{curFocus.ToInt64():X8} -- restoring caret");
                 }
 
-                Console.Error.WriteLine(
-                    $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
-                    $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- restoring");
-                NativeMethods.ForceForegroundWindow(_prevFg);
+                // Always re-apply inner SetFocus via AttachThreadInput so the
+                // keyboard caret lands back on the control that had it before.
+                // Covers Windows Terminal's "focus landed on tab bar" case where
+                // ForceForegroundWindow alone is insufficient.
+                if (_prevFocusCtl != IntPtr.Zero)
+                {
+                    RestoreInnerFocus(_prevFocusCtl);
+                }
+
                 AutoBugReport(
-                    $"FOCUS-STEAL {phase} during a11y {_action}: " +
-                    $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
+                    outerStolen
+                        ? $"FOCUS-STEAL {phase} during a11y {_action}: was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\""
+                        : $"FOCUS-INNER-SLIDE {phase} during a11y {_action} in \"{curTitle}\": focusCtl was=0x{_prevFocusCtl.ToInt64():X8} now=0x{curFocus.ToInt64():X8}");
                 return true;
             }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// AttachThreadInput to the target control's GUI thread so SetFocus
+        /// takes effect across thread boundaries, then detach. Mirrors the
+        /// pattern used by FocusSnapshot.Restore in KeyboardInput.
+        /// </summary>
+        private static void RestoreInnerFocus(IntPtr ctlHwnd)
+        {
+            try
+            {
+                var ourTid = (uint)Environment.CurrentManagedThreadId;
+                ourTid = NativeMethods.GetCurrentThreadId();
+                var targetTid = NativeMethods.GetWindowThreadProcessId(ctlHwnd, out _);
+                if (targetTid == 0) return;
+                if (targetTid == ourTid) { NativeMethods.SetFocusRaw(ctlHwnd); return; }
+                bool attached = NativeMethods.AttachThreadInput(ourTid, targetTid, true);
+                try { NativeMethods.SetFocusRaw(ctlHwnd); }
+                finally { if (attached) NativeMethods.AttachThreadInput(ourTid, targetTid, false); }
+            }
+            catch { /* best effort */ }
         }
     }
 
