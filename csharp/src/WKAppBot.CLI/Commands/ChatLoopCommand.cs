@@ -89,6 +89,16 @@ internal partial class Program
     {
         if (string.IsNullOrWhiteSpace(line)) return false;
 
+        // Trailing "?" (ASCII or fullwidth '?') -> almost certainly a question
+        // for the AI, not a shell invocation. Covers "how do I fix X?",
+        // "why did this fail?", even one-word prompts like "git?".
+        var trimmedEnd = line.TrimEnd();
+        if (trimmedEnd.Length > 0)
+        {
+            char last = trimmedEnd[^1];
+            if (last == '?' || last == '\uFF1F') return false;
+        }
+
         // Non-ASCII (e.g. Korean hangul/jamo) -> chat, never a shell command.
         foreach (var ch in line)
             if (ch > 0x7F) return false;
@@ -356,6 +366,7 @@ internal partial class Program
         Console.WriteLine("  /out <id>              display captured console (con) output by id");
         Console.WriteLine("  <shell command>        auto-detected: first token = path/exe -> run");
         Console.WriteLine("  \" <text>\" (leading space)   force chat mode (skip shell detection)");
+        Console.WriteLine("  <text ending in ?>     force chat mode (question heuristic)");
         Console.WriteLine("  <non-ASCII text>       always chat (Korean / CJK never run as shell)");
         Console.WriteLine("  <any other text>       dispatch to the current AI shell");
         Console.WriteLine();
@@ -366,9 +377,13 @@ internal partial class Program
 
     static string StripInterruptTimestamp(string line)
     {
-        // Expected format: "[yyyy-MM-ddTHH:mm:ss.fff] <body>"
+        // Expected format: "[yyyy-MM-ddTHH:mm:ss.fff] <body>" -- exactly one
+        // separator space between ']' and body. Skip exactly that one space
+        // (line[26..]) rather than TrimStart(); an intentional leading space
+        // in <body> is the "force chat" sentinel that HandleLine checks, and
+        // TrimStart would silently eat it.
         if (line.Length > 26 && line[0] == '[' && line[24] == ']')
-            return line[25..].TrimStart();
+            return line[26..];
         return line;
     }
 }
