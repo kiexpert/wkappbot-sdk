@@ -184,9 +184,13 @@ Usage:
       File reading, search, and pattern matching.
   ask gpt|gemini|claude|triad ""question"" [file.png]
       Ask AI via CDP (focusless). ask triad = parallel 3-way.
-  chat [""question""] [-p] [--no-fallback]
+  chat [""question""] [-p] [--no-fallback]        (alias: wkchat.exe)
       Claude Code CLI passthrough. On rate-limit -> auto-fallback to ask triad.
       No args: exec claude interactively (inherits stdio).
+      `chat cmd` enters a ConPTY cmd.exe with Enter-intercept: trailing ?/!
+      or leading space routes to the fallback AI, wkappbot/a11y commands
+      bypass cmd.exe's tokenizer. Typed input on edit keys (arrows/Tab/Home)
+      passes straight through so cmd.exe's line editor keeps working.
   logcat [regex] [files] [--past N] [-f] [--timeout N] [--hq]
       Stream/search logs. grep/grap = aliases with grep-compat arg order.
 

@@ -102,6 +102,22 @@ internal partial class Program
         // Resolve target shell: explicit flag > positional > persisted default.
         var shell = explicitShell ?? GetDefaultShell();
 
+        // Sticky default: whenever the user picks a shell explicitly (flag OR
+        // positional), silently promote it to be the default for future
+        // "wkappbot chat" with no args. So a workflow like
+        //   wkappbot chat cmd    # today's session
+        //   wkappbot chat        # tomorrow -- jumps back into cmd
+        // "just works" without --set-default ceremony.
+        if (explicitShell != null)
+        {
+            try
+            {
+                Directory.CreateDirectory(DataDir);
+                File.WriteAllText(ChatDefaultShellFile, explicitShell + "\n");
+            }
+            catch { /* best effort */ }
+        }
+
         // OS-shell route: stdio-inherited subprocess. No question mode, no fallback.
         if (_shellOsNames.Contains(shell))
             return ExecOsShell(shell);
