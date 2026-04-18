@@ -91,6 +91,49 @@ internal partial class Program
         Console.ResetColor();
     }
 
+    // Locate the most recently modified .wkappbot/ask/*-{ai}-*.md for the
+    // current project (git-root scoped, same lookup as WriteAskMd). The .md
+    // files are written by every ask invocation and form a natural per-project
+    // conversation log per AI, so "the last one" is the session we want the
+    // AI to continue from. Returns null when the project has no ask history
+    // yet, or when anything IO-related fails.
+    static string? FindLastAskMdForAi(string ai)
+    {
+        try
+        {
+            // Reuse WriteAskMd's cwd-resolution: prefer EyeCmdPipeServer's
+            // CallerCwd, else walk up from exe dir to a .git root, else
+            // fall back to Environment.CurrentDirectory.
+            var cwd = EyeCmdPipeServer.CallerCwd.Value;
+            if (string.IsNullOrEmpty(cwd) || !Directory.Exists(Path.Combine(cwd, ".git")))
+            {
+                var probe = Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
+                for (int i = 0; i < 10 && !string.IsNullOrEmpty(probe); i++)
+                {
+                    if (Directory.Exists(Path.Combine(probe, ".git"))) { cwd = probe; break; }
+                    probe = Path.GetDirectoryName(probe);
+                }
+                if (string.IsNullOrEmpty(cwd)) cwd = Environment.CurrentDirectory;
+            }
+            var askDir = Path.Combine(cwd, ".wkappbot", "ask");
+            if (!Directory.Exists(askDir)) return null;
+
+            // chatgpt / gpt share a log family; other AIs match on their exact name.
+            var names = ai switch
+            {
+                "gpt" or "chatgpt" => new[] { "gpt", "chatgpt" },
+                _                  => new[] { ai },
+            };
+            var candidates = new List<FileInfo>();
+            foreach (var name in names)
+                candidates.AddRange(new DirectoryInfo(askDir).GetFiles($"*-{name}-*.md"));
+            return candidates
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .FirstOrDefault()?.FullName;
+        }
+        catch { return null; }
+    }
+
     static int AskCommand(string[] args)
     {
         if (args.Length < 2)
@@ -211,6 +254,27 @@ internal partial class Program
         {
             if (!File.Exists(f))
                 return Error($"File not found: {f}");
+        }
+
+        // Session continuity: a fresh tab/session starts the AI cold, so auto-
+        // attach this project's MOST RECENT .wkappbot/ask/*-{ai}-*.md as
+        // context. InlineTextFiles (<100 KB .md cap) inlines it into the
+        // question directly, so the AI starts with the prior conversation
+        // already in its input. User-provided attachments take priority: we
+        // only auto-attach when attachFiles is otherwise empty.
+        if ((newTab || newSession) && attachFiles.Count == 0)
+        {
+            var lastMd = FindLastAskMdForAi(ai);
+            if (lastMd != null)
+            {
+                attachFiles.Add(lastMd);
+                Console.Error.WriteLine($"[ASK] auto-attach prior session: {Path.GetFileName(lastMd)}");
+                // Re-run the inline pass so the new [file:...] reference (if
+                // any) surfaces as context text. Direct attachment works too
+                // -- CDP uploaders pick the file up either way -- but inlining
+                // keeps the new session primed with the previous exchange.
+                question = InlineTextFiles(new List<string> { question, $"[file:{Path.GetFileName(lastMd)}]" }, attachFiles);
+            }
         }
 
         if (attachFiles.Count > 0)
