@@ -35,9 +35,22 @@ internal partial class Program
             var openClawDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".openclaw");
             var kroCwd = AbbreviateCwd(openClawDir);
             var (progress, done, next, block) = BuildKroStatus3(latest);
-            kroSb.AppendLine($"크로 진행: {progress}" + (string.IsNullOrWhiteSpace(kroCwd) ? "" : $" [{kroCwd}]"));
-            kroSb.AppendLine($"크로 완료: {done}");
-            kroSb.AppendLine($"크로 예정: {next}");
+
+            // Unified card format: match the clot cards (작업/상태/생각) so downstream
+            // parsers and operators see a single consistent schema. The KRO-specific
+            // fields (완료/예정/이슈) fold into 작업/상태 so the card stays compact.
+            kroSb.AppendLine($"크로[{kroCwd}]");
+            kroSb.AppendLine($"작업: {progress}");
+            kroSb.AppendLine($"상태: {done}" + (string.IsNullOrWhiteSpace(next) ? "" : $" → {next}"));
+            if (!string.IsNullOrWhiteSpace(block))
+                kroSb.AppendLine($"이슈: {block}");
+
+            // Latest assistant/user text from OpenClaw session
+            if (!string.IsNullOrWhiteSpace(prompt))
+            {
+                var kroThought = prompt.Length > 120 ? prompt[..120] + "..." : prompt;
+                kroSb.AppendLine($"생각: {kroThought}");
+            }
 
             var plans = ExtractRecentPlanItems(maxItems: 3);
             if (plans.Count > 0)
@@ -48,15 +61,6 @@ internal partial class Program
                     kroSb.AppendLine($"- --:-- 그 외 {_lastPlanItemsCache.Count - plans.Count}건...");
             }
 
-            if (!string.IsNullOrWhiteSpace(block))
-                kroSb.AppendLine($"크로 이슈: {block}");
-
-            // Latest assistant/user text from OpenClaw session
-            if (!string.IsNullOrWhiteSpace(prompt))
-            {
-                var kroThought = prompt.Length > 120 ? prompt[..120] + "..." : prompt;
-                kroSb.AppendLine($"크로 생각: {kroThought}");
-            }
             kroBlock = kroSb.ToString().TrimEnd();
         }
 
@@ -128,7 +132,7 @@ internal partial class Program
                     sb.AppendLine(header);
                     // Context % per card: prefer session-registry JSONL (exact file), fall back to CWD scan.
                     var ctxTag = "";
-                    var (cardCtx, jsonlAge, _, jsonlFileSize) = !string.IsNullOrEmpty(c.SessionJsonl) && File.Exists(c.SessionJsonl)
+                    var (cardCtx, jsonlAge, jsonlPath, jsonlFileSize) = !string.IsNullOrEmpty(c.SessionJsonl) && File.Exists(c.SessionJsonl)
                         ? GetContextInfoForJsonl(c.SessionJsonl)
                         : GetContextInfoForCwdEx(c.Cwd, c.HostType);
                     if (cardCtx >= 0)
@@ -136,6 +140,14 @@ internal partial class Program
                         var sizeMB = jsonlFileSize / (1024.0 * 1024.0);
                         var sizeTag = sizeMB >= 1.0 ? $"{sizeMB:F0}MB" : $"{jsonlFileSize / 1024}KB";
                         ctxTag = $" ctx={cardCtx}% ({sizeTag})";
+                    }
+                    // Session JSONL filename -- helps operators find the exact log.
+                    // Truncate to last 44 chars so long UUID-style names stay on one line.
+                    if (!string.IsNullOrEmpty(jsonlPath))
+                    {
+                        var fname = Path.GetFileName(jsonlPath);
+                        if (fname.Length > 44) fname = "..." + fname[^41..];
+                        sb.AppendLine($"세션: {fname}");
                     }
                     // For prompt-discovered cards, use JSONL age instead of tick age
                     if (c.LastTag == "prompt-discovered" && jsonlAge != null)
