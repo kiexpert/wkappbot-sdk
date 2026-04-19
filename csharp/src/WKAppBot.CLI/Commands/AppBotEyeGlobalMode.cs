@@ -371,12 +371,41 @@ internal partial class Program
 
                 if (eyeHwnd == IntPtr.Zero) { proc.Dispose(); continue; }
 
-                // 1. Post WM_CLOSE -- graceful request, works across IL on
-                //    some configs, silently ignored on others.
-                try { NativeMethods.PostMessageW(eyeHwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero); } catch { }
-                Console.Error.WriteLine($"[EYE:EVICT] close posted pid={proc.Id} hwnd=0x{eyeHwnd.ToInt64():X8}");
+                // Grap-style target tag for logs -- caller can copy-paste into
+                // `a11y windows {pid:...}` or similar to confirm what got hit.
+                var grap = $"{{pid:{proc.Id},proc:'wkappbot-core',hwnd:0x{eyeHwnd.ToInt64():X8}}}";
 
-                // 2. Wait up to 2s for the process to exit.
+                // 1. Pipe-based shutdown: old Eye still owns WKAppBotCmdPipe at
+                //    this moment. Sending `eye shutdown --target-pid <N>` lets
+                //    the old Eye's main loop exit cleanly + release mutex. The
+                //    target-pid guard prevents a stray shutdown from landing
+                //    on an unrelated Eye if pipe-ownership raced.
+                try
+                {
+                    using var pipe = new System.IO.Pipes.NamedPipeClientStream(".",
+                        EyeCmdPipeServer.PipeName, System.IO.Pipes.PipeDirection.InOut);
+                    pipe.Connect(500);
+                    var payload = new[] {
+                        $"__cwd:{Environment.CurrentDirectory}",
+                        "eye", "shutdown", "--target-pid", proc.Id.ToString()
+                    };
+                    var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                    var bytes = System.Text.Encoding.UTF8.GetBytes(json + "\n");
+                    pipe.Write(bytes, 0, bytes.Length);
+                    pipe.Flush();
+                    Console.Error.WriteLine($"[EYE:EVICT] pipe shutdown sent -> {grap}");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[EYE:EVICT] pipe shutdown skip ({ex.GetType().Name}) -> {grap}");
+                }
+
+                // 2. Post WM_CLOSE -- graceful UI-level request; works across
+                //    IL on some configs, silently ignored on others.
+                try { NativeMethods.PostMessageW(eyeHwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero); } catch { }
+                Console.Error.WriteLine($"[EYE:EVICT] WM_CLOSE posted -> {grap}");
+
+                // 3. Wait up to 2s for the process to exit (either pipe or WM path).
                 var evictStart = DateTime.UtcNow;
                 bool exited = false;
                 while ((DateTime.UtcNow - evictStart).TotalMilliseconds < 2000)
@@ -387,17 +416,17 @@ internal partial class Program
 
                 if (exited)
                 {
-                    Console.Error.WriteLine($"[EYE:EVICT] evicted pid={proc.Id}");
+                    Console.Error.WriteLine($"[EYE:EVICT] evicted -> {grap}");
                 }
                 else
                 {
-                    // 3. Unconditional kill attempt. Windows rejects for admin-
+                    // 4. Unconditional kill attempt. Windows rejects for admin-
                     //    protected pids; we log and continue either way.
                     bool killed = false;
                     try { proc.Kill(entireProcessTree: true); killed = true; } catch { }
                     Console.Error.WriteLine(killed
-                        ? $"[EYE:EVICT] kill ok pid={proc.Id}"
-                        : $"[EYE:EVICT] still-alive pid={proc.Id} (admin-protected) -- continuing to mutex wait");
+                        ? $"[EYE:EVICT] kill ok -> {grap}"
+                        : $"[EYE:EVICT] still-alive (admin-protected) -> {grap} -- continuing to mutex wait");
                 }
                 proc.Dispose();
             }

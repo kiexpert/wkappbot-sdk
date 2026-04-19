@@ -1018,6 +1018,22 @@ internal partial class Program
             Console.WriteLine("[SHUTDOWN] Must run via Eye CMD pipe (use: wkappbot eye shutdown)");
             return 1;
         }
+        // --target-pid N: only honor the shutdown if our pid matches. Prevents
+        // the race where a new Eye just became the pipe owner between our
+        // enumeration and the send -- we don't want to shut the wrong Eye down.
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--target-pid" && int.TryParse(args[i + 1], out var targetPid))
+            {
+                if (targetPid != Environment.ProcessId)
+                {
+                    Console.WriteLine($"[SHUTDOWN] target-pid {targetPid} != our pid {Environment.ProcessId} -- ignoring");
+                    return 2; // distinct exit code so caller can detect mismatch
+                }
+                Console.WriteLine($"[SHUTDOWN] target-pid {targetPid} matches -- accepting");
+                break;
+            }
+        }
         Console.WriteLine("[SHUTDOWN] Requesting graceful Eye shutdown...");
         _eyeShutdownRequested = true;
         return 0;
