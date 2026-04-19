@@ -131,6 +131,39 @@ internal partial class Program
                 return;
             }
             Console.Error.WriteLine($"[SUDO:HOTSWAP] OK: {Path.GetFileName(liveExe)} <- {Path.GetFileName(newExe)} (previous saved as {Path.GetFileName(oldExe)})");
+            if (force)
+            {
+                try
+                {
+                    // Spawn a fresh Eye directly so the user doesn't have to wait
+                    // for the watchdog VBS (which fires at 2min). Uses DETACHED_PROCESS
+                    // so the spawn doesn't inherit our console and doesn't flash.
+                    var psi = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = liveExe,
+                        Arguments = "eye",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = binDir,
+                    };
+                    // DETACHED_PROCESS = 0x00000008. AppBotPipe.Spawn provides this flag
+                    // for other call sites; here we use raw ProcessStartInfo because Eye
+                    // needs to outlive our --sudo helper. Mirror the flag via CREATE_NO_WINDOW
+                    // only (Process.Start doesn't expose DETACHED directly); CreateNoWindow=true
+                    // + no console inheritance is sufficient for the Eye's own AllocConsole
+                    // path to skip the visible flash.
+                    var newEye = System.Diagnostics.Process.Start(psi);
+                    if (newEye != null)
+                    {
+                        Console.Error.WriteLine($"[SUDO:HOTSWAP] force respawn: new Eye pid={newEye.Id}");
+                        newEye.Dispose();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[SUDO:HOTSWAP] force respawn failed: {ex.Message} -- watchdog VBS will retry in 2min");
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -714,4 +747,3 @@ internal partial class Program
         }
     }
 }
-

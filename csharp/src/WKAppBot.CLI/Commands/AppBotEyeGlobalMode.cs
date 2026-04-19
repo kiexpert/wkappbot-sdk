@@ -316,6 +316,7 @@ internal partial class Program
     {
         EyeCallerCwd = callerCwd; // store for DrainSlackQueueIfNeeded and HoverAnalyzer
         var eyeDiagFile = Path.Combine(GetEyeLogDir(), $"eye.diag.pid={Environment.ProcessId}.log");
+        var hasAnchor = posX >= 0 && posY >= 0;
         void EyeDiag(string step)
         {
             try
@@ -1516,6 +1517,27 @@ internal partial class Program
                     }
                     catch { }
                 }
+            }
+
+            // -- Self-drift guard: keep Eye's own console anchored unless the user is active --
+            if (hasAnchor && frameCount % Math.Max(1, 10_000 / Math.Max(1, intervalMs)) == 0
+                && !FocusSafe.ShouldYieldToActiveUser(out _))
+            {
+                try
+                {
+                    var hConsole = GetConsoleWindow();
+                    if (hConsole != IntPtr.Zero && NativeMethods.GetWindowRect(hConsole, out var rc))
+                    {
+                        var dx = rc.Left - posX;
+                        var dy = rc.Top - posY;
+                        if (Math.Abs(dx) > 100 || Math.Abs(dy) > 100)
+                        {
+                            Console.Error.WriteLine($"[EYE:POS] drift X={dx} Y={dy} -- restoring to ({posX}, {posY})");
+                            NativeMethods.SetWindowPos(hConsole, IntPtr.Zero, posX, posY, width, height, 0x0004 | NativeMethods.SWP_NOACTIVATE);
+                        }
+                    }
+                }
+                catch { }
             }
 
             frameCount++;

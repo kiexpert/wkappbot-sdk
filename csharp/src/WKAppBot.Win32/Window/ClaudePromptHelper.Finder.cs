@@ -206,6 +206,28 @@ public sealed partial class ClaudePromptHelper
             if (procName.Equals("codex", StringComparison.OrdinalIgnoreCase))
                 return FindCodexDesktopPromptByMarker((int)pidRaw);
 
+            if (IsCodexTerminalClass(cls) &&
+                (title.Contains("Codex", StringComparison.OrdinalIgnoreCase) ||
+                 procName.Equals("codex", StringComparison.OrdinalIgnoreCase)))
+            {
+                NativeMethods.GetWindowRect(rootHwnd, out var termWr);
+                var termRect = Rectangle.FromLTRB(termWr.Left, termWr.Top, termWr.Right, termWr.Bottom);
+                var caret = GetCaretScreenPos(NativeMethods.GetKeyboardFocusHwnd());
+                if (caret.HasValue && !termRect.Contains(caret.Value))
+                    return null;
+
+                var promptHeight = Math.Min(48, Math.Max(40, termRect.Height / 10));
+                var promptY = Math.Max(termRect.Top + 4, termRect.Bottom - promptHeight - 6);
+                var promptRect = new Rectangle(
+                    termRect.Left + 4,
+                    promptY,
+                    Math.Max(360, termRect.Width - 8),
+                    promptHeight);
+
+                Console.WriteLine($"  [PROMPT] Cursor-hint matched Codex terminal prompt: ({promptRect.X},{promptRect.Y} {promptRect.Width}x{promptRect.Height}) title=\"{title}\"");
+                return new PromptInfo(rootHwnd, title, "codex", promptRect, HostCodexDesktop);
+            }
+
             if (!procName.Equals("Code", StringComparison.OrdinalIgnoreCase))
                 return null;
 
@@ -334,6 +356,13 @@ public sealed partial class ClaudePromptHelper
                 _turnFormCache[hWnd] = vsCodeEntry; // expose to GetAllCachedPrompts() for status streaming
                 seen.Add(hWnd);
             }
+        }
+
+        var cursorPrompt = TryFindPromptAtCursor();
+        if (cursorPrompt != null && seen.Add(cursorPrompt.WindowHandle))
+        {
+            results.Add(cursorPrompt);
+            _turnFormCache[cursorPrompt.WindowHandle] = cursorPrompt;
         }
 
         results = results

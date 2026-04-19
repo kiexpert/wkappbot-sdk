@@ -247,19 +247,28 @@ internal partial class Program
             }
         }
         bool agentShortcut = tokens.Remove("--agent");
-        // --agent expands to --full-auto + -C <repo-root> (unless the caller
-        // already specified a competing sandbox / approval / cwd).
+        // --agent expands to --full-auto + -C <repo-root> + -m <agent_model>
+        // where agent_model defaults to "codex-mini" (per user directive to
+        // force the cheap tier when delegating). Override via a per-project
+        // config at <cwd>/.wkappbot/codex.json { "agent_model": "..." }.
+        // Callers who pass -m / --model explicitly bypass the default.
         if (agentShortcut)
         {
             bool hasSandbox  = tokens.Any(t => t is "-s" or "--sandbox");
             bool hasApproval = tokens.Any(t => t is "-a" or "--approval");
             bool hasFullAuto = tokens.Any(t => t == "--full-auto");
             bool hasCwd      = tokens.Any(t => t is "-C" or "--cd");
+            bool hasModel    = tokens.Any(t => t is "-m" or "--model");
             if (!hasFullAuto && !hasSandbox && !hasApproval) tokens.Insert(0, "--full-auto");
             if (!hasCwd)
             {
                 tokens.Add("-C");
                 tokens.Add(DetectCodexRepoRoot());
+            }
+            if (!hasModel)
+            {
+                tokens.Add("-m");
+                tokens.Add(GetCodexAgentModel());
             }
         }
 
@@ -331,6 +340,44 @@ internal partial class Program
             Console.Error.WriteLine($"[ASK] codex CLI error: {ex.Message}");
             return 1;
         }
+    }
+
+    // Per-project agent model for `ask codex --agent`. Config persists at
+    // <repo-root>/.wkappbot/codex.json with shape { "agent_model": "<name>" }.
+    // Missing / unreadable / empty --> default "codex-mini". On first successful
+    // read of a missing file, we also write the default so users can edit it.
+    static string GetCodexAgentModel()
+    {
+        const string DefaultModel = "codex-mini";
+        try
+        {
+            var repo = DetectCodexRepoRoot();
+            var cfgDir = Path.Combine(repo, ".wkappbot");
+            var cfgPath = Path.Combine(cfgDir, "codex.json");
+            if (File.Exists(cfgPath))
+            {
+                var json = File.ReadAllText(cfgPath);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("agent_model", out var m)
+                    && m.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var val = m.GetString();
+                    if (!string.IsNullOrWhiteSpace(val)) return val!;
+                }
+            }
+            else
+            {
+                try
+                {
+                    Directory.CreateDirectory(cfgDir);
+                    File.WriteAllText(cfgPath,
+                        "{\n  \"agent_model\": \"" + DefaultModel + "\",\n  \"_note\": \"wkappbot ask codex --agent uses this model. Edit to override.\"\n}\n");
+                }
+                catch { /* best-effort seed; falling back to default is still fine */ }
+            }
+        }
+        catch { /* any JSON / IO error -> default */ }
+        return DefaultModel;
     }
 
     // Repo root for the --agent shortcut: prefer Eye pipe's CallerCwd when

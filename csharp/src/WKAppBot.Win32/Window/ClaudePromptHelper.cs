@@ -34,6 +34,14 @@ public sealed partial class ClaudePromptHelper : IDisposable
     private const string HostVsCodeCodex = "vscode-codex";
     private const string HostCodexDesktop = "codex-desktop";
 
+    private static readonly HashSet<string> CodexTerminalClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ConsoleWindowClass",
+        "CASCADIA_HOSTING_WINDOW_CLASS",
+        "PseudoConsoleWindow",
+        "VirtualConsoleClass",
+    };
+
     /// <summary>
     /// Global toggle: when true, only focusless strategies are allowed.
     /// When true, allows focus-stealing as a fallback after focusless input fails.
@@ -98,6 +106,9 @@ public sealed partial class ClaudePromptHelper : IDisposable
         if (!title.Contains("Visual Studio Code", StringComparison.OrdinalIgnoreCase)) return false;
         return title.Contains("Codex", StringComparison.OrdinalIgnoreCase);
     }
+
+    public static bool IsCodexTerminalClass(string? className) =>
+        !string.IsNullOrWhiteSpace(className) && CodexTerminalClasses.Contains(className);
 
     public static string ClassifyVsCodeHostType(string? title) =>
         IsLikelyVsCodeCodexWindowTitle(title) ? HostVsCodeCodex : HostVsCodeClaudeCode;
