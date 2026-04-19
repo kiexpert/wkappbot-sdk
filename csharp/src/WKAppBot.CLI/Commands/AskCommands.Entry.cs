@@ -192,6 +192,78 @@ internal partial class Program
         }
     }
 
+    // Dispatch a one-shot question to codex CLI. Uses the `codex exec` form
+    // which runs a headless one-shot (no TUI) so output can be captured and
+    // archived alongside the other ask peers. Session continuity isn't
+    // forwarded -- Codex's resume-last flow belongs to `wkappbot chat codex`,
+    // not `ask codex` (ask is one-shot by design).
+    static int AskCodexCli(string question, bool newSession)
+    {
+        var codexExe = ResolveCodexExe();
+        if (codexExe == null)
+        {
+            Console.Error.WriteLine("[ASK] codex CLI not found on PATH or at %USERPROFILE%\\.codex\\.sandbox-bin\\codex.exe");
+            return 127;
+        }
+        Console.Error.WriteLine($"[ASK] codex exec -- \"{(question.Length > 60 ? question[..57] + "..." : question)}\"");
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = codexExe,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+        };
+        psi.ArgumentList.Add("exec");
+        psi.ArgumentList.Add(question);
+
+        try
+        {
+            using var proc = System.Diagnostics.Process.Start(psi);
+            if (proc == null) { Console.Error.WriteLine("[ASK] codex CLI failed to start"); return 1; }
+            var outSb = new StringBuilder();
+            var errSb = new StringBuilder();
+            var outLock = new object();
+            var errLock = new object();
+            static void DrainStream(
+                System.IO.StreamReader reader, System.IO.TextWriter sink,
+                StringBuilder mirror, object gate)
+            {
+                var buf = new char[1024];
+                int n;
+                while ((n = reader.Read(buf, 0, buf.Length)) > 0)
+                {
+                    lock (gate)
+                    {
+                        sink.Write(buf, 0, n);
+                        sink.Flush();
+                        mirror.Append(buf, 0, n);
+                    }
+                }
+            }
+            var stdoutThread = new Thread(() => DrainStream(proc.StandardOutput, Console.Out, outSb, outLock))
+            { IsBackground = true, Name = "codex-cli-stdout" };
+            var stderrThread = new Thread(() => DrainStream(proc.StandardError, Console.Error, errSb, errLock))
+            { IsBackground = true, Name = "codex-cli-stderr" };
+            stdoutThread.Start();
+            stderrThread.Start();
+            proc.WaitForExit();
+            stdoutThread.Join();
+            stderrThread.Join();
+            string stdout;
+            lock (outLock) stdout = outSb.ToString();
+            try { WriteAskMd("codex", question, stdout); } catch { }
+            return proc.ExitCode;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ASK] codex CLI error: {ex.Message}");
+            return 1;
+        }
+    }
+
     // Locate the most recently modified .wkappbot/ask/*-{ai}-*.md for the
     // current project (git-root scoped, same lookup as WriteAskMd). The .md
     // files are written by every ask invocation and form a natural per-project
@@ -401,8 +473,9 @@ internal partial class Program
             "gpt" or "chatgpt" => AskChatGpt(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "claude" => AskClaude(question, true, timeoutSec, newTab, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, triadMode, modelHint, noWait, targetTagOverride),
             "claude-cli" or "clicode" => AskClaudeCli(question, newSession),
+            "codex" => AskCodexCli(question, newSession),
             "triad" or "all" => AskTriadParallel(question, timeoutSec, attachFiles, newSession, loopMode, loopMaxSteps, loopRetry, loopMaxParallel, modelHint, noWait, debateMode),
-            _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, claude-cli, or triad)")
+            _ => Error($"Unknown AI: {ai} (use gemini, gpt, claude, claude-cli, codex, or triad)")
         };
     }
 
