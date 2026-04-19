@@ -202,6 +202,12 @@ internal partial class Program
     private static string _BuildCompactWinGrapCore(IntPtr hwnd)
     {
         var g = WindowFinder.BuildTargetJson5(hwnd);
+        // Hot-swap leaves the previous core running under `<name>.old-<stamp>`
+        // until it exits. Portable patterns must stay stable across that
+        // rename, otherwise the auto-find verify pass reports MISS every time
+        // the user hits a stale hwnd belonging to the old core. Normalize
+        // here before other regex passes see the proc value.
+        g = Regex.Replace(g, @"(proc:'[^']*?)\.old-\d{8}-\d{4,6}(')", "$1$2");
         g = Regex.Replace(g, @",?hwnd:0x[0-9A-Fa-f]+,?", ",");
         g = Regex.Replace(g, @",?pid:\d+,?", ",");
         g = Regex.Replace(g, @",title:'[^']*'", "");
@@ -240,6 +246,8 @@ internal partial class Program
         {
             WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint fallbackPid);
             var fallbackProc = WKAppBot.Win32.Native.NativeMethods.TryGetProcessNameFast(fallbackPid) ?? "";
+            // Strip hot-swap .old-<timestamp> suffix (see normalize above).
+            fallbackProc = Regex.Replace(fallbackProc, @"\.old-\d{8}-\d{4,6}$", "");
             var fallbackCls  = WindowFinder.GetClassName(hwnd) ?? "";
             fallbackProc = fallbackProc.Replace("'", "\\'");
             fallbackCls  = fallbackCls.Replace("'", "\\'");

@@ -119,7 +119,11 @@ public static class ChromeLauncher
         // appMode disabled: always use normal browser UI (tabs + address bar visible)
         arguments += $" \"{targetUrl}\"";
 
-        // UseShellExecute=true so WindowStyle.Minimized is respected (no focus theft)
+        // UseShellExecute=true + WindowStyle.Minimized: Chrome shows up in
+        // the taskbar without stealing foreground focus. AppBotPipe's focus
+        // guard allowlists this exact shape (Verb-less UseShellExecute with
+        // Minimized/Hidden window) so the launch stays tracked without the
+        // focusless violation trip.
         var psi = new ProcessStartInfo
         {
             FileName = chromePath,

@@ -157,6 +157,12 @@ internal partial class Program
                 jsonIn = pipeIn;
                 jsonOut = pipeOut;
                 Console.Error.WriteLine("[MCP:ADMIN] Named pipes connected -- admin MCP ready");
+                // Admin is live and UAC-approved: this is the cheapest
+                // opportunity to clear a stuck hot-swap. The normal-core
+                // path can't touch admin-protected orphans or rename the
+                // live exe if Eye is stale; admin core can. Fire-and-forget
+                // so the primary admin request isn't delayed.
+                _ = System.Threading.Tasks.Task.Run(TryAdminHotSwap);
             }
             catch (Exception ex)
             {

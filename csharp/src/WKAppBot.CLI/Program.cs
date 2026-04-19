@@ -34,6 +34,100 @@ internal partial class Program
     internal static bool ReadOnlyMode = false;
     // Delegates to AppBotPipe.IsElevated() which caches per-process.
     internal static bool IsElevated() => AppBotPipe.IsElevated();
+
+    // -- Admin-assisted hot-swap -------------------------------------------
+    // When an elevated core is alive (triggered by --sudo), it has two
+    // unique powers relative to the normal path:
+    //   1. Can Stop-Process / TerminateProcess admin-protected orphans that
+    //      the non-admin core can't touch (e.g. stray MCP workers started by
+    //      a prior elevated run).
+    //   2. Windows honors rename-in-use for exe files, so renaming the live
+    //      wkappbot-core.exe to .old-<ts>.exe and copying wkappbot-core.new.exe
+    //      in its place succeeds even while Eye has the file mapped.
+    // We only act when .new.exe is clearly fresher (>=60s lag) to avoid
+    // racing the Launcher's own FSW-based hot-swap on happy-path publishes.
+    internal static void TryAdminHotSwap()
+    {
+        try
+        {
+            if (!IsElevated()) return;
+            var binDir  = AppContext.BaseDirectory;
+            var liveExe = Path.Combine(binDir, "wkappbot-core.exe");
+            var newExe  = Path.Combine(binDir, "wkappbot-core.new.exe");
+            if (!File.Exists(liveExe) || !File.Exists(newExe)) return;
+
+            var live = new FileInfo(liveExe);
+            var next = new FileInfo(newExe);
+            var lagSec = (next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalSeconds;
+            if (lagSec < 60) return; // live is already current or within FSW window
+
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] stale live exe detected (lag={lagSec:F0}s) -- admin-assisted swap");
+
+            // Kill orphan wkappbot-core processes. Preserve Eye + WhisperRing
+            // + self (our own PID). Eye/WhisperRing PIDs discovered via the
+            // eye_ticks.jsonl heartbeat so we don't hard-code them.
+            var selfPid = Environment.ProcessId;
+            int eyePid = -1, ringPid = -1;
+            try
+            {
+                var ticks = Path.Combine(binDir, "wkappbot.hq", "runtime", "eye_ticks.jsonl");
+                if (File.Exists(ticks))
+                {
+                    var tail = File.ReadLines(ticks).Reverse().Take(200).ToList();
+                    foreach (var line in tail)
+                    {
+                        if (eyePid < 0 && line.Contains("\"Tag\":\"eye\"", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var m = System.Text.RegularExpressions.Regex.Match(line, "\"Pid\":(\\d+)");
+                            if (m.Success) eyePid = int.Parse(m.Groups[1].Value);
+                        }
+                        if (eyePid >= 0) break;
+                    }
+                }
+            }
+            catch { }
+
+            int killed = 0, skipped = 0;
+            foreach (var p in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
+            {
+                try
+                {
+                    if (p.Id == selfPid || p.Id == eyePid || p.Id == ringPid) { skipped++; continue; }
+                    p.Kill(entireProcessTree: true);
+                    killed++;
+                }
+                catch { skipped++; }
+                finally { try { p.Dispose(); } catch { } }
+            }
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] orphans killed={killed} preserved={skipped} (self={selfPid}, eye={eyePid}, ring={ringPid})");
+
+            // Rename live -> .old-<ts>, then copy new -> live. Windows allows
+            // rename of a mapped exe; the running Eye keeps its section map
+            // pointing at the renamed inode while new spawns pick up the
+            // fresh exe at the canonical name.
+            var ts = DateTime.Now.ToString("yyyyMMdd-HHmm");
+            var oldExe = Path.Combine(binDir, $"wkappbot-core.old-{ts}.exe");
+            try { File.Move(liveExe, oldExe); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SUDO:HOTSWAP] rename failed: {ex.Message}");
+                return;
+            }
+            try { File.Copy(newExe, liveExe, overwrite: true); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SUDO:HOTSWAP] copy failed: {ex.Message}");
+                // Attempt rollback so the live exe name isn't left missing.
+                try { File.Move(oldExe, liveExe); } catch { }
+                return;
+            }
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] OK: {Path.GetFileName(liveExe)} <- {Path.GetFileName(newExe)} (previous saved as {Path.GetFileName(oldExe)})");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] error: {ex.Message}");
+        }
+    }
     internal static string? RelayFilePath = null;
     static string? _exitFilePath = null;
     static string? _exitEventName = null;
@@ -316,6 +410,17 @@ internal partial class Program
                 // Fall through: args already has --sudo stripped, normal dispatch will run
             }
             PulseStep.Finish("already elevated or --sudo fallthrough -> normal dispatch");
+
+            // Core sees --sudo + already elevated: this process has admin
+            // powers and will soon dispatch the normal command. Best time to
+            // clear a stuck hot-swap: admin-protected orphan cores can be
+            // killed and the live wkappbot-core.exe rename succeeds because
+            // we own SE_DEBUG_NAME. Fire-and-forget so command dispatch
+            // isn't blocked.
+            if (IsElevated())
+            {
+                _ = System.Threading.Tasks.Task.Run(TryAdminHotSwap);
+            }
         }
         if (args.Contains("--read-only"))
         {
@@ -530,6 +635,7 @@ internal partial class Program
                 "claude-detect" => ClaudeDetectCommand(restArgs),
                 "find-prompts" => FindPromptsCommand(restArgs),
                 "chat" => ChatCommand(restArgs),
+                "exec" => ExecCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),

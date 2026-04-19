@@ -28,12 +28,12 @@ internal partial class Program
         {
             for (int ri = 0; ri < ctx.Regions.Count; ri++)
             {
-                if (ctx.StageLabels.TryGetValue(ri, out var cur) && cur == "vision pending")
+                if (ctx.StageLabels.TryGetValue(ri, out var cur) && cur == HackVisionPendingLabel)
                     continue; // already marked
                 if (!ctx.StageLabels.ContainsKey(ri)
                     && ctx.Regions[ri].Type is ConnectedComponentAnalyzer.RegionType.DyText
                         or ConnectedComponentAnalyzer.RegionType.DyContainer)
-                    ctx.StageLabels[ri] = "vision pending";
+                    ctx.StageLabels[ri] = HackVisionPendingLabel;
             }
             ctx.UpdateOverlay();
         }
@@ -52,6 +52,11 @@ internal partial class Program
             File.WriteAllBytes(compositePath, images[0]);
             File.WriteAllText(Path.Combine(gapDir, $"hack_{ts}.prompt.txt"), prompt);
 
+            // CDP tab activation inside Ask* is the dominant focus-steal window
+            // once OCR is bitmap-only. Bracket the call with main-sentinel
+            // Checkpoints so theft gets caught+restored at the seam instead of
+            // leaking until the whole hack pipeline unwinds.
+            ctx.CheckpointFocus?.Invoke();
             int exitCode = visionEngine switch
             {
                 "gpt" => AskChatGpt(prompt, slackReport: false, timeoutSec: 60,
@@ -60,12 +65,13 @@ internal partial class Program
                 _ => AskGemini(prompt, slackReport: false, timeoutSec: 60,
                     attachFiles: new List<string> { compositePath }, noWait: false),
             };
+            ctx.CheckpointFocus?.Invoke();
 
             lock (ctx.Lock)
             {
                 for (int ri = 0; ri < ctx.Regions.Count; ri++)
                 {
-                    if (ctx.StageLabels.TryGetValue(ri, out var cur) && cur == "vision pending")
+                    if (ctx.StageLabels.TryGetValue(ri, out var cur) && cur == HackVisionPendingLabel)
                         ctx.StageLabels[ri] = $"vision {visionEngine}";
                 }
                 ctx.UpdateOverlay();

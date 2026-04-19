@@ -5,7 +5,7 @@
     "desc":  "Before sending a prompt to ChatGPT, wait until the stop button disappears (previous response finished). WaitWhileStopButtonVisible, timeout 60s.",
     "steps":  [
                   "Poll for stop button visibility before TypeAndSubmit",
-                  "60s timeout — fail if still busy"
+                  "60s timeout -- fail if still busy"
               ],
     "tags":  [
                  "cdp",

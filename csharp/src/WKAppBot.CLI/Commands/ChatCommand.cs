@@ -18,52 +18,6 @@ internal partial class Program
     ///   2. stdout/stderr contains rate-limit markers
     ///   3. claude exits non-zero with a known limit signature
     /// </summary>
-    // Supported shell targets. AI entries run as REPL via NonBlockingLineReader;
-    // OS shells (cmd/powershell/bash) are stdio-inherited subprocesses.
-    static readonly HashSet<string> _shellAis =
-        new(StringComparer.OrdinalIgnoreCase) { "gpt", "gemini", "triad" };
-    static readonly HashSet<string> _shellOsNames =
-        new(StringComparer.OrdinalIgnoreCase) { "cmd", "powershell", "pwsh", "bash" };
-
-    /// <summary>Path of persisted default-shell pointer. One line, shell name.</summary>
-    static string ChatDefaultShellFile => Path.Combine(DataDir, "chat-default.txt");
-
-    static string GetDefaultShell()
-    {
-        try
-        {
-            if (File.Exists(ChatDefaultShellFile))
-            {
-                var v = File.ReadAllText(ChatDefaultShellFile).Trim().ToLowerInvariant();
-                if (!string.IsNullOrEmpty(v)) return v;
-            }
-        }
-        catch { }
-        return "claude"; // bootstrap default
-    }
-
-    static int SetDefaultShell(string shell)
-    {
-        shell = shell.Trim().ToLowerInvariant();
-        if (shell != "claude" && shell != "codex" && !_shellAis.Contains(shell) && !_shellOsNames.Contains(shell))
-        {
-            Console.Error.WriteLine($"[CHAT] --set-default: unknown shell '{shell}'. Valid: claude | codex | cmd | powershell | bash | gemini | gpt | triad");
-            return 2;
-        }
-        try
-        {
-            Directory.CreateDirectory(DataDir);
-            File.WriteAllText(ChatDefaultShellFile, shell + "\n");
-            Console.WriteLine($"[CHAT] default shell set to '{shell}' -> {ChatDefaultShellFile}");
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[CHAT] --set-default failed: {ex.Message}");
-            return 1;
-        }
-    }
-
     static int ChatCommand(string[] args)
     {
         bool printMode = false;
@@ -240,56 +194,6 @@ internal partial class Program
         Console.WriteLine("  Routes to: ask <--ai>  (default gemini; cheap single-AI, not triad).");
     }
 
-    static string? ResolveClaudeExe()
-    {
-        var exts = new[] { ".cmd", ".exe", ".bat", "" };
-
-        // 1) Normal PATH walk (covers most installs when PATH was refreshed after install)
-        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-        foreach (var dir in pathEnv.Split(Path.PathSeparator))
-        {
-            if (string.IsNullOrWhiteSpace(dir)) continue;
-            foreach (var ext in exts)
-            {
-                var p = Path.Combine(dir, "claude" + ext);
-                if (File.Exists(p)) return p;
-            }
-        }
-
-        // 2) Well-known npm global install locations on Windows. Eye often starts
-        // BEFORE the user installs @anthropic-ai/claude-code via npm, so its cached
-        // PATH doesn't yet include %APPDATA%\npm. Explicit probe avoids needing an
-        // Eye restart.
-        var fallbackDirs = new List<string>();
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        if (!string.IsNullOrEmpty(appData))
-            fallbackDirs.Add(Path.Combine(appData, "npm"));
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (!string.IsNullOrEmpty(localAppData))
-        {
-            fallbackDirs.Add(Path.Combine(localAppData, "npm"));
-            fallbackDirs.Add(Path.Combine(localAppData, "Programs", "claude")); // official installer target
-        }
-        fallbackDirs.Add(@"C:\Program Files\nodejs");
-        fallbackDirs.Add(@"C:\Program Files (x86)\nodejs");
-
-        foreach (var dir in fallbackDirs)
-        {
-            foreach (var ext in exts)
-            {
-                var p = Path.Combine(dir, "claude" + ext);
-                if (File.Exists(p))
-                {
-                    Console.Error.WriteLine($"[CHAT] claude resolved via fallback probe: {p}");
-                    Console.Error.WriteLine($"[CHAT] (PATH did not include {dir} -- Eye started before install; restart Eye or add to system PATH)");
-                    return p;
-                }
-            }
-        }
-
-        return null;
-    }
-
     /// <summary>
     /// Launch an OS-shell subprocess with inherited stdio. No question mode, no
     /// rate-limit fallback -- the shell manages its own lifecycle. Exit code
@@ -309,6 +213,40 @@ internal partial class Program
     /// Launcher -> Core chain and future pipe-mode wrappers). Piped redirect
     /// + async BeginOutputReadLine is the reliable "works anywhere" path.
     /// </summary>
+    // Print the cmd.exe startup banner ourselves. cmd /K <command> suppresses
+    // the real banner, so we do what cmd would do when launched bare: run
+    // `cmd /c ver` as a one-shot, capture its version line, and echo it plus
+    // the Microsoft copyright line. Failures are silent -- chat cmd still
+    // works without the banner.
+    static void PrintCmdBanner()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c ver",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+            };
+            using var p = Process.Start(psi);
+            if (p == null) return;
+            var verLine = (p.StandardOutput.ReadToEnd() ?? "").Trim();
+            p.WaitForExit(2000);
+            if (!string.IsNullOrEmpty(verLine))
+            {
+                Console.WriteLine();
+                Console.WriteLine(verLine);
+                Console.WriteLine("(c) Microsoft Corporation. All rights reserved.");
+                Console.WriteLine();
+                Console.Out.Flush();
+            }
+        }
+        catch { /* banner is cosmetic */ }
+    }
+
     static int ExecOsShell(string shellName)
     {
         var exe = shellName switch
@@ -339,6 +277,14 @@ internal partial class Program
             Environment.SetEnvironmentVariable(
                 "PROMPT",
                 "$E[1;7;95m[WK]$E[0m $E[1;32m$P$G$E[0m ");
+            // cmd /K <command> deliberately suppresses the MS banner -- it's
+            // only shown for bare `cmd` with no args, and we can't drop /K
+            // because we need it to pre-run `chcp 65001` for UTF-8. Instead,
+            // fetch the real banner ourselves via a cheap `cmd /c ver` probe
+            // and print it before handing off to the ConPTY shell. Matches
+            // what the user would see in an unadorned terminal, without
+            // giving up the chcp setup.
+            PrintCmdBanner();
             shellArgs = "/Q /K @chcp 65001>nul";
         }
 
@@ -360,7 +306,7 @@ internal partial class Program
                     args: shellArgs,
                     cwd: Environment.CurrentDirectory,
                     onOutput: streamer.OnBytes,           // write to stdout
-                    onLineReady: InterceptChatOrShell,    // Enter-key chat detector
+                    onLineReady: line => InterceptChatOrShell(line, streamer),
                     mirrorToTerminal: false);
             }
             catch (Exception ex)
@@ -485,13 +431,48 @@ internal partial class Program
         readonly Stream _stdout = Console.OpenStandardOutput();
         readonly object _lock = new();
 
+        // Pause/resume gate used during an intercept's Phase 2 dispatch. While
+        // paused, child-shell bytes (ESC-erase echoes, prompt redraws, stray
+        // CRLFs) get appended to _parked instead of hitting the terminal, so
+        // they can't interleave with the dispatched command's output written
+        // via inherited stdio. Resume replays the parked bytes in order and
+        // goes back to passthrough. Lock-protected -- reader thread and the
+        // intercept thread both reach in here.
+        bool _paused;
+        readonly MemoryStream _parked = new();
+
         public void OnBytes(byte[] buf, int len)
         {
             if (len <= 0) return;
             lock (_lock)
             {
+                if (_paused)
+                {
+                    _parked.Write(buf, 0, len);
+                    return;
+                }
                 _stdout.Write(buf, 0, len);
                 _stdout.Flush();
+            }
+        }
+
+        public void Pause()
+        {
+            lock (_lock) _paused = true;
+        }
+
+        public void Resume()
+        {
+            lock (_lock)
+            {
+                if (_parked.Length > 0)
+                {
+                    var buf = _parked.GetBuffer();
+                    _stdout.Write(buf, 0, (int)_parked.Length);
+                    _stdout.Flush();
+                    _parked.SetLength(0);
+                }
+                _paused = false;
             }
         }
 
@@ -516,7 +497,7 @@ internal partial class Program
     // When consumed, print a blank line for visual separation, dispatch to
     // the fallback AI, then another blank line so the fresh cmd.exe prompt
     // (forced by PseudoConsoleRunner's Enter-replacement) lands cleanly.
-    static Action? InterceptChatOrShell(string line)
+    static Action? InterceptChatOrShell(string line, PromptDecoratingStreamer? streamer = null)
     {
         if (string.IsNullOrWhiteSpace(line)) return null;
 
@@ -553,11 +534,17 @@ internal partial class Program
                 $"\b\b{echoStyle}{echoPrefix}{line}\x1b[0m\r\n");
             stdout.Write(echo, 0, echo.Length);
             stdout.Flush();
+            // Park ConPTY bytes (ESC-erase echoes, cmd's prompt redraw) while
+            // the dispatched command writes through inherited stdio. Without
+            // this, the two streams race on the same terminal and emit
+            // composite lines like "[WK] ...> CSS attr -> CDP".
+            streamer?.Pause();
             try { dispatch(line); }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
             }
+            finally { streamer?.Resume(); }
         };
     }
 
@@ -636,47 +623,6 @@ internal partial class Program
         foreach (var ch in line)
             if (ch > 0x7F) return true;
         return false;
-    }
-
-    static string? ResolveBashExe()
-    {
-        foreach (var p in new[]
-        {
-            @"C:\Program Files\Git\bin\bash.exe",
-            @"C:\Program Files\Git\usr\bin\bash.exe",
-            @"C:\Windows\System32\bash.exe", // WSL wrapper
-        })
-            if (File.Exists(p)) return p;
-        return null;
-    }
-
-    // PATH lookup first (in case the user added codex to PATH after install),
-    // then the OpenAI-installer's canonical location at
-    // %USERPROFILE%\.codex\.sandbox-bin\codex.exe.
-    static string? ResolveCodexExe()
-    {
-        try
-        {
-            var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-            foreach (var dir in pathEnv.Split(Path.PathSeparator))
-            {
-                if (string.IsNullOrWhiteSpace(dir)) continue;
-                var candidate = Path.Combine(dir, "codex.exe");
-                if (File.Exists(candidate)) return candidate;
-            }
-        }
-        catch { }
-        try
-        {
-            var home = Environment.GetEnvironmentVariable("USERPROFILE");
-            if (!string.IsNullOrEmpty(home))
-            {
-                var fallback = Path.Combine(home, ".codex", ".sandbox-bin", "codex.exe");
-                if (File.Exists(fallback)) return fallback;
-            }
-        }
-        catch { }
-        return null;
     }
 
     // Locate the most recently modified .jsonl under
@@ -854,7 +800,7 @@ internal partial class Program
                     args: args,
                     cwd: Environment.CurrentDirectory,
                     onOutput: streamer.OnBytes,
-                    onLineReady: InterceptAppBotOnly,
+                    onLineReady: line => InterceptAppBotOnly(line, streamer),
                     mirrorToTerminal: false);
             }
             catch (Exception ex)
@@ -894,7 +840,7 @@ internal partial class Program
     // job and flow through unmodified. Think of claude as the chat agent
     // and wkappbot/a11y as side-channel tool invocations the user can mix
     // in without leaving the conversation.
-    static Action? InterceptAppBotOnly(string line)
+    static Action? InterceptAppBotOnly(string line, PromptDecoratingStreamer? streamer = null)
     {
         if (!IsAppBotCommand(line)) return null;
         return () =>
@@ -905,11 +851,16 @@ internal partial class Program
             var echo = Encoding.UTF8.GetBytes($"\r\n\x1b[1;33m$ {line}\x1b[0m\r\n");
             stdout.Write(echo, 0, echo.Length);
             stdout.Flush();
+            // See InterceptChatOrShell for the rationale -- park child-shell
+            // bytes during dispatch so the wkappbot output (inherited stdio)
+            // doesn't collide with claude's own prompt redraw.
+            streamer?.Pause();
             try { DispatchAppBotCommand(line); }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[CHAT] dispatch failed: {ex.Message}");
             }
+            finally { streamer?.Resume(); }
         };
     }
 
@@ -1126,11 +1077,27 @@ internal partial class Program
         var errCapture = new StringWriter();
         try
         {
+            // stdout: tee -- the AI's reply lives here and must stream live.
+            // stderr: capture-only. [ASK]/[ASK:MD]/[ASK-MD]-style diagnostic
+            // traces pile up per turn and clutter the chat transcript. Mirror
+            // the launcher's IocpPipeRelay policy (buffer stderr, drop on
+            // success, flush on failure) so the user sees a clean prompt when
+            // things work and gets the full trace the moment something breaks.
             Console.SetOut(new ChatLimitTeeTextWriter(originalOut, outCapture));
-            Console.SetError(new ChatLimitTeeTextWriter(originalErr, errCapture));
+            Console.SetError(errCapture);
             var rc = AskCommand(args);
             var combined = outCapture.ToString() + "\n" + errCapture.ToString();
             limitHit = DetectRateLimitMarker(combined) || (rc != 0 && DetectLimitExitSignature(combined));
+
+            if (rc != 0 || limitHit)
+            {
+                var trace = errCapture.ToString();
+                if (!string.IsNullOrEmpty(trace))
+                {
+                    originalErr.Write(trace);
+                    if (!trace.EndsWith('\n')) originalErr.WriteLine();
+                }
+            }
             return rc;
         }
         finally

@@ -648,9 +648,15 @@ public static class WindowFinder
     }
 
     /// <summary>
-    /// Find a child window (MDI children first, then direct children) matching a pattern.
-    /// Uses PatternMatcher.Create (substring matching) against title and enriched searchKey.
-    /// Returns null if no match found.
+    /// Find a child window matching a pattern. Resolution order:
+    ///   1. MDI children (direct children of MDIClient under hParent)
+    ///   2. Direct children of hParent
+    ///   3. Deep descendants (EnumChildWindows fallback for MFC grandchildren)
+    /// Step 3 is critical for HTS-style MFC apps where UIA tree is empty below
+    /// the top frame and controls live 3-4 levels deep under custom container
+    /// classes (Afx:* / CView / custom group boxes). Uses PatternMatcher
+    /// substring match against title + enriched searchKey.
+    /// Returns null if no match found at any depth.
     /// </summary>
     public static WindowInfo? FindChildByPattern(IntPtr hParent, string pattern)
     {
@@ -675,14 +681,30 @@ public static class WindowFinder
             }
         }
 
-        // Direct children fallback
+        // Direct children
         foreach (var ch in topChildren)
         {
             if (PatternMatcher.TokenMatchAny(pattern, ch.Title, SearchKey(ch)))
                 return ch;
         }
 
-        return null;
+        // Deep-descendant fallback -- for HTS/MFC apps with empty UIA tree,
+        // controls live 3-4 levels deep under custom MFC containers. Walk the
+        // full EnumChildWindows tree (depth capped implicitly by the Win32
+        // enum itself) and return the first pattern match. Visited set is
+        // unnecessary because EnumChildWindows walks a tree, not a graph.
+        WindowInfo? found = null;
+        NativeMethods.EnumChildWindows(hParent, (hWnd, _) =>
+        {
+            var wi = WindowInfo.FromHwnd(hWnd);
+            if (PatternMatcher.TokenMatchAny(pattern, wi.Title, SearchKey(wi)))
+            {
+                found = wi;
+                return false; // stop enumeration
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
     }
 
     /// <summary>
@@ -1468,12 +1490,18 @@ public static class WindowFinder
         var procNameCache = new Dictionary<uint, string>();
         var focus = FocusSnapshot.CaptureNow();
 
-        // -- If hwnd specified: check only that single window --
+        // -- If hwnd specified: hwnd is AUTHORITATIVE --
+        // Explicit hwnd in the grap dict means "I already resolved this window
+        // and want exactly this one." Do NOT re-validate the other fields
+        // (proc/title/cls/domain) because they were captured at probe time and
+        // can drift (dialog title rewrites, proc case, domain empty on new tab
+        // navigation). Prior behavior: any drifted field dropped the result to
+        // empty, and callers fell back to closest-match enumeration and
+        // returned a different sibling popup -- the exact bug reported for
+        // Hero4/HeroGlobal with 4+ #32770 popups open.
         if (hwndFilter != IntPtr.Zero)
         {
-            if (NativeMethods.IsWindow(hwndFilter) && MatchesMultiField(
-                    hwndFilter, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
-                    domainMatchers, urlMatchers, procNameCache, cmdMatchers))
+            if (NativeMethods.IsWindow(hwndFilter))
                 results.Add(WindowInfo.FromHwnd(hwndFilter));
             return results;
         }

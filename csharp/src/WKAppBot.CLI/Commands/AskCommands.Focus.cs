@@ -134,18 +134,38 @@ internal partial class Program
         Console.Error.WriteLine($"[ASK:FOCUS] STOLEN @ {step}: was={prevFg:X8} now={cur:X8} -- retrying...");
         Console.ResetColor();
 
-        // Retry loop until restored or timeout
+        // Retry loop until restored or timeout. If the user becomes active
+        // mid-retry we bail out quietly -- ripping focus back from an
+        // interactive user is worse than giving up, and the 32-retry spam
+        // that motivated the merged bug report is almost always this shape
+        // (user clicked somewhere else intentionally).
         var sw = Stopwatch.StartNew();
         int attempt = 0;
         bool restored = false;
+        bool userBailed = false;
         while (sw.ElapsedMilliseconds < timeoutMs)
         {
             attempt++;
             NativeMethods.ForceForegroundWindow(prevFg);
             await Task.Delay(retryIntervalMs);
             if (NativeMethods.GetForegroundWindow() == prevFg) { restored = true; break; }
+            if (NativeMethods.GetUserIdleMs() < 1500)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Error.WriteLine($"[ASK:FOCUS] user active @ {step} attempt={attempt} -- yielding");
+                Console.ResetColor();
+                userBailed = true;
+                break;
+            }
             if (attempt % 10 == 0)
                 Console.Error.WriteLine($"[ASK:FOCUS] still retrying @ {step} attempt={attempt} elapsed={sw.ElapsedMilliseconds}ms");
+        }
+
+        if (userBailed)
+        {
+            // Silent return -- not a bug, user made a choice. IME / cursor
+            // stay where the user put them.
+            return false;
         }
 
         // Last-resort: if Chrome keeps re-stealing, minimize it so Windows hands foreground

@@ -136,17 +136,46 @@ internal partial class Program
         {
             using var proc = System.Diagnostics.Process.Start(psi);
             if (proc == null) { Console.Error.WriteLine("[ASK] claude CLI failed to start"); return 1; }
+            // Char-level pump (NOT BeginOutputReadLine -- that waits for LF
+            // and made Claude's progressive output look like a wall-of-text
+            // drop at WaitForExit). We read whatever characters are ready,
+            // flush them to the user's terminal immediately, and mirror them
+            // to a StringBuilder for post-processing (rate-limit scan + the
+            // .wkappbot/ask/*.md archive). Token-by-token stream = live feel.
             var outSb = new StringBuilder();
             var errSb = new StringBuilder();
-            proc.OutputDataReceived += (_, e) => { if (e.Data != null) outSb.AppendLine(e.Data); };
-            proc.ErrorDataReceived += (_, e) => { if (e.Data != null) errSb.AppendLine(e.Data); };
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
+            var outLock = new object();
+            var errLock = new object();
+            static void DrainStream(
+                System.IO.StreamReader reader, System.IO.TextWriter sink,
+                StringBuilder mirror, object gate)
+            {
+                var buf = new char[1024];
+                int n;
+                while ((n = reader.Read(buf, 0, buf.Length)) > 0)
+                {
+                    lock (gate)
+                    {
+                        sink.Write(buf, 0, n);
+                        sink.Flush();
+                        mirror.Append(buf, 0, n);
+                    }
+                }
+            }
+            var stdoutThread = new Thread(() => DrainStream(proc.StandardOutput, Console.Out, outSb, outLock))
+            { IsBackground = true, Name = "claude-cli-stdout" };
+            var stderrThread = new Thread(() => DrainStream(proc.StandardError, Console.Error, errSb, errLock))
+            { IsBackground = true, Name = "claude-cli-stderr" };
+            stdoutThread.Start();
+            stderrThread.Start();
             proc.WaitForExit();
-            var stdout = outSb.ToString();
-            var stderr = errSb.ToString();
-            if (!string.IsNullOrEmpty(stdout)) Console.Write(stdout);
-            if (!string.IsNullOrEmpty(stderr)) Console.Error.Write(stderr);
+            // Let the drain threads finish any tail bytes before we read the
+            // mirrors for rate-limit detection / archive.
+            stdoutThread.Join();
+            stderrThread.Join();
+            string stdout, stderr;
+            lock (outLock) stdout = outSb.ToString();
+            lock (errLock) stderr = errSb.ToString();
             // Rate-limit detection on claude-cli output, symmetric to
             // RunClaudePrint's inspection: flip limitHit so the caller's
             // fallback rotation sees this as "try next AI, not fatal exit".

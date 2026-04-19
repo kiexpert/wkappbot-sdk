@@ -34,9 +34,13 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`5.14` -- bumped at 2026-04-16 (--sudo launcher pre-exec gate, Core bootstrap handler with PulseStep tracing, eye --sudo non-destructive force-launch, admin Eye reuse probe, indefinite post-UAC wait, no fallback after takeover, LaunchElevatedEye pre-spawn hot-swap + reason/trail for UAC)
+`6.0` -- bumped at 2026-04-19 (**milestone: accessibility narrator + stdin unification**) -- wkappbot exec/run managed launcher with loading-trace + a11y-diff streaming + --watch + --stdin-inject real-time ValuePattern injection (150ms fast-tick) + control-char signals (Ctrl+C=CloseMainWindow, Ctrl+Z=undo-keystroke-via-Hotkey) + UWP broker re-attach for Win11 Notepad/Calc + adopt-existing for HTS order-field flow + lifecycle contract (wkappbot never dies before child app), FocusSafe centralized user-idle yield, TryAdminHotSwap orphan-core cleanup, Eye idle self-swap on .new.exe, a11y grid-read clipboard bridge for MFC owner-drawn grids, Slack per-CWD reply ctx, ChatGPT EDITOR-RESCUE selector fallback, ScenarioRunner [SCENARIO:TAG] RETRY/RECOVERED/FAIL events, SuggestResolve skill-guard 7-check + evidence auto-append, AppBotEyeClaudeDetector FindPrompts focus-safe gate + 10s cache reuse
 
 ## Previous versions
+
+`5.15` -- skipped (rolled up into 6.0 milestone bump)
+
+`5.14` -- bumped at 2026-04-16 (--sudo launcher pre-exec gate, Core bootstrap handler with PulseStep tracing, eye --sudo non-destructive force-launch, admin Eye reuse probe, indefinite post-UAC wait, no fallback after takeover, LaunchElevatedEye pre-spawn hot-swap + reason/trail for UAC)
 
 `5.13` -- bumped at 2026-04-07 (kill ambiguity guard --nth, CDP browser-process gate, inspect --paths UIA flat listing, Launcher TranscodeStream CP949, misc fixes)
 

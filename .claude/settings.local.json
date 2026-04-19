@@ -1,4 +1,4 @@
-﻿{
+{
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -71,5 +71,9 @@
     "additionalDirectories": [
       "C:\\Users\\kiexp\\.claude"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "wkappbot",
+    "qmd"
+  ]
 }

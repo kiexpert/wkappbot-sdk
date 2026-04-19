@@ -202,6 +202,21 @@ internal partial class Program
                 Console.Error.WriteLine($"[ASK] Editor found: {editorSel}");
                 askSession.BindStreamingContext(editorSel);
 
+                // Claude periodically shows a "CoWork"-style promo popover over
+                // the chat surface. It's not a role=dialog so the Gemini-era
+                // DismissDialogAsync scan missed it -- new close-icon heuristics
+                // handle it but we have to actually call the helper from the
+                // Claude path too. Runs unconditionally, cheap when nothing is
+                // open (returns 'NONE'), avoids blocking the send/click below
+                // when the overlay would otherwise eat the click.
+                try
+                {
+                    var dismissed = await cdp.DismissDialogAsync();
+                    if (dismissed != null && dismissed != "NONE")
+                        Console.Error.WriteLine($"[ASK] Claude popup dismiss: {dismissed}");
+                }
+                catch { /* non-fatal */ }
+
                 // -- Phase 3: Check existing turns --
                 int existingTurns = await CountClaudeTurns(cdp);
                 if (existingTurns > 0)

@@ -35,6 +35,40 @@ internal partial class Program
     // tool-use protocol would deliver. Cleared after each AI dispatch.
     static readonly List<ToolOutputRecord> _chatToolUseBuffer = new();
 
+    static void EnsurePromptStartsOnFreshLine()
+    {
+        try
+        {
+            if (!Console.IsOutputRedirected && Console.CursorLeft != 0)
+                Console.WriteLine();
+        }
+        catch
+        {
+            // Best effort only; redirected or non-interactive consoles can throw.
+        }
+    }
+
+    static void EchoChatLineAtCurrentCursor(string line)
+    {
+        try
+        {
+            if (Console.IsOutputRedirected)
+            {
+                Console.WriteLine($"> {line}");
+                return;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Write($"\b\b> {line}");
+            Console.ResetColor();
+            Console.WriteLine();
+        }
+        catch
+        {
+            Console.WriteLine($"> {line}");
+        }
+    }
+
     static int ChatLoopCommand(string[] args)
     {
         var currentShell = _chatFallbackAi;
@@ -45,6 +79,20 @@ internal partial class Program
 
         while (true)
         {
+            var resolvedShell = ResolveNextEnabledChatAi(currentShell);
+            if (!string.IsNullOrEmpty(resolvedShell) && !string.Equals(resolvedShell, currentShell, StringComparison.OrdinalIgnoreCase))
+            {
+                // Rate-limit cooldown disabled the preferred shell -- announce the
+                // swap on a stealth line so the operator knows why the prompt pill
+                // changed. Without this the rotation looks like a silent rename.
+                Console.Error.WriteLine($"[CHAT:LOOP] {currentShell} unavailable (rate-limit cooldown) -> switching to {resolvedShell}");
+                currentShell = resolvedShell;
+            }
+            else if (!string.IsNullOrEmpty(resolvedShell))
+            {
+                currentShell = resolvedShell;
+            }
+
             // Drain the interrupt channel before asking for local input -- lines the
             // user typed while the previous AI call was in flight land here as
             // timestamped entries and execute next.
@@ -58,6 +106,7 @@ internal partial class Program
                 if (interruptExit.HasValue) return interruptExit.Value;
             }
 
+            EnsurePromptStartsOnFreshLine();
             Console.ForegroundColor = ConsoleColor.Cyan;
             var depthTag = reader.PendingCount > 0 ? $" (buffered={reader.PendingCount})" : "";
             Console.Write($"{currentShell}>{depthTag} ");
@@ -334,6 +383,8 @@ internal partial class Program
             return;
         }
 
+        EchoChatLineAtCurrentCursor(line);
+
         // -- plain dispatch to current AI shell ------------------------------
         // Prepend accumulated console (con) tool_use/tool_result blocks so the
         // AI sees the user's recent console activity as conversation context
@@ -344,7 +395,9 @@ internal partial class Program
             var question = string.IsNullOrEmpty(toolUseCtx)
                 ? line
                 : toolUseCtx + "\n\nUser: " + line;
-            var rc = AskSingleAiFallback(question, currentShell);
+            var nextShell = currentShell;
+            var rc = AskWithAutoFallback(question, currentShell, next => nextShell = next);
+            currentShell = nextShell;
             cycles++;
             var attachedTag = _chatToolUseBuffer.Count > 0
                 ? $" (attached {_chatToolUseBuffer.Count} con tool_use block(s))"

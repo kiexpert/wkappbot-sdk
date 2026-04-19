@@ -6,10 +6,10 @@
     "steps":  [
                   "SetDwmBorderColor((R,G,B)?): COLORREF=R",
                   "(G\u003c\u003c8)",
-                  "(B\u003c\u003c16); null → DWMWA_COLOR_DEFAULT=0xFFFFFFFF (Windows 11+ only, no-op on Win10)",
+                  "(B\u003c\u003c16); null -> DWMWA_COLOR_DEFAULT=0xFFFFFFFF (Windows 11+ only, no-op on Win10)",
                   "SetBotOverlayAsync(show,hexColor): injects #__wkbot_overlay fixed div + CSS keyframes (fade 0.6s / pulse 0.9s infinite) + __wkBotTick / __wkBotStreaming JS fns on window",
-                  "TickBotOverlay(): fire-and-forget EvalAsync(\u0027window.__wkBotTick?.()\u0027) on each CDP cmd — skips if !_overlayInjected",
-                  "SetBotOverlayStreaming(bool): toggles .streaming class → infinite pulse while AI responding",
+                  "TickBotOverlay(): fire-and-forget EvalAsync(\u0027window.__wkBotTick?.()\u0027) on each CDP cmd -- skips if !_overlayInjected",
+                  "SetBotOverlayStreaming(bool): toggles .streaming class -> infinite pulse while AI responding",
                   "On cmd start (EnsureCdpReadyAsync): SetDwmBorderColor + SetBotOverlayAsync(true)",
                   "On cmd end (GuardCdpFocusTheft): SetDwmBorderColor(null) + SetBotOverlayAsync(false)",
                   "Claude streaming: SetBotOverlayStreaming(true) on STREAMING detect, false on DONE/early-exit"

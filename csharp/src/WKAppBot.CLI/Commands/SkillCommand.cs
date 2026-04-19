@@ -329,9 +329,12 @@ internal partial class Program
             return 1;
         }
 
-        // Encoding risk check: reject Korean/emoji in skill content
+        // Encoding risk check: reject Korean/emoji in skill content.
+        // Korean-UI app categories (hts-*, heroes*, kiwoom*, invest-kr, ...)
+        // get a relaxed threshold inside HasEncodingRisk because documenting
+        // real UIA labels verbatim is the skill's job.
         var allContent = string.Join(" ", new[] { title, desc }.Concat(steps).Where(s => s != null)!);
-        if (!force && HasEncodingRisk(allContent, "skill contribute")) return 1;
+        if (!force && HasEncodingRisk(allContent, "skill contribute", app)) return 1;
 
         var slug = id ?? Slugify(title);
         if (string.IsNullOrEmpty(slug))
@@ -371,9 +374,15 @@ internal partial class Program
 
         skill.Save(path);
         var action = existing != null ? "Updated" : "Created";
-        Console.Error.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
+        // User-visible confirmation MUST go to stdout. IocpPipeRelay buffers
+        // stderr and drops the buffer on exit=0 by default, so Console.Error
+        // here vanishes for non-interactive callers (bash, MCP, agents) --
+        // which makes the command look like it timed out with no output even
+        // though the skill was written to disk. See skill
+        // 'iocp-stderr-default-buffered' for the full architecture note.
+        Console.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
         if (regScriptRef != null)
-            Console.Error.WriteLine($"[SKILL] Regression script: {regScriptRef} (auto-runs on suggest resolve)");
+            Console.WriteLine($"[SKILL] Regression script: {regScriptRef} (auto-runs on suggest resolve)");
         return 0;
     }
 
@@ -449,9 +458,10 @@ internal partial class Program
             }
         }
 
-        // Encoding risk check on edited content
+        // Encoding risk check on edited content -- deferred below until we
+        // know the target skill's app so Korean-UI apps (hts-*, heroes*, ...)
+        // can opt into their relaxed threshold.
         var editedContent = string.Join(" ", new[] { title, desc, stepContent }.Concat(steps ?? []).Where(s => s != null)!);
-        if (!force && !string.IsNullOrEmpty(editedContent) && HasEncodingRisk(editedContent, "skill edit")) return 1;
 
         bool hasSingleStep = stepIndex > 0 && stepContent != null;
         if (title == null && desc == null && steps == null && tags == null && !hasSingleStep && !addStep)
@@ -483,6 +493,9 @@ internal partial class Program
             return 1;
         }
 
+        // Run encoding check now that we know the target skill's app.
+        if (!force && !string.IsNullOrEmpty(editedContent) && HasEncodingRisk(editedContent, "skill edit", skill.App)) return 1;
+
         if (title != null) skill.Title = title;
         if (desc  != null) skill.Desc  = desc;
         if (steps != null) skill.Steps = steps;
@@ -497,7 +510,7 @@ internal partial class Program
                 return Error($"--step {stepIndex} out of range (skill has {skill.Steps.Count} step(s))");
             var old = skill.Steps[idx];
             skill.Steps[idx] = stepContent!;
-            Console.Error.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" -> \"{stepContent}\"");
+            Console.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" -> \"{stepContent}\"");
         }
 
         // --add-step X : append new step
@@ -505,14 +518,16 @@ internal partial class Program
         {
             skill.Steps ??= [];
             skill.Steps.Add(stepContent);
-            Console.Error.WriteLine($"[SKILL] added step {skill.Steps.Count}: \"{stepContent}\"");
+            Console.WriteLine($"[SKILL] added step {skill.Steps.Count}: \"{stepContent}\"");
         }
 
         skill.Updated = DateTime.UtcNow;
         skill.Version = BumpVersion(skill.Version);
 
         skill.Save(skillPath);
-        Console.Error.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
+        // stdout, not stderr -- see SkillContributeCommand for the rationale
+        // (IocpPipeRelay buffers+drops stderr on exit=0).
+        Console.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
         return 0;
     }
 
@@ -679,7 +694,8 @@ internal partial class Program
 
     static int SkillVerifyCommand(string[] args)
     {
-        if (args.Length == 0) { Console.WriteLine("Usage: wkappbot skill verify <id>"); return 1; }
+        if (args.Length == 0) { Console.WriteLine("Usage: wkappbot skill verify <id> [--skip-evidence]"); return 1; }
+        bool skipEvidence = args.Any(a => a == "--skip-evidence");
         var skill = FindSkill(args[0]);
         if (skill == null) { Console.Error.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
         var (ok, missing, stale) = RunVerify(skill, verbose: true);
@@ -691,7 +707,113 @@ internal partial class Program
             Console.Error.WriteLine($"  -> To add one: wkappbot skill contribute --id {skill.Id} --regression-script <test-{skill.App}-*.sh>");
             Console.ResetColor();
         }
-        return (missing + stale > 0 || regResult > 0) ? 1 : 0;
+
+        // Replay the Verified-step evidence scripts accumulated via resolves.
+        // Each `suggest resolve` appends a "Verified YYYY-MM-DD: <path>" step;
+        // re-running those scripts is the ultimate self-heal check -- if a
+        // regression sneaks back in, the same test that proved the original
+        // fix will now fail and skill verify surfaces it immediately.
+        int evidencePass = 0, evidenceFail = 0, evidenceMissing = 0;
+        if (!skipEvidence)
+        {
+            (evidencePass, evidenceFail, evidenceMissing) = RunVerifiedEvidenceScripts(skill);
+        }
+
+        return (missing + stale > 0 || regResult > 0 || evidenceFail > 0 || evidenceMissing > 0) ? 1 : 0;
+    }
+
+    // -- Evidence replay: re-run each "Verified ..." step's script -----------
+    static (int pass, int fail, int missing) RunVerifiedEvidenceScripts(SkillRecord skill)
+    {
+        if (skill.Steps == null || skill.Steps.Count == 0) return (0, 0, 0);
+        var verifiedRegex = new System.Text.RegularExpressions.Regex(
+            @"^Verified\s+\d{4}-\d{2}-\d{2}:\s*(?<path>\S[^(]*?)(?:\s*\(resolve ts=.*)?$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
+
+        int pass = 0, fail = 0, missing = 0;
+        var entries = new List<(string relPath, string absPath)>();
+        foreach (var step in skill.Steps)
+        {
+            var m = verifiedRegex.Match(step.Trim());
+            if (!m.Success) continue;
+            var rel = m.Groups["path"].Value.Trim();
+            var abs = Path.IsPathRooted(rel) ? rel : Path.Combine(hqDir, rel);
+            entries.Add((rel, abs));
+        }
+        if (entries.Count == 0) return (0, 0, 0);
+
+        Console.Error.WriteLine($"[SKILL] Replaying {entries.Count} Verified evidence script(s)...");
+        foreach (var (rel, abs) in entries)
+        {
+            if (!File.Exists(abs))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"    ❌ EVIDENCE MISSING: {rel}");
+                Console.ResetColor();
+                missing++;
+                continue;
+            }
+            var ext = Path.GetExtension(abs).ToLowerInvariant();
+            var psi = ext switch
+            {
+                ".sh"  => new System.Diagnostics.ProcessStartInfo("bash", $"\"{abs}\"")
+                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
+                ".ps1" => new System.Diagnostics.ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -File \"{abs}\"")
+                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
+                ".cmd" or ".bat" => new System.Diagnostics.ProcessStartInfo("cmd", $"/c \"{abs}\"")
+                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
+                _ => null
+            };
+            if (psi == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"    ⚠️  unsupported ext {ext}: {rel}");
+                Console.ResetColor();
+                missing++;
+                continue;
+            }
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try
+            {
+                using var proc = AppBotPipe.StartTracked(psi, Path.GetDirectoryName(abs) ?? Environment.CurrentDirectory, "SKILL-VERIFY");
+                if (proc == null) { fail++; continue; }
+                if (!proc.WaitForExit(300_000)) // 5-min cap per script
+                {
+                    try { proc.Kill(entireProcessTree: true); } catch { }
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"    ❌ TIMEOUT {sw.ElapsedMilliseconds}ms: {rel}");
+                    Console.ResetColor();
+                    fail++;
+                    continue;
+                }
+                sw.Stop();
+                if (proc.ExitCode == 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"    ✅ PASS ({sw.ElapsedMilliseconds}ms): {rel}");
+                    Console.ResetColor();
+                    pass++;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"    ❌ FAIL exit={proc.ExitCode} ({sw.ElapsedMilliseconds}ms): {rel}");
+                    Console.ResetColor();
+                    fail++;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"    ❌ EXEC ERROR: {rel}: {ex.Message}");
+                Console.ResetColor();
+                fail++;
+            }
+        }
+
+        Console.Error.WriteLine($"[SKILL] Evidence replay: {pass} pass, {fail} fail, {missing} missing");
+        return (pass, fail, missing);
     }
 
     // -- Audit --------------------------------------------------------------------

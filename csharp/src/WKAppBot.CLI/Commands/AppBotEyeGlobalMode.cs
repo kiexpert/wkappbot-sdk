@@ -13,32 +13,7 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
-    sealed class EyeParentCard
-    {
-        public int ParentPid { get; set; }
-        public string ParentName { get; set; } = "";
-        public string ParentTitle { get; set; } = "";
-        public string HostType { get; set; } = "";     // vscode, claude-desktop, codex, cursor, terminal
-        public string LastTag { get; set; } = "";
-        public string LastStatus { get; set; } = "";
-        public DateTime LastTsUtc { get; set; }
-        public string Cwd { get; set; } = "";    // working directory for display
-        public string SessionJsonl { get; set; } = ""; // explicit JSONL path from session registry (bypasses cache scan)
-    }
-
     // ClaudeInstanceState + _instanceStates -> moved to AppBotEyeClaudeStatusStreamer.cs
-
-    sealed class PromptDiag
-    {
-        public long StatMs { get; set; }
-        public long ReadMs { get; set; }
-        public long ScanMs { get; set; }
-        public long ParseMs { get; set; }
-        public long NormMs { get; set; }
-        public long CacheMs { get; set; }
-        public string Source { get; set; } = "none";
-        public DateTime FileWriteUtc { get; set; } = DateTime.MinValue; // session file mtime
-    }
 
     static DateTime _lastTickActivityUtc = DateTime.MinValue;
     static DateTime _lastAiActivityUtc = DateTime.MinValue;
@@ -551,8 +526,22 @@ internal partial class Program
 
         PulseStep.Mark("eye-pipe-server");
         // -- Auto a11y hack on InputReadiness probe success --
-        SetupAutoHackOnProbe();
-        EyeDiag("autohack-hooked");
+        // Disabled by default: the hover-driven auto-hack fires on every
+        // InputReadiness probe (i.e. on virtually every keystroke / click),
+        // which stacks up a11y scans while the user is actively typing and
+        // was the dominant source of "focus keeps getting stolen while I
+        // type" complaints. Re-enable per-session with WKAPPBOT_EYE_AUTOHACK=1
+        // when you actually want the live segment database populated.
+        if (Environment.GetEnvironmentVariable("WKAPPBOT_EYE_AUTOHACK") == "1")
+        {
+            SetupAutoHackOnProbe();
+            EyeDiag("autohack-hooked");
+        }
+        else
+        {
+            EyeDiag("autohack-disabled");
+            Console.Error.WriteLine("[EYE] Auto-hack hover worker disabled (set WKAPPBOT_EYE_AUTOHACK=1 to enable)");
+        }
         // -- Mouse CCA: 1s interval -> UIA element + CCA + Visual MD -> Slack thread reply --
         PulseStep.Mark("workers-init");
         StartMouseCcaWorker(cts.Token);
@@ -927,6 +916,34 @@ internal partial class Program
             if (frameCount < 3) EyeDiag($"frame-{frameCount}-start");
             if (frameCount < 3) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} start");
             // ScreenSaver now runs as separate process -- no Tick() needed in Eye
+
+            // -- Idle self-swap: Eye's job is relay + monitor, not heavy
+            //    compute. If a .new.exe is sitting on disk and the pipes are
+            //    quiet, it's a good moment to swap quietly without disrupting
+            //    callers. Checked once every ~50 frames (~5s). FSW based
+            //    triggers still work; this is a backstop that catches files
+            //    dropped in while Eye was unwatched or on a flaky FSW.
+            if (!_fswExeDirty && (frameCount % 50 == 0))
+            {
+                try
+                {
+                    var binDir  = AppContext.BaseDirectory;
+                    var liveExe = Path.Combine(binDir, "wkappbot-core.exe");
+                    var newExe  = Path.Combine(binDir, "wkappbot-core.new.exe");
+                    bool pipeIdle = !ElevatedEyeServer.IsBusy; // admin proxy quiet
+                    if (pipeIdle && File.Exists(liveExe) && File.Exists(newExe))
+                    {
+                        var live = new FileInfo(liveExe);
+                        var next = new FileInfo(newExe);
+                        if ((next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalSeconds >= 60)
+                        {
+                            Console.WriteLine($"[EYE:HOT-SWAP] idle self-swap trigger (.new.exe is {((next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalMinutes):F0}m newer)");
+                            _fswExeDirty = true;
+                        }
+                    }
+                }
+                catch { /* diagnostic probe -- never block the loop */ }
+            }
 
             // -- Duplicate Eye check (every 100 frames ≈ 10s) --
             if (++duplicateCheckFrame >= 100)

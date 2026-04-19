@@ -104,12 +104,27 @@ internal sealed class CdpPromptPump : IDisposable
                 lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
                 var first = await cdp.GetTextLengthAsync(editorSelector);
                 if (first <= 0) return; // already submitted
+
+                // Recovery attempt: the usual stuck cause is a promo popover
+                // (Claude CoWork banner, Gemini copyright, etc.) eating the
+                // submit click. Dismiss any such overlay and re-fire the
+                // send before giving up. Cheap when nothing's open -- the
+                // helper returns 'NONE'.
+                try
+                {
+                    var dismissed = await cdp.DismissDialogAsync();
+                    if (dismissed != null && dismissed != "NONE")
+                        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: watchdog recovery -- dismissed {dismissed}");
+                }
+                catch { }
+                try { await cdp.SendPromptAsync(editorSelector); } catch { }
+
                 await Task.Delay(3000);
                 lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
                 var second = await cdp.GetTextLengthAsync(editorSelector);
-                if (second <= 0) return; // submitted between checks
+                if (second <= 0) return; // submitted between checks (recovery worked)
                 if (second < first) return; // content decreasing = submission in progress
-                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 10s! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
+                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 10s (recovery failed)! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
                 Console.Error.WriteLine(msg);
                 Program.AutoRegisterBug(msg);
             }

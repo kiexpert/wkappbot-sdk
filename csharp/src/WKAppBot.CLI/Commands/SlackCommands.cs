@@ -55,8 +55,23 @@ internal partial class Program
     static string SlackStopSignalFile => Path.Combine(DataDir, "slack.stop");
     static string SlackInboxFile => Path.Combine(DataDir, "slack_inbox.jsonl");
     static string SlackLastTsFile => Path.Combine(DataDir, "slack_last_ts.txt");
-    /// <summary>Last reply context file: "channel=C0xxx\nthread=1234.5678" -- so 'slack reply' needs no flags.</summary>
-    static string SlackReplyContextFile => Path.Combine(DataDir, "slack_reply_ctx.txt");
+    /// <summary>Last reply context file -- now keyed by caller CWD to prevent
+    /// cross-project thread misroute. Previously a single hq-wide file meant
+    /// `slack reply` in project A replied to project B's last-saved thread.
+    /// Filename: slack_reply_ctx.<cwd-hash>.txt (8-hex SHA256 of CWD).</summary>
+    static string SlackReplyContextFile =>
+        Path.Combine(DataDir, $"slack_reply_ctx.{CallerCwdHash()}.txt");
+
+    static string CallerCwdHash()
+    {
+        var cwd = (EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory ?? "")
+            .TrimEnd('\\', '/')
+            .ToLowerInvariant();
+        if (cwd.Length == 0) return "none";
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var bytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(cwd));
+        return Convert.ToHexString(bytes).Substring(0, 8).ToLowerInvariant();
+    }
 
     /// <summary>
     /// Default keywords for keyword monitoring. These are USER-INPUT matchers -- the user
@@ -1128,10 +1143,18 @@ internal partial class Program
         return null;
     }
 
-    /// <summary>Save reply context so 'slack reply "text"' works without --channel/--thread.</summary>
+    /// <summary>Save reply context so 'slack reply "text"' works without --channel/--thread.
+    /// Per-project: the filename itself is keyed by caller-CWD hash so there's no
+    /// cross-project overwrite; we additionally record the plaintext CWD inside
+    /// the file for a second-layer verification on load.</summary>
     static void SaveReplyContext(string channel, string threadTs)
     {
-        try { File.WriteAllText(SlackReplyContextFile, $"channel={channel}\nthread={threadTs}"); }
+        try
+        {
+            var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory ?? "";
+            File.WriteAllText(SlackReplyContextFile,
+                $"cwd={cwd}\nchannel={channel}\nthread={threadTs}");
+        }
         catch { }
     }
 
@@ -1180,10 +1203,13 @@ internal partial class Program
         }
     }
 
-    /// <summary>Load saved reply context (channel, threadTs).</summary>
+    /// <summary>Load saved reply context (channel, threadTs). Verifies the
+    /// stored CWD matches the current caller before returning -- prevents
+    /// the legacy cross-project misroute bug in case an old shared file
+    /// still exists.</summary>
     static (string? channel, string? threadTs) LoadReplyContext()
     {
-        string? channel = null, threadTs = null;
+        string? channel = null, threadTs = null, storedCwd = null;
         try
         {
             if (!File.Exists(SlackReplyContextFile)) return (null, null);
@@ -1191,8 +1217,18 @@ internal partial class Program
             {
                 var parts = line.Split('=', 2);
                 if (parts.Length != 2) continue;
-                if (parts[0] == "channel") channel = parts[1];
-                else if (parts[0] == "thread") threadTs = parts[1];
+                if      (parts[0] == "cwd")     storedCwd = parts[1];
+                else if (parts[0] == "channel") channel   = parts[1];
+                else if (parts[0] == "thread")  threadTs  = parts[1];
+            }
+            if (storedCwd != null)
+            {
+                var callerCwd = (EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory ?? "").TrimEnd('\\', '/');
+                if (!string.Equals(storedCwd.TrimEnd('\\', '/'), callerCwd, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine($"[SLACK] reply context CWD mismatch (stored={storedCwd} caller={callerCwd}) -- refusing stale context to prevent cross-project misroute");
+                    return (null, null);
+                }
             }
         }
         catch { }

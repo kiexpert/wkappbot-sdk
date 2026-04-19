@@ -1019,6 +1019,22 @@ internal partial class Program
         {
             _mcpPromptHelper ??= new ClaudePromptHelper();
         }
+
+        // Focus-safe gate: the FindAllPrompts scan walks Chrome/Electron UIA
+        // trees (FromHandle + FindAllDescendants) which is the dominant focus
+        // steal source whenever a user is mid-typing. If the user has been
+        // active in the last ~1.5s, yield and return an empty/cached view
+        // rather than fighting them for foreground. Callers that truly need
+        // fresh data can pass --force to override. Shared helper so future
+        // UIA-heavy commands can adopt the same bail.
+        bool force = args.Any(a => a == "--force");
+        if (!force && FocusSafe.ShouldYieldToActiveUser(out var idleMs))
+        {
+            Console.Error.WriteLine($"[FIND-PROMPTS] user active ({idleMs}ms idle) -- yielding UIA scan, returning empty");
+            Console.WriteLine("[]");
+            return 0;
+        }
+
         var all = _mcpPromptHelper.FindAllPrompts();
         var result = all.Select(p => new
         {

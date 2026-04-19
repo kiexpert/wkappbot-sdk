@@ -1,17 +1,17 @@
 ﻿{
     "id":  "file-command-cheatsheet",
     "app":  "wkappbot-workflow",
-    "title":  "file — Read/Write/Edit/Grep/Glob Cheatsheet",
+    "title":  "file -- Read/Write/Edit/Grep/Glob Cheatsheet",
     "desc":  "wkappbot file tools for filesystem access. edit auto-creates .bak/ backup. glob MUST use **/ prefix. After edit, U+FFFD corruption triggers auto Slack alert.",
     "steps":  [
                   "READ: wkappbot file read \u003cpath\u003e [--offset N] [--limit N]",
                   "GREP: wkappbot file grep \"pattern\" --path dir --type cs [-i] [-C 3] [--max N]",
-                  "GLOB: wkappbot file glob \"**/*.cs\" --path dir — ALWAYS use **/ prefix",
+                  "GLOB: wkappbot file glob \"**/*.cs\" --path dir -- ALWAYS use **/ prefix",
                   "EDIT: wkappbot file edit \u003cpath\u003e --old \"...\" --new \"...\" (auto .bak/ backup)",
-                  "UNDO: wkappbot file undo \u003cpath\u003e — restore from .bak/",
+                  "UNDO: wkappbot file undo \u003cpath\u003e -- restore from .bak/",
                   "WRITE: wkappbot file write \u003cpath\u003e --content \"...\" (.bak/ created on overwrite)",
-                  "⚠ CP949 files: Korean source with Han comments — verify encoding before edit",
-                  "⚠ After edit: U+FFFD detected → auto Slack alert fired"
+                  "! CP949 files: Korean source with Han comments -- verify encoding before edit",
+                  "! After edit: U+FFFD detected -> auto Slack alert fired"
               ],
     "tags":  [
                  "file",

@@ -194,7 +194,30 @@ internal partial class Program
     static int RunCommand(string[] args)
     {
         if (args.Length == 0)
-            return Error("Usage: appbot run <scenario.yaml> [-v|--verbose] [--no-watch] [--report <dir>]");
+            return Error("Usage: wkappbot run <scenario.yaml | exec-key>  -- scenario file OR managed-exe key (hero4|heroglobal|xingq|kiwoom|tuhon|<custom>)");
+
+        // Branch on first arg shape:
+        //   - File that exists on disk (abs or relative) -> scenario YAML
+        //   - Known managed-exe key (built-in or registered) -> exec launcher
+        //   - Scenario-style extension (.yaml/.yml/.xmf) even if missing -> scenario (better error message)
+        //   - Otherwise treat as scenario path so existing error path runs
+        var first = args[0];
+        bool looksLikeScenario = File.Exists(first)
+            || first.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
+            || first.EndsWith(".yml",  StringComparison.OrdinalIgnoreCase)
+            || first.EndsWith(".xmf",  StringComparison.OrdinalIgnoreCase)
+            || first.Contains('/') || first.Contains('\\');
+        if (!looksLikeScenario)
+        {
+            var key = first.ToLowerInvariant();
+            bool isExecKey = _builtInExecProfiles.ContainsKey(key)
+                || LoadRunProfileStore().Paths.ContainsKey(key);
+            if (isExecKey)
+            {
+                Console.Error.WriteLine($"[RUN] '{first}' matches exec key -> dispatching to exec launcher");
+                return ExecCommand(args);
+            }
+        }
 
         string scenarioPath = args[0];
         bool verbose = args.Contains("-v") || args.Contains("--verbose");

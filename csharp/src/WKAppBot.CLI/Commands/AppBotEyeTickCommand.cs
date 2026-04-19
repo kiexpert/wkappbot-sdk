@@ -61,6 +61,35 @@ internal partial class Program
                 if (ipc.Plans.Length > 3) Console.Error.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
                 Console.Error.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
                 Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
+                // Staleness probe: compare the Eye's binary (what it booted
+                // from) with the freshly-published wkappbot-core.new.exe on
+                // disk. A non-trivial lag means Eye is running OLD code --
+                // hot-swap is pending or blocked. This is the "떠있는 아이가
+                // 올드인지?" query the user asked for.
+                try
+                {
+                    var exeDir  = AppContext.BaseDirectory;
+                    var liveExe = Path.Combine(exeDir, "wkappbot-core.exe");
+                    var newExe  = Path.Combine(exeDir, "wkappbot-core.new.exe");
+                    if (File.Exists(liveExe))
+                    {
+                        var live  = new FileInfo(liveExe);
+                        if (File.Exists(newExe))
+                        {
+                            var next = new FileInfo(newExe);
+                            var lagMin = (next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalMinutes;
+                            if (lagMin >= 1)
+                                Console.Error.WriteLine($"[EYE_EXE] STALE: live={live.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z  new={next.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z  lag={lagMin:F0}m (hot-swap pending)");
+                            else
+                                Console.Error.WriteLine($"[EYE_EXE] fresh: live={live.LastWriteTimeUtc:HH:mm}Z (matches .new.exe within 1m)");
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine($"[EYE_EXE] live={live.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z (no .new.exe staged)");
+                        }
+                    }
+                }
+                catch { /* probe is diagnostic only -- never block tick */ }
                 // "-- card display --" separator: stdout because it precedes the card content.
                 Console.WriteLine("-- card display --");
                 foreach (var line in ipc.Summary.Split('\n'))

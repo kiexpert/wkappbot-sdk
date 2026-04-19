@@ -68,18 +68,33 @@ internal partial class Program
             public ErrorCapture(TextWriter inner) => _inner = inner;
             public override Encoding Encoding => _inner.Encoding;
 
+            // Structured error markers only -- the old "any substring match"
+            // fired on prose like "[ASK] Persona injection failed, continuing"
+            // or "[gemini] failure modes detected", producing BUG-AUTO exit=0
+            // noise. Gates now require either a line-anchored error keyword
+            // with a colon (ERROR:, Exception:, 오류:) or a .NET/stack-trace
+            // signature.
             static readonly System.Text.RegularExpressions.Regex _errorPattern =
-                new(@"error|fail|exception|오류|에러",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                new(@"(?im)^\s*(error|fatal|err|exception|unhandled|traceback|오류|에러)\s*[:：]"
+                    + @"|^\s*at\s+\S+\.\S+\("                                // stack frame
+                    + @"|^\s*System\.\S*Exception\b"                          // .NET exception typename
+                    + @"|^\s*\w+Exception:\s",                                // bare "FooException: msg"
+                    System.Text.RegularExpressions.RegexOptions.Compiled);
+            // Progress/status lines like [ASK], [WEB], [gemini], etc. are
+            // never treated as errors -- they're our own diagnostic channels
+            // and frequently relay AI prose containing "fail"/"error" as
+            // natural-language content.
+            static readonly System.Text.RegularExpressions.Regex _progressTagPattern =
+                new(@"^\s*\[[^\]]+\]",
                     System.Text.RegularExpressions.RegexOptions.Compiled);
             static readonly System.Text.RegularExpressions.Regex _warningPattern =
-                new(@"warn|warning|경고",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                new(@"(?im)^\s*(warn|warning|경고)\s*[:：]",
                     System.Text.RegularExpressions.RegexOptions.Compiled);
 
             static bool IsErrorLike(string msg)
             {
                 if (string.IsNullOrWhiteSpace(msg)) return false;
+                if (_progressTagPattern.IsMatch(msg)) return false;
                 if (_warningPattern.IsMatch(msg)) return false;
                 return _errorPattern.IsMatch(msg);
             }

@@ -94,11 +94,11 @@ internal partial class Program
 You are receiving a relay handoff from the previous session.
 
 Begin your response with EXACTLY this line (Korean, no changes):
-"인수인계 받았습니다. 이전 작업과 맥락 빠르게 파악하고 끊임없이 이어갑니다. 봽"
+"인수인계 받았습니다. 이전 작업과 맥락 빠르게 파악하고 끊임없이 이어갑니다."
 
 Then immediately:
 1. Read CLAUDE.md + memory/MEMORY.md
-2. Send Slack: wkappbot slack send "인수인계 수락! 이전 작업 이어갑니다 봽"
+2. Send Slack: wkappbot slack send "인수인계 수락! 이전 작업 이어갑니다"
 3. Summarize what you understand is pending (Korean, bullet points)
 4. Continue work without waiting for confirmation
 """;
