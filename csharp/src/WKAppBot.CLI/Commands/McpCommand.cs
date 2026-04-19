@@ -162,7 +162,7 @@ internal partial class Program
                 // path can't touch admin-protected orphans or rename the
                 // live exe if Eye is stale; admin core can. Fire-and-forget
                 // so the primary admin request isn't delayed.
-                _ = System.Threading.Tasks.Task.Run(TryAdminHotSwap);
+                _ = System.Threading.Tasks.Task.Run(() => TryAdminHotSwap());
             }
             catch (Exception ex)
             {
