@@ -683,6 +683,7 @@ internal partial class Program
                 "find-prompts" => FindPromptsCommand(restArgs),
                 "chat" => ChatCommand(restArgs),
                 "exec" => ExecCommand(restArgs),
+                "taskkill" => TaskkillCompatCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
