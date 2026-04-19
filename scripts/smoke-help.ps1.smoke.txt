@@ -1,28 +1,28 @@
-commit: 2629a16ae63306cf724c5cfa61b554a8c543260e
+commit: d3ac175a3e14bfbb62385e8107c4a77d97eb2403
 workflow: build-csharp/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-19T21:33:00.3468596Z
+timestamp_utc: 2026-04-19T21:45:34.9200714Z
 
 == TEST --help ==
-{"_":"LAUNCH","pid":3436,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":7476,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 228 more line(s)
 EXITCODE: 0
 == TEST help ==
-{"_":"LAUNCH","pid":8536,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":4268,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 228 more line(s)
 EXITCODE: 0
 == TEST version ==
-{"_":"LAUNCH","pid":5748,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":7576,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
@@ -37,48 +37,48 @@ AI skill management -- executable knowhow for Claude instances.
 ... TRUNCATED: 31 more line(s)
 EXITCODE: 0
 == TEST knowhow --help --no-regression ==
-{"_":"LAUNCH","pid":6776,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":1828,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST schedule --help --no-regression ==
-{"_":"LAUNCH","pid":7296,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":4808,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 19 more line(s)
 EXITCODE: 0
 == TEST file --help --no-regression ==
-{"_":"LAUNCH","pid":7004,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":3912,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 36 more line(s)
 EXITCODE: 0
 == TEST file-read --help --no-regression ==
-{"_":"LAUNCH","pid":6480,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":8136,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-grep --help --no-regression ==
-{"_":"LAUNCH","pid":4988,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":5220,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-glob --help --no-regression ==
-{"_":"LAUNCH","pid":8932,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":5192,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
@@ -93,24 +93,24 @@ EXITCODE: 0
 ... TRUNCATED: 100 more line(s)
 EXITCODE: 0
 == TEST schedule list ==
-{"_":"LAUNCH","pid":1232,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":2412,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file read D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":8812,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":1124,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 11 more line(s)
 EXITCODE: 0
 == TEST file grep skill D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":8280,"sid":2
-,"fg":"0x201E8"
+{"_":"LAUNCH","pid":2976,"sid":2
+,"fg":"0x201DA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
