@@ -61,7 +61,7 @@ internal partial class Program
             "file"   => WebFileInputCommand(restArgs),
             "fetch"  => WebFetchCommand(restArgs),
             "search" => WebSearchCommand(restArgs),
-            "read"   => Error("[WEB] 'web read' removed. URL-as-target is banned -- use `a11y read <grap>` on an existing Chrome tab instead."),
+            "read"   => Error("[WEB] 'web read' removed. URL-as-target is banned -- use `a11y read <grap>` on an existing Chrome tab instead.\n  Read the policy first: wkappbot skill read web-command-cheatsheet"),
             "--help" or "-h" or "help" => WebUsage(),
             "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
                 or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
@@ -101,6 +101,7 @@ internal partial class Program
             Console.Error.WriteLine($"  Discover grap:  wkappbot a11y find \"*Chrome*\" --deep");
             Console.Error.WriteLine($"  Example:        wkappbot web {verb} \"{{proc:'chrome',hwnd:0x...}}\" [args]");
             Console.Error.WriteLine($"  To open a URL as a new tab instead, use `wkappbot web open <url>`.");
+            Console.Error.WriteLine($"  Read the policy first: wkappbot skill read web-command-cheatsheet");
             return false;
         }
         return true;
