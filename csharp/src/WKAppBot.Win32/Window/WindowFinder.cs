@@ -197,9 +197,15 @@ public static class WindowFinder
             if (matched)
             {
                 var info = WindowInfo.FromHwnd(hWnd);
-                // Coverage = pattern literal length / matched text length (higher = more specific match)
+                // Coverage = pattern-literal chars / matched-field chars (higher = tighter hit).
+                // Use the actual matched field's length as the denominator so a
+                // proc/domain/url match isn't unfairly penalized by a long window
+                // title, and a title match isn't over-credited by a short proc
+                // name. Search-term coverage becomes the primary sort key for
+                // results.Sort below.
                 var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
-                info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
+                var denomLen = (matchedSnippet ?? title).Length;
+                info.Coverage = patLen > 0 && denomLen > 0 ? (double)patLen / denomLen : 0;
                 info.MatchedVia = matchedVia;
                 info.MatchedSnippet = matchedSnippet;
                 results.Add(info);
@@ -295,8 +301,11 @@ public static class WindowFinder
                 if (matched)
                 {
                     var info = WindowInfo.FromHwnd(hWnd);
+                    // Same search-term coverage metric as the visible-scan path:
+                    // denominator = matched field length, not always title length.
                     var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
-                    info.Coverage = patLen > 0 && title.Length > 0 ? (double)patLen / title.Length : 0;
+                    var denomLen = (matchedSnippet ?? title).Length;
+                    info.Coverage = patLen > 0 && denomLen > 0 ? (double)patLen / denomLen : 0;
                     info.MatchedVia = matchedVia;
                     info.MatchedSnippet = matchedSnippet;
                     results.Add(info);
