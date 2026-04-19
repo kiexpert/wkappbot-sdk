@@ -252,10 +252,13 @@ internal partial class Program
         }
 
         // -- Skill guard step 3: core-command coupling --
-        // Skill id must contain at least one token from the merge's
-        // affectedCommands, AND the `skill read` body (desc + steps combined)
-        // must reference the actual command name so the skill carries a
-        // concrete usage example -- not just a matching id.
+        // Prefer a matching skill id, but allow a bridge skill when the
+        // rendered `skill read` body already shows a concrete command usage
+        // (e.g. "wkappbot <cmd>" / "a11y <cmd>" / "--<cmd>"). This keeps
+        // cross-cutting skills (Codex guidance that naturally belongs to
+        // ask/skill/eye workflows) from being blocked by a too-narrow id
+        // naming rule. The looser substring `exampleFound` check below is
+        // a separate safety net -- both must still agree.
         if (guardSkill != null && guardSkillReadOutput != null && mergeAffectedCmds is { Length: > 0 })
         {
             var tokens = mergeAffectedCmds
@@ -264,11 +267,19 @@ internal partial class Program
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
             bool idCovers = tokens.Any(tok => guardSkill.Id.Contains(tok, StringComparison.OrdinalIgnoreCase));
-            if (!idCovers)
+            bool bodyCovers = mergeAffectedCmds.Any(cmd =>
+                !string.IsNullOrWhiteSpace(cmd)
+                && (
+                    guardSkillReadOutput.Contains($"wkappbot {cmd}", StringComparison.OrdinalIgnoreCase) ||
+                    guardSkillReadOutput.Contains($"a11y {cmd}", StringComparison.OrdinalIgnoreCase) ||
+                    guardSkillReadOutput.Contains($"--{cmd}", StringComparison.OrdinalIgnoreCase)
+                ));
+            if (!idCovers && !bodyCovers)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"  Skill guard FAILED: skill id '{guardSkill.Id}' does not contain any core-command token from affectedCommands [{string.Join(", ", mergeAffectedCmds)}].");
-                Console.WriteLine($"  Rename / re-create the skill so its id includes one of: {string.Join(", ", tokens)}");
+                Console.WriteLine($"  Rename / re-create the skill, or add a concrete command usage to `skill read` output.");
+                Console.WriteLine($"  Preferred tokens: {string.Join(", ", tokens)}");
                 Console.ResetColor();
                 return 1;
             }
