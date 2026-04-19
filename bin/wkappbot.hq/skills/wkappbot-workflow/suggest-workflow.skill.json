@@ -4,7 +4,7 @@
     "title":  "서제스트 관리 워크플로우",
     "desc":  "서제스트 = AI가 발견한 버그/개선 자동 기록. 쌓이면 머지로 정리, 우선순위 높은 것부터 resolve. resolve 시 반드시 evidence 스크립트 필요.",
     "steps":  [
-                  "wkappbot suggest list — 현황 파악",
+                  "wkappbot suggest list -- 현황 파악",
                   "비슷한 것끼리 머지: wkappbot suggest merge \u003cts1\u003e \u003cts2\u003e --title X --root-cause Y --components Z --work Nh",
                   "CP949 깨진 텍스트: suggestions.jsonl 직접 python3으로 수정 (encoding=\u0027utf-8\u0027로 읽어서 덮어쓰기)",
                   "빠른 것(est≤2h) / freq 높은 것 / risk=high 우선 처리",

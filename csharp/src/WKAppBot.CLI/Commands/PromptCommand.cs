@@ -143,7 +143,18 @@ internal partial class Program
         message = message.Replace("\\n", "\n").Replace("\\t", "\t");
 
         using var ph = new ClaudePromptHelper();
-        var all = ph.FindAllPrompts();
+        // Prefer the MCP-backed cached probe: it reuses a warm FlaUI worker
+        // isolated in the MCP subprocess, and the 10-second cache cuts
+        // repeated UIA tree walks on Chrome/Electron -- which were the
+        // dominant focus-steal vector every time a prompt relay landed on
+        // AppBot without knowing the target AI upfront. Fallback to the
+        // direct helper only when MCP isn't wired up (cold start / diag).
+        List<ClaudePromptHelper.PromptInfo> all;
+        try { all = FindAllPromptsViaMcp(); }
+        catch
+        {
+            all = ph.FindAllPrompts();
+        }
         if (all.Count == 0) { Console.Error.WriteLine("[PROMPT] No prompt windows found."); return 1; }
 
         var matched = all

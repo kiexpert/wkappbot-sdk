@@ -583,9 +583,15 @@ internal partial class Program
     }
 
     // -- Encoding Risk Guard ----------------------------------------------------
-    // Returns true (and prints error) if text contains >0.1% Korean/emoji chars.
-    // Korean in AI-facing text costs 2-3x tokens; emojis corrupt in CP949 builds.
-    internal static bool HasEncodingRisk(string text, string context)
+    // Returns true (and prints error) if text contains risky (Korean/emoji)
+    // characters above the app-appropriate threshold. Korean in AI-facing text
+    // costs 2-3x tokens; emojis corrupt in CP949 builds.
+    // Threshold policy:
+    //   - Default:      >0.1% triggers (English-first rule)
+    //   - Korean-UI apps (hts-*, heroes*, kiwoom*, tuhon*, xingq*, invest-kr,
+    //     claude-desktop): >30% -- these skills document real Korean UIA
+    //     labels / menu text verbatim, so some Korean is expected and required.
+    internal static bool HasEncodingRisk(string text, string context, string? app = null)
     {
         if (string.IsNullOrEmpty(text)) return false;
         int total = text.Length;
@@ -602,9 +608,24 @@ internal partial class Program
             if (char.IsHighSurrogate(ch)) { risky++; continue; }
         }
         double ratio = (double)risky / total;
-        if (ratio > 0.001)
+
+        // Apps that legitimately document Korean UIA labels. For these, we
+        // still warn users away from prose-Korean, but allow enough Korean
+        // to transcribe menu/button labels without --i-acknowledge flag.
+        bool koreanUiApp = app != null && (
+            app.StartsWith("hts-", StringComparison.OrdinalIgnoreCase)
+            || app.StartsWith("heroes", StringComparison.OrdinalIgnoreCase)
+            || app.StartsWith("kiwoom", StringComparison.OrdinalIgnoreCase)
+            || app.StartsWith("tuhon",  StringComparison.OrdinalIgnoreCase)
+            || app.StartsWith("xingq",  StringComparison.OrdinalIgnoreCase)
+            || app.Equals("invest-kr",  StringComparison.OrdinalIgnoreCase)
+            || app.Equals("claude-desktop", StringComparison.OrdinalIgnoreCase));
+        double threshold = koreanUiApp ? 0.30 : 0.001;
+
+        if (ratio > threshold)
         {
-            Console.Error.WriteLine($"[ENCODING-GUARD] {context}: {risky}/{total} risky chars ({ratio:P1}) > 0.1% threshold.");
+            var pctStr = (threshold * 100).ToString(threshold < 0.01 ? "F1" : "F0");
+            Console.Error.WriteLine($"[ENCODING-GUARD] {context}: {risky}/{total} risky chars ({ratio:P1}) > {pctStr}% threshold{(koreanUiApp ? $" (Korean-UI app '{app}' has relaxed limit)" : "")}.");
             Console.Error.WriteLine($"  Korean/emoji in AI-facing text = 2-3x token waste + CP949 corruption risk.");
             Console.Error.WriteLine($"  Write in English. Use --i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste to bypass.");
             return true;

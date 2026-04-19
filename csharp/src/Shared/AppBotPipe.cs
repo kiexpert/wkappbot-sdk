@@ -344,11 +344,21 @@ internal static partial class AppBotPipe
         nint prevFg = needsApproval ? 0 : GetForegroundWindow();
 
         // -- FOCUSLESS GUARD --------------------------------------
-        // UseShellExecute=true is only allowed for Verb="runas" (UAC elevation -- OS-mandated).
-        // All other cases must use UseShellExecute=false to stay within our CreateProcessW guard.
-        if (psi.UseShellExecute && string.IsNullOrEmpty(psi.Verb))
+        // UseShellExecute=true is allowed in three shapes:
+        //   (1) Verb="runas"  -- UAC elevation, OS-mandated
+        //   (2) WindowStyle=Minimized -- visible in taskbar but won't steal
+        //       foreground (ShellExecuteEx respects SW_SHOWMINNOACTIVE). Used
+        //       by ChromeLauncher to bring Chrome up for CDP without stealing
+        //       focus from the active app.
+        //   (3) WindowStyle=Hidden -- not shown at all.
+        // Anything else (Normal/Maximized with UseShellExecute) would pop a
+        // visible, focus-stealing window and is blocked.
+        if (psi.UseShellExecute
+            && string.IsNullOrEmpty(psi.Verb)
+            && psi.WindowStyle != System.Diagnostics.ProcessWindowStyle.Minimized
+            && psi.WindowStyle != System.Diagnostics.ProcessWindowStyle.Hidden)
         {
-            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked -- UseShellExecute=true without Verb BLOCKED (focusless violation). Use Spawn() or set UseShellExecute=false. exe={psi.FileName}"); } catch { }
+            try { Console.Error.WriteLine($"[{caller}:BUG] StartTracked -- UseShellExecute=true without Verb + WindowStyle={psi.WindowStyle} BLOCKED (focusless violation). Set WindowStyle=Minimized/Hidden, use Spawn(), or UseShellExecute=false. exe={psi.FileName}"); } catch { }
             return null;
         }
 

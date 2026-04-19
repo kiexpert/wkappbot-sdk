@@ -34,6 +34,13 @@ internal partial class Program
         string visionEngine = "gemini";
         int? atX = null, atY = null; // --at x,y (point) or --ltrb l,t,r,b (rect)
         Rectangle? atRect = null;
+        // OCR + Vision fallback workers default OFF. hack is almost always
+        // called by workers (MCP, hover auto-hack clients, scripted agents)
+        // that want segment layout only -- running OCR on every call costs
+        // CPU and, more critically, fires the CDP Vision fallback which can
+        // steal foreground focus. Use --ocr to opt in when you actually need
+        // text. Pure text-from-region is `wkappbot a11y ocr <grap>`.
+        bool enableOcr = args.Contains("--ocr");
         for (int ai = 0; ai < args.Length; ai++)
         {
             if (args[ai] == "--engine" && ai + 1 < args.Length) visionEngine = args[++ai].ToLowerInvariant();
@@ -495,21 +502,30 @@ internal partial class Program
             StageLabels = stageLabels, UiaStandaloneBoxes = uiaStandaloneBoxes,
             LiveOverlay = liveOverlay, CcaOffX = ccaOffX, CcaOffY = ccaOffY,
             Hwnd = hwnd, ExpDir = _hackExpDir, GapCollector = gapCollector,
+            CheckpointFocus = focusSentinel.Checkpoint,
         };
 
-        var ocrThread = new Thread(() => RunOcrWorker(workerCtx, () => HackShouldAbort()))
-        { IsBackground = true, Name = "HackOcr" };
-        ocrThread.Start();
-        ocrThread.Join();
-        PulseStep.Mark("ocr-done");
-
-        if (!HackShouldAbort() && gapCollector.HasGaps)
+        if (enableOcr)
         {
-            var visionThread = new Thread(() => RunVisionWorker(workerCtx, visionEngine, () => HackShouldAbort()))
-            { IsBackground = true, Name = "HackVision" };
-            visionThread.Start();
-            visionThread.Join();
-            PulseStep.Mark("vision-done");
+            var ocrThread = new Thread(() => RunOcrWorker(workerCtx, () => HackShouldAbort()))
+            { IsBackground = true, Name = "HackOcr" };
+            ocrThread.Start();
+            ocrThread.Join();
+            PulseStep.Mark("ocr-done");
+
+            if (!HackShouldAbort() && gapCollector.HasGaps)
+            {
+                var visionThread = new Thread(() => RunVisionWorker(workerCtx, visionEngine, () => HackShouldAbort()))
+                { IsBackground = true, Name = "HackVision" };
+                visionThread.Start();
+                visionThread.Join();
+                PulseStep.Mark("vision-done");
+            }
+        }
+        else
+        {
+            hackLog.WriteLine("[HACK] OCR/Vision skipped (default); pass --ocr to include, or use `wkappbot a11y ocr <grap>` for text-only");
+            PulseStep.Mark("ocr-skipped");
         }
         gapCollector.Dispose();
 

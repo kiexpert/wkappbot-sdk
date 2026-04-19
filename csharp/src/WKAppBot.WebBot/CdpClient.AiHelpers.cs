@@ -637,28 +637,80 @@ public sealed partial class CdpClient
             """) ?? "NONE";
     }
 
-    /// <summary>Auto-dismiss modal dialogs (copyright, terms, warnings). Returns dismiss result.</summary>
+    /// <summary>Auto-dismiss modal dialogs (copyright, terms, warnings) AND
+    /// non-dialog promo popovers (Claude "CoWork"-style feature banners).
+    /// Strategy: scan dialog roots first for a primary-action button (OK/계속/...);
+    /// fall back to close-icon buttons (aria-label/title=close/dismiss/×, or SVG
+    /// hint) anywhere in the viewport. Returns dismiss result string.</summary>
     public async Task<string> DismissDialogAsync()
     {
         return await EvalAsync("""
             (() => {
+                const primaryWords = ['ok','got it','i understand','confirm','agree','continue',
+                    '\uc911\uc9c0','\uc815\uc9c0','계속','\ub3d9\uc758'];
+                const closeWords = ['close','dismiss','not now','no thanks','maybe later',
+                    '\ub2eb\uae30','\ucde8\uc18c','\ub098\uc911\uc5d0','\ub3c4\uc6c0\ub9d0\uae30','\uac70\uc808'];
+
+                function clickPrimary(root, tag) {
+                    const btns = root.querySelectorAll('button, [role="button"]');
+                    for (const btn of btns) {
+                        const txt = (btn.textContent || '').trim().toLowerCase();
+                        if (primaryWords.some(w => txt.includes(w))
+                            || btn.classList.contains('primary')
+                            || btn.classList.contains('mat-primary')) {
+                            btn.click(); return 'DISMISSED:' + tag + ':' + txt;
+                        }
+                    }
+                    return null;
+                }
+
+                // (1) Classic modal dialogs -- primary-action button
                 const dlg = document.querySelector('mat-dialog-container')
                          || document.querySelector('[role="dialog"]')
                          || document.querySelector('[role="alertdialog"]');
-                if (!dlg) return 'NONE';
-                const btns = dlg.querySelectorAll('button, [role="button"]');
-                for (const btn of btns) {
-                    const txt = (btn.textContent || '').trim().toLowerCase();
-                    if (txt.includes('ok') || txt.includes('got it') || txt.includes('i understand')
-                        || txt.includes('confirm') || txt.includes('agree') || txt.includes('continue')
-                        || txt.includes('\uc911\uc9c0') || txt.includes('\uc815\uc9c0') || txt.includes('계속')
-                        || txt.includes('\ub3d9\uc758') // 동의
-                        || btn.classList.contains('primary') || btn.classList.contains('mat-primary')) {
-                        btn.click(); return 'DISMISSED:' + txt;
+                if (dlg) {
+                    const r = clickPrimary(dlg, 'dialog');
+                    if (r) return r;
+                    const btns = dlg.querySelectorAll('button, [role="button"]');
+                    if (btns.length > 0) { btns[btns.length - 1].click(); return 'DISMISSED_LAST:dialog'; }
+                }
+
+                // (2) Promo popovers / announcement banners -- X-icon close buttons.
+                // Claude's "CoWork" / new-feature banners are not role=dialog; they
+                // sit in [role="region"] / aside / absolute-positioned div layers
+                // with a close button labelled via aria-label / title / SVG only.
+                const isVisible = (el) => {
+                    if (!el || el.offsetParent === null) return false;
+                    const r = el.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                };
+                const candidates = document.querySelectorAll(
+                    'button[aria-label], [role="button"][aria-label], button[title]');
+                for (const btn of candidates) {
+                    if (!isVisible(btn)) continue;
+                    const label = ((btn.getAttribute('aria-label') || '')
+                        + ' ' + (btn.getAttribute('title') || '')
+                        + ' ' + (btn.textContent || '')).toLowerCase();
+                    if (closeWords.some(w => label.includes(w)) || label.trim() === '\u00d7' || label.trim() === 'x') {
+                        // Narrow down: prefer close buttons that live inside a
+                        // "feature-y" surface -- aside, role=region, or a parent
+                        // whose text mentions Cowork / new / feature / try.
+                        let surface = btn.closest('aside,[role="region"],[role="complementary"],[class*="banner" i],[class*="announcement" i],[class*="promo" i],[class*="cowork" i],[class*="feature" i],[class*="popover" i]');
+                        if (!surface) {
+                            // fallback: any ancestor with promo-like text within 4 levels
+                            let p = btn.parentElement; let depth = 0;
+                            while (p && depth++ < 4) {
+                                const t = (p.innerText || '').slice(0, 200).toLowerCase();
+                                if (t.includes('cowork') || t.includes('new feature') || t.includes('try')
+                                    || t.includes('\uc0c8') /*새*/) { surface = p; break; }
+                                p = p.parentElement;
+                            }
+                        }
+                        if (surface) { btn.click(); return 'DISMISSED:promo:' + label.trim().slice(0, 40); }
                     }
                 }
-                if (btns.length > 0) { btns[btns.length - 1].click(); return 'DISMISSED_LAST'; }
-                return 'NO_BUTTON';
+
+                return 'NONE';
             })()
             """) ?? "NONE";
     }

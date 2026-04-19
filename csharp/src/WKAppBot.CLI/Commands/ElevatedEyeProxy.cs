@@ -371,6 +371,22 @@ static class ElevatedEyeClient
     public static int ExecuteViaProxy(string command, string[] args, int timeoutMs = 5000)
     {
         var resp = SendCommandAsync(command, args, timeoutMs).GetAwaiter().GetResult();
+
+        // Auto-retry once on subprocess timeout. Admin Eye reports a busy-path
+        // 50pct-ish timeout rate under load (the reported merged bug); one
+        // extra round trip fixes most of them without bothering the user.
+        // Protocol-level failures (resp == null) still fall through to the
+        // caller's launch-new-proxy strategy.
+        if (resp != null && resp.ExitCode == -1 && !string.IsNullOrEmpty(resp.Error)
+            && resp.Error.Contains("Subprocess timeout", StringComparison.Ordinal))
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.Error.WriteLine($"[ELEVATION] Subprocess timeout -- auto-retry 1/1");
+            Console.ResetColor();
+            var retry = SendCommandAsync(command, args, timeoutMs).GetAwaiter().GetResult();
+            if (retry != null) resp = retry;
+        }
+
         if (resp == null) return -1;
 
         if (!string.IsNullOrEmpty(resp.Stdout))

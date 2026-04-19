@@ -10,6 +10,14 @@ namespace WKAppBot.CLI;
 
 internal partial class Program
 {
+    // Placeholder written to stageLabels while an OCR-empty region is queued for
+    // vision, and also used by VisionWorker to tag regions still awaiting the
+    // vision call. Rendered directly in the console summary's OCR/Label column
+    // via the fallthrough branch in A11yHackCommand.cs, so keep it visually
+    // minimal -- verbose phrasing clutters the table during scroll-driven
+    // rehacks. Must match the literal compared in VisionWorker.cs.
+    const string HackVisionPendingLabel = "...";
+
     /// <summary>
     /// Context shared between main thread and OCR/Vision workers.
     /// All mutable state is guarded by the Lock object.
@@ -28,6 +36,15 @@ internal partial class Program
         public OcrGapCollector? GapCollector;
         public int OcrOk, OcrEmpty;
         public readonly object Lock = new();
+
+        // Bridge to the main thread's FocusStealSentinel so worker threads can
+        // run mid-pipeline theft checks directly. Invoked by RunVisionWorker
+        // around the CDP tab-activation window (the dominant steal vector once
+        // OCR is isolated to bitmap reads). Main owns the sentinel's lifetime
+        // -- workers never construct their own, so we avoid thrashing restores
+        // across multiple sentinels racing on the same original foreground.
+        // Returns true when a steal was detected AND recovered.
+        public Func<bool>? CheckpointFocus;
 
         public void UpdateOverlay()
         {
@@ -141,7 +158,7 @@ internal partial class Program
                                 ctx.GapCollector?.Add(cropRect, null, null, out cachedDesc);
                                 ctx.StageLabels[ri] = !string.IsNullOrWhiteSpace(cachedDesc)
                                     ? $"cache 100% {TrimPreview(cachedDesc, 18)}"
-                                    : "vision pending";
+                                    : HackVisionPendingLabel;
                             }
                         }
                     }

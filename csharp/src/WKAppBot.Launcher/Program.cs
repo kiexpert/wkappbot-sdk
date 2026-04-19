@@ -495,10 +495,13 @@ partial class Program
             return 1;
         }
 
-        // Strip routing flags from args forwarded downstream
-        var forwardArgs = onlyEye || onlyCore
-            ? args.Where(a => a != "--only-eye" && a != "--only-core").ToArray()
-            : args;
+        // Strip launcher-only flags from args before forwarding downstream.
+        // --stderr is purely an IocpPipeRelay concern (passthrough vs. buffer)
+        // and wkappbot-core has no handler for it -- leaving it in would route
+        // the command to "Unknown command" and hide the real subcommand,
+        // defeating the whole point of the flag. --sudo intentionally stays
+        // because Core's elevation path reads it (see isSudoRequest below).
+        var forwardArgs = args.Where(a => a != "--only-eye" && a != "--only-core" && a != "--stderr").ToArray();
 
         if (forwardArgs.Length == 0)
         {

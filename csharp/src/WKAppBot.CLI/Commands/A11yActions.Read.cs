@@ -270,6 +270,94 @@ internal partial class Program
         return names;
     }
 
+    // -- Grid-Read: clipboard bridge for owner-drawn grids (HTS/MFC) --
+    //
+    // MFC/GDI owner-drawn grids expose no UIA/MSAA tree nodes per cell, so
+    // A11yRead returns only the container. This action drives the grid's
+    // native "copy" path instead:
+    //   1. Focus the target control (required for hotkeys to route to it)
+    //   2. Clear the clipboard so stale data doesn't masquerade as a result
+    //   3. Send Ctrl+A + Ctrl+C via AttachThreadInput-safe KeyboardInput
+    //   4. Poll the clipboard for up to 2s
+    //   5. Print captured text verbatim (typically TSV from HTS grids)
+    //
+    // Users who need a non-standard copy sequence can pass the chord via
+    // --text (e.g. --text "ctrl+shift+c" for apps with a dedicated
+    // "copy all" binding, or --text "ctrl+a,ctrl+c" to customize the
+    // default chain).
+    static bool A11yGridRead(IntPtr hwnd, string hotkeyOverride)
+    {
+        var hotkey = string.IsNullOrEmpty(hotkeyOverride) ? "ctrl+a,ctrl+c" : hotkeyOverride;
+
+        // -- Clear clipboard (STA) --
+        bool clearedOk = false;
+        void DoClear()
+        {
+            try { System.Windows.Forms.Clipboard.Clear(); clearedOk = true; } catch { }
+        }
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) DoClear();
+        else
+        {
+            var t = new Thread(DoClear); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(1500);
+        }
+        if (!clearedOk)
+            Console.Error.WriteLine("[A11Y] grid-read: clipboard clear failed (continuing)");
+
+        // -- Focus + send hotkey sequence(s) --
+        NativeMethods.SmartSetForegroundWindow(hwnd);
+        Thread.Sleep(120);
+        foreach (var chord in hotkey.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var keys = chord.Split('+', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(k => k.Trim()).ToArray();
+            if (keys.Length == 0) continue;
+            try { WKAppBot.Win32.Input.KeyboardInput.Hotkey(keys); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[A11Y] grid-read: hotkey {chord} failed: {ex.Message}");
+                return false;
+            }
+            Thread.Sleep(80);
+        }
+
+        // -- Poll clipboard (STA) up to 2s --
+        string? captured = null;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < 2000 && captured == null)
+        {
+            void DoRead()
+            {
+                try
+                {
+                    if (System.Windows.Forms.Clipboard.ContainsText())
+                    {
+                        var t = System.Windows.Forms.Clipboard.GetText();
+                        if (!string.IsNullOrEmpty(t)) captured = t;
+                    }
+                }
+                catch { }
+            }
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) DoRead();
+            else
+            {
+                var t = new Thread(DoRead); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(500);
+            }
+            if (captured == null) Thread.Sleep(100);
+        }
+
+        if (string.IsNullOrEmpty(captured))
+        {
+            Console.Error.WriteLine($"[A11Y] grid-read: clipboard empty after {sw.ElapsedMilliseconds}ms (hotkey={hotkey}). " +
+                "Target may not respond to Ctrl+A/Ctrl+C -- try --hotkey with the app's actual copy binding.");
+            return false;
+        }
+
+        Console.Error.WriteLine($"[A11Y] grid-read: {captured.Length} chars from clipboard ({sw.ElapsedMilliseconds}ms, hotkey={hotkey})");
+        Console.Write(captured);
+        if (!captured.EndsWith('\n')) Console.WriteLine();
+        return true;
+    }
+
     // -- Read: dump element's accessible state (TTS friendly) --
     static bool A11yRead(AutomationElement el)
     {

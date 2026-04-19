@@ -5,7 +5,7 @@
     "desc":  "Each AI host gets a distinct DWM border + CSS overlay color. GetBotColors(label) helper picks from the existing label param in EnsureCdpReadyAsync: Claude=orange(255,120,30)/#ff781e, GPT=green(16,163,127)/#10A37F, Gemini=blue(66,133,244)/#4285F4. Also sets [host] title prefix on Chrome window; restores original title on guard exit.",
     "steps":  [
                   "Add GetBotColors(string? label) static helper returning ((R,G,B), hex) tuple",
-                  "EnsureCdpReadyAsync already receives label=\u0027Claude\u0027/\u0027ChatGPT\u0027/\u0027Gemini\u0027 — use it, no new param needed",
+                  "EnsureCdpReadyAsync already receives label=\u0027Claude\u0027/\u0027ChatGPT\u0027/\u0027Gemini\u0027 -- use it, no new param needed",
                   "SetBotTitlePrefixAsync(host): snapshot original title, prepend [host], skip if already prefixed (starts with \u0027[\u0027)",
                   "RestoreWindowTitleAsync(): restore _originalWindowTitle, clear field",
                   "GuardCdpFocusTheft: call _ = cdp.RestoreWindowTitleAsync() alongside SetDwmBorderColor(null) + SetBotOverlayAsync(false)"

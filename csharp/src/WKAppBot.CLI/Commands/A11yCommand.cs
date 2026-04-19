@@ -1402,6 +1402,7 @@ internal partial class Program
                         "highlight" => A11yHighlight(root, hwnd),
                         "find" => A11yFind(root, hwnd, findDepth),
                         "read" => A11yReadBrowserFirst(root, hwnd),
+                        "grid-read" => A11yGridRead(hwnd, text ?? ""),
                         "invoke" => A11yInvoke(root, hwnd),
                         "click" => A11yClick(root, hwnd),
                         "toggle" => A11yToggle(root, hwnd),

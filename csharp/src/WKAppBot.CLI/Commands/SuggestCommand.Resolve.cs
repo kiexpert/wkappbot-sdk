@@ -20,9 +20,10 @@ internal partial class Program
             return 0;
         }
 
-        // -- Resolve guard: require confirmation flag + evidence script --
+        // -- Resolve guard: require confirmation flag + evidence script + skill --
         const string ConfirmFlag = "--i-completed-the-code-and-built-successfully-and-deployed-and-tested-with-real-scenarios-and-confirmed-meaningful-results-and-have-evidence-and-willkim-allowed-this-script";
         string? evidenceFile = null;
+        string? skillId = null;
         bool hasConfirm = false;
         for (int ei = 0; ei < args.Length; ei++)
         {
@@ -30,7 +31,11 @@ internal partial class Program
             {
                 hasConfirm = true;
                 evidenceFile = args[ei + 1];
-                break;
+                continue;
+            }
+            if (args[ei] == "--skill" && ei + 1 < args.Length)
+            {
+                skillId = args[ei + 1];
             }
         }
 
@@ -39,49 +44,116 @@ internal partial class Program
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("  RESOLVE GUARD -- no resolve without test evidence!");
             Console.WriteLine();
-            Console.WriteLine("  Required: confirmation flag + test script/log file");
+            Console.WriteLine("  Required: confirmation flag + test script/log file + skill id");
             Console.WriteLine("  The evidence file is uploaded to Slack as proof of testing.");
+            Console.WriteLine("  The skill ensures the fix becomes reusable knowledge for future sessions.");
             Console.WriteLine();
-            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag} test_result.sh");
+            Console.WriteLine($"  wkappbot suggest resolve <ts> \"note\" {ConfirmFlag} test_result.sh --skill <id>");
             Console.WriteLine($"  Allowed evidence scripts: .sh, .ps1, .cmd");
             Console.ResetColor();
             return 1;
         }
 
-        if (!File.Exists(evidenceFile))
+        if (string.IsNullOrEmpty(skillId))
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  Evidence file not found: {evidenceFile}");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  RESOLVE GUARD -- --skill <id> is required (no bypass).");
+            Console.WriteLine();
+            Console.WriteLine("  Every resolved fix needs a skill entry so future AI/Claude sessions");
+            Console.WriteLine("  can reuse the institutional memory. Even CHORE / informational items");
+            Console.WriteLine("  should capture *why* they were closed. Create/update one via:");
+            Console.WriteLine("    wkappbot skill contribute --app <app> --title ... --desc ... --steps ...");
+            Console.WriteLine("    wkappbot skill edit <id> --step N --content ...");
             Console.ResetColor();
             return 1;
         }
 
-        var evidenceExt = Path.GetExtension(evidenceFile).ToLowerInvariant();
-        var allowedEvidenceExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        // -- Skill guard step 1 (exists + displayable via `skill read`) --
+        // We intentionally validate against what `skill read` prints rather
+        // than the raw JSON fields: that output IS the user contract. If
+        // the schema grows or the display changes, validation follows.
+        // Guard loads the record for recency (not displayed), then invokes
+        // SkillShowCommand in-process with stdout captured so later steps
+        // score the same text a human would see. No bypass -- every resolve
+        // must carry a fresh, displayable, command-coupled skill.
+        SkillRecord? guardSkill = null;
+        string? guardSkillReadOutput = null;
+        try
         {
-            ".sh", ".ps1", ".cmd", ".bat"
-        };
-        if (!allowedEvidenceExts.Contains(evidenceExt))
+            foreach (var dir in new[] { ProjectSkillsDir, Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "skills") })
+            {
+                if (!Directory.Exists(dir)) continue;
+                foreach (var f in Directory.EnumerateFiles(dir, "*.skill.json", SearchOption.AllDirectories))
+                {
+                    var s = SkillRecord.Load(f);
+                    if (s != null && s.Id.Equals(skillId, StringComparison.OrdinalIgnoreCase))
+                    { guardSkill = s; break; }
+                }
+                if (guardSkill != null) break;
+            }
+        }
+        catch (Exception ex)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  Unsupported evidence extension: {evidenceExt}");
-            Console.WriteLine($"     Allowed: .sh, .ps1, .cmd");
+            Console.WriteLine($"  Skill guard -- load error: {ex.Message}");
             Console.ResetColor();
             return 1;
         }
 
-        var evidenceName = Path.GetFileNameWithoutExtension(evidenceFile);
-        var evidenceParts = evidenceName.Split('-');
-        if (evidenceParts.Length < 3 || !evidenceParts[0].Equals("test", StringComparison.OrdinalIgnoreCase))
+        if (guardSkill == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"  Evidence filename must follow: test-{{cmd}}-{{subcmd}}-{{description}}.<sh|ps1|cmd>");
-            Console.WriteLine($"     Got: {Path.GetFileName(evidenceFile)}");
+            Console.WriteLine($"  Skill guard FAILED: skill id '{skillId}' not found in project or HQ skills.");
+            Console.WriteLine($"  Create with: wkappbot skill contribute --app <app> --title ... --desc ... --id {skillId}");
             Console.ResetColor();
             return 1;
         }
 
-        Console.Error.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
+        var skillAge = DateTime.UtcNow - guardSkill.LastActivity;
+        if (skillAge.TotalDays > 7)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Skill guard FAILED: '{skillId}' last-activity is {(int)skillAge.TotalDays}d old (>7d).");
+            Console.WriteLine($"  Update it to reflect this fix: wkappbot skill edit {skillId} --step N --content ... (or --add-step)");
+            Console.ResetColor();
+            return 1;
+        }
+
+        // Capture `skill read <id> --developer` output. --developer forces
+        // all steps to render (project skills are already full-display,
+        // but HQ skills from other projects would hide detail without it).
+        // We drive the actual command so any future display-layer change
+        // is reflected in validation automatically.
+        {
+            var prevOut = Console.Out;
+            using var captured = new StringWriter();
+            try
+            {
+                Console.SetOut(captured);
+                var rc = SkillShowCommand(new[] { skillId, "--developer" });
+                if (rc != 0)
+                {
+                    Console.SetOut(prevOut);
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"  Skill guard FAILED: `skill read {skillId}` returned exit={rc}.");
+                    Console.ResetColor();
+                    return 1;
+                }
+            }
+            finally { Console.SetOut(prevOut); }
+            guardSkillReadOutput = captured.ToString();
+        }
+
+        if (!guardSkillReadOutput.Contains($"ID     : {skillId}", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Skill guard FAILED: `skill read` output missing canonical ID line for '{skillId}'.");
+            Console.WriteLine($"  Output preview: {guardSkillReadOutput[..Math.Min(200, guardSkillReadOutput.Length)]}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.Error.WriteLine($"[RESOLVE] Skill: {guardSkill.Id} (app={guardSkill.App}, v{guardSkill.Version ?? "?"}, updated {skillAge.TotalHours:F1}h ago, skill-read OK)");
 
         // Pre-load resolve target to check for merge record's affectedCommands
         string[]? mergeAffectedCmds = null;
@@ -137,6 +209,124 @@ internal partial class Program
                 }
             }
         }
+
+        // -- Skill guard step 2: content depth (parsed from `skill read`) --
+        // Source of truth = the same text a human would see via
+        // `wkappbot skill read <id> --developer`. Future display format
+        // changes automatically flow into validation without touching this
+        // code.
+        if (guardSkill != null && guardSkillReadOutput != null)
+        {
+            var skillLines = guardSkillReadOutput.Split('\n').Select(l => l.TrimEnd('\r')).ToArray();
+            // Desc line: starts with "  Desc   : " (note: App/ID/Tags follow
+            // identical prefix; parse first Desc-prefixed line).
+            string descText = "";
+            foreach (var line in skillLines)
+            {
+                if (line.StartsWith("  Desc   : ", StringComparison.Ordinal))
+                { descText = line.Substring("  Desc   : ".Length); break; }
+            }
+            if (descText.Length < 50)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  Skill guard FAILED: `skill read` shows desc = '{descText}' ({descText.Length} chars < 50).");
+                Console.WriteLine($"  Extend via: wkappbot skill edit {guardSkill.Id} --desc \"<longer explanation>\"");
+                Console.ResetColor();
+                return 1;
+            }
+
+            // Steps: each step line matches "    {N}. {content}" (4 leading
+            // spaces, a digit run, a dot). We count only lines that also
+            // carry real content beyond the number.
+            var stepRegex = new System.Text.RegularExpressions.Regex(@"^    \d+\. \S");
+            int stepCount = skillLines.Count(l => stepRegex.IsMatch(l));
+            if (stepCount < 3)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  Skill guard FAILED: `skill read` shows {stepCount} step(s) (<3). Need at least 3 concrete how-to steps.");
+                Console.WriteLine($"  Add via: wkappbot skill edit {guardSkill.Id} --add-step \"<actionable instruction>\"");
+                Console.ResetColor();
+                return 1;
+            }
+            Console.Error.WriteLine($"[RESOLVE] Skill display depth OK (desc={descText.Length} chars, {stepCount} steps)");
+        }
+
+        // -- Skill guard step 3: core-command coupling --
+        // Skill id must contain at least one token from the merge's
+        // affectedCommands, AND the `skill read` body (desc + steps combined)
+        // must reference the actual command name so the skill carries a
+        // concrete usage example -- not just a matching id.
+        if (guardSkill != null && guardSkillReadOutput != null && mergeAffectedCmds is { Length: > 0 })
+        {
+            var tokens = mergeAffectedCmds
+                .SelectMany(c => c.Split(new[] { ' ', '-', '_', '/' }, StringSplitOptions.RemoveEmptyEntries))
+                .Where(t => t.Length >= 2)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            bool idCovers = tokens.Any(tok => guardSkill.Id.Contains(tok, StringComparison.OrdinalIgnoreCase));
+            if (!idCovers)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  Skill guard FAILED: skill id '{guardSkill.Id}' does not contain any core-command token from affectedCommands [{string.Join(", ", mergeAffectedCmds)}].");
+                Console.WriteLine($"  Rename / re-create the skill so its id includes one of: {string.Join(", ", tokens)}");
+                Console.ResetColor();
+                return 1;
+            }
+
+            // Concrete-example check against the rendered output (not raw
+            // fields): catches cases where desc+steps never mention the
+            // command even if tags do.
+            bool exampleFound = mergeAffectedCmds.Any(cmd =>
+                !string.IsNullOrWhiteSpace(cmd)
+                && guardSkillReadOutput.Contains(cmd, StringComparison.OrdinalIgnoreCase));
+            if (!exampleFound)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"  Skill guard FAILED: `skill read {guardSkill.Id}` never prints any affectedCommand phrase from [{string.Join(", ", mergeAffectedCmds)}].");
+                Console.WriteLine($"  Add a concrete step referencing the command: wkappbot skill edit {guardSkill.Id} --add-step \"... {mergeAffectedCmds[0]} ...\"");
+                Console.ResetColor();
+                return 1;
+            }
+
+            Console.Error.WriteLine($"[RESOLVE] Skill content OK (id covers, `skill read` body references affectedCommand)");
+        }
+
+        // -- Evidence file checks (deferred until after skill guard so a weak
+        // skill short-circuits before the user burns time on evidence). --
+        if (!File.Exists(evidenceFile))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Evidence file not found: {evidenceFile}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var evidenceExt = Path.GetExtension(evidenceFile).ToLowerInvariant();
+        var allowedEvidenceExts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".sh", ".ps1", ".cmd", ".bat"
+        };
+        if (!allowedEvidenceExts.Contains(evidenceExt))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Unsupported evidence extension: {evidenceExt}");
+            Console.WriteLine($"     Allowed: .sh, .ps1, .cmd");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var evidenceName = Path.GetFileNameWithoutExtension(evidenceFile);
+        var evidenceParts = evidenceName.Split('-');
+        if (evidenceParts.Length < 3 || !evidenceParts[0].Equals("test", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"  Evidence filename must follow: test-{{cmd}}-{{subcmd}}-{{description}}.<sh|ps1|cmd>");
+            Console.WriteLine($"     Got: {Path.GetFileName(evidenceFile)}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.Error.WriteLine($"[RESOLVE] Evidence: {evidenceFile} ({new FileInfo(evidenceFile).Length} bytes)");
 
         // Validate cmd/subcmd against known CLI commands
         {
@@ -528,6 +718,51 @@ internal partial class Program
         }
         catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Evidence copy failed: {ex.Message}"); }
 
+        // -- Auto-append evidence path to the skill as a new step --
+        // Skills accumulate verification trails this way: each resolve that
+        // targeted them adds a "Verified <timestamp>: <relative evidence path>"
+        // line. Future readers see at a glance which test scripts exercised
+        // the fix.
+        try
+        {
+            if (guardSkill != null && !string.IsNullOrEmpty(guardSkill.FilePath) && File.Exists(guardSkill.FilePath))
+            {
+                var relEvidence = Path.GetFileName(evidenceFile);
+                try
+                {
+                    var evidenceAbs = Path.GetFullPath(evidenceFile);
+                    var hqAbs = Path.GetFullPath(hqDir);
+                    if (evidenceAbs.StartsWith(hqAbs, StringComparison.OrdinalIgnoreCase))
+                        relEvidence = Path.GetRelativePath(hqAbs, evidenceAbs).Replace('\\', '/');
+                }
+                catch { }
+
+                var verifiedStep = $"Verified {DateTime.UtcNow:yyyy-MM-dd}: {relEvidence} (resolve ts={tsPrefix})";
+                var fresh = SkillRecord.Load(guardSkill.FilePath);
+                if (fresh != null)
+                {
+                    fresh.Steps ??= new List<string>();
+                    // De-dupe by exact evidence filename (same test run again shouldn't double-log)
+                    bool already = fresh.Steps.Any(s =>
+                        s.Contains("Verified", StringComparison.OrdinalIgnoreCase)
+                        && s.Contains(relEvidence, StringComparison.OrdinalIgnoreCase));
+                    if (!already)
+                    {
+                        fresh.Steps.Add(verifiedStep);
+                        fresh.Updated = DateTime.UtcNow;
+                        fresh.Version = BumpVersion(fresh.Version);
+                        fresh.Save(guardSkill.FilePath);
+                        Console.Error.WriteLine($"[RESOLVE] Skill step appended: {guardSkill.Id} +-> \"{verifiedStep}\"");
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"[RESOLVE] Skill step skipped (evidence already logged): {relEvidence}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex) { Console.Error.WriteLine($"[RESOLVE] Skill step append failed: {ex.Message}"); }
+
         try
         {
             var recoveryZip = CreateResolveRecoveryZip(hqDir, tsPrefix, evidenceFile);
@@ -888,20 +1123,72 @@ internal partial class Program
         {
             var suggPath = Path.Combine(DataDir, "suggestions.jsonl");
             var prefix = text[..Math.Min(80, text.Length)];
-            var since  = DateTime.UtcNow.AddHours(-1);
+            var nowIso = DateTime.UtcNow.ToString("o");
+
+            // Delta-comment mode: when the same-prefix record exists anywhere
+            // in the backlog (not just the recent window) we annotate the
+            // existing entry instead of creating a new one. That keeps the
+            // backlog flat + makes `freq/hr` naturally rise via seenCount
+            // rather than via spam. If prefix doesn't match anything, fall
+            // through to normal append.
             if (File.Exists(suggPath))
             {
-                foreach (var line in File.ReadLines(suggPath).TakeLast(100))
+                var lines = File.ReadAllLines(suggPath);
+                int matchIdx = -1;
+                JsonNode? matchNode = null;
+                for (int i = lines.Length - 1; i >= 0 && i >= lines.Length - 500; i--)
                 {
+                    var line = lines[i];
                     if (string.IsNullOrWhiteSpace(line)) continue;
                     try
                     {
                         var n = JsonNode.Parse(line);
-                        if (DateTime.TryParse(n?["ts"]?.GetValue<string>(), out var ts) && ts > since
-                            && (n?["text"]?.GetValue<string>() ?? "").StartsWith(prefix, StringComparison.Ordinal))
-                            return;
+                        var nodeText = n?["text"]?.GetValue<string>() ?? "";
+                        // Match direct text prefix OR a merge-record's title prefix
+                        var title = n?["title"]?.GetValue<string>() ?? "";
+                        if (nodeText.StartsWith(prefix, StringComparison.Ordinal)
+                            || title.StartsWith(prefix, StringComparison.Ordinal))
+                        {
+                            matchIdx = i;
+                            matchNode = n;
+                            break;
+                        }
                     }
                     catch { }
+                }
+
+                if (matchIdx >= 0 && matchNode != null)
+                {
+                    // Bump seenCount + lastSeen + append compact comment
+                    var obj = matchNode.AsObject();
+                    int prev = 1;
+                    if (obj.TryGetPropertyValue("seenCount", out var sc) && sc is JsonValue v && v.TryGetValue<int>(out var ci))
+                        prev = ci;
+                    obj["seenCount"] = prev + 1;
+                    obj["lastSeen"]  = nowIso;
+
+                    JsonArray comments;
+                    if (obj.TryGetPropertyValue("comments", out var cExisting) && cExisting is JsonArray arr)
+                        comments = arr;
+                    else
+                    {
+                        comments = new JsonArray();
+                        obj["comments"] = comments;
+                    }
+                    // Keep only the last 20 comments to prevent unbounded growth
+                    while (comments.Count >= 20) comments.RemoveAt(0);
+                    comments.Add(new JsonObject
+                    {
+                        ["ts"] = nowIso,
+                        ["cwd"] = callerCwd ?? Environment.CurrentDirectory,
+                        ["log"] = logFile ?? "",
+                        ["snippet"] = text.Length > 120 ? text[..117] + "..." : text,
+                    });
+
+                    lines[matchIdx] = matchNode.ToJsonString();
+                    File.WriteAllLines(suggPath, lines);
+                    Console.Error.WriteLine($"[BUG-AUTO] delta-comment on existing ({prev + 1}x): {prefix}...");
+                    return;
                 }
             }
 
@@ -914,6 +1201,7 @@ internal partial class Program
                 files  = logFile != null ? new[] { logFile } : Array.Empty<string>(),
                 status = "pending",
                 tag    = "bug-auto",
+                seenCount = 1,
             });
             File.AppendAllText(suggPath, entry + "\n");
             Console.Error.WriteLine($"[BUG-AUTO] registered: {prefix}...");

@@ -7,7 +7,7 @@
                   "Create Ansi.cs helper: static readonly bool IsEnabled = !Console.IsOutputRedirected \u0026\u0026 Environment.GetEnvironmentVariable(\"NO_COLOR\") == null;",
                   "Apply colors: Ansi.IsEnabled ? $\"\\x1b[1;96m{text}\\x1b[0m\" : text (always provide plain fallback)",
                   "Color palette: dim cyan \\x1b[2;36m = headers, bold cyan \\x1b[1;96m = key values, bold green \\x1b[1;32m = OK, bold red \\x1b[1;31m = MISS/error, yellow \\x1b[33m = warnings",
-                  "IsEnabled is static readonly — evaluated once at startup, never changes mid-process",
+                  "IsEnabled is static readonly -- evaluated once at startup, never changes mid-process",
                   "Test: redirect stdout to file and verify no escape codes appear in output"
               ],
     "tags":  [

@@ -1,7 +1,7 @@
 ﻿{
     "id":  "record-triad-insight-as-skill",
     "app":  "wkappbot-workflow",
-    "title":  "삼두 조언 → 스킬로 저장",
+    "title":  "삼두 조언 -> 스킬로 저장",
     "desc":  "삼두(ask triad)에서 얻은 유용한 인사이트는 바로 스킬로 저장. 다음 세션도 같은 고민 반복 안 하게. 오답노트+성공기록 = 집단지성 누적.",
     "steps":  [
                   "삼두 답변에서 핵심 결론 추출",

@@ -307,6 +307,7 @@ public sealed class ScenarioRunner
             if (attempt > 0)
             {
                 LogRun($"  Retry {attempt}/{config.RetryCount}...");
+                LogEvent("RETRY", $"step=\"{step.Name}\" attempt={attempt}/{config.RetryCount} delay={config.RetryDelay}s prev={lastResult?.Status}");
                 Thread.Sleep((int)(config.RetryDelay * 1000));
             }
 
@@ -314,7 +315,14 @@ public sealed class ScenarioRunner
             lastResult.RetryCount = attempt;
 
             if (lastResult.Status == StepStatus.Pass)
+            {
+                if (attempt > 0)
+                    LogEvent("RECOVERED", $"step=\"{step.Name}\" passed on attempt {attempt + 1}");
                 return lastResult;
+            }
+
+            if (attempt == config.RetryCount && lastResult.Status != StepStatus.Pass)
+                LogEvent("FAIL", $"step=\"{step.Name}\" exhausted {attempt + 1} attempt(s): {lastResult.Message ?? "(no message)"}");
         }
 
         return lastResult!;
@@ -444,6 +452,10 @@ public sealed class ScenarioRunner
 
     /// <summary>
     /// Output a [RUN] tagged line, thread-safe with background watcher.
+    /// Also mirrors to stderr as a structured [SCENARIO] event so downstream
+    /// AI agents / log parsers can grep tagged lines without re-parsing the
+    /// human-friendly stdout stream. The stdout path stays exactly as before
+    /// for backward compatibility with existing scripted callers.
     /// </summary>
     private void LogRun(string msg)
     {
@@ -457,6 +469,18 @@ public sealed class ScenarioRunner
             Console.ResetColor();
             Console.WriteLine(msg);
         }
+        try { Console.Error.WriteLine($"[SCENARIO] {msg}"); } catch { }
+    }
+
+    /// <summary>
+    /// Emit a structured notable-event line to stderr only. Use for retries,
+    /// timeouts, blocker dismisses, focus-steal observations and similar
+    /// diagnostics that would clutter stdout but help downstream agents
+    /// reconstruct the run timeline.
+    /// </summary>
+    private static void LogEvent(string tag, string msg)
+    {
+        try { Console.Error.WriteLine($"[SCENARIO:{tag}] {msg}"); } catch { }
     }
 
     private static void WriteColored(string msg, ConsoleColor color)

@@ -193,10 +193,10 @@ if "%NO_BUILD%"=="1" (
   exit /b 0
 )
 echo [BUILD]   step : dotnet publish (no-restore)
-"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal
+"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal /p:SkipDeployLauncher=true
 if not errorlevel 1 exit /b 0
 echo [BUILD]   step : dotnet publish (with restore)
-"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal
+"%DOTNET_EXE%" publish "%LAUNCHER_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal /p:SkipDeployLauncher=true
 if errorlevel 1 (
   echo [BUILD] launcher publish failed
   exit /b 1

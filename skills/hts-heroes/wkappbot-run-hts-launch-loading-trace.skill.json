@@ -1,0 +1,95 @@
+{
+  "id": "wkappbot-run-hts-launch-loading-trace",
+  "app": "hts-heroes",
+  "title": "wkappbot exec/run managed launcher \u002B stdin-inject \u002B Ctrl\u002BC/Z control chars",
+  "desc": "Command wkappbot exec \u003Ckey\u003E (polymorphic alias: wkappbot run \u003Ckey\u003E). Launches managed exe OR adopts an already-running one, streams per-second loading/liveness (title \u002B WM_NULL response-ms \u002B blockers \u002B newly-appeared UIA nodes as grap), auto-dismisses startup dialogs, prints OK when ready. --stdin-inject types each stdin line into the focused edit of the child via ValuePattern.SetValue; supports control-char signals: Ctrl\u002BC (0x03) = CloseMainWindow on adopted pid (app-control semantic NOT text-copy; use a11y clipboard-read for copy), Ctrl\u002BZ (0x1A) = undo keystroke forwarded to focused edit. Handles Win11 UWP broker re-attach automatically. --stdin-inject implies --no-pipe \u002B --watch. Built-in test presets include notepad and calc.",
+  "steps": [
+    "wkappbot exec hero4 launches Hero4.exe in piped-stdio mode (default) and polls per second",
+    "wkappbot exec hero4 --no-pipe GUI-only UseShellExecute=true \u002B Minimized (no focus steal)",
+    "wkappbot exec hero4 --watch stays attached streams per-second a11y diffs until child exits (7d budget)",
+    "wkappbot exec hero4 --timeout 1s caps READY wait when caller wants control back early",
+    "wkappbot exec hero4 --stdin-inject implies --no-pipe \u002B --watch stdin lines get typed into focused edit via ValuePattern.SetValue",
+    "Safety ladder for --stdin-inject (fail-closed): UIA reachable \u002B FocusSafe user-idle guard \u002B focused ProcessId==child \u002B ControlType in Edit or Document \u002B IsPassword==false \u002B last-injected dedup",
+    "Control-char signals in stdin-inject: Ctrl\u002BC (0x03) = CloseMainWindow on adopted pid (app-level close semantic NOT text-copy) Ctrl\u002BZ (0x1A) = undo keystroke via SendInput Hotkey(ctrl,z) gated on focused ProcessId==child Ctrl\u002BA (0x01) intentionally NOT handled since ValuePattern.SetValue already replaces full value",
+    "Ctrl\u002BC close exit path: on next tick proc.HasExited triggers OK closed-via-ctrl-c (exit 0) never re-attaches",
+    "Clipboard copy NOT provided: use wkappbot a11y clipboard-read or direct Windows API",
+    "Adoption: if process matching profile.ExeName is already running AND --stdin-inject then adopt existing pid instead of spawning (HTS order-field flow)",
+    "UWP broker re-attach: Win11 notepad.exe/calc.exe are App Execution Alias redirectors spawn stub exits then forks real process; watch loop detects HasExited and adopts the real pid by exe name",
+    "Spawn path for stdin-inject: AppBotPipe.Spawn(showNoActivate=true) bypasses Start()\u0027s hidden/minimized enforcement and UseShellExecute=true UWP-broker stub",
+    "Window-finder guard: already-running check uses Process.GetProcessesByName(exeName) NOT WindowFinder.FindWindows which walks a UIA subtree for Code/Claude/Codex/Chrome windows and false-positives on VS Code tabs containing keywords like Notepad",
+    "wkappbot exec list shows built-in keys hero4 heroglobal xingq kiwoom tuhon notepad calc \u002B registered paths",
+    "wkappbot exec --register key path.exe register a custom path or override auto-scan",
+    "Profile store persists at bin/wkappbot.hq/profiles/run_profiles.json",
+    "First launch auto-scans System32 \u002B Program Files \u002B Program Files x86 \u002B C: for matching exe name",
+    "Per-second stderr tag [EXEC] \u002BNs win=title resp=Nms stable=Ns blockers=N dlg=...",
+    "Per-new-node tag [EXEC:A11Y] {hwnd:0x...,proc:exe}#ControlType_Aid copy-paste ready into a11y commands",
+    "Inject event tag [EXEC:INJECT] ControlType aid=X name=Y len=N or BLOCKED password field or Ctrl\u002BC/Z signal logs",
+    "Fast-tick schedule: stdin-inject slices 1s sleep into 150ms probes so keyboard focus response stays near real-time",
+    "READY when main title matches pattern AND resp\u003C500ms AND stable\u003E=2s",
+    "Polymorphic alias: wkappbot run \u003Ckey\u003E dispatches to exec when first arg is a known exec key (not a scenario YAML file)",
+    "Lifecycle contract: wkappbot NEVER dies before the child app; survives until app exits (user-visible principle)",
+    "Design framing: wkappbot exec acts as accessibility narrator for automation agents continuously reads new a11y nodes in grap form reports blockers streams WM_NULL heartbeat treats AI agent downstream like a screen reader treats a blind user",
+    "Dynamic stdin source: tail -f feed.txt pipeline works for interactive demos; Ctrl\u002BD closes pipe and wkappbot keeps watching until child exits",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh \u002B live notepad adopt \u002B 3-line dynamic inject \u002B Ctrl\u002BC close observed"
+  ],
+  "tags": [
+    "hts",
+    " exec",
+    " run",
+    " launch",
+    " heroes",
+    " hero4",
+    " heroglobal",
+    " xingq",
+    " kiwoom",
+    " tuhon",
+    " notepad",
+    " calc",
+    " grap",
+    " a11y",
+    " focusless-first",
+    " stdin-inject",
+    " ctrl-c",
+    " ctrl-z",
+    " narrator",
+    " adopt",
+    " uwp-broker-reattach"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/RunCommand.cs",
+      "line": null,
+      "pattern": "ExecCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/RunCommand.cs",
+      "line": null,
+      "pattern": "TryInjectStdinToFocus",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/RunCommand.cs",
+      "line": null,
+      "pattern": "LaunchAndWatch",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/RunCommand.cs",
+      "line": null,
+      "pattern": "InjectState",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/AppBotProgramInfra.cs",
+      "line": null,
+      "pattern": "RunCommand",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T08:47:45.6197472Z",
+  "updated": "2026-04-19T13:22:14.9320831Z",
+  "version": "1.4"
+}

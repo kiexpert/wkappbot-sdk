@@ -71,13 +71,20 @@ internal partial class Program
     /// AND detect runaway streaming with no stop_reason for 30+ minutes (packet bomb).
     /// Returns the error description string, or null if no error detected.
     /// </summary>
+    // Ignore rate-limit/server-error text older than this. Claude's JSONL keeps
+    // historical error entries, so a limit that tripped hours ago would keep
+    // retriggering Gemini handoff every time the 10-minute cooldown dict
+    // expires (or on every Eye restart, which clears the dict entirely).
+    static readonly TimeSpan ClaudeErrorRecencyWindow = TimeSpan.FromMinutes(10);
+
     static string? DetectClaudeSessionError(string jsonlPath)
     {
         try
         {
             var lines = ReadLastLines(jsonlPath, 20);
+            var now = DateTime.UtcNow;
 
-            // -- 1. Error text in assistant turns --
+            // -- 1. Error text in assistant turns (RECENT ones only) --
             foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -87,6 +94,16 @@ internal partial class Program
                 if (node["type"]?.GetValue<string>() != "assistant") continue;
                 var content = node["message"]?["content"]?.AsArray();
                 if (content == null) continue;
+
+                // Recency gate: skip errors whose entry timestamp is stale.
+                // Missing/unparseable timestamp -> treat as non-recent (safer).
+                var tsRaw = node["timestamp"]?.GetValue<string>();
+                if (string.IsNullOrEmpty(tsRaw)
+                    || !DateTime.TryParse(tsRaw, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var entryTs))
+                    continue;
+                if ((now - entryTs.ToUniversalTime()) > ClaudeErrorRecencyWindow)
+                    continue;
 
                 foreach (var item in content)
                 {

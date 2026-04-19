@@ -390,6 +390,35 @@ internal partial class Program
             Console.WriteLine($"[ASK] EDITOR-DIAG: {diag}");
         }
         catch { }
+
+        // Last-resort rescue: ChatGPT sometimes renames the stable selector
+        // faster than we can update the chain. If *any* visible editable
+        // element exists, tag it with a unique data-attribute and return a
+        // selector targeting that tag. Beats returning null and killing the
+        // whole ask flow over a selector churn.
+        try
+        {
+            var rescue = await cdp.EvalAsync("""
+                (() => {
+                    var tag = 'wkappbot-editor-rescue';
+                    var cand = document.querySelector('[contenteditable="true"]')
+                            || document.querySelector('[role="textbox"]')
+                            || document.querySelector('textarea');
+                    if (!cand) return '';
+                    var r = cand.getBoundingClientRect();
+                    if (r.width < 50 || r.height < 10) return '';
+                    cand.setAttribute('data-' + tag, '1');
+                    return '[data-' + tag + '="1"]';
+                })()
+                """);
+            if (!string.IsNullOrEmpty(rescue) && rescue != "\"\"")
+            {
+                var sel = rescue.Trim('"');
+                Console.WriteLine($"[ASK] EDITOR-RESCUE: tagged first visible editable -> {sel}");
+                return sel;
+            }
+        }
+        catch { }
         return null;
     }
 
