@@ -368,7 +368,9 @@ public static class WindowFinder
                     // MatchedSnippet = "childProc:token" -> annotation "<- wkappbot: chatgpt.com"
                     hostInfo.MatchedVia = "child-cmd";
                     hostInfo.MatchedSnippet = $"{proc.ProcessName}:{matchToken}";
-                    hostInfo.Coverage = 0.5;
+                    // Real search-term coverage against the matched cmd token, not a hardcoded 0.5.
+                    var patLen2 = titlePattern.Replace("*", "").Replace("?", "").Length;
+                    hostInfo.Coverage = patLen2 > 0 && matchToken.Length > 0 ? (double)patLen2 / matchToken.Length : 0;
                     results.Add(hostInfo);
                 }
                 catch { }
@@ -398,7 +400,10 @@ public static class WindowFinder
                     || fgCls.StartsWith("Chrome_WidgetWin_", StringComparison.OrdinalIgnoreCase))
                 {
                     var host = WindowInfo.FromHwnd(focus.ForegroundHwnd);
-                    host.Coverage = 0.01;
+                    // No real search-term match -- this is a foreground-host
+                    // context add. Coverage=0 keeps it strictly below real
+                    // matches; focus priority is the natural tiebreaker.
+                    host.Coverage = 0;
                     host.MatchedVia = "context";
                     host.MatchedSnippet = "foreground host";
                     results.Add(host);
@@ -453,7 +458,8 @@ public static class WindowFinder
                 if (cached.host != IntPtr.Zero && seen.Add(cached.host))
                 {
                     var info = WindowInfo.FromHwnd(cached.host);
-                    info.Coverage = 0.1;
+                    // Owner-host fallback -- no direct text match, so zero coverage.
+                    info.Coverage = 0;
                     hosts.Add(info);
                 }
                 continue;
