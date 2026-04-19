@@ -1,0 +1,66 @@
+{
+  "id": "hts-testing-cheatsheet",
+  "app": "hts-heroes",
+  "title": "HTS Testing Cheatsheet (form-dump uia-test do scan chart analyze-hack dbgview)",
+  "desc": "Operator reference for HTS-specific testing verbs that predate the unified a11y command. Covers form-dump (MFC form structure dump), uia-test (UIA pattern prober), legacy do/scan/dialog-click/dialog/titlebar/toolbar-ocr wrappers, chart analysis, analyze-hack diagnostics, dbgview OutputDebugString tail. Use when automating Korean HTS (Hero4 HeroGlobal xingQ Kiwoom Tuhon).",
+  "steps": [
+    "form-dump WINDOW_TITLE FORM_ID --depth N: prints full MFC form tree including owner-drawn child controls. Use when UIA/MSAA do not expose a control -- form-dump shows the raw CChildWindow hierarchy so you can find the real control id",
+    "uia-test GRAP --invoke NAME: probes what UIA patterns and values a target exposes. Use before writing a11y type or set-value to confirm which pattern is available (Value vs LegacyIAccessible vs Text)",
+    "do WINDOW_TITLE FORM_ID BUTTON_TEXT --confirm: legacy wrapper for click-by-text on HTS MFC forms. Use when form-id plus button-text is unique. Modern equivalent is a11y invoke with a grap",
+    "scan WINDOW_TITLE --save --ocr --detail: OCR-based visual dump of a window. Use for debugging when UIA returns empty. --save writes PNG; --ocr runs Tesseract",
+    "click WINDOW_TITLE FORM_ID BUTTON_TEXT --combo N INDEX: combo-aware click for dropdown plus menu sequences on HTS",
+    "dialog-click DIALOG_TITLE BUTTON_INDEX: click button by index in a modal dialog. Use for standard OK Cancel Yes No patterns where text varies",
+    "titlebar WINDOW_TITLE FORM_ID BUTTON_INDEX --ocr: operates on MFC form titlebar buttons (close min max and custom). --ocr when the button text is a bitmap",
+    "toolbar-ocr WINDOW_TITLE --click TEXT --save: OCR on a toolbar region then optional click. Use for HTS toolbars that are one big bitmap image",
+    "capture WINDOW_TITLE -o OUTPUT_PNG --form FORM_ID: screenshot a window or specific form. Sibling of screenshot but tuned for HTS form boundaries",
+    "chart: chart analysis tool for heroes-specific chart windows. Extracts candle data via Vision. Use only when UIA and clipboard bridge both fail",
+    "analyze-hack: diagnostic superset of a11y hack -- runs CCA plus UIA plus OCR plus Gemini Vision and emits a JSON report. Expensive; use once when a control resists normal detection",
+    "dbgview: tail OutputDebugString stream from wkappbot-core and HTS. Useful to watch CMD execution guards fire during suggest resolve or to capture MFC TRACE output",
+    "Legacy vs modern: prefer a11y subcommands over do scan dialog-click titlebar when a grap expression works. The legacy verbs exist for pre-grap scripts and HTS edge cases only",
+    "HTS automation decision tree: UIA reachable -\u003E a11y invoke or a11y set-value. UIA missing but MSAA reachable -\u003E a11y click with Win32 tier. Both missing (owner-drawn grid) -\u003E a11y grid-read for reading or form-dump plus PostMessage WM_COMMAND for writing. Last resort -\u003E chart or analyze-hack"
+  ],
+  "tags": [
+    "hts",
+    " testing",
+    " cheatsheet",
+    " operator",
+    " form-dump",
+    " uia-test",
+    " chart",
+    " analyze-hack",
+    " dbgview",
+    " heroes",
+    " mfc"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/FormDumpCommand.cs",
+      "line": null,
+      "pattern": "FormDumpCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/UiaTestCommand.cs",
+      "line": null,
+      "pattern": "UiaTestCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ChartAnalyzerCommand.cs",
+      "line": null,
+      "pattern": "ChartAnalyzerCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yHackCommand.cs",
+      "line": null,
+      "pattern": "A11yHackCommand",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T15:28:52.3745008Z",
+  "updated": "2026-04-19T15:28:52.3745135Z",
+  "version": "1.0"
+}
