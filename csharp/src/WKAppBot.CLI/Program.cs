@@ -46,7 +46,7 @@ internal partial class Program
     //      in its place succeeds even while Eye has the file mapped.
     // We only act when .new.exe is clearly fresher (>=60s lag) to avoid
     // racing the Launcher's own FSW-based hot-swap on happy-path publishes.
-    internal static void TryAdminHotSwap()
+    internal static void TryAdminHotSwap(bool force = false)
     {
         try
         {
@@ -54,14 +54,19 @@ internal partial class Program
             var binDir  = AppContext.BaseDirectory;
             var liveExe = Path.Combine(binDir, "wkappbot-core.exe");
             var newExe  = Path.Combine(binDir, "wkappbot-core.new.exe");
-            if (!File.Exists(liveExe) || !File.Exists(newExe)) return;
+            if (!File.Exists(liveExe) || !File.Exists(newExe))
+            {
+                if (force) Console.Error.WriteLine("[SUDO:HOTSWAP] --force: .new.exe missing, nothing to swap");
+                return;
+            }
 
             var live = new FileInfo(liveExe);
             var next = new FileInfo(newExe);
             var lagSec = (next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalSeconds;
-            if (lagSec < 60) return; // live is already current or within FSW window
+            if (!force && lagSec < 60) return; // live is already current or within FSW window
 
-            Console.Error.WriteLine($"[SUDO:HOTSWAP] stale live exe detected (lag={lagSec:F0}s) -- admin-assisted swap");
+            var tag = force ? "--force" : "auto";
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] {tag} live-exe lag={lagSec:F0}s -- admin-assisted swap");
 
             // Kill orphan wkappbot-core processes. Preserve Eye + WhisperRing
             // + self (our own PID). Eye/WhisperRing PIDs discovered via the
@@ -92,14 +97,18 @@ internal partial class Program
             {
                 try
                 {
-                    if (p.Id == selfPid || p.Id == eyePid || p.Id == ringPid) { skipped++; continue; }
+                    if (p.Id == selfPid) { skipped++; continue; }
+                    // --force also terminates Eye + WhisperRing so they respawn
+                    // from the freshly-swapped canonical exe. Without --force we
+                    // preserve them to avoid disrupting an active session.
+                    if (!force && (p.Id == eyePid || p.Id == ringPid)) { skipped++; continue; }
                     p.Kill(entireProcessTree: true);
                     killed++;
                 }
                 catch { skipped++; }
                 finally { try { p.Dispose(); } catch { } }
             }
-            Console.Error.WriteLine($"[SUDO:HOTSWAP] orphans killed={killed} preserved={skipped} (self={selfPid}, eye={eyePid}, ring={ringPid})");
+            Console.Error.WriteLine($"[SUDO:HOTSWAP] cores killed={killed} preserved={skipped} (self={selfPid}, eye={eyePid}, ring={ringPid}, force={force})");
 
             // Rename live -> .old-<ts>, then copy new -> live. Windows allows
             // rename of a mapped exe; the running Eye keeps its section map
@@ -419,7 +428,12 @@ internal partial class Program
             // isn't blocked.
             if (IsElevated())
             {
-                _ = System.Threading.Tasks.Task.Run(TryAdminHotSwap);
+                // --force opts into the aggressive path: skip the 60s lag guard
+                // and also recycle Eye/WhisperRing so the next tick picks up
+                // the new exe. Use when an admin orphan is pinning the old
+                // core and normal auto-swap is stuck.
+                bool forceSwap = args.Any(a => a == "--force-swap" || a == "--force");
+                _ = System.Threading.Tasks.Task.Run(() => TryAdminHotSwap(forceSwap));
             }
         }
         if (args.Contains("--read-only"))
