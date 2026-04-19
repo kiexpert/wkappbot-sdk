@@ -1,28 +1,28 @@
-commit: 04bb8378567beb95598f6cf6515ed6ee058d9c47
+commit: 4b636f82432f0cd5965ebb9b36fe8aab03975dec
 workflow: build-csharp/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-19T16:44:35.7997722Z
+timestamp_utc: 2026-04-19T17:02:55.0310569Z
 
 == TEST --help ==
-{"_":"LAUNCH","pid":9160,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":6152,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 230 more line(s)
 EXITCODE: 0
 == TEST help ==
-{"_":"LAUNCH","pid":3916,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":1204,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 230 more line(s)
 EXITCODE: 0
 == TEST version ==
-{"_":"LAUNCH","pid":1496,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":8732,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
@@ -37,48 +37,48 @@ AI skill management -- executable knowhow for Claude instances.
 ... TRUNCATED: 31 more line(s)
 EXITCODE: 0
 == TEST knowhow --help --no-regression ==
-{"_":"LAUNCH","pid":6008,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":6172,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST schedule --help --no-regression ==
-{"_":"LAUNCH","pid":7156,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":8244,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 19 more line(s)
 EXITCODE: 0
 == TEST file --help --no-regression ==
-{"_":"LAUNCH","pid":6548,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":6112,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 36 more line(s)
 EXITCODE: 0
 == TEST file-read --help --no-regression ==
-{"_":"LAUNCH","pid":7124,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":7292,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-grep --help --no-regression ==
-{"_":"LAUNCH","pid":7484,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":5656,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-glob --help --no-regression ==
-{"_":"LAUNCH","pid":8056,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":7872,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
@@ -88,29 +88,29 @@ EXITCODE: 0
 [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
 [CMD] skill list
 [LAUNCH:CORE] cwd=D:\a\WKAppBot\WKAppBot hwnd=0x cmd=skill list
-[SKILL] 87 skill(s) - most recent first:
-  [hts-heroes]
-... TRUNCATED: 99 more line(s)
+[SKILL] 88 skill(s) - most recent first:
+  [wkappbot-core]
+... TRUNCATED: 100 more line(s)
 EXITCODE: 0
 == TEST schedule list ==
-{"_":"LAUNCH","pid":1792,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":8908,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file read D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":6964,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":8888,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
 ... TRUNCATED: 11 more line(s)
 EXITCODE: 0
 == TEST file grep skill D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":764,"sid":2
-,"fg":"0x101F2"
+{"_":"LAUNCH","pid":1068,"sid":2
+,"fg":"0x201EA"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
 ,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
 ,"chain":[
