@@ -247,6 +247,7 @@ internal partial class Program
             }
         }
         bool agentShortcut = tokens.Remove("--agent");
+        bool freshFlag    = tokens.Remove("--fresh") | tokens.Remove("--new-session");
         // --agent expands to --full-auto + -C <repo-root> + -m <agent_model>
         // where agent_model defaults to "codex-mini" (per user directive to
         // force the cheap tier when delegating). Override via a per-project
@@ -279,9 +280,44 @@ internal partial class Program
             return 1;
         }
 
+        // Resume-chain decision: when --agent is on and a prior session is
+        // saved in codex.json AND the session file is under 3MB AND caller
+        // didn't pass --fresh / --new-session, switch `exec` -> `resume <id>`
+        // so the agent continues the previous thread. Otherwise fall through
+        // to a fresh `exec` and (on success below) save the NEW session id.
+        string codexVerb = "exec";
+        string? resumeSessionId = null;
+        if (agentShortcut && !freshFlag)
+        {
+            var cfg = LoadCodexAgentConfig();
+            if (cfg.lastSessionId != null && cfg.lastSessionFile != null
+                && File.Exists(cfg.lastSessionFile))
+            {
+                long sz = 0;
+                try { sz = new FileInfo(cfg.lastSessionFile).Length; } catch { }
+                const long ROTATE_THRESHOLD = 3L * 1024 * 1024;
+                if (sz >= ROTATE_THRESHOLD)
+                {
+                    Console.Error.WriteLine($"[AGENT] session rotated ({sz / (1024.0 * 1024.0):F1}MB >= 3MB) -- starting fresh");
+                    SaveCodexAgentConfig(null, null); // clear
+                }
+                else
+                {
+                    codexVerb = "resume";
+                    resumeSessionId = cfg.lastSessionId;
+                    Console.Error.WriteLine($"[AGENT] resume session {cfg.lastSessionId} (file {sz / 1024.0:F0}KB)");
+                }
+            }
+        }
+        if (agentShortcut && freshFlag)
+        {
+            Console.Error.WriteLine("[AGENT] --fresh -- clearing saved session");
+            SaveCodexAgentConfig(null, null);
+        }
+
         var preview = prompt.Length > 60 ? prompt[..57] + "..." : prompt;
         var flagsTag = tokens.Count > 0 ? $" [{string.Join(' ', tokens)}]" : "";
-        Console.Error.WriteLine($"[ASK] codex exec{flagsTag} -- \"{preview}\"");
+        Console.Error.WriteLine($"[ASK] codex {codexVerb}{flagsTag} -- \"{preview}\"");
 
         var psi = new ProcessStartInfo
         {
@@ -292,8 +328,9 @@ internal partial class Program
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
-        psi.ArgumentList.Add("exec");
+        psi.ArgumentList.Add(codexVerb);
         foreach (var t in tokens) psi.ArgumentList.Add(t);
+        if (resumeSessionId != null) psi.ArgumentList.Add(resumeSessionId); // resume <SESSION_ID> <PROMPT>
         psi.ArgumentList.Add(prompt);
         var question2 = prompt; // used by the archive writer below
 
@@ -333,6 +370,31 @@ internal partial class Program
             string stdout;
             lock (outLock) stdout = outSb.ToString();
             try { WriteAskMd("codex", question2, stdout); } catch { }
+
+            // On --agent success, extract "session id: <uuid>" from codex's
+            // stdout and persist it alongside the resolved JSONL path. Next
+            // --agent run will reuse the session unless --fresh or 3MB rotation.
+            if (agentShortcut && proc.ExitCode == 0)
+            {
+                try
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(stdout,
+                        @"session id:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    if (m.Success)
+                    {
+                        var sid = m.Groups[1].Value;
+                        var sessionFile = LocateCodexSessionFile(sid);
+                        SaveCodexAgentConfig(sid, sessionFile);
+                        if (sessionFile != null)
+                            Console.Error.WriteLine($"[AGENT] saved session {sid} -> {sessionFile}");
+                        else
+                            Console.Error.WriteLine($"[AGENT] saved session {sid} (file not yet discovered under ~/.codex/sessions)");
+                    }
+                }
+                catch { /* best-effort persistence */ }
+            }
+
             return proc.ExitCode;
         }
         catch (Exception ex)
@@ -342,42 +404,101 @@ internal partial class Program
         }
     }
 
+    // ---- codex.json persistence --------------------------------------
+    // Per-project agent config stored at <repo-root>/.wkappbot/codex.json.
+    // Fields:
+    //   agent_model       : default model for `ask codex --agent` (codex-mini)
+    //   last_session_id   : UUID of the most recent successful agent run
+    //   last_session_file : absolute path to that session's JSONL (under
+    //                       %USERPROFILE%\.codex\sessions\). Used for the
+    //                       3MB rotation check.
+    // Any read/write failure falls back to safe defaults. Load returns
+    // a tuple so the caller doesn't juggle a dozen ref params.
+    static (string model, string? lastSessionId, string? lastSessionFile) LoadCodexAgentConfig()
+    {
+        const string DefaultModel = "codex-mini";
+        try
+        {
+            var repo = DetectCodexRepoRoot();
+            var cfgPath = Path.Combine(repo, ".wkappbot", "codex.json");
+            if (!File.Exists(cfgPath)) return (DefaultModel, null, null);
+            var json = File.ReadAllText(cfgPath);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            string model = DefaultModel;
+            if (root.TryGetProperty("agent_model", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String)
+            {
+                var s = m.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) model = s!;
+            }
+            string? sid = null, sfile = null;
+            if (root.TryGetProperty("last_session_id", out var sidEl) && sidEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                sid = sidEl.GetString();
+            if (root.TryGetProperty("last_session_file", out var sfEl) && sfEl.ValueKind == System.Text.Json.JsonValueKind.String)
+                sfile = sfEl.GetString();
+            return (model, string.IsNullOrWhiteSpace(sid) ? null : sid,
+                           string.IsNullOrWhiteSpace(sfile) ? null : sfile);
+        }
+        catch { return (DefaultModel, null, null); }
+    }
+
+    // Rewrite codex.json preserving agent_model, updating session fields.
+    // Passing null/null clears the session fields (rotation path).
+    static void SaveCodexAgentConfig(string? sessionId, string? sessionFile)
+    {
+        try
+        {
+            var repo = DetectCodexRepoRoot();
+            var cfgDir = Path.Combine(repo, ".wkappbot");
+            Directory.CreateDirectory(cfgDir);
+            var cfgPath = Path.Combine(cfgDir, "codex.json");
+            var existing = LoadCodexAgentConfig(); // preserves model
+            var payload = new System.Text.Json.Nodes.JsonObject
+            {
+                ["agent_model"] = existing.model,
+                ["_note"] = "wkappbot ask codex --agent: agent_model + last session pointer. Edit agent_model freely. last_session_* managed automatically -- delete fields to force a fresh session.",
+            };
+            if (sessionId != null) payload["last_session_id"] = sessionId;
+            if (sessionFile != null) payload["last_session_file"] = sessionFile;
+            File.WriteAllText(cfgPath, payload.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n");
+        }
+        catch { /* persistence is best-effort */ }
+    }
+
+    // Find the JSONL file for a given codex session UUID under
+    // %USERPROFILE%\.codex\sessions\ (directory layout is year/month/day/*.jsonl).
+    // Returns null if not found -- next run will retry the lookup.
+    static string? LocateCodexSessionFile(string sessionId)
+    {
+        try
+        {
+            var home = Environment.GetEnvironmentVariable("USERPROFILE");
+            if (string.IsNullOrEmpty(home)) return null;
+            var sessionsDir = Path.Combine(home, ".codex", "sessions");
+            if (!Directory.Exists(sessionsDir)) return null;
+            return Directory.EnumerateFiles(sessionsDir, $"*{sessionId}*.jsonl", SearchOption.AllDirectories)
+                .FirstOrDefault();
+        }
+        catch { return null; }
+    }
+
     // Per-project agent model for `ask codex --agent`. Config persists at
     // <repo-root>/.wkappbot/codex.json with shape { "agent_model": "<name>" }.
     // Missing / unreadable / empty --> default "codex-mini". On first successful
     // read of a missing file, we also write the default so users can edit it.
     static string GetCodexAgentModel()
     {
-        const string DefaultModel = "codex-mini";
+        var cfg = LoadCodexAgentConfig();
+        // Seed the file on first access so users can edit it without having
+        // to synthesize the schema from memory.
         try
         {
             var repo = DetectCodexRepoRoot();
-            var cfgDir = Path.Combine(repo, ".wkappbot");
-            var cfgPath = Path.Combine(cfgDir, "codex.json");
-            if (File.Exists(cfgPath))
-            {
-                var json = File.ReadAllText(cfgPath);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("agent_model", out var m)
-                    && m.ValueKind == System.Text.Json.JsonValueKind.String)
-                {
-                    var val = m.GetString();
-                    if (!string.IsNullOrWhiteSpace(val)) return val!;
-                }
-            }
-            else
-            {
-                try
-                {
-                    Directory.CreateDirectory(cfgDir);
-                    File.WriteAllText(cfgPath,
-                        "{\n  \"agent_model\": \"" + DefaultModel + "\",\n  \"_note\": \"wkappbot ask codex --agent uses this model. Edit to override.\"\n}\n");
-                }
-                catch { /* best-effort seed; falling back to default is still fine */ }
-            }
+            var cfgPath = Path.Combine(repo, ".wkappbot", "codex.json");
+            if (!File.Exists(cfgPath)) SaveCodexAgentConfig(null, null);
         }
-        catch { /* any JSON / IO error -> default */ }
-        return DefaultModel;
+        catch { }
+        return cfg.model;
     }
 
     // Repo root for the --agent shortcut: prefer Eye pipe's CallerCwd when
