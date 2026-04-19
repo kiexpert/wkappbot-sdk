@@ -17,8 +17,14 @@
 //   - anything ending in .exe    -> treated as /IM
 //   - otherwise                  -> passed through as a pattern (substring)
 //
-// Multiple targets are joined with ';' (a11y grap OR syntax) so one call
-// evicts all of them in one a11y kill sweep.
+// Grap emission (classic taskkill semantics = exact name, exact pid):
+//   /PID N      -> regex:^\[N\]             (anchored to nodeKey "[pid]name.exe")
+//   /IM name.exe-> regex:^\[\d+\]name\.exe$ (exact image-name, not substring)
+// Anchored regex is required because a11y kill nodeKey is "[pid]proc.exe" and
+// the default PatternMatcher does substring -- bare "notepad" would over-match
+// "notepad++.exe" and "[1234]foo" would match "[12340]foo" etc.
+// Multiple targets dispatch a separate a11y kill per target (kill path does
+// not understand ';' OR-grap in pattern).
 
 namespace WKAppBot.CLI;
 
@@ -46,14 +52,14 @@ internal partial class Program
             if (flag == "PID" && i + 1 < args.Length)
             {
                 if (int.TryParse(args[++i], out var pid) && pid > 0)
-                    targets.Add($"{{pid:{pid}}}");
+                    targets.Add(GrapForPid(pid));
                 continue;
             }
             if (flag == "IM" && i + 1 < args.Length)
             {
                 var name = StripExe(args[++i]);
                 if (!string.IsNullOrWhiteSpace(name))
-                    targets.Add($"{{proc:'{EscapeSingleQuote(name)}'}}");
+                    targets.Add(GrapForImage(name));
                 continue;
             }
             if (flag == "FI")
@@ -76,9 +82,9 @@ internal partial class Program
 
             // Bare positional: digit-only -> pid, *.exe -> image name, else pattern.
             if (a.All(char.IsDigit) && int.TryParse(a, out var bpid) && bpid > 0)
-                targets.Add($"{{pid:{bpid}}}");
+                targets.Add(GrapForPid(bpid));
             else if (a.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                targets.Add($"{{proc:'{EscapeSingleQuote(StripExe(a))}'}}");
+                targets.Add(GrapForImage(StripExe(a)));
             else
                 targets.Add(a); // pattern / glob as-is
         }
@@ -96,25 +102,42 @@ internal partial class Program
         if (tree)
             Console.Error.WriteLine("[TASKKILL] /T noted -- wkappbot a11y kill terminates the matched process' child tree by default.");
 
-        var grap = string.Join(';', targets);
-        Console.Error.WriteLine($"[TASKKILL] -> wkappbot a11y kill \"{grap}\"");
-
-        // Delegate to the real a11y kill pipeline so focus/Eye/WhisperRing
-        // guards apply. --force suppresses the interactive ambiguity prompt
-        // which taskkill never had anyway.
-        return A11yCommand(new[] { "kill", grap, "--force" });
+        // Dispatch one a11y kill per target -- kill path does not parse ';'
+        // OR-grap, and classic taskkill reports per-target status anyway.
+        // Return 0 if any target killed successfully, else the last rc.
+        // --force suppresses the interactive ambiguity prompt which taskkill
+        // never had anyway.
+        int lastRc = 0;
+        int anyOk = 1;
+        foreach (var t in targets)
+        {
+            Console.Error.WriteLine($"[TASKKILL] -> wkappbot a11y kill \"{t}\"");
+            var rc = A11yCommand(new[] { "kill", t, "--force" });
+            lastRc = rc;
+            if (rc == 0) anyOk = 0;
+        }
+        return anyOk == 0 ? 0 : lastRc;
     }
+
+    // Emit anchored regex grap matching a11y kill nodeKey "[pid]proc.exe".
+    // Exact image-name match (not substring) -- classic taskkill /IM semantics.
+    static string GrapForImage(string name) =>
+        $"regex:^\\[\\d+\\]{System.Text.RegularExpressions.Regex.Escape(name)}\\.exe$";
+
+    // Anchored PID prefix -- prevents [12340] matching when asked for [1234].
+    static string GrapForPid(int pid) => $"regex:^\\[{pid}\\]";
 
     static int TaskkillUsage()
     {
         Console.WriteLine("Usage: taskkill [/F] [/T] {/PID <n> | /IM <name>}+");
         Console.WriteLine("       taskkill <pid-or-name> [more...]");
-        Console.WriteLine("Translates to: wkappbot a11y kill \"<grap>\" (grap = ; -joined targets)");
+        Console.WriteLine("Translates each target to: wkappbot a11y kill \"regex:...\" (anchored, exact).");
         Console.WriteLine("Supported flags: /F (force, default), /T (tree, noted), /PID, /IM. /FI filter not supported.");
-        Console.WriteLine("Bare positional: digits -> pid, *.exe -> image name, else treated as grap pattern.");
+        Console.WriteLine("Bare positional: digits -> pid, *.exe -> image name, else passed through as grap pattern.");
+        Console.WriteLine("Exact image-name match: /IM notepad.exe kills notepad.exe but NOT notepad++.exe.");
         Console.WriteLine("Examples:");
         Console.WriteLine("  taskkill /F /PID 1234             # kill by pid");
-        Console.WriteLine("  taskkill /IM notepad.exe          # kill all notepad instances");
+        Console.WriteLine("  taskkill /IM notepad.exe          # kill all notepad instances (exact)");
         Console.WriteLine("  taskkill 1234 5678                # multiple pids");
         Console.WriteLine("  taskkill notepad.exe chrome.exe   # multiple image names");
         return 1;
@@ -122,6 +145,4 @@ internal partial class Program
 
     static string StripExe(string s) =>
         s.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? s[..^4] : s;
-
-    static string EscapeSingleQuote(string s) => s.Replace("'", "\\'");
 }
