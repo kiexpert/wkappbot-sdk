@@ -103,9 +103,83 @@ internal partial class Program
             Console.Error.WriteLine($"  2. Use that grap:   wkappbot web {verb} \"{{proc:'chrome',hwnd:0x...}}\" [args]");
             Console.Error.WriteLine($"  Need a new tab?     wkappbot web open <url>   (then parse OK <grap> from stdout)");
             Console.Error.WriteLine($"  Study the policy:   wkappbot skill read web-command-cheatsheet");
+            if (!string.IsNullOrWhiteSpace(first) && LooksLikeUrl(first))
+                ShowClosestTabsForUrl(first!);
             return false;
         }
         return true;
+    }
+
+    // When the caller passed a URL (the banned path), probe the running Chrome
+    // for tabs that might match and emit them as a "did-you-mean" block so the
+    // agent can grab a real grap without extra trial-and-error. Silent on any
+    // failure -- this is pure UX courtesy, never blocks the rejection path.
+    static void ShowClosestTabsForUrl(string givenUrl)
+    {
+        try
+        {
+            var host = ExtractHost(givenUrl);
+            var port = 9222; // only the default-port case; --port <N> path is rare
+            var cdp = new CdpClient();
+            try { cdp.ConnectAsync(port).GetAwaiter().GetResult(); }
+            catch { Console.Error.WriteLine($"  (no Chrome on port {port} -- run `wkappbot web open {givenUrl}` to start one)"); cdp.Dispose(); return; }
+            var tabs = cdp.ListTabsAsync(port).GetAwaiter().GetResult();
+            cdp.Dispose();
+
+            if (tabs.Count == 0)
+            {
+                Console.Error.WriteLine($"  (Chrome running on port {port} but no tabs open)");
+                return;
+            }
+
+            // URL field is noisy (query params, fragments, trailing /, tracking
+            // params), so exact 100 is rare. Show only matches >= 40 so the
+            // agent isn't drowned in low-confidence host-substring hits. 20
+            // (host appears somewhere) is suppressed -- too many false
+            // positives (CDN URLs, redirects, dashboard-embedded iframes).
+            const int DISPLAY_THRESHOLD = 40;
+            var scored = tabs
+                .Select(t => new { Tab = t, Score = ScoreTabForUrl(t.Url ?? "", givenUrl, host) })
+                .Where(x => x.Score >= DISPLAY_THRESHOLD)
+                .OrderByDescending(x => x.Score)
+                .Take(3)
+                .ToList();
+
+            if (scored.Count == 0)
+            {
+                Console.Error.WriteLine($"  No open Chrome tab scores >={DISPLAY_THRESHOLD} for host '{host}'. Use `wkappbot web open {givenUrl}`.");
+                return;
+            }
+
+            Console.Error.WriteLine($"  Closest Chrome tab match(es) for host '{host}' (score>={DISPLAY_THRESHOLD}, 100=exact URL / 60=same host / 40=subdomain):");
+            foreach (var m in scored)
+            {
+                var tabIdShort = (m.Tab.Id ?? "").Length >= 8 ? m.Tab.Id![..8] : (m.Tab.Id ?? "");
+                var urlPrev = m.Tab.Url ?? "";
+                if (urlPrev.Length > 70) urlPrev = urlPrev[..67] + "...";
+                Console.Error.WriteLine($"    [score={m.Score}] {urlPrev}  targetId={tabIdShort}");
+            }
+            Console.Error.WriteLine($"  Get the full grap: wkappbot web tabs   (then copy the grap line for the matching tab)");
+        }
+        catch { /* best-effort courtesy */ }
+    }
+
+    static int ScoreTabForUrl(string tabUrl, string givenUrl, string host)
+    {
+        if (string.IsNullOrEmpty(tabUrl)) return 0;
+        if (string.Equals(tabUrl, givenUrl, StringComparison.OrdinalIgnoreCase)) return 100; // exact
+        var tabHost = ExtractHost(tabUrl);
+        if (!string.IsNullOrEmpty(host) && string.Equals(tabHost, host, StringComparison.OrdinalIgnoreCase)) return 60; // same host
+        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(tabHost)
+            && (tabHost.EndsWith("." + host, StringComparison.OrdinalIgnoreCase)
+             || host.EndsWith("." + tabHost, StringComparison.OrdinalIgnoreCase))) return 40; // subdomain
+        if (!string.IsNullOrEmpty(host) && tabUrl.Contains(host, StringComparison.OrdinalIgnoreCase)) return 20; // host appears somewhere
+        return 0;
+    }
+
+    static string ExtractHost(string url)
+    {
+        try { return new Uri(url).Host; } catch { return ""; }
     }
 
     static bool LooksLikeUrl(string s)
