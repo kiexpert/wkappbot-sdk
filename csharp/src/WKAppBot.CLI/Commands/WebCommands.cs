@@ -35,6 +35,15 @@ internal partial class Program
             LaunchAppBotEyeIfNeeded(mvPort);
         }
 
+        // Grap-required guard: these subcommands operate on a specific Chrome
+        // tab and must be pointed at it via grap, not a bare URL. If the first
+        // positional looks like a URL (or is missing), reject with a uniform
+        // error before dispatching. open/fetch/search/tabs/close/status/help
+        // are exempt -- they're either launchers, raw HTTP, enumerations, or
+        // CDP-port operations with no per-tab target.
+        if (IsGrapRequiredWebVerb(sub) && !RequireGrapFirstArg(sub, restArgs))
+            return 1;
+
         // Removed (use a11y instead): eval, click, dblclick, type, text, screenshot, wait, check, select, restore/show
         // Migration: a11y <action> "*Chrome*#<css-selector>" -- CSS auto-routed to CDP
         return sub switch
@@ -61,6 +70,54 @@ internal partial class Program
                        + $"  CSS selectors auto-routed to CDP (no --port needed)"),
             _ => Error($"Unknown web subcommand: {sub}")
         };
+    }
+
+    // Subcommands that must target a specific Chrome tab via grap, not a
+    // bare URL. Kept here as a single list so new verbs can opt in by name.
+    static bool IsGrapRequiredWebVerb(string sub) => sub switch
+    {
+        "navigate" or "nav" => true,
+        "html"              => true,
+        "url"               => true,
+        "title"             => true,
+        "capture"           => true,
+        "run"               => true,
+        "file"              => true,
+        _                   => false
+    };
+
+    // Common grap-required gate. Returns true when the first positional is a
+    // plausible grap (not a URL, not empty); returns false after printing a
+    // standardized [WEB:<VERB>] error so the caller exits 1 cleanly.
+    // Grap detection is deliberately permissive -- anything that is NOT a
+    // bare URL protocol (http / https / file / chrome / about / javascript)
+    // passes, trusting the downstream parser to surface syntax errors.
+    static bool RequireGrapFirstArg(string verb, string[] args)
+    {
+        var first = args.FirstOrDefault(a => !string.IsNullOrEmpty(a) && !a.StartsWith('-'));
+        if (string.IsNullOrWhiteSpace(first) || LooksLikeUrl(first))
+        {
+            Console.Error.WriteLine($"[WEB:{verb.ToUpper()}] grap required as first positional. URL-as-target is banned.");
+            Console.Error.WriteLine($"  Discover grap:  wkappbot a11y find \"*Chrome*\" --deep");
+            Console.Error.WriteLine($"  Example:        wkappbot web {verb} \"{{proc:'chrome',hwnd:0x...}}\" [args]");
+            Console.Error.WriteLine($"  To open a URL as a new tab instead, use `wkappbot web open <url>`.");
+            return false;
+        }
+        return true;
+    }
+
+    static bool LooksLikeUrl(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return false;
+        // Common URL schemes users might type. `chrome://` and `about:` also
+        // flagged so internal URLs don't sneak through the guard either.
+        return s.StartsWith("http://",     StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("https://",    StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("file://",     StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("chrome://",   StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("about:",      StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)
+            || s.StartsWith("data:",       StringComparison.OrdinalIgnoreCase);
     }
 
     static string MapRemovedWebCmd(string sub) => sub switch
