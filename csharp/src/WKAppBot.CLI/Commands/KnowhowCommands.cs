@@ -19,7 +19,6 @@ internal partial class Program
             "write" => KnowhowWriteCommand(args.Skip(1).ToArray()),
             "read" => KnowhowReadCommand(args.Skip(1).ToArray()),
             "web" => KnowhowWebWriteCommand(args.Skip(1).ToArray()),
-            "web-read" => KnowhowWebReadCommand(args.Skip(1).ToArray()),
             "web-list" => KnowhowWebListCommand(),
             "--help" or "-h" or "help" => KnowhowUsage(),
             _ => Error($"Unknown knowhow sub-command: {sub}")
@@ -202,36 +201,6 @@ internal partial class Program
         }
 
         return ok ? 0 : 1;
-    }
-
-    /// <summary>
-    /// wkappbot knowhow web-read &lt;domain&gt; [--selector "..."]
-    /// </summary>
-    static int KnowhowWebReadCommand(string[] args)
-    {
-        if (args.Length < 1)
-        {
-            Console.WriteLine("Usage: wkappbot knowhow web-read <domain> [--selector \"...\"]");
-            return 1;
-        }
-
-        var domain = args[0];
-        string? selector = null;
-
-        for (int i = 1; i < args.Length; i++)
-        {
-            if (args[i] == "--selector" && i + 1 < args.Length)
-                selector = args[++i];
-        }
-
-        var knowhow = WebKnowhow.ReadKnowhow(WebProfilesDir, domain, selector);
-        if (knowhow != null)
-            Console.WriteLine(knowhow);
-        else
-            Console.Error.WriteLine($"[KNOWHOW] No web knowhow found for {domain}" +
-                (selector != null ? $" selector={selector}" : ""));
-
-        return 0;
     }
 
     /// <summary>

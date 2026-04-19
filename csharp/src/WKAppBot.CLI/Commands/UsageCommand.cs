@@ -94,8 +94,6 @@ Usage:
       HTTP GET -- returns response body (no browser needed).
   web search <query> [--limit N]
       Google search via Chrome CDP (no API key required).
-  web read <url> [--max-chars N] [--speak]
-      Navigate URL + extract rendered text content.
   web html <url>
       Capture raw HTML of browser tab via CDP.
   file read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
@@ -163,7 +161,7 @@ Testing & Analysis:
 Utility:
   snapshot <window-title> [--tag N] [--depth N]
       One-shot diagnostic: UIA tree + screenshot + OCR.
-  knowhow write|read|web|web-read
+  knowhow write|read|web|web-list
       Record/read per-control automation notes.
   skill list|show|contribute|export|import
       Manage executable automation skills (YAML-like structured knowledge).

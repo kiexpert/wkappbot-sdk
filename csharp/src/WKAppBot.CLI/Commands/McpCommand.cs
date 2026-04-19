@@ -376,7 +376,7 @@ internal partial class Program
         "  file glob: *.file.* / *.eye.* / ** (all) - supports ';' OR. text filters: pure regex, multiple = AND\n" +
         "Filesystem: file-read (encoding-aware read), file-write (write with encoding; creates .bak backup by default), file-edit (search-replace with backup)\n" +
         "Agent session: agent-checkpoint (snapshot before risky change), agent-dump-patch (write unified patch + restore hints to repo root)\n" +
-        "Web: web-fetch (HTTP GET), web-search (Google via CDP), web-read (navigate+extract text)\n" +
+        "Web: web-fetch (HTTP GET only), web-search (Google via CDP). For Chrome tab content use `a11y read <grap>` -- URL-as-target is BANNED (use a11y find to discover the grap first).\n" +
         "Build/publish: prefer signaling Claude Code (Slack) to build. If Claude Code is offline, you may publish directly - always checkpoint first";
 
     static JsonNode HandleToolsList()

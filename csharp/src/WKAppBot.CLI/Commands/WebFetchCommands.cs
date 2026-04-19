@@ -169,75 +169,24 @@ internal partial class Program
     // -- web read -- navigate to URL and read visible text via a11y/CDP ------
     // Reads document.body.innerText (rendered text, no HTML) -- same as what user sees.
     // --speak: TTS-read the content with karaoke overlay.
-    static int WebReadCommand(string[] args)
-    {
-        string? url      = null;
-        int     port     = 9222;
-        bool    speak    = false;
-        int     maxChars = 20_000;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            if      (args[i] == "--port"      && i + 1 < args.Length) int.TryParse(args[++i], out port);
-            else if (args[i] == "--max-chars" && i + 1 < args.Length) int.TryParse(args[++i], out maxChars);
-            else if (args[i] == "--speak") speak = true;
-            else if (!args[i].StartsWith("--")) url = args[i];
-        }
-
-        if (string.IsNullOrEmpty(url))
-            return Error("Usage: web read <url> [--speak] [--max-chars N] [--port N]");
-
-        _cdpBrowserLock.Wait();
-        try
-        {
-            // Pass url as navigateUrl: ensures a dedicated web tab, never steals an AI chat tab
-            var cdp = ConnectCdp(port, withBar: false, navigateUrl: url);
-
-            Console.Error.WriteLine($"[READ] Navigating: {url}");
-            cdp.NavigateAsync(url).GetAwaiter().GetResult();
-
-            // Wait for main content via promise
-            var js = """
-                new Promise(resolve => {
-                    const getText = () => {
-                        // Prefer article/main content, fall back to body
-                        const main = document.querySelector('article, main, [role="main"], .post-content, .entry-content, #content');
-                        return (main || document.body)?.innerText?.trim() || '';
-                    };
-                    let tries = 0;
-                    const check = () => {
-                        const t = getText();
-                        if (t.length > 100 || ++tries >= 20) resolve(t);
-                        else setTimeout(check, 200);
-                    };
-                    check();
-                })
-                """;
-
-            var text = cdp.EvalAsync(js, awaitPromise: true).GetAwaiter().GetResult() ?? "";
-            if (text.StartsWith('"') && text.EndsWith('"'))
-                text = System.Text.Json.JsonSerializer.Deserialize<string>(text) ?? "";
-
-            var title = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
-            Console.Error.WriteLine($"[READ] {title}");
-            Console.Error.WriteLine($"[READ] {text.Length:N0} chars");
-
-            if (text.Length > maxChars)
-            {
-                Console.Error.WriteLine($"[READ] Truncated to {maxChars:N0} chars");
-                text = text[..maxChars];
-            }
-
-            Console.WriteLine(text);
-
-            if (speak && !string.IsNullOrWhiteSpace(text))
-                SpeakCommand([text]);
-
-            return 0;
-        }
-        catch (Exception ex) { return Error($"Read failed: {ex.Message}\nTip: make sure WebBot Chrome is running -- wkappbot web open"); }
-        finally { _cdpBrowserLock.Release(); }
-    }
+    // Deprecated: `web read` is no longer the right tool. Access page
+    // content through a11y read with a precise grap so the call is
+    // scoped to a specific tab/frame (no whole-document dump, no CDP
+    // tab-stealing risk). This stub prints the migration guidance and
+    // exits non-zero so scripts fail loudly rather than silently.
+    // Deprecated: `web read <url>` is GONE. URL-as-target is banned because
+    // it silently navigates the wrong tab / launches a new tab / steals focus.
+    // Always address an existing Chrome tab via GRAP (process + domain + hwnd)
+    // and use `a11y read` to extract rendered text from it.
+    //
+    // The error output below is the ONLY remaining user-facing mention of
+    // `web read` -- all other guidance (CLAUDE.md, AgentsPolicy, skills,
+    // MCP tool description) has been updated to route operators through
+    // `a11y find` + `a11y read` instead.
+    // `web read` was removed outright (URL-as-target banned -- silently
+    // retargets the wrong tab). The only remaining mention is the Error
+    // in WebCommand's dispatch switch that tells the caller what to do
+    // instead; no command function lives here any more.
 
     record SearchResult(string Title, string Url, string Snippet);
 

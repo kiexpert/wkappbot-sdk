@@ -118,7 +118,7 @@ FILESYSTEM (read-only, code exploration):
 WEB TOOLS:
   wkappbot web fetch <url> [--max-chars N]              -- HTTP GET
   wkappbot web search <query> [--limit N]               -- Google via Chrome CDP (no API key)
-  wkappbot web read <url> [--max-chars N]               -- navigate + rendered text
+  wkappbot a11y read "{proc:'chrome',domain:'example.com'}"  -- rendered text, GRAP ONLY (URL-as-target banned; Chrome tabs addressed via proc/domain/title/hwnd)
 
 AI DELEGATION:
   wkappbot ask gpt|gemini|claude "<question>" [file.png]
