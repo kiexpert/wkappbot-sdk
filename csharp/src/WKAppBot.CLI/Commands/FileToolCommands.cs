@@ -19,7 +19,27 @@ internal partial class Program
     static int FileCommand(string[] args)
     {
         if (args.Length == 0) return FileToolUsage();
-        return args[0].ToLowerInvariant() switch
+        var sub = args[0].ToLowerInvariant();
+        // Skill JSON guard: direct .skill.json edits desync the skill store
+        // (missing version bump, broken | step separator, CRLF encoding hits).
+        // AIs keep reaching for file write/edit on these because they lack a
+        // native `wkappbot skill` integration -- redirect them hard.
+        if (sub is "write" or "edit" or "open")
+        {
+            var pathArg = args.Skip(1).FirstOrDefault(a => !string.IsNullOrEmpty(a) && !a.StartsWith('-'));
+            if (pathArg != null && pathArg.EndsWith(".skill.json", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.Error.WriteLine($"[FILE:{sub.ToUpper()}] REFUSED -- never edit .skill.json files directly.");
+                Console.Error.WriteLine($"  Use wkappbot skill commands instead:");
+                Console.Error.WriteLine($"    wkappbot skill read <id>                                   # view current skill");
+                Console.Error.WriteLine($"    wkappbot skill contribute --app X --id Y --title ... --steps \"a|b\"  # create or update");
+                Console.Error.WriteLine($"    wkappbot skill search <keyword>                           # find existing");
+                Console.Error.WriteLine($"  Why: direct JSON edits miss version bumps, split steps on '|', and corrupt encoding.");
+                Console.Error.WriteLine($"  Study: wkappbot skill read skill-contribute-edit");
+                return 1;
+            }
+        }
+        return sub switch
         {
             "open"                   => FileOpenCommand(args[1..]),
             "read"                   => FileReadCommand(args[1..]),

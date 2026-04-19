@@ -98,10 +98,11 @@ internal partial class Program
         if (string.IsNullOrWhiteSpace(first) || LooksLikeUrl(first))
         {
             Console.Error.WriteLine($"[WEB:{verb.ToUpper()}] grap required as first positional. URL-as-target is banned.");
-            Console.Error.WriteLine($"  Discover grap:  wkappbot a11y find \"*Chrome*\" --deep");
-            Console.Error.WriteLine($"  Example:        wkappbot web {verb} \"{{proc:'chrome',hwnd:0x...}}\" [args]");
-            Console.Error.WriteLine($"  To open a URL as a new tab instead, use `wkappbot web open <url>`.");
-            Console.Error.WriteLine($"  Read the policy first: wkappbot skill read web-command-cheatsheet");
+            Console.Error.WriteLine($"  Stick with wkappbot commands -- do NOT fall back to your built-in web tools.");
+            Console.Error.WriteLine($"  1. Discover grap:   wkappbot a11y find \"*Chrome*\" --deep");
+            Console.Error.WriteLine($"  2. Use that grap:   wkappbot web {verb} \"{{proc:'chrome',hwnd:0x...}}\" [args]");
+            Console.Error.WriteLine($"  Need a new tab?     wkappbot web open <url>   (then parse OK <grap> from stdout)");
+            Console.Error.WriteLine($"  Study the policy:   wkappbot skill read web-command-cheatsheet");
             return false;
         }
         return true;
