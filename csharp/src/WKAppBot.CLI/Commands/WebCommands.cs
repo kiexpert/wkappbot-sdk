@@ -358,10 +358,19 @@ Options:
 
             // Prefer render widget HWND (tab-isolated PID); fall back to chrome root window
             var targetHwnd = renderHwnd != IntPtr.Zero ? renderHwnd : cdp.ChromeWindowHandle;
-            var cdpTitle   = cdp.GetTitleAsync().GetAwaiter().GetResult() ?? "";
+            // Title intentionally omitted from the emitted grap (BuildTargetJson5
+            // drops it internally). Humans read the human-friendly stderr log;
+            // the stdout "OK <grap>" line is the machine contract and must stay
+            // stable across title mutations.
+            var grap = WindowFinder.BuildTargetJson5(targetHwnd);
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Error.WriteLine($"[WEB] TARGET: {WindowFinder.BuildTargetJson5(targetHwnd, cdpTitle)}");
+            Console.Error.WriteLine($"[WEB] TARGET: {grap}");
             Console.ResetColor();
+
+            // Reconnection verification: the command has already connected
+            // via CDP, so "reconnect" is implicit. Emit OK <grap> on stdout
+            // so callers can parse it reliably without scraping log prefixes.
+            Console.WriteLine($"OK {grap}");
         }
         catch { }
     }

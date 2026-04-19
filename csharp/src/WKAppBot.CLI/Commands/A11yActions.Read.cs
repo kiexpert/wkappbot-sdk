@@ -113,11 +113,10 @@ internal partial class Program
                 "proc"    => true, // already in proc field
                 "cls"     => clsMatch.Success,
                 "context" => true, // internal heuristic (foreground host) -- not a real grap field
-                // Suppress title in find output: hwnd+pid+proc is sufficient to
-                // identify the window, and title mutates (tab changes, doc name,
-                // etc.) so including it in a copy-paste grap invites miss-match
-                // on the next invocation.
-                "title"   => true,
+                // title: ALLOWED only when the match itself came via the title
+                // field (user explicitly searched by title). In every other
+                // path title stays out of the grap because it mutates (tabs,
+                // dirty-doc '*', etc.).
                 _         => false
             };
             if (!alreadyCovered)

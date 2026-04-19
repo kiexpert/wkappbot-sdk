@@ -132,7 +132,11 @@ public static class WindowFinder
 
             // Token-AND match: plain multi-word patterns check each token in title+searchKey (order-independent)
             string matchedVia = "title";
-            string matchedSnippet = title;
+            // "매칭된 만큼만" -- the emitted title field should show only the
+            // pattern's literal core, not the whole window title. Titles
+            // mutate (tab switches, dirty-doc '*', etc.) so full-title
+            // capture invites miss-match on the next copy-paste call.
+            string matchedSnippet = ExtractPatternLiteral(titlePattern, title);
             bool matched = PatternMatcher.TokenMatchAny(titlePattern, title, searchKey);
             if (matched && !PatternMatcher.TokenMatchAny(titlePattern, title) && PatternMatcher.TokenMatchAny(titlePattern, procName))
             {
@@ -550,6 +554,30 @@ public static class WindowFinder
     /// Format: "[ClassName] Title (processName hwnd=XXXXXXXX WxH ★flags)"
     /// Used by FindWindows, WindowsCommand, and any grap-based search.
     /// </summary>
+    // Slice the pattern's literal down to what actually matches inside text.
+    // Strips leading/trailing '*'/'?' wildcards and the "regex:" prefix, then
+    // returns the core. If the core is empty (e.g. pattern was just "*"), we
+    // fall back to the first 30 chars of text. Cap at 30 chars so the grap
+    // never blows out from long window titles.
+    public static string ExtractPatternLiteral(string pattern, string text)
+    {
+        if (string.IsNullOrEmpty(pattern)) return TrimForGrap(text);
+        var p = pattern;
+        if (p.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
+            p = p["regex:".Length..];
+        // Take longest literal run between wildcards/regex-anchors.
+        var parts = p.Split(new[] { '*', '?', '|', ';' }, StringSplitOptions.RemoveEmptyEntries);
+        var core = parts.OrderByDescending(s => s.Length).FirstOrDefault() ?? "";
+        if (core.Length == 0) return TrimForGrap(text);
+        return TrimForGrap(core);
+    }
+
+    static string TrimForGrap(string s)
+    {
+        var t = s.Trim();
+        return t.Length > 30 ? t[..30] : t;
+    }
+
     public static string BuildSearchKey(IntPtr hWnd, string cls, string title,
         string procName, int w, int h, FocusSnapshot? focus = null)
     {
@@ -1322,7 +1350,12 @@ public static class WindowFinder
         sb.Append($"{{hwnd:0x{hWnd.ToInt64():X8},pid:{pid}");
         if (!string.IsNullOrEmpty(proc)) sb.Append($",proc:'{proc}'");
         if (!string.IsNullOrEmpty(domain)) sb.Append($",domain:'{domain}'");
-        sb.Append($",title:'{title}'");
+        // title intentionally omitted: titles mutate (tab switches, doc dirty
+        // '*', browser tab flips), so including it in a copy-paste grap would
+        // invite miss-match on the next invocation. hwnd+pid+proc+domain is
+        // the stable identity set.
+        _ = title; // keep the variable referenced so the compute path upstream
+                   // (used by inspect / logs elsewhere) doesn't warn about unused.
         if (!string.IsNullOrEmpty(cls)) sb.Append($",cls:'{cls}'");
         if (cid != 0) sb.Append($",cid:{cid}");
         if (!string.IsNullOrEmpty(url)) sb.Append($",url:'{url.Replace("'", "\\'")}'");
