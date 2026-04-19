@@ -197,6 +197,16 @@ internal partial class Program
     // archived alongside the other ask peers. Session continuity isn't
     // forwarded -- Codex's resume-last flow belongs to `wkappbot chat codex`,
     // not `ask codex` (ask is one-shot by design).
+    //
+    // Agent-mode pass-through: callers can prepend flags to the question
+    // that get forwarded to codex.exe. `--agent` is an ergonomic shortcut
+    // that injects `--full-auto -C <repo-root>` so Opus can delegate
+    // unattended work in one line:
+    //   wkappbot ask codex "--agent Refactor A11yCommand.cs into per-action partials"
+    // Supported pass-through flags (anything starting with `-` before the
+    // prompt text gets forwarded; flags needing a value are recognized):
+    //   -s/--sandbox, -a/--approval, --full-auto, -C/--cd, --add-dir,
+    //   --search, -m/--model, -p/--profile, -c (config override)
     static int AskCodexCli(string question, bool newSession)
     {
         var codexExe = ResolveCodexExe();
@@ -205,7 +215,64 @@ internal partial class Program
             Console.Error.WriteLine("[ASK] codex CLI not found on PATH or at %USERPROFILE%\\.codex\\.sandbox-bin\\codex.exe");
             return 127;
         }
-        Console.Error.WriteLine($"[ASK] codex exec -- \"{(question.Length > 60 ? question[..57] + "..." : question)}\"");
+
+        // Parse any leading --flag / -flag tokens off the question. We split
+        // on whitespace but respect simple-quoting: callers wrap the prompt
+        // in quotes via shell already (ask's question arg is the full
+        // joined string), so we only need to peel leading "-..." words.
+        var tokens = new List<string>();
+        var remainder = question;
+        while (true)
+        {
+            remainder = remainder.TrimStart();
+            if (remainder.Length == 0 || remainder[0] != '-') break;
+            // Stop peeling when we hit a bare "--" terminator (optional).
+            var nextSpace = remainder.IndexOf(' ');
+            string tok;
+            if (nextSpace < 0) { tok = remainder; remainder = ""; }
+            else { tok = remainder[..nextSpace]; remainder = remainder[(nextSpace + 1)..]; }
+            if (tok == "--") break;
+            tokens.Add(tok);
+            // If this flag expects a value, peel the next token as value.
+            if (tok is "-C" or "--cd" or "-s" or "--sandbox"
+                    or "-a" or "--approval" or "-c" or "--config"
+                    or "-p" or "--profile" or "-m" or "--model"
+                    or "--add-dir")
+            {
+                remainder = remainder.TrimStart();
+                if (remainder.Length == 0) break;
+                nextSpace = remainder.IndexOf(' ');
+                if (nextSpace < 0) { tokens.Add(remainder); remainder = ""; }
+                else { tokens.Add(remainder[..nextSpace]); remainder = remainder[(nextSpace + 1)..]; }
+            }
+        }
+        bool agentShortcut = tokens.Remove("--agent");
+        // --agent expands to --full-auto + -C <repo-root> (unless the caller
+        // already specified a competing sandbox / approval / cwd).
+        if (agentShortcut)
+        {
+            bool hasSandbox  = tokens.Any(t => t is "-s" or "--sandbox");
+            bool hasApproval = tokens.Any(t => t is "-a" or "--approval");
+            bool hasFullAuto = tokens.Any(t => t == "--full-auto");
+            bool hasCwd      = tokens.Any(t => t is "-C" or "--cd");
+            if (!hasFullAuto && !hasSandbox && !hasApproval) tokens.Insert(0, "--full-auto");
+            if (!hasCwd)
+            {
+                tokens.Add("-C");
+                tokens.Add(DetectCodexRepoRoot());
+            }
+        }
+
+        var prompt = remainder.Trim();
+        if (prompt.Length == 0)
+        {
+            Console.Error.WriteLine("[ASK] codex: prompt is empty after flag peel -- add the task text after flags.");
+            return 1;
+        }
+
+        var preview = prompt.Length > 60 ? prompt[..57] + "..." : prompt;
+        var flagsTag = tokens.Count > 0 ? $" [{string.Join(' ', tokens)}]" : "";
+        Console.Error.WriteLine($"[ASK] codex exec{flagsTag} -- \"{preview}\"");
 
         var psi = new ProcessStartInfo
         {
@@ -217,7 +284,9 @@ internal partial class Program
             StandardErrorEncoding = Encoding.UTF8,
         };
         psi.ArgumentList.Add("exec");
-        psi.ArgumentList.Add(question);
+        foreach (var t in tokens) psi.ArgumentList.Add(t);
+        psi.ArgumentList.Add(prompt);
+        var question2 = prompt; // used by the archive writer below
 
         try
         {
@@ -254,7 +323,7 @@ internal partial class Program
             stderrThread.Join();
             string stdout;
             lock (outLock) stdout = outSb.ToString();
-            try { WriteAskMd("codex", question, stdout); } catch { }
+            try { WriteAskMd("codex", question2, stdout); } catch { }
             return proc.ExitCode;
         }
         catch (Exception ex)
@@ -262,6 +331,27 @@ internal partial class Program
             Console.Error.WriteLine($"[ASK] codex CLI error: {ex.Message}");
             return 1;
         }
+    }
+
+    // Repo root for the --agent shortcut: prefer Eye pipe's CallerCwd when
+    // available (accurate per-project), else walk up from the process dir
+    // to find a .git anchor, else fall back to current directory.
+    static string DetectCodexRepoRoot()
+    {
+        try
+        {
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+            if (!string.IsNullOrEmpty(callerCwd) && Directory.Exists(Path.Combine(callerCwd, ".git")))
+                return callerCwd;
+        }
+        catch { }
+        var probe = Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
+        for (int i = 0; i < 12 && !string.IsNullOrEmpty(probe); i++)
+        {
+            if (Directory.Exists(Path.Combine(probe, ".git"))) return probe;
+            probe = Path.GetDirectoryName(probe);
+        }
+        return Environment.CurrentDirectory;
     }
 
     // Locate the most recently modified .wkappbot/ask/*-{ai}-*.md for the
