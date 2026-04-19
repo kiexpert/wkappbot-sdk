@@ -132,11 +132,9 @@ internal partial class Program
                 return;
             }
 
-            // URL field is noisy (query params, fragments, trailing /, tracking
-            // params), so exact 100 is rare. Show only matches >= 40 so the
-            // agent isn't drowned in low-confidence host-substring hits. 20
-            // (host appears somewhere) is suppressed -- too many false
-            // positives (CDN URLs, redirects, dashboard-embedded iframes).
+            // Score = common-prefix-length / max(tabUrl, givenUrl) * 100.
+            // Threshold 40 keeps out weak "same scheme only" matches while
+            // still surfacing same-host tabs where query params differ.
             const int DISPLAY_THRESHOLD = 40;
             var scored = tabs
                 .Select(t => new { Tab = t, Score = ScoreTabForUrl(t.Url ?? "", givenUrl, host) })
@@ -151,7 +149,7 @@ internal partial class Program
                 return;
             }
 
-            Console.Error.WriteLine($"  Closest Chrome tab match(es) for host '{host}' (score>={DISPLAY_THRESHOLD}, 100=exact URL / 60=same host / 40=subdomain):");
+            Console.Error.WriteLine($"  Closest Chrome tab match(es) for host '{host}' (score = common-prefix-chars / max-len * 100, shown >={DISPLAY_THRESHOLD}):");
             foreach (var m in scored)
             {
                 var tabIdShort = (m.Tab.Id ?? "").Length >= 8 ? m.Tab.Id![..8] : (m.Tab.Id ?? "");
@@ -164,17 +162,21 @@ internal partial class Program
         catch { /* best-effort courtesy */ }
     }
 
+    // Simple char-level score: longest common prefix / max length, as a
+    // percentage. Handles the common "same host + diverging path/query" shape
+    // naturally (two URLs sharing "https://example.com/" already score well
+    // even when query params differ). Case-insensitive.
     static int ScoreTabForUrl(string tabUrl, string givenUrl, string host)
     {
-        if (string.IsNullOrEmpty(tabUrl)) return 0;
-        if (string.Equals(tabUrl, givenUrl, StringComparison.OrdinalIgnoreCase)) return 100; // exact
-        var tabHost = ExtractHost(tabUrl);
-        if (!string.IsNullOrEmpty(host) && string.Equals(tabHost, host, StringComparison.OrdinalIgnoreCase)) return 60; // same host
-        if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(tabHost)
-            && (tabHost.EndsWith("." + host, StringComparison.OrdinalIgnoreCase)
-             || host.EndsWith("." + tabHost, StringComparison.OrdinalIgnoreCase))) return 40; // subdomain
-        if (!string.IsNullOrEmpty(host) && tabUrl.Contains(host, StringComparison.OrdinalIgnoreCase)) return 20; // host appears somewhere
-        return 0;
+        _ = host; // unused in the simplified scheme, kept for signature stability
+        if (string.IsNullOrEmpty(tabUrl) || string.IsNullOrEmpty(givenUrl)) return 0;
+        int prefix = 0;
+        var maxLen = Math.Min(tabUrl.Length, givenUrl.Length);
+        while (prefix < maxLen
+            && char.ToLowerInvariant(tabUrl[prefix]) == char.ToLowerInvariant(givenUrl[prefix]))
+            prefix++;
+        var denom = Math.Max(tabUrl.Length, givenUrl.Length);
+        return denom == 0 ? 0 : (int)(100.0 * prefix / denom);
     }
 
     static string ExtractHost(string url)
