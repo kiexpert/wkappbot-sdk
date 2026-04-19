@@ -334,10 +334,15 @@ internal partial class Program
             posY = y;
         }
 
-        // -- Duplicate Eye guard (no kill -- mutex-based yielding) --
-        // If another Eye with a window already exists and we're NOT a hot-swap replacement,
-        // log a warning and let the mutex guard in AppBotEyeCommand handle it.
-        // The alive-mutex 5s wait ensures exactly one Eye survives without killing.
+        // -- Duplicate Eye guard (unconditional eviction, admin-agnostic) --
+        // New Eye NEVER yields. For every other wkappbot-core Eye window we
+        // discover, PostMessage WM_CLOSE, wait up to 2s for the process to
+        // exit, then attempt Kill() unconditionally (Windows silently rejects
+        // on admin-protected pids -- we log that and move on). The mutex
+        // wait below then handles any residual race.
+        //
+        // Title detection accepts both historical forms: "AppBotEye" (current,
+        // console window) and "WK AppBot Eye" (older dashboard card).
         if (replacePid == 0)
         {
             int myPid = Environment.ProcessId;
@@ -346,27 +351,55 @@ internal partial class Program
             foreach (var proc in Process.GetProcessesByName(name))
             {
                 if (proc.Id == myPid) { proc.Dispose(); continue; }
-                bool isEye = false;
+                IntPtr eyeHwnd = IntPtr.Zero;
                 try
                 {
                     var sb2 = new System.Text.StringBuilder(256);
                     NativeMethods.EnumWindows((hwnd, _) =>
                     {
                         NativeMethods.GetWindowTextW(hwnd, sb2, sb2.Capacity);
-                        if (sb2.ToString() == "WK AppBot Eye")
+                        var t = sb2.ToString();
+                        if (t == "WK AppBot Eye" || t == "AppBotEye")
                         {
                             NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
-                            if ((int)pid == proc.Id) isEye = true;
+                            if ((int)pid == proc.Id) { eyeHwnd = hwnd; return false; }
                         }
-                        return !isEye;
+                        return true;
                     }, IntPtr.Zero);
                 }
                 catch { }
-                proc.Dispose();
-                if (isEye)
+
+                if (eyeHwnd == IntPtr.Zero) { proc.Dispose(); continue; }
+
+                // 1. Post WM_CLOSE -- graceful request, works across IL on
+                //    some configs, silently ignored on others.
+                try { NativeMethods.PostMessageW(eyeHwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero); } catch { }
+                Console.Error.WriteLine($"[EYE:EVICT] close posted pid={proc.Id} hwnd=0x{eyeHwnd.ToInt64():X8}");
+
+                // 2. Wait up to 2s for the process to exit.
+                var evictStart = DateTime.UtcNow;
+                bool exited = false;
+                while ((DateTime.UtcNow - evictStart).TotalMilliseconds < 2000)
                 {
-                    Console.Error.WriteLine($"[EYE:WARN] ! Existing Eye detected (PID={proc.Id}) -- yielding via mutex (no kill)");
+                    try { if (proc.HasExited) { exited = true; break; } } catch { break; }
+                    Thread.Sleep(100);
                 }
+
+                if (exited)
+                {
+                    Console.Error.WriteLine($"[EYE:EVICT] evicted pid={proc.Id}");
+                }
+                else
+                {
+                    // 3. Unconditional kill attempt. Windows rejects for admin-
+                    //    protected pids; we log and continue either way.
+                    bool killed = false;
+                    try { proc.Kill(entireProcessTree: true); killed = true; } catch { }
+                    Console.Error.WriteLine(killed
+                        ? $"[EYE:EVICT] kill ok pid={proc.Id}"
+                        : $"[EYE:EVICT] still-alive pid={proc.Id} (admin-protected) -- continuing to mutex wait");
+                }
+                proc.Dispose();
             }
         }
         else
