@@ -79,7 +79,10 @@ internal partial class Program
         IsRunningFromHostApp("claude", "WKAPPBOT_ASSUME_CLAUDE_APP");
 
     static string GetSlackPrefixForHostType(string? hostType) =>
-        ClaudePromptHelper.IsCodexHostType(hostType) ? SlackCodexPrefix : SlackClaudePrefix;
+        string.Equals(hostType, "codex-desktop", StringComparison.OrdinalIgnoreCase) ? SlackCodexAppPrefix
+        : string.Equals(hostType, "vscode-codex", StringComparison.OrdinalIgnoreCase) ? SlackCodexPrefix
+        : ClaudePromptHelper.IsCodexHostType(hostType) ? SlackCodexPrefix
+        : SlackClaudePrefix;
 
     static List<ClaudePromptHelper.PromptInfo> GetKnownPromptInfos()
     {
@@ -813,6 +816,7 @@ internal partial class Program
         {
             "claude-desktop" => SlackClaudeAppPrefix,
             "codex-desktop" => SlackCodexAppPrefix,
+            "vscode-codex" => SlackCodexPrefix,
             _ when ClaudePromptHelper.IsCodexHostType(hostType) => SlackCodexPrefix,
             _ => SlackClaudePrefix,
         };
@@ -852,14 +856,13 @@ internal partial class Program
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
 
         // Parent-chain-only detection: no AI in parent -> treat as human user.
-        // Prefix is determined by host type: vscode-extension -> short name, desktop app -> "앱" suffix.
-        // Codex: CODEX_HOME (VS Code ext) -> 코덳, parent "codex" process (desktop) -> 코덳앱.
+        // Prefix is determined by host type.
         // Claude: CLAUDE_CODE_ENTRYPOINT (VS Code ext) -> 클롣, parent "claude" process (desktop) -> 클롣앱.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return BuildSlackBotUsername(SlackCodexPrefix, instanceName, spaceBeforeBracket: false);
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT")))
             return BuildSlackBotUsername(SlackClaudePrefix, instanceName, spaceBeforeBracket: false);
-        if (IsRunningFromCodexDesktop())   // parent chain "codex" = Codex Desktop -> 코덳앱
+        if (IsRunningFromCodexDesktop())
             return BuildSlackBotUsername(SlackCodexAppPrefix, instanceName, spaceBeforeBracket: false);
         if (IsRunningFromClaudeDesktop())  // parent chain "claude" = Claude Desktop -> 클롣앱
             return BuildSlackBotUsername(SlackClaudeAppPrefix, instanceName, spaceBeforeBracket: false);

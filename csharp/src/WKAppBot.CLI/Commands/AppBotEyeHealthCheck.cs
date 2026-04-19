@@ -305,7 +305,7 @@ internal partial class Program
 
                 cards[cardKey] = new EyeParentCard
                 {
-                    ParentPid = s.ParentPid > 0 ? s.ParentPid : s.Pid,
+                    ParentPid = s.Pid,
                     ParentName = s.HostType,
                     ParentTitle = s.HostTitle,
                     HostType = s.HostType,
