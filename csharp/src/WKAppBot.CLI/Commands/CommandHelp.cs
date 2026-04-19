@@ -494,7 +494,7 @@ internal partial class Program
             web capture [-o out.png] [--port N]
             web url [--port N]  /  web title [--port N]
             web close [--port N]  /  web status [--port N]
-            web fetch <url>  /  web search <query>  /  web read <url>
+            web fetch <url>  /  web search <query>  (no web read -- use a11y read <grap>)
             web run <steps-file.txt> [--port N]
 
             Removed (use a11y instead -- CSS auto-routed to CDP):

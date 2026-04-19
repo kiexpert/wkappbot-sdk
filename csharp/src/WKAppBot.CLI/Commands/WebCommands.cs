@@ -25,7 +25,7 @@ internal partial class Program
         // Auto-launch AppBotEye for all CDP commands (not just "open")
         // "open" handles it internally, help/status don't need it
         if (sub != "open" && sub != "--help" && sub != "-h" && sub != "help"
-            && sub != "status" && sub != "fetch" && sub != "search" && sub != "read")
+            && sub != "status" && sub != "fetch" && sub != "search")
         {
             // Parse port from args (--port N pattern)
             int mvPort = 9222;
@@ -52,7 +52,7 @@ internal partial class Program
             "file"   => WebFileInputCommand(restArgs),
             "fetch"  => WebFetchCommand(restArgs),
             "search" => WebSearchCommand(restArgs),
-            "read"   => WebReadCommand(restArgs),
+            "read"   => Error("[WEB] 'web read' removed. URL-as-target is banned -- use `a11y read <grap>` on an existing Chrome tab instead."),
             "--help" or "-h" or "help" => WebUsage(),
             "eval" or "click" or "dblclick" or "double-click" or "type" or "text"
                 or "screenshot" or "wait" or "check" or "select" or "restore" or "show"
@@ -129,9 +129,9 @@ Batch:
       Each line is a web subcommand (open/navigate/html/capture/url/title/close).
 
 Fetch / Search:
-  fetch <url> [--max-chars N]   HTTP GET + extract text content.
+  fetch <url> [--max-chars N]   Raw HTTP GET + text extract (no JS, no CDP).
+                                For content from an open Chrome tab, use `a11y read <grap>` instead.
   search <query> [--limit N]    Web search.
-  read <url> [--max-chars N]    Article reader (main content extraction).
 
 Options:
   --port N   CDP port (default: 9222)
@@ -995,7 +995,6 @@ Options:
             }
 
             Console.ForegroundColor = ConsoleColor.DarkGray;
-            Console.WriteLine($"  read:  wkappbot knowhow web-read {domain}");
             Console.WriteLine($"  add:   wkappbot knowhow web {domain} \"lesson\" [--category \"...\"]");
             Console.WriteLine($"  file:  {sitePath}");
             Console.ResetColor();

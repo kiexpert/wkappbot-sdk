@@ -169,7 +169,6 @@ internal partial class Program
         if (tag.StartsWith("slack-"))     return "slack " + tag["slack-".Length..];
         if (tag.StartsWith("file-"))      return "file " + tag["file-".Length..];
         if (tag.StartsWith("web-fetch-")) return "web fetch " + tag["web-fetch-".Length..];
-        if (tag.StartsWith("web-read-"))  return "web read " + tag["web-read-".Length..];
         if (tag.StartsWith("web-"))       return "web " + tag["web-".Length..];
         if (tag.StartsWith("ask-"))       return "ask " + tag["ask-".Length..];
         if (tag.StartsWith("agent-"))     return "agent " + tag["agent-".Length..];

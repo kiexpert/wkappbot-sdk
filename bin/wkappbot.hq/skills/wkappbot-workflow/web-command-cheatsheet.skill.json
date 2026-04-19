@@ -1,29 +1,51 @@
-﻿{
-    "id":  "web-command-cheatsheet",
-    "app":  "wkappbot-workflow",
-    "title":  "web -- Fetch/Search/Read Cheatsheet",
-    "desc":  "wkappbot web tools for HTTP and browser access. fetch = raw HTTP GET. search = Google via Chrome CDP. read = navigate + rendered text (JS executed). search needs Chrome running.",
-    "steps":  [
-                  "FETCH: wkappbot web fetch \u003curl\u003e [--max-chars 5000] -- raw HTTP GET",
-                  "SEARCH: wkappbot web search \"query\" [--limit 10] -- Google via Chrome CDP",
-                  "READ: wkappbot web read \u003curl\u003e [--max-chars N] -- navigate + rendered text",
-                  "OPEN: wkappbot web open \u003curl\u003e -- open in browser (tab dedup by URL)",
-                  "! search requires Chrome running with CDP port open",
-                  "! read executes JS -- use for SPAs, NOT for static HTML (use fetch)"
-              ],
-    "tags":  [
-                 "web",
-                 "fetch",
-                 "search",
-                 "cdp",
-                 "http",
-                 "reference",
-                 "operator"
-             ],
-    "source_refs":  null,
-    "regression_script":  null,
-    "author":  "claude",
-    "created":  "2026-04-07T13:00:00Z",
-    "updated":  "2026-04-08T16:49:07.4964158Z",
-    "version":  "1.9"
+{
+  "id": "web-command-cheatsheet",
+  "app": "wkappbot-workflow",
+  "title": "web -- Fetch/Search/Open Cheatsheet (no web read -- URL-as-target banned)",
+  "desc": "wkappbot web tools for HTTP and browser access. fetch = raw HTTP GET. search = Google via Chrome CDP. open = launch/navigate tab. For reading content from a Chrome tab, use a11y read with a grap -- web read is REMOVED because URL-as-target silently retargets the wrong tab.",
+  "steps": [
+    "FETCH: wkappbot web fetch \u003Curl\u003E [--max-chars 5000] -- raw HTTP GET (no JS, no CDP)",
+    "SEARCH: wkappbot web search \u0022query\u0022 [--limit 10] -- Google via Chrome CDP",
+    "OPEN: wkappbot web open \u003Curl\u003E -- launch browser or navigate existing tab (tab dedup by URL)",
+    "READ (banned): wkappbot web read \u003Curl\u003E is REMOVED. URL-as-target silently retargets the wrong tab and steals focus. Use a11y read with a grap that pins a specific Chrome window instead",
+    "Correct read flow: a11y find \u0022*Chrome*\u0022 --deep to discover the grap, then a11y read \u0022{proc:\u0027chrome\u0027,domain:\u0027example.com\u0027,hwnd:0x...}\u0022 to extract rendered text",
+    "search requires Chrome running with CDP port open",
+    "fetch is for raw HTTP where no JS is needed (static HTML, API endpoints); anything needing JS rendering belongs to a11y read on an open tab"
+  ],
+  "tags": [
+    "web",
+    " fetch",
+    " search",
+    " open",
+    " cdp",
+    " http",
+    " reference",
+    " operator",
+    " banned-url-target"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/WebCommands.cs",
+      "line": null,
+      "pattern": "WebCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/WebFetchCommands.cs",
+      "line": null,
+      "pattern": "WebFetchCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yActions.Read.cs",
+      "line": null,
+      "pattern": "BuildFindGrap",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T13:00:00Z",
+  "updated": "2026-04-19T21:26:06.4126761Z",
+  "version": "1.10"
 }
