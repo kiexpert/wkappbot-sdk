@@ -1,0 +1,65 @@
+{
+  "id": "diagnostic-commands-cheatsheet",
+  "app": "wkappbot-workflow",
+  "title": "Diagnostic Commands Cheatsheet (whisper validate claude-usage eye tick)",
+  "desc": "Operator reference for diagnostic and introspection verbs: whisper (real-time speech plus offline pipeline), validate (scenario YAML syntax check), claude-usage (session ctx percent from JSONL size), eye tick (one-shot Eye probe). Use these to assess system health before running heavier automation.",
+  "steps": [
+    "whisper dictate --target GRAP --lang ko or en --confidence N --no-space --enter: live speech-to-text into focused control. Runs until Ctrl\u002BC. Use for hands-free HTS order entry",
+    "whisper study --batch N --for DURATION --engine gemini or gpt: batch-transcribe MP3 segments via AI. Use for auditing recorded sessions",
+    "whisper pipeline --loop or --once --for DURATION --script PATH: stable orchestration (study then auto-slice then phoneme harvest). --once runs a single scan; default loops until Ctrl\u002BC",
+    "whisper slice or clean or index with --split: offline-only segment processing. Run after pipeline produces new MP3s",
+    "whisper phoneme-search --db DIR --query FILE_OR_TEXT --top N: rank phoneme_db candidates. --no-harvest prevents incorporating the query back",
+    "validate SCENARIO_YAML: YAML scenario syntax check WITHOUT executing. Use before wkappbot run to catch indent or quote or action-name errors early",
+    "claude-usage: prints current session JSONL size and ctx percent (JSONL divided by 20MB). Handoff threshold at 8MB (40 percent) urgent at 10MB (50 percent). Integrated into eye tick output automatically",
+    "eye tick: one-shot Eye status query including ctx percent mode prompt source cache. IPC fast-path when Eye alive (typical total 40ms)",
+    "--sudo eye tick: same as eye tick but via admin Eye pipe. Shows admin-side state (orphan count hot-swap defer) and helps diagnose when admin Eye itself is stuck",
+    "windows FILTER --deep --process NAME --cmd SUBSTR: enumerate top-level windows. Most flexible introspection -- use to confirm a target exists before automating",
+    "logcat REGEX --past Nh -f --timeout N --json: tail wkappbot-core logs. -f follows new writes (like tail -f). --past looks back N hours",
+    "gc PATTERN --days N --sweep: cleanup stale logs cache runtime files. --sweep is destructive -- review first without the flag",
+    "skill audit --app X: cross-check all skills for stale source_refs that no longer match code. Run periodically after refactors",
+    "skill verify ID: check a single skill source_refs still match the code. Use after editing a ref target file",
+    "Diagnostic decision tree: system feels stuck then start with eye tick (is Eye alive?) then claude-usage (session getting full?) then windows (target exists?) then logcat -f (what is the core saying right now)",
+    "Healthy baseline: eye tick total under 100ms ctx under 40 percent windows enumerates in under 500ms. Deviations from these baselines signal which layer needs attention"
+  ],
+  "tags": [
+    "diagnostic",
+    " whisper",
+    " validate",
+    " claude-usage",
+    " eye",
+    " cheatsheet",
+    " operator",
+    " introspection"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/WhisperCommand.cs",
+      "line": null,
+      "pattern": "WhisperCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/AppBotProgramInfra.cs",
+      "line": null,
+      "pattern": "ValidateCommand",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yClaudeUsage.cs",
+      "line": null,
+      "pattern": "A11yClaudeUsage",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
+      "line": null,
+      "pattern": "EyeTick",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T15:28:20.2976444Z",
+  "updated": "2026-04-19T15:28:20.2976551Z",
+  "version": "1.0"
+}
