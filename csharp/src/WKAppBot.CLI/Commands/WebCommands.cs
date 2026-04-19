@@ -149,7 +149,7 @@ internal partial class Program
                 return;
             }
 
-            Console.Error.WriteLine($"  Closest Chrome tab match(es) for host '{host}' (score = common-prefix-chars / max-len * 100, shown >={DISPLAY_THRESHOLD}):");
+            Console.Error.WriteLine($"  Closest Chrome tab match(es) for host '{host}' (score = longest-common-substring / max-len * 100, shown >={DISPLAY_THRESHOLD}):");
             foreach (var m in scored)
             {
                 var tabIdShort = (m.Tab.Id ?? "").Length >= 8 ? m.Tab.Id![..8] : (m.Tab.Id ?? "");
@@ -162,21 +162,34 @@ internal partial class Program
         catch { /* best-effort courtesy */ }
     }
 
-    // Simple char-level score: longest common prefix / max length, as a
-    // percentage. Handles the common "same host + diverging path/query" shape
-    // naturally (two URLs sharing "https://example.com/" already score well
-    // even when query params differ). Case-insensitive.
+    // Char-level score based on the longest common substring (LCS) between
+    // the two URLs, divided by max length, as a percentage. LCS (not prefix)
+    // so subdomain insertions like https://www.example.com vs https://example.com
+    // still score well on the shared "example.com" chunk. Case-insensitive.
+    // O(n*m) DP; URLs rarely exceed a few hundred chars so cost is trivial.
     static int ScoreTabForUrl(string tabUrl, string givenUrl, string host)
     {
-        _ = host; // unused in the simplified scheme, kept for signature stability
+        _ = host; // kept in signature in case future scoring re-adds host weighting
         if (string.IsNullOrEmpty(tabUrl) || string.IsNullOrEmpty(givenUrl)) return 0;
-        int prefix = 0;
-        var maxLen = Math.Min(tabUrl.Length, givenUrl.Length);
-        while (prefix < maxLen
-            && char.ToLowerInvariant(tabUrl[prefix]) == char.ToLowerInvariant(givenUrl[prefix]))
-            prefix++;
-        var denom = Math.Max(tabUrl.Length, givenUrl.Length);
-        return denom == 0 ? 0 : (int)(100.0 * prefix / denom);
+        int n = tabUrl.Length, m = givenUrl.Length, best = 0;
+        var prev = new int[m + 1];
+        var curr = new int[m + 1];
+        for (int i = 1; i <= n; i++)
+        {
+            for (int j = 1; j <= m; j++)
+            {
+                if (char.ToLowerInvariant(tabUrl[i - 1]) == char.ToLowerInvariant(givenUrl[j - 1]))
+                {
+                    curr[j] = prev[j - 1] + 1;
+                    if (curr[j] > best) best = curr[j];
+                }
+                else curr[j] = 0;
+            }
+            (prev, curr) = (curr, prev);
+            Array.Clear(curr, 0, curr.Length);
+        }
+        var denom = Math.Max(n, m);
+        return denom == 0 ? 0 : (int)(100.0 * best / denom);
     }
 
     static string ExtractHost(string url)
