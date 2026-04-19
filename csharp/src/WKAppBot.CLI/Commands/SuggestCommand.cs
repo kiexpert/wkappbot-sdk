@@ -23,6 +23,8 @@ internal partial class Program
             return SuggestMergeCommand(args[1..]);
         if (args.Length > 0 && args[0] is "show" or "get" or "view")
             return SuggestShowCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "delegate")
+            return SuggestDelegateCommand(args[1..]);
 
         // Guard: single lowercase word that looks like an unrecognized subcommand -> error instead of saving as text.
         // Prevents accidental "suggest show 19" -> garbage JSONL entry.
@@ -438,6 +440,82 @@ internal partial class Program
     }
 
     /// <summary>suggest show &lt;n|ts&gt; -- show full content of suggestion by list number or ts prefix.</summary>
+    // Hand off a suggest entry to a local AI CLI for analysis + fix proposal.
+    // Designed for the Codex CLI's local-code strength but symmetric with
+    // claude-cli. Does NOT resolve the suggest -- that still requires the
+    // existing evidence + skill + confirmation guard. This is the triage
+    // step: "look at this backlog item and tell me if it's actionable".
+    static int SuggestDelegateCommand(string[] args)
+    {
+        if (args.Length == 0 || args[0] is "-h" or "--help")
+        {
+            Console.WriteLine("Usage: wkappbot suggest delegate <n|ts> [--to codex|claude]");
+            Console.WriteLine("  Hand off a suggest to a local AI CLI for analysis + fix proposal.");
+            Console.WriteLine("  Default: codex (strong at local code work).");
+            Console.WriteLine("  Does NOT resolve the suggest -- use `suggest resolve` after manual verification.");
+            return 0;
+        }
+
+        var query = args[0];
+        var target = "codex";
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--to" && i + 1 < args.Length)
+                target = args[i + 1].ToLowerInvariant();
+        }
+
+        var jsonlPath = Path.Combine(DataDir, "suggestions.jsonl");
+        if (!File.Exists(jsonlPath))
+        {
+            Console.Error.WriteLine("[SUGGEST] No suggestions.jsonl");
+            return 1;
+        }
+
+        var lines = File.ReadAllLines(jsonlPath).Where(l => !string.IsNullOrWhiteSpace(l)).ToList();
+        var entries = lines
+            .Select(l => System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(l)!)
+            .Where(e => e["review_status"]?.GetValue<string>() != "done"
+                     && e["status"]?.GetValue<string>() != "done")
+            .ToList();
+
+        System.Text.Json.Nodes.JsonNode? entry = null;
+        if (int.TryParse(query, out var n) && n >= 1 && n <= entries.Count)
+            entry = entries[n - 1];
+        else
+            entry = entries.FirstOrDefault(e => (e["ts"]?.GetValue<string>() ?? "").StartsWith(query));
+
+        if (entry == null)
+        {
+            Console.Error.WriteLine($"[SUGGEST] Not found: {query}");
+            Console.Error.WriteLine($"  Run 'suggest list' to see numbers. Total: {entries.Count}");
+            return 1;
+        }
+
+        var ts = entry["ts"]?.GetValue<string>() ?? "";
+        var text = entry["text"]?.GetValue<string>() ?? "";
+        var title = entry["title"]?.GetValue<string>() ?? "";
+
+        var prompt =
+$@"You are reviewing a backlog suggest/bug-report for the WKAppBot repo at D:/GitHub/WKAppBot/.
+Read the suggest below, investigate the relevant source if you have repo access, and respond with ONE of:
+  (a) A concrete code fix: file path, line range, current-vs-new diff, and a 1-line rationale.
+  (b) A clarifying question if the suggest is ambiguous.
+  (c) ""Not actionable: <reason>"" if the issue is already fixed, out of scope, or unreproducible.
+Keep the response tight (under 250 words). No preamble.
+
+--- SUGGEST {ts} ---
+{(string.IsNullOrEmpty(title) ? "" : $"TITLE: {title}\n")}{text}
+---";
+
+        Console.Error.WriteLine($"[SUGGEST:DELEGATE] ts={ts} -> {target}");
+        return target switch
+        {
+            "codex" => AskCodexCli(prompt, newSession: true),
+            "claude" or "claude-cli" => AskClaudeCli(prompt, newSession: true),
+            _ => Error($"Unknown --to target: {target} (use codex or claude)")
+        };
+    }
+
     static int SuggestShowCommand(string[] args)
     {
         if (args.Length == 0 || args[0] is "-h" or "--help")
