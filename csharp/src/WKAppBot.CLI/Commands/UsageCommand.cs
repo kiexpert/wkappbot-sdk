@@ -358,7 +358,7 @@ Data Directory:
     }
 
     // Busybox aliases to auto-create as symlinks next to wkappbot.exe
-    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap", "wkedit" };
+    static readonly string[] BusyboxAliases = { "a11y", "wka11y", "grep", "grap", "wkedit", "taskkill" };
 
     static void PrintGrapHelp(string alias)
     {

@@ -35,6 +35,7 @@ partial class Program
         ("scan",   "scan"),
         ("wkedit", "file"),   // wkedit.exe -> file edit (busybox-style)
         ("wkchat", "chat"),   // wkchat.exe -> chat REPL (ConPTY + Enter intercept)
+        ("taskkill", "taskkill"), // taskkill.exe -> a11y kill compat (translates /F /PID /IM)
     };
 
     // Aliases that bypass Launcher and point directly to Core (no relay needed)
