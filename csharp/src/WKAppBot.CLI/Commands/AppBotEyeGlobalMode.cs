@@ -369,7 +369,14 @@ internal partial class Program
                         continue;
                     }
                 }
-                catch { /* cmdline lookup may fail for protected pids; fall through to conservative skip below */ }
+                catch
+                {
+                    // cmdline lookup fails for elevated processes (access denied).
+                    // A process we can't inspect is likely admin Eye -- skip it conservatively.
+                    Console.Error.WriteLine($"[EYE:EVICT] skip pid={proc.Id} (cmdline inaccessible -- likely elevated)");
+                    proc.Dispose();
+                    continue;
+                }
 
                 IntPtr eyeHwnd = IntPtr.Zero;
                 try
