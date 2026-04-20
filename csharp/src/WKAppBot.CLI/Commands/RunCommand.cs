@@ -73,30 +73,49 @@ internal partial class Program
         }
 
         var key = args[0].ToLowerInvariant();
-        if (!_builtInExecProfiles.TryGetValue(key, out var profile))
-        {
-            Console.Error.WriteLine($"[EXEC] Unknown key: {key}. Try `wkappbot exec list` or `--register`.");
-            return 1;
-        }
+        ExecProfile? profile = null;
+        string? exePath = null;
 
-        // Resolve exe path: saved profile > Program Files scan > error out
-        var store = LoadRunProfileStore();
-        string? exePath = store.Paths.TryGetValue(key, out var saved) && File.Exists(saved) ? saved : null;
-        if (exePath == null)
+        if (_builtInExecProfiles.TryGetValue(key, out var builtIn))
         {
-            exePath = ScanForExe(profile.ExeName);
-            if (exePath != null)
+            profile = builtIn;
+            // Resolve exe path: saved profile > Program Files scan > error out
+            var store = LoadRunProfileStore();
+            exePath = store.Paths.TryGetValue(key, out var saved) && File.Exists(saved) ? saved : null;
+            if (exePath == null)
             {
-                store.Paths[key] = exePath;
-                SaveRunProfileStore(store);
-                Console.Error.WriteLine($"[EXEC] Discovered + saved: {key} -> {exePath}");
+                exePath = ScanForExe(profile.ExeName);
+                if (exePath != null)
+                {
+                    store.Paths[key] = exePath;
+                    SaveRunProfileStore(store);
+                    Console.Error.WriteLine($"[EXEC] Discovered + saved: {key} -> {exePath}");
+                }
+            }
+            if (exePath == null || !File.Exists(exePath))
+            {
+                Console.Error.WriteLine($"[EXEC] {profile.DisplayName} exe not found. Register explicitly:");
+                Console.Error.WriteLine($"  wkappbot run --register {key} \"C:\\Path\\To\\{profile.ExeName}\"");
+                return 1;
             }
         }
-        if (exePath == null || !File.Exists(exePath))
+        else
         {
-            Console.Error.WriteLine($"[EXEC] {profile.DisplayName} exe not found. Register explicitly:");
-            Console.Error.WriteLine($"  wkappbot run --register {key} \"C:\\Path\\To\\{profile.ExeName}\"");
-            return 1;
+            // Direct-path or PATH-resolved fallback: args[0] is either a raw exe
+            // path (e.g. "C:/bin/foo.exe") or a bare name (e.g. "notepad") that
+            // RunCommand already resolved via TryResolveExecutable before
+            // delegating here. Build an ad-hoc ExecProfile so the rest of the
+            // pipeline (launch, watch, loading-trace) still applies.
+            exePath = TryResolveExecutable(args[0]);
+            if (exePath == null || !File.Exists(exePath))
+            {
+                Console.Error.WriteLine($"[EXEC] Unknown key: {key}. Not a preset, not a registered path, not a resolvable executable.");
+                Console.Error.WriteLine("  Try `wkappbot exec list` or `--register`, or pass an absolute .exe path.");
+                return 1;
+            }
+            var display = Path.GetFileNameWithoutExtension(exePath);
+            profile = new ExecProfile(display, Path.GetFileName(exePath), new[] { "*" + display + "*" });
+            Console.Error.WriteLine($"[EXEC] ad-hoc launch: {exePath} (no preset)");
         }
 
         // Flag parse (must happen before the "already running" adopt branch
@@ -835,6 +854,58 @@ internal partial class Program
     }
 
     // -- Helpers -------------------------------------------------------------
+
+    /// <summary>
+    /// Resolve a user-provided executable reference to an absolute exe path.
+    /// Accepts: absolute/relative paths that exist, bare names found on %PATH%
+    /// with any %PATHEXT% extension (default .exe). Returns null if nothing
+    /// resolves -- caller should fall through to a usage error rather than
+    /// pretending the arg is a preset key.
+    /// Used by RunCommand polymorphic dispatch and ExecCommand ad-hoc fallback
+    /// so `wkappbot run notepad` or `wkappbot exec C:/bin/foo.exe` both work.
+    /// </summary>
+    static string? TryResolveExecutable(string arg)
+    {
+        if (string.IsNullOrWhiteSpace(arg)) return null;
+
+        // Direct path (absolute or with separator) -- verify + normalize.
+        if (arg.Contains('/') || arg.Contains('\\') || Path.IsPathRooted(arg))
+        {
+            if (File.Exists(arg)) return Path.GetFullPath(arg);
+            // Also try appending .exe for rooted bare filename
+            if (!arg.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            {
+                var withExe = arg + ".exe";
+                if (File.Exists(withExe)) return Path.GetFullPath(withExe);
+            }
+            return null;
+        }
+
+        // Bare name -- walk %PATH% and %PATHEXT%
+        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+        var pathExtEnv = Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE";
+        var extensions = pathExtEnv.Split(';', StringSplitOptions.RemoveEmptyEntries);
+        bool alreadyHasExt = Path.HasExtension(arg);
+
+        foreach (var dir in pathEnv.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = dir.Trim().Trim('"');
+            if (string.IsNullOrEmpty(trimmed)) continue;
+            // Exact-as-given first
+            var direct = Path.Combine(trimmed, arg);
+            if (File.Exists(direct)) return Path.GetFullPath(direct);
+            // Then try with each PATHEXT extension (skip if user already provided one)
+            if (!alreadyHasExt)
+            {
+                foreach (var ext in extensions)
+                {
+                    var candidate = Path.Combine(trimmed, arg + ext);
+                    if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+                }
+            }
+        }
+        return null;
+    }
 
     static string? ScanForExe(string exeName)
     {
