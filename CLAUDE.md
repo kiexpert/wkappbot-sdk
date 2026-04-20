@@ -103,6 +103,9 @@ Eye ↔ MCP worker(Core) JSON-RPC over pipe. a11y/UIA isolated in separate proce
 - **Launcher quiet-swap**: launcher watches only original `wkappbot-core.exe` path change. `.new.exe` staging/rename is Eye's responsibility.
 - **Admin-first swap**: if admin endpoint is alive, defer normal core swap; retry only after admin exits with newer stamp.
 - **Failed-stamp skip**: a core `mtime` stamp that failed once is not retried until a newer file arrives.
+- **Pipe separation (v6.0)**: normal Eye → `wkappbot_eye_ipc` (tick IPC only). Admin Eye → `wkappbot_elevated` (command proxy only). Must not mix or normal Eye intercepts elevated connections.
+- **Proxy encoding**: admin Eye subprocess stdout/stderr captured as UTF-8 (`StandardOutputEncoding=UTF8` on `ProcessStartInfo`).
+- **Argv recovery**: `TryRecoverUtf8Argv()` at Main() entry -- detects CreateProcessA UTF-8 bytes via `GetCommandLineA()` strict UTF-8 check, re-parses with `CommandLineToArgvW`.
 - **CDP ask prompt pump**: triad/cross-prompt uses per-page singleton prompt pump. Chunks appended then sent on 1s idle; page key = `scope + targetId + editorSelector`.
 - **Attachment transaction lock**: if CDP attachment present, acquire page lock and upload attachment first. Chunks arriving during lock are queued; after upload completes, append queue text + immediate flush, then unlock.
 
