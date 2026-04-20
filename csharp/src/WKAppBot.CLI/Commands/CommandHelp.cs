@@ -542,7 +542,7 @@ internal partial class Program
 
         ["knowhow"] = "knowhow [show|list] [--app <proc>] [--action <action>]\nView recorded automation knowhow from experience DB.",
 
-        ["run"] = "run <scenario.yaml> [--dry-run]\nExecute YAML automation scenario.",
+        ["run"] = "run <scenario.yaml | exec-key | exe-path | bare-exe>\nPolymorphic: .yaml/.yml/.xmf = scenario; preset key (hero4/calc/notepad/...) = exec; raw exe path OR PATH-resolvable name = ad-hoc exec launch.",
 
         ["validate"] = "validate <scenario.yaml>\nValidate YAML scenario syntax without executing.",
 

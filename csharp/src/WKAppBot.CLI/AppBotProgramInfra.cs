@@ -195,18 +195,18 @@ internal partial class Program
         if (args.Length == 0)
             return Error("Usage: wkappbot run <scenario.yaml | exec-key>  -- scenario file OR managed-exe key (hero4|heroglobal|xingq|kiwoom|tuhon|<custom>)");
 
-        // Branch on first arg shape:
-        //   - File that exists on disk (abs or relative) -> scenario YAML
-        //   - Known managed-exe key (built-in or registered) -> exec launcher
-        //   - Scenario-style extension (.yaml/.yml/.xmf) even if missing -> scenario (better error message)
-        //   - Otherwise treat as scenario path so existing error path runs
+        // Branch on first arg shape (priority order):
+        //   1. YAML-ish extension (.yaml/.yml/.xmf) -> scenario YAML runner (even if missing -> better error)
+        //   2. Known managed-exe key (built-in or registered) -> exec launcher
+        //   3. Resolvable executable (direct path OR PATH-searched) -> exec launcher with raw path
+        //   4. Otherwise fall through to scenario so the existing error path runs
+        // Bare path/filename (no yaml extension, no match) no longer auto-treated as scenario --
+        // `wkappbot run mklink` now exec-branches if it resolves, instead of confusing YAML parse error.
         var first = args[0];
-        bool looksLikeScenario = File.Exists(first)
-            || first.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
+        bool isScenarioYaml = first.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase)
             || first.EndsWith(".yml",  StringComparison.OrdinalIgnoreCase)
-            || first.EndsWith(".xmf",  StringComparison.OrdinalIgnoreCase)
-            || first.Contains('/') || first.Contains('\\');
-        if (!looksLikeScenario)
+            || first.EndsWith(".xmf",  StringComparison.OrdinalIgnoreCase);
+        if (!isScenarioYaml)
         {
             var key = first.ToLowerInvariant();
             bool isExecKey = _builtInExecProfiles.ContainsKey(key)
@@ -215,6 +215,16 @@ internal partial class Program
             {
                 Console.Error.WriteLine($"[RUN] '{first}' matches exec key -> dispatching to exec launcher");
                 return ExecCommand(args);
+            }
+            // PATH / direct-path resolution: bare name like `notepad` or full path like `C:/bin/foo.exe`.
+            var resolved = TryResolveExecutable(first);
+            if (resolved != null)
+            {
+                Console.Error.WriteLine($"[RUN] '{first}' resolved to exe '{resolved}' -> dispatching to exec launcher");
+                var execArgs = new string[args.Length];
+                execArgs[0] = resolved;
+                Array.Copy(args, 1, execArgs, 1, args.Length - 1);
+                return ExecCommand(execArgs);
             }
         }
 
