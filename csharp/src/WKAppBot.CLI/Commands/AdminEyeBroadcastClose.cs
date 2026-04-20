@@ -62,28 +62,38 @@ internal static class AdminEyeBroadcastClose
             Console.Error.WriteLine($"[EYE:ADMIN-CLOSE] graceful signal skipped: {ex.Message}");
         }
 
-        // -- Phase 2: force kill other admin Eye processes --
+        // -- Phase 2: force kill OTHER ADMIN EYE processes (not random wkappbot-core) --
         // Bootstrap path -- when old admin Eye was built WITHOUT the broadcast listener
-        // (e.g. first upgrade), Phase 1 has no effect. We are running as admin so
-        // we can terminate other elevated wkappbot-core processes.
+        // (e.g. first upgrade), Phase 1 has no effect. We are running as admin so we can
+        // terminate other admin processes. Strictly filter by cmdline `eye --elevated`
+        // so user Eye, MCP worker, whisper-ring, screensaver, analyze-hack etc. are NOT
+        // touched -- the previous "collateral on user Eye is acceptable" policy killed
+        // the entire user-session tree whenever a pipe zombie extended Phase 1.
         try
         {
             int me = Environment.ProcessId;
             int killed = 0;
+            int skipped = 0;
             foreach (var p in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
             {
                 try
                 {
                     if (p.Id == me) continue;
-                    // Best-effort: kill any other wkappbot-core; caller uses this only when new admin
-                    // Eye is actively taking over, so collateral on user Eye is acceptable (user Eye will
-                    // be respawned by the guardian with --sudo marker inherited).
+                    string cmd = "";
+                    try { cmd = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                    bool isAdminEye = cmd.Contains(" eye --elevated", StringComparison.OrdinalIgnoreCase)
+                                   || cmd.EndsWith(" eye --elevated", StringComparison.OrdinalIgnoreCase);
+                    if (!isAdminEye)
+                    {
+                        skipped++;
+                        continue;
+                    }
                     p.Kill(entireProcessTree: false);
                     killed++;
                 }
                 catch { /* ignore -- may be protected or already gone */ }
             }
-            Console.Error.WriteLine($"[EYE:ADMIN-CLOSE] force-killed {killed} other wkappbot-core process(es)");
+            Console.Error.WriteLine($"[EYE:ADMIN-CLOSE] force-killed {killed} admin Eye process(es), spared {skipped} other wkappbot-core (user Eye/MCP/ring)");
 
             // Re-poll pipe disappearance after kill
             var deadline2 = Environment.TickCount + 1500;
@@ -93,7 +103,7 @@ internal static class AdminEyeBroadcastClose
                 Thread.Sleep(50);
             }
             Console.Error.WriteLine(File.Exists(AdminPipePath)
-                ? "[EYE:ADMIN-CLOSE] pipe STILL present after kill -- something odd"
+                ? "[EYE:ADMIN-CLOSE] pipe STILL present after kill -- kernel may still be GC-ing a handleless entry; new ListenAsync will supersede"
                 : "[EYE:ADMIN-CLOSE] pipe cleared after force kill -- clean gap");
         }
         catch (Exception ex)

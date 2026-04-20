@@ -351,6 +351,26 @@ internal partial class Program
             foreach (var proc in Process.GetProcessesByName(name))
             {
                 if (proc.Id == myPid) { proc.Dispose(); continue; }
+
+                // Admin Eye's console window ALSO has title "AppBotEye". Without
+                // this guard, a fresh user Eye polling loop would WM_CLOSE + Kill
+                // the admin Eye the moment it starts, causing --sudo to fail
+                // silently with exit=-1 on the first proxy call. Skip any process
+                // running `eye --elevated` -- admin Eye lifecycle is owned by
+                // SudoHandler + AdminEyeBroadcastClose, not by user Eye.
+                try
+                {
+                    var cmd = NativeMethods.GetProcessCommandLine(proc.Id) ?? "";
+                    if (cmd.Contains(" eye --elevated", StringComparison.OrdinalIgnoreCase)
+                        || cmd.EndsWith(" eye --elevated", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.Error.WriteLine($"[EYE:EVICT] skip admin Eye pid={proc.Id} (cmdline: eye --elevated)");
+                        proc.Dispose();
+                        continue;
+                    }
+                }
+                catch { /* cmdline lookup may fail for protected pids; fall through to conservative skip below */ }
+
                 IntPtr eyeHwnd = IntPtr.Zero;
                 try
                 {
