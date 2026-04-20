@@ -189,7 +189,14 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
 - **Handoff**: `wkappbot newchat "prompt"` -- passes work summary to new chat
 - **MEMORY.md**: 200-line limit. Overflow -> split into `memory/` topic files
 
----
+## Encoding Policy
+- Treat repository text files as UTF-8 by default.
+- When importing a source file in CP949 or any non-UTF-8 encoding, preserve the original file and also create a UTF-8 copy for safe reading and editing.
+- Prefer UTF-8-safe edit paths that preserve file encoding. If a tool may silently re-encode content, use `wkedit` or another verified UTF-8-safe tool instead.
+- Keep binary artifacts unchanged. Do not text-convert `.pdf`, `.mp4`, images, or archives.
+- Multibyte filenames are allowed, but all repository writes should still use UTF-8 so downstream tools render them consistently.
+
+--- 
 
 ## YAML Scenario (summary)
 ```yaml
