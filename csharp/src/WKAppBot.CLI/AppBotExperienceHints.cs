@@ -175,4 +175,7 @@ internal partial class Program
         var chars = s.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
         return new string(chars);
     }
+
+    // Alias for InspectionCommands backward compatibility (SnapshotCommand.cs was deleted)
+    static string SanitizePathToken(string s) => SanitizePathTokenForExp(s);
 }

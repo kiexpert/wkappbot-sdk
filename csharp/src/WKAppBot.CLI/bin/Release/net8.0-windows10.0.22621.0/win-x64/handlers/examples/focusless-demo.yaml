@@ -1,0 +1,59 @@
+scenario:
+  name: "Notepad Focusless Demo"
+  description: |
+    Demonstrates WKAppBot's focusless-first path on Notepad.
+    The editor write/verify/close flow uses UIA COM patterns (Invoke/Value)
+    and keeps user focus free for other work while the scenario runs.
+
+config:
+  focus_check: false
+  prefer_focusless: true
+  screenshot_on_step: false
+
+app:
+  launch: "notepad.exe"
+  wait_for_window:
+    title_contains: "메모장"
+    timeout: 15
+
+steps:
+  # Step 1: Type via UIA Value pattern (focusless — no keyboard input needed)
+  - name: "Focusless type (COM ValuePattern)"
+    action: set_value
+    target:
+      name: "텍스트 편집기;Text editor"
+      control_type: "Edit"
+    params: { text: "This text was typed WITHOUT stealing your focus.\nYou can keep working in your editor.\nWKAppBot uses UIA COM ValuePattern — not SendInput." }
+    expect:
+      condition: value_contains
+      target:
+        control_type: "Edit"
+        description: "Notepad editor"
+      value: "WITHOUT"
+      timeout: 3
+
+  # Step 2: Ctrl+A select all via UIA (focusless hotkey alternative)
+  # Note: select-all isn't a UIA pattern, so we use hotkey as fallback
+  # But the VALUE was set focuslessly in step 1 — that's the demo point
+
+  # Step 2: Read back what we wrote — verify focusless write worked (assert, no focus needed)
+  - name: "Verify text (focusless read)"
+    action: assert
+    target:
+      name: "텍스트 편집기;Text editor"
+      control_type: "Edit"
+    params:
+      type: value_contains
+      expected: "WITHOUT stealing"
+
+  # Step 3: Focusless window close — UIA WindowPattern.Close(), no Alt+F4 needed
+  - name: "Focusless close (COM WindowPattern)"
+    action: window_close
+    target: { name: "*메모장*", control_type: "Window" }
+
+teardown:
+  - name: "Close notepad if it is still open"
+    action: window_close
+    target:
+      name: "*메모장*"
+      control_type: "Window"

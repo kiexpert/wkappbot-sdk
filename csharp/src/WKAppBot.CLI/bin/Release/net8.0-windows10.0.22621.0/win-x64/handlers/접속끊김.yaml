@@ -1,0 +1,15 @@
+# Dialog handler: 접속끊김 (Disconnection alert)
+# Filename "접속끊김" triggers when class path or title contains this keyword.
+# Clicks "확인" to dismiss, then waits for reconnection.
+
+match:
+  title_contains: "접속 끊김"
+  class: "#32770"
+  process: "nkrunlite"
+
+action: click_button
+
+params:
+  button_text: "확인"   # match by text — safer than index
+  wait_after: 30000     # 30s — wait for reconnection
+  retry: true           # retry the original action after handling

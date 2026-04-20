@@ -55,32 +55,21 @@ internal partial class Program
             catch { }
         }
 
-        // === ADB early dispatch: adb:// prefix -> Android pipeline ===
-        if (args.Length >= 2 && Android.AdbGrapRouter.IsAdbGrap(args[1]))
-            return AdbA11yDispatch(args);
-        // Also check if grap is first arg (discovery actions)
-        if (args.Length >= 1 && Android.AdbGrapRouter.IsAdbGrap(args[0]))
-            return AdbA11yDispatch(new[] { "inspect" }.Concat(args).ToArray());
+        // === ADB early dispatch: DISABLED (Android support removed for public release) ===
 
         // === Delegate actions (may not require grap) ===
         if (args.Length >= 1)
         {
             var maybeAction = args[0].ToLowerInvariant();
-            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr" or "hack" or "hack-hover" or "hack-input")
+            if (maybeAction is "inspect" or "windows" or "screenshot" or "ocr")
             {
                 var delegateArgs = args.Skip(1).ToArray();
-                // ADB check: if first delegate arg is adb:// -> route to Android pipeline
-                if (delegateArgs.Length > 0 && Android.AdbGrapRouter.IsAdbGrap(delegateArgs[0]))
-                    return AdbA11yDispatch(args);
                 return maybeAction switch
                 {
                     "inspect"    => InspectCommand(delegateArgs),
                     "windows"    => WindowsCommand(delegateArgs),
                     "screenshot" => CaptureCommand(delegateArgs),
                     "ocr"        => OcrCommand(delegateArgs),
-                    "hack"       => A11yHackCommand(delegateArgs),
-                    "hack-hover" => A11yHackHoverWorker(delegateArgs),
-                    "hack-input" => A11yHackInputWorker(delegateArgs),
                     _ => 1
                 };
             }
@@ -969,48 +958,8 @@ internal partial class Program
                     }
                     else
                     {
-                        // Fire parallel CCA analysis while UIA searches (non-blocking)
+                        // === Parallel CCA analysis DISABLED (Vision/DYN-A11Y support removed for public release) ===
                         Task? parallelCca = null;
-                        if (_autoHackSemaphore.Wait(0))
-                        {
-                            parallelCca = Task.Run(() =>
-                            {
-                                try
-                                {
-                                    NativeMethods.GetWindowRect(hwnd, out var wr4);
-                                    int pw = wr4.Right - wr4.Left, ph = wr4.Bottom - wr4.Top;
-                                    if (pw > 10 && ph > 10)
-                                    {
-                                        if (pw > 1200) pw = 1200; if (ph > 800) ph = 800;
-                                        using var bmp2 = new System.Drawing.Bitmap(pw, ph);
-                                        using (var g2 = System.Drawing.Graphics.FromImage(bmp2))
-                                            g2.CopyFromScreen(wr4.Left, wr4.Top, 0, 0, new System.Drawing.Size(pw, ph));
-                                        var cca3 = new WKAppBot.Vision.ConnectedComponentAnalyzer();
-                                        var regions3 = cca3.Analyze(bmp2);
-                                        NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid3);
-                                        string proc3; try { proc3 = System.Diagnostics.Process.GetProcessById((int)pid3).ProcessName; } catch { proc3 = "unknown"; }
-                                        var cls3 = WKAppBot.Win32.Window.WindowFinder.GetClassName(hwnd);
-                                        // Collect UIA for fused match
-                                        var uias3 = new List<WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo>();
-                                        try
-                                        {
-                                            using var uia3 = new UiaLocator();
-                                            var leaves3 = new List<(string text, int lx, int ly, int lw, int lh, int d)>();
-                                            UiaLocator.CollectTextLeaves(root, leaves3, 0, 6);
-                                            foreach (var l in leaves3)
-                                                uias3.Add(new WKAppBot.Vision.CcaUiaFusedMatcher.UiaInfo
-                                                { Name = l.text, Bounds = new System.Drawing.Rectangle(l.lx - wr4.Left, l.ly - wr4.Top, l.lw, l.lh) });
-                                        } catch { }
-                                        var mr3 = WKAppBot.Vision.CcaUiaFusedMatcher.Match(regions3, uias3);
-                                        WKAppBot.Vision.CcaUiaFusedMatcher.SaveToExperienceDb(
-                                            DataDir + "/experience", proc3, cls3, mr3);
-                                        Console.Error.WriteLine($"[A11Y] Parallel CCA: {WKAppBot.Vision.CcaUiaFusedMatcher.Summarize(mr3)}");
-                                    }
-                                }
-                                catch { }
-                                finally { _autoHackSemaphore.Release(); }
-                            });
-                        }
 
                         // Dy-tagged paths are experience-DB only -- skip live UIA lookup
                         bool isDyTag = uiaPath?.StartsWith("Dy", StringComparison.Ordinal) == true;
@@ -1064,27 +1013,10 @@ internal partial class Program
                         {
                             try
                             {
-                                NativeMethods.GetWindowThreadProcessId(hwnd, out uint expPid);
-                                string expProc;
-                                try { expProc = System.Diagnostics.Process.GetProcessById((int)expPid).ProcessName; } catch { expProc = ""; }
-                                var expCls = WKAppBot.Win32.Window.WindowFinder.GetClassName(hwnd);
-                                var (expBounds, expScore) = WKAppBot.Vision.CcaUiaFusedMatcher.FindByNameInExperience(
-                                    DataDir + "/experience", expProc, expCls, uiaPath);
-                                if (expBounds.Width > 0 && expScore > 0.3)
-                                {
-                                    Console.Error.WriteLine($"[A11Y] Experience DB hit: \"{uiaPath}\" -> ({expBounds.X},{expBounds.Y} {expBounds.Width}x{expBounds.Height}) score={expScore:F2}");
-                                    // Use experience bounds for click/invoke actions
-                                    if (action is "click" or "invoke")
-                                    {
-                                        NativeMethods.GetWindowRect(hwnd, out var wr3);
-                                        int cx = wr3.Left + expBounds.X + expBounds.Width / 2;
-                                        int cy = wr3.Top + expBounds.Y + expBounds.Height / 2;
-                                        Console.Error.WriteLine($"[A11Y] Experience click at ({cx},{cy})");
-                                        WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
-                                        ok++;
-                                        continue;
-                                    }
-                                }
+                                // === Experience DB lookup DISABLED (Vision/DYN-A11Y support removed for public release) ===
+                                // NativeMethods.GetWindowThreadProcessId(hwnd, out uint expPid);
+                                // var expProc = ...
+                                // var (expBounds, expScore) = WKAppBot.Vision.CcaUiaFusedMatcher.FindByNameInExperience(...);
                             }
                             catch { }
                         }
@@ -1122,7 +1054,7 @@ internal partial class Program
                 // Applies to all elements wider than one character (~14px)
                 bool needsOcrScan = elBounds is { Width: > 0, Height: > 0 };
                 ClickZoomHelper? dynZoom = null; // magnifier for DYN-A11Y analysis
-                if (needsOcrScan)
+                if (false) // === OCR gap analysis DISABLED (Vision support removed for public release) ===
                 {
                     var capturedBounds = elBounds!.Value;
                     try
@@ -1130,110 +1062,9 @@ internal partial class Program
                         using var bmp = new System.Drawing.Bitmap(capturedBounds.Width, capturedBounds.Height);
                         using (var g = System.Drawing.Graphics.FromImage(bmp))
                             g.CopyFromScreen(capturedBounds.X, capturedBounds.Y, 0, 0, capturedBounds.Size);
-                        using var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
-                        var result = ocr.RecognizeAll(bmp).GetAwaiter().GetResult();
 
-                        if (result.Words.Count > 0)
-                        {
-                            // Build coverage map: which X-pixels are covered by OCR words
-                            int totalW = capturedBounds.Width;
-                            var covered = new bool[totalW];
-                            foreach (var w in result.Words)
-                            {
-                                int x0 = Math.Max(0, w.X);
-                                int x1 = Math.Min(totalW, w.X + w.Width);
-                                for (int px = x0; px < x1; px++) covered[px] = true;
-                            }
-
-                            // Find gaps wider than one char (~14px)
-                            const int charWidth = 14;
-                            var gaps = new List<(int start, int width)>();
-                            int gapStart = -1;
-                            for (int px = 0; px < totalW; px++)
-                            {
-                                if (!covered[px])
-                                {
-                                    if (gapStart < 0) gapStart = px;
-                                }
-                                else
-                                {
-                                    if (gapStart >= 0)
-                                    {
-                                        int gw = px - gapStart;
-                                        if (gw >= charWidth) gaps.Add((gapStart, gw));
-                                        gapStart = -1;
-                                    }
-                                }
-                            }
-                            if (gapStart >= 0 && (totalW - gapStart) >= charWidth)
-                                gaps.Add((gapStart, totalW - gapStart));
-
-                            // Build display: words sorted by X + [?] for gaps
-                            var sortedWords = result.Words.OrderBy(w => w.X).ToList();
-                            int expectedChars = totalW / charWidth;
-                            int actualChars = sortedWords.Sum(w => w.Text.Length);
-                            bool partial = gaps.Count > 0 || actualChars < expectedChars / 2;
-
-                            if (partial)
-                            {
-                                // Interleave words and [?] gaps
-                                var parts = new List<string>();
-                                int cursor = 0;
-                                foreach (var w in sortedWords)
-                                {
-                                    if (w.X - cursor >= charWidth)
-                                        parts.Add("[?]");
-                                    parts.Add(w.Text);
-                                    cursor = w.X + w.Width;
-                                }
-                                if (totalW - cursor >= charWidth)
-                                    parts.Add("[?]");
-
-                                var displayText = string.Join("", parts);
-                                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                Console.ResetColor();
-                                if (gapCollector.Add(capturedBounds, displayText, elAid, out var cached1))
-                                {
-                                    Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                    Console.Error.WriteLine($"[A11Y] Acquiring target context... \"{displayText}\"");
-                                    Console.ResetColor();
-                                }
-                                else if (cached1 != null)
-                                {
-                                    elName = cached1;
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Error.WriteLine($"[A11Y] Cache hit -> \"{cached1}\"");
-                                    Console.ResetColor();
-                                }
-                            }
-                            else if (string.IsNullOrWhiteSpace(elName))
-                            {
-                                // Full OCR success on blind node
-                                elName = string.Join(" ", sortedWords.Select(w => w.Text));
-                                Console.ForegroundColor = ConsoleColor.Yellow;
-                                Console.Error.WriteLine($"[A11Y] OCR -> \"{elName}\"");
-                                Console.ResetColor();
-                            }
-                        }
-                        else if (string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid))
-                        {
-                            // No OCR words at all on blind node -> definitely needs Vision
-                            Console.ForegroundColor = ConsoleColor.DarkCyan;
-                            Console.ResetColor();
-                            if (gapCollector.Add(capturedBounds, null, elAid, out var cached2))
-                            {
-                                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                Console.Error.WriteLine($"[A11Y] Acquiring target context... (no text detected)");
-                                Console.ResetColor();
-                            }
-                            else if (cached2 != null)
-                            {
-                                elName = cached2;
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.Error.WriteLine($"[A11Y] Cache hit -> \"{cached2}\"");
-                                Console.ResetColor();
-                            }
-                        }
+                        // === Vision OCR gap analysis block DISABLED for public release ===
+                        // else if (string.IsNullOrWhiteSpace(elName) && string.IsNullOrWhiteSpace(elAid)) { ... }
 
                         // -- Magnifier: 1 gap -> zoom on segment, 2+ gaps -> zoom on parent node --
                         if (gapCollector.HasGaps)

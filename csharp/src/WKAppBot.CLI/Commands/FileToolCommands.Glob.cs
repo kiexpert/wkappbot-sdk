@@ -262,7 +262,9 @@ internal partial class Program
                     var absPath = Path.GetFullPath(path).Replace('/', '\\');
                     var storageFile = await Windows.Storage.StorageFile.GetFileFromPathAsync(absPath);
                     winPdf = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(storageFile);
-                    ocr = new SimpleOcrAnalyzer("ko", "en-US");
+                    // Vision OCR DISABLED for public release
+                    // ocr = new SimpleOcrAnalyzer("ko", "en-US");
+                    useOcr = false;
                 }
                 catch (Exception ex)
                 {
@@ -297,27 +299,10 @@ internal partial class Program
                         stream.Seek(0);
                         using var bmp = new System.Drawing.Bitmap(stream.AsStream());
 
-                        // Pass 1: full-page OCR (fast, catches normal text + word coords)
-                        Console.Write($"[PDF+OCR] p{p} fullpage...");
-                        Console.Out.Flush();
-                        var pageOcr = await ocr.RecognizeAll(bmp);
-                        Console.WriteLine($" {pageOcr.Words.Count} words");
-                        var combined = pageOcr.FullText;
-                        // Pass 2: coverage-guided fallback -- only for uncovered pixel regions
-                        if (deepOcr)
-                        {
-                            int deepHits = 0;
-                            Console.Write($"[PDF+OCR] p{p} deep...");
-                            Console.Out.Flush();
-                            var deepText = await DeepScanOcrAsync(bmp, ocr, pageOcr, t =>
-                            {
-                                if (deepHits == 0) Console.WriteLine();
-                                Console.Error.WriteLine($"[OCR-DEEP] -> {t}");
-                                deepHits++;
-                            });
-                            if (deepHits == 0) Console.WriteLine(" nothing new");
-                            combined += " " + deepText;
-                        }
+                        // === Vision OCR DISABLED for public release ===
+                        // var pageOcr = await ocr.RecognizeAll(bmp);
+                        // var combined = pageOcr.FullText;
+                        var combined = "";
 
                         // Garble check: PdfPig custom-font failure -> '?' ratio > 20%
                         // In this case OCR is the ground truth; replace pageText entirely.
