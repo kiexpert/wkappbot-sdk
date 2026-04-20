@@ -609,10 +609,12 @@ internal partial class Program
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-        // -- Eye pipe server (always: admin UIA proxy + eye tick IPC) --
-        _ = Task.Run(() => ElevatedEyeServer.ListenAsync(cts.Token));
+        // -- Eye IPC tick server (non-elevated Eye only: tick queries on wkappbot_eye_ipc) --
+        // Admin Eye opens wkappbot_elevated exclusively. Normal Eye must NOT open that pipe
+        // or it intercepts elevated command connections meant for admin Eye.
+        _ = Task.Run(() => EyeIpcServer.ListenAsync(cts.Token));
         EyeDiag("eye-pipe-started");
-        Console.Error.WriteLine($"[EYE] Eye pipe server started (elevated={elevated})");
+        Console.Error.WriteLine($"[EYE] Eye IPC tick server started (elevated={elevated})");
 
         PulseStep.Mark("eye-pipe-server");
         // -- Auto a11y hack on InputReadiness probe success --
