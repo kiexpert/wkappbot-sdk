@@ -229,6 +229,8 @@ internal partial class Program
             adminPing: ElevatedEyeClient.Ping,
             adminExecute: ElevatedEyeClient.ExecuteViaProxy,
             ensureAdmin: SudoHandler.EnsureAdminForSudo);
+        // Recover args corrupted by CreateProcessA ACP conversion -- must run before any arg inspection.
+        args = TryRecoverUtf8Argv(args);
         {
             if (args.Length >= 2 && args[0].ToLowerInvariant() == "grap" && args[1].ToLowerInvariant() is "save" or "list" or "show" or "remove" or "rm" or "delete" or "del" or "verify")
             {
@@ -266,7 +268,6 @@ internal partial class Program
             }
             catch { }
         }
-        args = TryRecoverUtf8Argv(args);
         if (Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1") RunningInEye = true;
         {
             var dbgCmd = args.FirstOrDefault(a => !a.StartsWith('-'));
