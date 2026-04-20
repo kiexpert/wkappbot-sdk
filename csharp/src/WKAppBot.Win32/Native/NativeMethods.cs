@@ -642,6 +642,16 @@ public static partial class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern bool GlobalUnlock(IntPtr hMem);
 
+    // -- Argv UTF-8 recovery: raw ANSI command line + parser --
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr GetCommandLineA();
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr CommandLineToArgvW(string lpCmdLine, out int pNumArgs);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
+
     // -- SendMessageTimeout (responsive check: SMTO_ABORTIFHUNG) --
     public const uint WM_NULL = 0x0000;
     public const uint SMTO_ABORTIFHUNG = 0x0002;
