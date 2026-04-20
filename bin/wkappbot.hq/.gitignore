@@ -1,0 +1,10 @@
+# Runtime data -- never commit
+runtime/
+logs/
+suggestions.jsonl
+suggestions_history.jsonl
+skill_seen.jsonl
+command_history.jsonl
+skill_news_ts
+*.jsonl
+*.log
