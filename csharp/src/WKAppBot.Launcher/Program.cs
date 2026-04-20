@@ -455,12 +455,15 @@ partial class Program
 
             if (handshakeFailure)
             {
+                // Diagnostic: append bug-auto suggest, emit a concise warning line,
+                // and fall through to Core anyway. Previous policy (exit 126) turned
+                // pipe-zombie into a hard stop that required reboot -- user-visible
+                // breakage far worse than the "bug we refused to paper over" rhetoric.
+                // Core's SudoHandler will attempt UAC + spawn admin Eye fresh; the
+                // new admin Eye's ListenAsync creates a new pipe server on the same
+                // name, superseding the zombie and restoring normal operation.
                 ReportHandshakeMiss(args, sudoProbeMs, elapsedMs, exMessage);
-                // Do NOT fall through to Core. Handshake-miss on a reachable pipe is a
-                // bug we refuse to silently paper over by respawning admin Eye. Exit
-                // with a dedicated code so callers / CI can detect it distinctly from
-                // "no admin Eye" (which continues to Core spawn above).
-                return 126;
+                Console.Error.WriteLine("[LAUNCHER:SUDO] handshake-miss -> falling through to Core for fresh UAC + admin Eye spawn");
             }
         }
 

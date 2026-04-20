@@ -32,6 +32,7 @@ internal static class SudoHandler
     /// </summary>
     public static bool EnsureAdminForSudo(string reason = "--sudo request")
     {
+        if (ElevationHelper.ShortCircuitIfUacFailed($"SudoHandler({reason})")) return false;
         PulseStep.Line("SudoHandler: pre-check Ping(100)");
         if (ElevatedEyeClient.Ping(100))
         {
@@ -107,6 +108,11 @@ internal static class SudoHandler
     /// </summary>
     static bool SpawnAndAwaitAdmin(string reason)
     {
+        // Fix TMP/TEMP before runas: ShellExecute inherits caller's env, so Git
+        // Bash "/tmp" would break .NET bundle extract on the admin child and
+        // crash it with STATUS_DLL_INIT_FAILED before Main() runs.
+        ElevationHelper.SanitizeEnvForElevatedSpawn();
+
         var exePath = Environment.ProcessPath ?? "wkappbot.exe";
         var psi = new ProcessStartInfo
         {
@@ -174,6 +180,7 @@ internal static class SudoHandler
                 : $"UAC cancelled (err={err})";
             Console.Error.WriteLine($"[SUDO] {suffix} -- no admin Eye available");
             Console.ResetColor();
+            ElevationHelper.MarkUacFailure("SudoHandler", suffix);
             return false;
         }
 
@@ -213,6 +220,7 @@ internal static class SudoHandler
                         Console.Error.WriteLine($"[SUDO] admin Eye process died before pipe came up -- {label}");
                         Console.ResetColor();
                         PulseStep.Line($"SudoHandler: admin Eye died exit=0x{hex} after {tick * 250}ms");
+                        ElevationHelper.MarkUacFailure("SudoHandler", label);
                         return false;
                     }
                 }

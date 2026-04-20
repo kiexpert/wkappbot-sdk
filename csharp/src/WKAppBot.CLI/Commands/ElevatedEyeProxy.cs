@@ -408,6 +408,82 @@ static class ElevatedEyeClient
 
 static class ElevationHelper
 {
+    // UAC-storm guard: once any UAC attempt in this process fails (timeout,
+    // STATUS_DLL_INIT_FAILED, pipe-zombie handshake miss, cancel), every
+    // subsequent UAC attempt short-circuits to false. Heroes HTS and similar
+    // elevated targets trigger the Readiness path which historically chained
+    // SudoHandler -> LaunchElevatedEye -> runas-relaunch = 2-3 UAC dialogs
+    // popping in a row for the same failure mode. One dialog + one clear
+    // error is a much better experience than three.
+    static int _uacFailedCount;
+
+    public static bool UacAlreadyFailedThisProcess => Volatile.Read(ref _uacFailedCount) > 0;
+
+    public static void MarkUacFailure(string caller, string reason)
+    {
+        var count = Interlocked.Increment(ref _uacFailedCount);
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.Error.WriteLine($"[ELEVATION:GUARD] UAC failure #{count} by {caller}: {reason}");
+        Console.Error.WriteLine($"[ELEVATION:GUARD] further UAC attempts this process will be skipped");
+        Console.ResetColor();
+    }
+
+    public static bool ShortCircuitIfUacFailed(string attempt)
+    {
+        if (!UacAlreadyFailedThisProcess) return false;
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.Error.WriteLine($"[ELEVATION:GUARD] skipping {attempt} -- UAC already failed once this process");
+        Console.ResetColor();
+        return true;
+    }
+
+    /// <summary>
+    /// Sanitize TEMP/TMP/DOTNET_BUNDLE_EXTRACT_BASE_DIR before spawning an
+    /// elevated child via ShellExecute(runas). ShellExecute inherits the
+    /// caller's environment block, so Git Bash / MSYS2 "/tmp" leaks into
+    /// the admin-child and breaks .NET 8 single-file bundle extract with
+    /// STATUS_DLL_INIT_FAILED (0xC0000142) -- admin Eye dies before it
+    /// can even reach Main(), pipe never comes up, caller hangs or falls
+    /// back to more UAC prompts. Call this right before runas.
+    /// </summary>
+    public static void SanitizeEnvForElevatedSpawn()
+    {
+        try
+        {
+            var winDir = Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows";
+            var fallbackTemp = Path.Combine(winDir, "Temp");
+            Directory.CreateDirectory(fallbackTemp);
+
+            foreach (var name in new[] { "TEMP", "TMP" })
+            {
+                var cur = Environment.GetEnvironmentVariable(name);
+                bool invalid = string.IsNullOrWhiteSpace(cur)
+                    || cur!.StartsWith('/')
+                    || !Directory.Exists(cur);
+                if (invalid)
+                {
+                    Environment.SetEnvironmentVariable(name, fallbackTemp);
+                    Console.Error.WriteLine($"[ELEVATION:ENV] {name}={cur ?? "(null)"} invalid -> {fallbackTemp}");
+                }
+            }
+
+            // .NET 8 single-file bundle extract dir -- explicit override bypasses
+            // any lingering resolution issues on the elevated child.
+            var bundleDir = Path.Combine(fallbackTemp, "wkappbot-bundle");
+            Directory.CreateDirectory(bundleDir);
+            var curBundle = Environment.GetEnvironmentVariable("DOTNET_BUNDLE_EXTRACT_BASE_DIR");
+            if (string.IsNullOrEmpty(curBundle) || !Directory.Exists(curBundle))
+            {
+                Environment.SetEnvironmentVariable("DOTNET_BUNDLE_EXTRACT_BASE_DIR", bundleDir);
+                Console.Error.WriteLine($"[ELEVATION:ENV] DOTNET_BUNDLE_EXTRACT_BASE_DIR -> {bundleDir}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[ELEVATION:ENV] sanitize failed: {ex.Message}");
+        }
+    }
+
     /// <summary>Check if current process is running as administrator.</summary>
     public static bool IsElevated()
     {
@@ -560,6 +636,9 @@ static class ElevationHelper
 
     public static bool LaunchElevatedEye(string reason = "Eye proxy")
     {
+        if (ShortCircuitIfUacFailed($"LaunchElevatedEye({reason})")) return false;
+        // Fix TMP/TEMP before runas -- see SanitizeEnvForElevatedSpawn comment.
+        SanitizeEnvForElevatedSpawn();
         try
         {
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
@@ -645,6 +724,7 @@ static class ElevationHelper
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
                 Console.Error.WriteLine($"[ELEVATION] UAC cancelled ({uacEx?.NativeErrorCode}) -- no admin Eye available");
                 Console.ResetColor();
+                MarkUacFailure("LaunchElevatedEye", $"UAC cancelled err={uacEx?.NativeErrorCode}");
                 return false;
             }
 
@@ -660,11 +740,30 @@ static class ElevationHelper
                     Console.ResetColor();
                     return true;
                 }
+                // Bail early if the spawned admin Eye died (STATUS_DLL_INIT_FAILED etc.)
+                // so we don't burn 10s of polling for a ghost. Mirrors SudoHandler fix d03182fc.
+                try
+                {
+                    if (proc != null && proc.HasExited)
+                    {
+                        var hex = unchecked((uint)proc.ExitCode).ToString("X8");
+                        var label = unchecked((uint)proc.ExitCode) == 0xC0000142u
+                            ? "STATUS_DLL_INIT_FAILED (admin .NET init crash)"
+                            : $"exit=0x{hex}";
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Error.WriteLine($"[ELEVATION] admin Eye died before pipe came up -- {label}");
+                        Console.ResetColor();
+                        MarkUacFailure("LaunchElevatedEye", $"admin Eye died {label}");
+                        return false;
+                    }
+                }
+                catch { /* handle race -- keep polling */ }
             }
 
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine("[ELEVATION] Elevated Eye did not start in time (10s)");
             Console.ResetColor();
+            MarkUacFailure("LaunchElevatedEye", "pipe didn't come up within 10s");
             return false;
         }
         catch (Exception ex)

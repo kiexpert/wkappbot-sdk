@@ -183,9 +183,17 @@ internal sealed class ElevationRequesterAdapter : IElevationRequester
             return DelegateViaProxy();
         }
 
+        // UAC already failed above -> don't pop another dialog for the same
+        // failure mode. Strategy 3 is the legacy runas-relaunch fallback; we
+        // skip it when the guard says UAC is reproducibly broken this session.
+        if (ElevationHelper.ShortCircuitIfUacFailed("ReadinessStrategy3-runas-relaunch"))
+            return false;
+
         // Strategy 3: Fallback -- relaunch self as admin (legacy).
         try
         {
+            // Same env sanitize as SudoHandler/LaunchElevatedEye before runas.
+            ElevationHelper.SanitizeEnvForElevatedSpawn();
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
             var rawArgs = Environment.GetCommandLineArgs();
             var args = string.Join(" ", rawArgs.Skip(1).Select(a =>
