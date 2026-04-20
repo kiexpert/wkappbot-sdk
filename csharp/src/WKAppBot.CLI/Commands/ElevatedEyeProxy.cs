@@ -204,6 +204,9 @@ static class ElevatedEyeServer
             // stdout pipe, a grandchild Eye would inherit it and block ReadToEndAsync forever.
             psi.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = "eye-proxy";
             psi.EnvironmentVariables["WKAPPBOT_SUDO_ACTIVE"] = "1";
+            // RunningInEye=true: skip card registration, OrphanGuard, TeeWriter console init,
+            // and other interactive-session startup paths that hang under elevated stdout redirection.
+            psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
 
             Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} StartTracked exe={Path.GetFileName(exePath)} args=\"{argsStr}\"");
             var swStart = System.Diagnostics.Stopwatch.StartNew();
@@ -797,17 +800,86 @@ sealed class EyeIpcTickResponse
     [JsonPropertyName("cachedAgeMs")]      public long CachedAgeMs { get; set; }
 }
 
-/// <summary>Client used by one-shot eye tick to query the running Eye loop's cached state via ElevatedEyeServer.</summary>
-static class EyeIpcClient
+/// <summary>
+/// Simple tick-only IPC server that runs inside normal (non-elevated) Eye process.
+/// Handles only __eye_tick__ queries on wkappbot_eye_ipc.
+/// Real command proxy is handled exclusively by admin Eye on wkappbot_elevated.
+/// Separation prevents normal Eye from intercepting elevated command connections.
+/// </summary>
+static class EyeIpcServer
 {
-    public static async Task<EyeIpcTickResponse?> QueryTickAsync(int timeoutMs = 2000)
+    public const string PipeName = "wkappbot_eye_ipc";
+    static readonly JsonSerializerOptions _opts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    public static async Task ListenAsync(CancellationToken ct)
     {
-        var resp = await ElevatedEyeClient.SendCommandAsync("__eye_tick__", [], timeoutMs);
-        if (resp == null || resp.ExitCode != 0 || string.IsNullOrEmpty(resp.Stdout)) return null;
+        Console.Error.WriteLine($"[EYE:IPC] Eye IPC server listening on \\\\.\\pipe\\{PipeName}");
+        while (!ct.IsCancellationRequested)
+        {
+            NamedPipeServerStream? pipe = null;
+            try
+            {
+                pipe = new NamedPipeServerStream(
+                    PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+                await pipe.WaitForConnectionAsync(ct);
+                var connectedPipe = pipe;
+                pipe = null;
+                _ = Task.Run(async () =>
+                {
+                    try { await HandleTickClient(connectedPipe, ct); }
+                    finally { connectedPipe.Dispose(); }
+                }, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EYE:IPC] Error: {ex.Message}");
+                try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
+                catch (OperationCanceledException) { break; }
+            }
+            finally { pipe?.Dispose(); }
+        }
+        Console.Error.WriteLine("[EYE:IPC] Eye IPC server stopped");
+    }
+
+    static async Task HandleTickClient(NamedPipeServerStream pipe, CancellationToken ct)
+    {
         try
         {
-            return System.Text.Json.JsonSerializer.Deserialize<EyeIpcTickResponse>(resp.Stdout,
-                new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+            var req = await EyeProxyWire.ReadAsync<EyeProxyRequest>(pipe, ct);
+            if (req == null) return;
+            if (req.Command == "__eye_tick__")
+            {
+                var tickResp = Program.BuildIpcTickResponse();
+                var tickJson = JsonSerializer.Serialize(tickResp, _opts);
+                var resp = new EyeProxyResponse { Id = req.Id, ExitCode = 0, Stdout = tickJson };
+                await EyeProxyWire.WriteAsync(pipe, resp, ct);
+            }
+        }
+        catch { }
+    }
+}
+
+/// <summary>Client used by one-shot eye tick to query the running Eye loop's cached state.</summary>
+static class EyeIpcClient
+{
+    static readonly JsonSerializerOptions _opts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    public static async Task<EyeIpcTickResponse?> QueryTickAsync(int timeoutMs = 2000)
+    {
+        // Connect to normal Eye's dedicated IPC pipe, separate from the elevated command proxy.
+        try
+        {
+            using var pipe = new NamedPipeClientStream(
+                ".", EyeIpcServer.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+            using var cts = new CancellationTokenSource(timeoutMs);
+            await pipe.ConnectAsync(timeoutMs, cts.Token);
+            var req = new EyeProxyRequest { Id = 1, Command = "__eye_tick__", Args = [] };
+            await EyeProxyWire.WriteAsync(pipe, req, cts.Token);
+            var resp = await EyeProxyWire.ReadAsync<EyeProxyResponse>(pipe, cts.Token);
+            if (resp == null || resp.ExitCode != 0 || string.IsNullOrEmpty(resp.Stdout)) return null;
+            return JsonSerializer.Deserialize<EyeIpcTickResponse>(resp.Stdout, _opts);
         }
         catch { return null; }
     }
