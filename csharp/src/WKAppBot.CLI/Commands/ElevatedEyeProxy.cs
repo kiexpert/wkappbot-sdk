@@ -199,6 +199,11 @@ static class ElevatedEyeServer
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
+                // Must match subprocess's Console.OutputEncoding (UTF-8 set at startup).
+                // Without this, StreamReader defaults to system codepage (CP949 on Korean Windows)
+                // and misinterprets UTF-8 Korean bytes as mojibake.
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
             };
             // Subprocess-tag: skip Eye auto-spawn in child. When elevated parent already holds
             // stdout pipe, a grandchild Eye would inherit it and block ReadToEndAsync forever.
