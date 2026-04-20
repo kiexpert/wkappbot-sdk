@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using WKAppBot.Core.Scenario;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Window;
@@ -265,6 +266,7 @@ internal partial class Program
             }
             catch { }
         }
+        args = TryRecoverUtf8Argv(args);
         if (Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1") RunningInEye = true;
         {
             var dbgCmd = args.FirstOrDefault(a => !a.StartsWith('-'));
@@ -746,5 +748,48 @@ internal partial class Program
             timeoutTimer?.Dispose();
             if (_fastExitAfterCommand) FastExit(exitCode);
         }
+    }
+
+    /// <summary>
+    /// Recover args corrupted by CreateProcessA treating UTF-8 bytes as the system ACP (CP949).
+    /// Strategy: GetCommandLineA() returns the raw ANSI bytes. If those bytes are valid UTF-8,
+    /// the caller was UTF-8 (e.g. Git Bash / MSYS2 exec path) and the runtime's args[] are
+    /// CP949-mojibake. Re-parse the UTF-8 bytes with CommandLineToArgvW for correct Unicode.
+    /// If not valid UTF-8, the caller used ACP correctly -- args[] is already correct.
+    /// </summary>
+    static string[] TryRecoverUtf8Argv(string[] args)
+    {
+        // Fast path: system already UTF-8 or all args are ASCII
+        if (Encoding.Default.CodePage == 65001) return args;
+        if (!args.Any(a => a.Any(c => c > 127))) return args;
+
+        var pCmdLine = WKAppBot.Win32.Native.NativeMethods.GetCommandLineA();
+        if (pCmdLine == IntPtr.Zero) return args;
+
+        // Count and copy raw ANSI bytes in one pass (avoids List<byte> allocation)
+        int len = 0;
+        while (Marshal.ReadByte(pCmdLine, len) != 0) len++;
+        var bytes = new byte[len];
+        Marshal.Copy(pCmdLine, bytes, 0, len);
+
+        // Strict UTF-8 decode: CP949 Korean lead byte (0xBE, 0xB3, ...) immediately fails
+        // since UTF-8 continuation bytes must be 0x80-0xBF and lead bytes 0xC2-0xF4.
+        // This distinguishes CreateProcessA(UTF-8 bytes) from CreateProcessW(correct Unicode).
+        string cmdLine;
+        try { cmdLine = new UTF8Encoding(false, throwOnInvalidBytes: true).GetString(bytes); }
+        catch (DecoderFallbackException) { return args; }
+
+        // Parse recovered command line with CommandLineToArgvW, skip argv[0] (exe path)
+        var pArgv = WKAppBot.Win32.Native.NativeMethods.CommandLineToArgvW(cmdLine, out int argc);
+        if (pArgv == IntPtr.Zero || argc <= 1) return args;
+        try
+        {
+            var recovered = new string[argc - 1];
+            for (int i = 1; i < argc; i++)
+                recovered[i - 1] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(pArgv, i * IntPtr.Size)) ?? "";
+            Console.Error.WriteLine($"[ARGV:UTF8] Recovered {recovered.Length} args from raw UTF-8 cmdline (CreateProcessA CP949 bypass)");
+            return recovered;
+        }
+        finally { WKAppBot.Win32.Native.NativeMethods.LocalFree(pArgv); }
     }
 }
