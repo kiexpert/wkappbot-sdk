@@ -61,10 +61,13 @@
 - **Don't repeat what the user already explained** -- use their words, move on
 - **ctx% check**: `wkappbot claude-usage` -- handoff at 8MB, urgent at 10MB, use `/compact` when growing
 - **Use `qmd search` before reading files** -- BM25+vector pre-index of all C# + skills + docs (MCP: qmd)
-- **Delegate detail work to Haiku** -- Opus 4.7 (this session) is expensive; Claude Haiku 4.5 is the cheap tier for bulk reads, grep sweeps, file enumeration, boilerplate edits, log triage, mechanical refactors. In Claude Code spawn the Agent tool with `model: "haiku"` (e.g. Explore/general-purpose/Plan at haiku); outside Claude Code use `wkappbot ask claude --model haiku` or the Anthropic API directly with `claude-haiku-4-5-20251001`.
-  - Keep on Opus: design decisions, multi-file architectural changes, root-cause debugging, judgment calls, anything that needs whole-codebase context.
-  - Push to Haiku: read-only surveys, pattern matching across many files, draft-then-review, log-tail analysis, repetitive grep/glob/read loops that would otherwise bloat this session's JSONL.
-  - See also `feedback_delegate_mechanical_to_codex` memory -- same rationale, Codex CLI is the same-tier alternative when wkappbot skills want it.
+- **Delegate detail work to cheap tier** -- Opus 4.7 (this session) is expensive. Push mechanical / read-heavy work to a cheap-tier agent, keep Opus for judgment.
+  - **Keep on Opus**: design decisions, multi-file architectural changes, root-cause debugging, judgment calls, anything that needs whole-codebase context.
+  - **Push to cheap tier**: read-only surveys, pattern matching across many files, draft-then-review, log-tail analysis, repetitive grep/glob/read loops, boilerplate edits, mechanical refactors -- anything that would otherwise bloat this session's JSONL.
+  - **Cheap-tier targets (any of these works, pick by availability/context)**:
+    - Claude Haiku 4.5 -- in Claude Code spawn the `Agent` tool with `model: "haiku"` (Explore / general-purpose / Plan agents at haiku); outside Claude Code use `wkappbot ask claude --model haiku` or Anthropic API directly with `claude-haiku-4-5-20251001`.
+    - Codex CLI with codex-mini -- `wkappbot ask codex --agent "<task>"` (codex-mini is the default agent model per v6.0; session resume built-in via `.wkappbot/codex.json` with 3MB rotation). Good for autonomous multi-turn source-split and file-level refactors.
+  - See also `feedback_delegate_mechanical_to_codex` memory for the established Codex delegation pattern.
 
 ### Forbidden
 - Directly spawning Eye / options that block Claude delivery / options that skip Eye -- all forbidden
