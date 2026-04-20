@@ -1,6 +1,8 @@
 namespace WKAppBot.CLI;
 
-// wkappbot agent <ai> "task" -- autonomous sub-agent execution
+// wkappbot agent <ai> "task"
+// wkappbot agent "task" - <tier>
+// -- autonomous sub-agent execution
 // Wraps ask --loop with agent-optimized defaults and a separate tab namespace.
 //
 // Tab namespace: {ai}-agent-{sessionHash}  (separate from ask: {ai}-{sessionHash})
@@ -65,6 +67,9 @@ internal partial class Program
             AgentFileTracker.SessionClear();
             return 0;
         }
+
+        if (TryParseAgentTierShorthand(args, out var shorthandTask, out var shorthandTier))
+            return RunAgentTierShorthand(shorthandTask, shorthandTier);
 
         if (args.Length < 2)
             return AgentUsage();
@@ -246,7 +251,15 @@ wkappbot agent -- autonomous sub-agent (multi-step reasoning loop with tools)
   vs ask:  ask = one-shot Q&A    agent = autonomous loop: plans -> uses tools -> verifies -> repeats
 
 Usage:
+  wkappbot agent ""task"" [- <tier>]
   wkappbot agent gemini|gpt|claude|triad ""task"" [files...] [options]
+
+Tier shorthand:
+  codex-mini (default, omitted) -> AskCodexCli with --agent
+  read-only                    -> AskCodexCli with sandbox read-only
+  haiku                        -> AskClaude --model haiku
+  triad                        -> AskTriadParallel
+  sonnet                       -> AskClaude --model sonnet
 
   triad / all  -- run Gemini + GPT + Claude in parallel, each prefixed [gemini]/[gpt]/[claude]
 
@@ -287,6 +300,10 @@ APSP v1 (WKAppBot MCP extension -- beyond standard MCP spec):
   data field format: ""N> output line""  (N=progress counter, correlates console with MCP stream)
 
 Examples:
+  wkappbot agent ""mechanically split this class into partials""
+  wkappbot agent ""survey this repo for risky IO patterns"" - read-only
+  wkappbot agent ""review this design doc and suggest simplifications"" - haiku
+  wkappbot agent ""compare these approaches and synthesize a recommendation"" - triad
   wkappbot agent gemini ""analyze all *.cs files and find N+1 query patterns""
   wkappbot agent gpt ""fix UI bug shown in screenshot"" screen.png --slack
   wkappbot agent claude ""investigate why build fails"" --max-steps 30
@@ -298,4 +315,52 @@ Examples:
         PrintRelatedSkills("agent");
         return 1;
     }
+
+    static bool TryParseAgentTierShorthand(string[] args, out string task, out string tierHint)
+    {
+        task = "";
+        tierHint = "";
+        if (args.Length == 0)
+            return false;
+
+        var dashIdx = Array.IndexOf(args, "-");
+        if (dashIdx >= 0)
+        {
+            task = string.Join(" ", args[..dashIdx]).Trim();
+            tierHint = string.Join(" ", args[(dashIdx + 1)..]).Trim();
+            return true;
+        }
+
+        if (args.Length == 1 && args[0] is not ("gemini" or "gpt" or "chatgpt" or "claude" or "triad" or "all"
+                or "checkpoint" or "dump-patch" or "session-status" or "session-clear"))
+        {
+            task = args[0].Trim();
+            return true;
+        }
+
+        return false;
+    }
+
+    static int RunAgentTierShorthand(string task, string tierHint)
+    {
+        if (string.IsNullOrWhiteSpace(task))
+            return Error("Agent task is empty.");
+
+        var tier = string.IsNullOrWhiteSpace(tierHint) ? "codex-mini" : tierHint.Trim().ToLowerInvariant();
+        var preview = task.Length > 80 ? task[..77] + "..." : task;
+        Console.Error.WriteLine($"[AGENT] shorthand | tier={tier} | task=\"{preview}\"");
+
+        return tier switch
+        {
+            "codex-mini" => AskCodexCli($"--agent {task}", newSession: false),
+            "read-only" => AskCodexCli($"--agent -s read-only {task}", newSession: false),
+            "haiku" => AskClaude(task, true, 90, newTab: false, attachFiles: null, newSession: false, loopMode: true, 20, 2, 4, triadMode: false, modelHint: "haiku", noWait: false, targetTagOverride: BuildAgentTargetTag("claude"), linePrefix: "[claude] "),
+            "triad" => AskTriadParallel(task, 90, attachFiles: null, newSession: false, loopMode: true, loopMaxSteps: 20, loopRetry: 2, loopMaxParallel: 4, modelHint: null, noWait: false),
+            "sonnet" => AskClaude(task, true, 90, newTab: false, attachFiles: null, newSession: false, loopMode: true, 20, 2, 4, triadMode: false, modelHint: "sonnet", noWait: false, targetTagOverride: BuildAgentTargetTag("claude"), linePrefix: "[claude] "),
+            _ => Error($"Unknown agent tier: {tier} (use codex-mini, read-only, haiku, triad, or sonnet)")
+        };
+    }
+
+    static string BuildAgentTargetTag(string ai)
+        => $"{ai}-agent-{(GetSessionTag() ?? "default")}";
 }
