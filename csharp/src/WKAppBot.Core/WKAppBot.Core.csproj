@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WKAppBot.Win32\WKAppBot.Win32.csproj" />
-    <ProjectReference Include="..\WKAppBot.Vision\WKAppBot.Vision.csproj" />
   </ItemGroup>
 
 </Project>
