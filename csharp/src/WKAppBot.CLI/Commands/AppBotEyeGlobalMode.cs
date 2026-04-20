@@ -360,7 +360,16 @@ internal partial class Program
                 // SudoHandler + AdminEyeBroadcastClose, not by user Eye.
                 try
                 {
-                    var cmd = NativeMethods.GetProcessCommandLine(proc.Id) ?? "";
+                    var cmd = NativeMethods.GetProcessCommandLine(proc.Id);
+                    if (cmd == null)
+                    {
+                        // OpenProcess returned null (access denied -- elevated process).
+                        // We can't inspect it, so skip conservatively. Admin Eye lifecycle
+                        // is owned by SudoHandler + AdminEyeBroadcastClose, not user Eye.
+                        Console.Error.WriteLine($"[EYE:EVICT] skip pid={proc.Id} (cmdline null -- likely admin-elevated)");
+                        proc.Dispose();
+                        continue;
+                    }
                     if (cmd.Contains(" eye --elevated", StringComparison.OrdinalIgnoreCase)
                         || cmd.EndsWith(" eye --elevated", StringComparison.OrdinalIgnoreCase))
                     {
@@ -371,9 +380,8 @@ internal partial class Program
                 }
                 catch
                 {
-                    // cmdline lookup fails for elevated processes (access denied).
-                    // A process we can't inspect is likely admin Eye -- skip it conservatively.
-                    Console.Error.WriteLine($"[EYE:EVICT] skip pid={proc.Id} (cmdline inaccessible -- likely elevated)");
+                    // Unexpected exception during cmdline lookup -- skip conservatively.
+                    Console.Error.WriteLine($"[EYE:EVICT] skip pid={proc.Id} (cmdline exception -- skipping)");
                     proc.Dispose();
                     continue;
                 }
