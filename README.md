@@ -189,3 +189,15 @@ bin/wkappbot.hq/          runtime HQ -- experience DB, skills, sessions, logs
 - [CLAUDE.md](./CLAUDE.md) -- detailed operational guidance for AI agents
 - [AGENTS.md](./AGENTS.md) -- shared AI engineering rules
 - `wkappbot skill list` -- accumulated knowhow: grap syntax, MFC quirks, CDP gotchas, and more
+
+---
+
+## Encoding Policy
+
+Repository text assets should be treated as UTF-8 by default.
+
+- Prefer UTF-8 when creating or updating `.md`, `.txt`, `.html`, `.json`, `.yml`, `.xml`, and other text-based files.
+- If an imported source arrives in another encoding such as CP949, keep the original file for archival purposes and also store a UTF-8 converted copy for reading and editing.
+- Use file-editing tools that preserve encoding correctly. If a tool may re-encode content incorrectly, prefer `wkedit` or another UTF-8-safe path.
+- Binary files such as `.pdf`, `.mp4`, images, and archives should be preserved as-is and not text-converted.
+- Multibyte filenames are allowed, but repository writes should still use UTF-8 so downstream tools and web viewers can read them reliably.

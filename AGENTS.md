@@ -91,7 +91,14 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - No-arg scripts should be healthy.
 - Skill commands are core AI learning surface.
 
-## 11. GitHub tool usage knowhow
+## 11. Encoding policy
+- Treat repository text files as UTF-8 by default.
+- If a source arrives in CP949 or another non-UTF-8 encoding, preserve the original file and also save a UTF-8 copy for reading and editing.
+- Prefer UTF-8-safe editing tools. If a tool may silently re-encode content, use `wkedit` or another verified UTF-8-safe path.
+- Keep binary files unchanged. Do not text-convert `.pdf`, `.mp4`, images, or archives.
+- Multibyte filenames are allowed, but repository writes should still use UTF-8 so downstream tools and web views render them reliably.
+
+## 12. GitHub tool usage knowhow
 - Large multi-file workflow edits may be blocked by the platform safety layer even when the content is valid.
 - When GitHub tool updates are unstable, split the change into small pieces:
   1. create blob
@@ -102,19 +109,19 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - When isolating a blocking pattern, prefer one-file or one-topic commits.
 - Confirm the current main SHA before building a tree or commit.
 
-## 12. GitHub Actions environment knowhow
+## 13. GitHub Actions environment knowhow
 - Do not assume every Actions expression context works in every YAML location.
 - If a workflow title disappears or the workflow fails before jobs start, check expression placement first.
 - `runner.*` expressions are safest inside step-level keys and `with:` values, not arbitrarily hoisted.
 - Keep workflow syntax conservative.
 
-## 13. Self-test workflow policy
+## 14. Self-test workflow policy
 - Script self-test should choose the latest commit among recent history that actually changed scripts.
 - The selected commit's `*.ps1`, `*.py`, and `*.sh` files should all be tested.
 - Self-test scripts are AppBot-integrated by default unless explicitly documented otherwise.
 - If scripts need helpers, allow those helpers to be installed inside `bin/` and persisted by cache.
 
-## 14. Cache policy
+## 15. Cache policy
 - Prefer repo-local caches so helper tools survive across CI runs.
 - `bin/` is the primary reusable cache surface for self-test helpers and official binaries.
 - Restore by exact key first, then by recent prefix, so cache misses are rare.
@@ -122,7 +129,7 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - Build cache should prioritize recent-hit behavior over strict exact-only reuse.
 - Intermediate build outputs may be cached when they reduce rebuild cost and do not break correctness.
 
-## 15. GitHub Actions weirdness response
+## 16. GitHub Actions weirdness response
 - When CI behavior is surprising, first determine whether the issue is:
   - workflow trigger design
   - expression location
