@@ -735,6 +735,8 @@ internal partial class Program
                 EmitEyeTick(cmd, cmdTag, $"end:{exitCode}");
             }
             catch { }
+            AppendCommandHistory(args, exitCode);
+            PrintSkillHintOnError(args, exitCode);
             if (tee != null) tee.ExitCode = exitCode;
             tee?.WriteErrorRecordNow();
             if (!_fastExitAfterCommand) WriteExitFile(exitCode);
