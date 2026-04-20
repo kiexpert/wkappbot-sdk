@@ -64,11 +64,10 @@
 - **Delegate detail work to cheap tier** -- Opus 4.7 (this session) is expensive. Push mechanical / read-heavy work to a cheap-tier agent, keep Opus for judgment.
   - **Keep on Opus**: design decisions, multi-file architectural changes, root-cause debugging, judgment calls, anything that needs whole-codebase context.
   - **Push to cheap tier**: read-only surveys, pattern matching across many files, draft-then-review, log-tail analysis, repetitive grep/glob/read loops, boilerplate edits, mechanical refactors -- anything that would otherwise bloat this session's JSONL.
-  - **Cheap-tier targets (any of these works, pick by availability/context)**:
-    - Claude Haiku 4.5 -- in Claude Code spawn the `Agent` tool with `model: "haiku"` (Explore / general-purpose / Plan agents at haiku); outside Claude Code use `wkappbot ask claude --model haiku` or Anthropic API directly with `claude-haiku-4-5-20251001`.
-    - Codex CLI with codex-mini -- `wkappbot ask codex --agent "<task>"` (codex-mini is the default agent model per v6.0; session resume built-in via `.wkappbot/codex.json` with 3MB rotation). Good for autonomous multi-turn source-split and file-level refactors.
+  - **Cheap-tier targets -- unified via `wkappbot agent "task" - <tier>`**: use `codex-mini` (default / omitted) for mechanical work, `read-only` for Codex exploration without writes, `haiku` for Claude Haiku surveys, `sonnet` for Claude Sonnet mid-tier reasoning, and `triad` for parallel GPT + Gemini + Claude on hard problems.
+  - In Claude Code IDE, the closest in-process equivalent is `Agent(subagent_type: "Explore", model: "haiku", prompt: "...")`.
   - See also `feedback_delegate_mechanical_to_codex` memory for the established Codex delegation pattern.
-- **Ask triad for hard problems** -- any root-cause investigation or design decision that would take Opus ~1 minute+ of thinking/searching, punt to `wkappbot ask triad "<problem>"` (parallel GPT + Gemini + Claude). Three outside perspectives for the price of three cheap calls beats Opus burning tokens on a deep dive alone. Use when: unfamiliar bug pattern, ambiguous regression, architecture trade-off with no obvious winner, stuck more than a couple iterations. See `ask-triad-when-uncertain` skill.
+- **Ask triad for hard problems** -- any root-cause investigation or design decision that would take ~1 minute+ of thinking/searching, use `wkappbot agent "problem" - triad` (parallel GPT + Gemini + Claude). Three outside perspectives for the price of three cheap calls beats burning tokens on a deep dive alone. Use when: unfamiliar bug pattern, ambiguous regression, architecture trade-off with no obvious winner, stuck more than a couple iterations. See `ask-triad-when-uncertain` skill.
 
 ### Forbidden
 - Directly spawning Eye / options that block Claude delivery / options that skip Eye -- all forbidden
