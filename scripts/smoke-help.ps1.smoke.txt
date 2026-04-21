@@ -1,118 +1,118 @@
-commit: 8b633583606176babced527f60582f7aefe31e89
+commit: 7675522410ad716f3d6fc648807b4012845314d6
 workflow: build-csharp/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-20T07:34:09.2997198Z
+timestamp_utc: 2026-04-21T13:05:31.0041557Z
 
 == TEST --help ==
-{"_":"LAUNCH","pid":4592,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":4972,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 228 more line(s)
 EXITCODE: 0
 == TEST help ==
-{"_":"LAUNCH","pid":1828,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":1748,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 228 more line(s)
 EXITCODE: 0
 == TEST version ==
-{"_":"LAUNCH","pid":2516,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":5992,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 7 more line(s)
 EXITCODE: 0
 == TEST skill --help --no-regression ==
 [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
 [CMD] skill --help --no-regression
-[LAUNCH:CORE] cwd=D:\a\WKAppBot\WKAppBot hwnd=0x cmd=skill --help --no-regression
+[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill --help --no-regression
 skill <subcommand> [options]
 AI skill management -- executable knowhow for Claude instances.
 ... TRUNCATED: 31 more line(s)
 EXITCODE: 0
 == TEST knowhow --help --no-regression ==
-{"_":"LAUNCH","pid":3992,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":9116,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST schedule --help --no-regression ==
-{"_":"LAUNCH","pid":5840,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":3300,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 19 more line(s)
 EXITCODE: 0
 == TEST file --help --no-regression ==
-{"_":"LAUNCH","pid":6300,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":7980,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 36 more line(s)
 EXITCODE: 0
 == TEST file-read --help --no-regression ==
-{"_":"LAUNCH","pid":6284,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":1316,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-grep --help --no-regression ==
-{"_":"LAUNCH","pid":7776,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":532,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST file-glob --help --no-regression ==
-{"_":"LAUNCH","pid":6684,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":3312,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
 == TEST skill list ==
 [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
 [CMD] skill list
-[LAUNCH:CORE] cwd=D:\a\WKAppBot\WKAppBot hwnd=0x cmd=skill list
+[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
 [SKILL] 88 skill(s) - most recent first:
   [wkappbot-workflow]
 ... TRUNCATED: 100 more line(s)
 EXITCODE: 0
 == TEST schedule list ==
-{"_":"LAUNCH","pid":1480,"sid":2
-,"fg":"0x201DE"
+{"_":"LAUNCH","pid":8428,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 8 more line(s)
 EXITCODE: 0
-== TEST file read D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":5600,"sid":2
-,"fg":"0x201DE"
+== TEST file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt ==
+{"_":"LAUNCH","pid":9060,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 11 more line(s)
 EXITCODE: 0
-== TEST file grep skill D:\a\WKAppBot\WKAppBot\smoke-temp\sample.txt ==
-{"_":"LAUNCH","pid":1032,"sid":2
-,"fg":"0x201DE"
+== TEST file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt ==
+{"_":"LAUNCH","pid":6840,"sid":2
+,"fg":"0x101F8"
 ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-,"cwd":"D:\\a\\WKAppBot\\WKAppBot"
+,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
 ,"chain":[
 ... TRUNCATED: 11 more line(s)
 EXITCODE: 0
