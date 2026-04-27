@@ -18,6 +18,7 @@ venv/
 obj/
 csharp/**/bin/
 # bin/: allow wkappbot.hq learned data, ignore build artifacts
+bin/*.exe.bak
 bin/*.exe
 bin/*.dll
 bin/*.pdb
