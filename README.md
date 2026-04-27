@@ -101,6 +101,41 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 
 ---
 
+## Installation
+
+Download `wkappbot.exe` and `wkappbot-core.exe` from the [latest release](../../releases/latest) and place them in the same folder.
+
+**Recommended install path:** your home directory keeps runtime data (skills, logs, experience DB) out of system folders and avoids permission issues.
+
+```
+%USERPROFILE%\wkappbot\
+  wkappbot.exe          ← launcher / busybox entry point
+  wkappbot-core.exe     ← core worker (hot-swapped on update)
+  wkappbot.hq\          ← auto-created on first run
+```
+
+Add the folder to your `PATH` so `wkappbot` is available in any terminal:
+
+```powershell
+# PowerShell (permanent, current user)
+[Environment]::SetEnvironmentVariable(
+  'PATH',
+  "$env:USERPROFILE\wkappbot;$([Environment]::GetEnvironmentVariable('PATH','User'))",
+  'User'
+)
+```
+
+Verify the install:
+
+```bash
+wkappbot --version
+wkappbot skill list
+```
+
+> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed -- the binary is self-contained.
+
+---
+
 ## CLI at a Glance
 
 ```bash

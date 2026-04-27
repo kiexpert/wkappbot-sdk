@@ -1,10 +1,12 @@
-name: build-csharp
+name: build-launcher
 
 on:
   push:
     paths:
       - 'csharp/**'
       - 'handlers/**'
+      - 'skills/**'
+      - 'scripts/smoke-help.ps1'
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
@@ -12,152 +14,170 @@ jobs:
   detect:
     runs-on: windows-latest
     outputs:
-      csharp_changed: ${{ steps.diff.outputs.csharp_changed }}
+      changed: ${{ steps.diff.outputs.changed }}
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Detect C# changes
+    - name: Detect changes
       id: diff
       shell: pwsh
       run: |
         if ('${{ github.event_name }}' -ne 'push') {
-          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           exit 0
         }
         $before = '${{ github.event.before }}'
-        $after = '${{ github.sha }}'
+        $after  = '${{ github.sha }}'
         if ([string]::IsNullOrWhiteSpace($before) -or $before -match '^0+$') {
-          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           exit 0
         }
-        $files = git diff --name-only $before $after
-        $changed = @($files | Where-Object { $_ -match '^(csharp/|handlers/|\.github/workflows/build\.yml$)' })
-        if ($changed.Count -gt 0) {
-          "csharp_changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-        } else {
-          "csharp_changed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-        }
+        $files   = git diff --name-only $before $after
+        $changed = @($files | Where-Object {
+          $_ -match '^(csharp/|handlers/|skills/|scripts/smoke-help\.ps1|\.github/workflows/build\.yml$)'
+        })
+        $out = if ($changed.Count -gt 0) { 'true' } else { 'false' }
+        "changed=$out" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
   build:
     needs: [detect]
-    if: ${{ needs.detect.outputs.csharp_changed == 'true' }}
+    if: ${{ needs.detect.outputs.changed == 'true' }}
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Restore NuGet packages
+
+    - name: Restore NuGet cache
       uses: actions/cache/restore@v4
       with:
         path: |
           ~/.nuget/packages
           ~\AppData\Local\NuGet\v3-cache
-        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+
     - name: Restore build cache
-      id: restore_build_cache
       uses: actions/cache/restore@v4
       with:
         path: |
           bin
           csharp/**/obj
-        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
         restore-keys: |
-          ${{ runner.os }}-wkappbot-build-run-
-          ${{ runner.os }}-wkappbot-build-
-    - name: Restore previous build state
-      id: restore_build_state
+          ${{ runner.os }}-sdk-build-run-
+          ${{ runner.os }}-sdk-build-
+
+    - name: Restore build state
+      id: restore_state
       uses: actions/cache/restore@v4
       with:
         path: .ci-state/build
-        key: ${{ runner.os }}-wkappbot-build-state-${{ github.run_id }}
+        key: ${{ runner.os }}-sdk-build-state-${{ github.run_id }}
         restore-keys: |
-          ${{ runner.os }}-wkappbot-build-state-
-    - name: Decide clean build
-      id: decide_clean
+          ${{ runner.os }}-sdk-build-state-
+
+    - name: Clean after failed build
       shell: pwsh
       run: |
         $marker = '.ci-state/build/last_build_failed.txt'
-        if (Test-Path $marker) {
-          $value = (Get-Content $marker -Raw).Trim().ToLowerInvariant()
-          if ($value -eq 'true') {
-            'need_clean=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
+        if ((Test-Path $marker) -and ((Get-Content $marker -Raw).Trim() -eq 'true')) {
+          Write-Host 'Previous build failed -- cleaning.'
+          if (Test-Path ./bin) { Remove-Item ./bin -Recurse -Force }
+          Get-ChildItem -Path csharp -Directory -Recurse -Filter obj |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          dotnet clean csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release
+          dotnet clean csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release
         }
-        'need_clean=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-    - name: Clean after previous failed build
-      if: ${{ steps.decide_clean.outputs.need_clean == 'true' }}
-      shell: pwsh
-      run: |
-        if (Test-Path ./bin) { Remove-Item ./bin -Recurse -Force }
-        Get-ChildItem -Path csharp -Directory -Recurse -Filter obj | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-        dotnet clean csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release
-        dotnet clean csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release
+
     - name: Ensure bin dir
       shell: pwsh
       run: New-Item -ItemType Directory -Force -Path bin | Out-Null
-    - name: Publish Core to repo bin
-      shell: pwsh
-      run: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
-    - name: Publish Launcher to repo bin
-      shell: pwsh
-      run: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
-    - name: Seed bin/wkappbot.hq from repo
+
+    # --- Launcher (public source) ---
+    - name: Build launcher
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq | Out-Null
+        dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+          --configuration Release `
+          -p:SkipDeployLauncher=true `
+          -o bin
+
+    # --- Core (source build; TODO: replace with GitHub Release download when core goes closed-source) ---
+    - name: Build core
+      shell: pwsh
+      run: |
+        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
+          --configuration Release `
+          -p:SkipDeployCore=true `
+          -o bin
+
+    - name: Seed bin/wkappbot.hq
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
         if (Test-Path wkappbot.hq) {
           Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
         }
-    - name: Install skills to bin/wkappbot.hq
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
-        Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
-        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
+        if (Test-Path skills)   { Copy-Item -Path skills/*   -Destination bin/wkappbot.hq/skills   -Recurse -Force }
+        if (Test-Path handlers) { Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+
     - name: Write build info
       shell: pwsh
       run: |
-        $info = [ordered]@{ run_id = "${{ github.run_id }}"; sha = "${{ github.sha }}"; built_at = (Get-Date -AsUTC -Format o) } | ConvertTo-Json -Compress
+        $info = [ordered]@{
+          run_id   = "${{ github.run_id }}"
+          sha      = "${{ github.sha }}"
+          built_at = (Get-Date -AsUTC -Format o)
+        } | ConvertTo-Json -Compress
         $info | Set-Content -Path bin/build_info.json -Encoding utf8
-    - name: Verify official binaries
+
+    - name: Verify binaries
       shell: pwsh
       run: |
-        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
+        if (!(Test-Path ./bin/wkappbot.exe))      { throw 'bin/wkappbot.exe missing' }
         if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+        $v = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
+        if (!$v) { throw 'wkappbot --version produced no version line' }
+        Write-Host "Binary verified: $v"
+
     - name: Mark build success
       if: ${{ success() }}
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path .ci-state/build | Out-Null
         'false' | Set-Content .ci-state/build/last_build_failed.txt -Encoding ascii
+
     - name: Mark build failure
       if: ${{ failure() }}
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path .ci-state/build | Out-Null
         'true' | Set-Content .ci-state/build/last_build_failed.txt -Encoding ascii
-    - name: Save build snapshot cache
+
+    - name: Save build cache
       if: ${{ always() }}
       uses: actions/cache/save@v4
       with:
         path: |
           bin
           csharp/**/obj
-        key: ${{ runner.os }}-wkappbot-build-run-${{ github.run_id }}
+        key: ${{ runner.os }}-sdk-build-run-${{ github.run_id }}
+
     - name: Save build state
       if: ${{ always() }}
       uses: actions/cache/save@v4
       with:
         path: .ci-state/build
-        key: ${{ runner.os }}-wkappbot-build-state-${{ github.run_id }}
-    - name: Upload official bin artifact
+        key: ${{ runner.os }}-sdk-build-state-${{ github.run_id }}
+
+    - name: Upload bin artifact
       if: ${{ always() }}
       uses: actions/upload-artifact@v4
       with:
@@ -175,56 +195,54 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Restore cached official bin
+
+    - name: Restore cached bin
       uses: actions/cache/restore@v4
       with:
         path: bin
-        key: ${{ runner.os }}-wkappbot-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
+        key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
         restore-keys: |
-          ${{ runner.os }}-wkappbot-build-run-
-          ${{ runner.os }}-wkappbot-build-
-    - name: Download official bin artifact
+          ${{ runner.os }}-sdk-build-run-
+          ${{ runner.os }}-sdk-build-
+
+    - name: Download bin artifact
       if: ${{ needs.build.result == 'success' }}
       uses: actions/download-artifact@v4
       with:
         name: wkappbot-bin-${{ github.run_id }}
         path: bin
-    - name: Fallback rebuild official bin when missing
+
+    - name: Rebuild bin if missing
       shell: pwsh
       run: |
         if ((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe)) {
-          Write-Host 'Official bin already present.'
-          exit 0
+          Write-Host 'Bin already present.'; exit 0
         }
-        Write-Host 'Official bin missing. Rebuilding fallback bin in smoke job.'
+        Write-Host 'Bin missing -- fallback rebuild.'
         New-Item -ItemType Directory -Force -Path bin | Out-Null
-        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
         dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
+        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj             --configuration Release -p:SkipDeployCore=true    -o bin
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
         if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
-        Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
-        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
-    - name: Verify official binary folder
-      shell: pwsh
-      run: |
-        if (!(Test-Path ./bin/wkappbot.exe)) { throw 'bin/wkappbot.exe missing' }
-        if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills   -Recurse -Force }
+        if (Test-Path handlers)    { Copy-Item -Path handlers/*    -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+
     - name: Seed bin/wkappbot.hq
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
-        if (Test-Path wkappbot.hq) {
-          Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
-        }
-        Copy-Item -Path skills/*   -Destination bin/wkappbot.hq/skills   -Recurse -Force
-        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
-    - name: AppBot help smoke with sidecar
+        if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
+        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills   -Recurse -Force }
+        if (Test-Path handlers)    { Copy-Item -Path handlers/*    -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+
+    - name: User-centric smoke test
       shell: pwsh
       run: |
         $file    = 'scripts/smoke-help.ps1'
@@ -233,7 +251,7 @@ jobs:
         $code    = $LASTEXITCODE
         @(
           "commit: ${{ github.sha }}",
-          "workflow: build-csharp/smoke",
+          "workflow: build-launcher/smoke",
           "script: $file",
           "exitcode: $code",
           "timestamp_utc: $(Get-Date -AsUTC -Format o)",
@@ -241,26 +259,23 @@ jobs:
         ) + @($lines) | Set-Content -Path $outFile -Encoding utf8
         $lines | ForEach-Object { Write-Host $_ }
         exit $code
-    - name: Commit smoke sidecar files
+
+    - name: Commit smoke sidecar
       if: ${{ always() && github.event_name == 'push' }}
       shell: pwsh
       run: |
         git config user.name  'github-actions[bot]'
         git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         $changed = @(git status --porcelain -- '**/*.smoke.txt')
-        if ($changed.Count -eq 0) {
-          Write-Host 'No smoke sidecar changes to commit.'
-          exit 0
-        }
+        if ($changed.Count -eq 0) { Write-Host 'No smoke sidecar changes.'; exit 0 }
         git add -- '**/*.smoke.txt'
         git commit -m 'test: update build smoke sidecar files [skip ci]'
-        # Retry push with rebase to handle concurrent-push races (multiple pushes while CI runs)
         $ok = $false
         for ($i = 1; $i -le 5; $i++) {
           git pull --rebase origin main
           git push
-          if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "Pushed on attempt $i"; break }
-          Write-Host "Push attempt $i failed (exit=$LASTEXITCODE), retrying..."
+          if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "Pushed (attempt $i)"; break }
+          Write-Host "Push attempt $i failed, retrying..."
           Start-Sleep -Seconds (2 * $i)
         }
         if (-not $ok) { Write-Host 'All push attempts failed'; exit 1 }
