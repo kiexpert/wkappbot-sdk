@@ -100,7 +100,11 @@ internal partial class Program
                 try
                 {
                     NativeMethods.GetWindowRect(targetHwnd, out var pre9R);
-                    using var pre9Bmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    using var pre9Bmp = ScreenCapture.CaptureWindow(targetForm.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = true,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
                     if (pre9Bmp != null)
                     {
                         NativeMethods.GetWindowRect(targetForm.Handle, out var pre9FR);

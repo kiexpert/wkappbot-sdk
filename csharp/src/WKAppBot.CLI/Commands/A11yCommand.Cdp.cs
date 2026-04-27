@@ -105,7 +105,8 @@ internal partial class Program
             }
 
             // -- AAR: Action-Aware Readiness for CDP --
-            if (action is not ("read" or "find" or "inspect" or "highlight" or "screenshot" or "ocr" or "eval"))
+            bool isCoordClick = cssSelector.StartsWith("coord:", StringComparison.OrdinalIgnoreCase);
+            if (!isCoordClick && action is not ("read" or "find" or "inspect" or "highlight" or "screenshot" or "ocr" or "eval"))
             {
                 var cdpAar = new WKAppBot.WebBot.CdpActionReadiness();
                 var (offX, offY) = WKAppBot.WebBot.CdpActionTarget.GetWindowContentOffset(cdp);
@@ -125,6 +126,8 @@ internal partial class Program
 
             bool result = action switch
             {
+                "click" or "invoke" when cssSelector.StartsWith("coord:", StringComparison.OrdinalIgnoreCase)
+                    => CdpClickAtViewportCoord(cdp, cssSelector),
                 "click" or "invoke" => CdpClick(cdp, cssSelector),
                 "double-click" or "double_click" => CdpDoubleClick(cdp, cssSelector),
                 "right-click" or "right_click" => CdpRightClick(cdp, cssSelector),
@@ -174,10 +177,35 @@ internal partial class Program
         }
     }
 
+    /// <summary>CDP trusted click at explicit viewport coordinates: selector is "coord:X,Y".</summary>
+    static bool CdpClickAtViewportCoord(WKAppBot.WebBot.CdpClient cdp, string coordSelector)
+    {
+        var coordPart = coordSelector["coord:".Length..];
+        var parts = coordPart.Split(',');
+        if (parts.Length < 2 || !int.TryParse(parts[0].Trim(), out int x) || !int.TryParse(parts[1].Trim(), out int y))
+        {
+            Console.Error.WriteLine($"[A11Y] CDP coord click: invalid format '{coordSelector}' (expected coord:X,Y)");
+            return false;
+        }
+        cdp.TrustedClickAtAsync(x, y).GetAwaiter().GetResult();
+        Console.Error.WriteLine($"[A11Y] CDP coord click: TrustedClick viewport ({x},{y})");
+        return true;
+    }
+
     static bool CdpClick(WKAppBot.WebBot.CdpClient cdp, string selector)
     {
-        cdp.ClickAsync(selector).GetAwaiter().GetResult();
-        return true;
+        try
+        {
+            cdp.ClickAsync(selector).GetAwaiter().GetResult();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] CDP click failed ({ex.Message}), trying React fiber fallback");
+            var fiberOk = cdp.TryReactFiberClickAsync(selector).GetAwaiter().GetResult();
+            if (fiberOk) { Console.Error.WriteLine("[A11Y] React fiber click OK"); return true; }
+            throw;
+        }
     }
 
     static bool CdpDoubleClick(WKAppBot.WebBot.CdpClient cdp, string selector)
@@ -206,19 +234,29 @@ internal partial class Program
 
     static bool CdpType(WKAppBot.WebBot.CdpClient cdp, string selector, string text)
     {
-        // Auto-detect CJK text -> use Input.insertText (bypasses IME composition issues)
-        if (text.Any(c => c >= 0x1100 && c <= 0xD7AF   // Korean (Hangul)
-                       || c >= 0x3000 && c <= 0x9FFF    // CJK Unified + Japanese Kana
-                       || c >= 0xF900 && c <= 0xFAFF))  // CJK Compatibility
+        try
         {
-            Console.WriteLine("[A11Y] CJK text detected -> using CDP Input.insertText");
-            cdp.TypeInsertTextAsync(selector, text).GetAwaiter().GetResult();
+            // Auto-detect CJK text -> use Input.insertText (bypasses IME composition issues)
+            if (text.Any(c => c >= 0x1100 && c <= 0xD7AF   // Korean (Hangul)
+                           || c >= 0x3000 && c <= 0x9FFF    // CJK Unified + Japanese Kana
+                           || c >= 0xF900 && c <= 0xFAFF))  // CJK Compatibility
+            {
+                Console.WriteLine("[A11Y] CJK text detected -> using CDP Input.insertText");
+                cdp.TypeInsertTextAsync(selector, text).GetAwaiter().GetResult();
+            }
+            else
+            {
+                cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+            }
+            return true;
         }
-        else
+        catch (Exception ex)
         {
-            cdp.TypeAsync(selector, text).GetAwaiter().GetResult();
+            Console.Error.WriteLine($"[A11Y] CDP type failed ({ex.Message}), trying React fiber setValue fallback");
+            var fiberOk = cdp.TryReactFiberSetValueAsync(selector, text).GetAwaiter().GetResult();
+            if (fiberOk) { Console.Error.WriteLine("[A11Y] React fiber setValue OK"); return true; }
+            throw;
         }
-        return true;
     }
 
     /// <summary>
@@ -562,6 +600,12 @@ internal partial class Program
     /// </summary>
     static bool A11yReadBrowserFirst(AutomationElement el, IntPtr hwnd)
     {
+        // BUG-AUTO: FOCUS-STEAL end during a11y a11y-read -- same guard as InspectionCommands/A11yClose
+        if (FocusSafe.ShouldYieldToActiveUser(out var idleMs))
+        {
+            Console.Error.WriteLine($"[A11Y:READ] user active ({idleMs}ms idle) -- skipping to avoid focus steal");
+            return A11yRead(el); // fall back to UIA read (focusless)
+        }
         if (hwnd != IntPtr.Zero)
         {
             try

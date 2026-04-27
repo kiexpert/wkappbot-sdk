@@ -14,6 +14,8 @@ namespace WKAppBot.CLI;
 // file grep <pattern> [--path dir/file] [--type ext] [-i] [-C N] [--max N] [--encoding N]
 // file glob <pattern> [--path dir]
 // file undo --at <timestamp> [--path dir] [--list] [--dry-run]
+// file symlink <target> <linkname>
+// file link <target> <linkname>
 internal partial class Program
 {
     static int FileCommand(string[] args)
@@ -50,6 +52,8 @@ internal partial class Program
             "grep"                   => FileGrepCommand(args[1..]),
             // json-grep removed -- use "grap ... --json" instead (unified with logcat ecosystem)
             "glob"                   => FileGlobCommand(args[1..]),
+            "link"                   => FileLinkCommand(args[1..], symbolic: false),
+            "symlink"                => FileLinkCommand(args[1..], symbolic: true),
             "--help" or "-h" or "help" => FileToolUsage(),
             _ => Error($"Unknown file subcommand: {args[0]}")
         };

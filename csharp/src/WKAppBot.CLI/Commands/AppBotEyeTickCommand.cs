@@ -46,58 +46,49 @@ internal partial class Program
                 : EyeIpcClient.QueryTickAsync(timeoutMs: 100).GetAwaiter().GetResult();
             if (ipc != null)
             {
-                // Diagnostic/meta lines go to stderr -- buffered by Launcher and shown only
-                // on error exit (or with --stderr flag). Cards are the user-facing result
-                // so they stay on stdout. Pipe mode currently drops stderr entirely; the
-                // Launcher smart-stderr handler is a separate enhancement to plumb it.
-                Console.Error.WriteLine($"[EYE] one-shot tick (IPC fast-path, cache age={ipc.CachedAgeMs}ms)");
-                Console.Error.WriteLine($"[EYE_TICK] ipc=ok total={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}%");
-                Console.Error.WriteLine($"[EYE_TICK] hint promptLine={ipc.PromptLineHint} tickLine={ipc.TickLineHint}");
-                Console.Error.WriteLine($"[EYE_TICK] cards={ipc.CardCount} promptSource={ipc.PromptSource}");
-                if (!string.IsNullOrWhiteSpace(ipc.Prompt))
-                    Console.Error.WriteLine($"[EYE_TICK] recent={ipc.Prompt}");
-                foreach (var plan in ipc.Plans)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> {plan}");
-                if (ipc.Plans.Length > 3) Console.Error.WriteLine($"[EYE_PLAN] -> +{ipc.Plans.Length - 3} more...");
-                Console.Error.WriteLine($"[EYE_GUARD] armed={(ipc.GuardArmed ? 1 : 0)} execIdle={ipc.ExecIdleSec:F0}s aiIdle={ipc.AiIdleSec:F0}s cooldown={ipc.CooldownSec:F0}s");
-                Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(ipc.KeepAwakeAgeSec < 0 ? "n/a" : ipc.KeepAwakeAgeSec.ToString("F0") + "s")} promptSource={ipc.PromptSource} latestTickAge={(ipc.LatestTickAgeSec < 0 ? "n/a" : ipc.LatestTickAgeSec.ToString("F0") + "s")}");
-                // Staleness probe: compare the Eye's binary (what it booted
-                // from) with the freshly-published wkappbot-core.new.exe on
-                // disk. A non-trivial lag means Eye is running OLD code --
-                // hot-swap is pending or blocked. This is the "떠있는 아이가
-                // 올드인지?" query the user asked for.
+                // Diag to stderr (debug only)
+                Console.Error.WriteLine($"[EYE_TICK] ipc={swTotal.ElapsedMilliseconds}ms ctx={ipc.ContextPct}% cards={ipc.CardCount} armed={(ipc.GuardArmed?1:0)}");
+
+                // Staleness probe -- warn only when swap is pending
                 try
                 {
-                    var exeDir  = AppContext.BaseDirectory;
-                    var liveExe = Path.Combine(exeDir, "wkappbot-core.exe");
-                    var newExe  = Path.Combine(exeDir, "wkappbot-core.new.exe");
-                    if (File.Exists(liveExe))
+                    var liveExe = Path.Combine(AppContext.BaseDirectory, "wkappbot-core.exe");
+                    var newExe  = Path.Combine(AppContext.BaseDirectory, "wkappbot-core.new.exe");
+                    if (File.Exists(liveExe) && File.Exists(newExe))
                     {
-                        var live  = new FileInfo(liveExe);
-                        if (File.Exists(newExe))
-                        {
-                            var next = new FileInfo(newExe);
-                            var lagMin = (next.LastWriteTimeUtc - live.LastWriteTimeUtc).TotalMinutes;
-                            if (lagMin >= 1)
-                                Console.Error.WriteLine($"[EYE_EXE] STALE: live={live.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z  new={next.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z  lag={lagMin:F0}m (hot-swap pending)");
-                            else
-                                Console.Error.WriteLine($"[EYE_EXE] fresh: live={live.LastWriteTimeUtc:HH:mm}Z (matches .new.exe within 1m)");
-                        }
-                        else
-                        {
-                            Console.Error.WriteLine($"[EYE_EXE] live={live.LastWriteTimeUtc:yyyy-MM-dd HH:mm}Z (no .new.exe staged)");
-                        }
+                        var lagMin = (new FileInfo(newExe).LastWriteTimeUtc - new FileInfo(liveExe).LastWriteTimeUtc).TotalMinutes;
+                        if (lagMin >= 1)
+                            Console.Error.WriteLine($"[EYE_EXE] STALE: hot-swap pending (lag={lagMin:F0}m)");
                     }
                 }
-                catch { /* probe is diagnostic only -- never block tick */ }
-                // "-- card display --" separator: stdout because it precedes the card content.
-                Console.WriteLine("-- card display --");
-                foreach (var line in ipc.Summary.Split('\n'))
-                    Console.WriteLine(line.TrimEnd('\r'));
+                catch { }
+
+                // Card summary is the main user-facing output
+                var ipcSummary = ipc.Summary ?? "";
+                if (!string.IsNullOrWhiteSpace(ipcSummary))
+                {
+                    foreach (var line in ipcSummary.Split('\n'))
+                        Console.WriteLine(line.TrimEnd('\r'));
+                    Console.Out.Flush();
+                    PulseStep.Mark("ipc-done");
+                    return 0;
+                }
+
+                // IPC alive but summary empty (Eye warming up post-swap) -- fast card scan fallback
+                Console.Error.WriteLine("[EYE_TICK] ipc-summary-empty -- fast card scan fallback");
+                PulseStep.Mark("ipc-empty-fallback");
+                var swFallback = Stopwatch.StartNew();
+                var fbCards = ReadEyeCards(staleSeconds: 86400);
+                var fbTick = ReadLatestTick(out _, out _);
+                var fbSummary = BuildEyeSummary(fbCards, fbTick, "");
+                Console.Error.WriteLine($"[EYE_TICK] fallback={swFallback.ElapsedMilliseconds}ms cards={fbCards.Count}");
+                if (string.IsNullOrWhiteSpace(fbSummary))
+                    Console.WriteLine("(no summary yet -- Eye initializing)");
+                else
+                    foreach (var line in fbSummary.Split('\n'))
+                        Console.WriteLine(line.TrimEnd('\r'));
                 Console.Out.Flush();
-                // Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll on tick)
                 PulseStep.Mark("ipc-done");
-                Console.Out.Flush();
                 return 0;
             }
 
@@ -130,7 +121,6 @@ internal partial class Program
             CheckAndReportDeadCards(cards);
             swPhase.Stop();
             var msCards = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] ReadEyeCards={msCards}ms (count={cards.Count})");
             _lastPromptSource = promptDiag.Source;
 
             // -- Phase 4: Context % check --
@@ -146,94 +136,45 @@ internal partial class Program
                         .OrderByDescending(fi => fi!.LastWriteTimeUtc)
                         .ToList();
                     if (jsonls.Count > 0)
-                    {
-                        var lf = jsonls[0]!;
-                        _lastContextPct = (int)(lf.Length / (1024.0 * 1024.0) / 20.0 * 100);
-                    }
+                        _lastContextPct = (int)(jsonls[0]!.Length / (1024.0 * 1024.0) / 20.0 * 100);
                 }
             }
             catch { }
             swPhase.Stop();
-            var msCtx = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] ContextPct={msCtx}ms (ctx={_lastContextPct}%)");
 
-            // -- Phase 5: ExtractRecentPlanItems --
-            swPhase.Restart();
+            // -- Phase 5+6: Plans + Summary --
             var plans = ExtractRecentPlanItems(maxItems: 3);
-            swPhase.Stop();
-            var msPlans = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] PlanItems={msPlans}ms (count={plans.Count})");
-
-            // -- Phase 6: BuildEyeSummary --
-            swPhase.Restart();
             var summary = BuildEyeSummary(cards, latest, prompt, promptDiag.FileWriteUtc);
-            swPhase.Stop();
-            var msSummary = swPhase.ElapsedMilliseconds;
-            Console.Error.WriteLine($"[PROF] BuildSummary={msSummary}ms");
 
-            // -- Print results --
+            // Single diag line to stderr (not shown on success in interactive terminal)
             var ctxInfo = _lastContextPct >= 0 ? $" ctx={_lastContextPct}%" : "";
-            Console.Error.WriteLine("[EYE] one-shot tick");
-            Console.Error.WriteLine($"[EYE_TICK] tick={msReadTick}ms prompt={msPrompt}ms cards={msCards}ms ctx={msCtx}ms plans={msPlans}ms summary={msSummary}ms total={swTotal.ElapsedMilliseconds}ms{ctxInfo}");
-            Console.Error.WriteLine($"[EYE_TICK] hint promptLine={_lastPromptLineIndex} tickLine={_lastEyeTickLineIndex}");
-            Console.Error.WriteLine($"[EYE_TICK] cards={cards.Count} promptSource={promptDiag.Source}");
-            if (!string.IsNullOrWhiteSpace(prompt))
-                Console.Error.WriteLine($"[EYE_TICK] recent={prompt}");
+            Console.Error.WriteLine($"[EYE_TICK] legacy={swTotal.ElapsedMilliseconds}ms cards={cards.Count}{ctxInfo}");
 
-            if (plans.Count > 0)
-            {
-                for (int i = 0; i < plans.Count; i++)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> {plans[i]}");
-                if (_lastPlanItemsCache.Count > plans.Count)
-                    Console.Error.WriteLine($"[EYE_PLAN] -> +{_lastPlanItemsCache.Count - plans.Count} more...");
-            }
-
-            var execIdle = (DateTime.UtcNow - _lastTickActivityUtc).TotalSeconds;
-            var aiIdle = (DateTime.UtcNow - _lastAiActivityUtc).TotalSeconds;
-            var cooldown = _lastAutoGogoUtc == DateTime.MinValue ? 9999 : (DateTime.UtcNow - _lastAutoGogoUtc).TotalSeconds;
-            var armed = execIdle >= 60 && aiIdle >= 60 && cooldown >= 600;
-            Console.Error.WriteLine($"[EYE_GUARD] armed={(armed ? 1 : 0)} execIdle={execIdle:F0}s aiIdle={aiIdle:F0}s cooldown={cooldown:F0}s");
-
-            var latestAge = -1.0;
-            if (latest != null && DateTime.TryParse(latest.Ts, out var ts))
-                latestAge = (DateTime.UtcNow - ts.ToUniversalTime()).TotalSeconds;
-            var keepAge = _lastKeepAwakeUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastKeepAwakeUtc).TotalSeconds;
-            Console.Error.WriteLine($"[EYE_LOOP] keepAwakeAge={(keepAge < 0 ? "n/a" : keepAge.ToString("F0") + "s")} promptSource={_lastPromptSource} latestTickAge={(latestAge < 0 ? "n/a" : latestAge.ToString("F0") + "s")}");
-
-            Console.WriteLine("-- card display --");
-            foreach (var line in summary.Split('\n'))
-                Console.WriteLine(line.TrimEnd('\r'));
+            // Card summary -- clean stdout, no separator header
+            if (string.IsNullOrWhiteSpace(summary))
+                Console.WriteLine("(no summary yet)");
+            else
+                foreach (var line in summary.Split('\n'))
+                    Console.WriteLine(line.TrimEnd('\r'));
             Console.Out.Flush();
 
-            // Phase 7: Slack forwarding handled by OnMessage -> slack route worker (no HTTP poll)
-
-            // Phase 8: Eye watchdog + route retry flush (called by Task Scheduler every 10 min)
+            // Watchdog + route retry (background concern, errors to stderr only)
             try
             {
-                // Respawn Eye daemon if it was killed -- watchdog core behavior
                 RouteRetryQueue.EnsureEyeRunning();
-
-                // Flush due retry items
                 var retryItems = RouteRetryQueue.GetDueItems();
                 if (retryItems.Count > 0)
                 {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.Error.WriteLine($"[EYE_TICK] Route retry flush: {retryItems.Count} item(s)");
-                    Console.ResetColor();
                     foreach (var item in retryItems)
                         SlackRouteCommand([item]);
                 }
-
-                // Sync precise one-shot for remaining items (if any)
                 RouteRetryQueue.ScheduleRetryTask();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[EYE_TICK] Watchdog/retry error: {ex.Message}");
+                Console.Error.WriteLine($"[EYE_TICK] Watchdog error: {ex.Message}");
             }
-
-            Console.Error.WriteLine($"[PROF] TOTAL={swTotal.ElapsedMilliseconds}ms");
-            Console.Out.Flush();
 
             return 0;
         }
@@ -260,6 +201,12 @@ internal partial class Program
 
     /// <summary>
     /// Build IPC response from cached state -- called by EyeIpcServer on pipe connection.
+    /// Trigger EnsureVisible() on the running Eye host -- called by IPC tick handler
+    /// so `wkappbot eye tick` also heals opacity/topmost/position.
+    /// </summary>
+    public static void EnsureEyeVisible() => _globalEyeHost?.EnsureVisible();
+
+    /// <summary>
     /// All fields read from static cache updated by RunOneGlobalTick; no UIA/file scan needed.
     /// </summary>
     public static EyeIpcTickResponse BuildIpcTickResponse()

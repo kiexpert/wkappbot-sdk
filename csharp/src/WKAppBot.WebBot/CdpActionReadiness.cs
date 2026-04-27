@@ -25,12 +25,12 @@ public sealed class CdpActionReadiness : IActionReadiness
 
         // -- Stage 0: Global -- no lock screen check for web (handled by Windows AAR above) --
 
-        // -- Stage 1: Target validation --
+        // -- Stage 1: Target validation (--force bypasses visible/enabled/readonly soft gates) --
         if (!target.Visible)
         {
-            if (act is "type" or "set-value" or "click" or "invoke")
+            if (act is "type" or "set-value" or "click" or "invoke" && !ctx.Force)
             {
-                Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target not visible (hidden/display:none) for {action}: \"{target.DisplayName}\"");
+                Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target not visible (hidden/display:none) for {action}: \"{target.DisplayName}\" (hint: --force to override)");
                 return null;
             }
             Console.Error.WriteLine($"[AAR:CDP] WARNING: target not visible for {action}: \"{target.DisplayName}\"");
@@ -38,9 +38,9 @@ public sealed class CdpActionReadiness : IActionReadiness
 
         if (!target.Enabled)
         {
-            if (act is "type" or "set-value" or "click" or "invoke" or "toggle" or "select")
+            if (act is "type" or "set-value" or "click" or "invoke" or "toggle" or "select" && !ctx.Force)
             {
-                Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target disabled for {action}: \"{target.DisplayName}\"");
+                Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target disabled for {action}: \"{target.DisplayName}\" (hint: --force to override)");
                 return null;
             }
         }
@@ -51,9 +51,9 @@ public sealed class CdpActionReadiness : IActionReadiness
             switch (act)
             {
                 case "type" or "set-value":
-                    if (cdpTarget.IsReadOnly)
+                    if (cdpTarget.IsReadOnly && !ctx.Force)
                     {
-                        Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target is readonly for {action}: \"{target.DisplayName}\"");
+                        Console.Error.WriteLine($"[AAR:CDP] BLOCKED: target is readonly for {action}: \"{target.DisplayName}\" (hint: --force to override)");
                         return null;
                     }
                     // Warn if not a typical input element

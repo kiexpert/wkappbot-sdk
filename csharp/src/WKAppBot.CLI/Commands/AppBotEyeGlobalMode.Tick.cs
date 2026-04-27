@@ -76,6 +76,7 @@ internal partial class Program
         var cards = _cachedCards;
 
         host.UpdateInfo("global", $"WK AppBot Global Eye {DateTime.Now:HH:mm:ss}");
+        host.EnsureVisible(); // self-heal: clamp off-screen, restore opacity/visibility
         // Amber border when admin Eye proxy is reachable -- NOT when current process is
         // elevated. User Eye itself is never elevated; what matters is whether a separate
         // admin Eye is serving the wkappbot_elevated pipe so --sudo commands can route

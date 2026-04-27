@@ -241,14 +241,34 @@ internal partial class Program
                 if (string.IsNullOrWhiteSpace(card.Cwd)) continue;
                 // Use exact SessionJsonl from registry when available -- avoids CWD scan ambiguity
                 // (two AIs sharing the same CWD would otherwise get the same JSONL from CWD scan)
-                var (pct, _, jsonlPath, fileSize) = !string.IsNullOrEmpty(card.SessionJsonl) && File.Exists(card.SessionJsonl)
-                    ? GetContextInfoForJsonl(card.SessionJsonl)
+                bool hasExplicitJsonl = !string.IsNullOrEmpty(card.SessionJsonl) && File.Exists(card.SessionJsonl);
+                var (pct, jsonlAge, jsonlPath, fileSize) = hasExplicitJsonl
+                    ? GetContextInfoForJsonl(card.SessionJsonl!)
                     : GetContextInfoForCwdEx(card.Cwd, card.HostType);
                 var sizeMB = fileSize / (1024.0 * 1024.0);
                 const double ContextLimitMB = 20.0;
                 const double SkillNudgeMB  = 9.5;   // skill contribute nudge
                 const double UrgentMB      = 10.0;   // urgent handoff threshold
                 if (sizeMB < SkillNudgeMB || jsonlPath == null) continue;
+
+                // Skip if this JSONL is not the newest file in its project folder.
+                // Covers both explicit (card.SessionJsonl) and CWD-fallback paths:
+                // after newchat, a newer JSONL exists so the old large file is silenced.
+                {
+                    var projDir = System.IO.Path.GetDirectoryName(jsonlPath);
+                    if (projDir != null && Directory.Exists(projDir))
+                    {
+                        var thisMtime = File.GetLastWriteTimeUtc(jsonlPath);
+                        var newerExists = Directory.GetFiles(projDir, "*.jsonl")
+                            .Any(f => !f.Equals(jsonlPath, StringComparison.OrdinalIgnoreCase)
+                                   && File.GetLastWriteTimeUtc(f) > thisMtime);
+                        if (newerExists) continue;
+                    }
+                }
+
+                // CWD-fallback guard: stale file (no writes in 30+ min) silenced until next genuine growth.
+                if (!hasExplicitJsonl && jsonlAge.HasValue && jsonlAge.Value.TotalMinutes > 30) continue;
+
 
                 // Key dedup by the ACTUAL measured jsonlPath -- NOT by CWD or card.SessionJsonl.
                 // Root cause of the "new AI pops up and immediately re-warns" bug: when a new
@@ -268,6 +288,7 @@ internal partial class Program
 
                 var cwdTag = AbbreviateCwd(card.Cwd);
                 contextWarnedPcts[jsonlKey] = (curMB, jsonlPath);
+                SaveContextWarnedEntry(jsonlKey, curMB);
 
                 // Resolve Slack username from card host type (Claude vs Codex)
                 var cardSlackUser = ClaudePromptHelper.IsCodexHostType(card.HostType)
@@ -763,14 +784,23 @@ internal partial class Program
                             (state.CwdLabel ?? "").IndexOf("WKAppBot", StringComparison.OrdinalIgnoreCase) >= 0;
                         if (_isWkAppBotInstance && state.LastHomeworkAt == null && !string.IsNullOrEmpty(state.FullCwd ?? state.CwdLabel))
                         {
-                            var ck = state.FullCwd ?? state.CwdLabel;
+                            var ck = state.FullCwd ?? state.CwdLabel ?? "";
                             state.LastHomeworkAt = LoadHomeworkAt(ck);
                         }
-                        if (_isWkAppBotInstance
+                        // Trigger 1: WKAppBot instance + Claude idle 1min + cooldown 10min
+                        var claudeIdleTrigger = _isWkAppBotInstance
                             && state.IdleMessageSent && !state.HomeworkNotified
                             && state.IdleStartedAt != null
-                            && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1    // 협의값: 1분
-                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalMinutes >= 10)) // 협의값: 10분
+                            && (DateTime.UtcNow - state.IdleStartedAt.Value).TotalMinutes >= 1
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalMinutes >= 10);
+                        // Trigger 2: user input idle >= 5min -> UNCONDITIONAL (any instance, no _isWkAppBotInstance gate)
+                        var userIdleMs = NativeMethods.GetUserIdleMs();
+                        var userIdleTrigger = !state.HomeworkNotified
+                            && userIdleMs >= 5 * 60 * 1000
+                            && (state.LastHomeworkAt == null || (DateTime.UtcNow - state.LastHomeworkAt.Value).TotalMinutes >= 10);
+                        // Both triggers require WKAppBot instance (prevents wrong-bot Slack posts)
+                        // Global user-idle 5min is handled at Eye main loop level (AppBotEyeGlobalMode)
+                        if ((claudeIdleTrigger || userIdleTrigger) && _isWkAppBotInstance)
                         {
                             try { CheckAndSendHomework(state, hwnd, label); }
                             catch { }
@@ -1186,6 +1216,47 @@ internal partial class Program
         catch { }
     }
 
+    // -- Context-warned state (survives Eye hot-swap) ------------------------------------
+    static string _contextWarnedStatePath => Path.Combine(DataDir, "runtime", "context_warned.json");
+
+    internal static Dictionary<string, (int mb, string? path)> LoadContextWarnedState()
+    {
+        var result = new Dictionary<string, (int mb, string? path)>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            if (!File.Exists(_contextWarnedStatePath)) return result;
+            var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_contextWarnedStatePath));
+            if (json is not System.Text.Json.Nodes.JsonObject obj) return result;
+            foreach (var kv in obj)
+                if (int.TryParse(kv.Value?.GetValue<string>(), out var mb))
+                    result[kv.Key] = (mb, null);
+        }
+        catch { }
+        return result;
+    }
+
+    static void SaveContextWarnedEntry(string jsonlKey, int mb)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(_contextWarnedStatePath)!;
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            System.Text.Json.Nodes.JsonObject obj;
+            if (File.Exists(_contextWarnedStatePath))
+            {
+                var existing = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_contextWarnedStatePath));
+                obj = existing as System.Text.Json.Nodes.JsonObject ?? new();
+            }
+            else obj = new();
+            // Only update if new value is higher (never lower -- avoids stale re-warn after handoff)
+            if (obj[jsonlKey]?.GetValue<string>() is string prev && int.TryParse(prev, out var prevMb) && mb <= prevMb)
+                return;
+            obj[jsonlKey] = mb.ToString();
+            File.WriteAllText(_contextWarnedStatePath, obj.ToJsonString());
+        }
+        catch { }
+    }
+
     // Fired once per idle session (HomeworkNotified guard) when Claude has been idle 1+ min.
     // All idle instances (Codex, Claude Desktop, OpenClaw, etc.). Reads suggestions.jsonl for pending items,
     // types prompt directly via TypeAndSubmit (NO /clear, NO policy injection).
@@ -1263,14 +1334,31 @@ internal partial class Program
         // If window gone, TrySpawnAppbotVsCode will open VS Code and deliver after it's ready.
         try
         {
-            var cwdFilter = state.FullCwd ?? state.CwdLabel;
+            // Suggest homework is WKAppBot-specific -- always target the WKAppBot session.
+            // Use full path as CWD filter (not just folder name) to avoid matching windows
+            // with "WKAppBot" anywhere in their title (e.g. WkAutoQuant bash tool outputs).
+            var wkAppBotRoot = Path.GetDirectoryName(Path.GetDirectoryName(DataDir)); // bin/wkappbot.hq -> bin -> WKAppBot
+            var cwdFilter = wkAppBotRoot ?? (state.FullCwd ?? state.CwdLabel); // full path, not just folder name
 
             // Set 1h cooldown now -- persisted to disk
             state.LastHomeworkAt = DateTime.UtcNow;
             if (!string.IsNullOrEmpty(cwdKey))
                 SaveHomeworkAt(cwdKey, state.LastHomeworkAt.Value);
 
-            // Route through MCP: prompt send finds window by name, respects idle check
+            // Guard: if WKAppBot Claude is not running, MCP falls back to any idle instance (e.g. WkAutoQuant) -- wrong label/channel.
+            // Spawn VS Code instead so homework lands in the right context.
+            var wkAppBotCwdShort = wkAppBotRoot != null ? Path.GetFileName(wkAppBotRoot) : "WKAppBot";
+            var wkAppBotRunning = _instanceStates.Values.Any(s =>
+                (s.FullCwd  ?? "").IndexOf(wkAppBotCwdShort, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                (s.CwdLabel ?? "").IndexOf(wkAppBotCwdShort, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!wkAppBotRunning)
+            {
+                Console.Error.WriteLine($"[EYE] Homework: WKAppBot Claude not running -- spawning VS Code (avoid wrong-instance delivery)");
+                TrySpawnAppbotVsCode(prompt);
+                return;
+            }
+
+            // Route through MCP: prompt send finds window by full CWD path
             var (output, exitCode) = EyeMcpClient.CallAsync(
                 ["prompt", "send", cwdFilter ?? "", prompt, "--timeout", "2m"],
                 timeoutMs: 150_000).GetAwaiter().GetResult();

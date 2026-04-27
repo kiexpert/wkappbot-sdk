@@ -245,6 +245,8 @@ internal static class FocuslessWarningOverlay
     private static readonly ConcurrentDictionary<string, bool> _suppressed = new();
     // 현재 표시 중인 프로세스별 창 추적 -- 중복 창 방지
     private static readonly ConcurrentDictionary<string, bool> _active = new();
+    // 자동 suggest 발송 추적 -- 세션 당 프로세스별 1회만 suggest
+    private static readonly ConcurrentDictionary<string, bool> _suggested = new();
 
     /// <summary>
     /// 포커스리스 경고 알림 표시 (fire-and-forget, non-blocking).
@@ -274,6 +276,34 @@ internal static class FocuslessWarningOverlay
         }
 
         var detailText = detail ?? "(unknown)";
+
+        // Auto-suggest bug: once per procName per session
+        var stackNow = Environment.StackTrace;
+        if (_suggested.TryAdd(procName, true))
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var frames = stackNow.Split('\n')
+                    .Skip(3).Take(8)
+                    .Select(s => s.Trim()).Where(s => s.Length > 0);
+                var stack = string.Join(" | ", frames);
+                var safeDetail = detailText.Replace("\"", "'").Replace("\n", " ");
+                var title = $"[BUG] focus-steal: {procName} stole fg -- {safeDetail}";
+                var desc = $"callstack: {stack}";
+                var psi = new System.Diagnostics.ProcessStartInfo(
+                    System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "wkappbot",
+                    $"suggest \"{title}: {desc}\"")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = AppContext.BaseDirectory,
+                };
+                System.Diagnostics.Process.Start(psi)?.WaitForExit(5000);
+            }
+            catch { }
+        });
+
         var thread = new Thread(() =>
         {
             try

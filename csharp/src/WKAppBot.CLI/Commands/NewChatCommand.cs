@@ -111,7 +111,21 @@ Then immediately:
         Console.Error.WriteLine($"[NEWCHAT] Prompt: {(text.Length > 80 ? text[..77] + "..." : text)} ({text.Length} chars)");
 
         using var promptHelper = new ClaudePromptHelper();
-        var currentPrompt = promptHelper.FindPrompt(Environment.CurrentDirectory);
+        // Use CallerCwd (invoker's actual project dir) not Environment.CurrentDirectory (wkappbot.exe dir).
+        // Try CWD-strict search first (no cursor hint, direct folder matching) to avoid picking the wrong
+        // VSCode window when multiple projects are open. Fall back to generic search if CWD search fails.
+        var cwdForSearch = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+        Console.Error.WriteLine($"[NEWCHAT] CWD for window search: {cwdForSearch}");
+        var currentPrompt = promptHelper.FindPromptForCwd(cwdForSearch);
+        if (currentPrompt == null)
+        {
+            Console.Error.WriteLine("[NEWCHAT] FindPromptForCwd returned null, falling back to FindPrompt");
+            currentPrompt = promptHelper.FindPrompt(cwdForSearch);
+        }
+        else
+        {
+            Console.Error.WriteLine($"[NEWCHAT] FindPromptForCwd matched: hwnd=0x{currentPrompt.WindowHandle:X} \"{currentPrompt.WindowTitle}\"");
+        }
         if (currentPrompt != null && !ClaudePromptHelper.IsVsCodeHostType(currentPrompt.HostType))
         {
             Console.ForegroundColor = ConsoleColor.Red;
@@ -278,11 +292,29 @@ Then immediately:
             if (editEl == null) return Error("[NEWCHAT] Edit element lost after compress");
         }
 
-        // -- Step 1: /clear via keyboard (slash command menu needs keystroke input!) --
-        Console.WriteLine("[NEWCHAT] Using keyboard input for slash command (v2)");
-        if (!TypeSlashCommandAndSubmit(editEl, vsHwnd, "/clear"))
-            return Error("[NEWCHAT] Failed to send /clear");
-        Console.WriteLine("[NEWCHAT] /clear submitted ??waiting 3s for reset...");
+        // -- Step 1: /clear (char-by-char triggers autocomplete menu, PostMessage Enter selects it) --
+        Console.WriteLine("[NEWCHAT] Sending /clear...");
+        bool clearOk = false;
+        for (int attempt = 1; attempt <= 3 && !clearOk; attempt++)
+        {
+            if (!A11yTypeAndSubmit(editEl, vsHwnd, "/clear")) continue;
+            Thread.Sleep(200);
+            try
+            {
+                var afterVal = editEl.Patterns.Value.IsSupported
+                    ? editEl.Patterns.Value.Pattern.Value.Value ?? "" : "";
+                if (!afterVal.TrimStart().StartsWith("/", StringComparison.Ordinal))
+                    clearOk = true;
+                else
+                {
+                    Console.Error.WriteLine($"[NEWCHAT] /clear not consumed attempt={attempt}: '{afterVal}' -- retrying");
+                    Thread.Sleep(300 * attempt);
+                }
+            }
+            catch { clearOk = true; }
+        }
+        if (!clearOk) return Error("[NEWCHAT] Failed to send /clear after 3 attempts");
+        Console.WriteLine("[NEWCHAT] /clear submitted -- waiting 3s...");
         Thread.Sleep(3000);
 
         // -- Step 2: Re-find edit (DOM may have changed after /clear) --
@@ -298,8 +330,8 @@ Then immediately:
         }) : null;
         if (editEl == null) return Error("[NEWCHAT] Edit element lost after /clear");
 
-        // -- Step 3: Paste prompt + submit --
-        if (!SetValueAndSubmit(editEl, vsHwnd, text))
+        // -- Step 3: Inject prompt --
+        if (!A11yTypeAndSubmit(editEl, vsHwnd, text))
             return Error("[NEWCHAT] Failed to send prompt");
 
         // -- Step 4: Restore focus --
@@ -316,51 +348,81 @@ Then immediately:
         return 0;
     }
 
-    /// <summary>
-    /// Type a slash command via keyboard input so the autocomplete menu appears,
-    /// then press Enter to select it. SetValue bypasses the menu!
-    /// </summary>
-    static bool TypeSlashCommandAndSubmit(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string command)
+    // TypeSlashCommandAndSubmit and SetValueAndSubmit removed -- replaced by A11yTypeAndSubmit.
+
+    // placeholder to keep compiler happy if any stale reference remains
+    static bool _unusedTypeSlashPlaceholder_Remove(FlaUI.Core.AutomationElements.AutomationElement editEl, IntPtr hwnd, string command)
     {
-        // newchat is an intentional automation command ??bypass readiness assertion
         WKAppBot.Win32.Input.InputReadiness.ReadinessCalled = true;
-        try
+        WKAppBot.Win32.Input.InputReadiness.SetApprovalGrace();
+
+        const int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            // Focus the edit element first
-            try { editEl.Focus(); Thread.Sleep(100); }
-            catch
+            try
             {
                 NativeMethods.SmartSetForegroundWindow(hwnd);
+                Thread.Sleep(150);
+
+                // Click directly on the edit element to guarantee focus
+                var rect = editEl.BoundingRectangle;
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    MouseInput.Click(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+                    Thread.Sleep(250);
+                }
+                else
+                {
+                    NativeMethods.GetWindowRect(hwnd, out var wr);
+                    MouseInput.Click(wr.Left + wr.Width / 2, wr.Top + 15);
+                    Thread.Sleep(200);
+                    KeyboardInput.PressKey("escape");
+                    Thread.Sleep(150);
+                }
+
+                // Clear any existing text
+                KeyboardInput.Hotkey(new[] { "ctrl", "a" });
+                Thread.Sleep(50);
+                KeyboardInput.PressKey("delete");
+                Thread.Sleep(100);
+
+                // Paste via clipboard (fires DOM input events in Chromium)
+                using var clipGuard = new WKAppBot.Win32.Window.ClaudePromptHelper.ClipboardGuard();
+                ClaudePromptHelper.SetClipboardTextPublic(command);
+                Thread.Sleep(50);
+                KeyboardInput.Hotkey(new[] { "ctrl", "v" });
                 Thread.Sleep(300);
+                Console.Error.WriteLine($"[NEWCHAT] attempt={attempt}: pasted '{command}'");
+
+                // SendInput Enter (real keystroke -- executes the slash command)
+                KeyboardInput.PressKey("enter");
+                Thread.Sleep(400);
+
+                // Verify: command consumed → input empty; still starts with "/" → retry
+                try
+                {
+                    var afterVal = editEl.Patterns.Value.IsSupported
+                        ? editEl.Patterns.Value.Pattern.Value.Value ?? "" : "";
+                    if (!string.IsNullOrWhiteSpace(afterVal) &&
+                        afterVal.TrimStart().StartsWith("/", StringComparison.Ordinal))
+                    {
+                        Console.Error.WriteLine($"[NEWCHAT] attempt={attempt}: input still '{afterVal}' -- retrying");
+                        Thread.Sleep(300 * attempt);
+                        continue;
+                    }
+                }
+                catch { /* value check optional */ }
+
+                Console.Error.WriteLine($"[NEWCHAT] attempt={attempt}: OK");
+                return true;
             }
-
-            // Clear any existing text
-            KeyboardInput.Hotkey(new[] { "ctrl", "a" });
-            Thread.Sleep(50);
-            KeyboardInput.PressKey("delete");
-            Thread.Sleep(100);
-
-            // Type each character via SendInput so the slash command menu triggers
-            foreach (var ch in command)
+            catch (Exception ex)
             {
-                KeyboardInput.TypeText(ch.ToString());
-                Thread.Sleep(50); // delay for menu to react per keystroke
+                Console.Error.WriteLine($"[NEWCHAT] TypeSlashCommand attempt={attempt}: {ex.Message}");
+                if (attempt < maxAttempts) Thread.Sleep(300 * attempt);
             }
-            Console.Error.WriteLine($"[NEWCHAT] Typed '{command}' via keyboard");
-
-            // Wait for autocomplete menu to appear and settle
-            Thread.Sleep(800);
-
-            // Press Enter once to select the slash command from menu
-            KeyboardInput.PressKey("enter");
-            Thread.Sleep(200);
-            return true;
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[NEWCHAT] TypeSlashCommand failed: {ex.Message}");
-            return false;
-        }
+        return false;
     }
 
     /// <summary>
@@ -433,6 +495,8 @@ Then immediately:
             Thread.Sleep(100);
 
             // Paste via clipboard (fires DOM input/change events in Chromium!)
+            // ClipboardGuard saves+restores clipboard so user's copied content is preserved.
+            using var clipGuard = new WKAppBot.Win32.Window.ClaudePromptHelper.ClipboardGuard();
             ClaudePromptHelper.SetClipboardTextPublic(text);
             Thread.Sleep(50);
             KeyboardInput.Hotkey(new[] { "ctrl", "v" });

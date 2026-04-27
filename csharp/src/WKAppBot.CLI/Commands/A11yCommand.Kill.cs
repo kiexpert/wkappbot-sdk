@@ -1,5 +1,6 @@
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -14,12 +15,30 @@ internal partial class Program
     //   "flutter/node/wkappbot-core" -> chain: flutter->node->wkappbot-core
     //   "**/wkappbot-core"         -> wkappbot-core with any ancestor (any depth)
     //   "wkappbot-core#regex:lucy" -> '#' splits name#exePathFilter
+    //   "{proc:'notepad',pid:1234}" -> JSON5 multi-field grap (proc/pid/cmd AND)
     // If process has a window -> WM_CLOSE first then Kill; else -> Kill directly.
     // KillCandidate: a process that passed all guards and is eligible to kill.
     record KillCandidate(System.Diagnostics.Process Proc, string NodeKey, string CmdLine, string CmdBrief);
 
     static int A11yKillByPattern(string grap, bool allowAncestors, bool dryRun = false, string? argFilter = null, string? nthRaw = null)
     {
+        // JSON5 multi-field grap: {proc:'notepad', pid:1234, cmd:'--flag'}
+        // Reuses WindowFinder's grap parser so the kill syntax matches the rest
+        // of a11y. For kill we only care about process-level fields:
+        //   proc  process name (glob/regex)
+        //   pid   numeric PID
+        //   cmd   cmdline substring (glob/regex)
+        // title/cls/domain/url are window-only and ignored with a warning.
+        if (grap.Length >= 2 && grap[0] == '{' && grap[^1] == '}')
+        {
+            var mf = WindowFinder.TryParseMultiFieldPattern(grap);
+            if (mf != null)
+                return A11yKillByMultiField(mf, allowAncestors, dryRun, argFilter, nthRaw, grap);
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[KILL] JSON5 grap \"{grap}\" failed to parse -- falling back to name pattern");
+            Console.ResetColor();
+        }
+
         // [FOCUS-STEAL] Local sentinel so Peek() inside the kill loop can see fg changes
         // triggered by per-target WM_CLOSE (save-prompt dialogs). The outer A11yCommand
         // sentinel is fine for end-of-command; this one enables mid-loop Peek.
@@ -320,6 +339,279 @@ internal partial class Program
         // X-ray cleanup: recover any windows left transparent by killed processes
         try { XRayHelper.RestoreAll(); } catch { }
 
+        return 0;
+    }
+
+    // JSON5 grap variant of kill: match processes by proc/pid/cmd fields (AND).
+    // Shares all guards (self-kill, eye-child, webbot-cdp, mcp-launcher, --nth)
+    // with the name-pattern path by converting multi-field matches into a
+    // synthetic "proc name" pattern for each matched process. Callers who pass
+    // {proc:'notepad'} get exactly the same guard behavior as `a11y kill notepad`.
+    static int A11yKillByMultiField(
+        Dictionary<string, List<string>> fields,
+        bool allowAncestors,
+        bool dryRun,
+        string? argFilter,
+        string? nthRaw,
+        string displayGrap)
+    {
+        using var killSentinel = new FocusStealSentinel("a11y-kill");
+        if (_dryRunMode.Value) dryRun = true;
+
+        // Warn on ignored window-only fields -- kill operates at process level.
+        foreach (var k in fields.Keys)
+        {
+            if (k.Equals("title", StringComparison.OrdinalIgnoreCase) ||
+                k.Equals("cls", StringComparison.OrdinalIgnoreCase) ||
+                k.Equals("domain", StringComparison.OrdinalIgnoreCase) ||
+                k.Equals("url", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Error.WriteLine($"[KILL] JSON5 field '{k}' is window-only -- ignored for process kill");
+                Console.ResetColor();
+            }
+        }
+
+        // Build field matchers (all AND-ed). At least one of proc/pid/cmd must be present.
+        uint pidFilter = 0;
+        if (fields.TryGetValue("pid", out var pidVals) && pidVals.Count > 0)
+        {
+            var pv = pidVals[0].Trim();
+            if (pv.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                uint.TryParse(pv[2..], System.Globalization.NumberStyles.HexNumber, null, out pidFilter);
+            else
+                uint.TryParse(pv, out pidFilter);
+        }
+
+        List<PatternMatcher>? procMatchers = null;
+        if (fields.TryGetValue("proc", out var pv2))
+            procMatchers = pv2.Select(v =>
+                PatternMatcher.Create(v.StartsWith('/') && v.EndsWith('/') ? "regex:" + v[1..^1] : v)).ToList();
+
+        List<PatternMatcher>? cmdMatchers = null;
+        if (fields.TryGetValue("cmd", out var cv))
+            cmdMatchers = cv.Select(v =>
+                PatternMatcher.Create(v.StartsWith('/') && v.EndsWith('/') ? "regex:" + v[1..^1] : v)).ToList();
+
+        if (pidFilter == 0 && procMatchers == null && cmdMatchers == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"[KILL] JSON5 grap needs at least one of: proc, pid, cmd -- got \"{displayGrap}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        var allProcs = System.Diagnostics.Process.GetProcesses();
+        var selfPids = allowAncestors ? new HashSet<int>() : GetSelfAndAncestorPids();
+        var candidates = new List<KillCandidate>();
+        var skipped = new List<string>();
+
+        foreach (var p in allProcs)
+        {
+            try
+            {
+                if (pidFilter != 0 && (uint)p.Id != pidFilter) continue;
+
+                var procName = p.ProcessName;
+                if (procMatchers != null)
+                {
+                    bool procOk = procMatchers.Any(m => m.IsMatch(procName));
+                    if (!procOk) continue;
+                }
+
+                string cmdLine = "";
+                if (cmdMatchers != null || argFilter != null)
+                {
+                    try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                    if (cmdMatchers != null && !cmdMatchers.Any(m => m.IsMatch(cmdLine)))
+                        continue;
+                }
+
+                var nodeKey = $"[{p.Id}]{procName}.exe";
+
+                if (selfPids.Contains(p.Id))
+                {
+                    skipped.Add($"{nodeKey} (ancestor-protected)");
+                    continue;
+                }
+                if (IsMcpLauncherProcess(p.Id))
+                {
+                    skipped.Add($"{nodeKey} (mcp-launcher-protected)");
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(cmdLine))
+                    try { cmdLine = NativeMethods.GetProcessCommandLine(p.Id) ?? ""; } catch { }
+                var cmdBrief = cmdLine.Length > 80 ? cmdLine[..80] + "..." : cmdLine;
+
+                if (argFilter != null && !cmdLine.Contains(argFilter, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!string.IsNullOrEmpty(cmdLine) && (
+                    cmdLine.Contains("whisper-ring", StringComparison.OrdinalIgnoreCase) ||
+                    cmdLine.Contains("screensaver", StringComparison.OrdinalIgnoreCase) ||
+                    cmdLine.Contains("analyze-hack", StringComparison.OrdinalIgnoreCase)))
+                {
+                    skipped.Add($"[{p.Id}]{procName} (eye-child)");
+                    Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} -- SKIP (eye-child: {cmdBrief})");
+                    continue;
+                }
+
+                if (argFilter == null && !string.IsNullOrEmpty(cmdLine) &&
+                    (procName.Equals("chrome", StringComparison.OrdinalIgnoreCase) ||
+                     procName.Equals("msedge", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(cmdLine, @"--remote-debugging-port=(\d+)");
+                    if (m.Success)
+                    {
+                        skipped.Add($"[{p.Id}]{procName} (webbot-cdp:port={m.Groups[1].Value})");
+                        Console.Error.WriteLine($"[KILL] [{p.Id}]{procName} -- SKIP (WebBot CDP port={m.Groups[1].Value}). Use --arg=remote-debugging-port={m.Groups[1].Value} to force.");
+                        continue;
+                    }
+                }
+
+                candidates.Add(new KillCandidate(p, nodeKey, cmdLine, cmdBrief));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[KILL] pid={p.Id} scan failed: {ex.Message}");
+            }
+        }
+
+        if (skipped.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            foreach (var s in skipped)
+                Console.Error.WriteLine($"[GUARD] skipped {s} -- use --allow-ancestors to override");
+            Console.ResetColor();
+        }
+
+        if (candidates.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[KILL] no matching processes for \"{displayGrap}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        if (candidates.Count > 1 && nthRaw == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[KILL] ambiguous -- {candidates.Count} processes match \"{displayGrap}\". Use --nth N to target one:");
+            Console.ResetColor();
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var c = candidates[i];
+                Console.WriteLine($"  [{i + 1}] {c.NodeKey}");
+                if (!string.IsNullOrEmpty(c.CmdBrief))
+                    Console.WriteLine($"       {c.CmdBrief}");
+            }
+            return 1;
+        }
+
+        IEnumerable<KillCandidate> targets;
+        if (nthRaw != null && candidates.Count > 1)
+        {
+            var picked = new List<KillCandidate>();
+            var seen = new HashSet<int>();
+            bool parseOk = true;
+            foreach (var term in nthRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var idxList = ParseNthIndexes(term, candidates.Count);
+                if (idxList == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Error.WriteLine($"[KILL] --nth \"{term}\" is invalid or out of range (1~{candidates.Count})");
+                    Console.ResetColor();
+                    parseOk = false;
+                    break;
+                }
+                foreach (var idx in idxList)
+                    if (seen.Add(idx)) picked.Add(candidates[idx - 1]);
+            }
+            if (!parseOk) return 1;
+            targets = picked;
+        }
+        else
+        {
+            targets = candidates;
+        }
+
+        if (!dryRun)
+        {
+            try
+            {
+                var firstHwnd = targets
+                    .Select(c => { try { return c.Proc.MainWindowHandle; } catch { return IntPtr.Zero; } })
+                    .FirstOrDefault(h => h != IntPtr.Zero && NativeMethods.IsWindow(h));
+                EnsureA11yReadiness(firstHwnd, "kill");
+            }
+            catch { }
+        }
+
+        var killed = new List<string>();
+        foreach (var c in targets)
+        {
+            try
+            {
+                var p = c.Proc;
+                var procName = p.ProcessName;
+                if (dryRun)
+                {
+                    Console.Error.WriteLine($"[KILL:DRY] {c.NodeKey} -- {c.CmdBrief}");
+                    killed.Add(c.NodeKey);
+                    continue;
+                }
+                var mainHwnd = p.MainWindowHandle;
+                bool hasWindow = mainHwnd != IntPtr.Zero && NativeMethods.IsWindow(mainHwnd);
+                if (hasWindow)
+                {
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- window found, sending WM_CLOSE\n       cmd: {c.CmdBrief}");
+                    NativeMethods.SendMessageTimeoutW(mainHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero, 0x0002, 2000, out _);
+                    Thread.Sleep(800);
+                    try { p.Refresh(); } catch { }
+                    if (p.HasExited)
+                    {
+                        Console.Error.WriteLine($"[KILL] {c.NodeKey} -- exited gracefully");
+                        killed.Add(c.NodeKey);
+                        continue;
+                    }
+                    if (killSentinel.Peek())
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Error.WriteLine($"[KILL] {c.NodeKey} -- focus moved after WM_CLOSE (dialog?) -- skipping force-kill, user may be deciding");
+                        Console.ResetColor();
+                        skipped.Add($"[{p.Id}]{procName} (focus-moved-after-close)");
+                        continue;
+                    }
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- still alive, force kill");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[KILL] {c.NodeKey} -- no window, force kill\n       cmd: {c.CmdBrief}");
+                }
+                p.Kill(entireProcessTree: false);
+                killed.Add(c.NodeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[KILL] {c.NodeKey} failed: {ex.Message}");
+            }
+        }
+
+        if (killed.Count == 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine($"[KILL] nothing killed for \"{displayGrap}\"");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Error.WriteLine($"[KILL] killed {killed.Count}: {string.Join(", ", killed)}");
+        Console.ResetColor();
+
+        try { XRayHelper.RestoreAll(); } catch { }
         return 0;
     }
 

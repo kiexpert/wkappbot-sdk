@@ -136,7 +136,8 @@ internal partial class Program
         if (DateTime.UtcNow - _lastAppbotVsCodeSpawnAt < cooldown) return;
         _lastAppbotVsCodeSpawnAt = DateTime.UtcNow;
 
-        var appbotDir = Environment.CurrentDirectory; // "D:\GitHub\WKAppBot"
+        // Derive WKAppBot root from DataDir (process-relative), not CWD (may differ when Eye launched elsewhere)
+        var appbotDir = Path.GetDirectoryName(Path.GetDirectoryName(DataDir)) ?? Environment.CurrentDirectory;
         if (string.IsNullOrWhiteSpace(appbotDir) || IsSystemOrInstallDirectory(appbotDir)) return;
 
         Console.ForegroundColor = ConsoleColor.Yellow;
@@ -150,7 +151,7 @@ internal partial class Program
 
         // Route through MCP: prompt send handles finding the window + typing + submitting
         // --after 5s gives VS Code time to start; --when-idle 3s auto-approves focus steal
-        var cwdFolder = Path.GetFileName(Environment.CurrentDirectory) ?? "";
+        var cwdFolder = Path.GetFileName(appbotDir) ?? "";  // "WKAppBot" -- derived from DataDir, not CWD
         Console.Error.WriteLine($"[EYE][SLACK] VS Code 대기 메시지 MCP 전달 예약: {pendingMessage[..Math.Min(60, pendingMessage.Length)]}...");
         EyeMcpClient.CallFireAndForget(["prompt", "send", cwdFolder, pendingMessage, "--after", "5s", "--timeout", "30s"]);
     }
@@ -688,10 +689,12 @@ internal partial class Program
             var idleMs = NativeMethods.GetUserIdleMs();
             var yieldTimeout = 3; // Slack routing = user-initiated -> always 3s auto-approve
             Console.WriteLine($"  [SLACK->PROMPT] idle={idleMs}ms -> yieldTimeout={yieldTimeout}s");
-            var (approved, _, deniedByUser) = UserInputWaitOverlay.Show(
-                prompt.WindowHandle, userIdleMs: idleMs, timeoutSeconds: yieldTimeout,
-                positionHwnd: prompt.WindowHandle, noSound: true,
-                actionInfo: actionInfo);
+            var promptRect = System.Drawing.Rectangle.Empty;
+            if (NativeMethods.GetWindowRect(prompt.WindowHandle, out var slackWr))
+                promptRect = new System.Drawing.Rectangle(slackWr.Left, slackWr.Top, slackWr.Width, slackWr.Height);
+            var (approved, _, deniedByUser) = CalloutInputOverlay.ShowForReadiness(
+                actionInfo, promptRect, yieldTimeout,
+                targetHwnd: prompt.WindowHandle, resetSeconds: 0);
 
             if (!approved || deniedByUser)
             {
@@ -954,6 +957,11 @@ internal partial class Program
         // Handle @mentions
         slack.OnMention += (msg) =>
         {
+            if (!string.IsNullOrEmpty(channel) && msg.Channel != channel)
+            {
+                Console.Error.WriteLine($"[EYE][SLACK] @mention skip: ch={msg.Channel} != configured={channel}");
+                return;
+            }
             var cleanText = System.Text.RegularExpressions.Regex.Replace(
                 msg.Text, @"<@[A-Z0-9]+>\s*", "").Trim();
             Console.Error.WriteLine($"[EYE][SLACK] @mention from {msg.User}: {cleanText}");
@@ -1174,6 +1182,11 @@ internal partial class Program
         slack.OnMessage += (msg) =>
         {
             if (string.IsNullOrEmpty(msg.Text)) return;
+            if (!string.IsNullOrEmpty(channel) && msg.Channel != channel)
+            {
+                Console.Error.WriteLine($"[EYE][SLACK] MSG skip: ch={msg.Channel} != configured={channel}");
+                return;
+            }
             // Fire-and-forget: don't block WebSocket receive thread
             // (InputReadiness approval can take 30s+ -> next messages would stall)
             _ = Task.Run(() =>
@@ -1420,10 +1433,14 @@ internal partial class Program
             // 0. Shell command mode
             if (!string.IsNullOrEmpty(item.Command))
             {
+                // Auto-resolve shell interpreters (bash/sh/python) to full path on Windows.
+                var execCmd = item.Command;
+                Program.ResolveShellCommand(ref execCmd);
+
                 if (item.NotifySlack)
                     ScheduleNotifySlack(slackBotToken, slackChannel,
-                        $":rocket: 스케줄 커맨드 실행: `{item.Command}`");
-                using var proc = AppBotPipe.Spawn("cmd.exe", $"/c {item.Command}",
+                        $":rocket: 스케줄 커맨드 실행: `{execCmd}`");
+                using var proc = AppBotPipe.Spawn("cmd.exe", $"/c {execCmd}",
                     cwd: item.Cwd ?? (EyeCallerCwd.Length > 0 ? EyeCallerCwd : Environment.CurrentDirectory),
                     redirectStdOut: true, redirectStdErr: true, caller: "EYE")!;
                 var stdout = proc.StdOut!.ReadToEnd();

@@ -83,21 +83,25 @@ internal partial class Program
         else if (IsElectronWindow(hwnd))
         {
             // Electron/VS Code: elements have no NativeWindowHandle -> treat window as surface.
-            // Send WM_LBUTTON to Chrome_RenderWidgetHostHWND (or root Chrome_WidgetWin_1).
-            // This is focusless and more reliable than SendInput for Chromium-based windows.
+            // Tier 1: WM_LBUTTON to Chrome_RenderWidgetHostHWND (focusless, fast)
             if (TryElectronSurfaceClick(hwnd, cx, cy, el))
                 return true;
             _autoHealTiers?.Add("Electron surface WM_LBUTTON: no UI response");
+
+            // Tier 2: CDP Input.dispatchMouseEvent (isTrusted=true, works headless/React SPAs)
+            if (TryCdpTrustedClick(hwnd, cx, cy, el))
+                return true;
+            _autoHealTiers?.Add("CDP TrustedClick: no UI response");
         }
 
-        // Physical click: last resort, or FLUTTERVIEW-no-response fallback.
-        // For flutter fallback: run InputReadiness.Probe() to avoid focus-steal when user is active.
-        if (flutterNoResponse)
+        // Physical click: last resort, or FLUTTERVIEW-no-response / Electron-surface-no-response fallback.
+        // Always probe + foreground before SendInput so the click lands on the right window.
+        var targetHwnd = elHwnd != IntPtr.Zero ? elHwnd : hwnd;
         {
             var probe = CreateInputReadiness();
             var probeResult = probe.Probe(new InputReadinessRequest
             {
-                TargetHwnd     = elHwnd,
+                TargetHwnd     = targetHwnd,
                 IntendedAction = "click",
             });
             if (probeResult.ActiveBlocker != null)
@@ -106,9 +110,14 @@ internal partial class Program
                 _autoHealTiers?.Add($"Physical SendInput: Probe blocked by \"{probeResult.ActiveBlocker.Title}\"");
                 return false;
             }
-            NativeMethods.SmartSetForegroundWindow(elHwnd);
+            NativeMethods.SmartSetForegroundWindow(targetHwnd);
             Thread.Sleep(150);
         }
+        // Snapshot focus state before the foreground switch -- SendInput click delivers
+        // the event but focus returns to caller immediately after. If caller wanted
+        // focus they would have used 'a11y focus' first.
+        var preFg       = NativeMethods.GetForegroundWindow();
+        var preFocusCtl = NativeMethods.GetKeyboardFocusHwnd();
 
         // Before-screenshot for pixel-diff verify (only if rect is usable)
         System.Drawing.Bitmap? sendBefore = null;
@@ -132,6 +141,46 @@ internal partial class Program
             }
         }
 
+        // Click-through tier: if another window covers (cx,cy), temporarily make it
+        // WS_EX_TRANSPARENT so the click passes through to the target.
+        // Skips elevated (admin) windows -- SetWindowLong is rejected by UIPI.
+        var restored = new List<(IntPtr hwnd, int origStyle)>();
+        try
+        {
+            var pt = new WKAppBot.Win32.Native.POINT { X = cx, Y = cy };
+            var topAtPt = NativeMethods.WindowFromPoint(pt);
+            if (topAtPt != IntPtr.Zero && topAtPt != targetHwnd
+                && NativeMethods.GetAncestor(topAtPt, NativeMethods.GA_ROOT) != targetHwnd)
+            {
+                // Collect all top-level windows covering (cx,cy) above the target
+                NativeMethods.EnumWindows((hWnd, _) =>
+                {
+                    if (hWnd == targetHwnd) return false; // stop at target Z-order
+                    try
+                    {
+                        NativeMethods.GetWindowRect(hWnd, out var r);
+                        if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                        if (cx < r.Left || cx >= r.Right || cy < r.Top || cy >= r.Bottom) return true;
+                        NativeMethods.GetWindowThreadProcessId(hWnd, out uint covPid);
+                        var cmd = NativeMethods.GetProcessCommandLine((int)covPid);
+                        // Skip if we can't read cmdline (likely elevated -- UIPI would reject SetWindowLong)
+                        if (cmd == null) return true;
+                        int orig = NativeMethods.GetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE);
+                        if ((orig & NativeMethods.WS_EX_TRANSPARENT) == 0)
+                        {
+                            NativeMethods.SetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE,
+                                orig | NativeMethods.WS_EX_TRANSPARENT);
+                            restored.Add((hWnd, orig));
+                            Console.Error.WriteLine($"[A11Y] click-through: 0x{hWnd.ToInt64():X8} made transparent");
+                        }
+                    }
+                    catch { }
+                    return true;
+                }, IntPtr.Zero);
+            }
+        }
+        catch { }
+
         var inputs = new INPUT[2];
         inputs[0].type = INPUT.INPUT_MOUSE;
         inputs[0].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTDOWN;
@@ -139,6 +188,23 @@ internal partial class Program
         inputs[1].u.mi.dwFlags = MouseFlags.MOUSEEVENTF_LEFTUP;
         NativeMethods.SendInput(2, inputs, System.Runtime.InteropServices.Marshal.SizeOf<INPUT>());
         Console.Error.WriteLine($"[A11Y] click -- SendInput at ({cx},{cy})");
+
+        // Restore ExStyle on all click-through windows immediately after click
+        foreach (var (hWnd, origStyle) in restored)
+        {
+            try { NativeMethods.SetWindowLongW(hWnd, NativeMethods.GWL_EXSTYLE, origStyle); } catch { }
+        }
+
+        // Restore focus: let the click settle (1 frame), then return focus to caller.
+        // SendInput click is now focusless -- target receives the event, caller keeps focus.
+        if (preFg != IntPtr.Zero && preFg != targetHwnd)
+        {
+            Thread.Sleep(16);
+            try { NativeMethods.SmartSetForegroundWindow(preFg); } catch { }
+            if (preFocusCtl != IntPtr.Zero)
+                try { NativeMethods.SetFocus(preFocusCtl); } catch { }
+            Console.Error.WriteLine($"[A11Y] click -- focus restored to 0x{preFg.ToInt64():X8}");
+        }
 
         // Pixel-diff verification: 280ms after cursor-move = ~310ms from SendInput
         if (sendBefore != null)
@@ -229,6 +295,89 @@ internal partial class Program
         // No rect for pixel-diff -> optimistic success
         if (el != null) RecordTierSuccess(windowHwnd, el, "click", "Electron surface WM_LBUTTON", KnowhowCategory.Focusless);
         return true;
+    }
+
+    /// <summary>
+    /// CDP Input.dispatchMouseEvent trusted click — isTrusted=true, works headless/minimized.
+    /// Used as fallback when TryElectronSurfaceClick WM_LBUTTON fails (React/SPA buttons).
+    /// </summary>
+    static bool TryCdpTrustedClick(IntPtr windowHwnd, int screenX, int screenY, AutomationElement? el)
+    {
+        try
+        {
+            var pid = (int)NativeMethods.GetWindowThreadProcessId(windowHwnd, out _);
+            if (pid <= 0) pid = el != null ? (int)(el.Properties.ProcessId.ValueOrDefault) : 0;
+            var cdpPort = WKAppBot.WebBot.CdpClient.DetectCdpPort(pid);
+            if (cdpPort <= 0) { Console.Error.WriteLine("[A11Y] click -- CDP: no port detected"); return false; }
+
+            // Get viewport-relative coords via JS (screenX/Y -> client coords via CDP page metrics)
+            using var cdp = new WKAppBot.WebBot.CdpClient();
+            cdp.ConnectAsync(cdpPort, preferredTargetTag: $"hwnd:{windowHwnd:X}").GetAwaiter().GetResult();
+
+            // Convert screen coords to viewport coords (subtract window client origin)
+            var jsResult = cdp.EvalAsync(
+                $"JSON.stringify({{x: {screenX} - window.screenX, y: {screenY} - window.screenY - (outerHeight - innerHeight)}})"
+            ).GetAwaiter().GetResult();
+
+            int vx = screenX, vy = screenY;
+            if (!string.IsNullOrEmpty(jsResult))
+            {
+                try
+                {
+                    var jo = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(jsResult);
+                    vx = jo.GetProperty("x").GetInt32();
+                    vy = jo.GetProperty("y").GetInt32();
+                }
+                catch { }
+            }
+
+            var rect = el != null ? GetBoundingRect(el) : null;
+            System.Drawing.Bitmap? before = null;
+            if (rect != null && rect.Value.Width > 4 && rect.Value.Height > 4)
+                try { before = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(rect.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height); } catch { }
+
+            cdp.TrustedClickAtAsync(vx, vy).GetAwaiter().GetResult();
+            Console.Error.WriteLine($"[A11Y] click -- CDP TrustedClick screen({screenX},{screenY}) viewport({vx},{vy})");
+
+            // Focus-only elements (Text/Edit/Document/Custom web nodes) don't change visually on click --
+            // pixel-diff would always fail. Skip visual verification for these; trust the CDP click.
+            var ctType = el?.Properties.ControlType.ValueOrDefault;
+            bool skipPixelDiff = ctType == FlaUI.Core.Definitions.ControlType.Text
+                              || ctType == FlaUI.Core.Definitions.ControlType.Edit
+                              || ctType == FlaUI.Core.Definitions.ControlType.Document
+                              || ctType == FlaUI.Core.Definitions.ControlType.Custom;
+
+            if (before != null && !skipPixelDiff)
+            {
+                Thread.Sleep(300);
+                try
+                {
+                    using var after = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(rect!.Value.Left, rect.Value.Top, rect.Value.Width, rect.Value.Height);
+                    double diff = ComputePixelDiffRatio(before, after);
+                    Console.Error.WriteLine($"[A11Y] click -- CDP TrustedClick pixel-diff {diff:P1}");
+                    if (diff > 0.02)
+                    {
+                        if (el != null) RecordTierSuccess(windowHwnd, el, "click", "CDP TrustedClick", KnowhowCategory.Focusless);
+                        return true;
+                    }
+                    return false;
+                }
+                catch { }
+                finally { before.Dispose(); }
+            }
+            else
+            {
+                before?.Dispose();
+            }
+
+            if (el != null) RecordTierSuccess(windowHwnd, el, "click", "CDP TrustedClick", KnowhowCategory.Focusless);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] click -- CDP TrustedClick failed: {ex.Message}");
+            return false;
+        }
     }
 
     // Send WM_LBUTTON to FLUTTER_VIEW child at element's center (screen->client conversion).

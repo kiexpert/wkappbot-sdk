@@ -145,7 +145,11 @@ internal partial class Program
             {
                 try
                 {
-                    using var bmp = ScreenCapture.CaptureWindow(hWnd);
+                    using var bmp = ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = false,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
                     if (bmp != null)
                     {
                         NativeMethods.GetWindowRect(hWnd, out var fRect);
@@ -193,7 +197,11 @@ internal partial class Program
                 {
                     try
                     {
-                        using var bmp = ScreenCapture.CaptureWindow(hWnd);
+                        using var bmp = ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+                        {
+                            RejectBlank = false,
+                            StepLogger = s => Console.Error.WriteLine(s),
+                        });
                         if (bmp != null)
                         {
                             NativeMethods.GetWindowRect(hWnd, out var fRect);

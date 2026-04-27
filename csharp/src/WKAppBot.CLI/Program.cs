@@ -13,6 +13,7 @@ internal partial class Program
 {
     internal static volatile bool RunningInEye = false;
     internal static volatile bool IsMcpMode = false;
+    internal static TeeTextWriter? ActiveTee;
     [ThreadStatic] internal static bool McpElevationRequired;
     internal static bool GrepModeActive = false;
     internal static bool GrapMode = false;
@@ -176,7 +177,65 @@ internal partial class Program
     static string? _exitEventName = null;
     internal static TextWriter OriginalStdout = Console.Out;
     internal static readonly string DataDir = Path.Combine(
-        Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".", "wkappbot.hq");
+        ProjectRoot.Find(), ".wkappbot", "hq");
+
+    /// <summary>
+    /// Safeguard 2: legacy DataDir migration guard.
+    /// Pre-v6.x DataDir was `<exe-dir>/wkappbot.hq`. v6.x moved it to
+    /// `<project-root>/.wkappbot/hq`. If Eye starts and the new DataDir has no
+    /// suggestions.jsonl but the legacy one does, copy the backlog files over
+    /// so Eye + suggest commands don't operate on an empty backlog (which is
+    /// what caused the silent bulk-resolve incident).
+    ///
+    /// Idempotent: only fires when newDataDir/suggestions.jsonl is missing.
+    /// Returns true if a migration happened (caller may log).
+    /// </summary>
+    internal static bool MigrateLegacyDataDirIfNeeded()
+    {
+        try
+        {
+            var newPath = Path.Combine(DataDir, "suggestions.jsonl");
+            if (File.Exists(newPath)) return false;
+
+            var legacyDir = Path.Combine(
+                Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".",
+                "wkappbot.hq");
+            var legacyPath = Path.Combine(legacyDir, "suggestions.jsonl");
+            if (!File.Exists(legacyPath)) return false;
+            // Don't migrate if both paths point at the same place (legacy = new)
+            try
+            {
+                if (string.Equals(Path.GetFullPath(legacyDir), Path.GetFullPath(DataDir),
+                        StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            catch { }
+
+            Directory.CreateDirectory(DataDir);
+
+            int n = 0;
+            File.Copy(legacyPath, newPath, overwrite: false);
+            n++;
+            Console.Error.WriteLine($"[WARN:DATADIR] migrated suggestions.jsonl: {legacyPath} -> {newPath}");
+
+            var legacyHistory = Path.Combine(legacyDir, "suggestions_history.jsonl");
+            var newHistory = Path.Combine(DataDir, "suggestions_history.jsonl");
+            if (File.Exists(legacyHistory) && !File.Exists(newHistory))
+            {
+                File.Copy(legacyHistory, newHistory, overwrite: false);
+                n++;
+                Console.Error.WriteLine($"[WARN:DATADIR] migrated suggestions_history.jsonl: {legacyHistory} -> {newHistory}");
+            }
+
+            Console.Error.WriteLine($"[WARN:DATADIR] DataDir migration complete ({n} file(s)). Legacy path retained for rollback: {legacyDir}");
+            return n > 0;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[WARN:DATADIR] migration failed: {ex.Message}");
+            return false;
+        }
+    }
     internal static string GetCurrentSessionHash()
     {
         try
@@ -303,6 +362,50 @@ internal partial class Program
                 args = args[..eeIdx].Concat(args[(eeIdx + 2)..]).ToArray();
             }
         }
+        // Global: --from-eye -- process was spawned by Eye; monitor OS parent and exit when Eye dies.
+        // Must be processed before any command routing so MCP workers are also covered.
+        // Exception: when the command IS "eye", skip the guard -- Eye manages its own lifecycle
+        // and must not self-terminate when its spawner (another Eye during hot-swap) exits.
+        {
+            var feIdx = Array.FindIndex(args, a => a == "--from-eye");
+            if (feIdx >= 0)
+            {
+                args = args[..feIdx].Concat(args[(feIdx + 1)..]).ToArray();
+                bool commandIsEye = args.Length > 0 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
+                if (!commandIsEye)
+                {
+                    var eyePid = GetParentPid(Environment.ProcessId);
+                    if (eyePid > 0)
+                    {
+                        var guard = new Thread(() =>
+                        {
+                            while (true)
+                            {
+                                Thread.Sleep(3000);
+                                try
+                                {
+                                    using var ph = System.Diagnostics.Process.GetProcessById(eyePid);
+                                    if (ph.HasExited)
+                                    {
+                                        Console.Error.WriteLine($"[EYE-GUARD] ERROR: Parent Eye (PID={eyePid}) has exited -- worker error exit (exit=1)");
+                                        AppBotExitFromGuard(1);
+                                        return;
+                                    }
+                                }
+                                catch (ArgumentException)
+                                {
+                                    Console.Error.WriteLine($"[EYE-GUARD] ERROR: Parent Eye (PID={eyePid}) has exited -- worker error exit (exit=1)");
+                                    AppBotExitFromGuard(1);
+                                    return;
+                                }
+                                catch { }
+                            }
+                        }) { IsBackground = true, Name = "EyeGuard" };
+                        guard.Start();
+                    }
+                }
+            }
+        }
         if (args.Length > 0 && args[0] == "mcp")
         {
             try { WKAppBot.Win32.Native.NativeMethods.SetProcessDpiAwareness(2); } catch { }
@@ -368,6 +471,15 @@ internal partial class Program
             _fastExitAfterCommand = true;
             GrapMode = true;
         }
+        // Read-only a11y discovery: use FastExit path (no TeeTextWriter, no log, no eye tick).
+        // Avoids ExitProcess → DLL_PROCESS_DETACH → FlaUI/COM loader-lock deadlock (~50s).
+        // MUST be set here (before TeeTextWriter creation at line ~537).
+        if (!_fastExitAfterCommand
+            && args.Length >= 2
+            && args[0].Equals("a11y", StringComparison.OrdinalIgnoreCase)
+            && args[1].ToLowerInvariant() is "find" or "inspect" or "windows" or "screenshot" or "ocr")
+            _fastExitAfterCommand = true;
+
         if (!_fastExitAfterCommand)
         {
             Directory.CreateDirectory(logDir);
@@ -385,6 +497,16 @@ internal partial class Program
             PulseStep.Line($"flag stripped: remaining args={args.Length}");
             if (!IsElevated())
             {
+                // "eye tick --sudo" is read-only -- bypass proxy, use normal IPC path directly.
+                bool isEyeTickReadOnly = args.Length >= 2
+                    && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase)
+                    && args[1].Equals("tick", StringComparison.OrdinalIgnoreCase);
+                if (isEyeTickReadOnly)
+                {
+                    PulseStep.Line("path=eye tick (read-only, bypass sudo proxy)");
+                    return AppBotEyeCommand(args[1..]);
+                }
+
                 // "eye --sudo" alone = bootstrap admin Eye session (no other command).
                 // "eye tick --sudo", "eye hotswap --sudo" etc. = proxy eye subcommand through admin Eye.
                 bool isEyeRelaunch = args.Length == 1 && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase);
@@ -480,6 +602,7 @@ internal partial class Program
         GrepModeActive = Console.IsOutputRedirected && args.Length > 0 && args[0].ToLowerInvariant() == "logcat" && !args.Any(a => a is "--past" or "--follow" or "-f" or "--timeout") && !args.Any(a => a is "--help" or "-h");
         OriginalStdout = Console.Out;
         TeeTextWriter? tee = (RunningInEye || _fastExitAfterCommand) ? null : new TeeTextWriter(GrepModeActive ? Console.Error : Console.Out, logFile, oldSubDir: oldSubDir);
+        ActiveTee = tee;
         if (tee != null) Console.SetOut(new ThreadRoutingWriter(tee));
         if (tee != null && !GrepModeActive && !QuietFindOutput) Console.Error.WriteLine($"[LOG] {logFile}");
         {
@@ -502,6 +625,20 @@ internal partial class Program
         }
         if (_fastExitAfterCommand) SetupSyncStdout();
         prof("TeeWriter ready");
+        // Hook all Environment.Exit() calls: if ActiveTee hasn't recorded yet, do it now.
+        // This catches timeout/guardian/direct Exit callers that bypass the normal exit path.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                var t = ActiveTee;
+                if (t == null) return;
+                var code = Environment.ExitCode;
+                if (code == 0) return;
+                if (!t.ErrorRecordWritten) { t.ExitCode = code; t.WriteErrorRecordNow(); }
+            }
+            catch { }
+        };
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
         {
             try
@@ -659,6 +796,7 @@ internal partial class Program
                 // "analyze-hack" => DISABLED (Vision support removed for public release)
                 "screensaver" => ScreenSaverStandaloneCommand(),
                 "whisper-ring" => WhisperRingStandaloneCommand(restArgs),
+                "eye-card" => WKAppBot.CLI.Commands.EyeCardStandaloneCommand.Run(restArgs),
                 "prompt" => PromptCommand(restArgs),
                 "schedule" => ScheduleCommand(restArgs),
                 "dashboard" => DashboardCommand(restArgs),
@@ -688,9 +826,11 @@ internal partial class Program
                 "exec" => ExecCommand(restArgs),
                 "taskkill" => TaskkillCompatCommand(restArgs),
                 "msaa-probe" => MsaaProbeCommand(restArgs),
+                "screenshot" => ScreenshotCommand(restArgs),
                 "--help" or "-h" or "help" => PrintUsage(),
                 "--version" or "version" => PrintVersion(),
                 _ when command.StartsWith("kro-trial-", StringComparison.OrdinalIgnoreCase) => KroTrialSpecialCommand(command, restArgs),
+                _ when restArgs.Any(a => a is "--help" or "-h") && TryPrintCommandHelp(command, restArgs) => 0,
                 _ => Error($"Unknown command: {command}")
             };
             try
@@ -722,6 +862,13 @@ internal partial class Program
             try { Console.Error.WriteLine(errorMsg); } catch { }
             try { Console.WriteLine(errorMsg); } catch { }
             try { Console.ResetColor(); } catch { }
+            try
+            {
+                var stack = ex.StackTrace ?? new System.Diagnostics.StackTrace(true).ToString();
+                var cmd   = string.Join(" ", EyeCmdPipeServer.CallerArgs.Value ?? []);
+                AutoBugReport($"{ex.GetType().Name}: {ex.Message}\ncmd: {cmd}\n{stack}");
+            }
+            catch { }
             return 1;
         }
         finally
@@ -737,6 +884,8 @@ internal partial class Program
             catch { }
             AppendCommandHistory(args, exitCode);
             PrintSkillHintOnError(args, exitCode);
+            PrintSkillHintOnSuccess(args, exitCode);
+            AppBotExit(exitCode, args);
             if (tee != null) tee.ExitCode = exitCode;
             tee?.WriteErrorRecordNow();
             if (!_fastExitAfterCommand) WriteExitFile(exitCode);

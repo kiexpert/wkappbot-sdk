@@ -1,4 +1,5 @@
 using FlaUI.Core.AutomationElements;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -6,6 +7,21 @@ namespace WKAppBot.CLI;
 // Both paths emit the same FOCUS/TARGET code-fence format.
 internal partial class Program
 {
+    /// <summary>
+    /// Format WindowInfo.FieldScores as "score={field1:0.91,field2:0.64,...}" sorted high→low.
+    /// Returns "" when no field scores are available (non-JSON5 patterns).
+    /// </summary>
+    static string FormatFieldScores(WindowInfo? hit)
+    {
+        if (hit?.FieldScores == null || hit.FieldScores.Count == 0) return "";
+        // Format: field:'matchedValue':score  (value shows what to use in grap)
+        var parts = hit.FieldScores.Select(s =>
+        {
+            var val = s.Matched.Length > 0 ? $"'{s.Matched}'" : "";
+            return $"{s.Field}:{val}:{s.Score:F2}";
+        });
+        return $"score={{{string.Join(",", parts)}}}";
+    }
     // Print FOCUS code-fence block (stdout, dimmed).
     // paste  : quoted grap expression, e.g. "{hwnd:0x...,proc:'Code'}#absPath"
     // okMiss : "OK" / "MISS" / "?"
@@ -30,12 +46,13 @@ internal partial class Program
     // matchNote    : e.g. "  <- cmd: chatgpt.com" or "" for clean match
     // leafTag      : leaf node XML tag, e.g. <Edit ltwh=... aid='prompt'>텍스트</Edit>
     static void PrintTargetBlock(string titleHeading, string paste, string action,
-        string[]? extraArgs, string okMiss, long ms, string matchNote = "", string leafTag = "")
+        string[]? extraArgs, string okMiss, long ms, string matchNote = "", string leafTag = "", string scoreStr = "")
     {
         var cmdLine = $"wkappbot a11y {action} {paste}";
         if (extraArgs != null && extraArgs.Length > 0)
             cmdLine += " " + string.Join(" ", extraArgs);
-        var verifyLine = $"{Ansi.Mark(okMiss)} {ms}ms{Ansi.Dim(matchNote)}";
+        var scoreAppend = string.IsNullOrEmpty(scoreStr) ? "" : $"  {scoreStr}";
+        var verifyLine = $"{Ansi.Mark(okMiss)} {ms}ms{Ansi.Dim(matchNote + scoreAppend)}";
 
         Console.WriteLine(Ansi.TargetLine($"## {titleHeading}"));
         Console.WriteLine(Ansi.TargetLine("```"));

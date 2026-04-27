@@ -9,16 +9,154 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
+/// <summary>Result of InspectTargetA11yNode: element bounds + tail tip + DPI scale.</summary>
+internal record A11yNodeInfo(
+    System.Drawing.Rectangle ElementRect,  // full BoundingRectangle of the a11y element
+    System.Drawing.Rectangle TipRect,      // caret / text-end / left+20 (for callout tail tip)
+    float DpiScale);
+
 // partial class: inspect, focus, watch, capture commands + watch helpers
 internal partial class Program
 {
+    /// <summary>
+    /// Prints a prominent skill-search reminder to stdout.
+    /// Call this before listing/inspecting results when no specific keyword was supplied,
+    /// so any Claude session (even without hook configuration) sees it immediately.
+    /// </summary>
+    internal static void PrintSkillSearchHint(string? context = null)
+    {
+        var ctx = context != null ? $" [{context}]" : "";
+        Console.WriteLine($"# SKILL SEARCH FIRST{ctx}: wkappbot skill search <keyword>");
+        Console.WriteLine("#   Skills cover: Eye/CDP/a11y/grap/guardian/suggest/build -- check before file search.");
+    }
+
+    // -- InspectTargetA11yNode: find Edit/target node, print rect/center/DPI to stdout --
+
+    /// <summary>
+    /// Finds the target a11y node (Edit by name) in the given window, prints its rect/center/DPI,
+    /// and returns the BoundingRectangle. Returns default if not found.
+    /// Call this before showing the callout so the tail tip uses the correct coordinates.
+    /// </summary>
+    internal static A11yNodeInfo? InspectTargetA11yNode(IntPtr hwnd, string elementName = "Message input",
+        FlaUI.Core.Definitions.ControlType controlType = FlaUI.Core.Definitions.ControlType.Edit)
+    {
+        try
+        {
+            using var uia = new FlaUI.UIA3.UIA3Automation();
+            var root = uia.FromHandle(hwnd);
+            if (root == null) return default;
+
+            var el = root.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants,
+                new FlaUI.Core.Conditions.AndCondition(
+                    uia.ConditionFactory.ByControlType(controlType),
+                    uia.ConditionFactory.ByName(elementName)));
+
+            if (el == null)
+            {
+                Console.WriteLine($"[INSPECT] {controlType}(\"{elementName}\") not found in hwnd=0x{hwnd:X}");
+                return null;
+            }
+
+            var r = el.Properties.BoundingRectangle.ValueOrDefault;
+            int cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2;
+
+            // DPI scale via user32 GetDpiForWindow (Win10+)
+            float dpiScale = 1f;
+            try
+            {
+                var elHwnd = (IntPtr)el.Properties.NativeWindowHandle.ValueOrDefault;
+                if (elHwnd == IntPtr.Zero) elHwnd = hwnd;
+                uint dpi = NativeMethods.GetDpiForWindow(elHwnd);
+                if (dpi > 0) dpiScale = dpi / 96f;
+            }
+            catch { }
+
+            Console.WriteLine($"[INSPECT] {controlType}(\"{elementName}\") hwnd=0x{hwnd:X}");
+            Console.WriteLine($"[INSPECT]   rect   ltwh=({r.X},{r.Y},{r.Width},{r.Height})");
+            Console.WriteLine($"[INSPECT]   center px=({cx},{cy})  dip=({cx/dpiScale:F1},{cy/dpiScale:F1})  dpiScale={dpiScale:F2}");
+
+            // Caret rect: if element has TextPattern2, get caret position for tail tip
+            System.Drawing.Rectangle caretRect = default;
+            try
+            {
+                var tp2 = el.Patterns.Text2;
+                if (tp2.IsSupported)
+                {
+                    var getCaretRange = tp2.Pattern.GetType().GetMethod("GetCaretRange",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    if (getCaretRange != null)
+                    {
+                        var args2 = new object[] { false };
+                        var caretRange = getCaretRange.Invoke(tp2.Pattern, args2);
+                        if (caretRange != null)
+                        {
+                            var getBounds = caretRange.GetType().GetMethod("GetBoundingRectangles");
+                            var rects = getBounds?.Invoke(caretRange, null) as System.Windows.Rect[];
+                            if (rects != null && rects.Length > 0)
+                            {
+                                var cr = rects[0];
+                                caretRect = new System.Drawing.Rectangle((int)cr.X, (int)cr.Y, Math.Max(1, (int)cr.Width), (int)cr.Height);
+                                int ccx = caretRect.X + caretRect.Width / 2, ccy = caretRect.Y + caretRect.Height / 2;
+                                Console.WriteLine($"[INSPECT]   caret  ltwh=({caretRect.X},{caretRect.Y},{caretRect.Width},{caretRect.Height}) center=({ccx},{ccy})");
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            var elemRect = new System.Drawing.Rectangle(r.X, r.Y, r.Width, r.Height);
+
+            // Tail tip priority:
+            // 1. Caret rect (if cursor is active -- most precise)
+            // 2. Text end position (if element has text content)
+            // 3. Element left+20px (just inside left edge of the node)
+            if (caretRect.Height > 0)
+            {
+                Console.WriteLine($"[INSPECT]   tail=caret");
+                return new A11yNodeInfo(elemRect, caretRect, dpiScale);
+            }
+
+            // Try text-end position via TextPattern.DocumentRange
+            try
+            {
+                var tp = el.Patterns.Text;
+                if (tp.IsSupported)
+                {
+                    var docRange = tp.Pattern.DocumentRange;
+                    var textRects = docRange.GetBoundingRectangles();
+                    if (textRects != null && textRects.Length > 0)
+                    {
+                        var lastRect = textRects[textRects.Length - 1];
+                        int tx = (int)(lastRect.X + lastRect.Width), ty = (int)(lastRect.Y + lastRect.Height / 2);
+                        Console.WriteLine($"[INSPECT]   tail=text-end px=({tx},{ty})");
+                        var tipRect = new System.Drawing.Rectangle(tx, ty - r.Height / 2, 1, r.Height);
+                        return new A11yNodeInfo(elemRect, tipRect, dpiScale);
+                    }
+                }
+            }
+            catch { }
+
+            // Fallback: 20px inside left edge of element
+            Console.WriteLine($"[INSPECT]   tail=left+20");
+            var fallbackTip = new System.Drawing.Rectangle(r.X + 20, r.Y, 1, r.Height);
+            return new A11yNodeInfo(elemRect, fallbackTip, dpiScale);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[INSPECT] error: {ex.Message}");
+            return null;
+        }
+    }
+
     // -- find (unified search -- absorbs windows --uia + inspect --filter) --
 
     static int FindCommand(string[] args)
     {
         if (args.Length == 0 || (args.Length == 1 && args[0].StartsWith("--")))
             return Error("Usage: wkappbot find <keyword> [--deep] [--limit N] [--process <name>]\n" +
-                         "  Unified search: window titles + UIA accessibility elements.\n" +
+                         "  Default: tree output -- prints reachable grap paths (Win32 children + UIA)\n" +
+                         "           for each matched window. Copy-paste any path into another a11y command.\n" +
                          "  Path search: find \"윈도우/UIA요소\" -- / separates hierarchy levels.\n" +
                          "    * = any chars within one level, ** = any number of levels.\n" +
                          "    Each segment is implicitly *segment* (contains match).\n" +
@@ -27,6 +165,7 @@ internal partial class Program
                          "  --deep: Deeper UIA tree search (depth 12, slower but thorough).\n" +
                          "  Examples:\n" +
                          "    find \"Claude\"                       Search everywhere for 'Claude'\n" +
+                         "    find \"영웅문*\"                      영웅문 windows -> Win32+UIA grap tree\n" +
                          "    find \"투혼/현재가\"                  투혼 windows -> ... -> 현재가 element\n" +
                          "    find \"투혼/**/현재가\"               투혼 -> any depth -> 현재가\n" +
                          "    find \"*영웅문*#*잔고확인*\"          영웅문 -> UIA scope 잔고확인 -> list elements\n" +
@@ -38,17 +177,9 @@ internal partial class Program
         if (uiaP != null || w32segs.Length >= 2)
             return FindScopedCommand(args);
 
-        // Preprocess: inject --uia (or --uia-deep for --deep) and forward to WindowsCommand
-        var forwarded = new List<string>(args);
-        bool hasDeep = forwarded.Remove("--deep");
-
-        // Path search: "**" present -> auto deep (hierarchy needs thorough search)
-        string keyword = forwarded.FirstOrDefault(a => !a.StartsWith("--")) ?? "";
-        if (keyword.Contains("**"))
-            hasDeep = true;
-
-        forwarded.Add(hasDeep ? "--uia-deep" : "--uia");
-        return WindowsCommand(forwarded.ToArray());
+        // Default: tree output (Win32 children + UIA path suffixes per matched window).
+        // --tree flag remains accepted for backward compatibility but is now implicit.
+        return FindTreeCommand(args);
     }
 
     /// <summary>
@@ -185,7 +316,14 @@ internal partial class Program
                 "  --filter: Search entire UIA tree for matching elements (Name/AutomationId/ControlType)\n" +
                 "            Supports wildcards (*/?), regex: prefix, or plain substring");
 
+        // Yield to active user: heavy UIA FromHandle + tree dump on Chromium/Electron
+        // targets steals foreground. Bail out early if user is mid-typing.
+        if (FocusSafe.ShouldYieldToActiveUser(out var idleMs))
+            return Error($"[A11Y:INSPECT] user active ({idleMs}ms idle) -- skipping UIA scan to avoid focus steal");
+
         string rawTitle = args[0];
+        if (rawTitle == "*" || rawTitle == "**")
+            PrintSkillSearchHint("inspect");
         int depth = int.TryParse(GetArgValue(args, "--depth"), out var d) ? d : 5;
         bool win32Mode = args.Contains("--win32");
         bool pathsMode = args.Contains("--paths");
@@ -262,6 +400,34 @@ internal partial class Program
             Console.Error.WriteLine($"[PROCESS] pid={procPid} {proc.ProcessName}  Priv={privMB:F1}MB  WS={wsMB:F1}MB  handles={handles}  threads={threads}  GDI={gdi}  USER={user}");
         }
         catch { /* best effort -- skip if access denied */ }
+
+        // [URL] grap field: domain + full url (browser windows only)
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(inspectHandle, out uint urlPid);
+            var browserUrl = WindowFinder.GetBrowserUrl(inspectHandle, urlPid);
+            if (!string.IsNullOrEmpty(browserUrl) && Uri.TryCreate(browserUrl, UriKind.Absolute, out var uri))
+            {
+                Console.Error.WriteLine($"[URL]     domain={uri.Host}");
+                Console.Error.WriteLine($"          url={browserUrl}");
+            }
+        }
+        catch { }
+
+        // [CMD] grap field: process command line (WMI)
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(inspectHandle, out uint cmdPid);
+            using var searcher = new ManagementObjectSearcher(
+                $"SELECT CommandLine FROM Win32_Process WHERE ProcessId={cmdPid}");
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                var cmdLine = mo["CommandLine"]?.ToString() ?? "";
+                if (!string.IsNullOrEmpty(cmdLine))
+                    Console.Error.WriteLine($"[CMD]     {cmdLine}");
+            }
+        }
+        catch { }
 
         // 노하우 방송: 프로파일 매칭 -> 해당 폼 폴더의 knowhow.md
         BroadcastInspectKnowhow(mainWin.Handle, mainWin.ClassName, matchedFormId, matchedFormTitle);
@@ -351,6 +517,12 @@ internal partial class Program
             }
             Console.Write(tree);
 
+            // Binary garbage detection: UIA names from MFC owner-drawn windows (e.g. Kiwoom Heroes
+            // _NKHeroMainClass MDI child) may contain non-printable bytes. Auto-trigger visual
+            // capture as fallback so caller gets a screenshot instead of unreadable text.
+            if (IsBinaryOutput(tree))
+                TryCaptureOnBinaryTree(inspectHandle, args);
+
             var children = WindowFinder.GetChildren(inspectHandle);
             Console.WriteLine($"\n--- Win32 children: {children.Count} ---");
             if (children.Count > 0 && string.IsNullOrWhiteSpace(tree.Replace($"[Window] \"{matchedFormTitle ?? mainWin.Title}\"", "").Trim()))
@@ -364,6 +536,7 @@ internal partial class Program
             TryDynamicA11yFallback(inspectHandle, tree, args);
         }
 
+        Console.WriteLine($"# END hwnd:0x{inspectHandle.ToInt64():X8}");
         return 0;
     }
 
@@ -436,6 +609,145 @@ internal partial class Program
         }
     }
 
+    /// <summary>
+    /// Returns true when the UIA tree output contains a high ratio of non-printable bytes
+    /// (binary garbage from elevated MFC owner-drawn MDI children such as Kiwoom Heroes
+    /// _NKHeroMainClass / Afx:* sub-windows where UIA cannot read text across the elevated
+    /// process boundary).
+    ///
+    /// Threshold: >30% non-readable chars. A char is "readable" when it is:
+    ///   - ASCII printable (0x20-0x7E)
+    ///   - Normal whitespace (\n \r \t)
+    ///   - Hangul (AC00-D7A3 syllables, 1100-11FF Jamo, 3130-318F Compat Jamo)
+    ///   - CJK Unified Ideographs (4E00-9FFF) -- common in Korean trading apps for ticker names
+    ///   - Other Letter/Number/Punctuation/Symbol categories (covers JP/CN, math, currency)
+    /// Anything else (control chars outside the whitespace allow-list, surrogate halves,
+    /// PUA garbage) counts as binary noise.
+    /// </summary>
+    static bool IsBinaryOutput(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length < 20) return false;
+        int binary = 0;
+        foreach (var c in text)
+        {
+            if (c == '\n' || c == '\r' || c == '\t') continue;
+            if (c >= 0x20 && c <= 0x7E) continue;                       // ASCII printable
+            if (c >= 0xAC00 && c <= 0xD7A3) continue;                   // Hangul syllables
+            if (c >= 0x1100 && c <= 0x11FF) continue;                   // Hangul Jamo
+            if (c >= 0x3130 && c <= 0x318F) continue;                   // Hangul Compat Jamo
+            if (c >= 0x4E00 && c <= 0x9FFF) continue;                   // CJK Unified
+            var cat = char.GetUnicodeCategory(c);
+            if (cat == System.Globalization.UnicodeCategory.UppercaseLetter
+                || cat == System.Globalization.UnicodeCategory.LowercaseLetter
+                || cat == System.Globalization.UnicodeCategory.TitlecaseLetter
+                || cat == System.Globalization.UnicodeCategory.OtherLetter
+                || cat == System.Globalization.UnicodeCategory.DecimalDigitNumber
+                || cat == System.Globalization.UnicodeCategory.LetterNumber
+                || cat == System.Globalization.UnicodeCategory.OtherNumber
+                || cat == System.Globalization.UnicodeCategory.ConnectorPunctuation
+                || cat == System.Globalization.UnicodeCategory.DashPunctuation
+                || cat == System.Globalization.UnicodeCategory.OpenPunctuation
+                || cat == System.Globalization.UnicodeCategory.ClosePunctuation
+                || cat == System.Globalization.UnicodeCategory.InitialQuotePunctuation
+                || cat == System.Globalization.UnicodeCategory.FinalQuotePunctuation
+                || cat == System.Globalization.UnicodeCategory.OtherPunctuation
+                || cat == System.Globalization.UnicodeCategory.MathSymbol
+                || cat == System.Globalization.UnicodeCategory.CurrencySymbol
+                || cat == System.Globalization.UnicodeCategory.ModifierSymbol
+                || cat == System.Globalization.UnicodeCategory.OtherSymbol)
+                continue;
+            binary++;
+        }
+        return binary * 100 / text.Length > 30;
+    }
+
+    /// <summary>
+    /// Auto-capture the target window when inspect returns binary garbage from an elevated
+    /// MFC/MDI child where UIA text extraction is unreadable.
+    ///
+    /// Fallback chain (per suggest 2026-04-26 -- elevated MDI capture):
+    ///   1. ScreenCapture.TryPrintWindowOnly(hwnd) -- focusless, no Z-order disturbance
+    ///   2. ScreenCapture.CaptureScreenRegion(GetWindowRect) -- screen-coord fallback if
+    ///      PrintWindow returns null (window may be partially covered but visible)
+    ///
+    /// GetWindowRect returns screen coordinates even for child/MDI windows on Win10+,
+    /// so no ClientToScreen translation is required for top-level capture geometry.
+    /// Output: prints "# SCREENSHOT path=..." marker line so downstream tooling (Claude
+    /// session, Eye renderer) can pick up the visual context instead of binary text.
+    /// </summary>
+    static void TryCaptureOnBinaryTree(IntPtr hWnd, string[] args)
+    {
+        if (args.Contains("--no-vision")) return;
+        try
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Error.WriteLine("[INSPECT] Binary garbage detected (>30% non-readable) -- elevated MDI fallback to PrintWindow...");
+            Console.ResetColor();
+
+            System.Drawing.Bitmap? bmp = null;
+            string source = "";
+
+            // 1) PrintWindow: focusless, works against most owner-drawn HDC paths.
+            try
+            {
+                bmp = WKAppBot.Win32.Input.ScreenCapture.TryPrintWindowOnly(hWnd);
+                if (bmp != null) source = "PrintWindow";
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[INSPECT] PrintWindow threw: {ex.Message}");
+            }
+
+            // 2) Screen-region fallback via GetWindowRect (returns screen coords on Win10+).
+            if (bmp == null)
+            {
+                try
+                {
+                    if (NativeMethods.GetWindowRect(hWnd, out var wr))
+                    {
+                        int w = wr.Right - wr.Left;
+                        int h = wr.Bottom - wr.Top;
+                        if (w > 0 && h > 0)
+                        {
+                            bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureScreenRegion(wr.Left, wr.Top, w, h);
+                            if (bmp != null) source = "ScreenRegion";
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[INSPECT] CaptureScreenRegion threw: {ex.Message}");
+                }
+            }
+
+            if (bmp == null)
+            {
+                Console.Error.WriteLine("[INSPECT] Both PrintWindow and ScreenRegion fallbacks returned null -- window may be minimized or off-screen.");
+                return;
+            }
+
+            try
+            {
+                var dir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq", "experience", "captures");
+                Directory.CreateDirectory(dir);
+                var path = Path.Combine(dir, $"inspect_binary_{DateTime.Now:yyyyMMdd_HHmmss}_0x{hWnd:X}.png");
+                WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, path);
+
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"# SCREENSHOT path={path} source={source}");
+                Console.ResetColor();
+            }
+            finally
+            {
+                bmp.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[INSPECT] Capture failed: {ex.Message}");
+        }
+    }
+
     static void TryDynamicA11yFallback(IntPtr hWnd, string uiaTree, string[] args)
     {
         if (args.Contains("--no-vision")) return;
@@ -472,7 +784,18 @@ internal partial class Program
 
         try
         {
-            var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd);
+            var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
+            if (bmp == null)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine("[DYN-A11Y] Capture returned blank -- skipping Gemini scan.");
+                Console.ResetColor();
+                return;
+            }
             var segments = AskGeminiForFormScanAsync(bmp).GetAwaiter().GetResult();
             if (segments == null || segments.Count == 0)
             {
@@ -926,5 +1249,15 @@ internal partial class Program
     }
 
     // -- focus ------------------------------------------------─
+
+    // windows was removed (v6.1) -- redirect to a11y find
+    // Strip --uia/--uia-deep injected by FindCommand to avoid mutual recursion.
+    static int WindowsCommand(string[] args)
+    {
+        var cleanArgs = args.Where(a => a != "--uia" && a != "--uia-deep").ToArray();
+        if (cleanArgs.Length == 0 || (cleanArgs.Length == 1 && cleanArgs[0] == "--help"))
+            return A11yCommand(["find", "wkappbot*"]);
+        return A11yCommand(["find", ..cleanArgs]);
+    }
 
 }

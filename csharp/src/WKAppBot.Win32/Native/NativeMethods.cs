@@ -35,6 +35,12 @@ public static partial class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool IsWindowVisible(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetDesktopWindow();
+
     // -- Menu API ------------------------------------------------─
     [DllImport("user32.dll")]
     public static extern IntPtr GetMenu(IntPtr hWnd);
@@ -416,6 +422,8 @@ public static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+    [DllImport("user32.dll")]
+    public static extern bool GetLayeredWindowAttributes(IntPtr hwnd, out uint pcrKey, out byte pbAlpha, out uint pdwFlags);
     public const uint LWA_ALPHA = 0x02;
 
     // -- Cursor detection (EditCursor hint for DYN-A11Y) --
@@ -678,8 +686,13 @@ public static partial class NativeMethods
     public const uint VK_CONTROL = 0x11;
     public const uint VK_MENU    = 0x12; // Alt
     public const uint WM_MOUSEMOVE = 0x0200;
-    public const uint WM_LBUTTONDOWN = 0x0201;
-    public const uint WM_LBUTTONUP = 0x0202;
+    public const uint WM_LBUTTONDOWN  = 0x0201;
+    public const uint WM_LBUTTONUP    = 0x0202;
+    public const uint WM_LBUTTONDBLCLK = 0x0203;
+    public const uint WM_RBUTTONDOWN  = 0x0204;
+    public const uint WM_RBUTTONUP    = 0x0205;
+    public const uint MK_LBUTTON      = 0x0001;
+    public const uint MK_RBUTTON      = 0x0002;
     public const uint WM_NCHITTEST = 0x0084;
 
     // WM_NCHITTEST return values
@@ -1259,6 +1272,9 @@ public static partial class NativeMethods
         catch { return null; }
         finally { if (hProcess != IntPtr.Zero) CloseHandle(hProcess); }
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
 }
 
 // -- Structs --------------------------------------------------

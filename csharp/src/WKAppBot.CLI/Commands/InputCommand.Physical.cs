@@ -313,7 +313,11 @@ internal partial class Program
                 try
                 {
                     NativeMethods.GetWindowRect(targetHwnd, out var preRect);
-                    using var preBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    using var preBmp = ScreenCapture.CaptureWindow(targetForm.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = true,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
                     if (preBmp != null)
                     {
                         NativeMethods.GetWindowRect(targetForm.Handle, out var preFormRect);
@@ -367,7 +371,11 @@ internal partial class Program
                 try
                 {
                     NativeMethods.GetWindowRect(targetHwnd, out var verifyRect);
-                    using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = true,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
                     if (formBmp != null)
                     {
                         NativeMethods.GetWindowRect(targetForm.Handle, out var formRect);
@@ -578,7 +586,11 @@ internal partial class Program
                 try
                 {
                     NativeMethods.GetWindowRect(targetHwnd, out var verifyRect5);
-                    using var formBmp5 = ScreenCapture.CaptureWindow(targetForm.Handle);
+                    using var formBmp5 = ScreenCapture.CaptureWindow(targetForm.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = true,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
                     if (formBmp5 != null)
                     {
                         NativeMethods.GetWindowRect(targetForm.Handle, out var formRect5);
@@ -789,12 +801,19 @@ internal partial class Program
                 // Take screenshot for visual verification
                 try
                 {
-                    using var bmp = ScreenCapture.CaptureWindow(win.Handle);
-                    var ssPath = OcrDebugPath("verify");
-                    bmp.Save(ssPath);
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
-                    Console.ResetColor();
+                    using var bmp = ScreenCapture.CaptureWindow(win.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                    {
+                        RejectBlank = true,
+                        StepLogger = s => Console.Error.WriteLine(s),
+                    });
+                    if (bmp != null)
+                    {
+                        var ssPath = OcrDebugPath("verify");
+                        bmp.Save(ssPath);
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
+                        Console.ResetColor();
+                    }
                 }
                 catch { }
 

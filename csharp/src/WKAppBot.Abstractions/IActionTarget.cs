@@ -98,6 +98,14 @@ public class ReadinessContext
 
     /// <summary>Synchronous polling timeout in ms</summary>
     public int TimeoutMs { get; init; } = 5000;
+
+    /// <summary>
+    /// --force flag: bypass soft gates (IsEnabled, IsVisible, readonly) and attempt the
+    /// action anyway. The caller accepts responsibility for targets that UIA reports as
+    /// disabled/hidden -- useful for MFC owner-drawn controls whose UIA surface lies.
+    /// Hard gates (stale element, lock screen, global pre-conditions) still apply.
+    /// </summary>
+    public bool Force { get; init; }
 }
 
 /// <summary>

@@ -691,7 +691,7 @@ internal sealed class AskSession : IDisposable
         // Prevents zombie-minimized Chrome windows after ask session ends.
         try
         {
-            if (Cdp?.ChromeWindowHandle != 0)
+            if (Cdp is not null && Cdp.ChromeWindowHandle != 0)
             {
                 var hwnd = (IntPtr)Cdp.ChromeWindowHandle;
                 if (WKAppBot.Win32.Native.NativeMethods.IsIconic(hwnd))

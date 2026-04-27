@@ -234,13 +234,16 @@ Usage:
   wkappbot web <subcommand> [options]
 
 Session Management:
-  open [url] [--port N] [--headless] [--no-launch] [--browser] [--no-minimize] [--show]
+  open [url] [--port N] [--headless] [--no-launch] [--browser] [--no-minimize] [--show] [--keeplogin-Ns]
       Open Chrome with CDP and navigate to URL.
       --port N: CDP port (default: 9222)
       --headless: Run Chrome headless (no visible window)
       --no-launch: Connect to already-running Chrome (don't launch)
       --browser: Normal Chrome UI with address bar/tabs (for debugging)
       --no-minimize / --show: Keep Chrome window visible (default: minimize)
+      --keeplogin-Ns: login session keepalive -- reload <url> every N seconds.
+                            Blocks until Ctrl+C. Stdout: # KEEPALIVE url=... interval=Ns pid=...
+                            Use case: KIS myAsset.jsp session keepalive (--keeplogin-30s).
   close [--port N]
       Disconnect from Chrome (does not close the browser).
   status [--port N]
@@ -605,6 +608,11 @@ Options:
         // Get URL (first non-flag argument)
         string? url = args.FirstOrDefault(a => !a.StartsWith("--") && a != "true" && a != "false");
 
+        // --keeplogin-Ns: login session keepalive -- after open, loop reload every N seconds
+        // until Ctrl+C. Use case: KIS myAsset.jsp expires session after ~45s; periodic reload
+        // refreshes the session cookie without a Python worker.
+        int keepaliveSeconds = ParseIdleSeconds(args);
+
         bool freshLaunch = false;
         Console.Write($"[WEB] ");
 
@@ -707,6 +715,181 @@ Options:
         // Auto-launch AppBotEye overlay if not already running
         LaunchAppBotEyeIfNeeded(port);
 
+        // -- Keepalive loop (--keeplogin-Ns) ---------------------------
+        // Reloads the same URL every N seconds to keep server-side session alive.
+        // Blocks until Ctrl+C. Each tick uses CDP NavigateAsync(url) -- preserves
+        // cookies and storage (same tab), unlike a fresh open that creates a new tab.
+        if (keepaliveSeconds > 0 && !string.IsNullOrEmpty(url))
+        {
+            var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            const int idleThresholdMs = 60_000; // 1분 무접근 → URL 강제 주입
+            Console.WriteLine($"# KEEPALIVE url={url} interval={keepaliveSeconds}s idle-threshold=60s pid={pid}");
+            Console.Error.WriteLine($"[WEB] Keepalive started -- inject URL after 60s idle. Press Ctrl+C to stop.");
+            Console.Out.Flush();
+
+            // Web Worker keepalive -- immune to background tab throttling.
+            // Enhanced guards: URL drift detection, tab-lost recovery, visibilitychange reset.
+            const string injectJs = @"
+(function(){
+  if(window._kaWorker && location.href===window._kaTargetUrl) return 'already';
+  if(window._kaWorker){ window._kaWorker.terminate(); window._kaWorker=null; }
+  var workerSrc=[
+    'var last=Date.now();',
+    'self.onmessage=function(e){if(e.data==""activity"")last=Date.now();};',
+    'setInterval(function(){self.postMessage(Date.now()-last);},1000);'
+  ].join('');
+  var blob=new Blob([workerSrc],{type:'application/javascript'});
+  var w=new Worker(URL.createObjectURL(blob));
+  window._kaIdleMs=0;
+  window._kaTargetUrl=location.href;
+  w.onmessage=function(e){ window._kaIdleMs=e.data; };
+  window._kaWorker=w;
+  ['mousemove','mousedown','keydown','scroll','touchstart','focus'].forEach(function(ev){
+    document.addEventListener(ev,function(){ w.postMessage('activity'); window._kaIdleMs=0; },{passive:true,capture:true});
+  });
+  // Tab restored to foreground → treat as activity (reset idle clock)
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden){ w.postMessage('activity'); window._kaIdleMs=0; }
+  });
+  // URL drift: clear worker on unload so next status check forces re-inject
+  window.addEventListener('beforeunload',function(){ window._kaWorker=null; window._kaTargetUrl=null; });
+  // Tab close protection: warn user before closing (prevents accidental close)
+  window.addEventListener('beforeunload',function(e){
+    e.preventDefault(); e.returnValue='keeplogin 탭입니다. 닫으면 세션이 끊길 수 있어요.'; return e.returnValue;
+  });
+  // Visual marker: prefix title with 🔒 so tab is recognizable
+  if(!document.title.startsWith('🔒')){
+    document.title='🔒 '+document.title;
+    var _kaObs=new MutationObserver(function(){
+      if(!document.title.startsWith('🔒')) document.title='🔒 '+document.title;
+    });
+    _kaObs.observe(document.querySelector('title')||document.head,{childList:true,subtree:true,characterData:true});
+    window._kaTitleObs=_kaObs;
+  }
+  return 'injected';
+})()";
+
+            // Per-tick status: idle ms + current URL + worker alive
+            const string statusJs = "(function(){return JSON.stringify({idle:window._kaIdleMs||0,url:location.href,ok:!!window._kaWorker});})()";
+
+            int tick = 0, cdpFailStreak = 0;
+            const int maxCdpFailStreak = 3;
+            using var cancelEvent = new ManualResetEventSlim(false);
+            ConsoleCancelEventHandler cancelHandler = (s, e) => { e.Cancel = true; cancelEvent.Set(); };
+            Console.CancelKeyPress += cancelHandler;
+            string? currentTabUrl = null;
+            try
+            {
+                while (!cancelEvent.IsSet)
+                {
+                    if (cancelEvent.Wait(keepaliveSeconds * 1000)) break;
+                    tick++;
+                    try
+                    {
+                        // navigateUrl=url: if the tab for this URL is gone, CDP opens it again
+                        using var kcdp = ConnectCdp(port, navigateUrl: url);
+                        cdpFailStreak = 0;
+
+                        // Read status (idle, currentUrl, workerAlive)
+                        var statusRaw = kcdp.EvalAsync(statusJs).GetAwaiter().GetResult()?.Trim('"') ?? "{}";
+                        long idleMs = 0; string tabUrl = url; bool workerOk = false;
+                        try
+                        {
+                            var node = System.Text.Json.JsonDocument.Parse(statusRaw).RootElement;
+                            idleMs   = node.TryGetProperty("idle", out var iv) ? iv.GetInt64() : 0;
+                            tabUrl   = node.TryGetProperty("url",  out var uv) ? uv.GetString() ?? url : url;
+                            workerOk = node.TryGetProperty("ok",   out var ov) && ov.GetBoolean();
+                        }
+                        catch { }
+
+                        // URL drift: tab navigated away from target
+                        bool urlDrifted = !string.IsNullOrEmpty(tabUrl) &&
+                                          !tabUrl.StartsWith(url.Split('?')[0], StringComparison.OrdinalIgnoreCase);
+                        if (urlDrifted)
+                            Console.Error.WriteLine($"[KEEPALIVE] tick={tick} URL drift: {tabUrl} (expected {url})");
+
+                        // Re-inject worker if lost (page reload, navigation, URL drift)
+                        if (!workerOk || urlDrifted)
+                        {
+                            // Navigate back to target first if drifted and idle
+                            if (urlDrifted && idleMs >= idleThresholdMs)
+                            {
+                                kcdp.EvalAsync($"location.href='{url.Replace("'","\\'")}'").GetAwaiter().GetResult();
+                                Console.WriteLine($"# URL-RESTORE url={url} was={tabUrl} idle={idleMs/1000}s ts={DateTimeOffset.UtcNow:o}");
+                                Console.Out.Flush();
+                                System.Threading.Thread.Sleep(2000); // wait for navigation
+                            }
+                            var r = kcdp.EvalAsync(injectJs).GetAwaiter().GetResult();
+                            currentTabUrl = url;
+                            Console.Error.WriteLine($"[KEEPALIVE] tick={tick} tracker {r?.Trim('"') ?? "?"} (url={tabUrl})");
+                        }
+                        else
+                        {
+                            currentTabUrl = tabUrl;
+                        }
+
+                        // Main idle check: >= 60s without activity → force URL reload
+                        if (idleMs >= idleThresholdMs && !urlDrifted)
+                        {
+                            var safeUrl = url.Replace("'", "\\'");
+                            kcdp.EvalAsync($"if(window._kaWorker)window._kaWorker.postMessage('activity');window._kaIdleMs=0;location.href='{safeUrl}';").GetAwaiter().GetResult();
+                            Console.WriteLine($"# LOGIN-KEEPALIVE url={url} idle={idleMs/1000}s ts={DateTimeOffset.UtcNow:o}");
+                            Console.Out.Flush();
+                            Console.Error.WriteLine($"[KEEPALIVE] tick={tick} idle={idleMs/1000}s >= 60s → URL injected");
+                        }
+                        else if (!urlDrifted)
+                        {
+                            var shortUrl = tabUrl.Length > 60 ? tabUrl[..60] + "..." : tabUrl;
+                            Console.Error.WriteLine($"[KEEPALIVE] tick={tick} idle={idleMs/1000}s ok url={shortUrl}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        cdpFailStreak++;
+                        Console.Error.WriteLine($"[KEEPALIVE] tick={tick} cdp-error ({cdpFailStreak}/{maxCdpFailStreak}): {ex.Message}");
+                        if (cdpFailStreak >= maxCdpFailStreak)
+                        {
+                            // Tab is gone -- ConnectCdp with navigateUrl will reopen on next tick
+                            Console.WriteLine($"# TAB-LOST url={url} ts={DateTimeOffset.UtcNow:o}");
+                            Console.Out.Flush();
+                            Console.Error.WriteLine($"[KEEPALIVE] TAB-LOST after {cdpFailStreak} failures -- will reopen on next tick");
+                            cdpFailStreak = 0;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                Console.CancelKeyPress -= cancelHandler;
+            }
+            Console.Error.WriteLine($"[KEEPALIVE] stopped after {tick} tick(s). last url={currentTabUrl ?? url}");
+        }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Parse --keeplogin interval from args.
+    /// Accepts: --keeplogin-30s  --keeplogin-Ns  --keeplogin 30  --keeplogin 30s
+    /// Returns poll interval seconds, or 0 if not specified.
+    /// </summary>
+    static int ParseIdleSeconds(string[] args)
+    {
+        // Pattern A: --keeplogin-30s (suffix-style)
+        foreach (var a in args)
+        {
+            if (a == null) continue;
+            if (!a.StartsWith("--keeplogin-", StringComparison.OrdinalIgnoreCase)) continue;
+            var rest = a["--keeplogin-".Length..].TrimEnd('s', 'S');
+            if (int.TryParse(rest, out var n) && n > 0) return n;
+        }
+        // Pattern B: --keeplogin 30 / --keeplogin 30s (separate value)
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (!string.Equals(args[i], "--keeplogin", StringComparison.OrdinalIgnoreCase)) continue;
+            var v = args[i + 1].TrimEnd('s', 'S');
+            if (int.TryParse(v, out var n) && n > 0) return n;
+        }
         return 0;
     }
 
@@ -772,7 +955,11 @@ Options:
         }
 
         // Use Win32 ScreenCapture (PrintWindow) -- captures title bar + chrome
-        var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd);
+        var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd, new WKAppBot.Win32.Input.CaptureOptions
+        {
+            RejectBlank = true,
+            StepLogger = s => Console.Error.WriteLine(s),
+        });
         if (bmp == null)
         {
             Console.ForegroundColor = ConsoleColor.Red;

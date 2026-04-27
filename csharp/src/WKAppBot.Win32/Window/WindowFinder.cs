@@ -155,7 +155,8 @@ public static class WindowFinder
             }
 
             // cmd: fallback -- match against process command line args
-            if (!matched)
+            // Skip wkappbot* and shell processes: their cmdline carries the current search query.
+            if (!matched && !IsSearcherProcess(procName))
             {
                 try
                 {
@@ -197,17 +198,15 @@ public static class WindowFinder
             if (matched)
             {
                 var info = WindowInfo.FromHwnd(hWnd);
-                // Coverage = pattern-literal chars / matched-field chars (higher = tighter hit).
-                // Use the actual matched field's length as the denominator so a
-                // proc/domain/url match isn't unfairly penalized by a long window
-                // title, and a title match isn't over-credited by a short proc
-                // name. Search-term coverage becomes the primary sort key for
-                // results.Sort below.
                 var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
                 var denomLen = (matchedSnippet ?? title).Length;
                 info.Coverage = patLen > 0 && denomLen > 0 ? (double)patLen / denomLen : 0;
                 info.MatchedVia = matchedVia;
                 info.MatchedSnippet = matchedSnippet;
+                // Expose all discoverable fields so a11y find can suggest better grap alternatives
+                var simpleFields = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase)
+                    { [matchedVia ?? "title"] = new List<string> { titlePattern } };
+                info.FieldScores = ComputeFieldScores(hWnd, simpleFields, procNameCache: null);
                 results.Add(info);
                 if (stopOnFirstMatch) return false;
             }
@@ -257,7 +256,7 @@ public static class WindowFinder
                     }
                 }
 
-                if (!matched)
+                if (!matched && !IsSearcherProcess(procName))
                 {
                     try
                     {
@@ -316,8 +315,46 @@ public static class WindowFinder
             }, IntPtr.Zero);
         }
 
+        // -- MDI child title scan fallback --
+        // EnumWindows only enumerates top-level windows. MDI document children
+        // (e.g. Heroes4 "[0150] 조건검색" under MDIClient) are invisible to a
+        // plain title-pattern search. When the main scan found nothing (or only
+        // shell-noise matches), scan MDI children of all visible top-level windows.
+        // Run BEFORE the slow windowless cmdLine scan so we can skip that scan
+        // when MDI children already answer the query (30+s -> <1s on hit).
+        bool noRealResults = results.Count == 0
+            || results.All(r => r.Coverage == 0
+                             || r.MatchedVia is "context" or "child-cmd");
+        if (noRealResults)
+        {
+            NativeMethods.EnumWindows((hWnd, _) =>
+            {
+                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
+                var hMdi = NativeMethods.FindWindowExW(hWnd, IntPtr.Zero, "MDIClient", null);
+                if (hMdi == IntPtr.Zero) return true;
+                foreach (var mc in GetChildrenZOrder(hMdi))
+                {
+                    if (!NativeMethods.IsWindowVisible(mc.Handle)) continue;
+                    if (string.IsNullOrEmpty(mc.Title)) continue;
+                    if (!PatternMatcher.TokenMatchAny(titlePattern, mc.Title)) continue;
+                    if (results.Any(r => r.Handle == mc.Handle)) continue;
+                    var patLen = titlePattern.Replace("*", "").Replace("?", "").Length;
+                    mc.Coverage = patLen > 0 && mc.Title.Length > 0 ? (double)patLen / mc.Title.Length : 0;
+                    mc.MatchedVia = "title";
+                    mc.MatchedSnippet = mc.Title;
+                    mc.FieldScores = ComputeFieldScores(mc.Handle, null, null);
+                    results.Add(mc);
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
+
         // -- Windowless process cmdLine scan: find processes with no visible window --
         // Walk PPID chain to find host window (e.g. wkappbot running in VS Code terminal).
+        // Only run when no results found yet -- GetProcessCommandLine across all
+        // processes takes 30+s, so skip it entirely when main scan + MDI fallback
+        // already produced matches.
+        if (results.Count == 0)
         {
             // Build pid->hwnd map from all visible windows
             var pidToHwnd = new Dictionary<uint, IntPtr>();
@@ -339,6 +376,7 @@ public static class WindowFinder
                     var pid = (uint)proc.Id;
                     if (pid <= 4) continue;
                     if (pidToHwnd.ContainsKey(pid)) continue; // has own window -- already checked
+                    if (IsSearcherProcess(proc.ProcessName)) continue;
                     var cmdLine = NativeMethods.GetProcessCommandLine((int)pid);
                     if (string.IsNullOrEmpty(cmdLine)) continue;
                     if (!PatternMatcher.TokenMatchAny(titlePattern, cmdLine)) continue;
@@ -933,6 +971,67 @@ public static class WindowFinder
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Returns class name ancestry path: "ownClass/parentClass" (up to maxDepth).
+    /// Stops at desktop (#32769), zero hwnd, or repeated classes.
+    /// WPF HwndWrapper[proc;name;UUID]: extracts semantic name part only (e.g. "WhisperRing-Main-STA").
+    /// Empty name segment → uses proc name (e.g. "wkappbot-core").
+    /// Example (MFC):  "Afx:00DB0000/_NKHeroMainClass"
+    /// Example (WPF):  "WhisperRing-Main-STA/wkappbot-core"
+    /// </summary>
+    public static string GetClassPath(IntPtr hWnd, int maxDepth = 3)
+    {
+        var parts = new List<string>();
+        var cur = hWnd;
+        for (int i = 0; i < maxDepth && cur != IntPtr.Zero; i++)
+        {
+            var cls = GetClassName(cur);
+            if (string.IsNullOrEmpty(cls) || cls == "#32769") break; // desktop
+            // WPF: HwndWrapper[proc;name;UUID] → extract semantic name or proc
+            var wpf = System.Text.RegularExpressions.Regex.Match(cls,
+                @"HwndWrapper\[([^;]+);([^;]*);[0-9a-f\-]{0,36}\]",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (wpf.Success)
+            {
+                var name = wpf.Groups[2].Value.Trim();
+                cls = name.Length > 0 ? name : wpf.Groups[1].Value.Trim();
+            }
+            if (parts.Contains(cls)) break; // cycle guard
+            parts.Add(cls);
+            cur = NativeMethods.GetParent(cur);
+        }
+        return string.Join("/", parts);
+    }
+
+    // Shell/system processes that "launch" everything -- stop proc path walk here.
+    // Including them makes proc:'**/explorer' match all apps, which is useless noise.
+    static readonly HashSet<string> _procPathStopList = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "explorer", "svchost", "services", "lsass", "winlogon", "csrss", "smss",
+        "wininit", "System", "Registry", "dwm",
+    };
+
+    /// <summary>
+    /// Returns process ancestry path: "ownProc/parentProc" (up to maxDepth).
+    /// Stops at pid 0/1, shell/system processes (explorer, svchost, etc.), or repeated names.
+    /// Example: "nkrunlite/wkappbot-core" (stops before bash/explorer)
+    /// </summary>
+    public static string GetProcPath(uint pid, int maxDepth = 3)
+    {
+        var parts = new List<string>();
+        var cur = (int)pid;
+        for (int i = 0; i < maxDepth && cur > 1; i++)
+        {
+            var name = NativeMethods.TryGetProcessNameFast((uint)cur) ?? "";
+            if (string.IsNullOrEmpty(name)) break;
+            if (_procPathStopList.Contains(name)) break; // shell/system stop
+            if (parts.Contains(name)) break; // cycle guard
+            parts.Add(name);
+            cur = NativeMethods.GetParentProcessId(cur);
+        }
+        return string.Join("/", parts);
+    }
+
     public static RECT GetWindowRect(IntPtr hWnd)
     {
         NativeMethods.GetWindowRect(hWnd, out var rect);
@@ -1174,7 +1273,11 @@ public static class WindowFinder
                         int.TryParse(m.Groups[1].Value, out port);
                 }
 
-                if (port > 0)
+                // Sanity: port must be in valid user-range. port 9 (discard), <1024 (reserved),
+                // or >65535 are never legit CDP endpoints. GetPropW occasionally returns stale/
+                // corrupted values -> probing 127.0.0.1:9 throws HttpRequestException that escaped
+                // to RunMain top-level catch in the 2026-04-19 Slack bug report.
+                if (port >= 1024 && port <= 65535)
                 {
                     using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
                     var json = http.GetStringAsync($"http://localhost:{port}/json").GetAwaiter().GetResult();
@@ -1182,6 +1285,8 @@ public static class WindowFinder
                     cdpUrls = string.Join(" ", urlMatches.Select(u => u.Groups[1].Value));
                 }
             }
+            catch (System.Net.Http.HttpRequestException) { /* probe failed -- cache empty */ }
+            catch (TaskCanceledException) { /* probe timed out */ }
             catch { }
             _cdpPidUrlCache[pid] = (cdpUrls, now);
             cdpEntry = (cdpUrls, now);
@@ -1315,7 +1420,10 @@ public static class WindowFinder
         var url = "";
         try
         {
-            url = GetPrimaryUrlToken(GetBrowserUrl(hWnd, pid));
+            // Skip Electron apps (VS Code, Codex, etc.) -- their GetBrowserUrl triggers
+            // deep UIA tree traversal (30+s). Only actual browser processes need this.
+            bool isElectronSkip = IsElectronWindow(cls, proc);
+            url = isElectronSkip ? "" : GetPrimaryUrlToken(GetBrowserUrl(hWnd, pid));
             // Skip Electron internal URLs (not real web -- noise in grap pattern)
             if (!string.IsNullOrEmpty(url) &&
                 (url.StartsWith("vscode-file://", StringComparison.OrdinalIgnoreCase) ||
@@ -1392,6 +1500,21 @@ public static class WindowFinder
     ///   [a,b,"c"]  ->  OR list of values
     /// Returns null if the input doesn't look like a valid multi-field pattern.
     /// </summary>
+    /// <summary>
+    /// Public entry for JSON5-like multi-field grap parsing. Accepts either
+    /// a brace-wrapped pattern ({proc:'x',pid:123}) or a pre-stripped inner.
+    /// Returns null if the pattern is not parseable as multi-field.
+    /// Exposed so non-window consumers (e.g. a11y kill) can reuse grap syntax
+    /// without re-implementing the parser.
+    /// </summary>
+    public static Dictionary<string, List<string>>? TryParseMultiFieldPattern(string pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern)) return null;
+        if (pattern.Length >= 2 && pattern[0] == '{' && pattern[^1] == '}')
+            return ParseMultiFieldPattern(pattern);
+        return null;
+    }
+
     static Dictionary<string, List<string>>? ParseMultiFieldPattern(string pattern)
     {
         var inner = pattern[1..^1].Trim();
@@ -1492,12 +1615,298 @@ public static class WindowFinder
         }
     }
 
+    /// <summary>
+    /// Electron-based apps (VS Code, Codex, Claude desktop, etc.) use Chrome_WidgetWin_1
+    /// but their UIA trees are managed by the Chromium renderer, not classic Win32/UIA.
+    /// Traversal can take 30+s -- skip UIA path building for these windows.
+    /// </summary>
+    public static bool IsElectronWindow(string cls, string proc)
+    {
+        if (!cls.Equals("Chrome_WidgetWin_1", StringComparison.OrdinalIgnoreCase)
+            && !cls.Equals("Chrome_WidgetWin_0", StringComparison.OrdinalIgnoreCase))
+            return false;
+        // True browser processes are NOT Electron; skip them (GetBrowserUrl is fast via CDP).
+        return !IsChromiumProcess(proc);
+    }
+
+    /// <summary>Public fast process-name lookup for use outside WindowFinder.</summary>
+    public static string GetProcessNameCached2(uint pid)
+        => NativeMethods.TryGetProcessNameFast(pid) ?? "";
+
+    /// <summary>
+    /// Returns true for processes that act as search-runners and always carry the current
+    /// search query in their cmdline, causing false positives in cmd: fallback matching.
+    /// Shells (bash/cmd/powershell) and wkappbot* workers are the main offenders.
+    /// </summary>
+    static bool IsSearcherProcess(string procName) =>
+        procName.StartsWith("wkappbot", StringComparison.OrdinalIgnoreCase)
+        || procName.Equals("bash",       StringComparison.OrdinalIgnoreCase)
+        || procName.Equals("sh",         StringComparison.OrdinalIgnoreCase)
+        || procName.Equals("cmd",        StringComparison.OrdinalIgnoreCase)
+        || procName.Equals("powershell", StringComparison.OrdinalIgnoreCase)
+        || procName.Equals("pwsh",       StringComparison.OrdinalIgnoreCase);
+
     static string NormalizeFieldPattern(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return value;
         if (value.Length >= 2 && value[0] == '/' && value[^1] == '/')
             return "regex:" + value[1..^1];
         return value;
+    }
+
+    /// <summary>
+    /// Compute per-field match scores for any grap match (JSON5 or simple pattern).
+    /// Discovers ALL available fields for the window (not just the ones specified in the pattern)
+    /// so users can see which fields offer the most efficient grap alternatives.
+    ///
+    /// Score = pattern_literal_chars / actual_field_value_chars (capped at 1.0).
+    ///   - Specified fields: coverage of the pattern against the real value.
+    ///   - Un-specified fields: 1.0 (full exact match possible, candidate to add to grap).
+    /// Sorted by score descending; tiebreak by value_length ascending (shorter = easier grap).
+    /// </summary>
+    static List<FieldScore> ComputeFieldScores(
+        IntPtr hWnd, Dictionary<string, List<string>>? fields, Dictionary<uint, string>? procNameCache)
+    {
+        NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
+        var cache = procNameCache ?? new Dictionary<uint, string>();
+
+        // Collect actual values for all text fields
+        // proc: "ownProc/parentProc" path (depth=2) for process ancestry context.
+        string? ownProc = cache.TryGetValue(pid, out var pn) ? pn : null;
+        if (ownProc == null)
+        {
+            ownProc = NativeMethods.TryGetProcessNameFast(pid) ?? "";
+            cache[pid] = ownProc;
+        }
+        var proc = GetProcPath(pid, maxDepth: 2);
+        var title  = GetWindowText(hWnd);
+        // cls: "ownClass/parentClass" path (depth=2) for all windows including WPF.
+        var cls = GetClassPath(hWnd, maxDepth: 2);
+        string domain = "", url = "", cmd = "";
+        // Only query browser URL for actual browser processes (Chrome, Edge, Firefox, Brave...).
+        // IsLikelyBrowserWindow also matches Chrome_WidgetWin_1 for VS Code / Codex / Claude
+        // (Electron apps) -- calling GetBrowserUrl on those triggers deep UIA tree traversal
+        // that can take 30+s. IsChromiumProcess guards against that.
+        bool needBrowserUrl = IsLikelyBrowserWindow(hWnd, cls, proc) && IsChromiumProcess(proc);
+        if (needBrowserUrl)
+        {
+            try { url = GetBrowserUrl(hWnd, pid) ?? ""; } catch { }
+            try { domain = ExtractDomainToken(url); } catch { }
+        }
+        // cmd: only fetch when explicitly requested in the pattern (expensive WMI/NTAPI call)
+        bool needCmd = fields != null && fields.ContainsKey("cmd");
+        if (needCmd)
+            try { cmd = NativeMethods.GetProcessCommandLine((int)pid) ?? ""; } catch { }
+
+        // All candidate fields in preferred display order.
+        // cmd/url are expensive and less commonly needed -- only include if requested in fields dict.
+        bool wantCmd = fields != null && fields.ContainsKey("cmd");
+        bool wantUrl = fields != null && fields.ContainsKey("url");
+        var candidates = new List<(string Field, string Actual)>
+        {
+            ("domain", domain),
+            ("proc",   proc),
+            ("cls",    cls),
+            ("title",  title),
+        };
+        if (wantUrl || !string.IsNullOrEmpty(url))   candidates.Add(("url",  url));
+        if (wantCmd && !string.IsNullOrEmpty(cmd))   candidates.Add(("cmd",  cmd));
+
+        var scores = new List<FieldScore>();
+        foreach (var (field, actual) in candidates)
+        {
+            if (string.IsNullOrEmpty(actual)) continue;
+
+            double score;
+            string pattern;
+
+            if (fields != null && fields.TryGetValue(field, out var values))
+            {
+                // Specified field: coverage score = Σ(matched chars) / field_length.
+                // For path patterns (cls:'A/B'), score against the matching path segment only.
+                // OR array [a,b,c] matches MORE windows → less discriminating → score / n.
+                pattern = values[0];
+                score = 0;
+                foreach (var v in values)
+                {
+                    double s;
+                    if (v.Contains('/') || v.Contains("**"))
+                    {
+                        // Path pattern: score each segment of actual against corresponding segment of pattern.
+                        // Use best-matching segment pair's score.
+                        var pathSegs = actual.Split('/');
+                        var patSegs  = v.Split('/').Where(p => p != "**").ToArray();
+                        s = patSegs.Length == 0 ? 0.0
+                            : pathSegs.Max(ps => patSegs.Max(pp => GlobCoverageScore(pp, ps)));
+                    }
+                    else
+                    {
+                        // Simple pattern: match against own class (first path segment)
+                        var ownSeg = actual.Split('/')[0];
+                        s = GlobCoverageScore(v, ownSeg);
+                        if (s == 0) s = GlobCoverageScore(v, actual); // fallback: full path
+                    }
+                    if (s > score) { score = s; pattern = v; }
+                }
+                if (values.Count > 1) score /= values.Count;
+            }
+            else
+            {
+                // Un-specified field: full exact match is possible → score 1.0 (candidate)
+                pattern = actual.Length > 30 ? actual[..30] : actual;
+                score = 1.0;
+            }
+
+            var display = GetMatchContext(actual, pattern, contextChars: 12);
+            scores.Add(new FieldScore(field, pattern, display, score));
+        }
+
+        // Sort: score descending, tiebreak by value length ascending (shorter = easier grap)
+        scores.Sort((a, b) =>
+        {
+            var cmp = b.Score.CompareTo(a.Score);
+            return cmp != 0 ? cmp : a.Matched.Length.CompareTo(b.Matched.Length);
+        });
+        return scores;
+    }
+
+    /// <summary>
+    /// Coverage score: Σ(segment_len × occurrence_count) / field_len, capped at 1.0.
+    /// Regex forms: "re:pat" (grap CLI), "/pat/" or "~pat~" (skill search / bash-safe).
+    /// Regex scored by literal-char-count (symbols penalized); exact match → score 1.0.
+    /// Glob: split on '*'/'?' → each segment counted independently; multi-hit boosts score.
+    /// </summary>
+    public static double GlobCoverageScore(string pattern, string field)
+    {
+        if (field.Length == 0) return 0.0;
+
+        // Detect regex form and extract inner pattern string.
+        string? rxPat = null;
+        if (pattern.Length > 3 && pattern.StartsWith("re:", StringComparison.OrdinalIgnoreCase))
+            rxPat = pattern[3..];
+        else if (pattern.Length > 2 && pattern[0] == '/' && pattern[^1] == '/')
+            rxPat = pattern[1..^1];
+        else if (pattern.Length > 2 && pattern[0] == '~' && pattern[^1] == '~')
+            rxPat = pattern[1..^1];
+
+        if (rxPat != null)
+        {
+            // Score = literal-char-count / field_len (symbols are "free" — naturally penalized).
+            int litCount = 0;
+            bool escaped = false;
+            foreach (var ch in rxPat)
+            {
+                if (escaped) { litCount++; escaped = false; continue; }
+                if (ch == '\\') { escaped = true; continue; }
+                if (".*+?^${}()|[]".IndexOf(ch) < 0) litCount++;
+            }
+            try
+            {
+                var rx = new System.Text.RegularExpressions.Regex(rxPat,
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase |
+                    System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+                if (!rx.IsMatch(field)) return 0.0;
+            }
+            catch { return 0.0; }
+            return Math.Min(1.0, (double)litCount / field.Length);
+        }
+
+        // Glob: split on '*' and '?' → count each literal segment independently.
+        var segments = pattern.Split('*', '?');
+        int total = 0;
+        foreach (var seg in segments)
+        {
+            if (seg.Length == 0) continue;
+            total += CountOccurrencesCI(field, seg) * seg.Length;
+        }
+        return total == 0 ? 0.0 : Math.Min(1.0, (double)total / field.Length);
+    }
+
+    /// <summary>Non-overlapping case-insensitive substring count.</summary>
+    public static int CountOccurrencesCI(string haystack, string needle)
+    {
+        if (needle.Length == 0) return 0;
+        int count = 0, idx = 0;
+        while ((idx = haystack.IndexOf(needle, idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            count++;
+            idx += needle.Length;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Returns a display snippet showing where pattern matched in actual.
+    /// Path fields (containing '/'): shows the matched segment + adjacent segments.
+    /// Other fields: shows contextChars chars before/after the match position.
+    /// Falls back to truncated actual if no literal part found.
+    /// </summary>
+    static string GetMatchContext(string actual, string pattern, int contextChars = 12)
+    {
+        if (actual.Length == 0) return actual;
+
+        // Extract literal part from glob pattern (strip * ? and re: prefix)
+        string lit = pattern;
+        if (lit.StartsWith("re:", StringComparison.OrdinalIgnoreCase)) lit = lit[3..];
+        else if ((lit.StartsWith("/") && lit.EndsWith("/")) || (lit.StartsWith("~") && lit.EndsWith("~")))
+            lit = lit[1..^1];
+        lit = System.Text.RegularExpressions.Regex.Replace(lit, @"[\*\?\[\]]", "");
+        if (lit.Length == 0) return actual.Length > 30 ? actual[..30] + "…" : actual;
+
+        // Path field: find which segment contains the match, show segment + neighbors
+        if (actual.Contains('/'))
+        {
+            var segs = actual.Split('/');
+            for (int i = 0; i < segs.Length; i++)
+            {
+                if (segs[i].IndexOf(lit, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    // Show: prev…matched/next (or just matched if neighbors are long)
+                    var prev = i > 0 ? "…/" : "";
+                    var next = i < segs.Length - 1 ? "/" + segs[i + 1] : "";
+                    var result = prev + segs[i] + next;
+                    return result.Length > 40 ? result[..40] + "…" : result;
+                }
+            }
+        }
+
+        // Plain string: find match position, show context chars around it
+        int idx = actual.IndexOf(lit, StringComparison.OrdinalIgnoreCase);
+        if (idx < 0) return actual.Length > 30 ? actual[..30] + "…" : actual;
+
+        int start = Math.Max(0, idx - contextChars);
+        int end   = Math.Min(actual.Length, idx + lit.Length + contextChars);
+        var snippet = (start > 0 ? "…" : "") + actual[start..end] + (end < actual.Length ? "…" : "");
+        return snippet;
+    }
+
+    /// <summary>
+    /// Glob-path match for cls ancestor chains. Each segment is auto-wrapped as substring.
+    /// Supports GitHub-style ** (zero or more segments).
+    /// Pattern "나와" matches any path containing a segment with "나와" (substring).
+    /// Pattern "_NKHero**" matches main class and all descendants.
+    /// Pattern "**/_NKHeroDialog*" matches any dialog regardless of depth.
+    /// Pattern "Afx*/_NKHeroMain*" matches Afx child of _NKHeroMain parent.
+    /// </summary>
+    static bool MatchClassPath(string pattern, string path)
+    {
+        // Normalize each segment to substring (auto-wrap with *...*), except ** which stays as-is.
+        var patSegs = pattern.Split('/');
+        var normalized = string.Join("/", patSegs.Select(seg =>
+            seg == "**" ? "**" : PatternMatcher.EnsureSubstring(seg)));
+        // Use CreatePathGlob for proper anchored path matching
+        var m = PatternMatcher.CreatePathGlob(normalized);
+        return m.IsMatch(path);
+    }
+
+    static string ExtractDomainToken(string? urls)
+    {
+        if (string.IsNullOrEmpty(urls)) return "";
+        foreach (var tok in urls.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            try { return new Uri(tok).Host; } catch { }
+        }
+        return urls.Length > 30 ? urls[..30] : urls;
     }
 
     /// <summary>
@@ -1566,16 +1975,70 @@ public static class WindowFinder
             if (MatchesMultiField(hWnd, pidFilter, cidFilter, titleMatchers, clsMatchers, procMatchers,
                     domainMatchers, urlMatchers, procNameCache, cmdMatchers))
             {
-                results.Add(WindowInfo.FromHwnd(hWnd));
+                var info = WindowInfo.FromHwnd(hWnd);
+                if (fields.Count > 1)
+                    info.FieldScores = ComputeFieldScores(hWnd, fields, procNameCache);
+                results.Add(info);
                 if (stopOnFirstMatch) return false;
             }
             return true;
         }, IntPtr.Zero);
 
+        // -- MDI child scan --
+        // EnumWindows above misses MDI document children (e.g. Heroes4 nkrunlite.exe
+        // "[0156]..." panels under MDIClient). When caller scoped to a specific process
+        // (proc: or pid:), walk the MDIClient of each matching frame and apply
+        // title/cls matchers to its children.
+        if ((!stopOnFirstMatch || results.Count == 0) &&
+            (pidFilter != 0 || procMatchers != null))
+        {
+            var framePids = new HashSet<uint>();
+            foreach (var kv2 in pidToHwnd)
+            {
+                var framePid = kv2.Key;
+                if (pidFilter != 0 && framePid != pidFilter) continue;
+                if (procMatchers != null)
+                {
+                    if (!procNameCache.TryGetValue(framePid, out var pn2))
+                    {
+                        pn2 = NativeMethods.TryGetProcessNameFast(framePid) ?? "";
+                        procNameCache[framePid] = pn2;
+                    }
+                    if (string.IsNullOrEmpty(pn2)) continue;
+                    if (!procMatchers.Any(m => m.IsMatch(pn2))) continue;
+                }
+                framePids.Add(framePid);
+            }
+
+            foreach (var fpid in framePids)
+            {
+                var frame = FindMDIMainFrame(fpid);
+                if (frame == IntPtr.Zero) continue;
+                var hMdiClient = NativeMethods.FindWindowExW(frame, IntPtr.Zero, "MDIClient", null);
+                if (hMdiClient == IntPtr.Zero) continue;
+
+                foreach (var mc in GetChildrenZOrder(hMdiClient))
+                {
+                    var mcHwnd = mc.Handle;
+                    if (!NativeMethods.IsWindowVisible(mcHwnd)) continue;
+                    if (results.Any(r => r.Handle == mcHwnd)) continue;
+                    if (cidFilter.HasValue && mc.ControlId != cidFilter.Value) continue;
+                    if (titleMatchers != null && !titleMatchers.Any(m => m.IsMatch(mc.Title ?? ""))) continue;
+                    if (clsMatchers   != null && !clsMatchers.Any(m => m.IsMatch(mc.ClassName ?? ""))) continue;
+                    mc.FieldScores = ComputeFieldScores(mcHwnd, fields, procNameCache);
+                    results.Add(mc);
+                    if (stopOnFirstMatch) break;
+                }
+                if (stopOnFirstMatch && results.Count > 0) break;
+            }
+        }
+
         // -- Secondary scan: windowless processes matching proc:/cmd: --
         // Handles processes with no own top-level window (e.g. terminal-hosted CLI tools).
         // For each matching process, walk parent PID chain to find effective host window.
-        if (procMatchers != null || cmdMatchers != null)
+        // proc-name scan: always run when procMatchers present (fast -- no cmdline read here).
+        // cmd-line scan: only run when no results yet (GetProcessCommandLine is 30+s across all procs).
+        if (procMatchers != null || (cmdMatchers != null && results.Count == 0))
         {
             foreach (var proc in Process.GetProcesses())
             {
@@ -1600,16 +2063,12 @@ public static class WindowFinder
                         if (matchedToken.Length > 60) matchedToken = matchedToken[..60];
                     }
 
-                    // Walk parent PID chain to find effective host window
-                    var effectiveHwnd = ResolveEffectiveHwnd(pid, pidToHwnd);
-                    if (effectiveHwnd == IntPtr.Zero) continue;
-                    if (results.Any(r => r.Handle == effectiveHwnd)) continue;
-
-                    var info = WindowInfo.FromHwnd(effectiveHwnd);
-                    info.MatchedVia = "child-cmd";
-                    info.MatchedSnippet = $"{procName}:{matchedToken}";
-                    info.Coverage = 0.5;
-                    results.Add(info);
+                    // Always include as process-only result with cmdline -- proc: search shows every
+                    // matching process regardless of window ownership.
+                    if (results.Any(r => r.IsProcessOnly && r.ProcessId == pid)) continue;
+                    if (string.IsNullOrEmpty(cmdLine))
+                        cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? "";
+                    results.Add(WindowInfo.FromProcess(pid, procName, cmdLine));
                 }
                 catch { }
                 finally { try { proc.Dispose(); } catch { } }
@@ -1683,15 +2142,29 @@ public static class WindowFinder
             if (!titleMatchers.Any(m => m.IsMatch(title))) return false;
         }
 
-        // cls (OR within list)
+        // cls: glob path matching.
+        // Simple "ClassName"  → own class + ancestor segments (finds main class AND all descendants).
+        // Path "A/B" or "A/**/B" → full glob-path match against ancestor chain.
         if (clsMatchers != null)
         {
             var cls = GetClassName(hWnd);
-            if (!clsMatchers.Any(m => m.IsMatch(cls))) return false;
+            bool clsMatch = clsMatchers.Any(m =>
+            {
+                if (m.IsMatch(cls)) return true; // own class -- fast path
+                var path = GetClassPath(hWnd, maxDepth: 5);
+                // Path pattern (contains '/' or '**'): use glob-path segment matching
+                var rawPat = m.RawPattern;
+                if (!string.IsNullOrEmpty(rawPat) && (rawPat.Contains('/') || rawPat.Contains("**")))
+                    return MatchClassPath(rawPat, path);
+                // Simple pattern: match any ancestor segment (e.g. cls:'_NKHeroMainClass' finds all children)
+                return path.Split('/').Skip(1).Any(seg => m.IsMatch(seg));
+            });
+            if (!clsMatch) return false;
         }
 
-        // proc (OR within list)
-        // proc: match against process name OR full command line (token-AND for multi-word patterns)
+        // proc: own process name + parent process chain (path patterns supported).
+        // Simple proc:'X' → own proc name (fast, current behavior).
+        // Path proc:'child/parent' or proc:'**/parent' → ancestor process chain.
         if (procMatchers != null)
         {
             if (!procNameCache.TryGetValue(pid, out var proc))
@@ -1701,7 +2174,17 @@ public static class WindowFinder
             }
             string cmdLine = "";
             try { cmdLine = NativeMethods.GetProcessCommandLine((int)pid) ?? ""; } catch { }
-            if (!procMatchers.Any(m => m.MatchAny(proc, cmdLine))) return false;
+            bool procMatch = procMatchers.Any(m =>
+            {
+                if (m.MatchAny(proc, cmdLine)) return true; // own proc -- fast path
+                var rawPat = m.RawPattern;
+                if (string.IsNullOrEmpty(rawPat) || (!rawPat.Contains('/') && !rawPat.Contains("**")))
+                    return false; // simple pattern -- only own proc
+                // Path pattern: walk parent process chain
+                var procPath = GetProcPath(pid, maxDepth: 4);
+                return MatchClassPath(rawPat, procPath); // reuse same glob-path logic
+            });
+            if (!procMatch) return false;
         }
 
         // cmd: match against process command line args
@@ -1742,6 +2225,9 @@ public static class WindowFinder
 /// <summary>
 /// Snapshot of window properties at query time.
 /// </summary>
+/// <summary>Per-field match score for JSON5 grap patterns. Field=field name, Score=literal_chars/field_len (higher=more discriminating).</summary>
+public record FieldScore(string Field, string Pattern, string Matched, double Score);
+
 public sealed class WindowInfo
 {
     public IntPtr Handle { get; init; }
@@ -1760,6 +2246,25 @@ public sealed class WindowInfo
     public string? MatchedVia { get; set; }
     /// <summary>Snippet of the matched value (truncated), for injecting into display grap.</summary>
     public string? MatchedSnippet { get; set; }
+    /// <summary>Per-field scores for JSON5 multi-field patterns; sorted by Score descending.</summary>
+    public List<FieldScore>? FieldScores { get; set; }
+    /// <summary>True when this result represents a windowless process (no HWND). Handle is Zero.</summary>
+    public bool IsProcessOnly { get; set; }
+    /// <summary>PID for process-only results where Handle is Zero.</summary>
+    public uint ProcessId { get; set; }
+
+    public static WindowInfo FromProcess(uint pid, string procName, string cmdLine) => new WindowInfo
+    {
+        Handle = IntPtr.Zero,
+        IsProcessOnly = true,
+        ProcessId = pid,
+        Title = cmdLine.Length > 0 ? cmdLine : procName,
+        ClassName = procName,
+        IsVisible = false,
+        MatchedVia = "proc",
+        MatchedSnippet = procName,
+        Coverage = 1.0,
+    };
 
     public static WindowInfo FromHwnd(IntPtr hWnd)
     {

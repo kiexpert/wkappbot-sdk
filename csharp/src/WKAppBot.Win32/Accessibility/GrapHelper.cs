@@ -606,6 +606,8 @@ public static class GrapHelper
         {
             // "?" = unknown segment from hack-hover path capture -> skip narrowing, keep current scope
             if (segment == "?") continue;
+            // "**" = skip volatile middle path -- FindByNameOrAid already searches deep (up to maxDepth)
+            if (segment == "**") continue;
 
             var found = FindByNameOrAid(current, segment, maxDepth);
             if (found == null)

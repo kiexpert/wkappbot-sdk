@@ -98,9 +98,15 @@ internal partial class Program
     // .wkappbot/ask/<ts>-claude-cli-<slug>.md just like any other ask target
     // so the session log keeps growing project-locally.
     static int AskClaudeCli(string question, bool newSession)
-        => AskClaudeCli(question, newSession, out _);
+        => AskClaudeCli(question, newSession, modelOverride: null, agentMode: false, out _);
+
+    static int AskClaudeCli(string question, bool newSession, string? modelOverride = null, bool agentMode = false)
+        => AskClaudeCli(question, newSession, modelOverride, agentMode, out _);
 
     static int AskClaudeCli(string question, bool newSession, out bool limitHit)
+        => AskClaudeCli(question, newSession, modelOverride: null, agentMode: false, out limitHit);
+
+    static int AskClaudeCli(string question, bool newSession, string? modelOverride, bool agentMode, out bool limitHit)
     {
         limitHit = false;
         var claudeExe = ResolveClaudeExe();
@@ -128,6 +134,16 @@ internal partial class Program
         {
             foreach (var a in extraArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 psi.ArgumentList.Add(a);
+        }
+        if (!string.IsNullOrEmpty(modelOverride))
+        {
+            psi.ArgumentList.Add("--model");
+            psi.ArgumentList.Add(modelOverride);
+        }
+        if (agentMode)
+        {
+            psi.ArgumentList.Add("--allowedTools");
+            psi.ArgumentList.Add("Bash,Read,Write,Grep,Glob");
         }
         psi.ArgumentList.Add("-p");
         psi.ArgumentList.Add(question);
@@ -329,8 +345,8 @@ internal partial class Program
             StandardErrorEncoding = Encoding.UTF8,
         };
         psi.ArgumentList.Add(codexVerb);
+        if (resumeSessionId != null) psi.ArgumentList.Add(resumeSessionId); // SESSION_ID must come before flags
         foreach (var t in tokens) psi.ArgumentList.Add(t);
-        if (resumeSessionId != null) psi.ArgumentList.Add(resumeSessionId); // resume <SESSION_ID> <PROMPT>
         psi.ArgumentList.Add(prompt);
         var question2 = prompt; // used by the archive writer below
 

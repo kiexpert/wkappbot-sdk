@@ -39,6 +39,15 @@ internal sealed class AppBotEyeOverlay : Window
     private readonly DateTime _startTime = DateTime.Now;
     private DateTime _lastUpdate = DateTime.MinValue;
     private DateTime _lastIdleReap = DateTime.MinValue;
+    // Render heartbeat: updated on Dispatcher thread every tick.
+    // A separate System.Threading.Timer checks this from outside the Dispatcher
+    // so frozen WPF Dispatcher (render freeze) is detected independently of IPC.
+    private volatile int _lastRenderTickSec; // unix seconds, set in OnCloakTick
+    private System.Threading.Timer? _renderFreezeWatchdog;
+    // Shared with external Guardian: wkappbot.hq/runtime/eye-render-tick.txt
+    private static readonly string _renderTickPath = System.IO.Path.Combine(
+        System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? "",
+        "wkappbot.hq", "runtime", "eye-render-tick.txt");
     private DispatcherTimer? _cloakTimer;
     private DispatcherTimer? _scrollTimer; // auto-scroll timer
     private IntPtr _chromeHwnd;
@@ -358,6 +367,21 @@ internal sealed class AppBotEyeOverlay : Window
         _cloakTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _cloakTimer.Tick += OnCloakTick;
         _cloakTimer.Start();
+
+        // Render freeze watchdog: fires every 30s from a ThreadPool thread (NOT Dispatcher).
+        // If _lastRenderTickSec hasn't been updated for >10min, Dispatcher is frozen -> exit.
+        _lastRenderTickSec = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        _renderFreezeWatchdog = new System.Threading.Timer(_ =>
+        {
+            var age = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() - _lastRenderTickSec;
+            if (age > 10 * 60)
+            {
+                try { File.AppendAllText(
+                    System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "logs", "eye-guardian.log"),
+                    $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [EYE_GUARDIAN] render freeze detected ({age}s) -- forcing exit\n"); } catch { }
+                Environment.Exit(1);
+            }
+        }, null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     private void SetupScrollTimer()
@@ -420,6 +444,11 @@ internal sealed class AppBotEyeOverlay : Window
 
     private void OnCloakTick(object? sender, EventArgs e)
     {
+        // Render heartbeat -- written on Dispatcher thread; watchdog + Guardian check from outside
+        var nowSec = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        _lastRenderTickSec = nowSec;
+        try { System.IO.File.WriteAllText(_renderTickPath, nowSec.ToString()); } catch { }
+
         // Once per minute: close sandbox tabs idle > 10 minutes
         if ((DateTime.Now - _lastIdleReap).TotalMinutes >= 1)
         {
@@ -513,8 +542,17 @@ internal sealed class AppBotEyeHost : IDisposable
                 // Chrome is at (rightEdge-800-20), so rightEdge = X+800+20
                 var rightEdge = chromeBounds.X + chromeBounds.W + 20;
                 var monitorTop = chromeBounds.Y - 20; // remove Chrome's 20px offset to get monitor top
-                _window.Left = rightEdge - width - corner;
-                _window.Top = monitorTop + corner;
+                var proposedLeft = rightEdge - width - corner;
+                var proposedTop = monitorTop + corner;
+                // Guard: if Chrome bounds are 0 or result is off-screen, fall back to primary screen top-right
+                if (proposedLeft < 0 || proposedTop < 0 || rightEdge <= 0)
+                {
+                    var screenW = (int)SystemParameters.PrimaryScreenWidth;
+                    proposedLeft = screenW - width - corner;
+                    proposedTop = corner;
+                }
+                _window.Left = proposedLeft;
+                _window.Top = proposedTop;
             }
 
             // Set owner window -- overlay follows Claude Desktop (minimize/restore together)
@@ -589,6 +627,59 @@ internal sealed class AppBotEyeHost : IDisposable
     public void SetElevatedBorder(bool elevated)
     {
         _dispatcher?.BeginInvoke(() => _window?.SetElevatedBorder(elevated));
+    }
+
+    /// <summary>
+    /// Self-heal: clamp window to a visible monitor work area and restore opacity/visibility.
+    /// Called on every Eye tick so off-screen / iconified / faded states auto-correct.
+    /// </summary>
+    public void EnsureVisible()
+    {
+        if (_dispatcher == null || _window == null) return;
+        _dispatcher.BeginInvoke(() =>
+        {
+            if (_window == null) return;
+
+            // Restore minimized or hidden state
+            if (_window.WindowState == System.Windows.WindowState.Minimized)
+                _window.WindowState = System.Windows.WindowState.Normal;
+            if (_window.Visibility != System.Windows.Visibility.Visible)
+                _window.Visibility = System.Windows.Visibility.Visible;
+
+            // Restore near-invisible opacity (animation may have drifted it down)
+            if (_window.Opacity < 0.80)
+            {
+                _window.BeginAnimation(System.Windows.UIElement.OpacityProperty, null); // cancel fade
+                _window.Opacity = 0.85;
+            }
+
+            // Re-assert Topmost -- some system events (UAC, fullscreen apps) can strip it
+            if (!_window.Topmost)
+                _window.Topmost = true;
+
+            // Clamp to any monitor's work area (at least 50px must be on-screen)
+            var left = _window.Left;
+            var top  = _window.Top;
+            var w = _window.ActualWidth  > 0 ? _window.ActualWidth  : _window.Width;
+            var h = _window.ActualHeight > 0 ? _window.ActualHeight : _window.Height;
+
+            var screens = System.Windows.Forms.Screen.AllScreens;
+            bool onScreen = screens.Any(s =>
+            {
+                var wa = s.WorkingArea;
+                return left + w > wa.Left + 50 && left < wa.Right  - 50 &&
+                       top  + h > wa.Top  + 50 && top  < wa.Bottom - 50;
+            });
+
+            if (!onScreen)
+            {
+                var wa = (System.Windows.Forms.Screen.PrimaryScreen?.WorkingArea)
+                         ?? new System.Drawing.Rectangle(0, 0, 1920, 1080);
+                _window.Left = wa.Right  - w - 10;
+                _window.Top  = wa.Top    + 10;
+                Console.Error.WriteLine($"[EYE] EnsureVisible: off-screen -> moved to ({_window.Left},{_window.Top})");
+            }
+        });
     }
 
     public void Dispose()

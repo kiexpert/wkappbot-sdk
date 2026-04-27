@@ -333,7 +333,11 @@ Examples:
         int width = windowRect.Right - windowRect.Left;
         if (width <= 0 || titlebarHeight <= 0) return;
 
-        using var fullBitmap = ScreenCapture.CaptureWindow(formHwnd);
+        using var fullBitmap = ScreenCapture.CaptureWindow(formHwnd, new WKAppBot.Win32.Input.CaptureOptions
+        {
+            RejectBlank = true,
+            StepLogger = s => Console.Error.WriteLine(s),
+        });
         if (fullBitmap == null) return;
 
         using var titlebarBmp = ScreenCapture.CropRegion(fullBitmap, 0, 0, width, titlebarHeight);
@@ -384,7 +388,11 @@ Examples:
         if (width <= 0 || titlebarHeight <= 0)
             return Array.Empty<string>();
 
-        using var fullBitmap = ScreenCapture.CaptureWindow(formHwnd);
+        using var fullBitmap = ScreenCapture.CaptureWindow(formHwnd, new WKAppBot.Win32.Input.CaptureOptions
+        {
+            RejectBlank = true,
+            StepLogger = s => Console.Error.WriteLine(s),
+        });
         if (fullBitmap == null)
             return Array.Empty<string>();
 

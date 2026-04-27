@@ -1,4 +1,7 @@
-﻿using FlaUI.Core.AutomationElements;
+using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Conditions;
+using FlaUI.Core.Definitions;
+using FlaUI.UIA3;
 using WKAppBot.Win32.Accessibility;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Window;
@@ -14,7 +17,7 @@ internal partial class Program
         var rect = GetBoundingRect(el);
         if (rect == null)
         {
-            Console.Error.WriteLine("[A11Y] highlight ??no BoundingRect available");
+            Console.Error.WriteLine("[A11Y] highlight: no BoundingRect available");
             return false;
         }
 
@@ -33,16 +36,14 @@ internal partial class Program
 
         if (zoom == null)
         {
-            // Fallback: just print position info without overlay
-            Console.Error.WriteLine($"[A11Y] highlight ??overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+            Console.Error.WriteLine($"[A11Y] highlight: overlay failed, element at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
             return true;
         }
 
         var label = !string.IsNullOrEmpty(name) ? $"\"{name}\"" : (aid != "" ? $"aid={aid}" : "(unnamed)");
         zoom.UpdateStatus($"[{type}] {label}");
-        Console.Error.WriteLine($"[A11Y] highlight ??[{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
+        Console.Error.WriteLine($"[A11Y] highlight: [{type}] {label} at ({rect.Value.X},{rect.Value.Y}) {rect.Value.Width}x{rect.Value.Height}");
 
-        // Show for duration then fade out
         zoom.ShowPass($"{type} {label}");
         Thread.Sleep(durationMs);
         zoom.Dispose();
@@ -60,9 +61,6 @@ internal partial class Program
     static string BuildFindGrap(IntPtr hwnd, uint pid, string procName,
         string compactGrap, WKAppBot.Win32.Window.WindowInfo? hit)
     {
-        // child-cmd: host window found via child process cmdline match.
-        // proc must be the child process (it owns the cmdline), not the host shell.
-        // MatchedSnippet = "childProcName:matchedToken"
         if (hit != null && hit.MatchedVia == "child-cmd" && !string.IsNullOrEmpty(hit.MatchedSnippet))
         {
             var sep = hit.MatchedSnippet.IndexOf(':');
@@ -80,7 +78,6 @@ internal partial class Program
         f.Append($",pid:{pid}");
         f.Append($",proc:'{procName.Replace("'", "\\'")}'");
 
-        // domain or file for web/browser windows
         var domainMatch = System.Text.RegularExpressions.Regex.Match(compactGrap, @"domain:'([^']*)'");
         var fileMatch   = System.Text.RegularExpressions.Regex.Match(compactGrap, @"file:'([^']*)'");
         var clsMatch    = System.Text.RegularExpressions.Regex.Match(compactGrap, @"cls:'([^']*)'");
@@ -98,11 +95,9 @@ internal partial class Program
         }
         else if (clsMatch.Success)
         {
-            // legacy app -- no a11y tree, cls is essential for targeting
             f.Append($",cls:'{clsMatch.Groups[1].Value.Replace("'", "\\'")}'");
         }
 
-        // matched search field -- always include if not already covered above
         if (hit != null && !string.IsNullOrWhiteSpace(hit.MatchedVia) && !string.IsNullOrWhiteSpace(hit.MatchedSnippet))
         {
             bool alreadyCovered = hit.MatchedVia switch
@@ -110,13 +105,9 @@ internal partial class Program
                 "domain"  => hasDomainOrFile,
                 "url"     => hasDomainOrFile,
                 "file"    => hasDomainOrFile,
-                "proc"    => true, // already in proc field
+                "proc"    => true,
                 "cls"     => clsMatch.Success,
-                "context" => true, // internal heuristic (foreground host) -- not a real grap field
-                // title: ALLOWED only when the match itself came via the title
-                // field (user explicitly searched by title). In every other
-                // path title stays out of the grap because it mutates (tabs,
-                // dirty-doc '*', etc.).
+                "context" => true,
                 _         => false
             };
             if (!alreadyCovered)
@@ -131,347 +122,220 @@ internal partial class Program
         return f.ToString();
     }
 
-    static bool A11yFind(AutomationElement root, IntPtr hwnd, int depth, bool printFocus = true, string[]? extraArgs = null,
-        WKAppBot.Win32.Window.WindowInfo? originalHit = null, string? multiHeader = null)
+    /// <summary>
+    /// Build the most concise stable grap that uniquely resolves to this window.
+    /// </summary>
+    static string BuildStableGrap(IntPtr hwnd, string procName)
     {
-        FocusedElementInfo? focInfo = null;
-        try
-        {
-            using var loc = new UiaLocator();
-            focInfo = loc.GetFocusedElementInfo();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[DIAG:find] error: {ex.Message}");
-        }
+        var compact  = BuildCompactWinGrap(hwnd);
+        var safeProc = procName.Replace("'", "\\'");
+        var procOnly = $"{{proc:'{safeProc}'}}";
 
-        var compactGrap = BuildCompactWinGrap(hwnd);
-        var fullGrap = BuildTargetGrapWithFocusPath(hwnd);
+        bool isBrowser = compact.Contains("domain:") || compact.Contains("file:");
+        var candidates = (isBrowser || compact == procOnly)
+            ? new List<string> { compact }
+            : new List<string> { procOnly, compact };
 
-        // -- FOCUS section --------------------------------------
-        if (printFocus && focInfo != null)
+        if (isBrowser && compact.Contains("domain:"))
         {
-            var gti2 = new NativeMethods.GUITHREADINFO
-                { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
-            NativeMethods.GetGUIThreadInfo(0, ref gti2);
-            var focRootHwnd = gti2.hwndFocus != IntPtr.Zero
-                ? NativeMethods.GetAncestor(gti2.hwndFocus, NativeMethods.GA_ROOT)
-                : IntPtr.Zero;
-            if (focRootHwnd == IntPtr.Zero) focRootHwnd = gti2.hwndFocus;
-
-            var focGrap = focRootHwnd != IntPtr.Zero
-                ? BuildTargetGrapWithFocusPath(focRootHwnd)
-                : BuildTargetGrapWithFocusPath(hwnd);
-            uint focPid = 0;
-            string focProc = "";
-            if (focRootHwnd != IntPtr.Zero)
-            {
-                NativeMethods.GetWindowThreadProcessId(focRootHwnd, out focPid);
-                try { using var fp = System.Diagnostics.Process.GetProcessById((int)focPid); focProc = fp.ProcessName; } catch { }
-            }
-            var focScope = focGrap.Contains('#') ? focGrap[focGrap.IndexOf('#')..] : "";
-            var focTitle = focRootHwnd != IntPtr.Zero ? NativeMethods.GetWindowTextW(focRootHwnd) : "";
-            var focCompact = BuildCompactWinGrap(focRootHwnd);
-            var focGrapJson = BuildFindGrap(focRootHwnd, focPid, focProc, focCompact, null);
-            var focPaste = QuoteGrapExpression($"{focGrapJson}{focScope}");
-            var focSw = System.Diagnostics.Stopwatch.StartNew();
-            string focVerify = "?";
             try
             {
-                var focHits = WindowFinder.FindWindows(focCompact, false);
-                focVerify = focHits.Any(v => v.Handle == focRootHwnd) ? "OK" : "MISS";
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint urlPid);
+                var rawUrl = WKAppBot.Win32.Window.WindowFinder.GetBrowserUrl(hwnd, urlPid);
+                if (!string.IsNullOrEmpty(rawUrl))
+                {
+                    var uri = new Uri(rawUrl.Split(' ')[0]);
+                    var path = uri.AbsolutePath.TrimEnd('/');
+                    if (!string.IsNullOrEmpty(path) && path != "/")
+                    {
+                        var safeUrl = path.Replace("'", "\\'");
+                        if (safeUrl.Length > 60) safeUrl = safeUrl[..60];
+                        var domainMatch = System.Text.RegularExpressions.Regex.Match(compact, @"domain:'([^']*)'");
+                        if (domainMatch.Success)
+                            candidates.Add($"{{domain:'{domainMatch.Groups[1].Value}',url:'{safeUrl}'}}");
+                    }
+                }
             }
             catch { }
-            focSw.Stop();
-            PrintFocusBlock(focPaste, focVerify, focSw.ElapsedMilliseconds);
-            if (!string.IsNullOrWhiteSpace(focTitle))
-                Console.Error.WriteLine(focTitle);
         }
 
-        // Multi-match header: printed once before first TARGET (after FOCUS if present)
-        if (!string.IsNullOrEmpty(multiHeader))
-            Console.WriteLine(Ansi.Dim(multiHeader));
-
-        // -- TARGET section ------------------------------------─
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        string verifyMark = "?";
-        var verifyHits = new List<WKAppBot.Win32.Window.WindowInfo>();
-        try
+        foreach (var candidate in candidates)
         {
-            verifyHits = WindowFinder.FindWindows(compactGrap, false);
-            verifyMark = verifyHits.Any(v => v.Handle == hwnd) ? "OK" : "MISS";
-        }
-        catch { }
-        sw.Stop();
-
-        NativeMethods.GetWindowThreadProcessId(hwnd, out uint resolvedPid);
-        string procName = "";
-        try { using var proc = System.Diagnostics.Process.GetProcessById((int)resolvedPid); procName = proc.ProcessName; } catch { }
-
-        var primaryHit = verifyHits.FirstOrDefault(v => v.Handle == hwnd);
-        var scope = fullGrap.Contains('#') ? fullGrap[fullGrap.IndexOf('#')..] : "";
-        var title = NativeMethods.GetWindowTextW(hwnd);
-        if (title.Length > 90) title = title[..87] + "...";
-
-        // Prefer originalHit for matched-field injection: verify re-searches by compact grap,
-        // losing the original matched field (e.g. cmdLine:'chatgpt.com' for a VS Code window).
-        var hitForGrap = originalHit ?? primaryHit;
-        var grapJson = BuildFindGrap(hwnd, resolvedPid, procName, compactGrap, hitForGrap);
-        var paste = QuoteGrapExpression($"{grapJson}{scope}");
-
-        var titleHeading = !string.IsNullOrWhiteSpace(title) ? title : "TARGET";
-        var matchNote = originalHit?.MatchedVia switch
-        {
-            null or "" or "context" or "proc" or "domain" or "url" or "file" or "cls" or "title" => "",
-            "uia"       => $"  <- uia: {originalHit.MatchedSnippet}",
-            "child-cmd" => "",  // proc/cmd already in grap -- no extra annotation needed
-            _ => $"  <- {originalHit.MatchedVia}: {originalHit.MatchedSnippet}"
-        } ?? "";
-
-        var leafTag = GetFocusedLeafTag(hwnd);
-        PrintTargetBlock(titleHeading, paste, "find", extraArgs, verifyMark, sw.ElapsedMilliseconds, matchNote, leafTag);
-
-        return true;
-    }
-
-    /// <summary>
-    /// Recursively dump UIA element tree to stderr (diagnostic use only).
-    /// </summary>
-    static void DumpUiaElement(AutomationElement el, int level, int maxDepth)
-    {
-        if (level > maxDepth) return;
-        var indent = new string(' ', level * 2);
-        try
-        {
-            var patterns = GetSupportedPatternNames(el);
-            var tag = GrapHelper.FormatNodeLabel(el, includeRect: false);
-            var nhStr = "";
-            var nh = GetElementHwnd(el);
-            if (nh != IntPtr.Zero) nhStr = $" hwnd={nh:X8}";
-            var patStr = patterns.Count > 0 ? $" ({string.Join(",", patterns)})" : "";
-            Console.Error.WriteLine($"[DIAG:uia] {indent}{tag}{nhStr}{patStr}");
-            if (level < maxDepth)
-                try { foreach (var child in el.FindAllChildren()) DumpUiaElement(child, level + 1, maxDepth); } catch { }
-        }
-        catch { }
-    }
-
-    /// <summary>Get compact list of supported UIA pattern names.</summary>
-    static List<string> GetSupportedPatternNames(AutomationElement el)
-    {
-        var names = new List<string>();
-        try { if (el.Patterns.Invoke.IsSupported) names.Add("Invoke"); } catch { }
-        try { if (el.Patterns.Value.IsSupported) names.Add("Value"); } catch { }
-        try { if (el.Patterns.Toggle.IsSupported) names.Add("Toggle"); } catch { }
-        try { if (el.Patterns.SelectionItem.IsSupported) names.Add("Select"); } catch { }
-        try { if (el.Patterns.ExpandCollapse.IsSupported) names.Add("Expand"); } catch { }
-        try { if (el.Patterns.Scroll.IsSupported) names.Add("Scroll"); } catch { }
-        try { if (el.Patterns.RangeValue.IsSupported) names.Add("Range"); } catch { }
-        try { if (el.Patterns.Window.IsSupported) names.Add("Window"); } catch { }
-        try { if (el.Patterns.Transform.IsSupported) names.Add("Transform"); } catch { }
-        try { if (el.Patterns.Grid.IsSupported) names.Add("Grid"); } catch { }
-        try { if (el.Patterns.LegacyIAccessible.IsSupported) names.Add("LegacyIA"); } catch { }
-        return names;
-    }
-
-    // -- Grid-Read: clipboard bridge for owner-drawn grids (HTS/MFC) --
-    //
-    // MFC/GDI owner-drawn grids expose no UIA/MSAA tree nodes per cell, so
-    // A11yRead returns only the container. This action drives the grid's
-    // native "copy" path instead:
-    //   1. Focus the target control (required for hotkeys to route to it)
-    //   2. Clear the clipboard so stale data doesn't masquerade as a result
-    //   3. Send Ctrl+A + Ctrl+C via AttachThreadInput-safe KeyboardInput
-    //   4. Poll the clipboard for up to 2s
-    //   5. Print captured text verbatim (typically TSV from HTS grids)
-    //
-    // Users who need a non-standard copy sequence can pass the chord via
-    // --text (e.g. --text "ctrl+shift+c" for apps with a dedicated
-    // "copy all" binding, or --text "ctrl+a,ctrl+c" to customize the
-    // default chain).
-    static bool A11yGridRead(IntPtr hwnd, string hotkeyOverride)
-    {
-        var hotkey = string.IsNullOrEmpty(hotkeyOverride) ? "ctrl+a,ctrl+c" : hotkeyOverride;
-
-        // -- Clear clipboard (STA) --
-        bool clearedOk = false;
-        void DoClear()
-        {
-            try { System.Windows.Forms.Clipboard.Clear(); clearedOk = true; } catch { }
-        }
-        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) DoClear();
-        else
-        {
-            var t = new Thread(DoClear); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(1500);
-        }
-        if (!clearedOk)
-            Console.Error.WriteLine("[A11Y] grid-read: clipboard clear failed (continuing)");
-
-        // -- Focus + send hotkey sequence(s) --
-        NativeMethods.SmartSetForegroundWindow(hwnd);
-        Thread.Sleep(120);
-        foreach (var chord in hotkey.Split(',', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var keys = chord.Split('+', StringSplitOptions.RemoveEmptyEntries)
-                            .Select(k => k.Trim()).ToArray();
-            if (keys.Length == 0) continue;
-            try { WKAppBot.Win32.Input.KeyboardInput.Hotkey(keys); }
-            catch (Exception ex)
+            try
             {
-                Console.Error.WriteLine($"[A11Y] grid-read: hotkey {chord} failed: {ex.Message}");
-                return false;
+                var hits = WKAppBot.Win32.Window.WindowFinder.FindWindows(candidate);
+                if (hits.Count == 1 && hits[0].Handle == hwnd)
+                    return candidate;
             }
-            Thread.Sleep(80);
+            catch { }
         }
 
-        // -- Poll clipboard (STA) up to 2s --
-        string? captured = null;
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < 2000 && captured == null)
+        NativeMethods.GetWindowThreadProcessId(hwnd, out uint fbPid);
+        return $"{{hwnd:0x{hwnd.ToInt64():X},pid:{fbPid},proc:'{safeProc}'}}";
+    }
+
+    // -- KIS dataAlert dismiss --------------------------------------------------
+    // KIS web dataAlert popup (class contains "Gro_dataAlert") fires on every
+    // navigation and steals UIA focus -- a11y read targets the modal button
+    // instead of page content. This pre-read step detects the popup, clicks its
+    // close button, and lets the actual read proceed against the right element.
+    //
+    // Detection strategies (any one hits -> dismiss):
+    //   A. Walk UIA parent chain of `el` looking for ClassName/Name containing
+    //      "Gro_dataAlert" (covers case where the read target IS inside the modal).
+    //   B. Enumerate top-level windows in the same process searching for class
+    //      "Gro_dataAlert*" (covers case where the modal is a sibling window
+    //      that's intercepting focus / blocking the page).
+    //
+    // Returns true if a popup was found AND dismissed (caller may want to re-resolve
+    // the UIA scope before reading); false on no-op.
+    static bool TryDismissKisDataAlert(AutomationElement el, IntPtr hostHwnd)
+    {
+        bool dismissed = false;
+
+        // -- Strategy A: UIA parent chain --------------------------------------
+        try
         {
-            void DoRead()
+            var current = el;
+            for (int i = 0; i < 25 && current != null; i++)
+            {
+                string cls = "";
+                string name = "";
+                try { cls  = current.Properties.ClassName.ValueOrDefault ?? ""; } catch { }
+                try { name = current.Properties.Name.ValueOrDefault ?? ""; } catch { }
+
+                if (cls.Contains("Gro_dataAlert", StringComparison.OrdinalIgnoreCase)
+                    || name.Contains("Gro_dataAlert", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Error.WriteLine($"[A11Y] KIS dataAlert ancestor detected (cls=\"{cls}\" name=\"{name}\")");
+                    if (DismissKisDataAlertElement(current))
+                    {
+                        dismissed = true;
+                        Thread.Sleep(150); // let modal teardown settle
+                    }
+                    break;
+                }
+
+                AutomationElement? parent = null;
+                try { parent = current.Parent; } catch { }
+                if (parent == null) break;
+                current = parent;
+            }
+        }
+        catch { }
+
+        // -- Strategy B: top-level window scan in same process -----------------
+        if (!dismissed && hostHwnd != IntPtr.Zero)
+        {
+            try
+            {
+                NativeMethods.GetWindowThreadProcessId(hostHwnd, out uint hostPid);
+                if (hostPid != 0)
+                {
+                    var found = new List<IntPtr>();
+                    NativeMethods.EnumWindows((hwnd, _) =>
+                    {
+                        if (!NativeMethods.IsWindowVisible(hwnd)) return true;
+                        NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
+                        if (pid != hostPid) return true;
+                        var sb = new System.Text.StringBuilder(256);
+                        NativeMethods.GetClassNameW(hwnd, sb, sb.Capacity);
+                        var cls = sb.ToString();
+                        if (cls.Contains("Gro_dataAlert", StringComparison.OrdinalIgnoreCase))
+                            found.Add(hwnd);
+                        return true;
+                    }, IntPtr.Zero);
+
+                    foreach (var alertHwnd in found)
+                    {
+                        Console.Error.WriteLine($"[A11Y] KIS dataAlert window detected (hwnd=0x{alertHwnd.ToInt64():X})");
+                        if (DismissKisDataAlertWindow(alertHwnd))
+                        {
+                            dismissed = true;
+                            Thread.Sleep(150);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        if (dismissed)
+            Console.Error.WriteLine("[A11Y] KIS dataAlert dismissed -- proceeding with read");
+        return dismissed;
+    }
+
+    /// <summary>Click the close/OK button inside a Gro_dataAlert UIA element. Falls back to WM_CLOSE on host hwnd.</summary>
+    static bool DismissKisDataAlertElement(AutomationElement modal)
+    {
+        try
+        {
+            var cf = new ConditionFactory(new UIA3PropertyLibrary());
+            // Try buttons -- prefer "Close"/"OK"/"확인"/"닫기" but invoke first hit if no name match.
+            var buttons = modal.FindAllDescendants(cf.ByControlType(ControlType.Button));
+            AutomationElement? target = null;
+            foreach (var b in buttons)
+            {
+                var nm = b.Properties.Name.ValueOrDefault ?? "";
+                if (nm.Contains("close", StringComparison.OrdinalIgnoreCase)
+                    || nm.Contains("OK",    StringComparison.OrdinalIgnoreCase)
+                    || nm.Contains("확인")
+                    || nm.Contains("닫기")
+                    || nm == "X" || nm == "x")
+                {
+                    target = b;
+                    break;
+                }
+            }
+            target ??= buttons.FirstOrDefault();
+            if (target != null)
             {
                 try
                 {
-                    if (System.Windows.Forms.Clipboard.ContainsText())
-                    {
-                        var t = System.Windows.Forms.Clipboard.GetText();
-                        if (!string.IsNullOrEmpty(t)) captured = t;
-                    }
+                    var inv = target.Patterns.Invoke;
+                    if (inv.IsSupported) { inv.Pattern.Invoke(); return true; }
                 }
                 catch { }
+                // Fallback: SendInput click via WindowFinder coordinates
+                var rect = GetBoundingRect(target);
+                if (rect != null)
+                {
+                    int cx = rect.Value.Left + rect.Value.Width / 2;
+                    int cy = rect.Value.Top + rect.Value.Height / 2;
+                    MouseInput.Click(cx, cy);
+                    return true;
+                }
             }
-            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) DoRead();
-            else
-            {
-                var t = new Thread(DoRead); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(500);
-            }
-            if (captured == null) Thread.Sleep(100);
         }
-
-        if (string.IsNullOrEmpty(captured))
-        {
-            Console.Error.WriteLine($"[A11Y] grid-read: clipboard empty after {sw.ElapsedMilliseconds}ms (hotkey={hotkey}). " +
-                "Target may not respond to Ctrl+A/Ctrl+C -- try --hotkey with the app's actual copy binding.");
-            return false;
-        }
-
-        Console.Error.WriteLine($"[A11Y] grid-read: {captured.Length} chars from clipboard ({sw.ElapsedMilliseconds}ms, hotkey={hotkey})");
-        Console.Write(captured);
-        if (!captured.EndsWith('\n')) Console.WriteLine();
-        return true;
+        catch { }
+        return false;
     }
 
-    // -- Read: dump element's accessible state (TTS friendly) --
-    static bool A11yRead(AutomationElement el)
+    /// <summary>Dismiss a Gro_dataAlert window by hwnd: try BM_CLICK on close button, else WM_CLOSE.</summary>
+    static bool DismissKisDataAlertWindow(IntPtr alertHwnd)
     {
-        var lines = new List<string>();
-
-        var name = el.Properties.Name.ValueOrDefault ?? "";
-        var aid = el.Properties.AutomationId.ValueOrDefault ?? "";
-        string controlType = "?";
-        try { controlType = el.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-        System.Drawing.Rectangle? rect = null;
-        try
+        // Try Win32 child enumeration for a Button/X control first.
+        IntPtr btn = IntPtr.Zero;
+        NativeMethods.EnumChildWindows(alertHwnd, (child, _) =>
         {
-            var r = el.Properties.BoundingRectangle.ValueOrDefault;
-            if (r.Width > 0) rect = new System.Drawing.Rectangle((int)r.X, (int)r.Y, (int)r.Width, (int)r.Height);
-        }
-        catch { }
-        lines.Add($"Tag: {GrapHelper.FormatNodeLabel(controlType, aid, name, rect: rect)}");
-        if (!string.IsNullOrEmpty(name))
-            lines.Add($"Name: {name}");
-        lines.Add($"Type: {controlType}");
-        if (!string.IsNullOrEmpty(aid))
-            lines.Add($"AutomationId: {aid}");
-
-        try
-        {
-            var vp = el.Patterns.Value;
-            if (vp.IsSupported)
+            var sb = new System.Text.StringBuilder(64);
+            NativeMethods.GetClassNameW(child, sb, sb.Capacity);
+            var cls = sb.ToString();
+            if (cls.Equals("Button", StringComparison.OrdinalIgnoreCase))
             {
-                var val = vp.Pattern.Value.ValueOrDefault ?? "";
-                var ro = vp.Pattern.IsReadOnly.ValueOrDefault;
-                lines.Add($"Value: \"{val}\"{(ro ? " (readonly)" : "")}");
+                btn = child;
+                return false; // first button = good enough for OK-style alerts
             }
-        }
-        catch { }
+            return true;
+        }, IntPtr.Zero);
 
-        var toggle = UiaLocator.GetToggleState(el);
-        if (toggle != null)
-            lines.Add($"ToggleState: {toggle}");
-
-        var sel = UiaLocator.IsSelected(el);
-        if (sel != null)
-            lines.Add($"IsSelected: {sel}");
-
-        var ec = UiaLocator.GetExpandCollapseState(el);
-        if (ec != null)
-            lines.Add($"ExpandState: {ec}");
-
-        var range = UiaLocator.GetRangeValueInfo(el);
-        if (range != null)
-            lines.Add($"Range: {range.Value} ({range.Minimum}..{range.Maximum}, step={range.SmallChange}{(range.IsReadOnly ? ", readonly" : "")})");
-
-        try
+        if (btn != IntPtr.Zero)
         {
-            var r = el.Properties.BoundingRectangle.ValueOrDefault;
-            if (r.Width > 0)
-                lines.Add($"Rect: ({(int)r.X},{(int)r.Y}) {(int)r.Width}x{(int)r.Height}");
+            // BM_CLICK = 0x00F5 -- focusless button click
+            try { NativeMethods.SendMessageW(btn, 0x00F5, IntPtr.Zero, IntPtr.Zero); return true; } catch { }
         }
-        catch { }
-
-        try
-        {
-            var legacy = el.Patterns.LegacyIAccessible;
-            if (legacy.IsSupported)
-            {
-                var desc = legacy.Pattern.Description.ValueOrDefault;
-                if (!string.IsNullOrEmpty(desc))
-                    lines.Add($"Description: {desc}");
-                var help = legacy.Pattern.Help.ValueOrDefault;
-                if (!string.IsNullOrEmpty(help))
-                    lines.Add($"Help: {help}");
-                var defAction = legacy.Pattern.DefaultAction.ValueOrDefault;
-                if (!string.IsNullOrEmpty(defAction))
-                    lines.Add($"DefaultAction: {defAction}");
-            }
-        }
-        catch { }
-
-        try
-        {
-            var children = el.FindAllChildren();
-            if (children.Length > 0)
-            {
-                lines.Add($"Children: {children.Length}");
-                foreach (var child in children.Take(10))
-                {
-                    try
-                    {
-                        var cn = child.Properties.Name.ValueOrDefault ?? "";
-                        var cct = "?";
-                        try { cct = child.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
-                        var caid = child.Properties.AutomationId.ValueOrDefault ?? "";
-                        lines.Add($"  {GrapHelper.FormatNodeLabel(cct, caid, cn)}");
-                    }
-                    catch { }
-                }
-                if (children.Length > 10)
-                    lines.Add($"  ... +{children.Length - 10} more");
-            }
-        }
-        catch { }
-
-        if (lines.Count == 0)
-        {
-            Console.Error.WriteLine("[A11Y] read ??no accessible information available");
-            return false;
-        }
-
-        foreach (var line in lines)
-            Console.Error.WriteLine($"[A11Y] {line}");
-        return true;
+        // Last resort: WM_CLOSE the modal directly
+        try { NativeMethods.PostMessageW(alertHwnd, NativeMethods.WM_CLOSE, IntPtr.Zero, IntPtr.Zero); return true; } catch { }
+        return false;
     }
 }
-

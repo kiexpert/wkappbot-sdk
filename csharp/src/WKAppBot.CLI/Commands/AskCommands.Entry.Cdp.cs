@@ -417,7 +417,8 @@ internal partial class Program
                     // Self-reporting audit: classify theft and file suggest automatically
                     // Known guarded methods: pre-minimize dance was applied but raced
                     // Unknown methods: gap in IsFocusStealingMethod coverage -- new vector found
-                    var knownGuarded = new[] { "Page.bringToFront", "Target.activateTarget", "Browser.setWindowBounds" };
+                    // Runtime.evaluate is now pre-minimized for focus-risky expressions (IsFocusRiskExpression).
+                    var knownGuarded = new[] { "Page.bringToFront", "Target.activateTarget", "Browser.setWindowBounds", "Runtime.evaluate" };
                     var baseMethod = method.Split('[')[0]; // strip [operationContext] suffix
                     if (knownGuarded.Any(m => baseMethod.StartsWith(m, StringComparison.OrdinalIgnoreCase)))
                         AutoBugReport($"focus-theft RACE: guarded method '{baseMethod}' still stole focus -- WaitForWindowStateAsync coverage may be incomplete");

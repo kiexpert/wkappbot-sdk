@@ -465,6 +465,7 @@ public static class KeyboardInput
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock -- first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
+        var modSnap = ModifierSnapshot.CaptureAndRelease();
         try
         {
         // Capture full focus snapshot (foreground + keyboard focus control) once before loop
@@ -480,6 +481,16 @@ public static class KeyboardInput
             // Unified mid-input check: competing lock + user activity + focus drift
             if (!MidInputCheck($"TypeText[{charIndex}]", effectiveHwnd, ref lastInputBaseline, ctx, snapshot)) return;
             charIndex++;
+
+            // \r (0x0D) → VK_RETURN: real Enter key for chat/form submission.
+            // \n (0x0A) → Unicode LF: line break within multi-line inputs (e.g. code editor).
+            // Callers use \r at the end to submit, \n for mid-text line breaks.
+            if (ch == '\r')
+            {
+                KeyDown(0x0D); Thread.Sleep(10); KeyUp(0x0D);
+                Thread.Sleep(10);
+                continue;
+            }
 
             var inputs = new INPUT[2];
 
@@ -498,7 +509,7 @@ public static class KeyboardInput
             NativeMethods.SendInput(2, inputs, Marshal.SizeOf<INPUT>());
             Thread.Sleep(10); // small delay for stability
         }
-        } finally { if (lockAcquired) ReleaseInputLock(); }
+        } finally { modSnap.Restore(); if (lockAcquired) ReleaseInputLock(); }
     }
 
     /// <summary>
@@ -651,6 +662,7 @@ public static class KeyboardInput
         var effectiveHwnd = ctx?.IntendedHwnd ?? intendedHwnd;
         // Acquire global input lock -- first grabber wins, others yield SmartSetForegroundWindow
         bool lockAcquired = AcquireInputLock();
+        var modSnap = ModifierSnapshot.CaptureAndRelease();
         try
         {
         // Capture full focus snapshot once -- restored per-token if focus drifts
@@ -733,7 +745,7 @@ public static class KeyboardInput
             KeyUp(heldStack.Pop());
             Thread.Sleep(20);
         }
-        } finally { if (lockAcquired) ReleaseInputLock(); }
+        } finally { modSnap.Restore(); if (lockAcquired) ReleaseInputLock(); }
     }
 
     /// <summary>
@@ -787,4 +799,62 @@ public static class KeyboardInput
 
         _ => throw new ArgumentException($"Unknown key name: '{name}'")
     };
+}
+
+/// <summary>
+/// Snapshot modifier key state (Shift/Ctrl/Alt/Win) at entry, release all held,
+/// then restore original state after typing to prevent sticky-key contamination.
+/// </summary>
+internal readonly struct ModifierSnapshot
+{
+    private static readonly byte[] _modVks = [0x10, 0x11, 0x12, 0x5B, 0x5C]; // Shift,Ctrl,Alt,LWin,RWin
+
+    private readonly bool[] _wasDown;
+
+    private ModifierSnapshot(bool[] wasDown) { _wasDown = wasDown; }
+
+    /// <summary>Capture current state and immediately release any pressed modifiers.</summary>
+    public static ModifierSnapshot CaptureAndRelease()
+    {
+        var wasDown = new bool[_modVks.Length];
+        var inputs  = new List<INPUT>();
+        for (int i = 0; i < _modVks.Length; i++)
+        {
+            wasDown[i] = (NativeMethods.GetAsyncKeyState(_modVks[i]) & 0x8000) != 0;
+            if (wasDown[i])
+            {
+                var inp = new INPUT { type = INPUT.INPUT_KEYBOARD };
+                inp.u.ki.wVk = _modVks[i];
+                inp.u.ki.dwFlags = KeyFlags.KEYEVENTF_KEYUP;
+                inputs.Add(inp);
+            }
+        }
+        if (inputs.Count > 0)
+        {
+            var arr = inputs.ToArray();
+            NativeMethods.SendInput((uint)arr.Length, arr, Marshal.SizeOf<INPUT>());
+            Thread.Sleep(10);
+        }
+        return new ModifierSnapshot(wasDown);
+    }
+
+    /// <summary>Restore modifiers that were held before the type operation.</summary>
+    public void Restore()
+    {
+        if (_wasDown == null) return;
+        var inputs = new List<INPUT>();
+        for (int i = 0; i < _modVks.Length; i++)
+        {
+            if (!_wasDown[i]) continue;
+            var inp = new INPUT { type = INPUT.INPUT_KEYBOARD };
+            inp.u.ki.wVk = _modVks[i];
+            inp.u.ki.dwFlags = 0; // key down
+            inputs.Add(inp);
+        }
+        if (inputs.Count > 0)
+        {
+            var arr = inputs.ToArray();
+            NativeMethods.SendInput((uint)arr.Length, arr, Marshal.SizeOf<INPUT>());
+        }
+    }
 }

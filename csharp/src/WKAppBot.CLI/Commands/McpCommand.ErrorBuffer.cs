@@ -18,6 +18,19 @@ internal partial class Program
         return code;
     }
 
+    // Exit path for background threads (EyeGuard etc.) -- routes through ActiveTee so
+    // the error is recorded to errors.jsonl before the process terminates.
+    internal static void AppBotExitFromGuard(int code)
+    {
+        try
+        {
+            var tee = ActiveTee;
+            if (tee != null) { tee.ExitCode = code; tee.WriteErrorRecordNow(); }
+        }
+        catch { }
+        WriteExitFile(code);
+    }
+
     sealed class ErrorScope : IDisposable
     {
         readonly TextWriter _originalStderr;

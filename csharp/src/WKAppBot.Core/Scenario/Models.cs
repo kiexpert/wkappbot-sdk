@@ -100,6 +100,8 @@ public sealed class ScenarioConfig
 public sealed class AppConfig
 {
     public string Launch { get; set; } = "";
+    public string? Process { get; set; }
+    public bool Adopt { get; set; }
     public WaitForWindowConfig? WaitForWindow { get; set; }
 }
 
@@ -200,6 +202,13 @@ public sealed class TargetDefinition
     public string? Description { get; set; }
     public int? X { get; set; }
     public int? Y { get; set; }
+
+    /// <summary>
+    /// Win32 class name of the target top-level window.
+    /// Resolved through WindowFinder.FindByClassName to obtain hWnd for
+    /// actions that need window scope (e.g., screenshot).
+    /// </summary>
+    public string? ClassName { get; set; }
 }
 
 /// <summary>
@@ -225,6 +234,13 @@ public sealed class StepParams
     // screenshot
     public string? Filename { get; set; }
 
+    /// <summary>
+    /// Full/relative output file path for screenshot action.
+    /// When set, takes precedence over Filename. Intermediate directories
+    /// are created automatically. Relative paths are resolved against CWD.
+    /// </summary>
+    public string? Path { get; set; }
+
     // scroll
     public string? Direction { get; set; }
     public int? Amount { get; set; }
@@ -241,4 +257,20 @@ public sealed class StepParams
     // select -- item text or index to select in list/combo
     public string? ItemText { get; set; }
     public int? ItemIndex { get; set; }
+
+    // read -- store extracted text as ${StoreAs} variable for later steps
+    // shell -- store stdout as ${StoreAs} variable
+    public string? StoreAs { get; set; }
+
+    // shell -- external command runner
+    // Command: executable path or name resolved via PATH (e.g. "cmd.exe", "git", "python")
+    // Args:    argument string (passed as-is to the process)
+    // WorkingDir: optional working directory (defaults to scenario CWD)
+    // TimeoutSec: kill the process if it runs longer than this (default 30)
+    // ExitCode:   expected exit code (default 0 -> non-zero fails the step)
+    public string? Command { get; set; }
+    public string? Args { get; set; }
+    public string? WorkingDir { get; set; }
+    public double? TimeoutSec { get; set; }
+    public int? ExitCode { get; set; }
 }

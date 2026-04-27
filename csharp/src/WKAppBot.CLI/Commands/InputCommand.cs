@@ -390,7 +390,11 @@ Examples:
             try
             {
                 NativeMethods.GetWindowRect(targetHwnd, out var verifyRect);
-                using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle);
+                using var formBmp = ScreenCapture.CaptureWindow(targetForm.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
                 if (formBmp == null) return false;
 
                 NativeMethods.GetWindowRect(targetForm.Handle, out var formRect);
@@ -428,8 +432,12 @@ Examples:
             try
             {
                 NativeMethods.GetWindowRect(controlHandle, out var cr);
-                using var formBmp = ScreenCapture.CaptureWindow(formHandle);
-                if (formBmp == null || ScreenCapture.IsBlankBitmap(formBmp)) return null;
+                using var formBmp = ScreenCapture.CaptureWindow(formHandle, new WKAppBot.Win32.Input.CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
+                if (formBmp == null) return null;
 
                 NativeMethods.GetWindowRect(formHandle, out var fr);
                 int rx = cr.Left - fr.Left, ry = cr.Top - fr.Top;

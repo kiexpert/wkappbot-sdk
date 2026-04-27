@@ -270,6 +270,9 @@ internal sealed class SpeakOverlayWindow : Window
     private DispatcherTimer? _karaokeTimer;
     private double _scrollTarget;
     private double _scrollCurrent;
+    private string? _text;
+    private bool _safetyTimerArmed;
+    private double _safetyTimeoutSecs;
 
     private static readonly SolidColorBrush WaitBrush = new(Color.FromRgb(200, 205, 215));        // 대기: 소프트 실버
     private static readonly SolidColorBrush ActiveBrush = new(Color.FromRgb(255, 200, 60));     // 발음 중: 골드
@@ -286,6 +289,7 @@ internal sealed class SpeakOverlayWindow : Window
         _mousePos = mousePos;
         _markers = markers;
         _stopwatch = sharedStopwatch;
+        _text = text;
         NormalSize = sizePx > 0 ? sizePx : 32;
         ActiveSize = NormalSize * 1.5;
 
@@ -388,10 +392,13 @@ internal sealed class SpeakOverlayWindow : Window
             _karaokeTimer.Tick += KaraokeTick;
             _karaokeTimer.Start();
 
-            // 안전망: 최대 30초 후 자동 닫기
-            var safetyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
-            safetyTimer.Tick += (_, _) => { safetyTimer.Stop(); BeginFadeOut(); };
-            safetyTimer.Start();
+            // 안전망: 재생 시작 감지 후 동적 시간으로 자동 닫기
+            // (고정 30s → Stopwatch 시작 후 예상재생시간+30s: 긴 한국어 텍스트 타임아웃 방지)
+            _safetyTimerArmed = false;
+            var estimatedSecs = _markers.Count > 0
+                ? _markers[^1].AudioPos.TotalSeconds + 30.0
+                : Math.Max(60.0, _text?.Length * 0.4 ?? 60.0);
+            _safetyTimeoutSecs = Math.Max(60.0, estimatedSecs);
         };
     }
 
@@ -406,6 +413,15 @@ internal sealed class SpeakOverlayWindow : Window
 
         // Stopwatch가 아직 시작 안 됐으면 대기
         if (!_stopwatch.IsRunning && _stopwatch.ElapsedMilliseconds == 0) return;
+
+        // 재생 시작 감지 → safety timer 발동 (Loaded에서 고정 30s 대신 동적 시간)
+        if (!_safetyTimerArmed)
+        {
+            _safetyTimerArmed = true;
+            var safetyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(_safetyTimeoutSecs) };
+            safetyTimer.Tick += (_, _) => { safetyTimer.Stop(); BeginFadeOut(); };
+            safetyTimer.Start();
+        }
 
         if (_markers.Count == 0) return;
         var elapsed = _stopwatch.Elapsed;

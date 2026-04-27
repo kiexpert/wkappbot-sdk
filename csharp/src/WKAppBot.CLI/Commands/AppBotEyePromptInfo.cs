@@ -23,7 +23,6 @@ internal partial class Program
     static readonly Dictionary<string, (string file, string? preview, long len, DateTime mtime)>
         _clotThoughtCache = new();
     static readonly Dictionary<string, string?> _projectFolderPathCache = new(StringComparer.OrdinalIgnoreCase);
-    static readonly Dictionary<string, (string provider, string path)?> _aiSessionFileCache = new(StringComparer.OrdinalIgnoreCase);
 
     // -- VS Code title -> CWD ------------------------------------------------─
 
@@ -353,24 +352,15 @@ internal partial class Program
         catch { return ""; }
     }
 
+
     static (string provider, string path)? ResolveAiSessionFileForCwd(string? cwd, string? preferredHostType = null)
     {
         if (string.IsNullOrWhiteSpace(cwd)) return null;
 
-        var cacheKey = $"{preferredHostType ?? ""}|{cwd.Replace('/', '\\').TrimEnd('\\')}";
-        if (_aiSessionFileCache.TryGetValue(cacheKey, out var cached))
-        {
-            if (cached == null) return null;
-            if (File.Exists(cached.Value.path))
-                return cached.Value;
-        }
-
-        (string provider, string path)? resolved = ClaudePromptHelper.IsCodexHostType(preferredHostType)
+        // No cache -- always re-scan so newchat picks up the newest JSONL immediately.
+        return ClaudePromptHelper.IsCodexHostType(preferredHostType)
             ? ResolveCodexSessionFileForCwd(cwd) ?? ResolveClaudeSessionFileForCwd(cwd)
             : ResolveClaudeSessionFileForCwd(cwd) ?? ResolveCodexSessionFileForCwd(cwd);
-
-        _aiSessionFileCache[cacheKey] = resolved;
-        return resolved;
     }
 
     static (string provider, string path)? ResolveClaudeSessionFileForCwd(string cwd)

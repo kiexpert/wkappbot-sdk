@@ -1,7 +1,4 @@
-﻿using System.IO.Compression;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 
 namespace WKAppBot.CLI;
 
@@ -41,11 +38,13 @@ internal partial class Program
             "edit"       => SkillEditCommand(args.Skip(1).ToArray()),
             "delete"     => SkillDeleteCommand(args.Skip(1).ToArray()),
             "search"     => SkillSearchCommand(args.Skip(1).ToArray()),
+            "news"       => SkillNewsCommand(args.Skip(1).ToArray()),
             "install"    => SkillInstallCommand(args.Skip(1).ToArray()),
             "export"     => SkillExportCommand(args.Skip(1).ToArray()),
             "import"     => SkillImportCommand(args.Skip(1).ToArray()),
             "verify"     => SkillVerifyCommand(args.Skip(1).ToArray()),
             "audit"      => SkillAuditCommand(args.Skip(1).ToArray()),
+            "sync"       => SkillSyncCommand(args.Skip(1).ToArray()),
             "--help" or "-h" or "help" => SkillUsage(),
             var s => Error($"Unknown skill sub-command: {s}")
         };
@@ -181,6 +180,19 @@ internal partial class Program
             }
         }
 
+        if (!string.IsNullOrEmpty(skill.PrimaryCmd))
+            Console.WriteLine($"  Primary: {skill.PrimaryCmd}");
+
+        if (skill.Requirements?.Count > 0)
+        {
+            Console.WriteLine("  Require:");
+            foreach (var r in skill.Requirements)
+                Console.WriteLine($"    $ {r.Cmd}");
+            Console.WriteLine("  Expect :");
+            foreach (var r in skill.Requirements)
+                Console.WriteLine($"    => {r.Expect}");
+        }
+
         if (developerMode && skill.SourceRefs?.Count > 0)
         {
             Console.WriteLine("  Refs   :");
@@ -196,7 +208,28 @@ internal partial class Program
         if (!string.IsNullOrEmpty(skill.Author))
             Console.WriteLine($"  Author : {skill.Author}");
         Console.WriteLine($"  Created: {skill.Created:yyyy-MM-dd}  Version: {skill.Version ?? "1.0"}");
+        AppendSkillInvocationLog(skill.Id, skill.App);
         return 0;
+    }
+
+    static void AppendSkillInvocationLog(string skillId, string? app)
+    {
+        try
+        {
+            var path = Path.Combine(DataDir, "runtime", "skill_invocations.jsonl");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var entry = JsonSerializer.Serialize(new
+            {
+                ts  = DateTime.UtcNow.ToString("o"),
+                id  = skillId,
+                app = app ?? "",
+                cwd = Environment.CurrentDirectory
+            });
+            if (File.Exists(path) && new FileInfo(path).Length > 500_000)
+                File.Move(path, path + ".1", overwrite: true);
+            File.AppendAllText(path, entry + "\n", System.Text.Encoding.UTF8);
+        }
+        catch { }
     }
 
     /// <summary>
@@ -245,7 +278,7 @@ internal partial class Program
     {
         if (args.Length == 0)
         {
-            Console.WriteLine("Usage: wkappbot skill search <keyword> [--app X] [--audience operator|developer|project|user]");
+            Console.WriteLine("Usage: wkappbot skill search <keyword|/regex/|~regex~> [--app X] [--audience operator|developer|project|user]");
             return 1;
         }
 
@@ -259,16 +292,43 @@ internal partial class Program
             else keywords.Add(args[i].ToLowerInvariant());
         }
 
+        // Build per-keyword matchers: /regex/, ~regex~, re:regex -> Regex + plain inner OR; else plain Contains.
+        // For regex forms, inner plain string is also OR'd so /chrome/ matches "chrome" substring too.
+        static bool KeywordMatches(string field, string kw, System.Text.RegularExpressions.Regex? rx, string? inner) =>
+            rx != null
+                ? rx.IsMatch(field) || (inner != null && field.Contains(inner, StringComparison.OrdinalIgnoreCase))
+                : field.Contains(kw, StringComparison.OrdinalIgnoreCase);
+
+        var matchers = keywords.Select(kw =>
+        {
+            // /pattern/ -- bash MSYS converts /x/ to Windows path; use ~x~ or re:x as alias
+            var isSlash = kw.Length > 2 && kw.StartsWith('/') && kw.EndsWith('/');
+            var isTilde = kw.Length > 2 && kw.StartsWith('~') && kw.EndsWith('~');
+            var isRe    = kw.Length > 3 && kw.StartsWith("re:", StringComparison.OrdinalIgnoreCase);
+            var rxPat   = isSlash || isTilde ? kw[1..^1] : isRe ? kw[3..] : null;
+            if (rxPat != null)
+            {
+                try { return (kw, rx: new System.Text.RegularExpressions.Regex(rxPat, System.Text.RegularExpressions.RegexOptions.IgnoreCase), inner: rxPat); }
+                catch { /* invalid regex -- treat as plain */ }
+            }
+            return (kw, rx: (System.Text.RegularExpressions.Regex?)null, inner: (string?)null);
+        }).ToList();
+
         var hits = LoadAllSkills(appFilter)
             .Where(s => string.IsNullOrWhiteSpace(audienceFilter) || HasAudience(s, audienceFilter))
-            .Where(s => keywords.All(kw =>
-                s.Id.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
-                s.Title.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
-                s.Desc.Contains(kw, StringComparison.OrdinalIgnoreCase) ||
-                (s.Tags?.Any(t => t.Contains(kw, StringComparison.OrdinalIgnoreCase)) ?? false) ||
-                (s.Steps?.Any(t => t.Contains(kw, StringComparison.OrdinalIgnoreCase)) ?? false)))
+            .Where(s => matchers.All(m =>
+                KeywordMatches(s.Id,    m.kw, m.rx, m.inner) ||
+                KeywordMatches(s.Title, m.kw, m.rx, m.inner) ||
+                KeywordMatches(s.Desc,  m.kw, m.rx, m.inner) ||
+                (s.Tags?.Any(t  => KeywordMatches(t, m.kw, m.rx, m.inner)) ?? false) ||
+                (s.Steps?.Any(t => KeywordMatches(t, m.kw, m.rx, m.inner)) ?? false)))
+            .Select(s => (skill: s, score: SkillCoverageScore(s, matchers.Select(m =>
+                // Score on inner plain string (strip delimiters); regex symbols treated as literals in glob path.
+                m.inner ?? m.kw))))
+            .OrderByDescending(x => x.score)
             .ToList();
 
+        Console.Error.WriteLine($"[DBG] kws={string.Join(",", keywords)} hits={hits.Count}");
         if (hits.Count == 0)
         {
             Console.Error.WriteLine($"[SKILL] No results for: {string.Join(" ", keywords)}");
@@ -276,997 +336,9 @@ internal partial class Program
         }
 
         Console.Error.WriteLine($"[SKILL] {hits.Count} match(es):");
-        foreach (var s in hits)
-            Console.WriteLine($"  [{s.App}] {s.Id} [{AudienceProfile(s)}] - {s.Title}");
+        foreach (var (s, score) in hits)
+            Console.WriteLine($"  [{s.App}] {s.Id} [{AudienceProfile(s)}] cov={score:F2} - {s.Title}");
         Console.WriteLine($"\n  Use: wkappbot skill read <id>");
         return 0;
-    }
-
-    // -- Contribute --------------------------------------------------------------─
-
-    static int SkillContributeCommand(string[] args)
-    {
-        string? app = null, title = null, desc = null, author = null, id = null, regressionScript = null;
-        var steps = new List<string>();
-        var tags = new List<string>();
-        var refs = new List<SkillSourceRef>();
-
-        bool force = args.Contains("--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste");
-        for (int i = 0; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--app"               when i + 1 < args.Length: app              = args[++i]; break;
-                case "--title"             when i + 1 < args.Length: title            = args[++i]; break;
-                case "--desc"              when i + 1 < args.Length: desc             = args[++i]; break;
-                case "--author"            when i + 1 < args.Length: author           = args[++i]; break;
-                case "--id"                when i + 1 < args.Length: id               = args[++i]; break;
-                case "--steps"             when i + 1 < args.Length: steps.AddRange(args[++i].Split('|')); break;
-                case "--tags"              when i + 1 < args.Length: tags.AddRange(args[++i].Split(',')); break;
-                case "--regression-script" when i + 1 < args.Length: regressionScript = args[++i]; break;
-                case "--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste": break;
-                // --refs "file.cs:42:pattern|file2.cs::pattern2"
-                case "--refs"   when i + 1 < args.Length:
-                    foreach (var r in args[++i].Split('|'))
-                    {
-                        var parts = r.Split(':', 3);
-                        refs.Add(new SkillSourceRef
-                        {
-                            File    = parts[0],
-                            Line    = parts.Length > 1 && int.TryParse(parts[1], out int ln) ? ln : null,
-                            Pattern = parts.Length > 2 && !string.IsNullOrEmpty(parts[2]) ? parts[2] : null
-                        });
-                    }
-                    break;
-            }
-        }
-
-        if (string.IsNullOrEmpty(app) || string.IsNullOrEmpty(title) || string.IsNullOrEmpty(desc))
-        {
-            Console.WriteLine("Usage: wkappbot skill contribute --app <app> --title <title> --desc <desc>");
-            Console.WriteLine("  Options: --steps \"s1|s2\"  --tags \"t1,t2\"  --id <slug>  --author <name>");
-            Console.WriteLine("           --regression-script <path>  (registers test script into experience/tests/)");
-            return 1;
-        }
-
-        // Encoding risk check: reject Korean/emoji in skill content.
-        // Korean-UI app categories (hts-*, heroes*, kiwoom*, invest-kr, ...)
-        // get a relaxed threshold inside HasEncodingRisk because documenting
-        // real UIA labels verbatim is the skill's job.
-        var allContent = string.Join(" ", new[] { title, desc }.Concat(steps).Where(s => s != null)!);
-        if (!force && HasEncodingRisk(allContent, "skill contribute", app)) return 1;
-
-        var slug = id ?? Slugify(title);
-        if (string.IsNullOrEmpty(slug))
-        {
-            Console.WriteLine("[SKILL] Could not generate ID from title. Use --id <slug> explicitly.");
-            return 1;
-        }
-
-        var appDir = Path.Combine(ProjectSkillsDir, app);
-        Directory.CreateDirectory(appDir);
-        var path = Path.Combine(appDir, $"{slug}.skill.json");
-
-        // Register regression script into experience/tests/{cmd}/{subcmd}/
-        string? regScriptRef = null;
-        if (!string.IsNullOrEmpty(regressionScript))
-        {
-            regScriptRef = RegisterRegressionScript(regressionScript, slug);
-            if (regScriptRef == null) return 1; // error already printed
-        }
-
-        var existing = File.Exists(path) ? SkillRecord.Load(path) : null;
-        var skill = new SkillRecord
-        {
-            Id               = slug,
-            App              = app,
-            Title            = title,
-            Desc             = desc,
-            Steps            = steps.Count > 0 ? steps : existing?.Steps ?? [],
-            Tags             = tags.Count  > 0 ? tags  : existing?.Tags  ?? [],
-            SourceRefs       = refs.Count  > 0 ? refs  : existing?.SourceRefs,
-            RegressionScript = regScriptRef ?? existing?.RegressionScript,
-            Author           = author ?? existing?.Author ?? "claude",
-            Created          = existing?.Created ?? DateTime.UtcNow,
-            Updated          = DateTime.UtcNow,
-            Version          = existing != null ? BumpVersion(existing.Version) : "1.0"
-        };
-
-        skill.Save(path);
-        var action = existing != null ? "Updated" : "Created";
-        // User-visible confirmation MUST go to stdout. IocpPipeRelay buffers
-        // stderr and drops the buffer on exit=0 by default, so Console.Error
-        // here vanishes for non-interactive callers (bash, MCP, agents) --
-        // which makes the command look like it timed out with no output even
-        // though the skill was written to disk. See skill
-        // 'iocp-stderr-default-buffered' for the full architecture note.
-        Console.WriteLine($"[SKILL] {action}: [{app}] {title} (id={slug}, v{skill.Version})");
-        if (regScriptRef != null)
-            Console.WriteLine($"[SKILL] Regression script: {regScriptRef} (auto-runs on suggest resolve)");
-        return 0;
-    }
-
-    // Copies regression script into experience/tests/{cmd}/{subcmd}/ and returns relative path from DataDir.
-    // Filename convention: test-{cmd}-{subcmd}[-desc].sh  ->  cmd + subcmd extracted from filename.
-    static string? RegisterRegressionScript(string scriptPath, string skillSlug)
-    {
-        if (!File.Exists(scriptPath))
-        {
-            Console.Error.WriteLine($"[SKILL] --regression-script not found: {scriptPath}");
-            return null;
-        }
-
-        var fileName = Path.GetFileNameWithoutExtension(scriptPath);
-        var parts    = fileName.Split('-');
-        // "test-{cmd}-{subcmd}" or fallback
-        var cmd    = parts.Length > 1 ? parts[1] : "misc";
-        var subcmd = parts.Length > 2 ? parts[2] : "general";
-
-        var testsDir = Path.Combine(DataDir, "experience", "tests", cmd, subcmd);
-        Directory.CreateDirectory(testsDir);
-        var destName = Path.GetFileName(scriptPath);
-        var destPath = Path.Combine(testsDir, destName);
-        File.Copy(scriptPath, destPath, overwrite: true);
-
-        // Update .manifest (used by RunRegressionTests deleted-test detection)
-        var manifestPath = Path.Combine(testsDir, ".manifest");
-        var manifest = File.Exists(manifestPath)
-            ? new HashSet<string>(File.ReadAllLines(manifestPath).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#')))
-            : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (manifest.Add(destName))
-            File.WriteAllLines(manifestPath, manifest.OrderBy(x => x));
-
-        var relPath = Path.GetRelativePath(DataDir, destPath).Replace('\\', '/');
-        Console.Error.WriteLine($"[SKILL] Regression -> experience/tests/{cmd}/{subcmd}/{destName}");
-        return relPath;
-    }
-
-    // -- Edit (partial update) ----------------------------------------------------
-
-    static int SkillEditCommand(string[] args)
-    {
-        if (args.Length == 0 || args[0].StartsWith('-'))
-        {
-            Console.WriteLine("Usage: wkappbot skill edit <id> [--title X] [--desc X] [--tags t1,t2] [--steps s1|s2]");
-            Console.WriteLine("                           [--step N --content X]   edit single step by 1-based index");
-            Console.WriteLine("                           [--add-step X]           append a new step");
-            Console.WriteLine("  Partial update -- only specified fields are changed. Version auto-bumped.");
-            Console.WriteLine("  Note: to rename the file slug, use delete + contribute --id <new-slug>.");
-            return 1;
-        }
-
-        var id = args[0];
-        string? title = null, desc = null, stepContent = null;
-        List<string>? steps = null, tags = null;
-        int stepIndex = -1;   // 1-based; -1 = not set
-        bool addStep  = false;
-        bool force    = args.Contains("--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste");
-
-        for (int i = 1; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--title"     when i + 1 < args.Length: title       = args[++i]; break;
-                case "--desc"      when i + 1 < args.Length: desc        = args[++i]; break;
-                case "--steps"     when i + 1 < args.Length: steps       = [.. args[++i].Split('|')]; break;
-                case "--tags"      when i + 1 < args.Length: tags        = [.. args[++i].Split(',')]; break;
-                case "--step"      when i + 1 < args.Length:
-                    if (int.TryParse(args[++i], out var si)) stepIndex = si; break;
-                case "--content"   when i + 1 < args.Length: stepContent = args[++i]; break;
-                case "--add-step"  when i + 1 < args.Length: stepContent = args[++i]; addStep = true; break;
-                case "--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste": break;
-            }
-        }
-
-        // Encoding risk check on edited content -- deferred below until we
-        // know the target skill's app so Korean-UI apps (hts-*, heroes*, ...)
-        // can opt into their relaxed threshold.
-        var editedContent = string.Join(" ", new[] { title, desc, stepContent }.Concat(steps ?? []).Where(s => s != null)!);
-
-        bool hasSingleStep = stepIndex > 0 && stepContent != null;
-        if (title == null && desc == null && steps == null && tags == null && !hasSingleStep && !addStep)
-        {
-            Console.WriteLine("[SKILL] Nothing to edit -- specify at least one of: --title, --desc, --tags, --steps, --step N --content X, --add-step X");
-            return 1;
-        }
-
-        if (!Directory.Exists(ProjectSkillsDir))
-        {
-            Console.WriteLine("[SKILL] No project skills directory. Run from project root.");
-            return 1;
-        }
-
-        string? skillPath = null;
-        SkillRecord? skill = null;
-        foreach (var f in Directory.GetFiles(ProjectSkillsDir, "*.skill.json", SearchOption.AllDirectories))
-        {
-            var s = SkillRecord.Load(f);
-            if (s != null && s.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
-            { skill = s; skillPath = f; break; }
-        }
-
-        if (skill == null || skillPath == null)
-        {
-            Console.Error.WriteLine($"[SKILL] Not found in project skills: {id}");
-            Console.WriteLine("  Hint: 'skill edit' only works for project skills, not HQ-only.");
-            Console.WriteLine("  To edit an HQ skill, first copy it: wkappbot skill contribute --app X --title ... --id " + id);
-            return 1;
-        }
-
-        // Run encoding check now that we know the target skill's app.
-        if (!force && !string.IsNullOrEmpty(editedContent) && HasEncodingRisk(editedContent, "skill edit", skill.App)) return 1;
-
-        if (title != null) skill.Title = title;
-        if (desc  != null) skill.Desc  = desc;
-        if (steps != null) skill.Steps = steps;
-        if (tags  != null) skill.Tags  = tags;
-
-        // --step N --content X : edit single step by 1-based index
-        if (hasSingleStep)
-        {
-            skill.Steps ??= [];
-            int idx = stepIndex - 1;
-            if (idx < 0 || idx >= skill.Steps.Count)
-                return Error($"--step {stepIndex} out of range (skill has {skill.Steps.Count} step(s))");
-            var old = skill.Steps[idx];
-            skill.Steps[idx] = stepContent!;
-            Console.WriteLine($"[SKILL] step {stepIndex}: \"{old}\" -> \"{stepContent}\"");
-        }
-
-        // --add-step X : append new step
-        if (addStep && stepContent != null)
-        {
-            skill.Steps ??= [];
-            skill.Steps.Add(stepContent);
-            Console.WriteLine($"[SKILL] added step {skill.Steps.Count}: \"{stepContent}\"");
-        }
-
-        skill.Updated = DateTime.UtcNow;
-        skill.Version = BumpVersion(skill.Version);
-
-        skill.Save(skillPath);
-        // stdout, not stderr -- see SkillContributeCommand for the rationale
-        // (IocpPipeRelay buffers+drops stderr on exit=0).
-        Console.WriteLine($"[SKILL] Updated: [{skill.App}] {skill.Title} (id={skill.Id}, v{skill.Version})");
-        return 0;
-    }
-
-    // -- Delete ------------------------------------------------------------------─
-
-    static int SkillDeleteCommand(string[] args)
-    {
-        if (args.Length == 0)
-        {
-            Console.WriteLine("Usage: wkappbot skill delete <id>");
-            return 1;
-        }
-
-        if (!Directory.Exists(ProjectSkillsDir))
-        {
-            Console.WriteLine("[SKILL] No project skills directory.");
-            return 1;
-        }
-
-        var id = args[0];
-        foreach (var f in Directory.GetFiles(ProjectSkillsDir, "*.skill.json", SearchOption.AllDirectories))
-        {
-            var s = SkillRecord.Load(f);
-            if (s == null || !s.Id.Equals(id, StringComparison.OrdinalIgnoreCase)) continue;
-            File.Delete(f);
-            Console.Error.WriteLine($"[SKILL] Deleted: [{s.App}] {s.Title} ({id})");
-            return 0;
-        }
-
-        Console.Error.WriteLine($"[SKILL] Not found in project skills: {id}");
-        return 1;
-    }
-
-    // -- Install ------------------------------------------------------------------
-
-    static int SkillInstallCommand(string[] args)
-    {
-        string? appFilter = null;
-        bool force = false;
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (args[i] == "--app"   && i + 1 < args.Length) appFilter = args[++i];
-            if (args[i] == "--force") force = true;
-        }
-
-        if (!Directory.Exists(ProjectSkillsDir))
-        {
-            Console.WriteLine("[SKILL] No project skills to install.");
-            return 0;
-        }
-
-        int copied = 0, skipped = 0;
-        foreach (var f in Directory.GetFiles(ProjectSkillsDir, "*.skill.json", SearchOption.AllDirectories))
-        {
-            var rel  = Path.GetRelativePath(ProjectSkillsDir, f);
-            if (appFilter != null && !rel.StartsWith(appFilter + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var dest = Path.Combine(HqSkillsDir, rel);
-            if (!force && File.Exists(dest))
-            {
-                // Only overwrite if project version is newer
-                var src  = SkillRecord.Load(f);
-                var existing = SkillRecord.Load(dest);
-                if (src != null && existing != null && CompareVersions(src.Version, existing.Version) <= 0)
-                { skipped++; continue; }
-            }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-            File.Copy(f, dest, overwrite: true);
-            copied++;
-            Console.Error.WriteLine($"[SKILL] Installed: {rel}");
-        }
-
-        Console.Error.WriteLine($"[SKILL] Install done: {copied} installed, {skipped} skipped (already up-to-date).");
-        return 0;
-    }
-
-    static int CompareVersions(string? a, string? b)
-    {
-        static (int maj, int min) Parse(string? v)
-        {
-            var parts = (v ?? "1.0").Split('.');
-            int.TryParse(parts.ElementAtOrDefault(0), out int maj);
-            int.TryParse(parts.ElementAtOrDefault(1), out int min);
-            return (maj, min);
-        }
-        var (am, an) = Parse(a);
-        var (bm, bn) = Parse(b);
-        var cmp = am.CompareTo(bm);
-        return cmp != 0 ? cmp : an.CompareTo(bn);
-    }
-
-    // -- Export ------------------------------------------------------------------─
-
-    static int SkillExportCommand(string[] args)
-    {
-        string? appFilter = null, outPath = null;
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (args[i] == "--app" && i + 1 < args.Length) appFilter = args[++i];
-            if (args[i] == "--out" && i + 1 < args.Length) outPath   = args[++i];
-        }
-
-        outPath ??= Path.Combine(Directory.GetCurrentDirectory(),
-            appFilter != null ? $"skills-{appFilter}.zip" : "skills.zip");
-
-        if (!Directory.Exists(ProjectSkillsDir))
-        {
-            Console.WriteLine("[SKILL] No project skills to export.");
-            return 1;
-        }
-
-        if (File.Exists(outPath)) File.Delete(outPath);
-        using var zip = ZipFile.Open(outPath, ZipArchiveMode.Create);
-
-        int count = 0;
-        foreach (var f in Directory.GetFiles(ProjectSkillsDir, "*.skill.json", SearchOption.AllDirectories))
-        {
-            var rel = Path.GetRelativePath(ProjectSkillsDir, f).Replace('\\', '/');
-            if (appFilter != null && !rel.StartsWith(appFilter + "/", StringComparison.OrdinalIgnoreCase))
-                continue;
-            zip.CreateEntryFromFile(f, rel);
-            count++;
-        }
-
-        Console.Error.WriteLine($"[SKILL] Exported {count} skill(s) -> {outPath}");
-        return 0;
-    }
-
-    // -- Import ------------------------------------------------------------------─
-
-    static int SkillImportCommand(string[] args)
-    {
-        if (args.Length == 0)
-        {
-            Console.WriteLine("Usage: wkappbot skill import <file.zip>");
-            return 1;
-        }
-
-        var zipPath = args[0];
-        if (!File.Exists(zipPath))
-        {
-            Console.Error.WriteLine($"[SKILL] File not found: {zipPath}");
-            return 1;
-        }
-
-        Directory.CreateDirectory(ProjectSkillsDir);
-        int count = 0;
-        using var zip = ZipFile.OpenRead(zipPath);
-        foreach (var entry in zip.Entries.Where(e => e.Name.EndsWith(".skill.json")))
-        {
-            var dest = Path.Combine(ProjectSkillsDir, entry.FullName.Replace('/', Path.DirectorySeparatorChar));
-            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-            entry.ExtractToFile(dest, overwrite: true);
-            count++;
-        }
-
-        Console.Error.WriteLine($"[SKILL] Imported {count} skill(s) from {zipPath}");
-        return 0;
-    }
-
-    // -- Verify ------------------------------------------------------------------─
-
-    static int SkillVerifyCommand(string[] args)
-    {
-        if (args.Length == 0) { Console.WriteLine("Usage: wkappbot skill verify <id> [--skip-evidence]"); return 1; }
-        bool skipEvidence = args.Any(a => a == "--skip-evidence");
-        var skill = FindSkill(args[0]);
-        if (skill == null) { Console.Error.WriteLine($"[SKILL] Not found: {args[0]}"); return 1; }
-        var (ok, missing, stale) = RunVerify(skill, verbose: true);
-        var regResult = RunSkillRegressionScript(skill);
-        if (regResult == -1)
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[SKILL] No regression script registered for '{skill.Id}'.");
-            Console.Error.WriteLine($"  -> To add one: wkappbot skill contribute --id {skill.Id} --regression-script <test-{skill.App}-*.sh>");
-            Console.ResetColor();
-        }
-
-        // Replay the Verified-step evidence scripts accumulated via resolves.
-        // Each `suggest resolve` appends a "Verified YYYY-MM-DD: <path>" step;
-        // re-running those scripts is the ultimate self-heal check -- if a
-        // regression sneaks back in, the same test that proved the original
-        // fix will now fail and skill verify surfaces it immediately.
-        int evidencePass = 0, evidenceFail = 0, evidenceMissing = 0;
-        if (!skipEvidence)
-        {
-            (evidencePass, evidenceFail, evidenceMissing) = RunVerifiedEvidenceScripts(skill);
-        }
-
-        return (missing + stale > 0 || regResult > 0 || evidenceFail > 0 || evidenceMissing > 0) ? 1 : 0;
-    }
-
-    // -- Evidence replay: re-run each "Verified ..." step's script -----------
-    static (int pass, int fail, int missing) RunVerifiedEvidenceScripts(SkillRecord skill)
-    {
-        if (skill.Steps == null || skill.Steps.Count == 0) return (0, 0, 0);
-        var verifiedRegex = new System.Text.RegularExpressions.Regex(
-            @"^Verified\s+\d{4}-\d{2}-\d{2}:\s*(?<path>\S[^(]*?)(?:\s*\(resolve ts=.*)?$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
-
-        int pass = 0, fail = 0, missing = 0;
-        var entries = new List<(string relPath, string absPath)>();
-        foreach (var step in skill.Steps)
-        {
-            var m = verifiedRegex.Match(step.Trim());
-            if (!m.Success) continue;
-            var rel = m.Groups["path"].Value.Trim();
-            var abs = Path.IsPathRooted(rel) ? rel : Path.Combine(hqDir, rel);
-            entries.Add((rel, abs));
-        }
-        if (entries.Count == 0) return (0, 0, 0);
-
-        Console.Error.WriteLine($"[SKILL] Replaying {entries.Count} Verified evidence script(s)...");
-        foreach (var (rel, abs) in entries)
-        {
-            if (!File.Exists(abs))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"    ❌ EVIDENCE MISSING: {rel}");
-                Console.ResetColor();
-                missing++;
-                continue;
-            }
-            var ext = Path.GetExtension(abs).ToLowerInvariant();
-            var psi = ext switch
-            {
-                ".sh"  => new System.Diagnostics.ProcessStartInfo("bash", $"\"{abs}\"")
-                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
-                ".ps1" => new System.Diagnostics.ProcessStartInfo("powershell", $"-NoProfile -ExecutionPolicy Bypass -File \"{abs}\"")
-                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
-                ".cmd" or ".bat" => new System.Diagnostics.ProcessStartInfo("cmd", $"/c \"{abs}\"")
-                            { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true },
-                _ => null
-            };
-            if (psi == null)
-            {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"    ⚠️  unsupported ext {ext}: {rel}");
-                Console.ResetColor();
-                missing++;
-                continue;
-            }
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                using var proc = AppBotPipe.StartTracked(psi, Path.GetDirectoryName(abs) ?? Environment.CurrentDirectory, "SKILL-VERIFY");
-                if (proc == null) { fail++; continue; }
-                if (!proc.WaitForExit(300_000)) // 5-min cap per script
-                {
-                    try { proc.Kill(entireProcessTree: true); } catch { }
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"    ❌ TIMEOUT {sw.ElapsedMilliseconds}ms: {rel}");
-                    Console.ResetColor();
-                    fail++;
-                    continue;
-                }
-                sw.Stop();
-                if (proc.ExitCode == 0)
-                {
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine($"    ✅ PASS ({sw.ElapsedMilliseconds}ms): {rel}");
-                    Console.ResetColor();
-                    pass++;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"    ❌ FAIL exit={proc.ExitCode} ({sw.ElapsedMilliseconds}ms): {rel}");
-                    Console.ResetColor();
-                    fail++;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"    ❌ EXEC ERROR: {rel}: {ex.Message}");
-                Console.ResetColor();
-                fail++;
-            }
-        }
-
-        Console.Error.WriteLine($"[SKILL] Evidence replay: {pass} pass, {fail} fail, {missing} missing");
-        return (pass, fail, missing);
-    }
-
-    // -- Audit --------------------------------------------------------------------
-
-    static int SkillAuditCommand(string[] args)
-    {
-        string? appFilter = null;
-        for (int i = 0; i < args.Length; i++)
-            if (args[i] == "--app" && i + 1 < args.Length) appFilter = args[++i];
-
-        var skills = LoadAllSkills(appFilter);
-        if (skills.Count == 0) { Console.WriteLine("[SKILL] No skills to audit."); return 0; }
-
-        int totalOk = 0, totalIssues = 0, noRefs = 0;
-        var issueIds = new List<string>();
-
-        Console.Error.WriteLine($"[SKILL] Auditing {skills.Count} skill(s)...");
-        foreach (var skill in skills.OrderBy(s => s.App).ThenBy(s => s.Id))
-        {
-            if (skill.SourceRefs == null || skill.SourceRefs.Count == 0) { noRefs++; continue; }
-            var (ok, missing, stale) = RunVerify(skill, verbose: false);
-            if (missing + stale > 0)
-            {
-                Console.WriteLine($"  ! [{skill.App}] {skill.Id}:");
-                RunVerify(skill, verbose: true);
-                issueIds.Add(skill.Id);
-                totalIssues++;
-            }
-            else totalOk++;
-        }
-
-        Console.WriteLine();
-        Console.Error.WriteLine($"[SKILL] Audit: {totalOk} ok, {totalIssues} stale/missing, {noRefs} without refs");
-        if (issueIds.Count > 0)
-        {
-            Console.WriteLine("  -> Fix: wkappbot skill read <id>  then  wkappbot skill contribute ...");
-            foreach (var id in issueIds) Console.WriteLine($"    wkappbot skill read {id}");
-        }
-        return totalIssues > 0 ? 1 : 0;
-    }
-
-    // Returns (ok, missing, stale). When verbose=true prints per-ref status.
-    static (int ok, int missing, int stale) RunVerify(SkillRecord skill, bool verbose)
-    {
-        if (skill.SourceRefs == null || skill.SourceRefs.Count == 0)
-        {
-            if (verbose) Console.Error.WriteLine($"[SKILL] {skill.Id}: no source_refs (nothing to verify)");
-            return (0, 0, 0);
-        }
-
-        var cwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
-        int ok = 0, missing = 0, stale = 0;
-
-        foreach (var r in skill.SourceRefs)
-        {
-            var absPath = Path.IsPathRooted(r.File) ? r.File : Path.Combine(cwd, r.File);
-            if (!File.Exists(absPath))
-            {
-                if (verbose) Console.WriteLine($"    ❌ FILE MISSING: {r.File}");
-                missing++; continue;
-            }
-            if (string.IsNullOrEmpty(r.Pattern))
-            {
-                if (verbose) Console.WriteLine($"    ✅ {r.File} -- file exists");
-                ok++; continue;
-            }
-
-            string[] lines;
-            try { lines = File.ReadAllLines(absPath); }
-            catch { missing++; continue; }
-
-            int foundLine = -1;
-            for (int i = 0; i < lines.Length; i++)
-                if (lines[i].Contains(r.Pattern, StringComparison.Ordinal)) { foundLine = i + 1; break; }
-
-            if (foundLine > 0)
-            {
-                if (verbose) Console.WriteLine($"    ✅ {r.File}:{foundLine} -- \"{r.Pattern}\"");
-                ok++;
-            }
-            else
-            {
-                if (verbose)
-                {
-                    Console.WriteLine($"    ! PATTERN NOT FOUND: \"{r.Pattern}\" in {r.File}");
-                    if (r.Line.HasValue)
-                    {
-                        int start = Math.Max(0, r.Line.Value - 2);
-                        int count = Math.Min(5, lines.Length - start);
-                        Console.WriteLine($"    (was line {r.Line}, now reads:)");
-                        foreach (var l in lines.Skip(start).Take(count)) Console.WriteLine($"      | {l.TrimEnd()}");
-                    }
-                }
-                stale++;
-            }
-        }
-
-        // Regression script existence check
-        if (!string.IsNullOrEmpty(skill.RegressionScript))
-        {
-            var scriptAbs = Path.IsPathRooted(skill.RegressionScript)
-                ? skill.RegressionScript
-                : Path.Combine(DataDir, skill.RegressionScript);
-            if (!File.Exists(scriptAbs))
-            {
-                if (verbose) Console.WriteLine($"    ❌ REGRESSION SCRIPT MISSING: {skill.RegressionScript}");
-                missing++;
-            }
-            else if (verbose)
-                Console.Error.WriteLine($"[SKILL] {skill.Id}: regression script ✅ {Path.GetFileName(scriptAbs)}");
-        }
-
-        if (verbose && missing + stale == 0)
-            Console.Error.WriteLine($"[SKILL] {skill.Id}: ✅ all {ok} ref(s) OK");
-        return (ok, missing, stale);
-    }
-
-    // Runs the skill's regression script (if any). Returns 0=pass, 1=fail, -1=no script.
-    static int RunSkillRegressionScript(SkillRecord skill)
-    {
-        if (string.IsNullOrEmpty(skill.RegressionScript)) return -1;
-        var scriptAbs = Path.IsPathRooted(skill.RegressionScript)
-            ? skill.RegressionScript
-            : Path.Combine(DataDir, skill.RegressionScript);
-        if (!File.Exists(scriptAbs))
-        {
-            Console.Error.WriteLine($"[SKILL] Regression script missing: {skill.RegressionScript}");
-            return 1;
-        }
-
-        var ext = Path.GetExtension(scriptAbs).ToLowerInvariant();
-        var (runner, runnerArgs) = ext switch
-        {
-            ".sh"  => (File.Exists(@"C:\Program Files\Git\usr\bin\bash.exe")
-                        ? @"C:\Program Files\Git\usr\bin\bash.exe" : "bash",
-                       $"\"{scriptAbs}\""),
-            ".ps1" => ("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -File \"{scriptAbs}\""),
-            ".cmd" or ".bat" => ("cmd.exe", $"/c \"{scriptAbs}\""),
-            _ => (null as string, null as string)
-        };
-        if (runner == null)
-        {
-            Console.Error.WriteLine($"[SKILL] Unsupported regression script type: {ext}");
-            return 1;
-        }
-
-        Console.Error.WriteLine($"[SKILL] Running regression: {Path.GetFileName(scriptAbs)}");
-        var psi = new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = runner, Arguments = runnerArgs,
-            UseShellExecute = false, CreateNoWindow = true,
-            RedirectStandardOutput = true, RedirectStandardError = true,
-        };
-        psi.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
-        var proc = AppBotPipe.StartTracked(psi, Environment.CurrentDirectory, "SKILL");
-        var rOut = Task.Run(() => { string? l; while ((l = proc?.StandardOutput.ReadLine()) != null) Console.WriteLine($"  {l}"); });
-        var rErr = Task.Run(() => { string? l; while ((l = proc?.StandardError.ReadLine()) != null) Console.Error.WriteLine($"  {l}"); });
-        proc?.WaitForExit(60_000);
-        rOut.Wait(3_000); rErr.Wait(1_000);
-        var exit = proc?.ExitCode ?? 1;
-        if (exit == 0)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Error.WriteLine($"[SKILL] Regression PASS");
-            Console.ResetColor();
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Error.WriteLine($"[SKILL] Regression FAIL (exit={exit})");
-            Console.ResetColor();
-        }
-        return exit == 0 ? 0 : 1;
-    }
-
-    // -- Helpers ------------------------------------------------------------------
-
-    // Loads from project dir + hq dir, deduplicating by id (project wins)
-    static List<SkillRecord> LoadAllSkills(string? appFilter = null)
-    {
-        var seen = new Dictionary<string, SkillRecord>(StringComparer.OrdinalIgnoreCase);
-
-        void LoadFrom(string dir, SkillSource source)
-        {
-            if (!Directory.Exists(dir)) return;
-            foreach (var f in Directory.GetFiles(dir, "*.skill.json", SearchOption.AllDirectories))
-            {
-                var s = SkillRecord.Load(f);
-                if (s == null) continue;
-                if (appFilter != null && !s.App.Contains(appFilter, StringComparison.OrdinalIgnoreCase)) continue;
-                s.Source = source;
-                if (!seen.ContainsKey(s.Id)) seen[s.Id] = s; // project wins if loaded first
-            }
-        }
-
-        LoadFrom(ProjectSkillsDir, SkillSource.Project);
-        LoadFrom(HqSkillsDir, SkillSource.Hq);
-        return [.. seen.Values];
-    }
-
-    static SkillRecord? FindSkill(string id)
-    {
-        // Project takes priority over HQ
-        foreach (var dir in new[] { ProjectSkillsDir, HqSkillsDir })
-        {
-            if (!Directory.Exists(dir)) continue;
-            foreach (var f in Directory.GetFiles(dir, "*.skill.json", SearchOption.AllDirectories))
-            {
-                var s = SkillRecord.Load(f);
-                if (s != null && s.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
-                    return s;
-            }
-        }
-        return null;
-    }
-
-    static string Slugify(string title)
-    {
-        // Strip non-ASCII (CJK etc.) -- caller must use --id for Korean-only titles
-        var ascii = Regex.Replace(title.ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
-        return ascii; // empty string = caller must supply --id
-    }
-
-    // Returns list of skill IDs with stale/missing source_refs. Used by Eye daily audit.
-    internal static List<string> RunSkillAuditSilent(string cwd)
-    {
-        var issues = new List<string>();
-        // temporarily override CallerCwd for dir resolution
-        var prev = EyeCmdPipeServer.CallerCwd.Value;
-        EyeCmdPipeServer.CallerCwd.Value = cwd;
-        try
-        {
-            foreach (var skill in LoadAllSkills())
-            {
-                if (skill.SourceRefs == null || skill.SourceRefs.Count == 0) continue;
-                var (_, missing, stale) = RunVerify(skill, verbose: false);
-                if (missing + stale > 0) issues.Add(skill.Id);
-            }
-        }
-        finally { EyeCmdPipeServer.CallerCwd.Value = prev; }
-        return issues;
-    }
-
-    /// <summary>
-    /// Print skills related to a command (+ optional subcommand/action) at end of help output.
-    /// sub-terms from the actual args (e.g. "hack", "type", "contribute") narrow the results.
-    /// </summary>
-    internal static void PrintRelatedSkills(string command, string? sub = null, int limit = 4)
-    {
-        try
-        {
-            var cmd  = command.ToLowerInvariant();
-            var terms = new[] { cmd }.Concat(
-                sub != null ? [sub.ToLowerInvariant()] : Array.Empty<string>()
-            ).ToArray();
-
-            var scored = LoadAllSkills()
-                .Select(s => (skill: s, score: SkillRelevanceScore(s, terms)))
-                .Where(x => x.score >= 5)
-                .OrderByDescending(x => x.score)
-                .Take(limit)
-                .ToList();
-
-            if (scored.Count == 0) return;
-
-            var label = sub != null ? $"'{command} {sub}'" : $"'{command}'";
-            Console.WriteLine();
-            Console.WriteLine($"Skills for {label}: (wkappbot skill read <id>)");
-            foreach (var (s, score) in scored)
-                Console.WriteLine($"  - {s.Title}  [{s.Id}] [{AudienceProfile(s)}]");
-        }
-        catch { /* never break usage output */ }
-    }
-
-    static int SkillRelevanceScore(SkillRecord s, string[] terms)
-    {
-        int score = 0;
-        foreach (var term in terms)
-        {
-            // tag exact match is the strongest signal
-            if (s.Tags?.Any(t => t.Equals(term, StringComparison.OrdinalIgnoreCase)) ?? false) score += 10;
-            // id starting with term (e.g. "a11y-command-cheatsheet" for cmd="a11y")
-            if (s.Id.StartsWith(term + "-", StringComparison.OrdinalIgnoreCase)) score += 6;
-            if (s.Id.Contains(term, StringComparison.OrdinalIgnoreCase))          score += 3;
-            if (s.Title.Contains(term, StringComparison.OrdinalIgnoreCase))       score += 2;
-            if (s.Desc.Contains(term, StringComparison.OrdinalIgnoreCase))        score += 1;
-        }
-        // alias expansion for top-level command terms
-        string primary = terms[0];
-        score += primary switch {
-            "a11y"    => (s.Tags?.Any(t => t is "uia" or "win32" or "automation") ?? false) ? 2 : 0,
-            "ask"     => (s.Tags?.Any(t => t is "gpt" or "gemini" or "triad" or "delegation") ?? false) ? 2 : 0,
-            "web"     => (s.Tags?.Any(t => t is "cdp" or "http" or "fetch") ?? false) ? 1 : 0,
-            "eye"     => (s.Tags?.Any(t => t is "mcp" or "daemon" or "hotswap") ?? false) ? 2 : 0,
-            "logcat"  => (s.Tags?.Any(t => t is "log" or "tail") ?? false) ? 1 : 0,
-            "suggest" => (s.Tags?.Any(t => t is "workflow" or "bug" or "resolve") ?? false) ? 1 : 0,
-            _         => 0,
-        };
-        return score;
-    }
-
-    static string FormatAge(DateTime dt)
-    {
-        var age = DateTime.UtcNow - dt.ToUniversalTime();
-        if (age.TotalMinutes < 1) return "just now";
-        if (age.TotalDays < 1)   return $"{(int)age.TotalHours}h ago";
-        if (age.TotalDays < 30)  return $"{(int)age.TotalDays}d ago";
-        if (age.TotalDays < 365) return $"{(int)(age.TotalDays / 30)}mo ago";
-        return $"{(int)(age.TotalDays / 365)}y ago";
-    }
-
-    static string BumpVersion(string? v)
-    {
-        if (string.IsNullOrEmpty(v)) return "1.1";
-        var parts = v.Split('.');
-        if (parts.Length >= 2 && int.TryParse(parts[1], out int minor))
-            return $"{parts[0]}.{minor + 1}";
-        return v + ".1";
-    }
-
-    static bool IsSkillAudience(string value) =>
-        SkillAudiences.Any(a => a.Equals(value, StringComparison.OrdinalIgnoreCase));
-
-    static bool HasAudience(SkillRecord skill, string? audience) =>
-        !string.IsNullOrWhiteSpace(audience) &&
-        skill.Tags?.Any(t => t.Equals(audience, StringComparison.OrdinalIgnoreCase)) == true;
-
-    static string AudienceLabel(SkillRecord skill)
-    {
-        var labels = skill.Tags?
-            .Where(IsSkillAudience)
-            .Select(t => t.ToLowerInvariant())
-            .Distinct()
-            .ToList() ?? [];
-
-        return labels.Count switch
-        {
-            0 => "unclassified",
-            1 => labels[0],
-            _ => string.Join("/", labels)
-        };
-    }
-
-    static string AudienceProfile(SkillRecord skill)
-    {
-        var labels = skill.Tags?
-            .Where(IsSkillAudience)
-            .Select(t => t.ToLowerInvariant())
-            .Distinct()
-            .ToList() ?? [];
-
-        return labels.Count switch
-        {
-            0 => "unclassified",
-            1 => $"{labels[0]} (pure)",
-            _ => $"{string.Join("/", labels)} (mixed)"
-        };
-    }
-
-    static int SkillUsage()
-    {
-        Console.WriteLine("Usage: wkappbot skill <command>");
-        Console.WriteLine();
-        Console.WriteLine("Storage: {callerCwd}/skills/  (project, git-tracked)");
-        Console.WriteLine("         {hq}/skills/          (installed, [HQ] tag in list)");
-        Console.WriteLine();
-        Console.WriteLine("  list [app|audience]               List skills grouped by app or audience");
-        Console.WriteLine("  read <id>                         Show skill details");
-        Console.WriteLine("  search <keyword> [--app X] [--audience X]  Search by keyword in title/desc/tags");
-        Console.WriteLine("  contribute --app X --title Y --desc Z");
-        Console.WriteLine("             [--steps \"s1|s2\"] [--tags \"t1,t2\"] [--id <slug>]");
-        Console.WriteLine("                                    Create or update skill in project dir");
-        Console.WriteLine("  edit <id> [--title X] [--desc X] [--tags X] [--steps X]");
-        Console.WriteLine("                                    Partial update -- only specified fields changed");
-        Console.WriteLine("  delete <id>                       Remove skill from project dir");
-        Console.WriteLine("  install [--app X] [--force]       Copy project skills -> HQ (on deploy)");
-        Console.WriteLine("  export [--app X] [--out f.zip]    Export project skills to zip");
-        Console.WriteLine("  import <file.zip>                 Import skills into project dir");
-        Console.WriteLine("  verify <id>                       Check if source_refs still match code");
-        Console.WriteLine("  audit [--app X]                   Audit all skills for stale/missing refs");
-        Console.WriteLine();
-        Console.WriteLine("  --refs \"file:line:pattern|...\"   Source code anchor for self-heal verify");
-        Console.WriteLine();
-        Console.WriteLine("Examples:");
-        Console.WriteLine("  wkappbot skill list");
-        Console.WriteLine("  wkappbot skill list operator");
-        Console.WriteLine("  wkappbot skill audit");
-        Console.WriteLine("  wkappbot skill list developer");
-        Console.WriteLine("  wkappbot skill list project");
-        Console.WriteLine("  wkappbot skill list user");
-        Console.WriteLine("  wkappbot skill verify chatgpt-blank-false-positive-guard");
-        Console.WriteLine("  wkappbot skill search retry");
-        Console.WriteLine("  wkappbot skill search retry --audience developer");
-        Console.WriteLine("  wkappbot skill search retry --audience operator");
-        Console.WriteLine("  wkappbot skill read cdp-eval-taskcancel-retry");
-        Console.WriteLine("  wkappbot skill contribute --app wkappbot-webbot \\");
-        Console.WriteLine("    --title \"CDP EvalAsync Retry\" --desc \"retry on cancel/timeout\" \\");
-        Console.WriteLine("    --steps \"catch TaskCanceledException|500ms backoff\" --tags \"cdp,retry\" \\");
-        Console.WriteLine("    --refs \"csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs::TaskCanceledException\"");
-        Console.WriteLine("  wkappbot skill install           # deploy to HQ after publish");
-        Console.WriteLine("  wkappbot skill delete test-skill");
-        PrintRelatedSkills("skill");
-        return 0;
-    }
-}
-
-// -- SkillSource / SkillRecord --------------------------------------------─
-
-internal enum SkillSource { Project, Hq }
-
-internal sealed class SkillSourceRef
-{
-    [JsonPropertyName("file")]    public string  File    { get; set; } = "";
-    [JsonPropertyName("line")]    public int?    Line    { get; set; }
-    [JsonPropertyName("pattern")] public string? Pattern { get; set; }
-    [JsonPropertyName("note")]    public string? Note    { get; set; }
-}
-
-internal sealed class SkillRecord
-{
-    [JsonPropertyName("id")]          public string Id      { get; set; } = "";
-    [JsonPropertyName("app")]         public string App     { get; set; } = "";
-    [JsonPropertyName("title")]       public string Title   { get; set; } = "";
-    [JsonPropertyName("desc")]        public string Desc    { get; set; } = "";
-    [JsonPropertyName("steps")]       public List<string> Steps { get; set; } = [];
-    [JsonPropertyName("tags")]        public List<string> Tags  { get; set; } = [];
-    [JsonPropertyName("source_refs")]        public List<SkillSourceRef>? SourceRefs      { get; set; }
-    [JsonPropertyName("regression_script")]  public string? RegressionScript              { get; set; }
-    [JsonPropertyName("author")]             public string? Author                        { get; set; }
-    [JsonPropertyName("created")]            public DateTime Created                      { get; set; } = DateTime.UtcNow;
-    [JsonPropertyName("updated")]            public DateTime? Updated                     { get; set; }
-    [JsonPropertyName("version")]            public string? Version                       { get; set; }
-
-    /// <summary>Most recent activity date -- updated if set, otherwise created.</summary>
-    [JsonIgnore] public DateTime LastActivity => Updated ?? Created;
-
-    [JsonIgnore] public SkillSource Source   { get; set; } = SkillSource.Project;
-    /// <summary>Absolute path to the loaded .skill.json file (set by Load).</summary>
-    [JsonIgnore] public string? FilePath     { get; set; }
-
-    static readonly JsonSerializerOptions Opts = new() { WriteIndented = true };
-
-    public void Save(string path) =>
-        File.WriteAllText(path, JsonSerializer.Serialize(this, Opts));
-
-    public static SkillRecord? Load(string path)
-    {
-        try
-        {
-            var s = JsonSerializer.Deserialize<SkillRecord>(File.ReadAllText(path));
-            if (s != null) s.FilePath = path;
-            return s;
-        }
-        catch { return null; }
     }
 }

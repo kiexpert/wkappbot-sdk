@@ -294,7 +294,15 @@ internal partial class Program
             + "  (no args)         submit a suggestion (opens editor or reads stdin)\n"
             + "  list              show active (unresolved) suggestions\n"
             + "  resolve <ts>      mark resolved (REQUIRES evidence script -- see below!)\n"
+            + "  add-requirement <ts> \"cmd => expected\" [--skill <id>]\n"
+            + "                    add a behavioral requirement to a pending suggest;\n"
+            + "                    with --skill: also updates the named skill immediately\n"
+            + "                    (any repo/contributor can add requirements, not just maintainer)\n"
             + "  repost            re-send suggestions to Slack if ts missing\n\n"
+            + "REQUIREMENTS (3 required for human suggests):\n"
+            + "  --requirement \"wkappbot <cmd> <args> => <expected output>\"\n"
+            + "  NOTE: do NOT include launcher flags (--sudo, --no-wait) in requirement cmd.\n"
+            + "        Strip them: 'wkappbot --sudo a11y ...' -> 'wkappbot a11y ...'\n\n"
             + "RESOLVE GUARD -- mandatory test evidence required:\n"
             + "  wkappbot suggest resolve <ts> \"note\"\n"
             + "    --i-completed-<cmd>-<subcmd>-willkim-allowed-this-script <test.sh|test.ps1|test.cmd>\n\n"
@@ -305,6 +313,7 @@ internal partial class Program
             + "  are re-run on each resolve. If any fail -> blocked.\n\n"
             + "evidence_file is saved to history so you can trace what was tested.\n\n"
             + "Examples:\n"
+            + "  wkappbot suggest add-requirement 2026-04-26T10 \"wkappbot suggest list => pending suggests shown\" --skill suggest-co-resolve-2of2\n"
             + "  wkappbot suggest resolve 2026-03-17T05 \"fixed logcat --dbg race\"\n"
             + "    --i-completed-logcat-dbg-willkim-allowed-this-script test/test-logcat-dbg-listener.sh",
 
@@ -502,13 +511,7 @@ internal partial class Program
               -> a11y <action> "*Chrome*#<css-selector>"
             """,
 
-        ["windows"] = """
-            windows [grap] [--deep] [--process <name>] [--cmd <substr>]
-            List top-level windows with title, class, PID, size.
-
-            No args: all visible windows. With grap: filter by pattern.
-            --deep: include child windows. --process: filter by process name.
-            """,
+        ["windows"] = "windows [grap]  →  converted to a11y find (v6.1)\nAlias: wkappbot windows <grap> == wkappbot a11y find <grap>\nNo args: finds wkappbot* windows. Use a11y find directly for full options.",
 
         ["mcp"] = "mcp\nRun as MCP (Model Context Protocol) stdio server.\nExposes wkappbot_cli tool for JSON-RPC calls.\nUsed by Claude Desktop, VS Code MCP clients.",
 
@@ -544,6 +547,8 @@ internal partial class Program
 
         ["run"] = "run <scenario.yaml | exec-key | exe-path | bare-exe>\nPolymorphic: .yaml/.yml/.xmf = scenario; preset key (hero4/calc/notepad/...) = exec; raw exe path OR PATH-resolvable name = ad-hoc exec launch.",
 
+        ["shell"] = "shell is a YAML scenario step action, not a standalone CLI command.\nUse inside a scenario:\n  steps:\n    - { name: \"Run\", action: shell, params: { command: \"powershell Get-Date\" } }\nFor one-shot shell execution use: wkappbot run <scenario.yaml>",
+
         ["validate"] = "validate <scenario.yaml>\nValidate YAML scenario syntax without executing.",
 
         ["capture"] = "capture [grap] [--output file.png]\nScreenshot a window or screen region.",
@@ -566,7 +571,7 @@ internal partial class Program
 
         ["watch"] = "watch [--duration N] [--live] [--win32] [--interval N]\nReal-time element tracking under mouse cursor. --live: print cursor position updates.",
 
-        ["win-click"] = "win-click <window-title> <x> <y> [--uia]\nClick a coordinate inside a window + detect UIA element at that point.",
+        ["win-click"] = "win-click <window-title> <x> <y> [--abs] [--dbl] [--right] [--fl]\nClick a coordinate inside a window. x y = window-relative (from top-left incl. title bar). --abs = absolute screen coords.",
 
         ["do"] = "do <window-title> <form-id> <button-text> [--confirm]\nFull automation: combo select + button click + dialog handling.",
 
@@ -604,7 +609,7 @@ internal partial class Program
             skill <subcommand> [options]
             AI skill management -- executable knowhow for Claude instances.
             Storage: {callerCwd}/skills/ (project, git-tracked)
-                     {hq}/skills/       (installed, [HQ] tag in list)
+                     {hq}/skills/       (installed, shared across all repos)
 
             Subcommands:
               list [app]                        List skills grouped by app, most recent first
@@ -614,19 +619,34 @@ internal partial class Program
                          [--steps "s1|s2"] [--tags "t1,t2"] [--id <slug>]
                          [--refs "file:line:pattern|..."]
                                                Create or update (auto version bump)
+              edit <id> [--title X] [--desc X] [--add-step X]
+                        [--add-requirement "cmd => expected"]
+                                               Partial update; auto version bump.
+                                               COPY-ON-EDIT: if skill is HQ-only (not in your
+                                               project skills/), it is automatically forked into
+                                               your repo's skills/ so you can edit and contribute.
+                                               Higher-version fork propagates back via sync.
               delete <id>                       Remove from project dir
               install [--app X] [--force]       Copy project -> HQ (runs on publish)
+              sync                              Immediately sync peer repo skills into HQ
+                                               (Eye runs this every 30 min automatically)
               export [--app X] [--out f.zip]    Export to zip
               import <file.zip>                 Import into project dir
               verify <id>                       Check source_refs still match code
               audit [--app X]                   Audit all skills for stale/missing refs
 
+            Cross-repo skill flow:
+              Any repo (suggester) can view all skills via `skill read` (shared HQ).
+              Any repo can add requirements to a suggest: `suggest add-requirement`.
+              Any repo can fork+edit an HQ skill: `skill edit` auto-forks if needed.
+              Eye syncs peer repo skills/ → HQ every 30 min; version field resolves conflicts.
+
             Examples:
               wkappbot skill list
-              wkappbot skill audit
+              wkappbot skill sync
               wkappbot skill read handoff-checklist
-              wkappbot skill search retry
-              wkappbot skill contribute --app wkappbot-webbot --title "X" --desc "Y" \\
+              wkappbot skill edit my-skill --add-requirement "wkappbot windows => nfrunlite shown"
+              wkappbot skill contribute --app wkappbot-webbot --title "X" --desc "Y" \
                 --refs "csharp/src/WKAppBot.WebBot/CdpClient.cs::pattern"
             """,
 
@@ -639,6 +659,44 @@ internal partial class Program
 
             Also probes claude.ai/settings/usage via CDP for plan usage %
             (fallback: UIA scrape of Claude Desktop).
+            """,
+
+        ["taskkill"] = """
+            taskkill [/F] [/T] {/PID <n> | /IM <name>}+
+            taskkill <pid-or-name> [more...]
+
+            Windows taskkill.exe compat shim -- translates classic taskkill args
+            to `wkappbot a11y kill <grap>` so scripts + AI agents land on the
+            unified accessibility-first kill path (FocusLaunchTracker awareness,
+            focusless guards, Eye/WhisperRing preservation) instead of raw
+            TerminateProcess.
+
+            Supported flags (subset):
+              /F        force -- ignored (a11y kill is force by default)
+              /T        tree -- a11y kill already sweeps child processes
+              /PID <n>  by pid (repeatable)
+              /IM <n>   by image name (repeatable) -- exact match, not substring
+              /FI       filter -- NOT SUPPORTED; use grap directly instead
+
+            Bare positional:
+              all-digits      -> treated as /PID
+              ends with .exe  -> treated as /IM
+              otherwise       -> passed through as grap pattern
+
+            Grap emission (exact, anchored):
+              /PID N     -> regex:^\\[N\\]
+              /IM name   -> regex:^\\[\\d+\\]name\\.exe$
+              (prevents over-matching: notepad.exe does NOT kill notepad++.exe)
+
+            Examples:
+              taskkill /F /PID 1234
+              taskkill /IM notepad.exe
+              taskkill 1234 5678                 # multiple pids
+              taskkill notepad.exe chrome.exe    # multiple image names
+
+            Invoked as: taskkill.exe (busybox symlink) OR `wkappbot taskkill`.
+            For complex filters, use grap directly:
+              wkappbot a11y kill "{proc:'...',title:'...'}"
             """,
 
         ["claude-proxy"] = """

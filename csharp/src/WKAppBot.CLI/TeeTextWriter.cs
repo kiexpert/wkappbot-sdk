@@ -85,6 +85,7 @@ public sealed class TeeTextWriter : TextWriter
     public int ExitCode { get; set; } = 0;
 
     private bool _errorRecordWritten = false;
+    public bool ErrorRecordWritten => _errorRecordWritten;
 
     /// <summary>
     /// Write errors.jsonl entry immediately -- call BEFORE WriteExitFile() so the record is

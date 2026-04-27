@@ -133,6 +133,15 @@ internal partial class Program
             return Error("schedule add: --at/--after, --every, --every-day, or --on-limit-reset required");
         }
 
+        // Warn if --cmd starts with a shell interpreter that may not be in cmd.exe PATH.
+        if (!string.IsNullOrEmpty(command))
+        {
+            var resolved = ResolveShellCommand(ref command);
+            item.Command = command; // update with resolved path if changed
+            if (resolved != null)
+                Console.Error.WriteLine($"[SCHEDULE] NOTE: {resolved}");
+        }
+
         var id = ScheduleManager.Add(item);
 
         Console.ForegroundColor = ConsoleColor.Green;
@@ -338,5 +347,65 @@ internal partial class Program
         Console.WriteLine("AppBotEye polls this file and executes pending schedules automatically.");
         PrintRelatedSkills("schedule");
         return 1;
+    }
+
+    /// <summary>
+    /// Resolve bash/sh/python prefix in --cmd on Windows.
+    /// Mutates cmd to use full interpreter path if found.
+    /// Returns a warning string if interpreter needs PATH resolution, null if already fine.
+    /// </summary>
+    internal static string? ResolveShellCommand(ref string cmd)
+    {
+        if (string.IsNullOrEmpty(cmd)) return null;
+        var first = cmd.Split(' ', 2)[0].ToLowerInvariant().TrimEnd('"');
+        if (first is not ("bash" or "sh" or "python" or "python3" or "node")) return null;
+
+        // Already a full path
+        if (first.Contains('/') || first.Contains('\\')) return null;
+
+        // Try to find in PATH or common locations
+        var resolved = FindInterpreterPath(first);
+        if (resolved != null)
+        {
+            cmd = $"\"{resolved}\" {cmd.Split(' ', 2).ElementAtOrDefault(1) ?? ""}".Trim();
+            return $"'{first}' resolved to {resolved} (auto-fixed in command)";
+        }
+
+        return $"WARNING: '{first}' not found in PATH. Command may fail at execution time. " +
+               $"Use full path: e.g. \"C:\\Program Files\\Git\\bin\\bash.exe ...\"";
+    }
+
+    static string? FindInterpreterPath(string name)
+    {
+        // Common Windows locations
+        var candidates = name switch
+        {
+            "bash" or "sh" => new[]
+            {
+                @"C:\Program Files\Git\bin\bash.exe",
+                @"C:\Program Files\Git\usr\bin\bash.exe",
+                @"C:\Windows\System32\bash.exe",  // WSL
+            },
+            "python" or "python3" => new[]
+            {
+                @"C:\Python312\python.exe", @"C:\Python311\python.exe", @"C:\Python310\python.exe",
+            },
+            "node" => new[] { @"C:\Program Files\nodejs\node.exe" },
+            _ => Array.Empty<string>()
+        };
+
+        foreach (var p in candidates)
+            if (File.Exists(p)) return p;
+
+        // Check PATH
+        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+        foreach (var dir in pathEnv.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var full = Path.Combine(dir.Trim(), name + ".exe");
+            if (File.Exists(full)) return full;
+            full = Path.Combine(dir.Trim(), name);
+            if (File.Exists(full)) return full;
+        }
+        return null;
     }
 }
