@@ -77,77 +77,6 @@ jobs:
         if (!(Test-Path bin/wkappbot.exe))      { throw 'wkappbot.exe missing' }
         if (!(Test-Path bin/wkappbot-core.exe)) { throw 'wkappbot-core.exe missing' }
 
-    # ── Release notes via Claude Haiku ─────────────────────────────────────────
-    - name: Collect commits since previous tag
-      id: commits
-      shell: pwsh
-      run: |
-        $tag  = '${{ steps.ver.outputs.tag }}'
-        $prev = git describe --tags --abbrev=0 "$tag^" 2>$null
-        if (!$prev) { $prev = git rev-list --max-parents=0 HEAD }
-        Write-Host "Diff range: $prev..$tag"
-
-        $log = git log --pretty=format:"- %s (%h)" "$prev..$tag" |
-               Where-Object { $_ -notmatch '\[skip ci\]|smoke sidecar|self-test sidecar' }
-
-        $log | Set-Content commits.txt -Encoding utf8
-        Write-Host ($log -join "`n")
-        "prev=$prev" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-
-    - name: Generate release notes with Claude Haiku
-      id: notes
-      shell: pwsh
-      env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      run: |
-        $version = '${{ steps.ver.outputs.version }}'
-        $commits = Get-Content commits.txt -Raw -Encoding utf8
-
-        $prompt = @"
-        Write GitHub release notes for WKAppBot v$version.
-
-        WKAppBot is a Windows & Android UI automation framework — focusless, self-healing, AI-native.
-        It gives AI agents (Claude, GPT, Gemini) eyes and hands to operate desktop and mobile apps.
-
-        Commits since last release:
-        $commits
-
-        Rules:
-        - English only
-        - GitHub-flavoured markdown
-        - Group under: ## What's New, ## Improvements, ## Bug Fixes, ## Internal
-          (omit a section if empty)
-        - Skip trivial chore/ci/docs entries unless they are user-visible
-        - 1-2 sentences per item max — tight and scannable
-        - End with: ## Install  -> one-liner pointing to README Installation section
-        - No preamble, no sign-off
-        "@
-
-        $payload = [ordered]@{
-          model      = 'claude-haiku-4-5-20251001'
-          max_tokens = 1024
-          messages   = @(@{ role = 'user'; content = $prompt })
-        } | ConvertTo-Json -Depth 5
-
-        try {
-          $resp = Invoke-RestMethod `
-            -Uri     'https://api.anthropic.com/v1/messages' `
-            -Method  POST `
-            -Headers @{
-              'x-api-key'         = $env:ANTHROPIC_API_KEY
-              'anthropic-version' = '2023-06-01'
-              'content-type'      = 'application/json'
-            } `
-            -Body $payload
-          $notes = $resp.content[0].text
-          Write-Host "=== Claude-generated notes ===`n$notes"
-        } catch {
-          Write-Host "Claude API unavailable ($_) -- using plain commit list as fallback"
-          $notes = "## WKAppBot v$version`n`n$commits`n`n## Install`nSee [README](../../blob/main/README.md#installation)."
-        }
-
-        $notes | Set-Content release_notes.md -Encoding utf8
-
     # ── Bundle & publish ────────────────────────────────────────────────────────
     - name: Create release zip
       shell: pwsh
@@ -163,12 +92,11 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $tag   = '${{ steps.ver.outputs.tag }}'
-        $zip   = "wkappbot-${{ steps.ver.outputs.version }}.zip"
-        $notes = Get-Content release_notes.md -Raw -Encoding utf8
+        $tag = '${{ steps.ver.outputs.tag }}'
+        $zip = "wkappbot-${{ steps.ver.outputs.version }}.zip"
 
         gh release create $tag $zip `
           --title "WKAppBot $tag" `
-          --notes $notes `
+          --generate-notes `
           --verify-tag
         Write-Host "Release published: https://github.com/${{ github.repository }}/releases/tag/$tag"
