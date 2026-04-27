@@ -273,7 +273,7 @@ jobs:
         $ok = $false
         for ($i = 1; $i -le 5; $i++) {
           git pull --rebase origin main
-          git push
+          git push origin HEAD:main
           if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "Pushed (attempt $i)"; break }
           Write-Host "Push attempt $i failed, retrying..."
           Start-Sleep -Seconds (2 * $i)
