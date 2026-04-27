@@ -12,6 +12,8 @@ on:
 jobs:
   script_selftest:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
     - uses: actions/checkout@v4
       with:
