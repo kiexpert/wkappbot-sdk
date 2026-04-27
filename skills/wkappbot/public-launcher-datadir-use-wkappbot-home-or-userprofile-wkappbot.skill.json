@@ -1,0 +1,19 @@
+{
+  "id": "public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot",
+  "app": "wkappbot",
+  "title": "Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot",
+  "desc": "The public kiexpert/wkappbot launcher must use WKAPPBOT_HOME env var or %USERPROFILE%/.wkappbot as the default data root instead of AppContext.BaseDirectory. Dev builds keep D:/GitHub/WKAppBot/bin.",
+  "steps": [
+    "Change DataDir to: WKAPPBOT_HOME env \u003E %USERPROFILE%/.wkappbot \u003E AppContext.BaseDirectory. Installer bootstraps directory on first run.",
+    "HQ path (skills/logs/runtime) and binary paths must all derive from DataDir. Never hardcode D:/GitHub/WKAppBot in production paths.",
+    "Dev override: D:/GitHub/WKAppBot/bin path remains default when WKAPPBOT_HOME is not set and AppContext.BaseDirectory matches the dev repo. Add a IsDev check via presence of csharp/ sibling.",
+    "Verified 2026-04-22: test-eye-tick-design-defer.sh (resolve ts=2026-04-20T23:30:00Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:47:50.2018856Z",
+  "updated": "2026-04-22T03:48:15.1944382Z",
+  "version": "1.1"
+}
