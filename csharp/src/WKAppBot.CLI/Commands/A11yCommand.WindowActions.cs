@@ -5,12 +5,116 @@ using FlaUI.UIA3;
 using WKAppBot.Win32.Input;
 using WKAppBot.Win32.Native;
 using WKAppBot.Win32.Window;
+using System.Text;
 
 namespace WKAppBot.CLI;
 
 internal partial class Program
 {
     // === Window-Level Actions (see A11yElementActions.cs for element-level) ===
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref OverlayRect pvParam, uint fWinIni);
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct OverlayRect { public int left, top, right, bottom; }
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")]
+    static extern uint GetPixel(IntPtr hdc, int x, int y);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr GetDC(IntPtr hWnd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern int ReleaseDC(IntPtr hWnd, IntPtr hdc);
+
+    // Track how many times each HWND was suppressed -- kill if ≥4 times
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<IntPtr, int> _overlaySuppressCount = new();
+
+    /// <summary>
+    /// Suppress any visible window that:
+    ///   (1) covers ≥80% of the work area (taskbar excluded), AND
+    ///   (2) average of 5 sample pixels is near-black (avg RGB brightness &lt; 80/765).
+    /// Forces alpha=0 on WS_EX_LAYERED windows; hides others.
+    /// If same HWND suppressed ≥4 times: kill the process.
+    /// Fired as a pre-check on every a11y command entry.
+    /// </summary>
+    static void SuppressFullscreenOpaqueOverlays()
+    {
+        try
+        {
+            // Work area = screen minus taskbar
+            var wa = new OverlayRect();
+            SystemParametersInfo(0x0030 /*SPI_GETWORKAREA*/, 0, ref wa, 0);
+            long waW = wa.right - wa.left;
+            long waH = wa.bottom - wa.top;
+            if (waW <= 0 || waH <= 0) return;
+            long minArea = (long)(waW * waH * 0.8);
+
+            var screenDc = GetDC(IntPtr.Zero);
+            try
+            {
+                NativeMethods.EnumWindows((hwnd, _) =>
+                {
+                    try
+                    {
+                        if (!NativeMethods.IsWindowVisible(hwnd)) return true;
+                        NativeMethods.GetWindowRect(hwnd, out var rect);
+                        long w = rect.Right - rect.Left;
+                        long h = rect.Bottom - rect.Top;
+                        if (w * h < minArea) return true;
+
+                        // Sample 5 points (center + 4 quadrant centers) -- average brightness
+                        // More reliable than single center pixel (avoids wallpaper bleed-through)
+                        int[] sampleX = { rect.Left + (int)(w/2), rect.Left + (int)(w/4), rect.Left + (int)(w*3/4), rect.Left + (int)(w/4), rect.Left + (int)(w*3/4) };
+                        int[] sampleY = { rect.Top + (int)(h/2), rect.Top + (int)(h/4), rect.Top + (int)(h/4), rect.Top + (int)(h*3/4), rect.Top + (int)(h*3/4) };
+                        int totalBrightness = 0; int validSamples = 0;
+                        for (int si = 0; si < 5; si++)
+                        {
+                            uint px = GetPixel(screenDc, sampleX[si], sampleY[si]);
+                            if (px == 0xFFFFFFFF) continue;
+                            totalBrightness += (int)((px & 0xFF) + ((px >> 8) & 0xFF) + ((px >> 16) & 0xFF));
+                            validSamples++;
+                        }
+                        if (validSamples == 0) return true;
+                        int avgBrightness = totalBrightness / validSamples; // max 765 (255*3)
+                        if (avgBrightness > 80) return true; // not near-black (avg channel < ~27)
+
+                        var cls = new System.Text.StringBuilder(128);
+                        NativeMethods.GetClassNameW(hwnd, cls, cls.Capacity);
+                        int ex = NativeMethods.GetWindowLongW(hwnd, -20);
+                        bool layered = (ex & NativeMethods.WS_EX_LAYERED) != 0;
+
+                        if (layered)
+                        {
+                            // Force alpha=0 (invisible but still running)
+                            NativeMethods.SetLayeredWindowAttributes(hwnd, 0, 0, NativeMethods.LWA_ALPHA);
+                        }
+                        else
+                        {
+                            // Non-layered: minimize to get it out of the way
+                            NativeMethods.ShowWindow(hwnd, 6); // SW_MINIMIZE
+                        }
+                        int count = _overlaySuppressCount.AddOrUpdate(hwnd, 1, (_, c) => c + 1);
+                        Console.Error.WriteLine($"[OVERLAY-GUARD] Suppressed black overlay: 0x{hwnd.ToInt64():X} cls={cls} {w}x{h} avg_brightness={avgBrightness} layered={layered} count={count}");
+                        if (count >= 4)
+                        {
+                            // Persistent offender -- kill the process
+                            NativeMethods.GetWindowThreadProcessId(hwnd, out uint pidU);
+                            int pid = (int)pidU;
+                            try
+                            {
+                                System.Diagnostics.Process.GetProcessById(pid).Kill();
+                                Console.Error.WriteLine($"[OVERLAY-GUARD] KILLED pid={pid} (reappeared {count} times)");
+                                _overlaySuppressCount.TryRemove(hwnd, out int _removed);
+                            }
+                            catch (Exception kex) { Console.Error.WriteLine($"[OVERLAY-GUARD] Kill failed: {kex.Message}"); }
+                        }
+                    }
+                    catch { }
+                    return true;
+                }, IntPtr.Zero);
+            }
+            finally { ReleaseDC(IntPtr.Zero, screenDc); }
+        }
+        catch { }
+    }
 
     static bool A11yFocus(IntPtr hwnd, string tag)
     {
@@ -20,6 +124,57 @@ internal partial class Program
         NativeMethods.BringWindowToTop(hwnd);
         Console.Error.WriteLine($"[A11Y] focus {tag} -- SetForegroundWindow");
         return true;
+    }
+
+    /// <summary>
+    /// Print structured BLOCKED output with dismiss grap when a blocker dialog is detected.
+    /// stdout line: "# BLOCKED {hwnd_grap}#{btn_scope} -- dismiss first then retry"
+    /// Makes it easy for callers (Claude, scripts) to dismiss and retry automatically.
+    /// </summary>
+    static void EmitBlockerGrap(WKAppBot.Win32.Input.BlockerInfo blocker)
+    {
+        try
+        {
+            // Find dismiss button: enumerate child Button windows
+            NativeMethods.GetWindowThreadProcessId(blocker.Handle, out uint pid);
+            string proc = "";
+            try { proc = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName; } catch { }
+            var grapBase = $"{{hwnd:0x{blocker.Handle.ToInt64():X},proc:'{proc}',cls:'{blocker.ClassName}'}}";
+
+            // Enumerate child buttons (Win32 class "Button")
+            var buttons = new List<string>();
+            var sb = new StringBuilder(128);
+            NativeMethods.EnumChildWindows(blocker.Handle, (hChild, _) =>
+            {
+                sb.Clear();
+                NativeMethods.GetClassNameW(hChild, sb, sb.Capacity);
+                if (sb.ToString().Equals("Button", StringComparison.OrdinalIgnoreCase))
+                {
+                    var titleBuf = new StringBuilder(64);
+                    NativeMethods.GetWindowTextW(hChild, titleBuf, titleBuf.Capacity);
+                    var btnText = titleBuf.ToString().Trim();
+                    if (!string.IsNullOrEmpty(btnText)) buttons.Add(btnText);
+                }
+                return true;
+            }, IntPtr.Zero);
+
+            // First button = likely dismiss (OK/확인/Close/닫기)
+            var dismissBtn = buttons.FirstOrDefault(b =>
+                b.Equals("OK", StringComparison.OrdinalIgnoreCase) ||
+                b.Contains("확인") || b.Contains("OK") || b.Contains("닫기") || b.Contains("Close"))
+                ?? buttons.FirstOrDefault();
+
+            var btnScope = dismissBtn != null ? $"#*{dismissBtn}*" : "";
+            var btnList = buttons.Count > 0 ? $" buttons=[{string.Join(",", buttons)}]" : "";
+
+            // stdout: machine-parseable BLOCKED line
+            Console.WriteLine($"# BLOCKED {grapBase}{btnScope} title=\"{blocker.Title}\"{btnList}");
+            Console.Error.WriteLine($"[A11Y] BLOCKED dismiss: wkappbot a11y invoke {grapBase}{btnScope}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] EmitBlockerGrap error: {ex.Message}");
+        }
     }
 
     static bool A11yHotkey(IntPtr hwnd, string tag, string keyCombo)
@@ -65,6 +220,21 @@ internal partial class Program
 
     static bool A11yClose(UIA3Automation automation, IntPtr hwnd, string tag, bool force, InputReadiness readiness)
     {
+        // Yield to active user: WindowPattern.Close / WM_CLOSE / Process.Kill all steal
+        // foreground when the target is in front. FocusSentinel only catches the steal
+        // AFTER it happens; by then the user has lost their typing context. Mirrors the
+        // pre-op guard in InspectionCommands.InspectCommand. --force opts out (explicit
+        // user intent: kill regardless of activity).
+        // BUG-AUTO patterns addressed: "FOCUS-STEAL end during a11y-close",
+        // "focus-steal unrecoverable after trusted-click-menu-item",
+        // "FOCUS-STEAL a11y-close remaining batch A C",
+        // "UIA focus steal ask-trusted-click-menu-item", "trusted-click-upload-btn"
+        if (!force && FocusSafe.ShouldYieldToActiveUser(out var idleMs))
+        {
+            Console.Error.WriteLine($"[A11Y:CLOSE] {tag} -- user active ({idleMs}ms idle) -- skipping to avoid focus steal (use --force to override)");
+            return false;
+        }
+
         // Pre-flight: show the plan -- process name + any pre-existing modal -- so the
         // user sees what's about to happen before any WM_CLOSE fires.
         try
@@ -472,26 +642,29 @@ internal partial class Program
 
     static HashSet<IntPtr> BuildWindowHierarchyAncestors()
     {
+        // wkappbot is a console app with no visible window, so EnumWindows never
+        // finds a window for our own PID -- walking from our windows yields nothing.
+        // Instead, walk the PROCESS ancestor chain (shell -> terminal -> VS Code host)
+        // and collect every window owned by any ancestor PID. That catches hosts like
+        // VS Code that aren't reachable via HWND owner/parent chain from us.
         var ancestors = new HashSet<IntPtr>();
         try
         {
-            uint myPid = (uint)Environment.ProcessId;
+            var myPid = Environment.ProcessId;
+            // Build ancestor PID set inline (can't reference _cachedAncestorPids -- not yet initialized)
+            var ancestorPids = new HashSet<int>();
+            int pid = myPid;
+            for (int i = 0; i < 20 && pid > 0; i++)
+            {
+                int ppid = GetParentPid(pid);
+                if (ppid <= 0 || !ancestorPids.Add(ppid)) break;
+                pid = ppid;
+            }
             NativeMethods.EnumWindows((hWnd, _) =>
             {
-                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid != myPid) return true;
-                // Walk owner + parent chain from our window up to root
-                var cur = hWnd;
-                for (int i = 0; i < 20 && cur != IntPtr.Zero; i++)
-                {
-                    var owner = NativeMethods.GetWindow(cur, 4u); // GW_OWNER = 4
-                    var parent = NativeMethods.GetParent(cur);
-                    var next = owner != IntPtr.Zero ? owner : parent;
-                    if (next == IntPtr.Zero) break;
-                    NativeMethods.GetWindowThreadProcessId(next, out uint nextPid);
-                    if (nextPid != myPid) ancestors.Add(NativeMethods.GetAncestor(next, NativeMethods.GA_ROOT));
-                    cur = next;
-                }
+                NativeMethods.GetWindowThreadProcessId(hWnd, out uint wpid);
+                if ((int)wpid != myPid && ancestorPids.Contains((int)wpid))
+                    ancestors.Add(hWnd);
                 return true;
             }, IntPtr.Zero);
         }

@@ -140,12 +140,13 @@ public sealed class ActionReadiness : IActionReadiness
         // 1c. Disabled ancestor check
         if (!target.Enabled)
         {
-            if (IsBlockOnDisabled(action))
+            if (IsBlockOnDisabled(action) && !ctx.Force)
             {
-                Console.Error.WriteLine($"[AAR] BLOCKED: target disabled for {action}: \"{target.DisplayName}\"");
+                Console.Error.WriteLine($"[AAR] BLOCKED: target disabled for {action}: \"{target.DisplayName}\" (hint: --force to override)");
                 return null;
             }
-            Console.Error.WriteLine($"[AAR] WARNING: target disabled for {action}: \"{target.DisplayName}\"");
+            var forceNote = ctx.Force ? " -- --force override, proceeding" : "";
+            Console.Error.WriteLine($"[AAR] WARNING: target disabled for {action}: \"{target.DisplayName}\"{forceNote}");
         }
 
         return target;
@@ -206,23 +207,23 @@ public sealed class ActionReadiness : IActionReadiness
         switch (action)
         {
             case "type" or "set-value":
-                // Must be enabled + visible
-                if (!target.Enabled)
+                // Must be enabled + visible (--force bypasses these soft gates)
+                if (!target.Enabled && !ctx.Force)
                 {
-                    Console.Error.WriteLine($"[AAR] BLOCKED: target not enabled for {action}");
+                    Console.Error.WriteLine($"[AAR] BLOCKED: target not enabled for {action} (hint: --force to override)");
                     return null;
                 }
-                if (!target.Visible)
+                if (!target.Visible && !ctx.Force)
                 {
-                    Console.Error.WriteLine($"[AAR] BLOCKED: target not visible for {action}");
+                    Console.Error.WriteLine($"[AAR] BLOCKED: target not visible for {action} (hint: --force to override)");
                     return null;
                 }
-                // Check if editable (UIA Value.IsReadOnly)
-                if (target is UiaActionTarget uat)
+                // Check if editable (UIA Value.IsReadOnly) -- --force bypasses too
+                if (target is UiaActionTarget uat && !ctx.Force)
                 {
                     if (IsReadOnly(uat.Element))
                     {
-                        Console.Error.WriteLine($"[AAR] BLOCKED: target is read-only for {action}");
+                        Console.Error.WriteLine($"[AAR] BLOCKED: target is read-only for {action} (hint: --force to override)");
                         return null;
                     }
                 }

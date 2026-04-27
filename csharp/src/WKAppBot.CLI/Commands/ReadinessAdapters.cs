@@ -64,16 +64,29 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
     private readonly bool _noSound;
     public UserInputWaitAdapter(bool noSound = false) => _noSound = noSound;
 
+    // User-activity reset window (seconds). Any detected input within the popup
+    // bumps the countdown back up to this value before auto-approval fires.
+    private const int ResetSeconds = 30;
+
     public UserYieldResult WaitForUserYield(IntPtr targetMainHwnd, uint userIdleMs, int timeoutSeconds,
                                              IntPtr positionHwnd = default)
     {
-        if (ShouldAutoApproveAll())
+        // Auto-approve timeout: scales with user activity.
+        // - User idle (>= 15s): 3s timeout → auto-approve (away from keyboard, proceed quickly)
+        // - User active (< 15s): 30s reset → every detected input resets timer to 30s;
+        //   only auto-approves after 30s of inactivity within the popup display.
+        // Auto-approve timeout scaling (only when no PendingAction -- i.e. not a type/input action).
+        // When PendingAction is set the user MUST explicitly confirm (O button) -- no auto-timeout.
+        // When PendingAction is set (type/input), always use full timeout -- explicit O required.
+        const uint ActiveThresholdMs = 15000;
+        if (CalloutInputWindow.PendingAction != null)
         {
-            var focusOk = targetMainHwnd == IntPtr.Zero ||
-                NativeMethods.SmartSetForegroundWindow(targetMainHwnd);
-            Console.WriteLine("  [READINESS] auto-approve-all: yield popup skipped");
-            return new UserYieldResult(true, focusOk);
+            timeoutSeconds = ResetSeconds; // 30s -- user MUST press O
+            Console.Error.WriteLine($"[CALLOUT] 타입명령 승인 대기 ({timeoutSeconds}s) -- O 버튼 필요");
         }
+        else if (ShouldAutoApproveAll())
+            timeoutSeconds = userIdleMs >= ActiveThresholdMs ? 3 : ResetSeconds;
+
 
         // Dot animation: print the popup label immediately, then one " ." per second.
         using var dotCts = new CancellationTokenSource();
@@ -117,11 +130,53 @@ internal sealed class UserInputWaitAdapter : IUserInputWait
                 : null;
             var callerInfo = callerName != null ? $"\n[요청자] {callerName}" : "";
             Console.Error.WriteLine($"[READINESS] cmd={actionArgs}{callerInfo}{stackInfo}");
-            var (approved, focusAcquired, deniedByUser) = UserInputWaitOverlay.Show(targetMainHwnd, userIdleMs, timeoutSeconds,
-                positionHwnd: positionHwnd, noSound: _noSound, actionInfo: actionArgs + callerInfo + stackInfo);
+
+            // Build targetRect: prefer PendingTargetRect (exact UIA element rect, e.g. Message input)
+            // over positionHwnd/window rect so the callout tail points to the actual input element.
+            Rectangle targetRect = CalloutInputWindow.PendingTargetRect;
+            if (targetRect.IsEmpty)
+            {
+                var anchorHwnd = positionHwnd != IntPtr.Zero ? positionHwnd : targetMainHwnd;
+                if (anchorHwnd != IntPtr.Zero && NativeMethods.GetWindowRect(anchorHwnd, out var rc))
+                    targetRect = new Rectangle(rc.Left, rc.Top, rc.Width, rc.Height);
+            }
+
+            // Body of the callout: action info + caller + stack (content the user should see).
+            // If A11yCommand set PendingContent for type/set-value, prefer that (shows the
+            // actual text about to be typed instead of the raw CLI args string).
+            var calloutContent = CalloutInputWindow.PendingContent ?? actionArgs;
+
+            Console.WriteLine($"[CALLOUT] 승인창 표시 → O 버튼 눌러주세요 (timeout={timeoutSeconds}s)");
+            Console.Out.Flush();
+            var (approved, focusAcquired, deniedByUser) = CalloutInputOverlay.ShowForReadiness(
+                calloutContent, targetRect, timeoutSeconds,
+                targetHwnd: targetMainHwnd, resetSeconds: ResetSeconds);
             if (deniedByUser)
-                Console.WriteLine("[READINESS] User rejected the focus yield -- aborting");
+                Console.WriteLine("[CALLOUT] ✗ 사용자가 거부했습니다");
+            else if (!approved)
+                Console.WriteLine("[CALLOUT] ✗ 타임아웃 (승인 없음)");
+            else
+                Console.WriteLine("[CALLOUT] ✓ 승인됨");
+            Console.Out.Flush();
             result = new UserYieldResult(approved, focusAcquired);
+            if (approved)
+            {
+                // 1. Initial delay: let the O-button click event fully process (300ms).
+                Thread.Sleep(300);
+
+                // 2. Idle gate: don't type while user is still active (mouse move, keyboard, etc.).
+                //    Any input within 500ms resets the wait. Cap at 30s total.
+                const uint IdleThresholdMs = 500;
+                const int MaxWaitMs = 30_000;
+                var gateStart = System.Diagnostics.Stopwatch.StartNew();
+                while (NativeMethods.GetUserIdleMs() < IdleThresholdMs
+                       && gateStart.ElapsedMilliseconds < MaxWaitMs)
+                {
+                    Thread.Sleep(50);
+                }
+                if (gateStart.ElapsedMilliseconds >= 200)
+                    Console.Error.WriteLine($"[READINESS] idle gate: waited {gateStart.ElapsedMilliseconds}ms for user to settle");
+            }
             return result;
         }
         finally

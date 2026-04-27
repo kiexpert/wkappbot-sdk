@@ -351,11 +351,22 @@ internal partial class Program
         // Window context screenshot (broader view)
         try
         {
-            using var winBmp = ScreenCapture.CaptureWindow(hwnd);
-            var winPath = Path.Combine(tmpDir, $"{sessionTag}_window.png");
-            winBmp.Save(winPath, ImageFormat.Png);
-            attachFiles.Add(winPath);
-            Console.Error.WriteLine($"[AUTO-HEAL] window screenshot -> {Path.GetFileName(winPath)}");
+            using var winBmp = ScreenCapture.CaptureWindow(hwnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
+            if (winBmp != null)
+            {
+                var winPath = Path.Combine(tmpDir, $"{sessionTag}_window.png");
+                winBmp.Save(winPath, ImageFormat.Png);
+                attachFiles.Add(winPath);
+                Console.Error.WriteLine($"[AUTO-HEAL] window screenshot -> {Path.GetFileName(winPath)}");
+            }
+            else
+            {
+                Console.Error.WriteLine("[AUTO-HEAL] window screenshot skipped: blank/failed capture");
+            }
         }
         catch { }
 

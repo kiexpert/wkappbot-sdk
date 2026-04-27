@@ -6,27 +6,34 @@ using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
-// partial class: win-click -- ProbeAtPoint 입력확보 -> UIA focusless (main) -> physical click (fallback)
-// Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl]
+// partial class WinClickCommand (Program): win-click -- maximally focusless coordinate-based click.
+// Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl] [--abs] [--dismiss-blocker]
 //
-// Flow: FindWindow -> ProbeAtPoint (Z-order 전수조사 + 포커스리스 시도) -> (fallback) Physical Click
-// ProbeAtPoint: 좌표에 겹쳐있는 창들을 앞에서부터 포커스리스 시도, 방해꾼 dismiss, 타겟을 앞으로.
-// --fl: Force focusless only (no fallback to physical click)
-// --dbl/--right: Skip focusless attempt (UIA has no double-click/right-click concept)
+// 3-tier focusless cascade (single left-click):
+//   1. UIA Invoke/Toggle/Select/ExpandCollapse at point  (ProbeAtPoint)
+//   2. PostMessage WM_LBUTTONDOWN/UP to deepest child    (TryPostMessageClick)
+//   3. Physical click -- Probe() yield popup, SmartSetForeground
+//
+// --dbl / --right: UIA has no dbl/right concept, so start at tier 2 (PostMessage), then tier 3.
+// --fl: stop at tier 2 (no physical click).
 internal partial class Program
 {
     static int WinClickCommand(string[] args)
     {
-        if (args.Length < 3)
-            return Error("Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl]\n" +
-                "  ProbeAtPoint 입력확보 + UIA focusless click (main) + physical click (fallback).\n" +
-                "  --fl: Force focusless only (fail if UIA pattern not available)\n" +
-                "  --dbl: Double-click (physical only)\n" +
-                "  --right: Right-click (physical only)");
+        if (args.Length < 2)
+            return Error("Usage: wkappbot win-click <window-title> <x> <y> [--dbl] [--right] [--fl] [--abs] [--dismiss-blocker]\n" +
+                "  x y = window-relative coords (from window top-left including title bar).\n" +
+                "  --abs: treat x y as absolute screen coordinates instead.\n" +
+                "  --dismiss-blocker: auto-dismiss #32770 dialog blocking the click, then retry.\n" +
+                "  --fl: Force focusless only (no physical click fallback)\n" +
+                "  --dbl: Double-click\n" +
+                "  --right: Right-click");
 
         bool isDouble = args.Any(a => a == "--dbl" || a == "--double");
         bool isRight = args.Any(a => a == "--right");
         bool forceFocusless = args.Any(a => a == "--fl" || a == "--focusless");
+        bool absCoords = args.Any(a => a == "--abs" || a == "--absolute");
+        bool dismissBlocker = args.Any(a => a == "--dismiss-blocker" || a == "--dismiss");
 
         // Support both positional (<title> <x> <y>) and named (--x N --y N) coordinate syntax
         int relX, relY;
@@ -34,18 +41,15 @@ internal partial class Program
         string? yStr = GetArgValue(args, "--y") ?? GetArgValue(args, "--Y");
         if (xStr != null || yStr != null)
         {
-            // Named arg syntax: win-click <title> --x N --y N
             if (!int.TryParse(xStr, out relX) || !int.TryParse(yStr, out relY))
                 return Error("Invalid coordinates. Usage: wkappbot win-click <title> --x N --y N");
         }
         else
         {
-            // Positional syntax: win-click <title> <x> <y>
             if (args.Length < 3 || !int.TryParse(args[1], out relX) || !int.TryParse(args[2], out relY))
                 return Error("Invalid coordinates. Usage: wkappbot win-click <title> <x> <y> or --x N --y N");
         }
 
-        // Resolve grap: "window/child" -- '/' = Win32 child, '#' part ignored (coordinate-based click)
         var (win32Segments, _) = GrapHelper.SplitGrap(args[0]);
         if (win32Segments.Length == 0) return Error("Empty grap pattern");
 
@@ -54,7 +58,6 @@ internal partial class Program
             return Error($"Window not found: \"{win32Segments[0]}\"");
 
         var hWnd = found[0].Handle;
-        // Walk Win32 children (segments before '#')
         for (int si = 1; si < win32Segments.Length; si++)
         {
             var child = WindowFinder.FindChildByPattern(hWnd, win32Segments[si]);
@@ -63,16 +66,14 @@ internal partial class Program
         }
         var winInfo = WindowInfo.FromHwnd(hWnd);
 
-        // Knowhow broadcast: show existing knowhow for this window/profile
         BroadcastInspectKnowhow(hWnd, winInfo.ClassName, null, winInfo.Title);
 
-        // Get window rect + compute screen coordinates
         NativeMethods.GetWindowRect(hWnd, out var wRect);
-        int screenX = wRect.Left + relX;
-        int screenY = wRect.Top + relY;
+        int screenX = absCoords ? relX : wRect.Left + relX;
+        int screenY = absCoords ? relY : wRect.Top + relY;
         string clickType = isDouble ? "DblClick" : isRight ? "RightClick" : "Click";
 
-        // -- 돋보기 최우선: 입력확보 전에 무조건 띄움 --
+        // -- 돋보기 --
         Rectangle zoomRect;
         string uiaLabel = "";
         string uiaInfo = "";
@@ -107,8 +108,7 @@ internal partial class Program
         using var zoom = ClickZoomHelper.BeginFromRect(zoomRect, hWnd, $"win_{clickType.ToLower()}", actionLabel);
         zoom?.UpdateStatus("입력확보 중...");
 
-        // -- Main path: ProbeAtPoint 좌표 기반 입력확보 --
-        // Single left-click: 포커스리스 시도 (Z-order 전수조사 + 방해꾼 dismiss + 경로 정리)
+        // ── Tier 1: UIA 포커스리스 (단순 좌클릭만) ────────────────────────
         if (!isDouble && !isRight)
         {
             try
@@ -123,19 +123,14 @@ internal partial class Program
                     FocuslessOnly = forceFocusless,
                 });
 
-                // 이미 포커스리스 클릭 성공?
                 if (pointReport.FocuslessClicked)
                 {
-                    // 전경 도둑질 감지 -> 알림 팝업 (타겟 소유, 다시알림 체크박스)
                     if (pointReport.ForegroundStolen)
                     {
                         zoom?.ShowFail($"!fg {pointReport.ResolvedDetail}");
-
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("[WIN] ");
-                        Console.Write("FocuslessClick !fg ");
+                        Console.Write("[WIN] FocuslessClick !fg ");
                         Console.ResetColor();
-
                         string? procName = null;
                         try
                         {
@@ -143,7 +138,6 @@ internal partial class Program
                             procName = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName;
                         }
                         catch { }
-
                         FocuslessWarningOverlay.Show(
                             NativeMethods.GetAncestor(hWnd, NativeMethods.GA_ROOT),
                             pointReport.ResolvedDetail,
@@ -151,54 +145,75 @@ internal partial class Program
                     }
                     else
                     {
-                        zoom?.ShowPass($"Focusless {pointReport.ResolvedDetail}");
-
+                        zoom?.ShowPass($"UIA {pointReport.ResolvedDetail}");
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.Write("[WIN] ");
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write("FocuslessClick ");
+                        Console.Write("FocuslessClick(UIA) ");
                         Console.ResetColor();
                     }
                     Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pointReport.ResolvedDetail}");
                     return 0;
                 }
 
-                // 포커스리스 전용 모드인데 실패?
                 if (forceFocusless)
                 {
-                    zoom?.ShowFail($"No focusless: {pointReport.ResolvedDetail}");
-
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write("[WIN] ");
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write("FocuslessFail ");
-                    Console.ResetColor();
-                    Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pointReport.ResolvedDetail}");
-                    return 1;
+                    // --fl: tier 2 (PostMessage) before giving up
+                    zoom?.UpdateStatus("UIA 불가 -> PostMessage 시도...");
                 }
-
-                // Fall through to physical click
-                zoom?.UpdateStatus("포커스리스 불가 -> 물리클릭...");
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Error.WriteLine($"[WIN] Focusless unavailable ({pointReport.ResolvedDetail}) -> fallback to physical click");
-                Console.ResetColor();
+                else
+                {
+                    zoom?.UpdateStatus("UIA 불가 -> PostMessage 시도...");
+                }
             }
             catch (Exception ex)
             {
                 if (forceFocusless)
-                {
-                    zoom?.ShowFail(ex.Message);
-                    return Error($"ProbeAtPoint failed: {ex.Message}");
-                }
-                zoom?.UpdateStatus($"ProbeAtPoint 오류 -> 물리클릭...");
+                    zoom?.UpdateStatus($"UIA 오류 -> PostMessage 시도...");
+                else
+                    zoom?.UpdateStatus($"UIA 오류 -> PostMessage 시도...");
                 Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Error.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) -> fallback to physical click");
+                Console.Error.WriteLine($"[WIN] ProbeAtPoint error ({ex.GetType().Name}) -> tier 2");
                 Console.ResetColor();
             }
         }
 
-        // -- Fallback: Foreground + Physical Click --
-        // Run input readiness (yield popup if user active; [IDLE] printed by SmartSetForegroundWindow)
+        // ── Tier 2: PostMessage WM_LBUTTONDOWN/UP (포커스리스) ─────────────
+        // UIA 패턴 없는 MFC/GDI 컨트롤에 효과적. 포커스 강탈 없음.
+        {
+            zoom?.UpdateStatus($"PostMessage {clickType}...");
+            var (pmOk, pmDetail) = TryPostMessageClick(hWnd, screenX, screenY, isDouble, isRight);
+            if (pmOk)
+            {
+                zoom?.ShowPass($"PostMessage {pmDetail}");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Write("[WIN] ");
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.Write($"FocuslessClick(PostMsg) ");
+                Console.ResetColor();
+                Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pmDetail}");
+                return 0;
+            }
+
+            Console.ForegroundColor = ConsoleColor.DarkGray;
+            Console.Error.WriteLine($"[WIN] PostMessage failed ({pmDetail}) -> tier 3");
+            Console.ResetColor();
+
+            if (forceFocusless)
+            {
+                zoom?.ShowFail($"No focusless: {pmDetail}");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Write("[WIN] ");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.Write("FocuslessFail ");
+                Console.ResetColor();
+                Console.WriteLine($"\"{winInfo.Title}\" at ({relX},{relY}) -> {pmDetail}");
+                return 1;
+            }
+        }
+
+        // ── Tier 3: 물리 클릭 (포커스 강탈 필요, 팝업 가능) ───────────────
+        zoom?.UpdateStatus("물리클릭...");
         var physReadiness = CreateInputReadiness();
         var physReport = physReadiness.Probe(new InputReadinessRequest
         {
@@ -208,22 +223,58 @@ internal partial class Program
         if (physReport.ActiveBlocker != null)
         {
             var blocker = physReport.ActiveBlocker;
-            zoom?.ShowFail($"blocker: {blocker.Title}");
-            return Error($"[WIN] physical click blocked by: \"{blocker.Title}\"");
+            if (dismissBlocker)
+            {
+                Console.Error.WriteLine($"[WIN] blocker detected: \"{blocker.Title}\" -- attempting auto-dismiss");
+                zoom?.UpdateStatus($"dismiss blocker: {blocker.Title}");
+                physReadiness.TryDismissBlocker(hWnd, blocker);
+                Thread.Sleep(400);
+                var physReport2 = CreateInputReadiness().Probe(new InputReadinessRequest
+                {
+                    TargetHwnd     = hWnd,
+                    IntendedAction = isDouble ? "dbl-click" : isRight ? "right-click" : "click",
+                });
+                if (physReport2.ActiveBlocker != null)
+                {
+                    zoom?.ShowFail($"dismiss failed: {physReport2.ActiveBlocker.Title}");
+                    return Error($"[WIN] blocker persists after dismiss: \"{physReport2.ActiveBlocker.Title}\"");
+                }
+                zoom?.UpdateStatus($"{clickType} 물리클릭...");
+            }
+            else
+            {
+                bool isTransparentOverlay = string.IsNullOrEmpty(blocker.Title) && blocker.ClassName != "#32770";
+                if (isTransparentOverlay)
+                {
+                    Console.WriteLine($"[WIN] empty-title overlay [{blocker.ClassName}] auto-dismissed");
+                    physReadiness.TryDismissBlocker(hWnd, blocker);
+                    Thread.Sleep(200);
+                }
+                else
+                {
+                    zoom?.ShowFail($"blocker: {blocker.Title}");
+                    return Error($"[WIN] physical click blocked by: \"{blocker.Title}\" (use --dismiss-blocker to auto-dismiss)");
+                }
+            }
+        }
+
+        if (physReport.UserYieldRequested && !physReport.UserYieldConfirmed)
+        {
+            zoom?.ShowFail("포커스양보 거부됨");
+            return Error("[WIN] physical click blocked: user denied focus yield");
         }
 
         zoom?.UpdateStatus($"{clickType} 물리클릭...");
-        NativeMethods.SmartSetForegroundWindow(hWnd);
+        if (!physReport.FocusPreAcquired)
+            NativeMethods.SmartSetForegroundWindow(hWnd);
         Thread.Sleep(150);
 
-        // Re-read rect after foreground (window position may have changed)
         NativeMethods.GetWindowRect(hWnd, out wRect);
-        screenX = wRect.Left + relX;
-        screenY = wRect.Top + relY;
+        screenX = absCoords ? relX : wRect.Left + relX;
+        screenY = absCoords ? relY : wRect.Top + relY;
 
         Console.Write($"[WIN] {clickType} \"{winInfo.Title}\" at ({relX},{relY}) -> screen ({screenX},{screenY}){uiaInfo}... ");
 
-        // Physical click
         var swPhys = System.Diagnostics.Stopwatch.StartNew();
         try
         {
@@ -249,5 +300,63 @@ internal partial class Program
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Tier-2 focusless click: PostMessage WM_LBUTTON*/WM_RBUTTON* to the deepest visible
+    /// child window at the given screen point. No focus steal.
+    /// Returns (true, detail) on success, (false, reason) on failure.
+    /// </summary>
+    static (bool ok, string detail) TryPostMessageClick(
+        IntPtr hWnd, int screenX, int screenY, bool isDouble = false, bool isRight = false)
+    {
+        try
+        {
+            // Find deepest child at screen point within hWnd
+            var clientPtForRoot = new POINT { X = screenX, Y = screenY };
+            NativeMethods.ScreenToClient(hWnd, ref clientPtForRoot);
+
+            // Drill into deepest non-invisible/non-disabled child
+            var targetHwnd = hWnd;
+            var childHwnd = NativeMethods.ChildWindowFromPointEx(
+                hWnd, clientPtForRoot,
+                NativeMethods.CWP_SKIPINVISIBLE | NativeMethods.CWP_SKIPDISABLED);
+            if (childHwnd != IntPtr.Zero && childHwnd != hWnd)
+                targetHwnd = childHwnd;
+
+            // Client coords relative to target child
+            var clientPt = new POINT { X = screenX, Y = screenY };
+            NativeMethods.ScreenToClient(targetHwnd, ref clientPt);
+            var lParam = (IntPtr)(((clientPt.Y & 0xFFFF) << 16) | (clientPt.X & 0xFFFF));
+
+            string childDesc = targetHwnd != hWnd
+                ? $"child 0x{targetHwnd:X} [{WindowFinder.GetClassName(targetHwnd)}]"
+                : "root";
+
+            if (isDouble)
+            {
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)NativeMethods.MK_LBUTTON, lParam);
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONUP,   (IntPtr)0, lParam);
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONDBLCLK, (IntPtr)NativeMethods.MK_LBUTTON, lParam);
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONUP,   (IntPtr)0, lParam);
+            }
+            else if (isRight)
+            {
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_RBUTTONDOWN, (IntPtr)NativeMethods.MK_RBUTTON, lParam);
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_RBUTTONUP,   (IntPtr)0, lParam);
+            }
+            else
+            {
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONDOWN, (IntPtr)NativeMethods.MK_LBUTTON, lParam);
+                NativeMethods.PostMessageW(targetHwnd, NativeMethods.WM_LBUTTONUP,   (IntPtr)0, lParam);
+            }
+
+            Thread.Sleep(50);
+            return (true, $"PostMsg at client ({clientPt.X},{clientPt.Y}) -> {childDesc}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"PostMsg error: {ex.Message}");
+        }
     }
 }

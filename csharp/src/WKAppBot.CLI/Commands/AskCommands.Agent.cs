@@ -68,6 +68,27 @@ internal partial class Program
             return 0;
         }
 
+        // wkappbot agent last  -- show last saved agent task
+        if (args.Length > 0 && args[0] == "last")
+        {
+            AgentLastState.Show();
+            return 0;
+        }
+
+        // wkappbot agent resume ["follow-up text"]  -- re-run last task, optionally appending follow-up
+        if (args.Length > 0 && args[0] == "resume")
+        {
+            var state = AgentLastState.Load();
+            if (state == null)
+                return Error("No previous agent task found. Run `wkappbot agent \"task\" - tier` first.");
+            var followUp = args.Length > 1 ? string.Join(" ", args[1..]).Trim() : "";
+            var task = string.IsNullOrWhiteSpace(followUp) ? state.Task : $"{state.Task}\n\nFollow-up: {followUp}";
+            Console.Error.WriteLine($"[AGENT] resume | tier={state.Tier} | original=\"{(state.Task.Length > 60 ? state.Task[..57] + "..." : state.Task)}\"");
+            if (!string.IsNullOrWhiteSpace(followUp))
+                Console.Error.WriteLine($"[AGENT] follow-up: \"{followUp}\"");
+            return RunAgentTierShorthand(task, state.Tier);
+        }
+
         if (TryParseAgentTierShorthand(args, out var shorthandTask, out var shorthandTier))
             return RunAgentTierShorthand(shorthandTask, shorthandTier);
 
@@ -257,11 +278,30 @@ Usage:
 Tier shorthand:
   codex-mini (default, omitted) -> AskCodexCli with --agent
   read-only                    -> AskCodexCli with sandbox read-only
-  haiku                        -> AskClaude --model haiku
-  triad                        -> AskTriadParallel
-  sonnet                       -> AskClaude --model sonnet
+  haiku                        -> AskClaude --model claude-haiku-4-5-20251001
+  sonnet                       -> AskClaude --model claude-sonnet-4-6
+  opus                         -> AskClaude --model claude-opus-4-7
+  gpt                          -> AskChatGpt (browser bot, loop mode)
+  gemini                       -> AskGemini (browser bot, loop mode)
+  triad                        -> AskTriadParallel (GPT + Gemini + Claude parallel)
 
   triad / all  -- run Gemini + GPT + Claude in parallel, each prefixed [gemini]/[gpt]/[claude]
+
+Canonical options (Claude-standard) -- apply to ALL tiers after ' - <tier>':
+  --model <id>         Override model within the tier
+  --max-turns N        Max agentic turns (default 20) -> loopMaxSteps for browser AIs
+  --system ""..""        System prompt override
+  --no-agent           One-shot (no loop)
+  --fresh              New session
+  --attach <file>      Attach file (repeatable)
+  --timeout N          Timeout seconds (default 90)
+  --no-wait            Fire and don't wait for response
+
+Canonical examples:
+  wkappbot agent ""task"" - opus --max-turns 10
+  wkappbot agent ""task"" - gemini --model 2.5-pro --timeout 180
+  wkappbot agent ""task"" - gpt --fresh --no-wait
+  wkappbot agent ""task"" - triad --max-turns 30
 
 Defaults (triad-agreed):
   --timeout      90     seconds total hard kill
@@ -346,19 +386,17 @@ Examples:
         if (string.IsNullOrWhiteSpace(task))
             return Error("Agent task is empty.");
 
-        var tier = string.IsNullOrWhiteSpace(tierHint) ? "codex-mini" : tierHint.Trim().ToLowerInvariant();
+        // Canonical (Claude-standard) option parse + tier-specific dispatch.
+        // tierHint = "<tier> [--model X] [--max-turns N] [--fresh] ..."
+        var effectiveHint = string.IsNullOrWhiteSpace(tierHint) ? "codex-mini" : tierHint;
+        var (tier, opts) = ParseTierAndCanonicalOpts(task, effectiveHint);
         var preview = task.Length > 80 ? task[..77] + "..." : task;
-        Console.Error.WriteLine($"[AGENT] shorthand | tier={tier} | task=\"{preview}\"");
+        Console.Error.WriteLine($"[AGENT] shorthand | tier={tier} | turns={opts.MaxTurns} | timeout={opts.TimeoutSec}s | task=\"{preview}\"");
+        if (!string.IsNullOrWhiteSpace(opts.ModelOverride))
+            Console.Error.WriteLine($"[AGENT] model override: {opts.ModelOverride}");
 
-        return tier switch
-        {
-            "codex-mini" => AskCodexCli($"--agent {task}", newSession: false),
-            "read-only" => AskCodexCli($"--agent -s read-only {task}", newSession: false),
-            "haiku" => AskClaude(task, true, 90, newTab: false, attachFiles: null, newSession: false, loopMode: true, 20, 2, 4, triadMode: false, modelHint: "haiku", noWait: false, targetTagOverride: BuildAgentTargetTag("claude"), linePrefix: "[claude] "),
-            "triad" => AskTriadParallel(task, 90, attachFiles: null, newSession: false, loopMode: true, loopMaxSteps: 20, loopRetry: 2, loopMaxParallel: 4, modelHint: null, noWait: false),
-            "sonnet" => AskClaude(task, true, 90, newTab: false, attachFiles: null, newSession: false, loopMode: true, 20, 2, 4, triadMode: false, modelHint: "sonnet", noWait: false, targetTagOverride: BuildAgentTargetTag("claude"), linePrefix: "[claude] "),
-            _ => Error($"Unknown agent tier: {tier} (use codex-mini, read-only, haiku, triad, or sonnet)")
-        };
+        AgentLastState.Save(task, tier);
+        return DispatchAgent(opts);
     }
 
     static string BuildAgentTargetTag(string ai)

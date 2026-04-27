@@ -23,6 +23,11 @@ sealed class EyeProxyRequest
     [JsonPropertyName("id")] public int Id { get; set; }
     [JsonPropertyName("command")] public string Command { get; set; } = "";
     [JsonPropertyName("args")] public string[] Args { get; set; } = [];
+    [JsonPropertyName("workingDir")] public string? WorkingDir { get; set; }
+    // Streaming output: if set, admin Eye connects to these pipes and CopyToAsync
+    // subprocess stdout/stderr directly. No buffering in admin Eye.
+    [JsonPropertyName("streamOutPipe")] public string? StreamOutPipe { get; set; }
+    [JsonPropertyName("streamErrPipe")] public string? StreamErrPipe { get; set; }
 }
 
 /// <summary>Response from elevated Eye -> CLI.</summary>
@@ -88,16 +93,43 @@ static class EyeProxyWire
 /// </summary>
 static class ElevatedEyeServer
 {
-    public const string PipeName = "wkappbot_elevated";
+    public static readonly string PipeName = $"wkappbot_elevated_{ProjectRoot.Hash8()}";
 
     /// <summary>True while at least one admin command is being executed -- hot-swap must defer.</summary>
     public static bool IsBusy => _activeClients > 0;
     static volatile int _activeClients;
 
+    // Number of concurrent accept-loop workers. Must be >= expected parallel --sudo
+    // burst size; fewer listeners mean a window where all instances are busy servicing
+    // and new ConnectAsync stalls until one loops back to WaitForConnectionAsync.
+    // 26 simultaneous Launcher probes (bug-auto merged count) -> 32 workers gives
+    // comfortable headroom without exhausting the OS max (MaxAllowedServerInstances).
+    const int AcceptWorkers = 32;
+
     public static async Task ListenAsync(CancellationToken ct)
     {
-        Console.Error.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName}");
+        Console.Error.WriteLine($"[EYE:PIPE] Eye pipe listening on \\\\.\\pipe\\{PipeName} workers={AcceptWorkers}");
 
+        // Run N concurrent acceptor loops. Each maintains its own pipe server
+        // instance and loops WaitForConnectionAsync -> handoff -> create-next.
+        // At any moment ~AcceptWorkers instances are in WaitForConnectionAsync,
+        // so a burst of simultaneous --sudo ConnectAsync calls all get accepted
+        // without serializing on the single-listener accept gap.
+        var workers = new Task[AcceptWorkers];
+        for (int i = 0; i < AcceptWorkers; i++)
+        {
+            int workerId = i;
+            workers[i] = Task.Run(() => AcceptLoop(workerId, ct), ct);
+        }
+
+        try { await Task.WhenAll(workers); }
+        catch (OperationCanceledException) { /* shutdown */ }
+
+        Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
+    }
+
+    static async Task AcceptLoop(int workerId, CancellationToken ct)
+    {
         while (!ct.IsCancellationRequested)
         {
             NamedPipeServerStream? pipe = null;
@@ -119,18 +151,22 @@ static class ElevatedEyeServer
 
                 await pipe.WaitForConnectionAsync(ct);
                 var connectedPipe = pipe;
-                pipe = null; // ownership transferred
+                pipe = null; // ownership transferred to handler
                 Interlocked.Increment(ref _activeClients);
                 _ = Task.Run(async () =>
                 {
                     try { await HandleClient(connectedPipe, ct); }
-                    finally { Interlocked.Decrement(ref _activeClients); }
+                    finally
+                    {
+                        Interlocked.Decrement(ref _activeClients);
+                        try { connectedPipe.Dispose(); } catch { }
+                    }
                 }, ct);
             }
             catch (OperationCanceledException) { break; }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[EYE:PIPE] Pipe error: {ex.Message}");
+                Console.Error.WriteLine($"[EYE:PIPE] worker#{workerId} error: {ex.Message}");
                 // Backoff to avoid log-spam tight loop when another process holds the pipe name
                 try { await Task.Delay(TimeSpan.FromSeconds(5), ct); }
                 catch (OperationCanceledException) { break; }
@@ -140,10 +176,10 @@ static class ElevatedEyeServer
                 pipe?.Dispose();
             }
 
-            // No delay on happy-path connections -- next WaitForConnectionAsync starts immediately
+            // No delay on happy-path connections -- this worker's next
+            // WaitForConnectionAsync starts immediately, and meanwhile the
+            // other AcceptWorkers-1 listeners are still armed.
         }
-
-        Console.WriteLine("[EYE:PIPE] Eye pipe stopped");
     }
 
     static async Task HandleClient(NamedPipeServerStream pipe, CancellationToken ct)
@@ -155,7 +191,18 @@ static class ElevatedEyeServer
                 var req = await EyeProxyWire.ReadAsync<EyeProxyRequest>(pipe, ct);
                 if (req == null) break;
 
-                Console.Error.WriteLine($"[EYE:ADMIN] Exec: {req.Command} {string.Join(" ", req.Args)}");
+                if (req.Command != "__eye_tick__" && string.IsNullOrWhiteSpace(req.WorkingDir))
+                {
+                    Console.Error.WriteLine($"[EYE:ADMIN] REJECTED id={req.Id} cmd='{req.Command}': WorkingDir not set");
+                    await EyeProxyWire.WriteAsync(pipe, new EyeProxyResponse
+                    {
+                        Id = req.Id, ExitCode = 1,
+                        Stderr = $"[SUDO-PROXY] WorkingDir not set in request -- upgrade caller (cmd='{req.Command}')",
+                    }, ct);
+                    continue;
+                }
+
+                Console.Error.WriteLine($"[EYE:ADMIN] Exec: {req.Command} {string.Join(" ", req.Args)} cwd={req.WorkingDir}");
 
                 var resp = await ExecuteCommand(req);
                 await EyeProxyWire.WriteAsync(pipe, resp, ct);
@@ -185,11 +232,62 @@ static class ElevatedEyeServer
         var reqTag = $"id={req.Id} cmd='{req.Command}'";
         try
         {
+            // WorkingDir is required -- callers must always set it (via Environment.CurrentDirectory).
+            // Silently falling back to admin Eye's own CWD causes wrong-project execution.
+            if (string.IsNullOrWhiteSpace(req.WorkingDir) || !Directory.Exists(req.WorkingDir))
+                return new EyeProxyResponse
+                {
+                    Id = req.Id, ExitCode = 1,
+                    Stderr = $"[SUDO-PROXY] WorkingDir missing or invalid: '{req.WorkingDir}' -- request rejected",
+                };
+
             var exePath = Environment.ProcessPath ?? "wkappbot.exe";
             var allArgs = new List<string> { req.Command };
             allArgs.AddRange(req.Args);
             var argsStr = string.Join(" ", allArgs.Select(a =>
                 a.Contains(' ') || a.Contains('"') ? $"\"{a.Replace("\"", "\\\"")}\"" : a));
+
+            // Streaming path: caller provided named pipes -- CopyToAsync directly, no buffer in admin Eye.
+            if (!string.IsNullOrEmpty(req.StreamOutPipe))
+            {
+                var psiS = new ProcessStartInfo
+                {
+                    FileName = exePath, Arguments = argsStr, UseShellExecute = false,
+                    RedirectStandardOutput = true, RedirectStandardError = true,
+                    CreateNoWindow = true, WorkingDirectory = req.WorkingDir,
+                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
+                };
+                psiS.EnvironmentVariables["WKAPPBOT_LOOP_CALLER"] = "eye-proxy";
+                psiS.EnvironmentVariables["WKAPPBOT_SUDO_ACTIVE"] = "1";
+                psiS.EnvironmentVariables["WKAPPBOT_WORKER"] = "1";
+
+                using var sProc = AppBotPipe.StartTracked(psiS, Environment.CurrentDirectory, "EYE-PROXY-STREAM");
+                if (sProc == null)
+                    return new EyeProxyResponse { Id = req.Id, ExitCode = -1, Error = "Failed to start process (streaming)" };
+
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} STREAM pid={sProc.Id}");
+
+                // Connect to caller's streaming pipes and copy subprocess output directly.
+                var outPipe = new NamedPipeClientStream(".", req.StreamOutPipe, PipeDirection.Out, PipeOptions.Asynchronous);
+                var errPipe = !string.IsNullOrEmpty(req.StreamErrPipe)
+                    ? new NamedPipeClientStream(".", req.StreamErrPipe, PipeDirection.Out, PipeOptions.Asynchronous)
+                    : null;
+                await outPipe.ConnectAsync(3000);
+                if (errPipe != null) await errPipe.ConnectAsync(3000);
+
+                var outCopy = sProc.StandardOutput.BaseStream.CopyToAsync(outPipe);
+                var errCopy = errPipe != null
+                    ? sProc.StandardError.BaseStream.CopyToAsync(errPipe)
+                    : sProc.StandardError.ReadToEndAsync().ContinueWith(_ => { });
+
+                await sProc.WaitForExitAsync();
+                await Task.WhenAll(outCopy, errCopy);
+                await outPipe.FlushAsync(); outPipe.Dispose();
+                if (errPipe != null) { await errPipe.FlushAsync(); errPipe.Dispose(); }
+
+                Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} STREAM done exit={sProc.ExitCode}");
+                return new EyeProxyResponse { Id = req.Id, ExitCode = sProc.ExitCode };
+            }
 
             var psi = new ProcessStartInfo
             {
@@ -199,6 +297,7 @@ static class ElevatedEyeServer
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
+                WorkingDirectory = req.WorkingDir,
                 // Must match subprocess's Console.OutputEncoding (UTF-8 set at startup).
                 // Without this, StreamReader defaults to system codepage (CP949 on Korean Windows)
                 // and misinterprets UTF-8 Korean bytes as mojibake.
@@ -227,8 +326,20 @@ static class ElevatedEyeServer
             var stderrTask = proc.StandardError.ReadToEndAsync();
 
             // Hard timeout: admin Eye must respond promptly or client will abandon.
-            // 30s gives slow commands room; if subprocess itself hangs, we kill + return error.
+            // 30s gives slow commands room.
+            //
+            // Note on .NET 8 Process.WaitForExitAsync: when stdout/stderr are
+            // redirected, WaitForExitAsync waits for BOTH process exit AND
+            // stream EOF. If the child exits cleanly but a grandchild inherits
+            // stdout (common: child launches background daemons that outlive
+            // it), WaitForExitAsync stalls on the stream half even though the
+            // process is long dead -- 30s fires with stdoutDone=False and the
+            // old code killed the (already-dead) tree and returned error.
+            // Fix: on timeout, check proc.HasExited first. If the process has
+            // exited, the child finished its work cleanly and we should return
+            // the drained output as success, not a spurious error.
             using var subprocCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            bool timedOut = false;
             try
             {
                 await proc.WaitForExitAsync(subprocCts.Token);
@@ -236,11 +347,41 @@ static class ElevatedEyeServer
             }
             catch (OperationCanceledException)
             {
+                timedOut = true;
+            }
+
+            if (timedOut)
+            {
+                // Give HasExited a moment to catch up with reality -- WaitForExitAsync
+                // cancellation can fire milliseconds before .HasExited flips.
+                try { proc.Refresh(); } catch { }
+                bool alreadyExited = false;
+                try { alreadyExited = proc.HasExited; } catch { }
+
+                if (alreadyExited)
+                {
+                    // Process already exited; WaitForExitAsync was blocked on
+                    // stdout/stderr drain because a grandchild inherited the
+                    // pipe. Grant a short grace window for any in-flight reader
+                    // bytes, then return whatever drained. This is success --
+                    // the subprocess completed its work.
+                    Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} child exited but readers pending (grandchild holds pipe); draining {proc.ExitCode}");
+                    try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(2)); } catch { }
+                    return new EyeProxyResponse
+                    {
+                        Id = req.Id,
+                        ExitCode = proc.ExitCode,
+                        Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
+                        Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
+                    };
+                }
+
+                // True hang: process still running after 30s. Kill and report.
                 bool stdoutDone = stdoutTask.IsCompleted;
                 bool stderrDone = stderrTask.IsCompleted;
                 Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} TIMEOUT (30s) -- stdoutDone={stdoutDone} stderrDone={stderrDone} -- killing tree");
                 try { proc.Kill(entireProcessTree: true); } catch { }
-                try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
+                try { await Task.WhenAll(stdoutTask, stderrTask).WaitAsync(TimeSpan.FromSeconds(2)); } catch { }
                 return new EyeProxyResponse
                 {
                     Id = req.Id,
@@ -251,20 +392,25 @@ static class ElevatedEyeServer
                 };
             }
 
-            // Child has exited. Reader tasks should complete quickly (pipe EOF on child close).
-            // But if a grandchild inherited stdout, these can hang -- cap with a short timeout.
+            // Child has exited cleanly. In .NET 8 WaitForExitAsync with redirected
+            // streams already waited for reader EOF, so these should be complete.
+            // Still cap with a grace timeout in case the runtime semantics ever
+            // diverge or a grandchild is holding the pipe on a fast exit.
             var readDeadline = Task.Delay(TimeSpan.FromSeconds(3));
             var readDone = Task.WhenAll(stdoutTask, stderrTask);
             if (await Task.WhenAny(readDone, readDeadline) == readDeadline)
             {
                 Console.Error.WriteLine($"[EYE:ADMIN:PULSE] {reqTag} stdout/stderr drain TIMEOUT (3s after child exit) -- grandchild may still hold pipe");
+                // Grandchild holds pipe; return drained-so-far as success since
+                // the main child exited cleanly. Do NOT tag this as error --
+                // callers (auto-retry in ExecuteViaProxy) treat Error/ExitCode=-1
+                // as "retry me" and that amplifies the original timeout.
                 return new EyeProxyResponse
                 {
                     Id = req.Id,
                     ExitCode = proc.ExitCode,
                     Stdout = stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : "",
                     Stderr = stderrTask.IsCompletedSuccessfully ? stderrTask.Result : "",
-                    Error = "stdout/stderr readers did not close within 3s of child exit",
                 };
             }
 
@@ -324,9 +470,9 @@ static class ElevatedEyeClient
         catch { return false; }
     }
 
-    /// <summary>Send a command to elevated Eye and get the result.</summary>
+    /// <summary>Send a pre-built request to elevated Eye and get the result.</summary>
     public static async Task<EyeProxyResponse?> SendCommandAsync(
-        string command, string[] args, int timeoutMs = 5000)
+        EyeProxyRequest req, int timeoutMs = 5000)
     {
         try
         {
@@ -339,20 +485,13 @@ static class ElevatedEyeClient
             {
                 cts = new CancellationTokenSource(timeoutMs);
                 ct = cts.Token;
-                await pipe.ConnectAsync(timeoutMs, ct); // use caller's timeoutMs, not hardcoded 3000
+                await pipe.ConnectAsync(timeoutMs, ct);
             }
             else
             {
                 ct = CancellationToken.None;
                 await Task.Run(() => pipe.Connect());
             }
-
-            var req = new EyeProxyRequest
-            {
-                Id = Interlocked.Increment(ref _nextId),
-                Command = command,
-                Args = args,
-            };
 
             await EyeProxyWire.WriteAsync(pipe, req, ct);
             return await EyeProxyWire.ReadAsync<EyeProxyResponse>(pipe, ct);
@@ -369,6 +508,17 @@ static class ElevatedEyeClient
         }
     }
 
+    /// <summary>Send a command to elevated Eye and get the result.</summary>
+    public static Task<EyeProxyResponse?> SendCommandAsync(
+        string command, string[] args, int timeoutMs = 5000)
+        => SendCommandAsync(new EyeProxyRequest
+        {
+            Id = Interlocked.Increment(ref _nextId),
+            Command = command,
+            Args = args,
+            WorkingDir = Environment.CurrentDirectory,
+        }, timeoutMs);
+
     /// <summary>
     /// Execute a command via elevated Eye proxy, printing stdout/stderr transparently.
     /// Returns exit code, or -1 if proxy unavailable / timed out.
@@ -378,7 +528,42 @@ static class ElevatedEyeClient
     /// </summary>
     public static int ExecuteViaProxy(string command, string[] args, int timeoutMs = 5000)
     {
-        var resp = SendCommandAsync(command, args, timeoutMs).GetAwaiter().GetResult();
+        var id = Guid.NewGuid().ToString("N")[..12];
+        var outPipeName = $"wkappbot_sudo_out_{id}";
+        var errPipeName = $"wkappbot_sudo_err_{id}";
+
+        using var outServer = new NamedPipeServerStream(outPipeName, PipeDirection.In, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        using var errServer = new NamedPipeServerStream(errPipeName, PipeDirection.In, 1,
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+        // Relay tasks: pipe server → Console.Out / Console.Error (streaming, no buffer)
+        var outRelay = Task.Run(async () =>
+        {
+            await outServer.WaitForConnectionAsync();
+            await outServer.CopyToAsync(Console.OpenStandardOutput());
+        });
+        var errRelay = Task.Run(async () =>
+        {
+            await errServer.WaitForConnectionAsync();
+            await errServer.CopyToAsync(Console.OpenStandardError());
+        });
+
+        // Response only carries exit code; output already streamed above.
+        // Use long timeout: subprocess may run for tens of seconds.
+        var streamReq = new EyeProxyRequest
+        {
+            Id = Interlocked.Increment(ref _nextId),
+            Command = command,
+            Args = args,
+            WorkingDir = Environment.CurrentDirectory,
+            StreamOutPipe = outPipeName,
+            StreamErrPipe = errPipeName,
+        };
+        var resp = SendCommandAsync(streamReq, Math.Max(timeoutMs, 300_000)).GetAwaiter().GetResult();
+
+        // Drain relay tasks (EOF received when admin Eye closes its pipe ends after subprocess exits).
+        Task.WhenAll(outRelay, errRelay).Wait(TimeSpan.FromSeconds(5));
 
         // Auto-retry once on subprocess timeout. Admin Eye reports a busy-path
         // 50pct-ish timeout rate under load (the reported merged bug); one
@@ -813,7 +998,7 @@ sealed class EyeIpcTickResponse
 /// </summary>
 static class EyeIpcServer
 {
-    public const string PipeName = "wkappbot_eye_ipc";
+    public static readonly string PipeName = $"wkappbot_eye_ipc_{ProjectRoot.Hash8()}";
     static readonly JsonSerializerOptions _opts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public static async Task ListenAsync(CancellationToken ct)
@@ -856,6 +1041,7 @@ static class EyeIpcServer
             if (req == null) return;
             if (req.Command == "__eye_tick__")
             {
+                Program.EnsureEyeVisible(); // restore opacity/topmost/position on every tick query
                 var tickResp = Program.BuildIpcTickResponse();
                 var tickJson = JsonSerializer.Serialize(tickResp, _opts);
                 var resp = new EyeProxyResponse { Id = req.Id, ExitCode = 0, Stdout = tickJson };

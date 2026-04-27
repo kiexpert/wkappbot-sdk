@@ -158,19 +158,54 @@ internal partial class Program
         return result;
     }
 
-    /// <summary>Detect host type from parent process chain + environment variables.</summary>
+    /// <summary>Detect host type from parent process chain + window title.</summary>
     static string DetectHostType(int parentPid)
     {
-        // Env-var detection (fastest, most reliable -- set by the AI host in all child processes).
-        // Check CODEX_HOME first: Codex sets this even in VS Code terminal mode.
+        try
+        {
+            var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value;
+            if (callerHwnd.HasValue && callerHwnd.Value != IntPtr.Zero)
+            {
+                var prompt = FindKnownPromptInfoByHwnd(callerHwnd.Value);
+                if (prompt != null)
+                    return prompt.HostType;
+            }
+
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+            if (!string.IsNullOrWhiteSpace(callerCwd))
+            {
+                var prompt = GetKnownPromptInfos().FirstOrDefault(p =>
+                {
+                    if (ClaudePromptHelper.IsVsCodeHostType(p.HostType))
+                    {
+                        var pCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                        return !string.IsNullOrEmpty(pCwd) &&
+                               string.Equals(pCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+                    }
+                    if (string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pCwd = ExtractCwdFromCodexWindow(p.WindowHandle);
+                        return !string.IsNullOrEmpty(pCwd) &&
+                               string.Equals(pCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    return false;
+                });
+
+                if (prompt != null)
+                    return prompt.HostType;
+            }
+        }
+        catch { }
+
+        // Env-var fast path: AI hosts inject these before the chain walk can distinguish them.
+        // Critical when two AIs share the same VS Code -- chain walk hits code.exe for both,
+        // so env vars are the only reliable discriminator.
         if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("CODEX_HOME")))
             return "vscode-codex";
-
-        // CLAUDE_CODE_ENTRYPOINT=claude-vscode: set by Claude Code VS Code extension.
         var claudeEntrypoint = Environment.GetEnvironmentVariable("CLAUDE_CODE_ENTRYPOINT");
         if (!string.IsNullOrWhiteSpace(claudeEntrypoint))
         {
-            // Classify from VSCODE_PID window title if available.
             var vscodePidStr = Environment.GetEnvironmentVariable("VSCODE_PID");
             if (!string.IsNullOrWhiteSpace(vscodePidStr) && int.TryParse(vscodePidStr, out var vscodePid) && vscodePid > 0)
             {
@@ -184,21 +219,7 @@ internal partial class Program
             return "vscode-claudecode";
         }
 
-        // VSCODE_PID without CLAUDE_CODE_ENTRYPOINT: generic VS Code terminal (Codex ext, Copilot, etc.)
-        // Only use as fallback -- real AI host env vars should have been checked above.
-        var vscodePidOnly = Environment.GetEnvironmentVariable("VSCODE_PID");
-        if (!string.IsNullOrWhiteSpace(vscodePidOnly) && int.TryParse(vscodePidOnly, out var vscPid) && vscPid > 0)
-        {
-            try
-            {
-                var vsProc = System.Diagnostics.Process.GetProcessById(vscPid);
-                return ClaudePromptHelper.ClassifyVsCodeHostType(GetMainWindowTitleSafe(vsProc));
-            }
-            catch { }
-            return "vscode-claudecode";
-        }
-
-        // Parent process chain walk (handles Claude Desktop, standalone Codex, Cursor, etc.)
+        // Parent process chain walk (handles Claude Desktop, standalone Codex, Cursor, VS Code).
         int cur = parentPid;
         for (int depth = 0; cur > 0 && depth < 12; depth++)
         {
@@ -213,7 +234,7 @@ internal partial class Program
                 if (name == "claude" || name.StartsWith("claude"))
                     return "claude-desktop";
                 if (name == "codex" || title.Contains("Codex", StringComparison.OrdinalIgnoreCase))
-                    return "codex-desktop";   // standalone Codex Desktop app -> 코덳앱
+                    return "codex-desktop";
                 if (name == "cursor" || title.Contains("Cursor", StringComparison.OrdinalIgnoreCase))
                     return "cursor";
                 if (name == "copilot")
@@ -430,3 +451,4 @@ internal partial class Program
         }
     }
 }
+

@@ -178,8 +178,6 @@ internal partial class Program
 
         // Fallback: try file on disk
         var filePath = Path.Combine(AppContext.BaseDirectory, "Commands", "DashboardPage.html");
-        if (!File.Exists(filePath))
-            filePath = Path.Combine(Path.GetDirectoryName(asm.Location) ?? ".", "Commands", "DashboardPage.html");
         if (File.Exists(filePath))
         {
             _cachedDashHtml = File.ReadAllText(filePath, Encoding.UTF8);

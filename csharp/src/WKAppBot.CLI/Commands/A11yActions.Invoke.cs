@@ -133,7 +133,62 @@ internal partial class Program
             return true;
         }
 
-        // Tier 3: WM_LBUTTON / SendInput (via A11yClick) -- A11yClick populates _autoHealTiers itself
+        // Tier 2.5: UIA pattern fallback per ControlType standard.
+        // Before physical click, try the UIA pattern the element's type expects.
+        // Physical click is the last resort -- only for elements with no applicable pattern.
+        try
+        {
+            var ct = el.Properties.ControlType.ValueOrDefault;
+            // Toggle: CheckBox, ToggleButton
+            if (ct is FlaUI.Core.Definitions.ControlType.CheckBox
+                    or FlaUI.Core.Definitions.ControlType.Button)
+            {
+                var tog = el.Patterns.Toggle.PatternOrDefault;
+                if (tog != null)
+                {
+                    tog.Toggle();
+                    Console.WriteLine($"[A11Y] invoke -- UIA TogglePattern ({ct})");
+                    RecordTierSuccess(elHwnd, el, "invoke", $"UIA TogglePattern ({ct})", KnowhowCategory.Focusless);
+                    return true;
+                }
+            }
+            // Select: RadioButton, ListItem, TabItem, TreeItem, DataItem
+            if (ct is FlaUI.Core.Definitions.ControlType.RadioButton
+                    or FlaUI.Core.Definitions.ControlType.ListItem
+                    or FlaUI.Core.Definitions.ControlType.TabItem
+                    or FlaUI.Core.Definitions.ControlType.TreeItem
+                    or FlaUI.Core.Definitions.ControlType.DataItem)
+            {
+                var sel = el.Patterns.SelectionItem.PatternOrDefault;
+                if (sel != null)
+                {
+                    sel.Select();
+                    Console.WriteLine($"[A11Y] invoke -- UIA SelectionItemPattern ({ct})");
+                    RecordTierSuccess(elHwnd, el, "invoke", $"UIA SelectionItem ({ct})", KnowhowCategory.Focusless);
+                    return true;
+                }
+            }
+            // Expand: ComboBox, MenuItem (with submenu), TreeItem
+            if (ct is FlaUI.Core.Definitions.ControlType.ComboBox
+                    or FlaUI.Core.Definitions.ControlType.MenuItem
+                    or FlaUI.Core.Definitions.ControlType.TreeItem)
+            {
+                var exp = el.Patterns.ExpandCollapse.PatternOrDefault;
+                if (exp != null)
+                {
+                    exp.Expand();
+                    Console.WriteLine($"[A11Y] invoke -- UIA ExpandCollapsePattern ({ct})");
+                    RecordTierSuccess(elHwnd, el, "invoke", $"UIA ExpandCollapse ({ct})", KnowhowCategory.Focusless);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[A11Y] invoke -- UIA pattern fallback skipped: {ex.Message}");
+        }
+
+        // Tier 3: physical click (SendInput + click-through + focus restore) -- A11yClick handles all
         _autoHealTiers?.Add("Tier3: delegating to A11yClick (WM_LBUTTON -> physical)");
         return A11yClick(el, hwnd);
     }

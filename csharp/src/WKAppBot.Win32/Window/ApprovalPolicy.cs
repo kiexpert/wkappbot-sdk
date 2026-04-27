@@ -27,10 +27,10 @@ public static class ApprovalPolicy
         "approval-policy.json");
 
     public static bool AutoApproveAll => _policy.Value.AutoApproveAll;
-    public static bool IsAcceptCommand(string text) => MatchesExact(text, _policy.Value.AcceptKeywords);
-    public static bool IsPlanApprovalKeyword(string text) => MatchesExact(text, _policy.Value.PlanApprovalKeywords);
-    public static bool ContainsApprovalContext(string text) => ContainsAny(text, _policy.Value.ApprovalContextKeywords);
-    public static bool ContainsApprovalButtonText(string text) => ContainsAny(text, _policy.Value.ApprovalButtonKeywords);
+    public static bool IsAcceptCommand(string text) => MatchesExact(text, _policy.Value.AcceptKeywords ?? []);
+    public static bool IsPlanApprovalKeyword(string text) => MatchesExact(text, _policy.Value.PlanApprovalKeywords ?? []);
+    public static bool ContainsApprovalContext(string text) => ContainsAny(text, _policy.Value.ApprovalContextKeywords ?? []);
+    public static bool ContainsApprovalButtonText(string text) => ContainsAny(text, _policy.Value.ApprovalButtonKeywords ?? []);
 
     private static ApprovalPolicyData LoadPolicy()
     {

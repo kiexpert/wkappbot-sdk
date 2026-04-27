@@ -1,6 +1,7 @@
 using System.Text.Json;
 using WKAppBot.Core.Runner;
 using WKAppBot.Win32.Native;
+using WKAppBot.Win32.Window;
 
 namespace WKAppBot.CLI;
 
@@ -170,6 +171,50 @@ internal partial class Program
 
     static (int hostPid, string hostName, string hostTitle) FindLogicalHost(int selfPid, int directParentPid)
     {
+        try
+        {
+            var callerHwnd = EyeCmdPipeServer.CallerHwnd.Value;
+            if (callerHwnd.HasValue && callerHwnd.Value != IntPtr.Zero)
+            {
+                var prompt = FindKnownPromptInfoByHwnd(callerHwnd.Value);
+                if (prompt != null)
+                {
+                    NativeMethods.GetWindowThreadProcessId(prompt.WindowHandle, out uint promptPid);
+                    return ((int)promptPid, prompt.HostType ?? "unknown", prompt.WindowTitle ?? "");
+                }
+            }
+
+            var callerCwd = EyeCmdPipeServer.CallerCwd.Value;
+            if (!string.IsNullOrWhiteSpace(callerCwd))
+            {
+                var match = GetKnownPromptInfos().FirstOrDefault(p =>
+                {
+                    if (ClaudePromptHelper.IsVsCodeHostType(p.HostType))
+                    {
+                        var pCwd = ExtractCwdFromVsCodeTitle(p.WindowTitle);
+                        return !string.IsNullOrEmpty(pCwd) &&
+                               string.Equals(pCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    if (string.Equals(p.HostType, "codex-desktop", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pCwd = ExtractCwdFromCodexWindow(p.WindowHandle);
+                        return !string.IsNullOrEmpty(pCwd) &&
+                               string.Equals(pCwd.TrimEnd('\\', '/'), callerCwd.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase);
+                    }
+
+                    return false;
+                });
+
+                if (match != null)
+                {
+                    NativeMethods.GetWindowThreadProcessId(match.WindowHandle, out uint promptPid);
+                    return ((int)promptPid, match.HostType ?? "unknown", match.WindowTitle ?? "");
+                }
+            }
+        }
+        catch { }
+
         static bool IsShell(string n)
         {
             var x = (n ?? "").ToLowerInvariant();
@@ -188,6 +233,11 @@ internal partial class Program
                 var p = System.Diagnostics.Process.GetProcessById(cur);
                 var name = p.ProcessName ?? "unknown";
                 var title = GetMainWindowTitleSafe(p);
+
+                // Codex often runs as a headless CLI host, so do not require a
+                // visible window title before recognizing it as the logical host.
+                if (name.Equals("codex", StringComparison.OrdinalIgnoreCase))
+                    return (cur, name, title);
 
                 if (!IsShell(name) && !string.IsNullOrWhiteSpace(title))
                     return (cur, name, title);

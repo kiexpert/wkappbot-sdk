@@ -15,14 +15,18 @@ internal partial class Program
     {
         using var focusSentinel = new FocusStealSentinel("a11y-screenshot");
         if (args.Length == 0)
-            return Error(@"Usage: appbot capture <window-title> [-o output.png] [--form <form-id>] [--no-learn]
-  --form <id>: Capture a specific MDI child form (brings it to front first).
-  --no-learn:  Skip per-control experience DB learning.");
+            return Error(@"Usage: wkappbot a11y screenshot <grap> [-o output.png] [--out output.png] [--stdout] [--form <form-id>] [--no-learn]
+  -o / --out <path>: Save PNG to given path (default: experience/<proc>/<class>/capture_<ts>.png).
+  --stdout:         Write raw PNG bytes to stdout (for subprocess capture_output=True).
+  --form <id>:      Capture a specific MDI child form (brings it to front first).
+  --no-learn:       Skip per-control experience DB learning.
+  Last stdout line: SAVED:<abs-path> for scripting.");
 
         string title = args[0];
-        string? output = GetArgValue(args, "-o");
+        string? output = GetArgValue(args, "-o") ?? GetArgValue(args, "--out");
         string? formId = GetArgValue(args, "--form");
         bool skipLearn = args.Any(a => a.Equals("--no-learn", StringComparison.OrdinalIgnoreCase));
+        bool stdoutMode = args.Any(a => a.Equals("--stdout", StringComparison.OrdinalIgnoreCase));
 
         // Ambiguity-guard + readiness Probe (magnifier) on the target.
         var win = ResolveA11yTarget(title, "screenshot");
@@ -68,16 +72,32 @@ internal partial class Program
             Thread.Sleep(200); // let repaint happen
 
             // Capture the MDI child window directly
-            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(form.Handle);
-            WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, output);
-            Console.WriteLine($"Saved: {Path.GetFullPath(output)} ({bmp.Width}x{bmp.Height})");
+            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(form.Handle, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = false,
+                StepLogger = msg => PulseStep.Line(msg),
+            });
+            if (bmp == null)
+            {
+                Console.Error.WriteLine("[CAPTURE] Capture failed.");
+                return 1;
+            }
+            SaveCaptureResult(bmp, output, stdoutMode);
         }
         else
         {
             Console.WriteLine($"Capturing: {win}");
-            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
-            WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, output);
-            Console.WriteLine($"Saved: {Path.GetFullPath(output)} ({bmp.Width}x{bmp.Height})");
+            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = false,
+                StepLogger = msg => PulseStep.Line(msg),
+            });
+            if (bmp == null)
+            {
+                Console.Error.WriteLine("[CAPTURE] Capture failed.");
+                return 1;
+            }
+            SaveCaptureResult(bmp, output, stdoutMode);
         }
 
         // Per-control experience learning (auto when profile exists)
@@ -111,6 +131,9 @@ internal partial class Program
             catch { /* best-effort */ }
         }
 
+        NativeMethods.GetWindowThreadProcessId(win.Handle, out uint endPid);
+        string endProc = ""; try { endProc = System.Diagnostics.Process.GetProcessById((int)endPid).ProcessName; } catch { }
+        Console.WriteLine($"# END {BuildStableGrap(win.Handle, endProc)}");
         return 0;
     }
 
@@ -130,6 +153,7 @@ internal partial class Program
 
         System.Drawing.Bitmap screenshot;
         string sourceDesc;
+        IntPtr ocrWinHandle = IntPtr.Zero;
 
         // Check if target is an image file
         if (File.Exists(target) && (target.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
@@ -144,8 +168,20 @@ internal partial class Program
             // Treat as window title -- ambiguity-guard + readiness Probe (magnifier).
             var win = ResolveA11yTarget(target, "ocr");
             if (win == null) return 1;
+            ocrWinHandle = win.Handle;
             Console.WriteLine($"Capturing: {win}");
-            screenshot = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle);
+            var capOpts = new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            };
+            var maybeShot = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(win.Handle, capOpts);
+            if (maybeShot == null)
+            {
+                Console.Error.WriteLine("[OCR] Capture returned blank -- window may be minimized or occluded");
+                return 1;
+            }
+            screenshot = maybeShot;
             sourceDesc = win.Title;
         }
 
@@ -219,7 +255,31 @@ internal partial class Program
             }
         }
 
+        if (ocrWinHandle != IntPtr.Zero)
+        {
+            NativeMethods.GetWindowThreadProcessId(ocrWinHandle, out uint ocrEndPid);
+            string ocrEndProc = ""; try { ocrEndProc = System.Diagnostics.Process.GetProcessById((int)ocrEndPid).ProcessName; } catch { }
+            Console.WriteLine($"# END {BuildStableGrap(ocrWinHandle, ocrEndProc)}");
+        }
         return 0;
+    }
+
+    static void SaveCaptureResult(System.Drawing.Bitmap bmp, string? outputPath, bool stdoutMode)
+    {
+        if (stdoutMode)
+        {
+            using var ms = new System.IO.MemoryStream();
+            bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+            var bytes = ms.ToArray();
+            using var stdout = Console.OpenStandardOutput();
+            stdout.Write(bytes, 0, bytes.Length);
+            Console.Error.WriteLine($"[CAPTURE] {bmp.Width}x{bmp.Height} PNG -> stdout ({bytes.Length} bytes)");
+            return;
+        }
+        WKAppBot.Win32.Input.ScreenCapture.SaveToFile(bmp, outputPath!);
+        var abs = Path.GetFullPath(outputPath!);
+        Console.Error.WriteLine($"[CAPTURE] {bmp.Width}x{bmp.Height} saved");
+        Console.WriteLine($"SAVED:{abs}");
     }
 
     static void PrintOcrLine(List<WKAppBot.Vision.OcrWord> words)

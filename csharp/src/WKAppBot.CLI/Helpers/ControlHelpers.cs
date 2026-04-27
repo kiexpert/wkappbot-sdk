@@ -225,8 +225,12 @@ internal partial class Program
             }
 
             // Fallback: OCR the window
-            using var bmp = ScreenCapture.CaptureWindow(hWnd);
-            if (bmp.Width < 30 || bmp.Height < 30) return null;
+            using var bmp = ScreenCapture.CaptureWindow(hWnd, new CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
+            if (bmp == null || bmp.Width < 30 || bmp.Height < 30) return null;
 
             var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
             var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
@@ -344,8 +348,12 @@ internal partial class Program
         {
             try
             {
-                using var bmp = ScreenCapture.CaptureWindow(hDialog);
-                if (bmp.Width > 20 && bmp.Height > 20)
+                using var bmp = ScreenCapture.CaptureWindow(hDialog, new CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
+                if (bmp != null && bmp.Width > 20 && bmp.Height > 20)
                 {
                     var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
                     var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";
@@ -646,8 +654,12 @@ params:
         {
             try
             {
-                using var bmp = ScreenCapture.CaptureWindow(hDialog);
-                if (bmp.Width > 20 && bmp.Height > 20)
+                using var bmp = ScreenCapture.CaptureWindow(hDialog, new CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
+                if (bmp != null && bmp.Width > 20 && bmp.Height > 20)
                 {
                     var ocrLangs = SimpleOcrAnalyzer.GetAvailableLanguages();
                     var lang = ocrLangs.Contains("ko") ? "ko" : ocrLangs.FirstOrDefault() ?? "en-US";

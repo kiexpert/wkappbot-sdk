@@ -826,6 +826,12 @@ Usage:
   wkappbot file glob --pattern <glob> [--path dir]
       Find files. Supports ** for recursive.
 
+  wkappbot file symlink <target> <linkname>
+      Create a symbolic link. Works for files and directories.
+
+  wkappbot file link <target> <linkname>
+      Create a hard link. Files only, same volume. Requires admin for cross-dir.
+
 Examples:
   wkappbot file read legacy.cpp --encoding 949
   wkappbot file read-pdf report.pdf --pages 1-10

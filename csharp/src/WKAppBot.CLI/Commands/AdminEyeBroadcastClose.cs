@@ -23,7 +23,7 @@ namespace WKAppBot.CLI;
 internal static class AdminEyeBroadcastClose
 {
     public const string EventName = "Global\\WKAppBotAdminEyeBroadcastClose";
-    public const string AdminPipePath = @"\\.\pipe\wkappbot_elevated";
+    public static readonly string AdminPipePath = $@"\\.\pipe\wkappbot_elevated_{ProjectRoot.Hash8()}";
 
     /// <summary>
     /// Fire a broadcast-close event, wait for old admin Eye(s) to release the pipe, return.
@@ -113,8 +113,9 @@ internal static class AdminEyeBroadcastClose
     }
 
     /// <summary>
-    /// Background listener: when the broadcast event fires, cancels the given CTS.
-    /// Old admin Eye uses this to self-terminate gracefully when a newer admin takes over.
+    /// Background listener: when the broadcast event fires, checks if the incoming Eye is also
+    /// admin-elevated. If not, performs a succession hot-swap -- spawns a new admin Eye from
+    /// the latest binary (no UAC needed: already elevated) before exiting.
     /// </summary>
     public static void StartListener(CancellationTokenSource cts)
     {
@@ -127,7 +128,8 @@ internal static class AdminEyeBroadcastClose
                 {
                     if (ev.WaitOne(500))
                     {
-                        Console.Error.WriteLine("[EYE:ADMIN-CLOSE] broadcast received -- initiating graceful exit");
+                        Console.Error.WriteLine("[EYE:ADMIN-CLOSE] broadcast received -- checking successor elevation");
+                        TrySuccessionHotSwap();
                         cts.Cancel();
                         break;
                     }
@@ -135,5 +137,70 @@ internal static class AdminEyeBroadcastClose
             }
             catch { /* event handle invalidated -- stop watching silently */ }
         });
+    }
+
+    /// <summary>
+    /// After receiving a close signal, wait for the successor Eye to stabilize, then check
+    /// whether it is admin-elevated. If not, spawn a new admin Eye from the latest binary
+    /// (elevation is inherited -- no UAC prompt since we are already running as admin).
+    /// </summary>
+    static void TrySuccessionHotSwap(int waitMs = 3000)
+    {
+        Thread.Sleep(waitMs); // let successor Eye establish itself
+
+        // Check if any running Eye is elevated
+        bool adminSuccessorFound = false;
+        int myPid = Environment.ProcessId;
+        foreach (var p in System.Diagnostics.Process.GetProcessesByName("wkappbot-core"))
+        {
+            if (p.Id == myPid) { p.Dispose(); continue; }
+            try
+            {
+                var cmd = WKAppBot.Win32.Native.NativeMethods.GetProcessCommandLine(p.Id) ?? "";
+                if (cmd.Contains(" eye --elevated", StringComparison.OrdinalIgnoreCase)
+                    || cmd.EndsWith(" eye --elevated", StringComparison.OrdinalIgnoreCase))
+                {
+                    adminSuccessorFound = true;
+                    p.Dispose();
+                    break;
+                }
+            }
+            catch { }
+            finally { try { p.Dispose(); } catch { } }
+        }
+
+        if (adminSuccessorFound)
+        {
+            Console.Error.WriteLine("[EYE:ADMIN-CLOSE] admin successor confirmed -- clean handoff");
+            return;
+        }
+
+        Console.Error.WriteLine("[EYE:ADMIN-CLOSE] successor is not admin -- attempting succession hot-swap");
+        try
+        {
+            var exePath = Environment.ProcessPath ?? "wkappbot-core.exe";
+            var exeDir  = Path.GetDirectoryName(exePath) ?? ".";
+
+            // Promote .new.exe if pending (same logic as LaunchElevatedEye pre-spawn swap)
+            var newExe = Path.Combine(exeDir, "wkappbot-core.new.exe");
+            if (File.Exists(newExe))
+            {
+                var backup = Path.Combine(exeDir, $"wkappbot-core.old-succession-{DateTime.Now:yyyyMMdd-HHmmss}.exe");
+                try { File.Move(exePath, backup); } catch { }
+                try { File.Move(newExe, exePath); Console.Error.WriteLine("[EYE:ADMIN-CLOSE] promoted .new.exe for succession"); } catch { }
+            }
+
+            // Spawn elevated without UAC -- inherits elevation token from this process
+            var psi = new System.Diagnostics.ProcessStartInfo(exePath, "eye --elevated")
+            {
+                UseShellExecute = false,
+            };
+            System.Diagnostics.Process.Start(psi);
+            Console.Error.WriteLine("[EYE:ADMIN-CLOSE] succession admin Eye spawned -- elevation preserved");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[EYE:ADMIN-CLOSE] succession spawn failed: {ex.Message}");
+        }
     }
 }

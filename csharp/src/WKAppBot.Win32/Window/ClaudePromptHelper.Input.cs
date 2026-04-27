@@ -859,7 +859,7 @@ public sealed partial class ClaudePromptHelper
     /// Use with 'using' around any SetClipboardText + paste sequence to protect user's clipboard.
     /// If save fails (clipboard locked etc.) -> blocks SetClipboardText to avoid silent data loss.
     /// </summary>
-    internal sealed class ClipboardGuard : IDisposable
+    public sealed class ClipboardGuard : IDisposable
     {
         private readonly string? _saved;
         private readonly bool _saveOk;

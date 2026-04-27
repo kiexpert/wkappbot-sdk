@@ -445,8 +445,12 @@ internal partial class Program
     {
         try
         {
-            using var bmp = ScreenCapture.CaptureWindow(hWnd);
-            if (bmp == null || ScreenCapture.IsBlankBitmap(bmp)) return null;
+            using var bmp = ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
+            if (bmp == null) return null;
 
             // Fast hash: lock bits and compute SHA256 over raw pixel data
             var rect = new System.Drawing.Rectangle(0, 0, bmp.Width, bmp.Height);

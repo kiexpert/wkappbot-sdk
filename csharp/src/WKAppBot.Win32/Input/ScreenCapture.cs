@@ -8,8 +8,17 @@ namespace WKAppBot.Win32.Input;
 /// Screen and window capture.
 /// Handles dual-monitor with negative coordinates correctly.
 /// </summary>
-public static class ScreenCapture
+public static partial class ScreenCapture
 {
+    /// <summary>
+    /// Optional step-level logger for capture diagnostics.
+    /// Wire to PulseStep.Line in CLI layer; defaults to Console.Error.WriteLine.
+    /// </summary>
+    public static Action<string>? StepLogger { get; set; }
+
+    private static void Log(string msg)
+        => (StepLogger ?? Console.Error.WriteLine)($"[CAPTURE] {msg}");
+
     /// <summary>
     /// Capture a specific window's client area.
     /// Falls back to screen-region capture if PrintWindow fails (common with HTS).
@@ -22,7 +31,10 @@ public static class ScreenCapture
         int h = rect.Height;
         if (w <= 0 || h <= 0) throw new InvalidOperationException("Window has zero size");
 
-        // Try PrintWindow first (works for most apps)
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        // Step 1: PrintWindow PW_RENDERFULLCONTENT (focusless, zero side effects)
+        Log($"step=1 PrintWindow hwnd=0x{hWnd:X} size={w}x{h}");
         var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
         using (var g = Graphics.FromImage(bmp))
         {
@@ -31,248 +43,97 @@ public static class ScreenCapture
             g.ReleaseHdc(hdc);
 
             if (ok && !IsBlankBitmap(bmp))
+            {
+                Log($"step=1 PrintWindow OK ({sw.ElapsedMilliseconds}ms)");
                 return bmp;
+            }
+            Log($"step=1 PrintWindow BLANK ok={ok} ({sw.ElapsedMilliseconds}ms) -> step2");
         }
         bmp.Dispose();
 
-        // Fallback: bring window to front -> capture from screen -> restore Z-order
-        // (Prevents overlapping windows from appearing in the screenshot)
-        return CaptureWindowWithBringToFront(hWnd);
-    }
-
-    /// <summary>
-    /// PrintWindow-only capture -- NO BringToFront fallback.
-    /// Returns null if PrintWindow fails (blank bitmap).
-    /// Designed for live preview where skipping a frame is acceptable (~200ms until next attempt).
-    /// Cost: ~5-15ms vs ~200ms+ with BringToFront fallback.
-    /// </summary>
-    public static Bitmap? TryPrintWindowOnly(IntPtr hWnd)
-    {
-        NativeMethods.GetWindowRect(hWnd, out var rect);
-        int w = rect.Width;
-        int h = rect.Height;
-        if (w <= 0 || h <= 0) return null;
-
-        var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(bmp))
+        // Step 2: Z-order BringToFront (SWP_NOACTIVATE -- no focus steal)
+        sw.Restart();
+        Log("step=2 BringToFront SWP_NOACTIVATE");
+        var step2 = CaptureWindowWithBringToFront(hWnd);
+        if (!IsBlankBitmap(step2))
         {
-            IntPtr hdc = g.GetHdc();
-            bool ok = NativeMethods.PrintWindow(hWnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
-            g.ReleaseHdc(hdc);
-
-            if (ok && !IsBlankBitmap(bmp))
-                return bmp;
+            Log($"step=2 BringToFront OK ({sw.ElapsedMilliseconds}ms)");
+            return step2;
         }
-        bmp.Dispose();
-        return null; // Skip this frame -- caller will retry in ~200ms
+        step2.Dispose();
+        Log($"step=2 BringToFront BLANK ({sw.ElapsedMilliseconds}ms) -> step3");
+
+        // Step 3: Hide covering windows via alpha=0 (no focus steal, works for elevated targets)
+        sw.Restart();
+        Log("step=3 HideOverlays alpha=0");
+        var step3 = CaptureWindowHideOverlays(hWnd);
+        if (step3 != null && !IsBlankBitmap(step3))
+        {
+            Log($"step=3 HideOverlays OK ({sw.ElapsedMilliseconds}ms)");
+            return step3;
+        }
+        step3?.Dispose();
+        Log($"step=3 HideOverlays BLANK/SKIP ({sw.ElapsedMilliseconds}ms) -> step4");
+
+        // Step 4: Focus borrow (last resort -- SetForegroundWindow briefly then restore)
+        sw.Restart();
+        Log("step=4 FocusBorrow SetForegroundWindow");
+        var step4 = CaptureWindowWithFocusBorrow(hWnd);
+        Log($"step=4 FocusBorrow done blank={IsBlankBitmap(step4)} ({sw.ElapsedMilliseconds}ms)");
+        return step4;
     }
 
     /// <summary>
-    /// Capture window by temporarily bringing it to Z-order top.
-    /// Uses SWP_NOACTIVATE to avoid stealing focus from the user.
-    /// Used when PrintWindow fails (common with HTS MFC apps).
+    /// Options-aware capture overload. Wraps <see cref="CaptureWindow(IntPtr)"/> and adds:
+    ///   * blank-rejection (returns null when <see cref="CaptureOptions.RejectBlank"/> is true and result is blank)
+    ///   * debug save-to-disk (<see cref="CaptureOptions.SaveDebug"/>)
+    ///   * per-call step logger (temporarily swaps <see cref="StepLogger"/>).
+    /// Thread-note: StepLogger is a static field; this method restores the prior value in a finally block,
+    /// but concurrent callers can race. Acceptable for current single-threaded capture call sites.
     /// </summary>
-    private static Bitmap CaptureWindowWithBringToFront(IntPtr hWnd)
+    public static Bitmap? CaptureWindow(IntPtr hWnd, CaptureOptions options)
     {
-        var originalFg = NativeMethods.GetForegroundWindow();
-        bool needsRestore = originalFg != IntPtr.Zero && originalFg != hWnd;
-
+        options ??= CaptureOptions.Default;
+        var prevLogger = StepLogger;
+        if (options.StepLogger != null) StepLogger = options.StepLogger;
         try
         {
-            // Bring target window to Z-order top without activating (no focus steal)
-            NativeMethods.SetWindowPos(
-                hWnd, NativeMethods.HWND_TOP,
-                0, 0, 0, 0,
-                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
-                NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
+            Bitmap result;
+            try
+            {
+                result = CaptureWindow(hWnd);
+            }
+            catch (Exception ex)
+            {
+                Log($"options=capture failed: {ex.Message}");
+                return null;
+            }
 
-            // Wait for window to render on top
-            Thread.Sleep(100);
+            if (options.RejectBlank && IsBlankBitmap(result))
+            {
+                Log("options=RejectBlank -> BLANK result discarded");
+                result.Dispose();
+                return null;
+            }
 
-            // Re-read rect (in case the window was moved)
-            NativeMethods.GetWindowRect(hWnd, out var rect);
-            return CaptureScreenRegion(rect.Left, rect.Top, rect.Width, rect.Height);
+            if (!string.IsNullOrEmpty(options.SaveDebug))
+            {
+                try
+                {
+                    SaveToFile(result, options.SaveDebug);
+                    Log($"options=SaveDebug wrote {options.SaveDebug}");
+                }
+                catch (Exception ex)
+                {
+                    Log($"options=SaveDebug FAILED: {ex.Message}");
+                }
+            }
+
+            return result;
         }
         finally
         {
-            // Restore original foreground window to Z-order top (best-effort)
-            if (needsRestore)
-            {
-                NativeMethods.SetWindowPos(
-                    originalFg, NativeMethods.HWND_TOP,
-                    0, 0, 0, 0,
-                    NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE |
-                    NativeMethods.SWP_SHOWWINDOW | NativeMethods.SWP_NOACTIVATE);
-            }
+            StepLogger = prevLogger;
         }
-    }
-
-    /// <summary>
-    /// Check if a bitmap is blank (all-black or nearly uniform).
-    /// Samples 9 points (3x3 grid) -- if ALL are (0,0,0), the capture failed.
-    /// Important: bad screenshots pollute ExperienceDB and mislead future Claude sessions.
-    /// </summary>
-    public static bool IsBlankBitmap(Bitmap bmp)
-    {
-        if (bmp.Width <= 0 || bmp.Height <= 0) return true;
-
-        // Sample 9 points in a 3x3 grid (avoids center-only false positives)
-        int[] xs = { bmp.Width / 4, bmp.Width / 2, bmp.Width * 3 / 4 };
-        int[] ys = { bmp.Height / 4, bmp.Height / 2, bmp.Height * 3 / 4 };
-
-        foreach (int x in xs)
-        {
-            foreach (int y in ys)
-            {
-                if (x >= bmp.Width || y >= bmp.Height) continue;
-                var p = bmp.GetPixel(x, y);
-                if (p.R != 0 || p.G != 0 || p.B != 0)
-                    return false; // At least one non-black pixel -> not blank
-            }
-        }
-        return true; // All 9 sample points are black -> blank capture
-    }
-
-    /// <summary>
-    /// Capture a sub-region of a window via PrintWindow + GDI viewport offset.
-    /// Creates only a regionWidth×regionHeight bitmap instead of the full window.
-    /// Falls back to full PrintWindow + CropRegion if viewport trick fails.
-    ///
-    /// Performance: Allocates only the needed bitmap size. On non-MFC apps this can be
-    /// significantly faster. On MFC apps the bottleneck is WM_PRINT message processing
-    /// (1000ms+) regardless of bitmap size, so savings are in GDI rendering + allocation only.
-    ///
-    /// Parameters: regionX/Y are relative to the window's top-left corner (not screen coordinates).
-    /// </summary>
-    public static Bitmap? CaptureWindowRegion(IntPtr hWnd, int regionX, int regionY,
-        int regionWidth, int regionHeight)
-    {
-        NativeMethods.GetWindowRect(hWnd, out var rect);
-        if (rect.Width <= 0 || rect.Height <= 0) return null;
-
-        // Clamp region to window bounds
-        if (regionX < 0) { regionWidth += regionX; regionX = 0; }
-        if (regionY < 0) { regionHeight += regionY; regionY = 0; }
-        if (regionX + regionWidth > rect.Width) regionWidth = rect.Width - regionX;
-        if (regionY + regionHeight > rect.Height) regionHeight = rect.Height - regionY;
-        if (regionWidth <= 0 || regionHeight <= 0) return null;
-
-        // Strategy 1: Small bitmap + viewport offset (GDI renders only needed region)
-        var bmp = new Bitmap(regionWidth, regionHeight, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            IntPtr hdc = g.GetHdc();
-
-            // Shift viewport so window's (regionX, regionY) maps to bitmap's (0, 0)
-            NativeMethods.SetViewportOrgEx(hdc, -regionX, -regionY, out _);
-
-            // Set clip region to ensure only our target area is rendered
-            IntPtr hRgn = NativeMethods.CreateRectRgn(regionX, regionY,
-                regionX + regionWidth, regionY + regionHeight);
-            NativeMethods.SelectClipRgn(hdc, hRgn);
-            NativeMethods.DeleteObject(hRgn);
-
-            bool ok = NativeMethods.PrintWindow(hWnd, hdc, NativeMethods.PW_RENDERFULLCONTENT);
-
-            // Reset viewport origin before releasing HDC
-            NativeMethods.SetViewportOrgEx(hdc, 0, 0, out _);
-            g.ReleaseHdc(hdc);
-
-            if (ok && !IsBlankBitmap(bmp))
-                return bmp;
-        }
-        bmp.Dispose();
-
-        // Strategy 2: Full PrintWindow + CropRegion (fallback if viewport trick fails)
-        try
-        {
-            using var fullBmp = TryPrintWindowOnly(hWnd);
-            if (fullBmp != null)
-                return CropRegion(fullBmp, regionX, regionY, regionWidth, regionHeight);
-        }
-        catch { }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Crop a sub-region from an existing bitmap (e.g., extract control from form capture).
-    /// Clamps the crop region to the bitmap bounds to avoid OutOfMemory on edge controls.
-    /// </summary>
-    public static Bitmap CropRegion(Bitmap source, int x, int y, int width, int height)
-    {
-        // Clamp to source bounds
-        if (x < 0) { width += x; x = 0; }
-        if (y < 0) { height += y; y = 0; }
-        if (x + width > source.Width) width = source.Width - x;
-        if (y + height > source.Height) height = source.Height - y;
-        if (width <= 0 || height <= 0)
-            throw new ArgumentException($"Crop region is empty after clamping: ({x},{y} {width}x{height}) from {source.Width}x{source.Height}");
-
-        var cropRect = new Rectangle(x, y, width, height);
-        return source.Clone(cropRect, source.PixelFormat);
-    }
-
-    /// <summary>
-    /// Capture a region of the virtual screen.
-    /// Handles negative coordinates for dual-monitor setups.
-    /// </summary>
-    public static Bitmap CaptureScreenRegion(int x, int y, int width, int height)
-    {
-        var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.CopyFromScreen(x, y, 0, 0, new Size(width, height), CopyPixelOperation.SourceCopy);
-        }
-        return bmp;
-    }
-
-    /// <summary>
-    /// Capture the entire virtual desktop (all monitors).
-    /// </summary>
-    public static Bitmap CaptureFullScreen()
-    {
-        int x = NativeMethods.GetSystemMetrics(76);  // SM_XVIRTUALSCREEN
-        int y = NativeMethods.GetSystemMetrics(77);  // SM_YVIRTUALSCREEN
-        int w = NativeMethods.GetSystemMetrics(78);  // SM_CXVIRTUALSCREEN
-        int h = NativeMethods.GetSystemMetrics(79);  // SM_CYVIRTUALSCREEN
-        return CaptureScreenRegion(x, y, w, h);
-    }
-
-    /// <summary>
-    /// Save bitmap to file (PNG or JPEG based on extension).
-    /// </summary>
-    public static void SaveToFile(Bitmap bmp, string filePath)
-    {
-        var dir = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        var ext = Path.GetExtension(filePath).ToLowerInvariant();
-        var format = ext switch
-        {
-            ".jpg" or ".jpeg" => ImageFormat.Jpeg,
-            ".bmp" => ImageFormat.Bmp,
-            _ => ImageFormat.Png,
-        };
-        bmp.Save(filePath, format);
-    }
-
-    /// <summary>
-    /// Convert bitmap to PNG byte array (for Vision API).
-    /// </summary>
-    public static byte[] ToPngBytes(Bitmap bmp)
-    {
-        using var ms = new MemoryStream();
-        bmp.Save(ms, ImageFormat.Png);
-        return ms.ToArray();
-    }
-
-    /// <summary>
-    /// Convert bitmap to base64-encoded PNG string (for Vision API).
-    /// </summary>
-    public static string ToPngBase64(Bitmap bmp)
-    {
-        return Convert.ToBase64String(ToPngBytes(bmp));
     }
 }

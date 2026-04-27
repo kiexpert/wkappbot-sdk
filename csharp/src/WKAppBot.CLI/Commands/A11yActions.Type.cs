@@ -152,6 +152,8 @@ internal partial class Program
             return false; // parentHwnd 없음
         }
 
+        Console.Error.WriteLine($"[A11Y] type -- entry hwnd=0x{hwnd:X} el={el?.Properties.Name.ValueOrDefault ?? "?"}");
+
         // Check terminal type for input strategy
         var winClass = WindowFinder.GetClassName(hwnd);
         bool isConPtyTerminal = ConPtyTerminalClasses.Contains(winClass);
@@ -165,11 +167,91 @@ internal partial class Program
         bool isElectronTerminal = winClass == "Chrome_WidgetWin_1"
             && (typeProcName.Equals("Code", StringComparison.OrdinalIgnoreCase)
                 || typeProcName.Equals("Codex", StringComparison.OrdinalIgnoreCase));
+        Console.Error.WriteLine($"[A11Y] type -- winClass={winClass} proc={typeProcName} isET={isElectronTerminal}");
+
+        // Chrome/Electron: hotkey tokens need CDP dispatch -- clipboard paste would type them literally
+        if (winClass == "Chrome_WidgetWin_1")
+        {
+            var htoken = TryParseHotkeyToken(text);
+            if (htoken.HasValue)
+            {
+                var (hKey, hCode, hVk) = htoken.Value;
+                if (TryCdpDispatchKeySync(typePid, hKey, hCode, hVk))
+                    return true;
+                // VS Code Claude Code: try renderer WM_KEYDOWN first (focusless), then Escape+Enter
+                if (hVk == 13 && isElectronTerminal)
+                {
+                    if (TryElectronRendererEnter(hwnd))
+                        return true;
+                    // Title-bar click required: Electron multi-window can't transfer keyboard focus via API alone
+                    Console.Error.WriteLine("[A11Y] type {Enter} -- VS Code: titlebar click + Escape + Enter");
+                    NativeMethods.SmartSetForegroundWindow(hwnd);
+                    NativeMethods.GetWindowRect(hwnd, out var wr);
+                    WKAppBot.Win32.Input.MouseInput.Click(wr.Left + wr.Width / 2, wr.Top + 15);
+                    Thread.Sleep(150);
+                    WKAppBot.Win32.Input.KeyboardInput.PressKey("escape");
+                    Thread.Sleep(100);
+                    WKAppBot.Win32.Input.KeyboardInput.PressKey("enter");
+                    return true;
+                }
+                Console.Error.WriteLine($"[A11Y] type -- CDP hotkey {text} failed, using SendInput");
+                NativeMethods.SmartSetForegroundWindow(hwnd);
+                Thread.Sleep(100);
+                WKAppBot.Win32.Input.KeyboardInput.SendKeys(text, hwnd,
+                    new WKAppBot.Win32.Input.KeyboardInput.TypeInputContext
+                    { IntendedHwnd = hwnd, UserInputWait = new UserInputWaitAdapter() });
+                return true;
+            }
+        }
+
         if (isElectronTerminal)
         {
+            // Tier 0a: TP2 via FocusedElement -- instant, no tree walk (only if message input already focused)
+            if (TryElectronTextPattern2Type(hwnd, text))
+                return true;
+
+            // Tier 0b: TP2 via FindFirst(ControlType.Edit, Name="Message input") -- truly focusless.
+            // Works even when message input is not the currently focused element.
+            if (TryElectronTP2FindFirst(hwnd, text))
+                return true;
+
+            // TP2FindFirst may insert text but throw on return (COM exception after insertion).
+            // Verify via TextPattern (reflects InsertTextAtSelection; Value may lag).
+            // If text already present, skip clipboard to prevent double-typing.
             try
             {
-                // Clipboard requires STA thread -- run on dedicated STA thread if needed
+                Thread.Sleep(50); // brief yield for DOM update
+                using var checkUia = new FlaUI.UIA3.UIA3Automation();
+                var checkRoot = checkUia.FromHandle(hwnd);
+                var checkEl = checkRoot?.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants,
+                    new FlaUI.Core.Conditions.AndCondition(
+                        checkUia.ConditionFactory.ByControlType(FlaUI.Core.Definitions.ControlType.Edit),
+                        checkUia.ConditionFactory.ByName("Message input")));
+                if (checkEl != null)
+                {
+                    // Prefer TextPattern (reflects InsertTextAtSelection) over Value
+                    string current = "";
+                    try
+                    {
+                        if (checkEl.Patterns.Text.IsSupported)
+                            current = checkEl.Patterns.Text.Pattern.DocumentRange.GetText(-1) ?? "";
+                    }
+                    catch { }
+                    if (string.IsNullOrEmpty(current) && checkEl.Patterns.Value.IsSupported)
+                        try { current = checkEl.Patterns.Value.Pattern.Value.Value ?? ""; } catch { }
+
+                    if (current.Contains(text))
+                    {
+                        Console.Error.WriteLine($"[A11Y] type -- TP2-find already inserted, skip clipboard");
+                        return true;
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                // Clipboard requires STA thread -- set up BEFORE clicking so paste is ready
                 bool clipOk = false;
                 var prevClip = "";
                 void DoClipboard()
@@ -189,10 +271,99 @@ internal partial class Program
                 }
                 if (!clipOk) throw new Exception("Clipboard STA thread failed");
 
-                NativeMethods.SmartSetForegroundWindow(hwnd);
-                Thread.Sleep(200);
+                // Determine click target: prefer el BoundingRectangle; fallback to WKAppBot_FocusRect property
+                System.Drawing.Rectangle clickRect = default;
+                string clickSrc = "none";
+                System.Drawing.Rectangle elRect0 = default;
+                try { if (el != null) elRect0 = el.Properties.BoundingRectangle.ValueOrDefault; } catch { }
+                if (elRect0.Width > 0 && elRect0.Height > 0)
+                {
+                    clickRect = elRect0;
+                    try { clickSrc = $"el({el!.Properties.ControlType.ValueOrDefault})"; } catch { clickSrc = "el"; }
+                }
+                else
+                {
+                    // Fallback: read WKAppBot_FocusRect property (stored by focus tracker -- physical coords)
+                    try
+                    {
+                        var ra = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusRect");
+                        if (ra != IntPtr.Zero)
+                        {
+                            var rsb = new System.Text.StringBuilder(64);
+                            NativeMethods.GlobalGetAtomNameW((ushort)ra.ToInt32(), rsb, 64);
+                            var pts = rsb.ToString().Split(',');
+                            if (pts.Length == 4 && int.TryParse(pts[0], out int rx) && int.TryParse(pts[1], out int ry)
+                                && int.TryParse(pts[2], out int rw) && int.TryParse(pts[3], out int rh) && rw > 0)
+                            {
+                                clickRect = new System.Drawing.Rectangle(rx, ry, rw, rh);
+                                clickSrc = "WKAppBot_FocusRect";
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                Console.WriteLine($"[TYPE] click target: src={clickSrc} rect=({clickRect.X},{clickRect.Y} {clickRect.Width}x{clickRect.Height})");
+
+                // Foreground check before click
+                var fgBefore = NativeMethods.GetForegroundWindow();
+                Console.WriteLine($"[TYPE] fg before click: 0x{fgBefore:X} target=0x{hwnd:X} match={fgBefore == hwnd}");
+
+                // Click center of target element → focus lands on it, then retry TP2
+                bool clickedOk = false;
+                if (clickRect.Width > 0)
+                {
+                    try
+                    {
+                        var cx = clickRect.X + clickRect.Width  / 2;
+                        var cy = clickRect.Y + clickRect.Height / 2;
+                        WKAppBot.Win32.Input.MouseInput.Click(cx, cy);
+                        Console.Error.WriteLine($"[A11Y] type -- clicked element center ({cx},{cy}) src={clickSrc}");
+                        Thread.Sleep(150);
+                        clickedOk = true;
+                    }
+                    catch { }
+                }
+
+                // Foreground check after click
+                var fgAfter = NativeMethods.GetForegroundWindow();
+                Console.WriteLine($"[TYPE] fg after click:  0x{fgAfter:X} target=0x{hwnd:X} match={fgAfter == hwnd}");
+
+                // Retry TP2 after click -- element focus should now be on message input
+                if (clickedOk && TryElectronTextPattern2Type(hwnd, text))
+                {
+                    // TP2 succeeded post-click: restore clipboard and return
+                    var restore2 = prevClip;
+                    var rt2 = new Thread(() => { try { if (!string.IsNullOrEmpty(restore2)) System.Windows.Forms.Clipboard.SetText(restore2); else System.Windows.Forms.Clipboard.Clear(); } catch { } });
+                    rt2.SetApartmentState(ApartmentState.STA);
+                    rt2.Start();
+                    Console.Error.WriteLine($"[A11Y] type -- Electron TP2 post-click ({text.Length} chars)");
+                    return true;
+                }
+
+                // TP2 still failed → fall back to Ctrl+V at focused element
+                if (!clickedOk)
+                {
+                    // No valid rect: bring window to foreground so Ctrl+V lands there
+                    NativeMethods.SmartSetForegroundWindow(hwnd);
+                    Thread.Sleep(150);
+                }
                 WKAppBot.Win32.Input.KeyboardInput.Hotkey(new[] { "Ctrl", "V" });
-                Thread.Sleep(200);
+                Thread.Sleep(300);
+
+                // Verify: read the element value after paste to confirm success
+                try
+                {
+                    using var verUia = new FlaUI.UIA3.UIA3Automation();
+                    var verRoot = verUia.FromHandle(hwnd);
+                    var verEl = verRoot?.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants,
+                        new FlaUI.Core.Conditions.AndCondition(
+                            verUia.ConditionFactory.ByControlType(FlaUI.Core.Definitions.ControlType.Edit),
+                            verUia.ConditionFactory.ByName("Message input")));
+                    var verVal = verEl?.Patterns.Value.IsSupported == true
+                        ? verEl.Patterns.Value.Pattern.Value.Value : "(no Value pattern)";
+                    Console.WriteLine($"[TYPE] verify: Message input value='{(verVal?.Length > 60 ? verVal[..60] + "..." : verVal)}'");
+                }
+                catch (Exception vex) { Console.WriteLine($"[TYPE] verify failed: {vex.Message}"); }
 
                 // Restore clipboard on STA
                 var restore = prevClip;
@@ -307,8 +478,10 @@ internal partial class Program
             Console.WriteLine("[A11Y] type -- focusless failed, falling back to SendKeys (focus required)");
             NativeMethods.SmartSetForegroundWindow(hwnd); // [FOCUS-GUARD] CheckActiveGuard 적용
             Thread.Sleep(100);
-            // Pass hwnd for per-token mid-input focus check+restore
-            WKAppBot.Win32.Input.KeyboardInput.SendKeys(text, hwnd);
+            // Pass ctx: mid-type user activity triggers callout approval popup.
+            WKAppBot.Win32.Input.KeyboardInput.SendKeys(text, hwnd,
+                new WKAppBot.Win32.Input.KeyboardInput.TypeInputContext
+                { IntendedHwnd = hwnd, UserInputWait = new UserInputWaitAdapter() });
             Console.Error.WriteLine($"[A11Y] type -- SendKeys keystroke ({text.Length} chars)");
             return true;
         }
@@ -358,6 +531,159 @@ internal partial class Program
 
         Console.Error.WriteLine("[A11Y] set-value -- no method available");
         return false;
+    }
+
+    // TextPattern2 via FindFirst(ControlType.Edit, Name="Message input") -- truly focusless.
+    // Finds the element by type+name without needing it to be focused.
+    // Slower than FocusedElement path but reliable even when focus is elsewhere.
+    static bool TryElectronTP2FindFirst(IntPtr hwnd, string text)
+    {
+        try
+        {
+            using var uia = new FlaUI.UIA3.UIA3Automation();
+            var root = uia.FromHandle(hwnd);
+            if (root == null) return false;
+
+            var editEl = root.FindFirst(FlaUI.Core.Definitions.TreeScope.Descendants,
+                new FlaUI.Core.Conditions.AndCondition(
+                    uia.ConditionFactory.ByControlType(FlaUI.Core.Definitions.ControlType.Edit),
+                    uia.ConditionFactory.ByName("Message input")));
+
+            if (editEl == null)
+            {
+                Console.Error.WriteLine("[A11Y] type -- TP2-find: Edit 'Message input' not found");
+                return false;
+            }
+
+            var tp2 = editEl.Patterns.Text2;
+            if (!tp2.IsSupported) return false;
+
+            var insert = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (insert == null) return false;
+
+            insert.Invoke(tp2.Pattern, new object[] { text });
+            Console.Error.WriteLine($"[A11Y] type -- TP2-find InsertTextAtSelection ({text.Length} chars, focusless!)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] type -- TP2-find failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    // TextPattern2.InsertTextAtSelection -- fast path only (FocusedElement, no tree walk)
+    // Returns false immediately if "Message input" is not currently focused.
+    static bool TryElectronTextPattern2Type(IntPtr hwnd, string text)
+    {
+        try
+        {
+            using var uia = new FlaUI.UIA3.UIA3Automation();
+            var focused = uia.FocusedElement();
+            if (focused == null) return false;
+            var fName = ""; try { fName = focused.Properties.Name.ValueOrDefault ?? ""; } catch { }
+            var fCt = "?"; try { fCt = focused.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+            Console.Error.WriteLine($"[A11Y] type -- TP2 focused: fCt={fCt} fName={fName}");
+            if (fCt != "Edit" || fName != "Message input") return false;
+            // Verify same process as target window
+            var focHwnd = focused.Properties.NativeWindowHandle.ValueOrDefault;
+            if (focHwnd != IntPtr.Zero)
+            {
+                NativeMethods.GetWindowThreadProcessId(hwnd, out uint tPid);
+                NativeMethods.GetWindowThreadProcessId(focHwnd, out uint fPid);
+                if (tPid != fPid) return false;
+            }
+            var tp2 = focused.Patterns.Text2;
+            if (!tp2.IsSupported) return false;
+            var insert = tp2.Pattern.GetType().GetMethod("InsertTextAtSelection",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+            if (insert == null) return false;
+            insert.Invoke(tp2.Pattern, new object[] { text });
+            Console.Error.WriteLine($"[A11Y] type -- TP2 InsertTextAtSelection ({text.Length} chars, focusless!)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] type -- TP2 failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    // WM_KEYDOWN Enter to Chrome renderer -- focusless Enter for React contenteditable
+    static bool TryElectronRendererEnter(IntPtr hwnd)
+    {
+        try
+        {
+            var rendHwnd = NativeMethods.FindWindowExW(hwnd, IntPtr.Zero, "Chrome_RenderWidgetHostHWND", null);
+            if (rendHwnd == IntPtr.Zero) return false;
+            const int WM_KEYDOWN = 0x0100, WM_KEYUP = 0x0101, VK_RETURN = 0x0D;
+            uint sc = NativeMethods.MapVirtualKeyW(VK_RETURN, 0);
+            NativeMethods.PostMessageW(rendHwnd, WM_KEYDOWN, (IntPtr)VK_RETURN, (IntPtr)((sc << 16) | 1));
+            Thread.Sleep(20);
+            NativeMethods.PostMessageW(rendHwnd, WM_KEYUP, (IntPtr)VK_RETURN, (IntPtr)unchecked((nint)((sc << 16) | 1 | (1u << 30) | (1u << 31))));
+            Console.Error.WriteLine("[A11Y] type -- renderer WM_KEYDOWN Enter (focusless!)");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] type -- renderer Enter failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    // Returns (key, code, windowsVirtualKeyCode) for {token} hotkey strings, null otherwise
+    static (string Key, string Code, int Vk)? TryParseHotkeyToken(string text)
+    {
+        if (text.Length < 3 || text[0] != '{' || text[^1] != '}') return null;
+        return text[1..^1].ToLowerInvariant() switch
+        {
+            "enter"  or "return"    => ("Enter",      "Enter",      13),
+            "tab"                   => ("Tab",         "Tab",         9),
+            "esc"    or "escape"    => ("Escape",      "Escape",     27),
+            "space"                 => (" ",            "Space",      32),
+            "backspace" or "bs"     => ("Backspace",   "Backspace",   8),
+            "delete" or "del"       => ("Delete",      "Delete",     46),
+            "up"                    => ("ArrowUp",     "ArrowUp",    38),
+            "down"                  => ("ArrowDown",   "ArrowDown",  40),
+            "left"                  => ("ArrowLeft",   "ArrowLeft",  37),
+            "right"                 => ("ArrowRight",  "ArrowRight", 39),
+            "home"                  => ("Home",        "Home",       36),
+            "end"                   => ("End",         "End",        35),
+            _                       => ((string, string, int)?)null
+        };
+    }
+
+    // Send a single key via CDP Input.dispatchKeyEvent (React contenteditable-safe)
+    static bool TryCdpDispatchKeySync(uint pid, string key, string code, int vk)
+    {
+        try
+        {
+            var port = WKAppBot.WebBot.CdpClient.DetectCdpPort((int)pid);
+            if (port <= 0)
+            {
+                Console.Error.WriteLine($"[A11Y] CDP hotkey -- no debug port for pid={pid}");
+                return false;
+            }
+            using var cdp = new WKAppBot.WebBot.CdpClient();
+            cdp.ConnectAsync(port).GetAwaiter().GetResult();
+            var evt = new System.Text.Json.Nodes.JsonObject
+            {
+                ["type"] = "keyDown", ["key"] = key, ["code"] = code,
+                ["windowsVirtualKeyCode"] = vk, ["nativeVirtualKeyCode"] = vk
+            };
+            cdp.SendAsync("Input.dispatchKeyEvent", evt).GetAwaiter().GetResult();
+            Thread.Sleep(30);
+            evt["type"] = "keyUp";
+            cdp.SendAsync("Input.dispatchKeyEvent", evt).GetAwaiter().GetResult();
+            Console.Error.WriteLine($"[A11Y] CDP hotkey -- {{{key}}} port={port}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[A11Y] CDP hotkey -- failed: {ex.Message}");
+            return false;
+        }
     }
 
     // -- SetRange: UIA RangeValue --

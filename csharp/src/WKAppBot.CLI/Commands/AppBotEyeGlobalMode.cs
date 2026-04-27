@@ -19,7 +19,10 @@ internal partial class Program
     static DateTime _lastAiActivityUtc = DateTime.MinValue;
     static DateTime _lastAutoGogoUtc = DateTime.MinValue;
     static DateTime _lastKeepAwakeUtc = DateTime.MinValue;
+    static DateTime _lastGlobalHomeworkAt = DateTime.MinValue; // user-idle 5min homework (Eye-level, WKAppBot-only)
     static string _lastPromptSource = "none";
+
+    static AppBotEyeHost? _globalEyeHost; // set once Eye starts; used by EnsureEyeVisible()
 
     static System.Windows.Forms.Form? _screenBlankForm;
 #pragma warning disable CS0169
@@ -62,6 +65,9 @@ internal partial class Program
     static DateTime _lastCcaAnalysis = DateTime.MinValue;
     static DateTime _lastZoomCleanup = DateTime.MinValue;
     static DateTime _lastSkillAuditUtc = DateTime.MinValue;
+    static DateTime _lastSkillSyncUtc   = DateTime.MinValue;
+    static DateTime _lastCalloutDrainUtc = DateTime.MinValue;
+    static string?  _activeCalloutId    = null;
 
     // -- CCA live analysis cache --
 #pragma warning disable CS0414
@@ -105,23 +111,16 @@ internal partial class Program
     static int _whisperRingX = 0;
     static int _whisperRingY = 0;
     static DateTime _lastWhisperRingCheck = DateTime.MinValue;
+
+    // -- Eye card per-workspace overlay (one wkappbot eye-card subprocess per VS Code window) --
+    static readonly Dictionary<string, int> _eyeCardPids = new(StringComparer.OrdinalIgnoreCase); // cwd -> eye-card pid
     static FileSystemWatcher? _fswExeNew; // hot-swap: .new.exe staged file
     static FileSystemWatcher? _fswMcp;
 #pragma warning disable CS0169
     static FileSystemWatcher? _fswClaudeJsonl; // Claude Code projects JSONL (~/.claude/projects/**/*.jsonl)
 #pragma warning restore CS0169
     static readonly HashSet<string> _mcpTabsOpened = new(StringComparer.OrdinalIgnoreCase);
-    static readonly HashSet<string> _knownLgOverlayProcesses = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "LGDisplayExtension",
-        "LGHotkeyExtension",
-        "LGSmartAssistantExtension",
-        "LGSmartAssistant",
-        "LGLivelyWallpaper",
-        "LG PC Care",
-    };
-    static DateTime _lastLgOverlayGuardUtc = DateTime.MinValue;
-    static nint _lastLgOverlayHwnd;
+    // LG overlay fields + methods -> AppBotEyeGlobalMode.LgOverlay.cs
 
     // -- Memory tracking --
     static long _prevWorkingSetMB;
@@ -138,167 +137,6 @@ internal partial class Program
     /// <summary>Cached appbot master prompt -- always-on relay target (WKAppBot VS Code).</summary>
     internal static ClaudePromptHelper.PromptInfo? CachedAppbotMasterPrompt;
 
-    static bool TryGuardLgOverlay(string logPrefix, string? slackBotToken = null, string? slackChannel = null)
-    {
-        try
-        {
-            if (_lastLgOverlayGuardUtc != DateTime.MinValue &&
-                (DateTime.UtcNow - _lastLgOverlayGuardUtc).TotalSeconds < 5)
-                return false;
-
-            var lgHwnd = FindLgOverlayWindow();
-            if (lgHwnd == IntPtr.Zero) return false;
-
-            _lastLgOverlayGuardUtc = DateTime.UtcNow;
-            _lastLgOverlayHwnd = lgHwnd;
-
-            var fgBuf = new StringBuilder(256);
-            NativeMethods.GetWindowTextW(NativeMethods.GetForegroundWindow(), fgBuf, fgBuf.Capacity);
-            var fgTitle = fgBuf.ToString();
-
-            NativeMethods.GetWindowThreadProcessId(lgHwnd, out uint lgPid);
-            string procName = "";
-            try { procName = lgPid > 0 ? Process.GetProcessById((int)lgPid).ProcessName : ""; } catch { }
-
-            Console.WriteLine($"{logPrefix} LG overlay topmost! pid={lgPid} proc={procName} fg=\"{fgTitle}\"");
-
-            ApplyLgOverlayNeutralize(lgHwnd, logPrefix);
-
-            NativeMethods.PostMessageW(lgHwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
-            Console.WriteLine($"{logPrefix} -> WM_CLOSE sent");
-
-            Thread.Sleep(500);
-            string result;
-            if (NativeMethods.IsWindow(lgHwnd))
-            {
-                Console.WriteLine($"{logPrefix} WM_CLOSE ignored -> applying shrink fallback");
-                ApplyLgOverlayFallbackLayout(lgHwnd, logPrefix);
-                Thread.Sleep(250);
-                result = "shrunk";
-
-                if (NativeMethods.IsWindow(lgHwnd))
-                {
-                    result = "kill";
-                    Console.WriteLine($"{logPrefix} shrink fallback insufficient -> killing process");
-                }
-
-                if (lgPid > 0)
-                {
-                    try
-                    {
-                        if (result == "kill")
-                        {
-                            Process.GetProcessById((int)lgPid).Kill();
-                            Console.WriteLine($"{logPrefix} Kill OK (pid={lgPid})");
-                        }
-                    }
-                    catch (Exception kex)
-                    {
-                        result = $"kill-failed: {kex.Message}";
-                        Console.WriteLine($"{logPrefix} Kill failed: {kex.Message}");
-                    }
-                }
-            }
-            else
-            {
-                result = "closed";
-                Console.WriteLine($"{logPrefix} overlay closed OK");
-            }
-
-            if (!string.IsNullOrEmpty(slackBotToken) && !string.IsNullOrEmpty(slackChannel))
-            {
-                var alertMsg = $":warning: *{(string.IsNullOrEmpty(procName) ? "LG overlay" : procName)}* screen-cover detected -> {result}\n포그라운드: `{fgTitle}`";
-                Task.Run(async () =>
-                {
-                    try { await SlackSendViaApi(slackBotToken, slackChannel, alertMsg, username: "앱봇아이"); }
-                    catch { }
-                });
-            }
-
-            return true;
-        }
-        catch { return false; }
-    }
-
-    static IntPtr FindLgOverlayWindow()
-    {
-        IntPtr best = IntPtr.Zero;
-        long bestArea = 0;
-        var virtualScreen = SystemInformation.VirtualScreen;
-
-        NativeMethods.EnumWindows((hWnd, _) =>
-        {
-            try
-            {
-                if (!NativeMethods.IsWindowVisible(hWnd)) return true;
-
-                int exStyle = NativeMethods.GetWindowLongW(hWnd, -20);
-                if ((exStyle & 0x8) == 0) return true; // WS_EX_TOPMOST
-
-                NativeMethods.GetWindowRect(hWnd, out var rc);
-                int w = Math.Max(0, rc.Right - rc.Left);
-                int h = Math.Max(0, rc.Bottom - rc.Top);
-                if (w < 600 || h < 300) return true; // ignore tiny LG helper popups
-
-                long area = (long)w * h;
-                long minCoverArea = (long)virtualScreen.Width * virtualScreen.Height / 3;
-                if (area < minCoverArea) return true; // only large screen-cover candidates
-
-                NativeMethods.GetWindowThreadProcessId(hWnd, out uint pid);
-                if (pid == 0) return true;
-
-                string procName;
-                try { procName = Process.GetProcessById((int)pid).ProcessName; }
-                catch { return true; }
-                if (!_knownLgOverlayProcesses.Contains(procName)) return true;
-
-                if (area > bestArea)
-                {
-                    bestArea = area;
-                    best = hWnd;
-                }
-            }
-            catch { }
-            return true;
-        }, IntPtr.Zero);
-
-        return best;
-    }
-
-    static void ApplyLgOverlayNeutralize(IntPtr hWnd, string logPrefix)
-    {
-        var exStyle = NativeMethods.GetWindowLongW(hWnd, -20);
-        var neutralExStyle = exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT;
-        NativeMethods.SetWindowLongW(hWnd, -20, neutralExStyle);
-        NativeMethods.SetLayeredWindowAttributes(hWnd, 0, 0, NativeMethods.LWA_ALPHA);
-        Console.WriteLine($"{logPrefix} -> transparent + click-through");
-    }
-
-    static void ApplyLgOverlayFallbackLayout(IntPtr hWnd, string logPrefix)
-    {
-        try
-        {
-            NativeMethods.ShowWindow(hWnd, NativeMethods.SW_SHOWMINNOACTIVE);
-            Console.WriteLine($"{logPrefix} -> minimize(no-activate)");
-            if (!NativeMethods.IsIconic(hWnd))
-            {
-                NativeMethods.ShowWindow(hWnd, 6); // SW_MINIMIZE
-                Console.WriteLine($"{logPrefix} -> force iconic minimize");
-            }
-        }
-        catch { }
-
-        try
-        {
-            NativeMethods.SetWindowPos(
-                hWnd,
-                new IntPtr(-2), // HWND_NOTOPMOST
-                -32000, -32000, 1, 1,
-                0x0010); // SWP_NOACTIVATE
-            Console.WriteLine($"{logPrefix} -> offscreen shrink");
-        }
-        catch { }
-    }
     static DateTime _lastFindAllPromptsAt = DateTime.MinValue;
 
     // -- Eye IPC cache: updated each tick so eye tick IPC queries get instant response --
@@ -561,6 +399,7 @@ internal partial class Program
         EyeDiag("mcp-client");
 
         using var host = new AppBotEyeHost();
+        _globalEyeHost = host;
         EyeDiag("host-start-call");
         host.Start(width, height, posX, posY, ownerHwnd: IntPtr.Zero);
         EyeDiag("host-start-return");
@@ -615,7 +454,15 @@ internal partial class Program
         Console.WriteLine("[EYE] Focusless mode (AllowFocusSteal=OFF by default)");
 
         var cts = new CancellationTokenSource();
-        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            // Release mutex immediately so incoming Eye can acquire it without 5s wait.
+            try { _eyeAliveMutex?.ReleaseMutex(); } catch { }
+            try { _eyeAliveMutex?.Dispose(); _eyeAliveMutex = null; } catch { }
+            EyeCmdPipeServer.StopAccepting();
+            cts.Cancel();
+        };
 
         // -- Eye IPC tick server (non-elevated Eye only: tick queries on wkappbot_eye_ipc) --
         // Admin Eye opens wkappbot_elevated exclusively. Normal Eye must NOT open that pipe
@@ -623,6 +470,7 @@ internal partial class Program
         _ = Task.Run(() => EyeIpcServer.ListenAsync(cts.Token));
         EyeDiag("eye-pipe-started");
         Console.Error.WriteLine($"[EYE] Eye IPC tick server started (elevated={elevated})");
+
 
         PulseStep.Mark("eye-pipe-server");
         // -- Auto a11y hack on InputReadiness probe success --
@@ -644,8 +492,16 @@ internal partial class Program
         }
         // -- Mouse CCA: 1s interval -> UIA element + CCA + Visual MD -> Slack thread reply --
         PulseStep.Mark("workers-init");
-        StartMouseCcaWorker(cts.Token);
-        EyeDiag("mouse-worker-started");
+        if (Environment.GetEnvironmentVariable("WKAPPBOT_EYE_MOUSECCA") != "0")
+        {
+            StartMouseCcaWorker(cts.Token);
+            EyeDiag("mouse-worker-started");
+        }
+        else
+        {
+            EyeDiag("mouse-worker-disabled");
+            Console.Error.WriteLine("[EYE] Mouse CCA worker disabled (WKAPPBOT_EYE_MOUSECCA=0)");
+        }
         // -- Keyboard Focus Chain: 1s interval -> focused element + parent chain -> Slack thread reply --
         // FocusChain now handled inside unified MouseCcaWorker (same server process)
 
@@ -718,6 +574,7 @@ internal partial class Program
 
                 if (!string.IsNullOrEmpty(appToken) && !string.IsNullOrEmpty(slackBotToken))
                 {
+                    EyeDiag("slack-connect-start");
                     if (_earlySlackClient != null && _slackConnectBgTask != null)
                     {
                         // Reuse the early-started client -- await completion (usually already done)
@@ -729,6 +586,7 @@ internal partial class Program
                         slackClient = new SlackSocketClient();
                         slackClient.ConnectAsync(appToken, slackBotToken).GetAwaiter().GetResult();
                     }
+                    EyeDiag("slack-connect-done");
                     EyeColor(ConsoleColor.Green);
                     PulseStep.Mark("slack-connected");
                     var workspace = json?["workspace"]?.GetValue<string>() ?? "?";
@@ -741,16 +599,20 @@ internal partial class Program
                     // Startup: collect stale status messages (reply_count==0) -- do NOT delete yet.
                     // Deletion happens after first new post succeeds (PostOrUpdateAiStatusAsync),
                     // so the old message stays visible until the new one appears -- no gap.
+                    // Runs async to avoid blocking Eye startup (HTTP call can take 1-2s).
                     {
                         _staleStatusTsOnStartup.Clear();
                         _recoveredStatusByUsername.Clear();
-                        try
+                        var _histBotToken = slackBotToken!;
+                        var _histChannel = slackChannel!;
+                        _ = Task.Run(async () => { try
                         {
+                            EyeDiag("slack-history-start");
                             using var http = new HttpClient();
                             http.DefaultRequestHeaders.Authorization =
-                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", slackBotToken);
-                            var histUrl = $"https://slack.com/api/conversations.history?channel={slackChannel}&limit=30";
-                            var histResp = http.GetStringAsync(histUrl).GetAwaiter().GetResult();
+                                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _histBotToken);
+                            var histUrl = $"https://slack.com/api/conversations.history?channel={_histChannel}&limit=30";
+                            var histResp = await http.GetStringAsync(histUrl);
                             var histJson = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.Nodes.JsonNode>(histResp);
                             if (histJson?["ok"]?.GetValue<bool>() == true && histJson["messages"] is System.Text.Json.Nodes.JsonArray msgs)
                             {
@@ -791,14 +653,15 @@ internal partial class Program
                             }
                         }
                         catch { }
+                        EyeDiag("slack-history-done");
                         if (_recoveredStatusByUsername.Count > 0)
                             Console.Error.WriteLine($"[EYE] Recovered {_recoveredStatusByUsername.Count} status position(s) from Slack");
                         if (_staleStatusTsOnStartup.Count > 0)
                         {
                             Console.Error.WriteLine($"[EYE] {_staleStatusTsOnStartup.Count} stale status message(s) pending -- will sweep after first post or 20s timer");
-                            // Independent timer: sweep even if first ticks are all idle (no new post fired)
-                            _ = SweepStaleOnStartupAsync(slackBotToken!, slackChannel!);
+                            _ = SweepStaleOnStartupAsync(_histBotToken, _histChannel);
                         }
+                        }); // end Task.Run for history
                         try { File.WriteAllText(statusTsFile, ""); } catch { }
                         previousStatusTs = null;
                     }
@@ -943,63 +806,56 @@ internal partial class Program
         // Eye 자체 콘솔 탭 오픈 (apbot-mcp 창 최초 생성 + 위치 고정)
         EyeOpenConsoleWtTab(eyeLogFile);
 
-        // -- Whisper Ring: separate process (WPF + audio model -> memory isolated) --
+        // -- Whisper Ring / ScreenSaver / Claude Proxy: spawn all three in parallel --
         var eyeStartTime = DateTime.UtcNow;
-        try
+        EyeDiag("spawns-start");
         {
-            var wrPath = Environment.ProcessPath ?? "wkappbot";
-            _whisperRingX = Math.Max(0, posX - 190); // WhisperRing 180px wide + 10px gap
+            var spawnPath = Environment.ProcessPath ?? "wkappbot";
+            var spawnCwd = callerCwd;
+            var spawnPid = Environment.ProcessId.ToString();
+            _whisperRingX = Math.Max(0, posX - 190);
             _whisperRingY = posY;
-            var wr = AppBotPipe.Spawn(wrPath, $"whisper-ring {_whisperRingX} {_whisperRingY}",
-                cwd: callerCwd,
-                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
-                showNoActivate: true,
-                caller: "EYE-WHISPER");
-            if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
-            PulseStep.Mark("whisper-spawned");
-            Console.Error.WriteLine($"[EYE] Whisper Ring spawned pid={_whisperRingPid}");
+            var spawnTasks = new[]
+            {
+                Task.Run(() => {
+                    try {
+                        var wr = AppBotPipe.Spawn(spawnPath, $"whisper-ring --from-eye {_whisperRingX} {_whisperRingY}",
+                            cwd: spawnCwd, env: new() { ["WKAPPBOT_PARENT_PID"] = spawnPid, ["WKAPPBOT_WORKER"] = "1" },
+                            showNoActivate: true, caller: "EYE-WHISPER");
+                        if (wr != null) { _whisperRingPid = wr.Pid; wr.Dispose(); }
+                        PulseStep.Mark("whisper-spawned");
+                        Console.Error.WriteLine($"[EYE] Whisper Ring spawned pid={_whisperRingPid}");
+                    } catch (Exception ex) { Console.Error.WriteLine($"[EYE] Whisper Ring spawn failed: {ex.Message}"); }
+                }),
+                Task.Run(() => {
+                    try {
+                        AppBotPipe.Spawn(spawnPath, "screensaver --from-eye",
+                            cwd: spawnCwd, env: new() { ["WKAPPBOT_PARENT_PID"] = spawnPid, ["WKAPPBOT_WORKER"] = "1" },
+                            showNoActivate: true, caller: "EYE-SCREENSAVER");
+                        PulseStep.Mark("screensaver-spawned");
+                        Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
+                    } catch (Exception ex) { Console.Error.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}"); }
+                }),
+                Task.Run(() => {
+                    try {
+                        AppBotPipe.Spawn(spawnPath, "claude-proxy --inject-context",
+                            cwd: spawnCwd, env: new() { ["WKAPPBOT_PARENT_PID"] = spawnPid, ["WKAPPBOT_WORKER"] = "1" },
+                            caller: "EYE-CLAUDE-PROXY");
+                        Console.Error.WriteLine($"[EYE] Claude proxy spawned on port {ProxyDefaultPort}");
+                    } catch (Exception ex) { Console.Error.WriteLine($"[EYE] Claude proxy spawn failed: {ex.Message}"); }
+                }),
+            };
+            // Fire-and-forget: do not block loop-ready waiting for spawns.
+            // A slow spawn (e.g. Claude proxy taking 12s) was delaying the entire startup.
+            _ = Task.WhenAll(spawnTasks);
         }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[EYE] Whisper Ring spawn failed: {ex.Message}");
-        }
-
-        // -- Screen Saver: separate process (WPF isolation -> Eye stays lightweight) --
-        try
-        {
-            var ssPath = Environment.ProcessPath ?? "wkappbot";
-            AppBotPipe.Spawn(ssPath, "screensaver",
-                cwd: callerCwd,
-                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
-                showNoActivate: true,
-                caller: "EYE-SCREENSAVER");
-            PulseStep.Mark("screensaver-spawned");
-            Console.WriteLine("[EYE] ScreenSaver spawned as separate process");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[EYE] ScreenSaver spawn failed: {ex.Message}");
-        }
-
-        // -- Claude Proxy: auto-start on port 7788 (ANTHROPIC_BASE_URL passthrough + limit handoff) --
-        try
-        {
-            var proxyPath = Environment.ProcessPath ?? "wkappbot";
-            AppBotPipe.Spawn(proxyPath, "claude-proxy --inject-context",
-                cwd: callerCwd,
-                env: new() { ["WKAPPBOT_PARENT_PID"] = Environment.ProcessId.ToString(), ["WKAPPBOT_WORKER"] = "1" },
-                caller: "EYE-CLAUDE-PROXY");
-            Console.Error.WriteLine($"[EYE] Claude proxy spawned on port {ProxyDefaultPort}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[EYE] Claude proxy spawn failed: {ex.Message}");
-        }
+        EyeDiag("spawns-done");
 
         // -- Context usage monitor (per-card) --
         // Track last warned MB + JSONL path per CWD.
         // Path change = new session (ctime-new file) -> reset MB counter so new session gets fresh warnings.
-        var contextWarnedPcts = new Dictionary<string, (int mb, string? path)>(StringComparer.OrdinalIgnoreCase);
+        // Pre-populate from disk so hot-swap doesn't re-fire alerts for pre-existing large JSONLs.
+        var contextWarnedPcts = LoadContextWarnedState();
 
         // -- Duplicate Eye self-close: Z-order check every ~10s --
         // EnumWindows enumerates top-level windows top-to-bottom (Z-order).
@@ -1009,6 +865,16 @@ internal partial class Program
 
         PulseStep.Done("ready");
         EyeDiag("loop-ready");
+
+        // Warm up MCP prompt cache 3s after Eye window is ready -- never at startup.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(3000).ConfigureAwait(false);
+            EyeDiag("find-prompts-warmup-start");
+            FindAllPromptsViaMcp();
+            EyeDiag("find-prompts-warmup-done");
+        });
+
         int frameCount = 0;
         Console.WriteLine("[EYE_LOOP] entering main loop");
         while (host.IsAlive && !cts.IsCancellationRequested && !hotReloadTriggered)
@@ -1079,25 +945,18 @@ internal partial class Program
             // -- Core tick: read ticks + sessions --
             var forceFull = ShouldForceFullLoad();
             var (tickDirty, promptDirty) = CheckGlobalDirtyFlags(forceFull);
-            if (frameCount < 3) EyeDiag($"frame-{frameCount}-before-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
-            if (frameCount < 3) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
+            if (frameCount < 6) EyeDiag($"frame-{frameCount}-before-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
+            if (frameCount < 6) Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} before-global-tick forceFull={forceFull} tickDirty={tickDirty} promptDirty={promptDirty}");
             // Skip tick when hot-swap is imminent -- reduces detection latency from ~3s to ~100ms
             if (!_fswExeDirty && !TryRunOneGlobalTick(host, timeoutMs: 3000, forceFull, tickDirty, promptDirty))
             {
-                if (frameCount < 3) EyeDiag($"frame-{frameCount}-tick-timeout");
+                if (frameCount < 6) EyeDiag($"frame-{frameCount}-tick-timeout");
                 Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-timeout");
-                if (frameCount < 3)
-                {
-                    Console.Error.WriteLine($"[EYE] tick timeout (>3s) on frame {frameCount} -- startup grace, continuing");
-                }
-                else
-                {
-                    Console.WriteLine("[EYE] tick timeout (>3s) - self terminate + restart");
-                    hotReloadTriggered = true; // trigger self-restart via hot-swap path
-                    break;
-                }
+                // Eye never self-terminates on tick timeout -- that conflates Core health with Eye health.
+                // Core has its own auto-restart (max 5/5min). Eye keeps running with degraded data.
+                Console.Error.WriteLine($"[EYE] tick timeout on frame {frameCount} -- continuing (Core will self-recover)");
             }
-            else if (!_fswExeDirty && frameCount < 3)
+            else if (!_fswExeDirty && frameCount < 6)
             {
                 EyeDiag($"frame-{frameCount}-tick-ok");
                 Console.Error.WriteLine($"[EYE_LOOP] frame={frameCount} global-tick-ok");
@@ -1186,6 +1045,57 @@ internal partial class Program
 
                 // -- Drain Slack message file queue --
                 DrainSlackQueue();
+            }
+
+            // -- Callout queue drain (500ms -- show next pending type-delegation callout) --
+            if (_activeCalloutId == null && (DateTime.UtcNow - _lastCalloutDrainUtc).TotalMilliseconds >= 500)
+            {
+                _lastCalloutDrainUtc = DateTime.UtcNow;
+                try
+                {
+                    var pending = CalloutQueueReadPending();
+                    if (pending.Count > 0)
+                    {
+                        var entry = pending[0];
+                        _activeCalloutId = entry.Id;
+                        CalloutQueueUpdateStatus(entry.Id, "shown");
+                        var capturedEntry = entry;
+                        var capturedDepth = pending.Count - 1;
+                        System.Threading.Tasks.Task.Run(() =>
+                        {
+                            try
+                            {
+                                var rect = new System.Drawing.Rectangle(capturedEntry.RectX, capturedEntry.RectY, capturedEntry.RectW, capturedEntry.RectH);
+                                bool confirmed = CalloutInputWindow.ShowForTypeAction(capturedEntry.Text, rect, capturedDepth);
+                                if (confirmed)
+                                {
+                                    // Execute the queued type action
+                                    try
+                                    {
+                                        var hwnd = new IntPtr(Convert.ToInt64(capturedEntry.Hwnd.TrimStart('0', 'x'), 16));
+                                        using var automation = new FlaUI.UIA3.UIA3Automation();
+                                        automation.ConnectionTimeout = TimeSpan.FromSeconds(5);
+                                        var el = automation.FromHandle(hwnd);
+                                        if (el != null) A11yTypeAndSubmit(el, hwnd, capturedEntry.Text);
+                                    }
+                                    catch (Exception ex2) { Console.Error.WriteLine($"[CALLOUT:EXEC] {ex2.Message}"); }
+                                }
+                                CalloutQueueUpdateStatus(capturedEntry.Id, confirmed ? "done" : "cancelled");
+                                Console.WriteLine($"# CALLOUT-{(confirmed ? "DONE" : "CANCELLED")} id={capturedEntry.Id}");
+                            }
+                            catch (Exception ex) { Console.Error.WriteLine($"[CALLOUT] {ex.Message}"); }
+                            finally { _activeCalloutId = null; }
+                        });
+                    }
+                }
+                catch { }
+            }
+
+            // -- Skill sync (every 30 min -- copy newer skills from peer repos into HQ installed dir) --
+            if ((DateTime.UtcNow - _lastSkillSyncUtc).TotalMinutes >= 30)
+            {
+                _lastSkillSyncUtc = DateTime.UtcNow;
+                try { SyncSkillsFromPeerRepos(); } catch { }
             }
 
             // -- Skill audit (once per day -- detect stale source_refs, prompt agent via newchat) --
@@ -1285,6 +1195,10 @@ internal partial class Program
                 catch { }
             }
 
+            // -- Eye card per-workspace overlay (one wkappbot eye-card per VS Code window) --
+            if (frameCount % 30 == 7) // roughly every 3s at 100ms cadence
+                TickEyeCards();
+
             // -- Screensaver lifecycle: kill when active, respawn when idle (every 5s) --
             if (frameCount % 50 == 25) // every 5s at 100ms interval
             {
@@ -1323,6 +1237,44 @@ internal partial class Program
                     }
                 }
                 catch { }
+            }
+
+            // -- Global user-idle homework: fires from WKAppBot Eye only, routes to WKAppBot session --
+            // Checked every 30s. Requires: user idle >= 5min + cooldown 10min + WKAppBot instance
+            if (frameCount % 300 == 150) // every 30s
+            {
+                try
+                {
+                    var userIdleMs = NativeMethods.GetUserIdleMs();
+                    var cooldownOk = (DateTime.UtcNow - _lastGlobalHomeworkAt).TotalMinutes >= 10;
+                    if (userIdleMs >= 5 * 60 * 1000 && cooldownOk)
+                    {
+                        // Find WKAppBot instance state (must have CwdLabel containing "WKAppBot")
+                        var wkState = _instanceStates.Values
+                            .FirstOrDefault(s => !string.IsNullOrEmpty(s.FullCwd) &&
+                                s.FullCwd.Contains("WKAppBot", StringComparison.OrdinalIgnoreCase) &&
+                                !s.FullCwd.Contains("WkAutoQuant", StringComparison.OrdinalIgnoreCase));
+                        var wkHwnd = _instanceStates
+                            .FirstOrDefault(kv => kv.Value == wkState).Key;
+                        if (wkState != null && !wkState.HomeworkNotified && wkHwnd != IntPtr.Zero)
+                        {
+                            _lastGlobalHomeworkAt = DateTime.UtcNow;
+                            Console.Error.WriteLine($"[EYE] Global user-idle homework trigger (idle={userIdleMs / 1000}s)");
+                            try { CheckAndSendHomework(wkState, wkHwnd, "[GLOBAL-IDLE] "); }
+                            catch (Exception ex) { Console.Error.WriteLine($"[EYE] Global homework error: {ex.Message}"); }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // -- Co-resolve reminder scan: nudge half-resolved suggests every hour --
+            // Cheap inner cadence (~30s); the scanner itself enforces a 5min outer
+            // throttle and a 60min per-entry reminder interval.
+            if (frameCount % 300 == 200) // every 30s, offset from homework
+            {
+                try { RunCoResolveReminderScan(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[EYE:COREMIND] scan error: {ex.Message}"); }
             }
 
             // -- Periodic GC: every 5 min, reduce memory pressure from CCA/UIA workers --
@@ -1429,12 +1381,17 @@ internal partial class Program
                 _fswExeDirty = false; // consume flag
                 try
                 {
-                    // Same-stamp guard: skip if this binary already failed once (MCP pattern)
-                    var currentStamp = File.Exists(exePath)
-                        ? File.GetLastWriteTimeUtc(exePath).Ticks.ToString() : null;
+                    // Same-stamp guard: skip if THIS .new.exe already failed once (MCP pattern).
+                    // Must stamp .new.exe's mtime (the pending binary), NOT exePath's mtime --
+                    // exePath only changes AFTER a successful swap, so stamping it would match forever.
+                    var newExePathForStamp = Path.Combine(
+                        Path.GetDirectoryName(exePath) ?? "",
+                        Path.GetFileNameWithoutExtension(exePath) + ".new.exe");
+                    var currentStamp = File.Exists(newExePathForStamp)
+                        ? File.GetLastWriteTimeUtc(newExePathForStamp).Ticks.ToString() : null;
                     if (currentStamp != null && currentStamp == _lastFailedSwapStamp)
                     {
-                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Previously-failed stamp ({currentStamp}) -- waiting for newer binary");
+                        Console.Error.WriteLine($"[EYE:HOT-SWAP] Previously-failed .new.exe stamp ({currentStamp}) -- waiting for newer binary");
                         goto AfterHotSwap;
                     }
 
@@ -1669,6 +1626,11 @@ internal partial class Program
         }
 
         // -- Cleanup --
+        // Release alive mutex immediately so any incoming Eye can acquire it without the 5s wait.
+        // Do this before WPF/FSW cleanup so a new Eye can start while we're still winding down.
+        try { _eyeAliveMutex?.ReleaseMutex(); } catch { }
+        try { _eyeAliveMutex?.Dispose(); _eyeAliveMutex = null; } catch { }
+
         WKAppBot.Win32.Native.NativeMethods.SetThreadExecutionState(
             WKAppBot.Win32.Native.NativeMethods.ES_CONTINUOUS);
 
@@ -1748,6 +1710,12 @@ internal partial class Program
                     try { newProc.StdErr?.Close(); } catch { }
                 }
                 PulseStep.Mark("pipes-closed");
+                // Release alive mutex NOW so new Eye can acquire it without hitting the 5s timeout.
+                // Old Eye holds this mutex until process exit, which causes new Eye to "exiting as duplicate"
+                // while old Eye is waiting 30s for new Eye's window -- deadlock: both die.
+                try { _eyeAliveMutex?.ReleaseMutex(); } catch { }
+                try { _eyeAliveMutex?.Dispose(); _eyeAliveMutex = null; } catch { }
+                PulseStep.Mark("mutex-released");
                 if (newProc != null)
                 {
                     // Wait for new Eye's window to appear (pipe server is up by then) before closing old Eye.
@@ -1769,6 +1737,35 @@ internal partial class Program
                     // Kill old WhisperRing -- new Eye will spawn its own
                     if (_whisperRingPid > 0) { try { Process.GetProcessById(_whisperRingPid).Kill(); } catch { } }
                     PulseStep.Mark("whisper-killed");
+                    // Kill all stale wkappbot-core workers (MCP, analyze-hack, slack-route, etc.)
+                    // Spare only: self (old Eye) and new Eye process
+                    {
+                        var selfPid = Environment.ProcessId;
+                        var newEyePid = newProc?.Pid ?? -1;
+                        int staleKilled = 0;
+                        foreach (var sp in Process.GetProcessesByName("wkappbot-core"))
+                        {
+                            try
+                            {
+                                if (sp.Id == selfPid || sp.Id == newEyePid) { sp.Dispose(); continue; }
+                                // Skip admin Eye (elevated) -- hot-swap must not break sudo sessions
+                                var cmd = NativeMethods.GetProcessCommandLine(sp.Id);
+                                if (cmd == null || cmd.Contains(" eye --elevated", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Console.Error.WriteLine($"[EYE:HOT-SWAP] Sparing admin Eye pid={sp.Id} (elevated -- owned by SudoHandler)");
+                                    sp.Dispose();
+                                    continue;
+                                }
+                                sp.Kill();
+                                staleKilled++;
+                            }
+                            catch { }
+                            finally { try { sp.Dispose(); } catch { } }
+                        }
+                        if (staleKilled > 0)
+                            Console.Error.WriteLine($"[EYE:HOT-SWAP] Killed {staleKilled} stale wkappbot-core workers");
+                    }
+                    PulseStep.Mark("stale-cores-killed");
                     try { host.Dispose(); } catch { } // free WPF "WK AppBot Eye" window first (prevents duplicate detection)
                     PulseStep.Mark("wpf-disposed");
                     TryHideConsoleWindow(); // hide console too
@@ -1790,76 +1787,17 @@ internal partial class Program
         // -- Graceful shutdown --
         cts.Cancel();
 
+        // Drain in-flight pipe connections before exit (hot-swap path does this in its own block).
+        if (!hotReloadTriggered)
+        {
+            Console.Error.WriteLine("[EYE] Draining pipe connections before exit...");
+            EyeCmdPipeServer.StopAcceptingAndWaitForDrain();
+        }
+
         WriteEyeCleanExit();
-        Console.WriteLine("[EYE:HOT-SWAP] Old Eye shutting down");
+        Console.WriteLine("[EYE] Eye shutting down");
         return 0;
     }
 
-    // -- Hot-swap: reusable rename-swap function ----------------------------------
-    // Called from: Eye main loop, Eye startup gentle-swap, `wkappbot hotswap` command.
-    // Thread-safe: callers serialize externally (Eye uses _fswExeDirty flag).
-
-    internal enum HotSwapResult { NoNewExe, Identical, Swapped, Failed }
-
-    /// <summary>
-    /// Check for {exeName}.new.exe next to exePath and apply rename-swap.
-    /// Returns: NoNewExe (nothing to do), Identical (deleted, no-op), Swapped (success), Failed (rollback).
-    /// All steps logged to stdout for transparency.
-    /// </summary>
-    internal static HotSwapResult TryRenameSwap(string exePath, string tag = "HOT-SWAP")
-    {
-        if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
-            return HotSwapResult.NoNewExe;
-
-        var exeDir = Path.GetDirectoryName(exePath) ?? "";
-        var exeName = Path.GetFileNameWithoutExtension(exePath);
-        var newExePath = Path.Combine(exeDir, $"{exeName}.new.exe");
-
-        if (!File.Exists(newExePath))
-            return HotSwapResult.NoNewExe;
-
-        var newInfo = new FileInfo(newExePath);
-        var curInfo = new FileInfo(exePath);
-
-        // Identical check: same mtime + size = no actual rebuild -> delete .new.exe
-        if (newInfo.LastWriteTimeUtc == curInfo.LastWriteTimeUtc && newInfo.Length == curInfo.Length)
-        {
-            Console.Error.WriteLine($"[{tag}] .new.exe identical (mtime={newInfo.LastWriteTimeUtc:HH:mm:ss}, size={newInfo.Length}) -- deleting");
-            try { File.Delete(newExePath); } catch { }
-            return HotSwapResult.Identical;
-        }
-
-        Console.Error.WriteLine($"[{tag}] .new.exe detected (new={newInfo.Length}b/{newInfo.LastWriteTimeUtc:HH:mm:ss}, cur={curInfo.Length}b/{curInfo.LastWriteTimeUtc:HH:mm:ss}) -- rename-swap");
-
-        // Step 1: running exe -> .old (Windows allows renaming running exe)
-        var oldExePath = Path.Combine(exeDir, $"{exeName}.old-{DateTime.Now:yyyyMMdd-HHmm}.exe");
-        bool step1 = false;
-        try { File.Move(exePath, oldExePath); step1 = true; }
-        catch (Exception ex) { Console.Error.WriteLine($"[{tag}] step1 rename->.old failed: {ex.Message}"); }
-
-        // Step 2: .new.exe -> exe (retry up to 4× for deploy file lock)
-        bool step2 = false;
-        if (step1)
-        {
-            for (int r = 0; r < 4 && !step2; r++)
-            {
-                if (r > 0) { Console.Error.WriteLine($"[{tag}] step2 retry {r}/3 (file locked -- waiting 1s)"); Thread.Sleep(1000); }
-                try { File.Move(newExePath, exePath); step2 = true; }
-                catch (Exception ex) { if (r == 3) Console.Error.WriteLine($"[{tag}] step2 .new->.exe failed: {ex.Message}"); }
-            }
-            if (!step2)
-            {
-                Console.Error.WriteLine($"[{tag}] rollback: .old->.exe");
-                try { File.Move(oldExePath, exePath); } catch { }
-            }
-        }
-
-        if (step1 && step2)
-        {
-            Console.Error.WriteLine($"[{tag}] swap OK (.exe->{Path.GetFileName(oldExePath)}, .new->.exe)");
-            return HotSwapResult.Swapped;
-        }
-        return HotSwapResult.Failed;
-    }
 
 }

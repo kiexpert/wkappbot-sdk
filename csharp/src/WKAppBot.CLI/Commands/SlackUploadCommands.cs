@@ -213,7 +213,11 @@ internal partial class Program
             var hwnd = windows[0].Handle;
             var safeTitle = windowTitle.Replace(" ", "_").Replace("/", "_").Replace("\\", "_");
             screenshotPath = Path.Combine(outputDir, $"slack_{timestamp}_{safeTitle}.png");
-            var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd);
+            var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hwnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = false,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
             if (bmp == null)
             {
                 Console.WriteLine("[SLACK] Screenshot capture failed");

@@ -112,6 +112,7 @@ internal static class EyeCmdPipeServer
         {
             "slack" => false,     // pure HTTP
             "eye" => false,       // Eye-internal status
+            "tick" => false,      // eye tick one-shot status (Eye-internal, no UIA)
             "schedule" => false,  // timer management
             "speak" => false,     // TTS
             "claude-usage" => false, // file reads
@@ -129,7 +130,21 @@ internal static class EyeCmdPipeServer
             "dashboard" => false, // long-running HTTP server (no UIA)
             "ask" => false,       // long-running CDP + Slack streaming (MCP 60s timeout too short)
             "agent" => false,     // long-running loop (MCP 60s timeout too short)
-            _ => true             // a11y, inspect, windows, prompt, capture, ocr, scan, etc.
+            "skill" => false,     // .skill.json file I/O only (no UIA)
+            "knowhow" => false,   // knowhow DB file I/O only (no UIA)
+            "update" => false,    // self-updater -- MCP routing would kill the updater mid-swap
+            "hotswap" => false,   // core hot-swap -- must run in Eye, never in MCP worker (self-kill)
+            "enc-test" => false,  // encoding diagnostic, no UIA
+            // Default: route to MCP subprocess. Covers the full desktop-control surface:
+            //   a11y (24 actions: inspect/find/click/type/scroll/screenshot/ocr/etc.),
+            //   windows (enumeration), inspect, find, do, input, click, dismiss,
+            //   win-click, dialog-click, tab-select, focus, watch, readiness,
+            //   tree-select, msaa-probe, capture, ocr, prompt, prompt-probe,
+            //   prompt-test, claude-detect, find-prompts, uia-test, toolbar-ocr,
+            //   titlebar, stock-scan, kiwoom, com, chat, exec, run, model, zoom-demo.
+            // All of these touch UIA / Win32 / screen-pixel surfaces and must be
+            // isolated in the MCP worker process so Eye itself stays stable.
+            _ => true
         };
     }
 

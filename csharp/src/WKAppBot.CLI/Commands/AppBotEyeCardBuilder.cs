@@ -90,7 +90,13 @@ internal partial class Program
         // Hide KRO if its tick is older than 24h (stale -- KRO not active)
         bool kroStale = kroTsUtc != DateTime.MinValue && (DateTime.UtcNow - kroTsUtc).TotalHours > 24;
         bool hasKro = !string.IsNullOrWhiteSpace(kroBlock) && !kroStale;
-        var sortedCards = cards.OrderByDescending(x => x.LastTsUtc).Take(6).ToList();
+        // Deduplicate by CWD: keep only the most recent card per working directory
+        var sortedCards = cards
+            .GroupBy(c => AbbreviateCwd(c.Cwd), StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.OrderByDescending(c => c.LastTsUtc).First())
+            .OrderByDescending(x => x.LastTsUtc)
+            .Take(6)
+            .ToList();
         bool kroRendered = !hasKro;  // if no KRO or stale, mark as already rendered
 
         if (sortedCards.Count == 0 && !hasKro)

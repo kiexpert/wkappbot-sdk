@@ -231,13 +231,14 @@ internal partial class Program
         string scenarioPath = args[0];
         bool verbose = args.Contains("-v") || args.Contains("--verbose");
         bool noWatch = args.Contains("--no-watch");
+        bool noDup = args.Contains("--no-dup");
         int watchMs = int.TryParse(GetArgValue(args, "--watch-interval"), out var wiv) ? wiv : 200;
         string? reportDir = GetArgValue(args, "--report");
 
         var doc = ScenarioParser.Load(scenarioPath);
         Console.WriteLine($"Loaded: {doc.Scenario.Name} ({doc.Steps.Count} steps)");
 
-        var runner = new ScenarioRunner(verbose, watch: !noWatch, watchIntervalMs: watchMs);
+        var runner = new ScenarioRunner(verbose, watch: !noWatch, watchIntervalMs: watchMs) { NoDup = noDup };
 
         runner.ZoomFactory = (screenRect, formHandle, action, label) =>
         {

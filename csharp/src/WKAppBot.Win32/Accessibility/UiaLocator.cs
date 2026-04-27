@@ -1849,6 +1849,9 @@ public sealed class PatternMatcher
     private PatternMatcher(Regex regex) { _regex = regex; }
     private PatternMatcher(string literal) { _literal = literal; }
 
+    /// <summary>Original pattern string used to create this matcher.</summary>
+    public string RawPattern { get; private init; } = "";
+
     /// <summary>
     /// Create a matcher from a pattern string.
     /// Auto-detects pattern type: regex: prefix, wildcard (*/?), or literal.
@@ -1861,7 +1864,7 @@ public sealed class PatternMatcher
         if (pattern.StartsWith("regex:", StringComparison.OrdinalIgnoreCase))
         {
             var regexStr = pattern[6..];
-            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled)) { RawPattern = pattern };
         }
 
         // Contains wildcard chars -> convert glob to regex (NO anchoring = substring)
@@ -1870,11 +1873,11 @@ public sealed class PatternMatcher
             var regexStr = Regex.Escape(pattern)
                 .Replace("\\*", ".*")
                 .Replace("\\?", ".");
-            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled));
+            return new PatternMatcher(new Regex(regexStr, RegexOptions.IgnoreCase | RegexOptions.Compiled)) { RawPattern = pattern };
         }
 
         // Plain literal -> substring match (Contains)
-        return new PatternMatcher(pattern);
+        return new PatternMatcher(pattern) { RawPattern = pattern };
     }
 
     /// <summary>

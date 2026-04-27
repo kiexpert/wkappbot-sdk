@@ -316,12 +316,19 @@ Examples:
             // Capture screenshot to see what happened
             try
             {
-                using var bmp = ScreenCapture.CaptureWindow(win.Handle);
-                var ssPath = DebugImagePath($"combo{comboNum}_opened");
-                bmp.Save(ssPath);
-                Console.ForegroundColor = ConsoleColor.DarkGray;
-                Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
-                Console.ResetColor();
+                using var bmp = ScreenCapture.CaptureWindow(win.Handle, new WKAppBot.Win32.Input.CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
+                if (bmp != null)
+                {
+                    var ssPath = DebugImagePath($"combo{comboNum}_opened");
+                    bmp.Save(ssPath);
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write($"[screenshot: {Path.GetFileName(ssPath)}] ");
+                    Console.ResetColor();
+                }
             }
             catch { /* screenshot not critical */ }
 

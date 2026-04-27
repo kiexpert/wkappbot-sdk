@@ -30,7 +30,7 @@ internal partial class Program
             Console.WriteLine("  --error-pattern \"..\" Regex matching error text (auto-detect recurrence)");
             Console.WriteLine("  --affected-cmds \"..\" wkappbot commands that trigger this (comma-sep)");
             Console.WriteLine("  --auto-heal-script path  Script to run on recurrence (self-healing)");
-            Console.WriteLine("  --all-matching \"..\"  Merge ALL suggestions whose text matches pattern");
+            Console.WriteLine("  (max 2 ts-prefixes per merge -- bulk wipe protection)");
             Console.WriteLine("  --keep-originals      Don't remove merged entries from active list");
             Console.WriteLine();
             Console.WriteLine("Example:");
@@ -58,6 +58,7 @@ internal partial class Program
         bool keepOriginals       = false;
         string? allMatchingPattern = null;
         bool forceNoCheck        = false;
+        bool dryRun              = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -73,7 +74,20 @@ internal partial class Program
                 case "--error-pattern"  when i + 1 < args.Length: errorPattern = args[++i]; break;
                 case "--affected-cmds"  when i + 1 < args.Length: affectedCmdsRaw = args[++i]; break;
                 case "--auto-heal-script" when i + 1 < args.Length: autoHealScript = args[++i]; break;
-                case "--all-matching"   when i + 1 < args.Length: allMatchingPattern = args[++i]; break;
+                case "--all-matching" when i + 1 < args.Length:
+                    // Block from WKAppBot maintainer channel (DG-WKAppBot CWD) to prevent bulk-fake-resolve abuse.
+                    // Non-maintainer channels (WkAutoQuant, etc.) allowed.
+                    var callerCwd = EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory;
+                    var isWkAppBotMaintainer = callerCwd.Replace('\\','/').Contains("/WKAppBot", StringComparison.OrdinalIgnoreCase)
+                        && !callerCwd.Replace('\\','/').Contains("/WkAutoQuant", StringComparison.OrdinalIgnoreCase);
+                    if (isWkAppBotMaintainer)
+                    {
+                        Console.Error.WriteLine("[MERGE] --all-matching blocked from WKAppBot maintainer channel. Use explicit ts prefixes.");
+                        return 1;
+                    }
+                    allMatchingPattern = args[++i];
+                    break;
+                case "--dry-run": dryRun = true; Console.Error.WriteLine("[MERGE] --dry-run: showing matches only (no write)"); break;
                 case "--keep-originals": keepOriginals = true; break;
                 case "--force": forceNoCheck = true; break;
                 default:
@@ -151,7 +165,45 @@ internal partial class Program
             return 1;
         }
 
+        // Hard cap: 2 for explicit ts-prefix merge; 20 for --all-matching (already channel-restricted)
+        int hardCap = allMatchingPattern != null ? 20 : 2;
+        if (matchedIdxs.Count > hardCap)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"[MERGE] BLOCKED: {matchedIdxs.Count} items matched -- max {hardCap} per merge.");
+            if (allMatchingPattern == null)
+                Console.Error.WriteLine("  Specify exactly 2 ts-prefixes at a time, or use --all-matching with a tighter pattern.");
+            Console.ResetColor();
+            return 1;
+        }
+
+        // --dry-run: show what would be merged, skip write
+        if (dryRun)
+        {
+            Console.WriteLine($"[MERGE:DRY-RUN] Would merge {matchedIdxs.Count} item(s) into \"{title}\":");
+            foreach (var idx in matchedIdxs.OrderBy(i => i))
+            {
+                var node = allNodes[idx].node;
+                var txt = node?["text"]?.GetValue<string>() ?? "";
+                Console.WriteLine($"  * {node?["ts"]?.GetValue<string>()} | {(txt.Length > 60 ? txt[..60] : txt)}");
+            }
+            return 0;
+        }
+
         var matched = matchedIdxs.OrderBy(i => i).Select(i => allNodes[i].node!).ToList();
+
+        // Block re-merging: if any matched item is itself a merge record, reject
+        var alreadyMerged = matched.Where(n => string.Equals(n["type"]?.GetValue<string>(), "merge", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (alreadyMerged.Count > 0)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Error.WriteLine($"[MERGE] BLOCKED: {alreadyMerged.Count} matched item(s) are already merged records.");
+            foreach (var m in alreadyMerged)
+                Console.Error.WriteLine($"     * {m["ts"]?.GetValue<string>()} \"{m["title"]?.GetValue<string>()}\"");
+            Console.Error.WriteLine("  Re-merging an already-merged record is not allowed. Specify original suggest ts-prefixes only.");
+            Console.ResetColor();
+            return 1;
+        }
 
         // -- Validate: same core command --
         if (!forceNoCheck)
@@ -240,6 +292,9 @@ internal partial class Program
 
         var mergeJson = JsonSerializer.Serialize(mergeRecord);
 
+        // Safeguard 1: pre-op snapshot of suggestions.jsonl before destructive write.
+        BackupSuggestFile("merge");
+
         // -- Remove originals --
         if (!keepOriginals)
         {
@@ -283,6 +338,13 @@ internal partial class Program
             }
             else Console.Error.WriteLine("[MERGE] Slack send failed");
         }
+
+        // Auto-commit: subject = the merge pattern when --all-matching, else the title slice.
+        var mergeSubject = !string.IsNullOrEmpty(allMatchingPattern)
+            ? ShortTsForCommit(allMatchingPattern, 50)
+            : ShortTsForCommit(title ?? string.Join(",", tsPrefixes), 50);
+        try { GitCommitSuggestFiles("merge", mergeSubject); }
+        catch (InvalidOperationException) { return 1; }
 
         return 0;
     }

@@ -81,8 +81,8 @@ public static class ScenarioParser
         if (string.IsNullOrWhiteSpace(doc.Scenario.Name))
             throw new ScenarioParseException("scenario.name is required");
 
-        if (string.IsNullOrWhiteSpace(doc.App.Launch))
-            throw new ScenarioParseException("app.launch is required");
+        if (string.IsNullOrWhiteSpace(doc.App.Launch) && string.IsNullOrWhiteSpace(doc.App.Process))
+            throw new ScenarioParseException("app.launch or app.process is required");
 
         if (doc.Steps == null || doc.Steps.Count == 0)
             throw new ScenarioParseException("At least one step is required");
@@ -155,6 +155,18 @@ public static class ScenarioParser
             case "window_maximize":
                 break;
 
+            // Text extraction from a UIA/OCR target (params optional -- store_as for variables)
+            case "read":
+                if (step.Target == null)
+                    throw new ScenarioParseException($"steps[{index}]: 'read' action requires a target");
+                break;
+
+            // External command runner -- params.command is mandatory
+            case "shell":
+                if (string.IsNullOrWhiteSpace(step.Params?.Command))
+                    throw new ScenarioParseException($"steps[{index}]: 'shell' action requires params.command");
+                break;
+
             case "window_close":
                 // dialog_policy is optional; unspecified -> "dont_save" (legacy).
                 if (!string.IsNullOrWhiteSpace(step.DialogPolicy))
@@ -177,7 +189,8 @@ public static class ScenarioParser
                     $"steps[{index}]: unknown action '{step.Action}'. " +
                     "Valid: click, double_click, right_click, type_text, press_key, hotkey, " +
                     "wait, screenshot, assert, scroll, toggle, expand, collapse, select, " +
-                    "set_range, invoke, set_value, window_close, window_minimize, window_maximize");
+                    "set_range, invoke, set_value, window_close, window_minimize, window_maximize, " +
+                    "read, shell");
         }
     }
 }

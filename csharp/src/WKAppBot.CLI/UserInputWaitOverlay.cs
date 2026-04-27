@@ -72,8 +72,8 @@ internal sealed class UserInputWaitWindow : Window
         // -- Build visual tree --
         var outerBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromArgb(0xF5, 0x1A, 0x1A, 0x2E)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00)), // amber
+            Background = new SolidColorBrush(Color.FromArgb(0xF2, 0x04, 0x10, 0x04)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xDD, 0x33)),
             BorderThickness = new Thickness(2),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(20, 14, 20, 14),
@@ -81,47 +81,14 @@ internal sealed class UserInputWaitWindow : Window
 
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
 
-        // Header
-        stack.Children.Add(new TextBlock
-        {
-            Text = "[READINESS] 포커스 양보 대기",
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00)),
-            FontFamily = new FontFamily("Consolas"),
-            FontSize = 11,
-            Margin = new Thickness(0, 0, 0, 10),
-        });
-
-        // Main message
-        stack.Children.Add(new TextBlock
-        {
-            Text = "사용자님의 포커스 양보가 필요합니다",
-            Foreground = Brushes.White,
-            FontFamily = new FontFamily("맑은 고딕"),
-            FontSize = 15,
-            FontWeight = FontWeights.Bold,
-            Margin = new Thickness(0, 0, 0, 6),
-        });
-
-        // Detail
-        stack.Children.Add(new TextBlock
-        {
-            Text = "자동화가 포커스를 확보해야 합니다.\n입력이 없으면 자동으로 진행합니다.",
-            Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
-            FontFamily = new FontFamily("맑은 고딕"),
-            FontSize = 11,
-            Margin = new Thickness(0, 0, 0, 8),
-            TextWrapping = TextWrapping.Wrap,
-        });
-
-        // Idle info (dynamic -- updates on user activity detection)
+        // Action info shown if provided, else minimal idle info
         _idleText = new TextBlock
         {
-            Text = $"마지막 입력: {userIdleMs / 1000.0:F1}초 전",
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xD5, 0x4F)),
+            Text = $"idle {userIdleMs / 1000.0:F1}s",
+            Foreground = new SolidColorBrush(Color.FromRgb(0x22, 0x99, 0x33)),
             FontFamily = new FontFamily("Consolas"),
-            FontSize = 10,
-            FontStyle = FontStyles.Italic,
-            Margin = new Thickness(0, 0, 0, 12),
+            FontSize = 9,
+            Margin = new Thickness(0, 0, 0, 6),
         };
         stack.Children.Add(_idleText);
 
@@ -173,7 +140,7 @@ internal sealed class UserInputWaitWindow : Window
         // Confirm button (Border + TextBlock for clean look, no ugly chrome)
         _buttonBorder = new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00)),
+            Background = new SolidColorBrush(Color.FromRgb(0x00, 0xDD, 0x33)),
             CornerRadius = new CornerRadius(4),
             Padding = new Thickness(28, 8, 28, 8),
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -191,9 +158,9 @@ internal sealed class UserInputWaitWindow : Window
         _buttonBorder.Child = _buttonText;
         _buttonBorder.MouseLeftButtonDown += (_, _) => OnConfirm();
         _buttonBorder.MouseEnter += (_, _) =>
-            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xB8, 0x40));
+            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x55));
         _buttonBorder.MouseLeave += (_, _) =>
-            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x00));
+            _buttonBorder.Background = new SolidColorBrush(Color.FromRgb(0x00, 0xDD, 0x33));
 
         // Deny button
         var denyBorder = new Border

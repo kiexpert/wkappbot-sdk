@@ -183,8 +183,85 @@ internal partial class Program
     /// Start unified analysis worker: mouse CCA + keyboard focus in ONE loop.
     /// Shares single analyze-hack server process, alternates requests.
     /// </summary>
-    internal static void StartMouseCcaWorker(CancellationToken ct) =>
+    internal static void StartMouseCcaWorker(CancellationToken ct)
+    {
         Task.Run(() => UnifiedAnalysisLoop(ct), ct);
+        Task.Run(() => StartFocusGrapTracker(ct), ct);
+    }
+
+    // UIA FocusChangedEvent -- fires instantly on ANY focus move (window change, intra-Chrome node move)
+    static void StartFocusGrapTracker(CancellationToken ct)
+    {
+        try
+        {
+            var uia = new FlaUI.UIA3.UIA3Automation();
+            uia.RegisterFocusChangedEvent(el =>
+            {
+                try
+                {
+                    if (ct.IsCancellationRequested) return;
+                    var elHwnd = IntPtr.Zero;
+                    try { elHwnd = (IntPtr)el.Properties.NativeWindowHandle.ValueOrDefault; } catch { }
+                    var fg = NativeMethods.GetForegroundWindow();
+                    var hwnd = elHwnd != IntPtr.Zero ? NativeMethods.GetAncestor(elHwnd, 2 /*GA_ROOT*/) : fg;
+                    if (hwnd == IntPtr.Zero) return;
+
+                    var path  = WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(
+                        el, uia.TreeWalkerFactory.GetRawViewWalker(), 15);
+                    var winGrap = BuildTargetGrap(hwnd);
+                    string grap;
+                    if (string.IsNullOrWhiteSpace(path))
+                        grap = winGrap;
+                    else if ($"{winGrap}#{path}".Length <= 255)
+                        grap = $"{winGrap}#{path}";
+                    else
+                    {
+                        var segs = path.Split('/');
+                        var compact = segs.Length > 4
+                            ? $"{segs[0]}/**/{string.Join("/", segs[^3..])}"
+                            : path;
+                        var full = $"{winGrap}#{compact}";
+                        if (full.Length <= 255)
+                            grap = full;
+                        else
+                        {
+                            var fName = ""; try { fName = el.Properties.Name.ValueOrDefault ?? ""; } catch { }
+                            grap = !string.IsNullOrEmpty(fName) ? $"{winGrap}#*{fName}*" : winGrap;
+                        }
+                    }
+
+                    if (grap.Length > 255) return;
+                    var old  = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusGrap");
+                    if (old != IntPtr.Zero) NativeMethods.GlobalDeleteAtom((ushort)old.ToInt32());
+                    var atom = NativeMethods.GlobalAddAtomW(grap);
+                    if (atom != 0) NativeMethods.SetPropW(hwnd, "WKAppBot_FocusGrap", (IntPtr)atom);
+
+                    // Also store physical bounding rect so type-action can click correct coords
+                    // without UIA tree walk (robust even when path is stale).
+                    try
+                    {
+                        var r = el.Properties.BoundingRectangle.ValueOrDefault;
+                        if (r.Width > 0 && r.Height > 0)
+                        {
+                            var rectStr = $"{r.X},{r.Y},{r.Width},{r.Height}";
+                            var oldRect = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusRect");
+                            if (oldRect != IntPtr.Zero) NativeMethods.GlobalDeleteAtom((ushort)oldRect.ToInt32());
+                            var rectAtom = NativeMethods.GlobalAddAtomW(rectStr);
+                            if (rectAtom != 0) NativeMethods.SetPropW(hwnd, "WKAppBot_FocusRect", (IntPtr)rectAtom);
+                        }
+                    }
+                    catch { }
+                }
+                catch { }
+            });
+            ct.WaitHandle.WaitOne(); // keep alive until cancelled
+            uia.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[FOCUS-GRAP] tracker error: {ex.Message}");
+        }
+    }
 
     static void EnsureHackServer()
     {
@@ -563,6 +640,64 @@ internal partial class Program
     }
 
     static string _lastFocusChainResult = "";
+
+    // -- Keyboard focus grap cache --
+    static IntPtr  _lastFocusedCtl  = IntPtr.Zero;
+    static IntPtr  _lastFocusedWin  = IntPtr.Zero;
+
+    static void CacheFocusGrapOnChange()
+    {
+        try
+        {
+            var fg = NativeMethods.GetForegroundWindow();
+            if (fg == IntPtr.Zero) return;
+            uint tid = NativeMethods.GetWindowThreadProcessId(fg, out _);
+            var gti = new NativeMethods.GUITHREADINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.GUITHREADINFO>() };
+            if (!NativeMethods.GetGUIThreadInfo(tid, ref gti)) return;
+            var focCtl = gti.hwndFocus != IntPtr.Zero ? gti.hwndFocus : fg;
+
+            // Only update when focus control or window changed
+            if (focCtl == _lastFocusedCtl && fg == _lastFocusedWin) return;
+            _lastFocusedCtl = focCtl;
+            _lastFocusedWin = fg;
+
+            // Build compact grap for the focused UIA element
+            string? grap = null;
+            try
+            {
+                using var uia = new FlaUI.UIA3.UIA3Automation();
+                var focused = uia.FocusedElement();
+                if (focused != null)
+                {
+                    var fName = focused.Properties.Name.ValueOrDefault ?? "";
+                    var path  = WKAppBot.Win32.Accessibility.GrapHelper.BuildAbsoluteTagPath(
+                        focused, uia.TreeWalkerFactory.GetRawViewWalker(), 15);
+                    var winGrap = BuildTargetGrap(fg);
+                    var full = string.IsNullOrWhiteSpace(path) ? winGrap : $"{winGrap}#{path}";
+
+                    if (full.Length <= 255)
+                        grap = full;
+                    else if (path.Split('/') is { Length: > 4 } segs)
+                    {
+                        var compact = $"{winGrap}#{segs[0]}/**/{string.Join("/", segs[^3..])}";
+                        grap = compact.Length <= 255 ? compact : (!string.IsNullOrEmpty(fName) ? $"{winGrap}#*{fName}*" : winGrap);
+                    }
+                    else
+                        grap = !string.IsNullOrEmpty(fName) ? $"{winGrap}#*{fName}*" : winGrap;
+                }
+            }
+            catch { }
+
+            if (string.IsNullOrEmpty(grap) || grap.Length > 255) return;
+
+            // Remove old atom, store new one
+            var old = NativeMethods.GetPropW(fg, "WKAppBot_FocusGrap");
+            if (old != IntPtr.Zero) NativeMethods.GlobalDeleteAtom((ushort)old.ToInt32());
+            var atom = NativeMethods.GlobalAddAtomW(grap);
+            if (atom != 0) NativeMethods.SetPropW(fg, "WKAppBot_FocusGrap", (IntPtr)atom);
+        }
+        catch { }
+    }
 
     /// <summary>
     /// Returns true if hwnd belongs to wkappbot-core itself (ScreenSaver, WhisperRing, overlays).

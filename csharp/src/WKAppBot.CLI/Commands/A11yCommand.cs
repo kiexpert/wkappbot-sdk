@@ -20,6 +20,10 @@ internal partial class Program
         if (args.Any(a => a is "--help" or "-h")) { TryPrintCommandHelp("a11y", args); return 0; }
         if (args.Any(a => a is "--regression")) { TryRunRegression("a11y", args); return 0; }
 
+        // [OVERLAY-GUARD] Pre-check: suppress full-screen opaque overlays (e.g. NVIDIA GeForce Overlay)
+        // Detects WS_EX_LAYERED windows covering >=80% of primary monitor with alpha>0 and forces alpha=0.
+        SuppressFullscreenOpaqueOverlays();
+
         // [FOCUS-STEAL] End-of-command sentinel: snapshots foreground now, on scope exit
         // verifies it hasn't changed -- if it did, restore + self-report via AutoBugReport.
         // Skipped for find (read-only probing, legitimate foreground probing is expected).
@@ -127,17 +131,20 @@ internal partial class Program
             var ver = typeof(Program).Assembly.GetName().Version;
             var verStr = ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "";
             Console.WriteLine();
-            Console.WriteLine($"  WKAppBot a11y {verStr}");
+            Console.WriteLine($"  WKAppBot a11y {verStr}  ·  AppUse™");
             Console.WriteLine($"  A MUD-style portal for AI to see and touch the real world.");
             Console.WriteLine($"  find = look, read = examine, invoke = open the door.");
             Console.WriteLine($"  31 actions · 3-tier fallback · focusless · zoom overlay");
             Console.WriteLine($"  UIA -> Win32 -> SendInput + CDP web fallback -- just works.");
+            Console.WriteLine($"  (They have Computer Use. We have App Use.");
+            Console.WriteLine($"   Not replacing apps -- living with them. Legacy included.)");
+
             Console.WriteLine();
             Console.WriteLine("  Usage: a11y <action> <grap>[#uia-scope] [options]");
             Console.WriteLine();
             Console.WriteLine("=== Discovery Actions (4) =================================");
             Console.WriteLine("  inspect     UIA element tree (delegates to inspect command)");
-            Console.WriteLine("  windows     List visible windows (delegates to windows command)");
+            Console.WriteLine("  windows     List visible windows -- converted to a11y find (v6.1 alias)");
             Console.WriteLine("  screenshot  Capture window screenshot (delegates to capture)");
             Console.WriteLine("  ocr         OCR text extraction (delegates to ocr command)");
             Console.WriteLine();
@@ -187,7 +194,7 @@ internal partial class Program
             Console.WriteLine("  --nth 3~    From 3rd to end");
             Console.WriteLine("  --nth ~3    First to 3rd");
             Console.WriteLine("  --nth 1,3~  Union: #1 plus #3 onward");
-            Console.WriteLine("  --all       All matches");
+            Console.WriteLine("  --all       All matches (find/click/invoke only — not permitted for close)");
             Console.WriteLine();
             Console.WriteLine("=== Options ===============================================");
             Console.WriteLine("  --depth N   Tree depth for find (default: 3)");
@@ -232,12 +239,14 @@ internal partial class Program
             Console.WriteLine("    HTS/0338#RealTimeAcct  / = Win32 child, # = UIA scope");
             Console.WriteLine("    */? wildcards · regex: · `;` OR · aid fallback");
             Console.WriteLine();
-            Console.WriteLine("--─ © 2026 WilKim · github.com/kiexpert/WKAppBot ----------");
+            Console.WriteLine("--─ © 2026 WilKim · AppUse™ · github.com/kiexpert/WKAppBot --");
             return 1;
         }
 
         var action = args[0].ToLowerInvariant();
         var grap = args[1];
+        if ((action == "find" || action == "inspect") && (grap == "*" || grap == "**"))
+            PrintSkillSearchHint(action);
         // @name alias expansion -- resolves before any grap parsing
         if (grap.StartsWith('@'))
         {
@@ -245,6 +254,8 @@ internal partial class Program
             if (healNote != null) Console.Error.WriteLine(healNote);
         }
         bool all = args.Any(a => a == "--all");
+        if (action == "close" && all)
+            return Error("Safety: --all is not permitted with close. Use #scope / hwnd: / --nth N to narrow targets explicitly.");
         bool force = args.Any(a => a == "--force");
         // --allow-ancestors: bypass ancestor process guard for ALL interactive actions.
         // ! ALWAYS prints warning -- so junior AIs learn this is dangerous.
@@ -255,6 +266,7 @@ internal partial class Program
         bool speak = args.Any(a => a == "--speak");
         bool repeat = args.Any(a => a == "--repeat");
         bool hotkey = args.Any(a => a == "--hotkey"); // type: Win32 label/menu dispatch instead of text input
+        bool noEnter = args.Any(a => a == "--no-enter"); // type: skip auto-Enter after text (default: Enter appended)
         int countN = 1;
         { var ci = Array.IndexOf(args, "--count"); if (ci >= 0 && ci + 1 < args.Length && int.TryParse(args[ci + 1], out var cv)) countN = Math.Max(1, cv); }
 
@@ -299,6 +311,30 @@ internal partial class Program
             return Error("resize requires --w N --h N");
         // keystroke/hotkey -> type alias (통합)
         if (action is "hotkey" or "keystroke") action = "type";
+
+        // --callout: queue the type action for user approval (non-blocking, mannerly)
+        bool useCallout = args.Any(a => a.Equals("--callout", StringComparison.OrdinalIgnoreCase));
+        if (action == "type" && useCallout && !string.IsNullOrWhiteSpace(text))
+        {
+            // Find first matching target to get its rect for callout placement
+            var pending = CalloutQueueReadPending();
+            // Resolve hwnd from grap quickly (best-effort, fallback to zero rect)
+            System.Drawing.Rectangle calloutRect = default;
+            IntPtr calloutHwnd = IntPtr.Zero;
+            try
+            {
+                var (w32segs, _) = GrapHelper.SplitGrap(grap ?? "");
+                if (w32segs.Length > 0)
+                {
+                    var wins = WindowFinder.FindWindows(w32segs[0], stopOnFirstMatch: true);
+                    if (wins.Count > 0) { calloutHwnd = wins[0].Handle; NativeMethods.GetWindowRect(calloutHwnd, out var wr); calloutRect = new System.Drawing.Rectangle(wr.Left, wr.Top, wr.Right - wr.Left, wr.Bottom - wr.Top); }
+                }
+            }
+            catch { }
+            CalloutQueueAppend(calloutHwnd, text.TrimEnd('\r', '\n'), calloutRect);
+            Console.WriteLine($"# CALLOUT queued text=\"{text.TrimEnd('\r','\n').Replace("\"","\\\"").Take(60).Aggregate("",((a,c)=>a+c))}\" depth={pending.Count + 1}");
+            return 0; // non-blocking: Eye daemon will drain queue and show callout
+        }
         // type/set-value/eval: --text 없으면 잔여 위치 인수(index 2+, -- 미시작) 공백 합치기
         // a11y type "*App*" hello world  ->  text = "hello world"
         // a11y type "*App*" 파일/저장 --hotkey  ->  text = "파일/저장"
@@ -312,15 +348,24 @@ internal partial class Program
             for (int i = 2; i < args.Length - 1; i++)
                 if (args[i].StartsWith("--") && valueOpts.Contains(args[i]))
                     consumedIdx.Add(i + 1);
+            // --enter mid-text: treated as \n separator between text segments.
+            // e.g.: a11y type "target" "line1" --enter "line2" -> "line1\nline2"
             var parts = args.Skip(2)
                 .Select((a, i) => (a, idx: i + 2))
-                .Where(t => !t.a.StartsWith("--") && !consumedIdx.Contains(t.idx))
-                .Select(t => t.a)
+                .Where(t => !consumedIdx.Contains(t.idx)
+                         && (t.a == "--enter" || (!t.a.StartsWith("--") )))
+                .Select(t => t.a == "--enter" ? "\r" : t.a)
                 .ToArray();
-            if (parts.Length > 0) text = string.Join(" ", parts);
+            if (parts.Length > 0) text = string.Join(" ", parts).Replace(" \r ", "\r").Replace(" \r", "\r").Replace("\r ", "\r");
         }
         if ((action is "type" or "set-value" or "eval") && text == null)
             return Error($"{action} requires text argument (e.g., a11y {action} \"target\" \"value\")");
+
+        // Auto-append \r (VK_RETURN) after type unless --no-enter specified.
+        // \r = real Enter key (submit); \n = Unicode LF (line break within multi-line fields).
+        // Use --no-enter for HTS fields or multi-step input where Enter must not fire.
+        if (action == "type" && text != null && !noEnter && !text.EndsWith('\r') && !text.EndsWith('\n'))
+            text += "\r";
 
         if (action == "set-range" && rangeValue == null)
             return Error("set-range requires --value N");
@@ -483,6 +528,11 @@ internal partial class Program
             });
         }
 
+        // Process-only results (no HWND) are only meaningful for 'find' display.
+        // For any interactive action, silently drop them -- they can't be acted on.
+        if (action != "find")
+            allWindows.RemoveAll(w => w.IsProcessOnly);
+
         if (allWindows.Count == 0)
             return Error($"No window found: \"{win32Segments[0]}\"");
 
@@ -551,27 +601,43 @@ internal partial class Program
         }
 
         // -- JSON5 TARGET: usable as grap pattern in any command --
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        foreach (var t in targets)
+        // Skip for "find" action: A11yFind handles its own output with full details.
+        if (action != "find")
         {
-            NativeMethods.GetWindowThreadProcessId(t.Handle, out uint tPid);
-            string tProc = ""; try { tProc = System.Diagnostics.Process.GetProcessById((int)tPid).ProcessName; } catch { }
-            var tCompact = BuildCompactWinGrap(t.Handle);
-            var tGrap = BuildFindGrap(t.Handle, tPid, tProc, tCompact, t);
-            var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
-            if (action != "find")
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            foreach (var t in targets)
             {
+                NativeMethods.GetWindowThreadProcessId(t.Handle, out uint tPid);
+                string tProc = ""; try { tProc = System.Diagnostics.Process.GetProcessById((int)tPid).ProcessName; } catch { }
+                var tCompact = BuildCompactWinGrap(t.Handle);
+                var tGrap = BuildFindGrap(t.Handle, tPid, tProc, tCompact, t);
+                var tStable = BuildStableGrap(t.Handle, tProc);
+                var uiaSuffix = !string.IsNullOrEmpty(uiaPath) ? $"#{uiaPath}" : "";
                 Console.Error.WriteLine($"[A11Y] TARGET: {tGrap}{uiaSuffix}");
-                Console.WriteLine(Ansi.TargetLine($"# TARGET {tGrap}{uiaSuffix}"));
+                Console.WriteLine(Ansi.TargetLine($"# TARGET {AppendFocusPath(tStable, t.Handle)}"));
             }
+            Console.ResetColor();
         }
-        Console.ResetColor();
 
         if (action == "find")
         {
             // Exclude foreground-host heuristic entries -- they matched no real field
             targets = targets.Where(t => t.MatchedVia != "context").ToList();
-            using var findAutomation = new UIA3Automation();
+            // Create UIA3Automation only when at least one target needs it (non-Electron windows).
+            // For Electron apps (VS Code, Codex, Claude), UIA3Automation.Dispose() flushes the
+            // cached UIA tree and takes 30+s. Skip creation entirely for Electron-only searches.
+            static bool NeedsUia(IntPtr h)
+            {
+                var cls = WKAppBot.Win32.Window.WindowFinder.GetClassName(h);
+                WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(h, out uint tp);
+                var proc2 = WKAppBot.Win32.Native.NativeMethods.TryGetProcessNameFast(tp) ?? "";
+                return !WKAppBot.Win32.Window.WindowFinder.IsElectronWindow(cls, proc2)
+                    && !cls.StartsWith("Afx:", StringComparison.OrdinalIgnoreCase)
+                    && !cls.StartsWith("_NKHero", StringComparison.OrdinalIgnoreCase)
+                    && !cls.Equals("#32770", StringComparison.OrdinalIgnoreCase);
+            }
+            bool anyNeedsUia = targets.Any(t => !t.IsProcessOnly && NeedsUia(t.Handle));
+            UIA3Automation? findAutomationOrNull = anyNeedsUia ? new UIA3Automation() : null;
             string? multiHeader = targets.Count > 1 ? $"### TARGETS  {targets.Count} matches" : null;
             var findExtraArgs = args.Skip(2).Where(a => !a.StartsWith("--deep") && a != "--depth").ToArray();
             for (int idx = 0; idx < targets.Count; idx++)
@@ -579,17 +645,22 @@ internal partial class Program
                 var win = targets[idx];
                 try
                 {
-                    var findRoot = findAutomation.FromHandle(win.Handle);
-                    if (findRoot != null)
-                        // multiHeader printed once: after FOCUS on first target, or before second target
-                        A11yFind(findRoot, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs,
-                            originalHit: win, multiHeader: idx == 0 ? multiHeader : null);
+                    var findRoot = (!win.IsProcessOnly && findAutomationOrNull != null)
+                        ? findAutomationOrNull.FromHandle(win.Handle) : null;
+                    // Always call A11yFind even with null root (A11yFind handles Electron windows
+                    // without UIA traversal via skipUia check inside).
+                    A11yFind(findRoot!, win.Handle, findDepth, printFocus: idx == 0, extraArgs: findExtraArgs,
+                        originalHit: win, multiHeader: idx == 0 ? multiHeader : null, totalCount: targets.Count, isBest: idx == 0);
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"[A11Y] find fast-path failed for 0x{win.Handle:X}: {ex.Message}");
                 }
             }
+            // Only dispose UIA automation when it was created (non-Electron targets).
+            // UIA3Automation.Dispose() on Electron windows flushes the entire cached
+            // accessibility tree and blocks for 30+s. FastExit handles process cleanup.
+            if (anyNeedsUia) findAutomationOrNull?.Dispose();
             return 0;
         }
 
@@ -612,15 +683,26 @@ internal partial class Program
         var (delegated, delegateExit) = ElevationHelper.TryDelegateIfElevated(
             targets[0].Handle, "a11y", args);
         if (delegated) return delegateExit;
-        // If elevation was needed but delegation failed (MCP/Eye mode), and we have UIA scope,
-        // skip UIA traversal entirely (would hang 60s on UIPI block)
-        if (action != "find" && _targetElevated == true && !NativeMethods.IsCurrentProcessElevated() && !string.IsNullOrEmpty(uiaPath))
+        // If elevation was needed but delegation failed, guard against silent UIPI failures
+        if (!delegated && _targetElevated == true && !NativeMethods.IsCurrentProcessElevated())
         {
-            Console.Error.WriteLine($"[A11Y] UIPI block: cannot traverse UIA on elevated target without admin rights");
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine($"[A11Y] Target is admin (pid={_targetPid}) -- elevation required for #scope access");
-            Console.ResetColor();
-            return 1;
+            // restore/focus/minimize silently fail via UIPI -- warn immediately
+            if (action is "restore" or "focus" or "minimize" or "maximize")
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Error.WriteLine($"[A11Y] WARN: '{action}' on elevated process (pid={_targetPid}) will fail silently (UIPI). Add --sudo.");
+                Console.ResetColor();
+                return 1;
+            }
+            // UIA traversal would hang 60s on UIPI -- skip if #scope given
+            if (action != "find" && !string.IsNullOrEmpty(uiaPath))
+            {
+                Console.Error.WriteLine($"[A11Y] UIPI block: cannot traverse UIA on elevated target without admin rights");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.Error.WriteLine($"[A11Y] Target is admin (pid={_targetPid}) -- elevation required for #scope access");
+                Console.ResetColor();
+                return 1;
+            }
         }
 
         // === STEP 4.95: close on browser window ===
@@ -728,10 +810,10 @@ internal partial class Program
         PulseStep.Mark("uia-ready");
 
         // Ambiguity guard for close: if grap matched >1 windows and caller did not narrow
-        // via --all / --nth / #scope / hwnd: prefix, bail out and show the candidate list
+        // via --nth / #scope / hwnd: prefix, bail out and show the candidate list
         // so the user can pick explicitly. Prevents loose patterns from closing the wrong
         // window (VS Code / browser / terminal -- work lost).
-        if (action == "close" && targets.Count() > 1 && !all)
+        if (action == "close" && targets.Count() > 1)
         {
             bool explicitNarrower = args.Any(a => a == "--nth")
                 || grap.StartsWith("hwnd:", StringComparison.OrdinalIgnoreCase)
@@ -739,12 +821,11 @@ internal partial class Program
             if (!explicitNarrower)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Error.WriteLine($"[A11Y] close AMBIGUOUS -- \"{grap}\" matched {targets.Count()} windows. Narrow via #scope / hwnd: / --nth N / --all:");
+                Console.Error.WriteLine($"[A11Y] close AMBIGUOUS -- \"{grap}\" matched {targets.Count()} windows. Narrow via #scope / hwnd: / --nth N:");
+                Console.Error.WriteLine($"[A11Y] ambiguous close -- showing find results:");
                 Console.ResetColor();
-                foreach (var t in targets.Take(20))
-                    Console.Error.WriteLine($"  0x{t.Handle.ToInt64():X8}  \"{t.Title}\"");
-                if (targets.Count() > 20)
-                    Console.Error.WriteLine($"  ... and {targets.Count() - 20} more");
+                TargetAmbiguityGuard.PrintMultiWindowTargets(targets.ToList(), "close");
+                Console.Error.WriteLine($"[A11Y] Tip: a11y find \"<target>\" to explore / re-run with a narrower grap / #scope / hwnd: / --nth N");
                 return 2;
             }
         }
@@ -766,6 +847,11 @@ internal partial class Program
             var title = win.Title;
             var tag = $"0x{hwnd.ToInt64():X} \"{title}\"";
 
+            // Declared here for scope: used in Electron fallback below
+            AutomationElement? hotFocusEl = null;
+            string hotFocusType = "", hotFocusName = "";
+            System.Drawing.Rectangle hotFocusRect = default;
+
             // -- Diagnostic: foreground window + UIA focused element --
             {
                 var fgHwnd = NativeMethods.GetForegroundWindow();
@@ -777,7 +863,7 @@ internal partial class Program
                 var idleMs = NativeMethods.GetUserIdleMs();
                 Console.Error.WriteLine($"[FOCUS] fg=0x{fgHwnd.ToInt64():X} \"{fgTitle}\" | target={tag} | {relation} | idle={idleMs}ms");
 
-                // UIA focused element chain
+                // UIA focused element chain -- type+name saved for scope fallback validation on Electron
                 try
                 {
                     using var uiaAuto = new UIA3Automation();
@@ -789,10 +875,31 @@ internal partial class Program
                         if (fName.Length > 40) fName = fName[..40] + "...";
                         var fAid = focused.Properties.AutomationId.ValueOrDefault ?? "";
                         var fRect = "";
-                        try { var r = focused.Properties.BoundingRectangle.ValueOrDefault; fRect = $" rect=({r.X},{r.Y} {r.Width}x{r.Height})"; } catch { }
+                        System.Drawing.Rectangle fBounds = default;
+                        try { fBounds = focused.Properties.BoundingRectangle.ValueOrDefault; fRect = $" rect=({fBounds.X},{fBounds.Y} {fBounds.Width}x{fBounds.Height})"; } catch { }
                         NativeMethods.GetWindowThreadProcessId(focused.Properties.NativeWindowHandle.ValueOrDefault, out uint focPid);
                         var focRelation = focPid == tPid ? "TARGET-PROC" : focPid == fgPid ? "FG-PROC" : "OTHER";
                         Console.Error.WriteLine($"[FOCUS] uia-focused: {fType} \"{fName}\" (aid=\"{fAid}\"){fRect} | {focRelation}");
+                        // Electron elements have NativeWindowHandle=0 so focPid=0 → focRelation="OTHER"
+                        // even when they belong to the target window. Use window-rect overlap instead.
+                        bool focusedInTargetWindow = focRelation is "TARGET-PROC" or "SAME";
+                        if (!focusedInTargetWindow && (focRelation == "OTHER" || focRelation == "FG-PROC"))
+                        {
+                            try
+                            {
+                                if (fBounds.Width > 0 && NativeMethods.GetWindowRect(hwnd, out var wr))
+                                    focusedInTargetWindow = fBounds.X >= wr.Left && fBounds.X < wr.Right
+                                                         && fBounds.Y >= wr.Top  && fBounds.Y < wr.Bottom;
+                            }
+                            catch { }
+                        }
+                        if (focusedInTargetWindow)
+                        {
+                            hotFocusEl = focused;
+                            hotFocusType = fType;
+                            hotFocusName = fName; // full name (already truncated above)
+                            hotFocusRect = fBounds; // only set when confirmed in target window
+                        }
                     }
                 }
                 catch { /* best effort */ }
@@ -807,7 +914,7 @@ internal partial class Program
                 {
                     Console.Error.WriteLine($"[A11Y] Win32 child not found: \"{win32Segments[i]}\" in {tag}");
                     // Guard Layer 4: Win32 child miss
-                    TargetAmbiguityGuard.ShowWin32ChildSiblings(hwnd, win32Segments[i], grap, action, uiaPath, win32Segments, i);
+                    TargetAmbiguityGuard.ShowWin32ChildSiblings(hwnd, win32Segments[i], grap ?? "", action, uiaPath, win32Segments, i);
                     childError = true;
                     break;
                 }
@@ -826,13 +933,176 @@ internal partial class Program
             // All actions: magnifier + blocker detection
             // Interaction actions: + yield popup if user is active
             {
+                // Set pending content for readiness callout to show typed text.
+                // Single-callout policy: readiness.Probe's yield popup will display the
+                // actual text about to be typed instead of the raw CLI args string.
+                // Cleared after the targets loop.
+                if (action is "type" or "set-value" && !string.IsNullOrWhiteSpace(text))
+                    CalloutInputWindow.PendingContent = text;
+
+                // Set exact element rect for callout tail tip.
+                // Priority: 1) live FindFirst(Edit,"Message input") on target window (authoritative)
+                //           2) hotFocusRect (confirmed in-window at focus-diagnostic time)
+                //           3) WKAppBot_FocusRect window property (stored by focus tracker)
+                if (action is "type" or "set-value" && IsElectronWindow(hwnd))
+                {
+                    System.Drawing.Rectangle tailRect = default;
+
+                    // 1. Live UIA inspect -- returns A11yNodeInfo with ElementRect + TipRect
+                    try
+                    {
+                        var inspectTask = System.Threading.Tasks.Task.Run(() =>
+                            InspectTargetA11yNode(hwnd, "Message input"));
+                        if (inspectTask.Wait(800) && inspectTask.Result != null)
+                        {
+                            var info = inspectTask.Result;
+                            tailRect = info.TipRect;
+                            CalloutInputWindow.PendingElementRect = info.ElementRect; // full element bounds for body placement
+                        }
+                        else
+                            Console.WriteLine("[CALLOUT] tail rect: inspect timeout/miss");
+                    }
+                    catch (Exception ex) { Console.WriteLine($"[CALLOUT] tail rect inspect error: {ex.Message}"); }
+
+                    // 2. hotFocusRect fallback
+                    if (tailRect.IsEmpty && !hotFocusRect.IsEmpty)
+                        tailRect = hotFocusRect;
+
+                    // 3. WKAppBot_FocusRect property fallback
+                    if (tailRect.IsEmpty)
+                    {
+                        try
+                        {
+                            var ra = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusRect");
+                            if (ra != IntPtr.Zero)
+                            {
+                                var rsb = new System.Text.StringBuilder(64);
+                                NativeMethods.GlobalGetAtomNameW((ushort)ra.ToInt32(), rsb, 64);
+                                var pts = rsb.ToString().Split(',');
+                                if (pts.Length == 4 && int.TryParse(pts[0], out int rx) && int.TryParse(pts[1], out int ry)
+                                    && int.TryParse(pts[2], out int rw) && int.TryParse(pts[3], out int rh) && rw > 0)
+                                    tailRect = new System.Drawing.Rectangle(rx, ry, rw, rh);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    if (!tailRect.IsEmpty)
+                        CalloutInputWindow.PendingTargetRect = tailRect;
+                }
+
+                // Bind PendingAction: callout executes type directly on O-press (no round-trip).
+                // Uses TP2FindFirst (focusless) then clipboard+Ctrl+V fallback.
+                if (action == "type" && !string.IsNullOrWhiteSpace(text) && IsElectronWindow(hwnd))
+                {
+                    var capturedHwnd = hwnd;
+                    var capturedText = text!;
+                    CalloutInputWindow.PendingAction = () =>
+                    {
+                        Console.WriteLine($"[CALLOUT:ACTION] Executing type on hwnd=0x{capturedHwnd:X} text='{capturedText}'");
+                        bool ok = A11yType(null!, capturedHwnd, capturedText, hotkey: false);
+                        if (ok)
+                        {
+                            // Auto-submit: send Enter to the Electron renderer after typing
+                            System.Threading.Thread.Sleep(100);
+                            bool entered = TryElectronRendererEnter(capturedHwnd);
+                            Console.WriteLine($"[CALLOUT:ACTION] Enter submit: {(entered ? "ok" : "fallback")}");
+                            if (!entered)
+                            {
+                                // Fallback: Ctrl+Enter or plain Enter via SendInput
+                                WKAppBot.Win32.Input.KeyboardInput.PressKey("enter");
+                            }
+                        }
+                        return ok;
+                    };
+                }
+
+                // --no-wait: show callout async (fire-and-forget), return immediately
+                if (args.Contains("--no-wait") && CalloutInputWindow.PendingAction != null)
+                {
+                    NativeMethods.GetWindowThreadProcessId(hwnd, out var _noWaitPid);
+                    var _noWaitProc = NativeMethods.TryGetProcessNameFast(_noWaitPid) ?? "?";
+                    var _noWaitGrap = $"{{hwnd:0x{hwnd:X8},proc:'{_noWaitProc}'}}";
+                    CalloutInputWindow.ShowAsync(
+                        CalloutInputWindow.PendingContent ?? text ?? "",
+                        CalloutContentType.Text,
+                        CalloutInputWindow.PendingElementRect,
+                        CalloutInputWindow.PendingAction,
+                        grapHint: _noWaitGrap);
+                    CalloutInputWindow.PendingAction = null;
+                    CalloutInputWindow.PendingContent = null;
+                    Console.Error.WriteLine($"[A11Y] --no-wait: callout shown async for {_noWaitGrap}");
+                    ok++;
+                    continue;
+                }
+
                 var probeReport = readiness.Probe(new InputReadinessRequest
                 {
                     TargetHwnd = hwnd,
                     IntendedAction = action,
+                    // close/minimize legitimately change foreground -- skip FocusStealer probe.
+                    QuickMode = action is "close" or "minimize",
                 });
                 if (probeReport.UserYieldConfirmed)
+                {
                     Console.Error.WriteLine($"[A11Y] yield confirmed for {action}");
+
+                    // After approval: bring target window to foreground and get best available click rect.
+                    if (action == "type" && IsElectronWindow(hwnd))
+                    {
+                        // Ensure target is in foreground so TP2/Ctrl+V land correctly.
+                        NativeMethods.SmartSetForegroundWindow(hwnd);
+
+                        // 1. Try fresh UIA focus capture (reliable when target just came to foreground).
+                        try
+                        {
+                            System.Threading.Thread.Sleep(80);
+                            using var freshUia = new UIA3Automation();
+                            var freshFocused = freshUia.FocusedElement();
+                            if (freshFocused != null)
+                            {
+                                var ffType = "?"; try { ffType = freshFocused.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                                var ffName = freshFocused.Properties.Name.ValueOrDefault ?? "";
+                                NativeMethods.GetWindowThreadProcessId(freshFocused.Properties.NativeWindowHandle.ValueOrDefault, out uint ffPid);
+                                NativeMethods.GetWindowThreadProcessId(hwnd, out uint tPid2);
+                                if (ffType == "Edit" && ffName == "Message input" && ffPid == tPid2)
+                                {
+                                    hotFocusEl = freshFocused;
+                                    hotFocusType = ffType;
+                                    hotFocusName = ffName;
+                                    try { hotFocusRect = freshFocused.Properties.BoundingRectangle.ValueOrDefault; } catch { }
+                                    Console.Error.WriteLine($"[A11Y] yield: fresh focused Edit rect=({hotFocusRect.X},{hotFocusRect.Y} {hotFocusRect.Width}x{hotFocusRect.Height})");
+                                }
+                            }
+                        }
+                        catch { }
+
+                        // 2. Fallback: read stored WKAppBot_FocusRect (physical coords, not stale like UIA path).
+                        if (hotFocusRect.IsEmpty)
+                        {
+                            try
+                            {
+                                var rAtom = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusRect");
+                                if (rAtom != IntPtr.Zero)
+                                {
+                                    var rSb = new System.Text.StringBuilder(64);
+                                    NativeMethods.GlobalGetAtomNameW((ushort)rAtom.ToInt32(), rSb, 64);
+                                    var parts = rSb.ToString().Split(',');
+                                    if (parts.Length == 4 && int.TryParse(parts[0], out int rx)
+                                        && int.TryParse(parts[1], out int ry) && int.TryParse(parts[2], out int rw)
+                                        && int.TryParse(parts[3], out int rh) && rw > 0 && rh > 0)
+                                    {
+                                        hotFocusRect = new System.Drawing.Rectangle(rx, ry, rw, rh);
+                                        hotFocusType = "Edit";
+                                        hotFocusName = "Message input";
+                                        Console.Error.WriteLine($"[A11Y] yield: stored FocusRect ({rx},{ry} {rw}x{rh})");
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                }
 
                 // -- Blocker retarget: 팝업이 타겟을 가리면 팝업으로 리타겟 --
                 if (probeReport.ActiveBlocker != null)
@@ -841,6 +1111,10 @@ internal partial class Program
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Error.WriteLine($"[A11Y] ! RETARGET: [{blocker.ClassName}] \"{blocker.Title}\" blocking {tag}");
                     Console.ResetColor();
+
+                    // Emit structured BLOCKED grap so caller can programmatically dismiss
+                    EmitBlockerGrap(blocker);
+
                     hwnd = blocker.Handle;
                     title = blocker.Title;
                     tag = $"0x{hwnd.ToInt64():X} \"{title}\"";
@@ -848,6 +1122,17 @@ internal partial class Program
             }
 
             bool success = false;
+
+            // Early-exit: PendingAction already fired (by callout or silent auto-approve).
+            // Skip entire scope walk + A11yType to avoid race / double-execution.
+            if (action == "type" && CalloutInputWindow.ActionExecuted)
+            {
+                CalloutInputWindow.ActionExecuted = false;
+                Console.Error.WriteLine("[A11Y] type -- PendingAction fired, skipping scope walk + legacy");
+                ok++;
+                continue; // next target (outer foreach)
+            }
+            CalloutInputWindow.ActionExecuted = false; // clear for non-PendingAction cases
 
             if (isElementAction)
             {
@@ -918,8 +1203,10 @@ internal partial class Program
                 }
                 PulseStep.Mark("uia-from-handle-done");
 
-                // -- Guard Layer 5: Element action without #scope --
-                if (string.IsNullOrEmpty(uiaPath) && TargetAmbiguityGuard.CheckMissingScope(root, hwnd, title, action, isInteractiveAction))
+                // -- Guard Layer 5: Element action without #scope (skipped when grap has explicit hwnd:0x...) --
+                // Also skip when the window has a stored WKAppBot_FocusGrap cache: the scope walk below uses it.
+                bool hasFocusGrapCache = string.IsNullOrEmpty(uiaPath) && NativeMethods.GetPropW(hwnd, "WKAppBot_FocusGrap") != IntPtr.Zero;
+                if (!hasFocusGrapCache && string.IsNullOrEmpty(uiaPath) && TargetAmbiguityGuard.CheckMissingScope(root, hwnd, title, action, isInteractiveAction, grap))
                 {
                     fail++;
                     continue;
@@ -968,7 +1255,20 @@ internal partial class Program
                             uiaPath.Split(new[] { '/', '#' }, StringSplitOptions.RemoveEmptyEntries)
                                    .All(s => s == "?");
                         if (!isDyTag)
-                            scoped = GrapHelper.FindUiaScope(root, uiaPath);
+                            scoped = GrapHelper.FindUiaScope(root, uiaPath ?? "");
+
+                        // For "type" on Electron: discard non-Edit results (e.g. Text element in terminal
+                        // whose content contains "Message input") so focus-grap cache fallback can take over.
+                        if (scoped != null && action == "type" && IsElectronWindow(hwnd))
+                        {
+                            var sType2 = "?"; try { sType2 = scoped.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                            if (sType2 != "Edit")
+                            {
+                                Console.Error.WriteLine($"[A11Y] type: scope walk found {sType2} (not Edit) -- discarding, will try focus grap cache");
+                                scoped = null;
+                            }
+                        }
+
                         if (isUnknownPath && scoped != null)
                         {
                             Console.Error.WriteLine($"[A11Y] Unknown path '?' -- listing available elements for analysis:");
@@ -991,6 +1291,57 @@ internal partial class Program
                                 }
                             }
                             catch { }
+                        }
+                    }
+
+                    // SetPropW focus grap cache: Eye stores last focused node's grap on each window.
+                    // Works even when window is in background -- read regardless of foreground state.
+                    if (scoped == null)
+                    {
+                        var atom = NativeMethods.GetPropW(hwnd, "WKAppBot_FocusGrap");
+                        if (atom != IntPtr.Zero)
+                        {
+                            var sb = new System.Text.StringBuilder(256);
+                            NativeMethods.GlobalGetAtomNameW((ushort)atom.ToInt32(), sb, 256);
+                            var cachedGrap = sb.ToString();
+                            if (!string.IsNullOrEmpty(cachedGrap))
+                            {
+                                Console.Error.WriteLine($"[A11Y] focus grap cache hit: {cachedGrap}");
+                                var resolved = WKAppBot.Win32.Accessibility.GrapHelper.ResolveFullGrap(
+                                    cachedGrap, automation);
+                                if (resolved?.root != null) scoped = resolved.Value.root;
+                            }
+                        }
+                    }
+
+                    // Electron terminal fallback: deep webview UIA scope walks can be slow (>1s) and fail.
+                    // A11yType for Electron uses clipboard+Ctrl+V which only needs hwnd, not a specific el.
+                    // Use window root as el so the action proceeds; paste lands on the OS-focused element.
+                    // Only when a write-capable element (Edit) was detected as hot-focused.
+                    if (scoped == null && hotFocusType == "Edit" && IsElectronWindow(hwnd))
+                    {
+                        Console.Error.WriteLine($"[A11Y] Electron scope walk failed → using window root for clipboard paste (hot-focused was {hotFocusType} \"{hotFocusName}\")");
+                        scoped = root;
+                    }
+
+                    // Electron type: if scoped resolved to a non-Edit (stale path) but hotFocusEl
+                    // WAS an Edit named "Message input", click its center and use it as the type target.
+                    if (action == "type" && scoped != null && IsElectronWindow(hwnd)
+                        && hotFocusEl != null && hotFocusType == "Edit" && hotFocusName == "Message input")
+                    {
+                        var scopedType = "?"; try { scopedType = scoped.Properties.ControlType.ValueOrDefault.ToString(); } catch { }
+                        if (scopedType != "Edit")
+                        {
+                            Console.Error.WriteLine($"[A11Y] Electron type: stale scope resolved to {scopedType}, hotFocusEl=Edit \"{hotFocusName}\" -- clicking center + re-targeting");
+                            // Use pre-captured rect (stable: captured before readiness, window position unchanged)
+                            var fr = hotFocusRect.Width > 0 ? hotFocusRect : default;
+                            if (fr == default) try { fr = hotFocusEl.Properties.BoundingRectangle.ValueOrDefault; } catch { }
+                            if (fr.Width > 0 && fr.Height > 0)
+                            {
+                                WKAppBot.Win32.Input.MouseInput.Click((int)(fr.X + fr.Width / 2), (int)(fr.Y + fr.Height / 2));
+                                System.Threading.Thread.Sleep(80);
+                            }
+                            scoped = hotFocusEl;
                         }
                     }
 
@@ -1032,7 +1383,7 @@ internal partial class Program
                         }
                         Console.Error.WriteLine($"[A11Y] UIA scope not found: \"{uiaPath}\" in {tag}");
                         // Guard Layer 6: UIA scope miss
-                        TargetAmbiguityGuard.ShowUiaScopeMiss(root, hwnd, uiaPath, action);
+                        TargetAmbiguityGuard.ShowUiaScopeMiss(root, hwnd, uiaPath ?? "", action);
                         fail++;
                         continue;
                     }
@@ -1132,7 +1483,7 @@ internal partial class Program
                 if (action is not ("read" or "find" or "highlight"))
                 {
                     var aarTarget = new UiaActionTarget(root);
-                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd, Force = force };
                     var aarResult = aar.Ensure(action, aarTarget, aarCtx);
                     if (aarResult == null)
                     {
@@ -1227,7 +1578,30 @@ internal partial class Program
                         break;
                     }
 
+                    // Pre-callout removed: single-callout policy (2026-04-23).
+                    // The readiness.Probe yield popup (earlier, before UIA scope resolution)
+                    // now shows the typed text via CalloutInputWindow.PendingContent,
+                    // so showing a second callout here would duplicate the popup.
+
+                    // If PendingAction was executed by the callout (direct O-press path),
+                    // skip the legacy A11yType call to avoid double-execution.
+                    if (action == "type" && CalloutInputWindow.ActionExecuted)
+                    {
+                        CalloutInputWindow.ActionExecuted = false;
+                        Console.Error.WriteLine("[A11Y] type -- PendingAction executed in callout, skipping legacy path");
+                        success = true;
+                        break;
+                    }
+                    CalloutInputWindow.ActionExecuted = false; // always clear
+
                     var swIter = System.Diagnostics.Stopwatch.StartNew();
+                    // KIS dataAlert pre-dismiss (read/find/highlight only -- safe ops):
+                    // Modal popup blocks UIA -- click its close button before we read.
+                    if (action is "read" or "find" or "highlight")
+                    {
+                        try { TryDismissKisDataAlert(root, hwnd); } catch { }
+                    }
+
                     success = action switch
                     {
                         "highlight" => A11yHighlight(root, hwnd),
@@ -1312,7 +1686,7 @@ internal partial class Program
                 if (action is not ("close" or "minimize"))
                 {
                     var aarTarget = new UiaActionTarget(automation.FromHandle(hwnd));
-                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd, Force = force };
                     var aarResult = aar.Ensure(action, aarTarget, aarCtx);
                     if (aarResult == null)
                     {
@@ -1325,7 +1699,7 @@ internal partial class Program
                 {
                     // close: AAR retarget -> dismiss child popup first
                     var aarTarget = new UiaActionTarget(automation.FromHandle(hwnd));
-                    var aarCtx = new ReadinessContext { Hwnd = hwnd };
+                    var aarCtx = new ReadinessContext { Hwnd = hwnd, Force = force };
                     var aarResult = aar.Ensure(action, aarTarget, aarCtx);
                     if (aarResult != null && aarResult != aarTarget && aarResult is UiaActionTarget retUia)
                     {
@@ -1432,6 +1806,11 @@ internal partial class Program
             }
         }
 
+        // Clear pending callout state (single-callout policy).
+        CalloutInputWindow.PendingContent = null;
+        CalloutInputWindow.PendingTargetRect = default;
+        CalloutInputWindow.PendingElementRect = default;
+
         // -- Batch Vision fallback: composite gap screenshots -> Gemini --
         if (gapCollector.HasGaps)
         {
@@ -1467,6 +1846,17 @@ internal partial class Program
             }
         }
         gapCollector.Dispose();
+
+        // Copy-paste-ready END markers (one per target) -- mirrors # TARGET lines above.
+        if (action != "find")
+        {
+            foreach (var t in targets)
+            {
+                NativeMethods.GetWindowThreadProcessId(t.Handle, out uint ePid);
+                string eProc = ""; try { eProc = System.Diagnostics.Process.GetProcessById((int)ePid).ProcessName; } catch { }
+                Console.WriteLine($"# END {AppendFocusPath(BuildStableGrap(t.Handle, eProc), t.Handle)}");
+            }
+        }
 
         Console.Error.WriteLine($"[A11Y] Done: {ok} ok, {fail} fail (total {targets.Count})");
         return fail > 0 ? 1 : 0;

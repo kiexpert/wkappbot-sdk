@@ -407,6 +407,20 @@ internal partial class Program
             }
         }
 
+        // Returns render tick age in seconds; -1 if file missing/unreadable (treated as fresh).
+        int GetRenderTickAgeSec()
+        {
+            try
+            {
+                var hbPath = Path.Combine(GetEyeLogDir(), "..", "runtime", "eye-render-tick.txt");
+                if (!File.Exists(hbPath)) return -1;
+                var content = File.ReadAllText(hbPath).Trim();
+                if (!long.TryParse(content, out var unixSec)) return -1;
+                return (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - unixSec);
+            }
+            catch { return -1; }
+        }
+
         bool PingEyeWindow()
         {
             try
@@ -432,16 +446,84 @@ internal partial class Program
         GuardianLog($"[EYE_GUARDIAN] started pollMs={pollMs} respawnDelaySec={respawnDelaySec} launchTimeoutMs={launchTimeoutMs} tickTimeoutMs={tickTimeoutMs} eyeHwnd=0x{eyeHwnd.ToInt64():X}");
         DateTime? deadSinceUtc = null;
         int consecutiveHealthFailures = 0;
+        // Render freeze tracking (independent of IPC health)
+        DateTime? renderFreezeSinceUtc = null;
+        bool renderSwapAttempted = false;
+
+        // .new.exe backup swapper: if Eye FSW missed the file, Guardian does the rename itself.
+        var binDir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? "";
+        var coreExe = Path.Combine(binDir, "wkappbot-core.exe");
+        var newExe  = Path.Combine(binDir, "wkappbot-core.new.exe");
+        DateTime? newExeSeenSinceUtc = null;
+
+        void TryGuardianSwap()
+        {
+            if (!File.Exists(newExe)) { newExeSeenSinceUtc = null; return; }
+            newExeSeenSinceUtc ??= DateTime.UtcNow;
+            if ((DateTime.UtcNow - newExeSeenSinceUtc.Value).TotalSeconds < 2) return; // wait for write to settle
+            var ts = DateTime.Now.ToString("HHmmss");
+            var oldExe = Path.Combine(binDir, $"wkappbot-core.old-{ts}.exe");
+            try
+            {
+                if (File.Exists(coreExe)) File.Move(coreExe, oldExe);
+                File.Move(newExe, coreExe);
+                GuardianLog($"[EYE_GUARDIAN] guardian-swap OK: .new.exe -> core (old={ts})");
+                newExeSeenSinceUtc = null;
+            }
+            catch (Exception ex)
+            {
+                GuardianLog($"[EYE_GUARDIAN] guardian-swap FAIL: {ex.Message}");
+            }
+        }
         // Guardian runs forever -- no self-succession to avoid infinite respawn chains.
         // Diag-file freshness check does not require hwnd; works across hot-swaps.
         while (true)
         {
+            TryGuardianSwap(); // backup .new.exe swapper -- runs every poll regardless of Eye state
             var alive = IsEyeAlive();
             if (alive)
             {
+                // -- Render freeze check (independent of IPC tick) --
+                var renderAge = GetRenderTickAgeSec();
+                if (renderAge >= 0 && renderAge > 60) // file exists and stale >1min
+                {
+                    renderFreezeSinceUtc ??= DateTime.UtcNow;
+                    var frozenFor = (DateTime.UtcNow - renderFreezeSinceUtc.Value).TotalSeconds;
+                    GuardianLog($"[EYE_GUARDIAN] render freeze detected: tick_age={renderAge}s frozen_for={frozenFor:F0}s");
+                    if (!renderSwapAttempted)
+                    {
+                        // Stage 1: gentle swap -- trigger Eye hot-swap
+                        GuardianLog("[EYE_GUARDIAN] render freeze stage1: requesting gentle hot-swap");
+                        try { EyeTickCommand(new[] { "--swap-now", "--timeout", "10" }); } catch { }
+                        renderSwapAttempted = true;
+                    }
+                    else if (frozenFor > 60)
+                    {
+                        // Stage 2: >1min since first freeze AND swap already tried -> send WM_CLOSE
+                        GuardianLog($"[EYE_GUARDIAN] render freeze stage2: sending WM_CLOSE to 0x{eyeHwnd.ToInt64():X}");
+                        try
+                        {
+                            if (eyeHwnd != IntPtr.Zero && WKAppBot.Win32.Native.NativeMethods.IsWindow(eyeHwnd))
+                                WKAppBot.Win32.Native.NativeMethods.PostMessageW(eyeHwnd, 0x0010 /* WM_CLOSE */, IntPtr.Zero, IntPtr.Zero);
+                        }
+                        catch { }
+                        renderFreezeSinceUtc = null;
+                        renderSwapAttempted = false;
+                    }
+                }
+                else
+                {
+                    // Render tick fresh -- reset freeze state
+                    if (renderFreezeSinceUtc != null)
+                        GuardianLog("[EYE_GUARDIAN] render freeze cleared");
+                    renderFreezeSinceUtc = null;
+                    renderSwapAttempted = false;
+                }
+
                 if (IsEyeHealthy())
                 {
-                    GuardianLog("[EYE_GUARDIAN] tick ok");
+                    if (renderFreezeSinceUtc == null)
+                        GuardianLog("[EYE_GUARDIAN] tick ok");
                     deadSinceUtc = null;
                     consecutiveHealthFailures = 0;
                     Thread.Sleep(pollMs);
@@ -800,6 +882,26 @@ internal partial class Program
         // admin Eye spawns the new version itself (already elevated -- no UAC needed) then exits.
         if (isElevatedArg)
         {
+            // Close all existing Eye windows (normal + admin) before taking over.
+            // WM_CLOSE is more reliable than broadcast alone for stuck/frozen Eyes.
+            {
+                var sb = new System.Text.StringBuilder(256);
+                WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
+                {
+                    sb.Clear();
+                    WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd, sb, sb.Capacity);
+                    if (sb.ToString() == "AppBotEye" || sb.ToString() == "WK AppBot Eye")
+                    {
+                        WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint wpid);
+                        if ((int)wpid != Environment.ProcessId)
+                        {
+                            Console.Error.WriteLine($"[EYE:ADMIN] WM_CLOSE -> Eye window pid={wpid} hwnd=0x{hwnd:X}");
+                            WKAppBot.Win32.Native.NativeMethods.PostMessageW(hwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero);
+                        }
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
             // "나야말로 진짜다" -- broadcast close signal: existing admin Eye(s) drain + exit.
             // Must fire BEFORE starting own pipe so old admin releases its pipe first -> clean gap.
             AdminEyeBroadcastClose.FireBroadcast();
@@ -825,6 +927,23 @@ internal partial class Program
             // Admin Eye's job here is simply: serve pipe until a broadcast tells us to
             // step aside.
 
+            // Verify admin Eye window is visible within 1s of startup.
+            // Title "AppBotEye" should be set immediately; hidden console still has the title.
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                bool found = false;
+                var sb2 = new System.Text.StringBuilder(256);
+                WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd2, _) =>
+                {
+                    sb2.Clear();
+                    WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd2, sb2, sb2.Capacity);
+                    if (sb2.ToString() == "AppBotEye") { found = true; return false; }
+                    return true;
+                }, IntPtr.Zero);
+                if (!found)
+                    Console.Error.WriteLine($"[EYE:ADMIN:BUG] Admin Eye window not visible within 1s of startup -- AppBotEye title missing (pid={Environment.ProcessId})");
+            });
             ElevatedEyeServer.ListenAsync(proxyCts.Token).GetAwaiter().GetResult();
             Console.WriteLine("[EYE:ADMIN] Elevated proxy exiting (broadcast received or cancelled)");
             return 0;
@@ -838,6 +957,10 @@ internal partial class Program
         PulseStep.Mark(replacePid > 0 ? $"replace-pid:{replacePid}" : "replace-pid:none");
 
         Console.WriteLine("[EYE] Starting WK AppBot Eye (GlobalMode)");
+        // Safeguard 2: DataDir migration guard. If new DataDir is empty but the
+        // legacy `<exe-dir>/wkappbot.hq` still has data, copy it over so Eye and
+        // suggest commands stop operating on a phantom-empty backlog.
+        try { MigrateLegacyDataDirIfNeeded(); } catch { }
         // Clean up orphan sandbox registry entries from previous Eye session (dead HWNDs)
         AskTargetRegistry.PurgeDeadHwnds();
         // Purge stale card cache from previous Eye session ??fresh start, no zombie cards
@@ -846,22 +969,60 @@ internal partial class Program
         // Walk up to git/.wkappbot root so watchdog VBS is always at project root,
         // not wherever the shell happened to be when Eye was spawned (e.g. during publish).
         var eyeCwd = Environment.CurrentDirectory;
-        try
+        static string? FindProjectRoot(string start)
         {
-            var d = eyeCwd.Replace('/', '\\');
+            var d = start.Replace('/', '\\');
             while (!string.IsNullOrEmpty(d))
             {
-                if (Directory.Exists(Path.Combine(d, ".git"))
-                    || Directory.Exists(Path.Combine(d, ".svn"))
-                    || Directory.Exists(Path.Combine(d, ".wkappbot"))
-                    || File.Exists(Path.Combine(d, ".wkappbot")))
-                { eyeCwd = d; break; }
+                if (Directory.Exists(Path.Combine(d, ".wkappbot"))
+                    || File.Exists(Path.Combine(d, ".wkappbot"))
+                    || Directory.Exists(Path.Combine(d, ".git"))
+                    || Directory.Exists(Path.Combine(d, ".svn")))
+                    return d;
                 var p = Path.GetDirectoryName(d);
-                if (p == d || p == null) break;
+                if (p == d || p == null) return null;
                 d = p;
             }
+            return null;
+        }
+        try
+        {
+            // Pass 1: walk up from current working directory
+            var found = FindProjectRoot(eyeCwd);
+            // Pass 2 (fallback): walk up from exe location -- exe is always in WKAppBot/bin/
+            // Handles cases where Eye was spawned from an unrelated CWD (SDK dir, temp, etc.)
+            if (found == null)
+                found = FindProjectRoot(AppContext.BaseDirectory);
+            if (found != null)
+            {
+                eyeCwd = found;
+                Console.Error.WriteLine($"[EYE:STARTUP] Project root resolved: {eyeCwd}");
+            }
+            else
+                Console.Error.WriteLine($"[EYE:STARTUP] WARN: could not resolve project root from '{Environment.CurrentDirectory}' or '{AppContext.BaseDirectory}' -- using CWD");
         }
         catch { }
+        // Close all existing Eye windows before creating our own -- ensures clean handoff.
+        // Hot-swap case (replacePid > 0): spare the outgoing parent Eye (it retires itself).
+        {
+            var myPid = Environment.ProcessId;
+            var sb3 = new System.Text.StringBuilder(256);
+            WKAppBot.Win32.Native.NativeMethods.EnumWindows((hwnd, _) =>
+            {
+                sb3.Clear();
+                WKAppBot.Win32.Native.NativeMethods.GetWindowTextW(hwnd, sb3, sb3.Capacity);
+                if (sb3.ToString() == "AppBotEye" || sb3.ToString() == "WK AppBot Eye")
+                {
+                    WKAppBot.Win32.Native.NativeMethods.GetWindowThreadProcessId(hwnd, out uint wpid);
+                    if ((int)wpid != myPid && (int)wpid != replacePid)
+                    {
+                        Console.Error.WriteLine($"[EYE:STARTUP] WM_CLOSE -> stale Eye window pid={wpid} hwnd=0x{hwnd:X}");
+                        WKAppBot.Win32.Native.NativeMethods.PostMessageW(hwnd, 0x0010 /*WM_CLOSE*/, IntPtr.Zero, IntPtr.Zero);
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+        }
         PulseStep.Mark("global-loop-call");
         return EyeGlobalPollingLoop(width, height, posX, posY, intervalMs, eyeCwd, elevated, replacePid);
     }

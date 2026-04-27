@@ -972,7 +972,11 @@ internal partial class Program
         int clickX = 150; // "내용" column area
         try
         {
-            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd);
+            using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
             if (bmp != null)
             {
                 var ocr = new WKAppBot.Vision.SimpleOcrAnalyzer();
@@ -1021,7 +1025,11 @@ internal partial class Program
         int bmpW = 0, bmpH = 0;
         try
         {
-            using var bmpCheck = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd);
+            using var bmpCheck = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
             if (bmpCheck != null)
             {
                 bmpW = bmpCheck.Width; bmpH = bmpCheck.Height;
@@ -1315,7 +1323,11 @@ internal partial class Program
         var hWnd = new IntPtr((long)hwndVal);
 
         // PrintWindow capture
-        using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd);
+        using var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(hWnd, new WKAppBot.Win32.Input.CaptureOptions
+        {
+            RejectBlank = true,
+            StepLogger = s => Console.Error.WriteLine(s),
+        });
         if (bmp == null) return Error("PrintWindow capture failed");
 
         Console.WriteLine($"Captured: {bmp.Width}x{bmp.Height}");

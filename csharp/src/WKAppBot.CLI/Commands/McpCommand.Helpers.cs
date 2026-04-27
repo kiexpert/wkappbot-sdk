@@ -273,7 +273,7 @@ internal partial class Program
                 ? RunCliCaptureWithCodeExternal("a11y", rest, emitProgress)
                 : RunCliCaptureWithCode("a11y", rest, emitProgress),
             "inspect" => RunCliCaptureWithCode("inspect", rest, emitProgress),
-            "windows" => RunCliCaptureWithCode("windows", rest, emitProgress),
+            "windows" => RunCliCaptureWithCode("find", rest.Length == 0 ? ["wkappbot*"] : rest, emitProgress),
             "ocr" => RunCliCaptureWithCode("ocr", rest, emitProgress),
             "prompt-probe" => RunCliCaptureWithCode("prompt-probe", rest, emitProgress),
             "claude-detect" => RunCliCaptureWithCode("claude-detect", rest, emitProgress),

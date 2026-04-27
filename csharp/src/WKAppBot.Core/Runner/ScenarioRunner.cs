@@ -37,6 +37,8 @@ public sealed class ScenarioRunner
     /// </summary>
     public Func<System.Drawing.Bitmap, string, Task<WKAppBot.Vision.OcrSegment?>>? VisionAskFn { get; set; }
 
+    public bool NoDup { get; set; }
+
     public ScenarioRunner(bool verbose = false, bool watch = true, int watchIntervalMs = 200)
     {
         _verbose = verbose;
@@ -328,19 +330,49 @@ public sealed class ScenarioRunner
         return lastResult!;
     }
 
+    private static System.Diagnostics.Process? TryAdoptProcess(string nameOrPath)
+    {
+        var exeName = System.IO.Path.GetFileNameWithoutExtension(nameOrPath);
+        var found = System.Diagnostics.Process.GetProcessesByName(exeName);
+        return found.Length > 0 ? found[0] : null;
+    }
+
     private void LaunchApp(AppConfig app, RuntimeContext ctx)
     {
-        // Start the process -- split "cmd.exe /c echo ok" into FileName + Arguments
-        var launchParts = app.Launch.Split(' ', 2, StringSplitOptions.TrimEntries);
-        var psi = new ProcessStartInfo
+        System.Diagnostics.Process? proc = null;
+
+        // adopt-only mode: process: key set, no launch
+        if (!string.IsNullOrWhiteSpace(app.Process))
         {
-            FileName = launchParts[0],
-            Arguments = launchParts.Length > 1 ? launchParts[1] : "",
-            UseShellExecute = true
-        };
-        // [FOCUS-GUARD] GuardedStart: 실행 전후 포커스 변화 감지 + 복원 + 강탈 기록
-        var proc = WKAppBot.Win32.Input.NativeHookLaunch.GuardedStart(psi, "ScenarioRunner")
-            ?? throw new InvalidOperationException($"Failed to start: {app.Launch}");
+            proc = TryAdoptProcess(app.Process);
+            if (proc != null)
+                Console.Error.WriteLine($"[RUN] Adopted existing process: {app.Process} (pid={proc.Id})");
+            else if (string.IsNullOrWhiteSpace(app.Launch))
+                throw new InvalidOperationException($"No running process found for: {app.Process}");
+        }
+
+        // soft adopt: adopt:true or --no-dup flag
+        if (proc == null && (app.Adopt || NoDup) && !string.IsNullOrWhiteSpace(app.Launch))
+        {
+            proc = TryAdoptProcess(app.Launch.Split(' ', 2, StringSplitOptions.TrimEntries)[0]);
+            if (proc != null)
+                Console.Error.WriteLine($"[RUN] Adopted existing process (no-dup): {proc.ProcessName} (pid={proc.Id})");
+        }
+
+        if (proc == null)
+        {
+            // Start the process -- split "cmd.exe /c echo ok" into FileName + Arguments
+            var launchParts = app.Launch.Split(' ', 2, StringSplitOptions.TrimEntries);
+            var psi = new ProcessStartInfo
+            {
+                FileName = launchParts[0],
+                Arguments = launchParts.Length > 1 ? launchParts[1] : "",
+                UseShellExecute = true
+            };
+            // [FOCUS-GUARD] GuardedStart: 실행 전후 포커스 변화 감지 + 복원 + 강탈 기록
+            proc = WKAppBot.Win32.Input.NativeHookLaunch.GuardedStart(psi, "ScenarioRunner")
+                ?? throw new InvalidOperationException($"Failed to start: {app.Launch}");
+        }
 
         // Wait for the main window
         var timeout = app.WaitForWindow?.Timeout ?? 10.0;

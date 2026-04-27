@@ -273,7 +273,12 @@ public sealed class BackgroundWatcher : IDisposable
         {
             try
             {
-                using var screenshot = ScreenCapture.CaptureWindow(hWndTarget);
+                using var screenshot = ScreenCapture.CaptureWindow(hWndTarget, new WKAppBot.Win32.Input.CaptureOptions
+                {
+                    RejectBlank = true,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
+                if (screenshot == null) return;
 
                 // Save screenshot
                 var watchDir = Path.Combine(_ctx!.VisionCacheDir.Replace("/entries", ""), "watch");

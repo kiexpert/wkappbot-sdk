@@ -13,6 +13,10 @@ internal partial class Program
     {
         Environment.SetEnvironmentVariable("WKAPPBOT_SUGGEST_BYPASS", "1");
 
+        // Surface half-resolved entries (1/2 co-resolve, awaiting confirm) at
+        // the very top BEFORE any subcommand dispatch. Silent when empty.
+        PrintPendingCoResolveBanner();
+
         if (args.Length > 0 && args[0] is "resolve")
             return SuggestResolveCommand(args[1..]);
         if (args.Length > 0 && args[0] is "list" or "ls")
@@ -25,6 +29,10 @@ internal partial class Program
             return SuggestShowCommand(args[1..]);
         if (args.Length > 0 && args[0] is "delegate")
             return SuggestDelegateCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "audit")
+            return SuggestAuditCommand(args[1..]);
+        if (args.Length > 0 && args[0] is "add-requirement" or "add-req")
+            return SuggestAddRequirementCommand(args[1..]);
 
         // Guard: single lowercase word that looks like an unrecognized subcommand -> error instead of saving as text.
         // Prevents accidental "suggest show 19" -> garbage JSONL entry.
@@ -32,7 +40,7 @@ internal partial class Program
             && !args[0].StartsWith('-'))
         {
             Console.Error.WriteLine($"[SUGGEST] Unknown subcommand: '{args[0]}'");
-            Console.Error.WriteLine($"  Known subcommands: list, show, merge, resolve, repost");
+            Console.Error.WriteLine($"  Known subcommands: list, show, merge, resolve, repost, audit");
             Console.Error.WriteLine($"  To suggest text starting with '{args[0]}', quote it: wkappbot suggest \"{string.Join(" ", args)}\"");
             return 1;
         }
@@ -56,22 +64,30 @@ internal partial class Program
             Console.WriteLine("  merge <ts1> [ts2..] --title \"...\"  Merge related suggestions into one self-healing record");
             Console.WriteLine("  resolve <ts> \"note\"   Mark resolved + Slack thread reply");
             Console.WriteLine("  repost [ts]            Re-post to Slack entries missing slack_ts, write ID back");
+            Console.WriteLine("  audit                  Health-check the suggest store (split-brain detector, exit=1 on mismatch)");
             Console.WriteLine();
             Console.WriteLine("Examples:");
-            Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\"");
-            Console.WriteLine("  wkappbot suggest \"Need UIA support for MDI child windows\" screenshot.png");
+            Console.WriteLine("  wkappbot suggest \"Magnifier doesn't appear when form opens\" \\");
+            Console.WriteLine("    --requirement \"wkappbot a11y inspect *App* => magnifier appears\" \\");
+            Console.WriteLine("    --requirement \"wkappbot a11y screenshot *App* => form visible\" \\");
+            Console.WriteLine("    --requirement \"wkappbot a11y click *App*#*OK* => no focus steal\"");
             Console.WriteLine("  wkappbot suggest list");
             Console.WriteLine("  wkappbot suggest resolve 2026-03-17T05:00:00 \"Fixed in v4.4.5\"");
             Console.WriteLine();
+            Console.WriteLine("Requirements (3 required for human suggests):");
+            Console.WriteLine("  --requirement \"wkappbot <cmd> <args> => <expected output>\"");
+            Console.WriteLine("  NOTE: do NOT include launcher flags (--sudo, --no-wait) in requirement cmd.");
+            Console.WriteLine("        Strip them: 'wkappbot --sudo a11y ...' -> 'wkappbot a11y ...'");
+            Console.WriteLine();
             Console.WriteLine("Merge (combine duplicates into one self-healing record):");
-            Console.WriteLine("  wkappbot suggest merge --all-matching \"pattern\" --title \"...\" \\");
-            Console.WriteLine("    --root-cause \"...\" --error-pattern \"regex\" --components \"...\" \\");
-            Console.WriteLine("    --priority N --work \"estimated fix\" --affected-cmds \"cmd1,cmd2\"");
+            Console.WriteLine("  wkappbot suggest merge <ts1> [ts2] --title \"...\" \\");
+            Console.WriteLine("    --root-cause \"...\" --components \"...\" \\");
+            Console.WriteLine("    --work \"1h\" --affected-cmds \"cmd1,cmd2\"");
             Console.WriteLine("  Options: --keep-originals  --force  --auto-heal-script <path>");
             Console.WriteLine("  Example:");
-            Console.WriteLine("    wkappbot suggest merge --all-matching \"Runtime.evaluate.*timeout\" \\");
+            Console.WriteLine("    wkappbot suggest merge 2026-04-01T10 2026-04-01T11 \\");
             Console.WriteLine("      --title \"CDP timeout on Ghost tabs\" --root-cause \"Chrome hang\" \\");
-            Console.WriteLine("      --work \"Ghost detection + retry\" --affected-cmds ask --priority 2 --force");
+            Console.WriteLine("      --work \"1h\" --affected-cmds ask --components CdpClient");
             Console.WriteLine();
             // Show experience DB test scripts summary
             var testsRoot = Path.Combine(DataDir, "experience", "tests");
@@ -103,9 +119,75 @@ internal partial class Program
 
         // Separate text vs files (shared ParseTextAndFiles)
         bool force = args.Contains("--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste");
-        var (textParts, files) = ParseTextAndFiles(args.Where(a => a != "--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste").ToArray());
+        var suggestRequirements = new List<string>();
+        var filteredArgs = new List<string>();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--requirement" && i + 1 < args.Length)
+            {
+                var raw = args[++i];
+                if (!raw.Contains(" => "))
+                {
+                    Console.Error.WriteLine($"[SUGGEST] --requirement must use ' => ' separator: \"{raw}\"");
+                    Console.Error.WriteLine($"  Correct format: --requirement \"wkappbot <cmd> <args> => <expected result>\"");
+                    Console.Error.WriteLine($"  Example:        --requirement \"wkappbot a11y click *App* => button clicked, no focus steal\"");
+                    return 1;
+                }
+                suggestRequirements.Add(raw);
+            }
+            else if (args[i] != "--i-acknowledge-encoding-risk-notified-willkim-and-take-responsibility-for-token-waste")
+                filteredArgs.Add(args[i]);
+        }
+        var (textParts, files) = ParseTextAndFiles(filteredArgs.ToArray());
         var text = string.Join("\n", textParts);
         if (!force && HasEncodingRisk(text, "suggest")) return 1;
+
+        // Require at least 3 --requirements for human-submitted suggests (not auto-generated).
+        bool isAutoSuggest = text.StartsWith("[BUG-AUTO]", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("[CDP-FALLBACK]", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("[AI-NEWS]", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("[HN]", StringComparison.OrdinalIgnoreCase)
+            || text.StartsWith("[YT:", StringComparison.OrdinalIgnoreCase);
+        if (!isAutoSuggest && suggestRequirements.Count < 3)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[SUGGEST] FAILED: at least 3 --requirement flags required for human suggests (got {suggestRequirements.Count}).");
+            Console.WriteLine("  Each requirement = one concrete wkappbot command + expected output:");
+            Console.WriteLine("    --requirement \"wkappbot <cmd> <args> => <expected output pattern>\"");
+            Console.WriteLine("  Requirements become behavioral contracts written into the skill on resolve.");
+            Console.ResetColor();
+            return 1;
+        }
+        // Validate each requirement: cmd must start with 'wkappbot ' + known subcommand.
+        if (!isAutoSuggest)
+        {
+            string[] knownSubcmds = ["a11y", "skill", "suggest", "ask", "eye", "slack", "file",
+                "gc", "logcat", "windows", "mcp", "claude-usage", "newchat", "validate", "win-move",
+                "schedule", "android", "speak", "screenshot", "snapshot"];
+            foreach (var req in suggestRequirements)
+            {
+                var sep = req.IndexOf(" => ", StringComparison.Ordinal);
+                var cmd = sep >= 0 ? req[..sep].Trim() : req.Trim();
+                if (!cmd.StartsWith("wkappbot ", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[SUGGEST] FAILED: requirement cmd must start with 'wkappbot ': \"{cmd}\"");
+                    Console.ResetColor();
+                    return 1;
+                }
+                var parts = cmd.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2 || !knownSubcmds.Contains(parts[1], StringComparer.OrdinalIgnoreCase))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    if (parts.Length >= 2 && parts[1].StartsWith("--"))
+                        Console.WriteLine($"[SUGGEST] FAILED: requirement cmd contains launcher flag '{parts[1]}' -- strip it from requirements (launcher flags are not wkappbot subcommands). Example: 'wkappbot {string.Join(" ", parts[2..])}'. Known subcommands: {string.Join(", ", knownSubcmds)}");
+                    else
+                        Console.WriteLine($"[SUGGEST] FAILED: unknown wkappbot subcommand in requirement: '{(parts.Length >= 2 ? parts[1] : "?")}'. Known: {string.Join(", ", knownSubcmds)}");
+                    Console.ResetColor();
+                    return 1;
+                }
+            }
+        }
         var cwdTag = AbbreviateCwd(Environment.CurrentDirectory);
         if (string.IsNullOrEmpty(cwdTag)) cwdTag = "unknown";
 
@@ -157,6 +239,8 @@ internal partial class Program
         }
 
         // Save to HQ suggestions.jsonl
+        var newEntryTs = DateTime.UtcNow.ToString("o");
+        bool saveOk = false;
         try
         {
             var hqDir = Path.Combine(AppContext.BaseDirectory, "wkappbot.hq");
@@ -164,21 +248,43 @@ internal partial class Program
             var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
             var entry = new
             {
-                ts = DateTime.UtcNow.ToString("o"),
+                ts = newEntryTs,
                 from = cwdTag,
                 cwd = Environment.CurrentDirectory,
                 text = text,
                 files = files.Select(Path.GetFileName).ToArray(),
-                slack_ts = messageTs  // Slack message ts for thread reply in resolve
+                slack_ts = messageTs,  // Slack message ts for thread reply in resolve
+                // Slack channel ID where the thread lives -- required for cross-project
+                // resolves so chat.postMessage can target the correct channel + thread.
+                // Same workspace/bot, so resolver's bot_token works for replies.
+                slack_channel = channel ?? "",
+                requirements = suggestRequirements.Count > 0 ? suggestRequirements.ToArray() : null
             };
             var json = JsonSerializer.Serialize(entry);
             File.AppendAllText(jsonlPath, json + Environment.NewLine);
             Console.Error.WriteLine($"[SUGGEST] Saved to {jsonlPath}");
+            saveOk = true;
+
+            // Auto-commit: subject = first ~50 chars of the title (line 1 of text).
+            var firstLine = (text ?? "").Split('\n', 2)[0];
+            var titleSlice = ShortTsForCommit(firstLine, 50);
+            GitCommitSuggestFiles("submit", titleSlice);
+        }
+        catch (InvalidOperationException)
+        {
+            // Auto-commit failure -- bubble up as non-zero exit per spec (no silent swallow).
+            return 1;
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"[SUGGEST] Failed to save locally: {ex.Message}");
         }
+
+        // Similarity nudge: scan open suggests for >=40% title overlap and
+        // print a ready-to-run merge command. Silent when none. Best-effort;
+        // never fails the submit.
+        if (saveOk)
+            SuggestSimilarityNudge(text ?? "", newEntryTs);
 
         return 0;
     }

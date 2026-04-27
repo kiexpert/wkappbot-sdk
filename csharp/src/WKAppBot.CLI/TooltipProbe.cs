@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
+using WKAppBot.Win32.Input;
 
 namespace WKAppBot.CLI;
 
@@ -41,12 +42,8 @@ internal static class TooltipProbe
     [DllImport("user32.dll")]
     private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
 
-    [DllImport("user32.dll")]
-    private static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
-
     private const int GWL_STYLE = -16;
     private const int GWL_EXSTYLE = -20;
-    private const uint PW_RENDERFULLCONTENT = 0x02;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct RECT
@@ -150,49 +147,41 @@ internal static class TooltipProbe
                 int h = rect.Bottom - rect.Top;
                 Console.WriteLine($"\nCapturing tooltip 0x{hWnd:X8} ({rect.Left},{rect.Top}) {w}x{h}");
 
-                // Method 1: PrintWindow
+                // Method 1: CaptureWindow (4-tier focusless fallback)
                 try
                 {
-                    using var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
-                    using var g = Graphics.FromImage(bmp);
-                    var hdc = g.GetHdc();
-                    bool ok = PrintWindow(hWnd, hdc, PW_RENDERFULLCONTENT);
-                    g.ReleaseHdc(hdc);
-
-                    if (ok)
+                    using var bmp = ScreenCapture.CaptureWindow(hWnd, new CaptureOptions { RejectBlank = false, StepLogger = Console.WriteLine });
+                    if (bmp != null)
                     {
                         var filename = $"tooltip_{hWnd:X8}_printwin.png";
                         var path = Path.Combine(outputDir, filename);
                         bmp.Save(path, ImageFormat.Png);
-                        Console.WriteLine($"  PrintWindow -> {path}");
-
-                        // OCR the captured image
-                        RunOcr(bmp, "PrintWindow");
+                        Console.WriteLine($"  CaptureWindow -> {path}");
+                        RunOcr(bmp, "CaptureWindow");
                     }
                     else
                     {
-                        Console.WriteLine("  PrintWindow failed, trying screen capture...");
+                        Console.WriteLine("  CaptureWindow returned blank, trying screen region...");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"  PrintWindow error: {ex.Message}");
+                    Console.WriteLine($"  CaptureWindow error: {ex.Message}");
                 }
 
-                // Method 2: Screen region capture (BitBlt from screen)
+                // Method 2: Screen region capture
                 try
                 {
-                    using var bmp = CaptureScreenRegion(rect.Left, rect.Top, w, h);
+                    using var bmp = ScreenCapture.CaptureScreenRegion(rect.Left, rect.Top, w, h);
                     var filename = $"tooltip_{hWnd:X8}_screen.png";
                     var path = Path.Combine(outputDir, filename);
                     bmp.Save(path, ImageFormat.Png);
-                    Console.WriteLine($"  ScreenCapture -> {path}");
-
-                    RunOcr(bmp, "ScreenCapture");
+                    Console.WriteLine($"  CaptureScreenRegion -> {path}");
+                    RunOcr(bmp, "CaptureScreenRegion");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"  ScreenCapture error: {ex.Message}");
+                    Console.WriteLine($"  CaptureScreenRegion error: {ex.Message}");
                 }
             }
         }
@@ -231,48 +220,4 @@ internal static class TooltipProbe
         }
     }
 
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr CreateCompatibleBitmap(IntPtr hdc, int width, int height);
-
-    [DllImport("gdi32.dll")]
-    private static extern IntPtr SelectObject(IntPtr hdc, IntPtr hgdiobj);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool BitBlt(IntPtr hdcDest, int xDest, int yDest, int width, int height,
-        IntPtr hdcSrc, int xSrc, int ySrc, uint rop);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteDC(IntPtr hdc);
-
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteObject(IntPtr hObject);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDC(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-
-    private const uint SRCCOPY = 0x00CC0020;
-
-    private static Bitmap CaptureScreenRegion(int x, int y, int width, int height)
-    {
-        var screenDc = GetDC(IntPtr.Zero);
-        var memDc = CreateCompatibleDC(screenDc);
-        var hBitmap = CreateCompatibleBitmap(screenDc, width, height);
-        var oldBmp = SelectObject(memDc, hBitmap);
-
-        BitBlt(memDc, 0, 0, width, height, screenDc, x, y, SRCCOPY);
-
-        SelectObject(memDc, oldBmp);
-        var bmp = Image.FromHbitmap(hBitmap);
-        DeleteObject(hBitmap);
-        DeleteDC(memDc);
-        ReleaseDC(IntPtr.Zero, screenDc);
-
-        return bmp;
-    }
 }

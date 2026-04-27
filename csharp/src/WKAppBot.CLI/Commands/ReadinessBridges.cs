@@ -151,23 +151,35 @@ internal partial class Program
                 try { curTitle = WindowFinder.GetWindowText(outerStolen ? curFg : _prevFg); } catch { }
                 if (curTitle.Length > 40) curTitle = curTitle[..40] + "...";
 
+                // User-active guard applies to BOTH outer steal and inner slide.
+                // Shared threshold with AskCommands.Focus.cs RestoreFocusWithRetryAsync
+                // (1500ms) -- a11y-focus-steal-user-active-silent-yield skill v1.3.
+                // When user is actively typing/clicking, treat foreground/focus change
+                // as an intentional user action. Silent yield: no restore, no
+                // AutoBugReport. Only involuntary steals (idle >= 1500ms) get reported.
+                var idleMs = NativeMethods.GetUserIdleMs();
+                if (idleMs < 1500)
+                {
+                    Console.Error.WriteLine(outerStolen
+                        ? $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
+                          $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- user active ({idleMs}ms), yielding"
+                        : $"[FOCUS-STEAL:{phase}] {_action} inner-slide in \"{curTitle}\": " +
+                          $"focusCtl was=0x{_prevFocusCtl.ToInt64():X8} now=0x{curFocus.ToInt64():X8} " +
+                          $"-- user active ({idleMs}ms), yielding");
+                    // Silent return -- user made a choice, no bug report.
+                    return true;
+                }
+
+                // If _prevFg no longer exists (e.g. a11y close destroyed it), focus shift is expected.
+                if (outerStolen && !NativeMethods.IsWindow(_prevFg))
+                {
+                    Console.Error.WriteLine(
+                        $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} (gone) " +
+                        $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- window closed, skip restore");
+                    return false;
+                }
                 if (outerStolen)
                 {
-                    // User-active guard: only for OUTER steals. If the user clicked
-                    // somewhere else, don't rip focus back. Inner slides (same outer)
-                    // never trigger this -- we're restoring to where the user WAS.
-                    var idleMs = NativeMethods.GetUserIdleMs();
-                    if (idleMs < 2000)
-                    {
-                        Console.Error.WriteLine(
-                            $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
-                            $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- user active ({idleMs}ms), NOT restoring");
-                        AutoBugReport(
-                            $"FOCUS-STEAL {phase} during a11y {_action} (user active, not restored): " +
-                            $"was=0x{_prevFg.ToInt64():X8} now=0x{curFg.ToInt64():X8} \"{curTitle}\"");
-                        return true;
-                    }
-
                     Console.Error.WriteLine(
                         $"[FOCUS-STEAL:{phase}] {_action}: was=0x{_prevFg.ToInt64():X8} " +
                         $"now=0x{curFg.ToInt64():X8} \"{curTitle}\" -- restoring");
@@ -175,9 +187,17 @@ internal partial class Program
                 }
                 else
                 {
+                    // Inner-slide: before restoring the caret, re-verify focusCtl
+                    // actually mismatched. Short spurious GetKeyboardFocusHwnd
+                    // flickers (e.g. during CDP attach or UIA scan) can report a
+                    // stale value; a 50ms re-read debounces that race so we don't
+                    // report a bug for a focus that's already back on its own.
+                    Thread.Sleep(50);
+                    var reverifyFocus = NativeMethods.GetKeyboardFocusHwnd();
+                    if (reverifyFocus == _prevFocusCtl) return false;
                     Console.Error.WriteLine(
                         $"[FOCUS-STEAL:{phase}] {_action} inner-slide in \"{curTitle}\": " +
-                        $"focusCtl was=0x{_prevFocusCtl.ToInt64():X8} now=0x{curFocus.ToInt64():X8} -- restoring caret");
+                        $"focusCtl was=0x{_prevFocusCtl.ToInt64():X8} now=0x{reverifyFocus.ToInt64():X8} -- restoring caret");
                 }
 
                 // Always re-apply inner SetFocus via AttachThreadInput so the
@@ -254,6 +274,10 @@ internal partial class Program
         }
         var target = windows[0];
         EnsureA11yReadiness(target.Handle, action);
+        // Copy-paste-ready TARGET grap line (stdout) -- parallel with main A11yCommand dispatcher.
+        NativeMethods.GetWindowThreadProcessId(target.Handle, out uint rPid);
+        string rProc = ""; try { rProc = System.Diagnostics.Process.GetProcessById((int)rPid).ProcessName; } catch { }
+        Console.WriteLine($"# TARGET {AppendFocusPath(BuildStableGrap(target.Handle, rProc), target.Handle)}");
         return target;
     }
 

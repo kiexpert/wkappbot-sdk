@@ -298,6 +298,14 @@ internal partial class Program
                 var by = int.Parse(parts[1]);
 
                 // [STEP 1] Trusted click on upload button
+                // Yield to active user: Input.dispatchMouseEvent on Chrome raises Chrome to
+                // foreground if it's not already there, stealing focus from the user mid-typing.
+                // FocusSentinel catches it post-hoc but the keystrokes are already lost.
+                if (FocusSafe.ShouldYieldToActiveUser(out var idleMsUp))
+                {
+                    Console.Error.WriteLine($"[ASK:FOCUS] trusted-click-upload-btn -- user active ({idleMsUp}ms idle) -- skipping to avoid focus steal");
+                    return false;
+                }
                 var prevFg1 = NativeMethods.GetForegroundWindow();
                 Console.Error.WriteLine($"[ASK:FOCUS] pre-upload-btn-click fg={prevFg1:X8}");
                 await CdpTrustedClick(cdp, bx, by);
@@ -338,6 +346,12 @@ internal partial class Program
                     var my = int.Parse(coords[1]);
 
                     // [STEP 2] Trusted click on menu item
+                    // Yield to active user (same rationale as STEP 1 above).
+                    if (FocusSafe.ShouldYieldToActiveUser(out var idleMsMenu))
+                    {
+                        Console.Error.WriteLine($"[ASK:FOCUS] trusted-click-menu-item -- user active ({idleMsMenu}ms idle) -- skipping to avoid focus steal");
+                        return false;
+                    }
                     var prevFg2 = NativeMethods.GetForegroundWindow();
                     Console.Error.WriteLine($"[ASK:FOCUS] pre-menu-item-click fg={prevFg2:X8}");
                     await CdpTrustedClick(cdp, mx, my);

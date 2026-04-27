@@ -570,7 +570,11 @@ internal partial class Program
                 var screenshotPath = Path.Combine(outputDir,
                     $"prompt_blocked_{DateTime.Now:yyyyMMdd_HHmmss}.png");
 
-                var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(fgWindow);
+                var bmp = WKAppBot.Win32.Input.ScreenCapture.CaptureWindow(fgWindow, new WKAppBot.Win32.Input.CaptureOptions
+                {
+                    RejectBlank = false,
+                    StepLogger = s => Console.Error.WriteLine(s),
+                });
                 if (bmp != null && !WKAppBot.Win32.Input.ScreenCapture.IsBlankBitmap(bmp))
                 {
                     bmp.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);

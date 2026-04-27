@@ -730,8 +730,12 @@ internal partial class Program
         try
         {
             // Capture window via PrintWindow (Z-order safe, focusless)
-            using var bitmap = ScreenCapture.CaptureWindow(claudeHwnd);
-            if (bitmap == null || ScreenCapture.IsBlankBitmap(bitmap))
+            using var bitmap = ScreenCapture.CaptureWindow(claudeHwnd, new WKAppBot.Win32.Input.CaptureOptions
+            {
+                RejectBlank = true,
+                StepLogger = s => Console.Error.WriteLine(s),
+            });
+            if (bitmap == null)
                 return null;
 
             // Run OCR -- crop upper portion only (rate limit banner is at top)
@@ -1074,13 +1078,14 @@ internal partial class Program
             return direct;
         }
 
-        if (forceRefresh || _mcpPromptCache == null)
+        if (forceRefresh)
         {
+            // Explicit refresh: caller accepts blocking (e.g. prompt delivery path).
             FindAllPromptsViaMcpCore();
             return _mcpPromptCache ?? new List<ClaudePromptHelper.PromptInfo>();
         }
 
-        // Fire-and-forget background refresh -- never blocks caller
+        // First call (no cache) or stale: always fire background, never block the tick.
         if (!_findPromptsRunning)
         {
             _findPromptsRunning = true;

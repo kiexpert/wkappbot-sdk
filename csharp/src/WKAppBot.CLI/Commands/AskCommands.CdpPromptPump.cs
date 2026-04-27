@@ -110,21 +110,32 @@ internal sealed class CdpPromptPump : IDisposable
                 // submit click. Dismiss any such overlay and re-fire the
                 // send before giving up. Cheap when nothing's open -- the
                 // helper returns 'NONE'.
-                try
-                {
-                    var dismissed = await cdp.DismissDialogAsync();
-                    if (dismissed != null && dismissed != "NONE")
-                        Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: watchdog recovery -- dismissed {dismissed}");
-                }
-                catch { }
+                // Also reset JS pump isSending flag so the interval can retry if CDP Enter misses.
+                string? recoveryDismissed = null;
+                try { recoveryDismissed = await cdp.DismissDialogAsync(); } catch { }
+                if (recoveryDismissed != null && recoveryDismissed != "NONE")
+                    Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: watchdog recovery -- dismissed {recoveryDismissed}");
+                try { await cdp.ResetPumpSendingAsync(editorSelector); } catch { } // unblock JS pump interval
                 try { await cdp.SendPromptAsync(editorSelector); } catch { }
 
-                await Task.Delay(3000);
+                await Task.Delay(5000); // increased from 3s -- give extra room for slow AI tabs
                 lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
                 var second = await cdp.GetTextLengthAsync(editorSelector);
                 if (second <= 0) return; // submitted between checks (recovery worked)
                 if (second < first) return; // content decreasing = submission in progress
-                var msg = $"[PUMP] Submit watchdog: editor still has {second} chars after 10s (recovery failed)! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
+
+                // Second recovery: explicit button click + re-send after another JS unblock
+                Console.Error.WriteLine($"[ASK:PUMP:{Name}] {scope} [{dumpTarget}]: watchdog 2nd recovery -- first={first} second={second}");
+                try { await cdp.DismissDialogAsync(); } catch { }
+                try { await cdp.ResetPumpSendingAsync(editorSelector); } catch { }
+                try { await cdp.SendPromptAsync(editorSelector); } catch { }
+
+                await Task.Delay(5000);
+                lock (state.SyncRoot) { if (state.WatchdogGen != myWatchdog) return; }
+                var third = await cdp.GetTextLengthAsync(editorSelector);
+                if (third <= 0) return;
+                if (third < second) return;
+                var msg = $"[PUMP] Submit watchdog: editor still has {third} chars after 17s (2x recovery failed)! scope={scope} target={dumpTarget} text=[{dumpPreview}]";
                 Console.Error.WriteLine(msg);
                 Program.AutoRegisterBug(msg);
             }
