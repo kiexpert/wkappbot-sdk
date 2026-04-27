@@ -1,14 +1,14 @@
-commit: fbdab6960f4d37dac26fee847ecd1f6ad2225edb
+commit: 2781b0a7c4ce32a395f49db62c630e80327f3395
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-27T04:26:40.0585561Z
+timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 
 === version ===
   CMD: wkappbot --version
-  {"_":"LAUNCH","pid":8112,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":6564,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -20,8 +20,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-root ===
   CMD: wkappbot --help
-  {"_":"LAUNCH","pid":8732,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":7608,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -33,8 +33,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-a11y ===
   CMD: wkappbot a11y --help --no-regression
-  {"_":"LAUNCH","pid":784,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":6628,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -46,8 +46,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-windows ===
   CMD: wkappbot windows --help --no-regression
-  {"_":"LAUNCH","pid":3976,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":5108,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -59,8 +59,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-file ===
   CMD: wkappbot file --help --no-regression
-  {"_":"LAUNCH","pid":3252,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":6352,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -85,8 +85,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-schedule ===
   CMD: wkappbot schedule --help --no-regression
-  {"_":"LAUNCH","pid":6916,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":8368,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -98,8 +98,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-logcat ===
   CMD: wkappbot logcat --help --no-regression
-  {"_":"LAUNCH","pid":8716,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":5788,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -111,8 +111,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-eye ===
   CMD: wkappbot eye --help --no-regression
-  {"_":"LAUNCH","pid":1832,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":8380,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -124,8 +124,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-slack ===
   CMD: wkappbot slack --help --no-regression
-  {"_":"LAUNCH","pid":7292,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":2388,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -137,8 +137,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-ask ===
   CMD: wkappbot ask --help --no-regression
-  {"_":"LAUNCH","pid":5968,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":2748,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -150,8 +150,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === help-gc ===
   CMD: wkappbot gc --help --no-regression
-  {"_":"LAUNCH","pid":764,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":1324,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -163,8 +163,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === windows-list ===
   CMD: wkappbot windows
-  {"_":"LAUNCH","pid":8172,"sid":2
-  ,"fg":"0x201C8"
+  {"_":"LAUNCH","pid":3076,"sid":2
+  ,"fg":"0x10202"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -203,8 +203,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === schedule-list ===
   CMD: wkappbot schedule list
-  {"_":"LAUNCH","pid":8272,"sid":2
-  ,"fg":"0x100C6"
+  {"_":"LAUNCH","pid":8008,"sid":2
+  ,"fg":"0x100B2"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -216,8 +216,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === file-read ===
   CMD: wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":2116,"sid":2
-  ,"fg":"0x100C6"
+  {"_":"LAUNCH","pid":6356,"sid":2
+  ,"fg":"0x100B2"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -229,8 +229,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === file-grep ===
   CMD: wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":8352,"sid":2
-  ,"fg":"0x100C6"
+  {"_":"LAUNCH","pid":6256,"sid":2
+  ,"fg":"0x100B2"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -242,8 +242,8 @@ timestamp_utc: 2026-04-27T04:26:40.0585561Z
 
 === file-glob ===
   CMD: wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  {"_":"LAUNCH","pid":4832,"sid":2
-  ,"fg":"0x100C6"
+  {"_":"LAUNCH","pid":608,"sid":2
+  ,"fg":"0x100B2"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
