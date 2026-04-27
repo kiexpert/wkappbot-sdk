@@ -11,6 +11,7 @@ venv/
 
 # C# / .NET
 obj/
+csharp/**/bin/
 # bin/: allow wkappbot.hq learned data, ignore build artifacts
 bin/*.exe
 bin/*.dll
@@ -26,7 +27,6 @@ bin/wkappbot.hq/runtime/
 bin/wkappbot.hq/output/
 bin/wkappbot.hq/sessions/
 bin/wkappbot.hq/skills/
-!bin/wkappbot.hq/skills/
 bin/wkappbot.hq/handlers/
 !bin/wkappbot.hq/experience/
 # Rules for high-churn files live in bin/wkappbot.hq/experience/.gitignore
