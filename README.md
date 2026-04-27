@@ -103,26 +103,37 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 
 ## Installation
 
-Download `wkappbot.exe` and `wkappbot-core.exe` from the [latest release](../../releases/latest) and place them in the same folder.
+Clone this repository to your home directory and build, or download the pre-built binaries from the [latest release](../../releases/latest).
 
-**Recommended install path:** your home directory keeps runtime data (skills, logs, experience DB) out of system folders and avoids permission issues.
+**Recommended layout** (mirrors the dev setup — binaries live under `bin\` inside the repo root):
 
 ```
-%USERPROFILE%\wkappbot\
-  wkappbot.exe          ← launcher / busybox entry point
-  wkappbot-core.exe     ← core worker (hot-swapped on update)
-  wkappbot.hq\          ← auto-created on first run
+%USERPROFILE%\wkappbot\          ← git clone target (or any folder you choose)
+  bin\
+    wkappbot.exe                 ← launcher / busybox entry point
+    wkappbot-core.exe            ← core worker (hot-swapped on update)
+    wkappbot.hq\                 ← runtime data: skills, logs, experience DB (auto-created)
+  csharp\
+  handlers\
+  skills\
+  ...
 ```
 
-Add the folder to your `PATH` so `wkappbot` is available in any terminal:
+Add `bin\` to your `PATH` so `wkappbot` is available in any terminal:
 
 ```powershell
 # PowerShell (permanent, current user)
 [Environment]::SetEnvironmentVariable(
   'PATH',
-  "$env:USERPROFILE\wkappbot;$([Environment]::GetEnvironmentVariable('PATH','User'))",
+  "$env:USERPROFILE\wkappbot\bin;$([Environment]::GetEnvironmentVariable('PATH','User'))",
   'User'
 )
+```
+
+Build from source (requires .NET SDK 8+):
+
+```bat
+build.cmd
 ```
 
 Verify the install:
@@ -132,7 +143,7 @@ wkappbot --version
 wkappbot skill list
 ```
 
-> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed -- the binary is self-contained.
+> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed — the binary is self-contained.
 
 ---
 
