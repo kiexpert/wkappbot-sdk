@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WKAppBot.Abstractions\WKAppBot.Abstractions.csproj" />
     <ProjectReference Include="..\WKAppBot.Win32\WKAppBot.Win32.csproj" />
   </ItemGroup>
 
