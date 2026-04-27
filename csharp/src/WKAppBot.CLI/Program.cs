@@ -744,8 +744,35 @@ internal partial class Program
             prof("dispatch");
             bool isConsoleDirect = !IsPipeMode && !RunningInEye && !IsMcpMode && !Console.IsErrorRedirected;
             using var _errScope = isConsoleDirect ? ErrorScope.Begin() : null;
+            // -- License gates ------------------------------------------------
+            // Touch the license up front so:
+            //   1. expiry warnings surface within the first ~7 days of expiry
+            //   2. Standard/Pro features fail fast with a clean upgrade message
+            //   3. dev repo (csharp/ sibling) auto-bypasses everything
+            // 'license' / 'help' / 'version' commands MUST stay reachable even
+            // after expiry, so they're excluded from the Require() gates below.
+            try
+            {
+                var _licWarn = WKAppBot.Core.License.LicenseManager.ExpiryWarning();
+                if (!string.IsNullOrEmpty(_licWarn)) Console.Error.WriteLine(_licWarn);
+            }
+            catch { }
+            switch (command)
+            {
+                case "ask":
+                case "agent":
+                case "newchat":
+                case "chat":
+                    WKAppBot.Core.License.LicenseManager.Require(WKAppBot.Abstractions.License.LicenseFeature.AskAI); break;
+                case "schedule":
+                case "eye":
+                    WKAppBot.Core.License.LicenseManager.Require(WKAppBot.Abstractions.License.LicenseFeature.Schedule); break;
+                // Vision and Android-ADB gates fire from inside their own commands
+                // since they're not top-level verbs in this build.
+            }
             exitCode = command switch
             {
+                "license" => WKAppBot.CLI.Commands.LicenseCommandImpl.Run(restArgs),
                 "a11y" => A11yCommand(restArgs),
                 "run" => RunCommand(restArgs),
                 "find" => FindCommand(restArgs),
