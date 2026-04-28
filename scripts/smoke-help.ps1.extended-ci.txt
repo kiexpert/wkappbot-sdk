@@ -1,0 +1,30 @@
+commit: 425cb609d106dd6cd47a857038106cea0940d774
+workflow: extended-smoke
+exitcode: 0  passed: 207  soft: 13  hard: 0
+timestamp_utc: 2026-04-28T08:55:52.6133606Z
+
+  [SKIP-CI] Section 11 Real app automation (app launch -- skipped on CI)
+  [SKIP-CI] Section 14 Multi-app (app launch -- skipped on CI)
+  [SKIP-CI] Section 15 Window state ops (app launch -- skipped on CI)
+  [SKIP-CI] Section 16 a11y inspect (app launch -- skipped on CI)
+  [SKIP-CI] Section 18 Complex grap patterns (app launch -- skipped on CI)
+  [SKIP-CI] Section 20 scenario-run (launches calc -- skipped on CI)
+  [SKIP-CI] Section 22 a11y click real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 23 a11y scroll real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 24 a11y wait real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 25 a11y highlight real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 27 a11y move real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 28 a11y resize real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 29 a11y close real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 30 minimize/maximize/restore real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 32 a11y invoke real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 33 a11y inspect real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 34 a11y focus real/missing (app launch -- skipped on CI)
+  [SKIP-CI] Section 35 a11y kill real/missing (app launch -- skipped on CI)
+  [SKIP-CI] ask-claude (spawns Chrome -- skipped on CI)
+  [SKIP-CI] ask-gpt    (spawns Chrome -- skipped on CI)
+  [SKIP-CI] speak-real  (audio device required)
+  [SKIP-CI] speak-empty (audio device required)
+  57. newchat -- 3 tests (soft-fail)
+  Smoke results [LOCAL+EXTENDED]: 207 passed, 13 soft-fail, 0 hard-fail
+All smoke checks passed.
