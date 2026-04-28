@@ -26,7 +26,7 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Restore cached repo bin
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: bin
         key: ${{ runner.os }}-wkappbot-bin-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/**/*.xaml', 'csharp/WKAppBot.sln') }}
