@@ -1,14 +1,14 @@
-commit: 2781b0a7c4ce32a395f49db62c630e80327f3395
+commit: fc39c7720cb641cd1428db429d7348106b2c5ff7
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-27T09:06:53.0322774Z
+timestamp_utc: 2026-04-28T04:23:54.7352674Z
 
 
 === version ===
   CMD: wkappbot --version
-  {"_":"LAUNCH","pid":6564,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":3248,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -20,8 +20,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-root ===
   CMD: wkappbot --help
-  {"_":"LAUNCH","pid":7608,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":6684,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -33,8 +33,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-a11y ===
   CMD: wkappbot a11y --help --no-regression
-  {"_":"LAUNCH","pid":6628,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":3592,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -46,8 +46,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-windows ===
   CMD: wkappbot windows --help --no-regression
-  {"_":"LAUNCH","pid":5108,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":6776,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -59,8 +59,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-file ===
   CMD: wkappbot file --help --no-regression
-  {"_":"LAUNCH","pid":6352,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":6944,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -85,8 +85,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-schedule ===
   CMD: wkappbot schedule --help --no-regression
-  {"_":"LAUNCH","pid":8368,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":5920,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -98,8 +98,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-logcat ===
   CMD: wkappbot logcat --help --no-regression
-  {"_":"LAUNCH","pid":5788,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":9024,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -111,8 +111,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-eye ===
   CMD: wkappbot eye --help --no-regression
-  {"_":"LAUNCH","pid":8380,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":6928,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -124,8 +124,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-slack ===
   CMD: wkappbot slack --help --no-regression
-  {"_":"LAUNCH","pid":2388,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":7268,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -137,8 +137,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-ask ===
   CMD: wkappbot ask --help --no-regression
-  {"_":"LAUNCH","pid":2748,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":7136,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -150,8 +150,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === help-gc ===
   CMD: wkappbot gc --help --no-regression
-  {"_":"LAUNCH","pid":1324,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":9128,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -163,8 +163,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === windows-list ===
   CMD: wkappbot windows
-  {"_":"LAUNCH","pid":3076,"sid":2
-  ,"fg":"0x10202"
+  {"_":"LAUNCH","pid":2124,"sid":2
+  ,"fg":"0x10206"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -182,9 +182,9 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 87 skill(s) - most recent first:
     [wkappbot]
-      - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot v1.1 [5d ago] [unclassified] - The public kiexpert/wkappbot launcher must use WKAPPBOT_HOME env var or %USERPROFILE%/.wkappbot as the default data root instead of AppContext.BaseDirectory. Dev builds keep D:/GitHub/WKAppBot/bin.
-      - Launcher console encoding: 3-mode policy for interactive + piped + UTF-8 terminals v1.0 [9d ago] [unclassified] - Set Console.OutputEncoding per mode so multi-byte chars (Korean CP949) render correctly everywhere: redirected streams force UTF-8 (inter-process standard), UTF-8 terminal keeps UTF-8, CP949 conhost uses CP949 with ? fallback. Explicit StreamWriter needed for redirected streams because .NET defaults to OS ACP.
-      - a11y close safety: ambiguity + focus-node diagnostics v1.0 [9d ago] [unclassified] - Close action defaults: multi-match without narrower -> abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -> dump UIA focused element so the blocker is visible
+      - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot v1.1 [6d ago] [unclassified] - The public kiexpert/wkappbot launcher must use WKAPPBOT_HOME env var or %USERPROFILE%/.wkappbot as the default data root instead of AppContext.BaseDirectory. Dev builds keep D:/GitHub/WKAppBot/bin.
+      - Launcher console encoding: 3-mode policy for interactive + piped + UTF-8 terminals v1.0 [10d ago] [unclassified] - Set Console.OutputEncoding per mode so multi-byte chars (Korean CP949) render correctly everywhere: redirected streams force UTF-8 (inter-process standard), UTF-8 terminal keeps UTF-8, CP949 conhost uses CP949 with ? fallback. Explicit StreamWriter needed for redirected streams because .NET defaults to OS ACP.
+      - a11y close safety: ambiguity + focus-node diagnostics v1.0 [10d ago] [unclassified] - Close action defaults: multi-match without narrower -> abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -> dump UIA focused element so the blocker is visible
   ... (96 more lines)
   EXITCODE: 0
 
@@ -203,8 +203,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === schedule-list ===
   CMD: wkappbot schedule list
-  {"_":"LAUNCH","pid":8008,"sid":2
-  ,"fg":"0x100B2"
+  {"_":"LAUNCH","pid":2660,"sid":2
+  ,"fg":"0x100B8"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -216,8 +216,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === file-read ===
   CMD: wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":6356,"sid":2
-  ,"fg":"0x100B2"
+  {"_":"LAUNCH","pid":9036,"sid":2
+  ,"fg":"0x100B8"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -229,8 +229,8 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
 
 === file-grep ===
   CMD: wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":6256,"sid":2
-  ,"fg":"0x100B2"
+  {"_":"LAUNCH","pid":4680,"sid":2
+  ,"fg":"0x100B8"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -240,20 +240,33 @@ timestamp_utc: 2026-04-27T09:06:53.0322774Z
   ... (8 more lines)
   EXITCODE: 0
 
-=== file-glob ===
-  CMD: wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  {"_":"LAUNCH","pid":608,"sid":2
-  ,"fg":"0x100B2"
+=== file-glob-yaml ===
+  CMD: wkappbot file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
+  {"_":"LAUNCH","pid":4944,"sid":2
+  ,"fg":"0x100B8"
   ,"fgT":"Program Manager"
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (4 more lines)
+  ... (12 more lines)
+  EXITCODE: 0
+
+=== file-glob-yml ===
+  CMD: wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
+  {"_":"LAUNCH","pid":5660,"sid":2
+  ,"fg":"0x100B8"
+  ,"fgT":"Program Manager"
+  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
+  ,"chain":[
+  {"pid":6,"name":"?"
+  }]}
+                                                                                  
+  ... (10 more lines)
   EXITCODE: 0
 
 ========================================
-  Smoke results: 18 passed, 1 soft-fail, 0 hard-fail
+  Smoke results: 19 passed, 1 soft-fail, 0 hard-fail
 ========================================
 All user-centric smoke checks passed.
