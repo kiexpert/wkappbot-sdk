@@ -292,6 +292,7 @@ jobs:
 
     - name: User-centric smoke test
       shell: pwsh
+      env:
       run: |
         $file    = 'scripts/smoke-help.ps1'
         $outFile = "$file.smoke.txt"
