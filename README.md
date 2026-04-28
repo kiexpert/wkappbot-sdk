@@ -122,7 +122,9 @@ Pre-built binaries are also available if you prefer not to build:
 | [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — extract anywhere |
 | [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every build → `wkappbot-bin-{run_id}` (90-day retention) |
 
-**Recommended layout** (mirrors the dev setup — binaries live under `bin\` inside the repo root):
+**Recommended layout** — clone under `Documents\` so your personal automation data (experience DB, logs, skills) stays in your home directory and is easy to find, back up, or exclude from sharing:
+
+> **Why Documents?** WKAppBot learns from your usage and stores UI experience data under `bin\wkappbot.hq\`. Keeping this under your personal Documents folder protects your privacy — it stays separate from shared or version-controlled paths.
 
 ```
 %USERPROFILE%\Documents\wkappbot\  ← recommended clone location (easy to find in Explorer)
