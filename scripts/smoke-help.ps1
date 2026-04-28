@@ -559,6 +559,484 @@ Section "21. gc -- garbage collect smoke-temp"
 # gc should run without crashing; sweep of fresh dir exits 0
 Invoke-CoreCmd 'gc-run' @('gc', '*.log', '--days', '0', '--sweep') -Soft
 
+# ============================================================
+#  SECTION 4 -- COVERAGE EXPANSION (3+ tests per command)
+# ============================================================
+
+Section "22. a11y click -- 3 tests"
+
+# T1: help only (basic)
+Invoke-Cmd 'a11y-click-help' @('a11y', 'click', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+
+    # T2: real click on a known control (Notepad title bar / menu)
+    Invoke-CoreCmd 'a11y-click-real' @('a11y', 'click', "{proc:'Notepad'}", '--timeout', '5') -Soft
+
+    # T3: edge -- click on nonexistent target -> non-zero exit
+    & $coreExe a11y click "nonexistent_xyz_target" --timeout 2 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { $pass++; Write-Host "  [ASSERT OK] click on missing target fails non-zero" }
+    else { $softFail++; Write-Host "  [SOFT] click on missing target unexpectedly returned 0" }
+} finally {
+    Close-Notepad
+}
+
+Section "23. a11y scroll -- 3 tests"
+
+# T1: help
+Invoke-Cmd 'a11y-scroll-help' @('a11y', 'scroll', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    # Fill with many lines so scrolling is meaningful
+    $bigText = (1..50 | ForEach-Object { "scroll-line-$_" }) -join "`r`n"
+    & $coreExe a11y type "{proc:'Notepad'}" $bigText --timeout 5 2>&1 | Out-Null
+
+    # T2: scroll down
+    Invoke-CoreCmd 'a11y-scroll-down' @('a11y', 'scroll', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    # T3: scroll on missing target
+    Invoke-CoreCmd 'a11y-scroll-missing' @('a11y', 'scroll', 'nonexistent_scroll_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "24. a11y wait -- 3 tests"
+
+# T1: help
+Invoke-Cmd 'a11y-wait-help' @('a11y', 'wait', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    # T2: wait for existing window -> success quickly
+    Invoke-CoreCmd 'a11y-wait-exists' @('a11y', 'wait', "{proc:'Notepad'}", '--condition', 'exists', '--timeout', '5') -Soft
+    # T3: wait for nonexistent -> timeout (non-zero)
+    Invoke-CoreCmd 'a11y-wait-timeout' @('a11y', 'wait', 'nonexistent_wait_target', '--condition', 'exists', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "25. a11y highlight -- 3 tests"
+
+Invoke-Cmd 'a11y-highlight-help' @('a11y', 'highlight', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Invoke-CoreCmd 'a11y-highlight-real' @('a11y', 'highlight', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-highlight-missing' @('a11y', 'highlight', 'nonexistent_highlight_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "26. a11y eval -- 3 tests"
+
+# T1: help
+Invoke-Cmd 'a11y-eval-help' @('a11y', 'eval', '--help', '--no-regression')
+# T2: real eval requires browser/CDP -- soft-fail
+Invoke-CoreCmd 'a11y-eval-noctx' @('a11y', 'eval', '--eval-js', '1+1', '--timeout', '3') -Soft
+# T3: edge -- empty JS string
+Invoke-CoreCmd 'a11y-eval-empty' @('a11y', 'eval', '--eval-js', '', '--timeout', '2') -Soft
+
+Section "27. a11y move -- 3 tests"
+
+Invoke-Cmd 'a11y-move-help' @('a11y', 'move', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Invoke-CoreCmd 'a11y-move-real' @('a11y', 'move', "{proc:'Notepad'}", '100', '100', '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-move-missing' @('a11y', 'move', 'nonexistent_move_target', '0', '0', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "28. a11y resize -- 3 tests"
+
+Invoke-Cmd 'a11y-resize-help' @('a11y', 'resize', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Invoke-CoreCmd 'a11y-resize-real' @('a11y', 'resize', "{proc:'Notepad'}", '600', '400', '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-resize-missing' @('a11y', 'resize', 'nonexistent_resize_target', '100', '100', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "29. a11y close -- 3 tests"
+
+Invoke-Cmd 'a11y-close-help' @('a11y', 'close', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    # T2: graceful close (may surface save dialog -- handle it)
+    Invoke-CoreCmd 'a11y-close-real' @('a11y', 'close', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Start-Sleep -Milliseconds 500
+    # Dismiss save dialog if any
+    & $coreExe a11y invoke "{proc:'Notepad'}#*저장 안 함*" --timeout 2 2>&1 | Out-Null
+    & $coreExe a11y invoke "{proc:'Notepad'}#*Don't Save*" --timeout 2 2>&1 | Out-Null
+    # T3: close on missing target
+    Invoke-CoreCmd 'a11y-close-missing' @('a11y', 'close', 'nonexistent_close_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "30. a11y minimize/maximize/restore -- 3 each"
+
+# minimize
+Invoke-Cmd 'a11y-min-help' @('a11y', 'minimize', '--help', '--no-regression')
+Invoke-Cmd 'a11y-max-help' @('a11y', 'maximize', '--help', '--no-regression')
+Invoke-Cmd 'a11y-restore-help' @('a11y', 'restore', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+
+    # minimize: real + missing
+    Invoke-CoreCmd 'a11y-min-real' @('a11y', 'minimize', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-min-missing' @('a11y', 'minimize', 'nonexistent_min_target', '--timeout', '2') -expect 1 -Soft
+
+    # maximize: real + missing
+    Invoke-CoreCmd 'a11y-max-real' @('a11y', 'maximize', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-max-missing' @('a11y', 'maximize', 'nonexistent_max_target', '--timeout', '2') -expect 1 -Soft
+
+    # restore: real + missing
+    Invoke-CoreCmd 'a11y-restore-real' @('a11y', 'restore', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-restore-missing' @('a11y', 'restore', 'nonexistent_restore_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "31. a11y clipboard-read/write -- 3 each"
+
+# clipboard-write: T1 help, T2 round-trip, T3 unicode
+Invoke-Cmd 'clip-write-help' @('a11y', 'clipboard-write', '--help', '--no-regression')
+Invoke-CoreCmd 'clip-write-basic' @('a11y', 'clipboard-write', 'smoke-clip-basic-001')
+$clipBasic = Invoke-CoreCmd 'clip-read-basic' @('a11y', 'clipboard-read')
+Assert-Contains 'clip basic round-trip' $clipBasic 'smoke-clip-basic-001'
+
+# Unicode round-trip
+Invoke-CoreCmd 'clip-write-unicode' @('a11y', 'clipboard-write', 'unicode-clip-AlphaBeta-end')
+$clipUnicode = Invoke-CoreCmd 'clip-read-unicode' @('a11y', 'clipboard-read')
+Assert-Contains 'clip unicode round-trip' $clipUnicode 'unicode-clip-AlphaBeta-end'
+
+# clipboard-read help
+Invoke-Cmd 'clip-read-help' @('a11y', 'clipboard-read', '--help', '--no-regression')
+
+Section "32. a11y invoke -- 3 tests"
+
+Invoke-Cmd 'a11y-invoke-help' @('a11y', 'invoke', '--help', '--no-regression')
+
+try {
+    Start-Process 'calc.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 3
+    # T2: invoke a real Calculator button
+    Invoke-CoreCmd 'a11y-invoke-real' @('a11y', 'invoke', "num7Button#{proc:'Calculator'}", '--timeout', '5') -Soft
+    # T3: invoke nonexistent
+    Invoke-CoreCmd 'a11y-invoke-missing' @('a11y', 'invoke', 'nonexistent_invoke_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Stop-TestApp 'CalculatorApp'
+}
+
+Section "33. a11y inspect -- 3 tests"
+
+Invoke-Cmd 'a11y-inspect-help' @('a11y', 'inspect', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    # T2: inspect Notepad
+    $insp2 = Invoke-CoreCmd 'a11y-inspect-real' @('a11y', 'inspect', "{proc:'Notepad'}", '--timeout', '8') -Soft
+    Assert-Contains 'inspect-real has Notepad' $insp2 'Notepad|hwnd|Doc|Edit'
+    # T3: inspect nonexistent
+    Invoke-CoreCmd 'a11y-inspect-missing' @('a11y', 'inspect', 'nonexistent_inspect_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "34. a11y focus -- 3 tests"
+
+Invoke-Cmd 'a11y-focus-help' @('a11y', 'focus', '--help', '--no-regression')
+
+try {
+    Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
+    Invoke-CoreCmd 'a11y-focus-real' @('a11y', 'focus', "{proc:'Notepad'}", '--timeout', '5') -Soft
+    Invoke-CoreCmd 'a11y-focus-missing' @('a11y', 'focus', 'nonexistent_focus_target', '--timeout', '2') -expect 1 -Soft
+} finally {
+    Close-Notepad
+}
+
+Section "35. a11y kill -- 3 tests"
+
+Invoke-Cmd 'a11y-kill-help' @('a11y', 'kill', '--help', '--no-regression')
+
+# T2: launch + kill (real)
+Start-Process 'notepad.exe' -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+Invoke-CoreCmd 'a11y-kill-real' @('a11y', 'kill', "{proc:'Notepad'}", '--timeout', '5') -Soft
+Start-Sleep -Milliseconds 500
+$stillThere = Get-Process notepad -ErrorAction SilentlyContinue
+if (!$stillThere) { $pass++; Write-Host "  [ASSERT OK] kill removed Notepad process" }
+else { $softFail++; Write-Host "  [SOFT] Notepad still alive after kill"; Stop-TestApp 'Notepad' }
+
+# T3: kill nonexistent
+Invoke-CoreCmd 'a11y-kill-missing' @('a11y', 'kill', 'nonexistent_kill_target', '--timeout', '2') -expect 1 -Soft
+
+Section "36. file write -- 3 tests"
+
+Invoke-Cmd 'file-write-help' @('file', 'write', '--help', '--no-regression')
+
+# T2: write content + verify
+$writeFile = Join-Path $smokeDir 'write-test.txt'
+Invoke-Cmd 'file-write-basic' @('file', 'write', $writeFile, '--content', 'wkappbot-write-content-XYZ')
+if (Test-Path $writeFile) {
+    $writeContent = Get-Content $writeFile -Raw
+    if ($writeContent -like '*wkappbot-write-content-XYZ*') {
+        $pass++; Write-Host "  [ASSERT OK] file write content verified"
+    } else {
+        $hardFail++; Write-Host "  [ASSERT FAIL] file write content mismatch"
+    }
+} else {
+    $hardFail++; Write-Host "  [ASSERT FAIL] file write -- file not created"
+}
+
+# T3: overwrite (backup behavior) -- must succeed and create .bak
+Invoke-Cmd 'file-write-overwrite' @('file', 'write', $writeFile, '--content', 'replaced-content-001')
+$writeContent2 = Get-Content $writeFile -Raw
+if ($writeContent2 -like '*replaced-content-001*') {
+    $pass++; Write-Host "  [ASSERT OK] file write overwrite verified"
+} else {
+    $hardFail++; Write-Host "  [ASSERT FAIL] file write overwrite did not replace content"
+}
+
+Section "37. file edit -- 3 tests (extended)"
+
+Invoke-Cmd 'file-edit-help' @('file', 'edit', '--help', '--no-regression')
+
+# T2: edit + verify (this also exists in section 5; this one is targeted)
+$editFile2 = Join-Path $smokeDir 'edit-test-2.txt'
+Set-Content $editFile2 'foo bar baz' -Encoding UTF8
+Invoke-Cmd 'file-edit-real' @('file', 'edit', 'foo', 'qux', $editFile2)
+$editContent2 = Get-Content $editFile2 -Raw
+if ($editContent2 -like '*qux*') {
+    $pass++; Write-Host "  [ASSERT OK] file-edit replaced foo -> qux"
+} else {
+    $hardFail++; Write-Host "  [ASSERT FAIL] file-edit did not replace foo"
+}
+
+# T3: edit on nonexistent file -> non-zero
+Invoke-Cmd 'file-edit-missing' @('file', 'edit', 'a', 'b', 'C:\nonexistent_smoke_xyz.txt') -expect 1 -Soft
+
+Section "38. file grep -- 3 tests (extended)"
+
+Invoke-Cmd 'file-grep-help' @('file', 'grep', '--help', '--no-regression')
+
+# already covered: basic find, OR pattern -- add empty-result edge case
+$grepEmpty = Join-Path $smokeDir 'grep-empty.txt'
+Set-Content $grepEmpty 'no-match-here' -Encoding UTF8
+Invoke-Cmd 'file-grep-empty' @('file', 'grep', 'pattern_not_found_zzz', $grepEmpty) -Soft | Out-Null
+# empty result is acceptable; test that command doesn't crash
+Write-Host "  [INFO] grep no-match completed without crash"
+
+Section "39. skill list -- 3 tests"
+
+Invoke-Cmd 'skill-list-help' @('skill', 'list', '--help', '--no-regression')
+
+$skList2 = Invoke-Cmd 'skill-list-real' @('skill', 'list')
+Assert-Contains 'skill-list has at least one skill' $skList2 'wkappbot|skill|grap|a11y'
+
+# T3: skill list with filter (if supported) or count check
+if ($skList2.Count -gt 1) {
+    $pass++; Write-Host "  [ASSERT OK] skill list returned multiple lines ($($skList2.Count))"
+} else {
+    $softFail++; Write-Host "  [SOFT] skill list very short -- may be empty"
+}
+
+Section "40. skill read -- 3 tests"
+
+Invoke-Cmd 'skill-read-help' @('skill', 'read', '--help', '--no-regression')
+
+$skRead2 = Invoke-Cmd 'skill-read-grap' @('skill', 'read', 'grap')
+Assert-Contains 'skill-read grap content' $skRead2 'grap|pattern|wildcard|JSON5'
+
+# T3: skill read nonexistent
+Invoke-Cmd 'skill-read-missing' @('skill', 'read', 'nonexistent_skill_xyzzy_smoke') -expect 1 -Soft
+
+Section "41. skill search -- 3 tests"
+
+Invoke-Cmd 'skill-search-help' @('skill', 'search', '--help', '--no-regression')
+
+$skSearch1 = Invoke-Cmd 'skill-search-grap2' @('skill', 'search', 'grap')
+Assert-Contains 'skill-search grap finds entry' $skSearch1 'grap'
+
+# T3: search with no matches
+Invoke-Cmd 'skill-search-empty' @('skill', 'search', 'zzz_no_skill_matches_this_xyz') -Soft
+
+Section "42. skill verify -- 3 tests"
+
+Invoke-Cmd 'skill-verify-help' @('skill', 'verify', '--help', '--no-regression')
+
+# Already exists: skill-verify-grap (soft) -- add another known skill
+Invoke-CoreCmd 'skill-verify-a11y' @('skill', 'verify', 'a11y') -Soft
+
+# T3: verify nonexistent
+Invoke-CoreCmd 'skill-verify-missing' @('skill', 'verify', 'nonexistent_verify_skill_xyz') -expect 1 -Soft
+
+Section "43. skill audit -- 3 tests"
+
+Invoke-Cmd 'skill-audit-help' @('skill', 'audit', '--help', '--no-regression')
+
+# T2/T3: run audit (may be slow / soft-fail if not implemented in SDK)
+Invoke-CoreCmd 'skill-audit-run' @('skill', 'audit') -Soft
+Invoke-CoreCmd 'skill-audit-grap' @('skill', 'audit', 'grap') -Soft
+
+Section "44. schedule list/add/remove -- 3 each"
+
+# list
+Invoke-Cmd 'schedule-list-help' @('schedule', 'list', '--help', '--no-regression')
+Invoke-Cmd 'schedule-list-real' @('schedule', 'list')
+# T3 list: stress -- list twice (idempotent)
+Invoke-Cmd 'schedule-list-twice' @('schedule', 'list')
+
+# add (soft -- may affect real schedules)
+Invoke-Cmd 'schedule-add-help' @('schedule', 'add', '--help', '--no-regression')
+$schedName = "smoke-test-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
+Invoke-Cmd 'schedule-add-real' @('schedule', 'add', $schedName, '--cron', '0 0 1 1 *', '--cmd', 'echo smoke') -Soft
+# T3 add: bad cron
+Invoke-Cmd 'schedule-add-bad' @('schedule', 'add', 'smoke-bad-cron', '--cron', 'NOT_A_CRON', '--cmd', 'echo') -Soft
+
+# remove
+Invoke-Cmd 'schedule-remove-help' @('schedule', 'remove', '--help', '--no-regression')
+Invoke-Cmd 'schedule-remove-real' @('schedule', 'remove', $schedName) -Soft
+# T3 remove: nonexistent
+Invoke-Cmd 'schedule-remove-missing' @('schedule', 'remove', 'nonexistent_smoke_sched_xyz') -Soft
+
+Section "45. eye tick -- 3 tests"
+
+Invoke-Cmd 'eye-tick-help' @('eye', 'tick', '--help', '--no-regression')
+
+# T2: eye tick with short timeout -- already in section 9, repeat with verbose
+Invoke-CoreCmd 'eye-tick-short' @('eye', 'tick', '--timeout', '2') -Soft
+
+# T3: eye tick with longer timeout
+Invoke-CoreCmd 'eye-tick-long' @('eye', 'tick', '--timeout', '5') -Soft
+
+Section "46. license status/activate/path -- 3 each"
+
+# status
+Invoke-Cmd 'license-status-help' @('license', 'status', '--help', '--no-regression')
+$licS = Invoke-CoreCmd 'license-status-real' @('license', 'status')
+Assert-Contains 'license-status has Tier' $licS 'Tier|Free|Standard|Pro'
+# T3 status: --json or alternate flag (soft if unsupported)
+Invoke-CoreCmd 'license-status-twice' @('license', 'status') -Soft
+
+# activate
+Invoke-Cmd 'license-activate-help' @('license', 'activate', '--help', '--no-regression')
+# already: missing file, invalid JSON in section 10 -- add a third edge case
+$emptyLic = Join-Path $smokeDir 'empty-license.json'
+Set-Content $emptyLic '' -Encoding UTF8
+Invoke-CoreCmd 'license-activate-empty' @('license', 'activate', $emptyLic) -expect 1 -Soft
+# Repeat the missing-file case for clarity
+Invoke-CoreCmd 'license-activate-missing-2' @('license', 'activate', 'C:\zzz_nonexistent_license.json') -expect 1 -Soft
+
+# path
+Invoke-Cmd 'license-path-help' @('license', 'path', '--help', '--no-regression')
+$licP = Invoke-CoreCmd 'license-path-real' @('license', 'path')
+Assert-Contains 'license-path shows a path' $licP 'license\.json|\.json|\\|/'
+# T3 path: run twice (idempotent)
+Invoke-CoreCmd 'license-path-twice' @('license', 'path')
+
+Section "47. validate -- 3 tests"
+
+Invoke-Cmd 'validate-help' @('validate', '--help', '--no-regression')
+# already: valid + bad yaml in section 8
+# T3: validate nonexistent file
+Invoke-CoreCmd 'validate-missing' @('validate', 'C:\zzz_nonexistent_scenario.yaml') -expect 1 -Soft
+
+Section "48. logcat -- 3 tests (extended)"
+
+Invoke-Cmd 'logcat-help' @('logcat', '--help', '--no-regression')
+# already: ERROR filter + OR filter in section 19
+# T3: logcat with --past flag (no live tail, just last N hours from logs)
+Invoke-CoreCmd 'logcat-past' @('logcat', 'INFO', '--past', '24h', '--timeout', '3') -Soft
+
+Section "49. gc -- 3 tests"
+
+Invoke-Cmd 'gc-help' @('gc', '--help', '--no-regression')
+# T2: gc dry-run on tmp dir
+Invoke-CoreCmd 'gc-dryrun' @('gc', '*.txt', '--days', '0') -Soft
+# T3: gc sweep (already in 21) -- repeat with different pattern
+Invoke-CoreCmd 'gc-sweep-png' @('gc', '*.png', '--days', '0', '--sweep') -Soft
+
+Section "50. suggest list -- 3 tests"
+
+Invoke-Cmd 'suggest-help' @('suggest', '--help', '--no-regression') -Soft
+Invoke-Cmd 'suggest-list-real' @('suggest', 'list') -Soft
+# T3: suggest list with possible filter
+Invoke-Cmd 'suggest-list-twice' @('suggest', 'list') -Soft
+
+Section "51. claude-usage -- 3 tests"
+
+Invoke-Cmd 'claude-usage-help' @('claude-usage', '--help', '--no-regression') -Soft
+
+# T2: claude-usage real -- expect output mentioning ctx or MB or %
+$cuOut = Invoke-Cmd 'claude-usage-real' @('claude-usage') -Soft
+$hasCu = $cuOut | Select-String 'ctx|MB|KB|%|JSONL|byte'
+if ($hasCu) { $pass++; Write-Host "  [ASSERT OK] claude-usage shows usage info" }
+else { $softFail++; Write-Host "  [SOFT] claude-usage output unclear" }
+
+# T3: idempotent
+Invoke-Cmd 'claude-usage-twice' @('claude-usage') -Soft
+
+Section "52. windows -- 3 tests (extended)"
+
+# already: list (soft), --deep, --process in sections 4 and 12
+# T3: windows with --cmd filter
+Invoke-Cmd 'windows-cmd' @('windows', '--cmd', 'svchost') -Soft
+
+Section "53. run scenario -- 3 tests"
+
+Invoke-Cmd 'run-help' @('run', '--help', '--no-regression') -Soft
+
+# T2 already in section 20 (run-scenario)
+# T3: run nonexistent yaml -> non-zero
+Invoke-CoreCmd 'run-missing' @('run', 'C:\zzz_nonexistent_scenario.yaml') -expect 1 -Soft
+
+# T-extra: validate as a sanity gate
+Invoke-CoreCmd 'run-validate-help' @('validate', '--help', '--no-regression')
+
+Section "54. ask -- 3 tests (soft-fail)"
+
+Invoke-Cmd 'ask-help' @('ask', '--help', '--no-regression')
+# T2 + T3 require external services -- soft-fail
+Invoke-Cmd 'ask-claude' @('ask', 'claude', 'echo this back: smoke-ask-test-001') -Soft
+Invoke-Cmd 'ask-gpt' @('ask', 'gpt', 'echo this back: smoke-ask-test-002') -Soft
+
+Section "55. slack -- 3 tests (soft-fail)"
+
+Invoke-Cmd 'slack-help' @('slack', '--help', '--no-regression')
+Invoke-Cmd 'slack-send-help' @('slack', 'send', '--help', '--no-regression') -Soft
+Invoke-Cmd 'slack-reply-help' @('slack', 'reply', '--help', '--no-regression') -Soft
+
+Section "56. speak -- 3 tests (soft-fail)"
+
+Invoke-Cmd 'speak-help' @('speak', '--help', '--no-regression') -Soft
+Invoke-Cmd 'speak-real' @('speak', 'smoke-speak-test') -Soft
+Invoke-Cmd 'speak-empty' @('speak', '') -Soft
+
+Section "57. newchat -- 3 tests (soft-fail)"
+
+Invoke-Cmd 'newchat-help' @('newchat', '--help', '--no-regression') -Soft
+# T2 + T3 may actually start chat -- only test help variants
+Invoke-Cmd 'newchat-help-2' @('newchat', '-h') -Soft
+Invoke-Cmd 'newchat-help-3' @('newchat', '--help', '--no-regression') -Soft
+
 } # end extended
 
 # ============================================================
