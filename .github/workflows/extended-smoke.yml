@@ -56,7 +56,7 @@ jobs:
 
     - name: Restore NuGet cache (only if building)
       if: ${{ steps.dl_artifact.outputs.found != 'true' }}
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           ~/.nuget/packages
