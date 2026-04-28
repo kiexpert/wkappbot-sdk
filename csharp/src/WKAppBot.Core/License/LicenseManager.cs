@@ -123,6 +123,7 @@ public static class LicenseManager
     {
         if (_loaded) return;
         _loaded = true;
+
         try
         {
             var path = LicensePath;
