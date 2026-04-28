@@ -636,8 +636,10 @@ partial class Program
                 };
                 foreach (var a in forwardArgs) _tp.StartInfo.ArgumentList.Add(a);
                 _tp.Start();
-                var _lDbg = Path.Combine(@"C:\Temp", "launcher_relay_dbg.txt");
-                void LDbg(string s) { try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}\n"); } catch { } }
+                // Debug relay tracing: set WKAPPBOT_DEBUG=1 to enable
+                var _lDbg = Environment.GetEnvironmentVariable("WKAPPBOT_DEBUG") == "1"
+                    ? Path.Combine(Path.GetTempPath(), "wkappbot_relay_dbg.txt") : null;
+                void LDbg(string s) { if (_lDbg != null) try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}\n"); } catch { } }
                 LDbg($"spawn done pid={_tp.Id}");
                 prof("UseShellExecute spawn done, waiting for relay");
 
