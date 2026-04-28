@@ -34,6 +34,18 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ---
 
+## OS Support
+
+| OS | Status |
+|----|--------|
+| Windows 11 | ✅ Fully supported |
+| Windows 10 22H2+ | ✅ Fully supported |
+| Windows 10 < 22H2 | ⚠️ Untested |
+| Windows Server 2019+ | ✅ Headless mode (no GUI a11y) |
+| macOS / Linux | ❌ Not supported |
+
+---
+
 ## What It Automates
 
 | Target | Method |
