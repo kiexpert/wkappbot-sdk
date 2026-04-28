@@ -1,8 +1,8 @@
-commit: e4d5ec40c026828d5edd6703e4def7726ab1b33f
+commit: 2034fac43dc6f5ac18094e330f8f6ff49b57e9c3
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 1
-timestamp_utc: 2026-04-28T14:07:13.3196981Z
+timestamp_utc: 2026-04-28T14:14:04.3385682Z
 
 
 ------------------------------------------------------------
@@ -884,8 +884,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
   [GLOB] 8 file(s)
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
@@ -894,8 +894,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
-D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
 [31;1m[GLOB] 8 file(s)[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
@@ -909,8 +909,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
-  [GLOB] 7 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+  [GLOB] 7 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
@@ -919,8 +919,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
-[31;1m[GLOB] 7 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+[31;1m[GLOB] 7 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
@@ -951,14 +951,14 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
-  [OVERLAY-GUARD] Suppressed black overlay: 0x100B8 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
+  [OVERLAY-GUARD] Suppressed black overlay: 0x100BC cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
-[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100B8 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
+[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100BC cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
