@@ -29,7 +29,7 @@ internal partial class Program
             Console.WriteLine("Options:");
             Console.WriteLine("  --check        Show whether an update is available (no download)");
             Console.WriteLine("  --force        Download even if already up to date");
-            Console.WriteLine("  --repo <r>     GitHub repo (default: kiexpert/WKAppBot)");
+            Console.WriteLine("  --repo <r>     GitHub repo (default: kiexpert/wkappbot-sdk)");
             Console.WriteLine();
             Console.WriteLine("Prerequisites: gh CLI authenticated (gh auth login)");
             return 0;
@@ -38,7 +38,7 @@ internal partial class Program
         bool checkOnly = args.Contains("--check");
         bool force = args.Contains("--force");
         var repoIdx = Array.IndexOf(args, "--repo");
-        const string defaultRepo = "kiexpert/WKAppBot";
+        const string defaultRepo = "kiexpert/wkappbot-sdk";
         var repo = repoIdx >= 0 && repoIdx + 1 < args.Length ? args[repoIdx + 1] : defaultRepo;
         var binDir = Path.GetDirectoryName(Environment.ProcessPath ?? ".") ?? ".";
         var buildInfoPath = Path.Combine(binDir, "build_info.json");

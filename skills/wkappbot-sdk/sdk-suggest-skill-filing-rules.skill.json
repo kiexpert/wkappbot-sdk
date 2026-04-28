@@ -1,0 +1,42 @@
+{
+  "id": "sdk-suggest-skill-filing-rules",
+  "app": "wkappbot-sdk",
+  "title": "SDK suggest and skill filing rules for AI agents",
+  "title_ko": null,
+  "desc": "How to correctly file suggests and contribute skills when working in the wkappbot-sdk project. Critical: CWD determines project association. Always run dev binary FROM sdk folder.",
+  "steps": [
+    "Applies to: suggest, suggest resolve, skill contribute, skill edit -- all commands that write to project state"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file read README.md",
+      "expect": "WKAppBot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "suggest",
+    "skill",
+    "rules",
+    "cwd",
+    "ai-agent"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T08:40:10.1628899Z",
+  "updated": "2026-04-28T08:40:18.5635547Z",
+  "version": "1.1"
+}

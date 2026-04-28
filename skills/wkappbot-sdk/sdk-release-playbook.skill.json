@@ -1,0 +1,53 @@
+{
+  "id": "sdk-release-playbook",
+  "app": "wkappbot-sdk",
+  "title": "SDK release playbook (version bump \u002B publish)",
+  "title_ko": null,
+  "desc": "Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.",
+  "steps": [
+    "TRIGGER: dev repo sync-public.yml pushes to SDK (new minor/major). That push = signal to cut SDK release too.",
+    "STEP 1 - Version alignment: SDK WKAppBotBaseVersion should match dev minor version. Dev=6.5 -\u003E SDK Directory.Build.props: \u003CWKAppBotBaseVersion\u003E6.5\u003C/WKAppBotBaseVersion\u003E. SDK has no VERSIONING.md or CLAUDE.md version header to update (unlike dev repo which requires 3-file commit).",
+    "STEP 2 - Pre-release checklist: (a) dev repo CI green, (b) SDK build-launcher CI green, (c) SDK extended-smoke CI green (\u003C5 hard-fail), (d) Launcher source audit: no hardcoded paths, no API keys (run security-review skill), (e) build.cmd --download-only works (latest dev GitHub Release exists and contains binaries).",
+    "STEP 3 - Local build \u002B smoke: cd d:\\GitHub\\wkappbot-sdk \u0026\u0026 build.cmd --download-only (fetches latest dev core) \u0026\u0026 dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin \u0026\u0026 powershell -File scripts/smoke-help.ps1 -BasicOnly",
+    "STEP 4 - Docs regeneration: bash scripts/gen-command-ref.sh (updates docs/wkappbot-commands.md from live binary). Commit if changed.",
+    "STEP 5 - Release: run scripts/find-stable-release.ps1 -MaxRuns 4. This: finds latest passing artifact -\u003E bundles zip -\u003E tags v{version} -\u003E gh release create --generate-notes. OR manual: git tag v6.5.0 \u0026\u0026 git push origin v6.5.0 (triggers release.yml workflow).",
+    "STEP 6 - Post-release: verify GitHub Release page shows correct assets \u002B auto-generated notes. Trigger extended-smoke.yml manually on the release tag to confirm.",
+    "VERSION SCHEME: SDK tag = v{WKAppBotBaseVersion}.{patch}-free. patch = commits since bump commit (auto). If aligning with dev, bump SDK WKAppBotBaseVersion immediately after dev minor bump commit.",
+    "PRIVATE NOTE: SDK Core binary comes from dev GitHub Release. SDK Launcher is built from wkappbot-sdk source. They must be version-compatible. Core release must precede SDK release.",
+    "SUGGEST/SKILL from SDK: always run D:\\GitHub\\WKAppBot\\bin\\wkappbot-core.exe from d:\\GitHub\\wkappbot-sdk CWD. Never cd to WKAppBot first.",
+    "LESSON (2026-04-28 first run): bump WKAppBotBaseVersion BEFORE running find-stable-release.ps1. Script builds from latest artifact \u002B smoke, then tags. Version in binary = 6.5.0.0 (launcher file ver). Core version from downloaded release may differ -- this is expected.",
+    "LESSON: find-stable-release.ps1 uses -BasicOnly smoke (25 tests, ~30s). Extended smoke (188 tests) is run separately via extended-smoke.yml CI. Do NOT use full extended mode in release script -- too slow."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file read README.md",
+      "expect": "WKAppBot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "release",
+    "version",
+    "publish",
+    "private",
+    "playbook"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T09:41:07.0617181Z",
+  "updated": "2026-04-28T10:31:42.5609932Z",
+  "version": "1.2"
+}

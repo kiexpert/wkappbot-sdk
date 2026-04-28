@@ -2,6 +2,7 @@
 .dotnet/
 .wkappbot/
 smoke-temp/
+.ci-test-tmp/
 
 # Python
 __pycache__/
@@ -37,7 +38,9 @@ bin/wkappbot.hq/handlers/
 !bin/wkappbot.hq/experience/
 # Rules for high-churn files live in bin/wkappbot.hq/experience/.gitignore
 !bin/wkappbot.hq/suggestions.jsonl
-!bin/wkappbot.hq/profiles/
+# profiles: ignore credential files, keep non-sensitive config
+bin/wkappbot.hq/profiles/slack_exp/
+bin/wkappbot.hq/profiles/*/webhook.json
 bin/wkappbot.hq/profiles/*/wav/
 bin/wkappbot.hq/profiles/*/tokens_*.jsonl
 bin/wkappbot.hq/profiles/*/stt_*.jsonl
@@ -81,3 +84,14 @@ agent-session.json
 agent-checkpoints/
 agent-patch-*.patch
 !bin/wkappbot.hq/suggestions_history.jsonl
+
+# Private/internal artifacts -- not for public SDK
+.mcp.json
+.claude/
+csharp/**/.wkappbot/
+docs/handoff/
+docs/handoff_*.md
+scripts/slack_merge_threads.py
+approval-policy.json
+wkappbot*.zip
+*.zip

@@ -246,12 +246,10 @@ agent-policy.txt
         Console.WriteLine($"[POLICY_END:{type}]");
     }
 
-    // Known agent workspace paths (hardcoded for this machine)
+    // Known agent workspace paths -- populated from WK_AGENT_PATHS env var (colon-separated)
     static readonly string[] KnownAgentPaths =
-    {
-        @"C:\Users\kiexp\.openclaw\workspace",  // OpenClaw (kro) main workspace
-        @"D:\GitHub\WKAppBot",                  // WKAppBot (clot)
-    };
+        (Environment.GetEnvironmentVariable("WK_AGENT_PATHS") ?? "")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries);
 
     static string ResolveWorkspace()
     {

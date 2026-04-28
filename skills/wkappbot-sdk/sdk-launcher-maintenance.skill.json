@@ -1,0 +1,50 @@
+{
+  "id": "sdk-launcher-maintenance",
+  "app": "wkappbot-sdk",
+  "title": "Launcher maintenance guide (public SDK)",
+  "title_ko": null,
+  "desc": "How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.",
+  "steps": [
+    "Repo: d:\\GitHub\\wkappbot-sdk -- Launcher source PUBLIC. Core source PRIVATE (binary only in bin\\wkappbot-core.exe)",
+    "Build: build.cmd (full) OR dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin",
+    "AOT requires MSVC linker (Visual Studio). build.cmd auto-prepends VS Installer dir. Missing symptom: MSB3073 vswhere not recognized",
+    "Core binary: downloaded via build.cmd --download-only from latest GitHub Release, or placed manually. ResolveCoreExe() = ProcessPath dirname \u002B wkappbot-core.exe",
+    "Hot-swap: launcher watches wkappbot-core.new.exe. Drain pipes -\u003E rename atomically. Trigger: eye tick --timeout 15. Never kill Eye manually",
+    "Debug tracing: WKAPPBOT_DEBUG=1 enables relay log at %TEMP%\\wkappbot_relay_dbg.txt. Do not hardcode C:\\Temp in source",
+    "CI: build.yml builds launcher\u002Bcore. extended-smoke.yml runs 188 tests on windows-latest. Triggers on push to csharp/ and smoke script changes",
+    "Public-safe checklist: no hardcoded dev paths, no API keys, no D:\\GitHub\\WKAppBot refs in Launcher source. Run audit before PR",
+    "Suggest/skill filing: run D:\\GitHub\\WKAppBot\\bin\\wkappbot-core.exe from d:\\GitHub\\wkappbot-sdk CWD. Never cd to WKAppBot first (breaks project tracking)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file read README.md",
+      "expect": "WKAppBot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "launcher",
+    "build",
+    "maintenance",
+    "public",
+    "aot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T09:36:40.5432654Z",
+  "updated": "2026-04-28T09:37:24.6663646Z",
+  "version": "1.2"
+}

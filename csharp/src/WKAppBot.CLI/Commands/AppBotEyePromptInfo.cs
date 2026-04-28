@@ -89,7 +89,8 @@ internal partial class Program
     /// <summary>Resolve a project folder name to a full path via searchRoots + ~/.claude/projects/ reverse-map.</summary>
     static string? ResolveProjectFolderToPath(string folderName)
     {
-        var searchRoots = new[] { @"D:\GitHub", @"D:\HTS_Project", @"C:\Users\kiexp\projects" };
+        var searchRoots = (Environment.GetEnvironmentVariable("WK_PROJECT_ROOTS") ?? @"D:\GitHub")
+            .Split(';', StringSplitOptions.RemoveEmptyEntries);
         if (_projectFolderPathCache.TryGetValue(folderName, out var cached))
             return cached;
 
