@@ -126,22 +126,13 @@ jobs:
         Write-Host "Fetching core ZIP from $env:CORE_REPO latest release..."
         try {
           $tmp = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path "$_.d" -Force }
-          gh release download --repo $env:CORE_REPO --pattern "*.zip" --dir $tmp --clobber
-          $zip = Get-ChildItem $tmp -Filter "*.zip" | Select-Object -First 1
-          if (-not $zip) {
-            Write-Host "No ZIP found in release -- will build from source."
+          gh release download --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+          if (-not (Test-Path bin/wkappbot-core.exe)) {
+            Write-Host "wkappbot-core.exe not found in release assets -- will build from source."
             "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
             exit 0
           }
-          Expand-Archive -Path $zip.FullName -DestinationPath "$tmp\out" -Force
-          $core = Get-ChildItem "$tmp\out" -Recurse -Filter "wkappbot-core.exe" | Select-Object -First 1
-          if (-not $core) {
-            Write-Host "wkappbot-core.exe not found inside ZIP -- will build from source."
-            "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          Copy-Item $core.FullName bin/wkappbot-core.exe -Force
-          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $($zip.Name)"
+          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB))"
           "fetched=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
         } catch {
           Write-Host "Fetch failed ($_) -- will build from source."
