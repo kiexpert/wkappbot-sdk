@@ -28,7 +28,7 @@ jobs:
         dotnet-version: 8.0.x
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: csharp
 
@@ -39,4 +39,4 @@ jobs:
           --configuration Release /p:EnableWindowsTargeting=true
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
