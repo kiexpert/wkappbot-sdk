@@ -255,7 +255,8 @@ partial class Program
             var fgTitle = "";
             try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
-            if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase)))
+            if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
+                && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
             {
             var err = Console.Error;
             void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
@@ -401,55 +402,75 @@ partial class Program
         // Core correctly reused. Only --sudo invocations pay the cost; everyone else
         // still sees a 100ms probe elsewhere in the stack. Core's own Ping is untouched.
         // Pipe path: \\.\pipe\wkappbot_elevated
+        //
+        // HANDSHAKE-MISS detection rule (v6.0.1 fix, 2026-04-21, 34x merged suggest):
+        //   The PRESENCE of the pipe file in the NT namespace is the authoritative
+        //   "server started" signal. If \\.\pipe\wkappbot_elevated does NOT exist,
+        //   admin Eye is simply not running yet (cold start) -- quiet fallthrough,
+        //   NEVER a handshake miss regardless of ConnectAsync elapsed time.
+        //   Handshake miss only fires when: pipe file EXISTS but ConnectAsync
+        //   fails to complete within the budget (real zombie / stalled server).
+        //   Previous fastFailMs=100 elapsed heuristic produced false positives
+        //   when ConnectAsync waited the full budget on a nonexistent pipe.
         if (args.Any(a => a == "--sudo"))
         {
             const int sudoProbeMs = 1500;
-            // "Fast fail" threshold: if ConnectAsync returns a failure in under this many
-            // ms, the pipe does not exist at all (admin Eye simply isn't running). That
-            // is the NORMAL "go spawn one" case and must not trigger the handshake-miss
-            // banner or bug report. Only failures that took the full budget (or nearly
-            // so) indicate "pipe exists but server stalled" -- the real regression.
-            const int fastFailMs = 100;
+
+            // Cheap existence check -- doesn't consume a connection, doesn't block.
+            bool pipeFileExists = File.Exists($@"\\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
 
             bool probeAlive = false;
-            bool handshakeFailure = false; // pipe existed but server didn't answer in budget
+            bool handshakeFailure = false; // pipe file existed but server didn't answer in budget
             long elapsedMs = -1;
             string? exMessage = null;
 
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
+            if (!pipeFileExists)
             {
-                using var pipe = new System.IO.Pipes.NamedPipeClientStream(
-                    ".", "wkappbot_elevated",
-                    System.IO.Pipes.PipeDirection.InOut,
-                    System.IO.Pipes.PipeOptions.Asynchronous);
-                using var cts = new System.Threading.CancellationTokenSource(sudoProbeMs);
-                pipe.ConnectAsync(sudoProbeMs, cts.Token).GetAwaiter().GetResult();
-                sw.Stop();
-                elapsedMs = sw.ElapsedMilliseconds;
-                probeAlive = pipe.IsConnected;
-                Console.Error.WriteLine(probeAlive
-                    ? $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): alive -- Core will reuse (took {elapsedMs}ms)"
-                    : $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable (took {elapsedMs}ms)");
-                if (!probeAlive && elapsedMs >= fastFailMs) handshakeFailure = true;
+                // Cold start -- admin Eye not spawned yet. Core will handle UAC + spawn.
+                // Don't even bother probing; it would just waste 1500ms waiting for a
+                // pipe that doesn't exist.
+                Console.Error.WriteLine("[LAUNCHER:SUDO] admin Eye pipe not present -- Core will spawn (cold start, not a handshake miss)");
             }
-            catch (Exception ex)
+            else
             {
-                sw.Stop();
-                elapsedMs = sw.ElapsedMilliseconds;
-                exMessage = ex.Message;
-                if (elapsedMs < fastFailMs)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try
                 {
-                    // Fast-fail == admin Eye not running at all. Quiet fallthrough; Core
-                    // handles the UAC + spawn. Not a handshake regression.
-                    Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping: not running (fast-fail {elapsedMs}ms) -- Core will spawn");
+                    using var pipe = new System.IO.Pipes.NamedPipeClientStream(
+                        ".", $"wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}",
+                        System.IO.Pipes.PipeDirection.InOut,
+                        System.IO.Pipes.PipeOptions.Asynchronous);
+                    using var cts = new System.Threading.CancellationTokenSource(sudoProbeMs);
+                    pipe.ConnectAsync(sudoProbeMs, cts.Token).GetAwaiter().GetResult();
+                    sw.Stop();
+                    elapsedMs = sw.ElapsedMilliseconds;
+                    probeAlive = pipe.IsConnected;
+                    Console.Error.WriteLine(probeAlive
+                        ? $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): alive -- Core will reuse (took {elapsedMs}ms)"
+                        : $"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): unreachable after connect (took {elapsedMs}ms)");
+                    // ConnectAsync returned without exception but IsConnected is false -- rare,
+                    // but the pipe existed at start so this is a real zombie-server scenario.
+                    if (!probeAlive) handshakeFailure = true;
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Took the full budget before failing -> pipe existed but we could
-                    // not complete handshake. This IS the regression we want to surface.
-                    handshakeFailure = true;
-                    Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): handshake failed after {elapsedMs}ms -- ex={ex.Message}");
+                    sw.Stop();
+                    elapsedMs = sw.ElapsedMilliseconds;
+                    exMessage = ex.Message;
+                    // Pipe file existed at the start of the probe but ConnectAsync failed.
+                    // Re-check: did the pipe file disappear during the probe? (Admin Eye
+                    // may have exited/crashed mid-probe -- not a zombie, just a race.)
+                    bool stillExists = File.Exists($@"\\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
+                    if (!stillExists)
+                    {
+                        Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye pipe disappeared during probe ({elapsedMs}ms) -- Core will spawn");
+                    }
+                    else
+                    {
+                        // Pipe still there but we can't connect -> true zombie/regression.
+                        handshakeFailure = true;
+                        Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye ping ({sudoProbeMs}ms): handshake failed after {elapsedMs}ms (pipe present) -- ex={ex.Message}");
+                    }
                 }
             }
 
@@ -468,8 +489,12 @@ partial class Program
         }
 
         // --stderr: show stderr in real-time (default: buffered, shown only on error)
-        // --sudo: implicitly pass through stderr so PULSE trail + ELEVATION reasons are visible
-        bool showStderr = args.Any(a => a == "--stderr" || a == "--sudo");
+        // --sudo: pass through stderr for elevation diagnostics -- EXCEPT eye tick (read-only, clean output)
+        bool isEyeTickCmd = args.Length >= 2
+            && args[0].Equals("eye", StringComparison.OrdinalIgnoreCase)
+            && args[1].Equals("tick", StringComparison.OrdinalIgnoreCase);
+        bool showStderr = !isEyeTickCmd && args.Any(a => a == "--stderr" || a == "--sudo");
+        if (isEyeTickCmd) _suppressErrorLog = true; // eye tick is read-only -- never show Error Log
         var stderrBuf = !showStderr ? new System.Collections.Generic.List<(long ms, string msg)>() : null;
         _stderrBuf = stderrBuf; // for AppBotExit
         _originalStderr = Console.Error; // save before redirect
@@ -539,7 +564,9 @@ partial class Program
         // Applies to most commands -- prevents 30s+ stall when Eye is busy but Core can handle it.
         // Excluded: slack (Eye owns WebSocket), ask/newchat (long-running, double-run risk),
         //           logcat/grep/grap (streaming, already excluded below), eye daemon (isEyeDaemon).
-        var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat";
+        // suggest/skill: routed directly to Core (bypass Eye entirely) -- no first-output guard needed.
+        var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat"
+                                 && cmd != "suggest" && cmd != "skill";
         // eye tick / eye hotswap / eye homework: one-shot subcommands -- route through Eye pipe if running
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
@@ -568,7 +595,10 @@ partial class Program
         // Route chat straight to Core so ProcessStartInfo with inherited stdio
         // points at the user's actual terminal.
         var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
-        if (!quietFind && !isCoreDirectCmd && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd
+        // newchat uses UIA + SendInput + MouseInput -- must not run in Eye process.
+        // Also a critical command that must work even when Eye is broken.
+        var isNewchat = string.Equals(cmd, "newchat", StringComparison.OrdinalIgnoreCase);
+        if (!quietFind && !isCoreDirectCmd && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd && !isNewchat
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
@@ -636,10 +666,8 @@ partial class Program
                 };
                 foreach (var a in forwardArgs) _tp.StartInfo.ArgumentList.Add(a);
                 _tp.Start();
-                // Debug relay tracing: set WKAPPBOT_DEBUG=1 to enable
-                var _lDbg = Environment.GetEnvironmentVariable("WKAPPBOT_DEBUG") == "1"
-                    ? Path.Combine(Path.GetTempPath(), "wkappbot_relay_dbg.txt") : null;
-                void LDbg(string s) { if (_lDbg != null) try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}\n"); } catch { } }
+                var _lDbg = Path.Combine(@"C:\Temp", "launcher_relay_dbg.txt");
+                void LDbg(string s) { try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}\n"); } catch { } }
                 LDbg($"spawn done pid={_tp.Id}");
                 prof("UseShellExecute spawn done, waiting for relay");
 
@@ -1107,6 +1135,7 @@ partial class Program
     ///        AppBotExit(1);  // error, flush stderr log
     /// </summary>
     [ThreadStatic] static System.Collections.Generic.List<(long ms, string msg)>? _stderrBuf;
+    static bool _suppressErrorLog;
     static System.IO.TextWriter? _originalStderr;
 
     static void AppBotExit(int code)
@@ -1121,7 +1150,7 @@ partial class Program
 
         // Restore original stderr FIRST (bypass buffer), then write error log
         if (_originalStderr != null) Console.SetError(_originalStderr);
-        if (code != 0 && _stderrBuf != null && _stderrBuf.Count > 0)
+        if (code != 0 && _stderrBuf != null && _stderrBuf.Count > 0 && !_suppressErrorLog)
         {
             try
             {
