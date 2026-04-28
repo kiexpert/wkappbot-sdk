@@ -18,7 +18,8 @@ param(
     [string]$DevRepo    = $env:WKAPPBOT_CORE_REPO,
     [string]$DevPAT     = $env:WKAPPBOT_CORE_PAT,
     [int]   $MaxRuns    = 6,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Force      # skip dev repo green check (use when dev CI budget exhausted)
 )
 
 Set-Location $PSScriptRoot\..
@@ -143,8 +144,12 @@ Write-Host "`nSTABLE: run=$($stableRun.runId) sha=$($stableRun.sha)"
 Write-Host ">>> $($stableRun.title)"
 
 if (!$devWorkflowOk) {
-    Write-Host "WARNING: dev repo not green -- skipping release creation."
-    exit 0
+    if ($Force) {
+        Write-Host "WARNING: dev repo not green but -Force set -- proceeding anyway."
+    } else {
+        Write-Host "WARNING: dev repo not green -- skipping release creation. Use -Force to override."
+        exit 0
+    }
 }
 
 # ── 4. Create GitHub Release ───────────────────────────────────────────────
