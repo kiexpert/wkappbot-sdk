@@ -1,7 +1,7 @@
-commit: 7a461f958726591624d9bb7d6660fe2222c4f54d
+commit: 640d05e43a764d5f2406875da27953f2440b9c71
 workflow: extended-smoke
 exitcode: 0  passed: 207  soft: 13  hard: 0
-timestamp_utc: 2026-04-28T18:39:31.9613770Z
+timestamp_utc: 2026-04-28T18:56:22.0538705Z
 
   [SKIP-CI] Section 11 Real app automation (app launch -- skipped on CI)
   [SKIP-CI] Section 14 Multi-app (app launch -- skipped on CI)
