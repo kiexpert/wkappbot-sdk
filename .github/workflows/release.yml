@@ -79,7 +79,7 @@ jobs:
             | Select-Object -First 1 -ExpandProperty tagName
           if (-not $tag) { throw "No core-* release found in $env:CORE_REPO" }
           Write-Host "Found: $tag"
-          gh release download --repo $env:CORE_REPO --tag $tag --pattern "wkappbot-core.exe" --dir bin --clobber
+          gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
           if (-not (Test-Path bin/wkappbot-core.exe)) { throw "wkappbot-core.exe not found in release $tag" }
           Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $tag"
           "fetched=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
