@@ -3,6 +3,11 @@
     <!-- Major.Minor set manually on each minor/major bump. Patch is auto-counted from git tag v$(WKAppBotBaseVersion). -->
     <WKAppBotBaseVersion>6.5</WKAppBotBaseVersion>
     <WKAppBotVersion>$(WKAppBotBaseVersion).0</WKAppBotVersion>
+    <!-- Treat warnings as errors in Release builds -->
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
+    <!-- Nullable references enabled globally -->
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <!--
