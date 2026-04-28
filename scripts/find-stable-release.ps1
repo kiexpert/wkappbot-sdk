@@ -49,9 +49,10 @@ function Send-Suggest([string]$text, [string[]]$reqs) {
 Write-Host "=== Dev repo workflow check ==="
 $devWorkflowOk = $true
 if ($DevRepo -and $DevPAT) {
-    $env:GH_TOKEN = $DevPAT
-    $devRunsRaw = gh run list --repo $DevRepo --workflow build.yml --limit 3 --json conclusion,displayTitle 2>$null
-    $env:GH_TOKEN = $null
+    $savedToken    = $env:GH_TOKEN
+    $env:GH_TOKEN  = $DevPAT
+    $devRunsRaw    = gh run list --repo $DevRepo --workflow build.yml --limit 3 --json conclusion,displayTitle 2>$null
+    $env:GH_TOKEN  = $savedToken   # restore so SDK run list below still has auth
     $devRuns = if ($devRunsRaw -and $devRunsRaw.TrimStart().StartsWith('[')) { $devRunsRaw | ConvertFrom-Json -ErrorAction SilentlyContinue } else { $null }
 
     if ($devRuns) {
