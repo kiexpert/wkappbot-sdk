@@ -22,6 +22,14 @@ param(
 )
 
 Set-Location $PSScriptRoot\..
+
+# Local fallback: if PAT not set but gh is authenticated, use its token.
+# CI uses WKAPPBOT_CORE_PAT secret; locally, gh auth token covers it.
+if (-not $DevPAT) {
+    $ghToken = (gh auth token 2>$null)
+    if ($ghToken) { $DevPAT = $ghToken; Write-Host "[local] Using gh auth token for dev repo access." }
+}
+if (-not $DevRepo) { $DevRepo = "kiexpert/WKAppBot" }
 $repoRoot = $PWD.Path
 $testDir  = "$repoRoot\.ci-test-tmp"
 $devCore  = "D:\GitHub\WKAppBot\bin\wkappbot-core.exe"
