@@ -69,7 +69,8 @@ $sampleTxt = Join-Path $smokeDir 'sample.txt'
 
 Invoke-Cmd 'file-read'     @('file', 'read',  $sampleTxt)
 Invoke-Cmd 'file-grep'     @('file', 'grep',  'skill', $sampleTxt)
-Invoke-Cmd 'file-glob'     @('file', 'glob',  '**/*.yml', '--path', (Join-Path $PWD 'handlers'))
+Invoke-Cmd 'file-glob-yaml' @('file', 'glob', '**/*.yaml', '--path', (Join-Path $PWD 'handlers'))
+Invoke-Cmd 'file-glob-yml'  @('file', 'glob', '**/*.yml',  '--path', (Join-Path $PWD '.github\workflows'))
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 Write-Host "`n========================================`n  Smoke results: $pass passed, $soft soft-fail, $fail hard-fail`n========================================"
