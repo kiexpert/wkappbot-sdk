@@ -1,0 +1,6 @@
+commit: b7a727b2dea692aa3a9665f88f7438bdf43f17f9
+script: scripts/get-latest-script-files.ps1
+exitcode: 0
+timestamp_utc: 2026-04-28T12:16:49.0731313Z
+
+{"selectedCommit":"b7a727b2dea692aa3a9665f88f7438bdf43f17f9","files":["scripts/get-latest-script-files.ps1"]}
