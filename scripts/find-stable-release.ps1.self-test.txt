@@ -1,15 +1,15 @@
-commit: df050464d40aa82f3a77f885d293f955d1ecabcc
+commit: 2680edde1974626f8d437465609afbfd16917dc7
 script: scripts/find-stable-release.ps1
 exitcode: 1
-timestamp_utc: 2026-04-28T10:33:16.2972182Z
+timestamp_utc: 2026-04-28T11:53:12.1630666Z
 
 === Dev repo workflow check ===
   DevRepo/DevPAT not set -- skipping dev workflow check
 
 === Fetching recent build-launcher runs ===
-[31;1mConvertFrom-Json: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\find-stable-release.ps1:68[0m
+[31;1mConvertFrom-Json: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\find-stable-release.ps1:76[0m
 [31;1m[0m[36;1mLine |[0m
-[31;1m[0m[36;1m[36;1m  68 | [0m            [36;1mConvertFrom-Json -ErrorAction SilentlyContinue[0m
+[31;1m[0m[36;1m[36;1m  76 | [0m            [36;1mConvertFrom-Json -ErrorAction SilentlyContinue[0m
 [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
 [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mConversion from JSON failed with error: Unexpected character encountered while parsing value: g. Path '', line[0m
 [31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m0, position 0.[0m
