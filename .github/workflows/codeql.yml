@@ -1,0 +1,42 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths: ['csharp/**']
+  pull_request:
+    branches: [main]
+    paths: ['csharp/**']
+  schedule:
+    - cron: '0 3 * * 1'  # weekly Monday 03:00 UTC
+
+jobs:
+  analyze:
+    name: Analyze (C#)
+    runs-on: windows-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+
+    - name: Build
+      shell: pwsh
+      run: |
+        dotnet build csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+          --configuration Release /p:EnableWindowsTargeting=true
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
