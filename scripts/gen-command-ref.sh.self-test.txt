@@ -1,0 +1,6 @@
+commit: 0d889711a4da68efa6ee0439a6379acbae86d130
+script: scripts/gen-command-ref.sh
+exitcode: 0
+timestamp_utc: 2026-04-28T07:49:58.7908794Z
+
+[OK] Generated docs/wkappbot-commands.md (454 lines, binary=v6.0.32)
