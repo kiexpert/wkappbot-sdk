@@ -1,8 +1,8 @@
-commit: eae7ebabf733fd767d75a9c6efde7254178d922b
+commit: cc34281aab89b2f46cf0bd90d575aed427207b42
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-28T16:02:49.0785824Z
+timestamp_utc: 2026-04-28T16:32:45.7880087Z
 
 
 ------------------------------------------------------------
@@ -662,7 +662,7 @@ Skills for 'gc': (wkappbot skill read <id>)
   [SKILL] 91 skill(s) - most recent first:
     [wkappbot-sdk]
       - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [5h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
-      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [5h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
+      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [6h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
       - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [6h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
   ... (101 more)
   exit=0
@@ -884,17 +884,16 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  [GLOB] 8 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
   ... (4 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
-[31;1m[GLOB] 8 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
@@ -903,6 +902,7 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\매매실행중지.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\스크립트오류.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
+[31;1m[GLOB] 8 file(s)[0m
 
 === file-glob-yml ===
   wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
@@ -951,14 +951,14 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
-  [OVERLAY-GUARD] Suppressed black overlay: 0x100CE cls=Progman 1024x768 avg_brightness=36 layered=False count=1
+  [OVERLAY-GUARD] Suppressed black overlay: 0x100E8 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
-[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100CE cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
+[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100E8 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
