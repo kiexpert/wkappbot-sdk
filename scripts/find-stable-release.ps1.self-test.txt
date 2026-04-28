@@ -1,7 +1,7 @@
-commit: af4eae27d67c788156075b24971fa137caae9433
+commit: df050464d40aa82f3a77f885d293f955d1ecabcc
 script: scripts/find-stable-release.ps1
 exitcode: 1
-timestamp_utc: 2026-04-28T05:46:28.1098550Z
+timestamp_utc: 2026-04-28T10:33:16.2972182Z
 
 === Dev repo workflow check ===
   DevRepo/DevPAT not set -- skipping dev workflow check
