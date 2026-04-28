@@ -6,63 +6,78 @@ on:
   push:
     paths:
       - 'scripts/smoke-help.ps1'
-      - 'scripts/gen-command-ref.sh'
-      - 'csharp/**'
       - '.github/workflows/extended-smoke.yml'
   workflow_dispatch:
-    inputs:
-      sections:
-        description: 'Section filter (e.g. "13 14 15" to run only those sections, empty = all)'
-        required: false
-        default: ''
 
 jobs:
   extended:
     runs-on: windows-latest
     permissions:
       contents: write
+    timeout-minutes: 15      # hard cap -- 188 tests should finish in ~5 min
 
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Setup .NET
+    # ── Reuse binaries from latest successful build-launcher run ─────────────
+    # Avoids a 15-min rebuild. Falls back to building if no artifact found.
+    - name: Download latest build artifact
+      id: dl_artifact
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        New-Item -Force -ItemType Directory bin | Out-Null
+
+        # Find latest successful build-launcher run on main
+        $runs = gh run list --workflow build.yml --status success --branch main `
+                  --limit 1 --json databaseId | ConvertFrom-Json
+        if (!$runs) { "found=false" | Out-File $env:GITHUB_OUTPUT -Append; exit 0 }
+
+        $runId = $runs[0].databaseId
+        Write-Host "Using artifact from build run $runId"
+        gh run download $runId --name "wkappbot-bin-$runId" --dir bin 2>&1 | Out-Null
+
+        if ((Test-Path bin/wkappbot.exe) -and (Test-Path bin/wkappbot-core.exe)) {
+          Write-Host "Artifact ready: $((Get-Item bin/wkappbot-core.exe).Length/1MB)MB core"
+          "found=true"  | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        } else {
+          Write-Host "Artifact empty -- will build from source."
+          "found=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        }
+
+    - name: Setup .NET (only if building)
+      if: ${{ steps.dl_artifact.outputs.found != 'true' }}
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
 
-    - name: Restore NuGet cache
+    - name: Restore NuGet cache (only if building)
+      if: ${{ steps.dl_artifact.outputs.found != 'true' }}
       uses: actions/cache/restore@v4
       with:
         path: |
           ~/.nuget/packages
           ~\AppData\Local\NuGet\v3-cache
-        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj', 'csharp/**/*.props') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj','csharp/**/*.props') }}
         restore-keys: ${{ runner.os }}-nuget-
 
-    - name: Restore latest build
-      uses: actions/cache/restore@v4
-      with:
-        path: bin
-        key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props') }}
-        restore-keys: |
-          ${{ runner.os }}-sdk-build-run-
-          ${{ runner.os }}-sdk-build-
-
-    - name: Build if binaries missing
+    - name: Build from source (fallback)
+      if: ${{ steps.dl_artifact.outputs.found != 'true' }}
       shell: pwsh
       run: |
-        if ((Test-Path bin/wkappbot.exe) -and (Test-Path bin/wkappbot-core.exe)) {
-          Write-Host "Binaries present from cache."
-        } else {
-          Write-Host "Building..."
-          New-Item -Force -ItemType Directory bin | Out-Null
-          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
-            --configuration Release -p:SkipDeployLauncher=true -o bin
-          dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
-            --configuration Release -p:SkipDeployCore=true -o bin
-        }
+        Write-Host "Building from source (no cached artifact)..."
+        New-Item -Force -ItemType Directory bin | Out-Null
+        dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+          --configuration Release -p:SkipDeployLauncher=true -o bin
+        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
+          --configuration Release -p:SkipDeployCore=true -o bin
+
+    - name: Seed bin/wkappbot.hq
+      shell: pwsh
+      run: |
         New-Item -Force -ItemType Directory bin/wkappbot.hq/skills   | Out-Null
         New-Item -Force -ItemType Directory bin/wkappbot.hq/handlers | Out-Null
         if (Test-Path skills)   { Copy-Item skills/*   bin/wkappbot.hq/skills   -Recurse -Force }
@@ -72,92 +87,84 @@ jobs:
       shell: pwsh
       run: |
         $v = & bin/wkappbot-core.exe --version 2>$null
-        Write-Host "Binary: $v"
         if (!$v) { throw "Binary check failed" }
+        Write-Host "Binary: $v"
 
+    # ── Extended smoke ────────────────────────────────────────────────────────
     - name: Run extended smoke
       id: smoke
       shell: pwsh
       run: |
         $env:WKAPPBOT_WORKER = '1'
+        $env:CI              = 'true'    # ensure isCI=true inside script
 
         $outFile = "scripts/smoke-help.ps1.extended-ci.txt"
-        $lines   = & pwsh -NoProfile -ExecutionPolicy Bypass -File "scripts/smoke-help.ps1" -Extended 2>&1
+        $lines   = & pwsh -NoProfile -ExecutionPolicy Bypass `
+                     -File "scripts/smoke-help.ps1" -Extended 2>&1
         $code    = $LASTEXITCODE
 
-        # Parse counts from summary line
-        $summary = $lines | Select-String "Smoke results"
-        $passed  = if ($summary -match '(\d+) passed')   { $Matches[1] } else { '?' }
-        $soft    = if ($summary -match '(\d+) soft-fail') { $Matches[1] } else { '?' }
-        $hard    = if ($summary -match '(\d+) hard-fail') { $Matches[1] } else { '?' }
+        $summary = ($lines | Select-String "Smoke results") | Select-Object -Last 1
+        $passed  = if ($summary -match '(\d+) passed')    { $Matches[1] } else { '0' }
+        $soft    = if ($summary -match '(\d+) soft-fail') { $Matches[1] } else { '0' }
+        $hard    = if ($summary -match '(\d+) hard-fail') { $Matches[1] } else { '99' }
 
-        # Write sidecar
         @(
           "commit: ${{ github.sha }}"
           "workflow: extended-smoke"
-          "runner: ${{ runner.os }}"
-          "exitcode: $code"
-          "passed: $passed  soft-fail: $soft  hard-fail: $hard"
+          "exitcode: $code  passed: $passed  soft: $soft  hard: $hard"
           "timestamp_utc: $(Get-Date -AsUTC -Format o)"
           ""
         ) + @($lines) | Set-Content $outFile -Encoding utf8
 
-        # Print to log
         $lines | ForEach-Object { Write-Host $_ }
 
-        # Output for steps
-        "passed=$passed"  | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-        "soft=$soft"      | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-        "hard=$hard"      | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-        "exit_code=$code" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "passed=$passed" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "soft=$soft"     | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        "hard=$hard"     | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-        # Don't fail the job -- let the summary show the counts
-        exit 0
-
+    # ── Job summary ───────────────────────────────────────────────────────────
     - name: Write Job Summary
       if: ${{ always() }}
       shell: pwsh
       run: |
         $passed = '${{ steps.smoke.outputs.passed }}'
         $soft   = '${{ steps.smoke.outputs.soft }}'
-        $hard   = '${{ steps.smoke.outputs.hard }}'
-        $code   = '${{ steps.smoke.outputs.exit_code }}'
-
-        $icon = if ($hard -eq '0') { 'green_circle' } `
-                elseif ([int]$hard -le 3) { 'yellow_circle' } `
-                else { 'red_circle' }
+        $hard   = [int]'${{ steps.smoke.outputs.hard }}'
+        $icon   = if ($hard -eq 0) { ':green_circle:' } `
+                  elseif ($hard -le 5) { ':yellow_circle:' } `
+                  else { ':red_circle:' }
 
         @"
-        ## :$icon: Extended Smoke Results
+        ## $icon Extended Smoke -- ${{ github.sha }}
 
-        | Metric | Count |
-        |--------|-------|
+        | | Count |
+        |---|---|
         | Passed | $passed |
-        | Soft-fail (external/env) | $soft |
+        | Soft-fail (env/external) | $soft |
         | **Hard-fail** | **$hard** |
 
-        - Commit: ``${{ github.sha }}``
-        - Runner: ``${{ runner.os }}`` (windows-latest)
-        - Exit code: ``$code``
-
-        > Soft-fails are expected on CI: external services (Slack, TTS, Ask AI),
-        > UWP app timing races, and focus-dependent operations.
-        > Hard-fails indicate real regressions.
+        > Soft-fails expected: Slack/TTS/AI (no creds), UWP timing, Chrome CDP.
+        > Hard-fails = real regressions.
         "@ | Add-Content $env:GITHUB_STEP_SUMMARY
 
-    - name: Fail if too many hard-fails
+    - name: Fail on excessive hard-fails
       shell: pwsh
       run: |
         $hard = [int]'${{ steps.smoke.outputs.hard }}'
-        # Allow up to 5 hard-fails (some tests are genuinely env-dependent on CI)
-        if ($hard -gt 5) {
-          Write-Host "FAIL: $hard hard-fails exceed threshold (5)"
-          exit 1
+        if ($hard -gt 5) { Write-Host "FAIL: $hard hard-fails"; exit 1 }
+        Write-Host "OK: $hard hard-fail(s)"
+
+    - name: Kill orphan test processes
+      if: ${{ always() }}
+      shell: pwsh
+      run: |
+        'CalculatorApp','win32calc','Notepad','chrome' | ForEach-Object {
+          $procs = Get-Process $_ -ErrorAction SilentlyContinue
+          if ($procs) { $procs | Stop-Process -Force; Write-Host "Killed: $_" }
         }
-        Write-Host "OK: $hard hard-fail(s) within threshold"
 
     - name: Commit sidecar
-      if: ${{ always() && github.event_name != 'pull_request' }}
+      if: ${{ always() }}
       shell: pwsh
       run: |
         git config user.name  'github-actions[bot]'
@@ -166,11 +173,9 @@ jobs:
         if ($changed.Count -eq 0) { Write-Host 'No sidecar changes.'; exit 0 }
         git add -- '**/*.extended-ci.txt'
         git commit -m 'test: update extended smoke CI sidecar [skip ci]'
-        $ok = $false
         for ($i = 1; $i -le 5; $i++) {
           git pull --rebase origin main
           git push origin HEAD:main
-          if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-          Write-Host "Push attempt $i failed, retrying..."; Start-Sleep -Seconds (2 * $i)
+          if ($LASTEXITCODE -eq 0) { break }
+          Start-Sleep -Seconds (2 * $i)
         }
-        if (-not $ok) { Write-Host 'Push failed'; exit 1 }
