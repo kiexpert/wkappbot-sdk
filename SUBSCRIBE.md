@@ -33,7 +33,7 @@ All Free features remain free forever — Pro tiers add capabilities, never gate
 | Field | Value |
 |-------|-------|
 | Bank | 한국투자증권 (KIS) |
-| Account number | `[YOUR_KIS_ACCOUNT]` |
+| Account number | `43420089-01` |
 | Account holder | 김기일 |
 | Amount | 100,000 KRW (CDP) or 500,000 KRW (Sudo) |
 | Memo (입금자명 / 표시내용) | **your GitHub username** — REQUIRED for auto-detection |
@@ -76,17 +76,10 @@ your tier. If `gh` is not installed or not authenticated, you stay on Free tier.
 
 ## Pending Invite UX
 
-Right after the system grants permission, GitHub sends an invite that needs your
-acceptance. Until you accept, wkappbot shows a non-blocking blue toast in the
-bottom-right corner:
-
-```
-[wkappbot] Pending GitHub invite — click to accept
-```
-
-CDP and Sudo features remain locked until acceptance. Free features keep working.
-Once you accept (browser → notifications → "View invitation" → "Accept"), the toast
-clears on the next wkappbot startup.
+Until you accept the invite, wkappbot shows a non-blocking blue toast bottom-right:
+`[wkappbot] Pending GitHub invite — click to accept`. Free features keep working;
+CDP/Sudo stay locked. Accept at github.com/notifications → toast clears on the next
+wkappbot startup.
 
 ---
 
