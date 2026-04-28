@@ -76,6 +76,7 @@ nul
 .vs/
 *.ps1
 !scripts/*.ps1
+!setup.ps1
 *.png
 tmp/
 tmp*
