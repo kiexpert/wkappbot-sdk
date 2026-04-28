@@ -115,5 +115,6 @@ If `tier: Free` after you've paid and accepted: re-run `gh auth login`, then ret
 
 ## Contact
 
-- License questions, payment issues, missing invite: **kiexpert@kivilab.co.kr**
+- **License / payment / activation** → [Open GitHub Issue](../../issues/new?template=license_question.md) (auto-reply in minutes)
+- **Email** → kiexpert@kivilab.co.kr
 - Bug reports / feature requests: `wkappbot suggest "..."` or open a GitHub issue.
