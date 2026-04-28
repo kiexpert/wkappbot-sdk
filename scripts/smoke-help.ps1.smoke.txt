@@ -1,8 +1,8 @@
-commit: 9b98c0fea3f88636dc260c2ab1d44a010ec276a5
+commit: 2680edde1974626f8d437465609afbfd16917dc7
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-28T09:56:57.3880870Z
+timestamp_utc: 2026-04-28T11:58:18.3554474Z
 
 
 ------------------------------------------------------------
@@ -11,24 +11,11 @@ timestamp_utc: 2026-04-28T09:56:57.3880870Z
 
 === version ===
   wkappbot --version
-  {"_":"LAUNCH","pid":4912,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (4 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] --version
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version
+  wkappbot v6.5.0
   exit=0
-[31;1m{"_":"LAUNCH","pid":4912,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] --version[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version[0m
@@ -36,24 +23,16 @@ wkappbot v6.5.0
 
 === help-root ===
   wkappbot --help
-  {"_":"LAUNCH","pid":2616,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (225 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] --help
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help
+  
+  WKAppBot v6.5.0 - Windows App Automation Test Framework
+  Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
+  All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
+  Your testing, coding, and ideas are appreciated. Let's build together.
+  ... (217 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":2616,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] --help[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help[0m
@@ -282,24 +261,16 @@ Data Directory:
 
 === help-a11y ===
   wkappbot a11y --help --no-regression
-  {"_":"LAUNCH","pid":4400,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (43 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] a11y --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=a11y --help --no-regression
+  a11y <action> <grap>[#uia-scope] [options]
+  Universal accessibility control: UIA -> Win32 -> SendInput 3-tier fallback.
+  
+  Actions: close  minimize  maximize  restore  focus  move  resize
+           read  find  highlight  invoke  click  toggle  expand  collapse
+  ... (35 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":4400,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] a11y --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=a11y --help --no-regression[0m
@@ -346,24 +317,16 @@ Skills for 'a11y': (wkappbot skill read <id>)
 
 === help-windows ===
   wkappbot windows --help --no-regression
-  {"_":"LAUNCH","pid":5916,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (9 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] windows --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows --help --no-regression
+  windows [grap]  →  converted to a11y find (v6.1)
+  Alias: wkappbot windows <grap> == wkappbot a11y find <grap>
+  No args: finds wkappbot* windows. Use a11y find directly for full options.
+  
+  Skills for 'windows': (wkappbot skill read <id>)
+  ... (1 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5916,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows --help --no-regression[0m
@@ -376,24 +339,16 @@ Skills for 'windows': (wkappbot skill read <id>)
 
 === help-file ===
   wkappbot file --help --no-regression
-  {"_":"LAUNCH","pid":5428,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (34 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] file --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file --help --no-regression
+  file <subcommand> [options]
+  File operations with 4-stage encoding detection (UTF-8/CP949).
+  
+  Subcommands:
+    open <path>[:line[:col]]
+  ... (26 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5428,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file --help --no-regression[0m
@@ -495,24 +450,16 @@ Skills for 'skill': (wkappbot skill read <id>)
 
 === help-schedule ===
   wkappbot schedule --help --no-regression
-  {"_":"LAUNCH","pid":7056,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (16 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] schedule --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule --help --no-regression
+  schedule add|list|remove|clear [options]
+  Manage scheduled prompts for auto-delivery to Claude.
+  
+  schedule add "<prompt>" --at "2026-03-30T15:00" [--repeat 1h]
+  schedule list     show pending items
+  ... (8 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":7056,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] schedule --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule --help --no-regression[0m
@@ -532,24 +479,16 @@ Skills for 'schedule': (wkappbot skill read <id>)
 
 === help-logcat ===
   wkappbot logcat --help --no-regression
-  {"_":"LAUNCH","pid":7724,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (27 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] logcat --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=logcat --help --no-regression
+  logcat [regex] [file1.glob ...] [options]
+  Stream or search wkappbot logs. grep-style argument order.
+  
+  First arg = content regex (';' = OR). Remaining = file globs (default: *.log).
+  Path segment ';' OR: "logs/媛;<name>*.log" expands to 3 patterns.
+  ... (19 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":7724,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] logcat --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=logcat --help --no-regression[0m
@@ -580,24 +519,16 @@ Skills for 'logcat': (wkappbot skill read <id>)
 
 === help-eye ===
   wkappbot eye --help --no-regression
-  {"_":"LAUNCH","pid":1352,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (28 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] eye --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=eye --help --no-regression
+  eye [options]
+  WK AppBot Eye -- persistent Slack daemon + status overlay.
+  Runs as background process, auto-spawned by most commands.
+  
+  Key behaviors:
+  ... (20 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":1352,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] eye --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=eye --help --no-regression[0m
@@ -629,24 +560,16 @@ Skills for 'eye': (wkappbot skill read <id>)
 
 === help-slack ===
   wkappbot slack --help --no-regression
-  {"_":"LAUNCH","pid":8532,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (22 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] slack --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=slack --help --no-regression
+  slack <subcommand> [options]
+  Slack messaging via Bot API (Socket Mode).
+  
+  Subcommands:
+    send "<msg>" [file.png]             send to main channel
+  ... (14 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":8532,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] slack --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=slack --help --no-regression[0m
@@ -672,24 +595,16 @@ Skills for 'slack': (wkappbot skill read <id>)
 
 === help-ask ===
   wkappbot ask --help --no-regression
-  {"_":"LAUNCH","pid":3524,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (21 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] ask --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=ask --help --no-regression
+  ask gpt|gemini|claude "<question>" [file.png] [--slack] [--new-tab]
+  Ask AI via CDP (Chrome DevTools Protocol, focusless).
+  
+  ask triad "<question>" [--debate [N]]
+    Parallel GPT + Gemini + Claude. --debate = triad-style multi-round synthesis.
+  ... (13 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":3524,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] ask --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=ask --help --no-regression[0m
@@ -714,24 +629,16 @@ Skills for 'ask': (wkappbot skill read <id>)
 
 === help-gc ===
   wkappbot gc --help --no-regression
-  {"_":"LAUNCH","pid":5772,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (10 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] gc --help --no-regression
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=gc --help --no-regression
+  gc [pattern] [--days N] [--sweep]
+  Garbage collect old logs, temp files, stale caches.
+  --days N: only files older than N days (default: 7).
+  --sweep: aggressive cleanup.
+  
+  ... (2 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5772,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] gc --help --no-regression[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=gc --help --no-regression[0m
@@ -941,38 +848,28 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 
 === file-read ===
   wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":2348,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (8 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  [FILE] D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt (4 lines, showing 1-4)
+       1	line one: alpha test
+       2	line two: beta value
+       3	line three: wkappbot skill smoke
+       4	
   exit=0
   [ASSERT OK] file-read has line 1
 
 === file-grep ===
   wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":9004,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (8 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  
+  [FILE] D:/a/wkappbot-sdk/wkappbot-sdk/smoke-temp/sample.txt
+  >     3| line three: wkappbot skill smoke
+  
+  [GREP] 1 match(es) in 1 file(s)
   exit=0
-[31;1m{"_":"LAUNCH","pid":9004,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt[0m
@@ -984,29 +881,20 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 
 === file-glob-yaml ===
   wkappbot file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  {"_":"LAUNCH","pid":6116,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (12 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
+  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
+  ... (4 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":6116,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
-[31;1m[GLOB] 8 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
@@ -1014,38 +902,31 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\매매실행중지.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\스크립트오류.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
+[31;1m[GLOB] 8 file(s)[0m
 
 === file-glob-yml ===
   wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
-  {"_":"LAUNCH","pid":2960,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (11 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
+  ... (3 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":2960,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
-[31;1m[GLOB] 7 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
+[31;1m[GLOB] 7 file(s)[0m
 
 ------------------------------------------------------------
   4. Schedule / Windows / License
@@ -1053,24 +934,12 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 
 === schedule-list ===
   wkappbot schedule list
-  {"_":"LAUNCH","pid":7312,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (5 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] schedule list
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list
+  [SCHEDULE] No schedules
+  [SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json
   exit=0
-[31;1m{"_":"LAUNCH","pid":7312,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] schedule list[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list[0m
@@ -1079,28 +948,17 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 
 === windows-list ===
   wkappbot windows
-  {"_":"LAUNCH","pid":2208,"sid":2
-  ,"fg":"0x201F8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (4 more)
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] windows
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
+  [OVERLAY-GUARD] Suppressed black overlay: 0x100B0 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
+  No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
-[31;1m{"_":"LAUNCH","pid":2208,"sid":2[0m
-[31;1m,"fg":"0x201F8"[0m
-[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
-[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
-[31;1m,"chain":[[0m
-[31;1m{"pid":6,"name":"?"[0m
-[31;1m}]}[0m
-[31;1m                                                                                [0m
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
+[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100B0 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
