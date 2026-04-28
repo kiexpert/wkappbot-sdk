@@ -1,76 +1,437 @@
-commit: fc39c7720cb641cd1428db429d7348106b2c5ff7
+commit: 9b1d60c37b0d266b4234274d9a10a42d0d1b4be6
 script: scripts/smoke-help.ps1
-exitcode: 0
-timestamp_utc: 2026-04-28T04:18:32.6541467Z
+exitcode: 1
+timestamp_utc: 2026-04-28T06:16:48.3503777Z
 
+
+------------------------------------------------------------
+  1. Identity & help pages
+------------------------------------------------------------
 
 === version ===
-  CMD: wkappbot --version
-  {"_":"LAUNCH","pid":5612,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot --version
+  {"_":"LAUNCH","pid":1864,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (4 more lines)
-  EXITCODE: 0
+  ... (4 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":1864,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] --version[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version[0m
+wkappbot v6.0.32
 
 === help-root ===
-  CMD: wkappbot --help
-  {"_":"LAUNCH","pid":6464,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot --help
+  {"_":"LAUNCH","pid":4804,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (225 more lines)
-  EXITCODE: 0
+  ... (225 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":4804,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] --help[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help[0m
+
+WKAppBot v6.0.32 - Windows App Automation Test Framework
+Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
+All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
+Your testing, coding, and ideas are appreciated. Let's build together.
+
+Usage:
+  wkappbot <command> [options]
+
+=== Public Commands ===================================================
+
+  a11y <action> <grap>[#uia-scope] [options]        (alias: a11y.exe / wka11y.exe)
+      Universal accessibility interface -- 31 standard actions for ANY window.
+      3-tier fallback: UIA -> Win32 -> SendInput. Busybox: symlink `a11y.exe` works.
+
+      Auto-pipeline per action: blocker dismiss -> minimize restore -> tab activate
+        -> zoom/magnifier -> execute (3-tier) -> result feedback (green/amber) -> fade
+
+      Window (8):  close  kill  minimize  maximize  restore  focus  move  resize
+      Element (13): read  find  highlight  invoke  click  toggle
+                    expand  collapse  select  scroll  type  set-value  set-range
+      Async (2):   wait  eval
+      Utility (4): clipboard  clipboard-write  file-read  file-write
+      Discovery (4): inspect  windows  screenshot  ocr
+
+      Target:  --nth 3 | 3~ | ~3 | 2~4 | 1,3~    --all    (default: first match)
+      Options: --depth N  --force  --value N  --direction  --amount
+      Grap:    AI target language for windows + a11y nodes.
+               Human sees windows; AI points with grap.
+               First exact match stops interactive actions fast.
+               Arrays are for lookups; actions consume the highest-priority target.
+               ';' = OR   # = scope drill-down
+               Ex: "*Notepad*#*File*" -> Notepad's File menu
+
+      a11y find "*app*" --depth 5       # MUD: look (Win32 + UIA children)
+      a11y highlight "*app*#*button*"   # visualize target with zoom overlay
+      a11y invoke "*app*#*button*"      # click (UIA Invoke -> BM_CLICK -> SendInput)
+      a11y close "*Chrome*" --nth 2~    # close 2nd window onwards
+      a11y type "*app*#*edit*" "hello"
+
+  find <keyword> [--deep] [--limit N] [--process <name>]
+      Unified search: window titles + UIA accessibility elements.
+      --deep: Thorough search (depth 12, slower but finds more).
+  run <scenario.yaml> [-v] [--no-watch]
+      Run a YAML test scenario with background element tracking.
+  do <window-title> <form-id> <button-text> [--confirm]
+      Full automation: combo select + button click + dialog handling.
+  scan <window-title> [--save] [--ocr] [--detail]
+      Scan app structure, learn controls, build Experience DB.
+  ocr <window-title|image.png> [--save] [-o file]
+      Extract text from window/image using Windows.Media.Ocr.
+  capture <window-title> [-o output.png] [--form <id>]
+      Capture a screenshot of a window or MDI child form.
+  dismiss <window-title> [keywords...]
+      Auto-dismiss notice/popup windows (OCR importance check).
+  input <window-title> <text>
+      Type text into a window (focusless PostMessage preferred).
+  whisper [options]
+      Real-time speech recognition + sound tokenization overlay.
+  whisper study [--batch N] [--for <duration>] [--engine gemini|gpt]
+      Batch-transcribe MP3 segments via AI. --for loops until timeout.
+      Duration: 30=30s, 2m, 500ms, 1.1s, 2h
+  whisper slice [--in <dir>] [--min-ms N] [--max-ms N]
+      Slice long audio into word-level MP3 segments.
+  whisper clean [--wav-dir <dir>] [--dry-run]
+      Sort wav/ root: voice->_unknown, noise->Recycle Bin.
+  whisper index [--in <slices-dir>] [--out <db-dir>] [--move] [--dry-run]
+      Extract first-syllable soundCode -> phoneme_db/<octal>/word.mp3.
+      Files with <9 voiced frames (~90ms) -> Recycle Bin automatically.
+  mcp
+      Start MCP stdio server (wkappbot_cli tool for JSON-RPC clients).
+      Add to .mcp.json: { "wkappbot": { "command": "wkappbot", "args": ["mcp"] } }
+  web <subcommand> [options]
+      Chrome DevTools Protocol web automation (open/click/type/eval).
+      Type 'wkappbot web help' for all subcommands.
+  web fetch <url> [--max-chars N]
+      HTTP GET -- returns response body (no browser needed).
+  web search <query> [--limit N]
+      Google search via Chrome CDP (no API key required).
+  web html <url>
+      Capture raw HTML of browser tab via CDP.
+  file read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
+      Read file with line numbers. .pdf -> auto-routes to read-pdf.
+  file read-pdf <path> [--ocr] [--page N] [--pages N-M]
+      Extract text from PDF. --ocr: Windows.Media.Ocr fallback for scanned PDFs.
+  file grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
+      Regex search across files. -i=case-insensitive, -C=context lines.
+  file glob <pattern> [--path <dir>]
+      Find files by ** glob pattern. ! ALWAYS use **/ prefix (e.g. **/*.cs).
+  eye [--interval N] [--size WxH] [--pos X,Y]
+      WK AppBot Eye -- live overlay + Slack daemon (always on).
+      ctx=N% in tick output, auto-deletes stale idle messages on restart.
+  newchat "prompt" [--file prompt.txt]
+      Open new Claude Desktop chat + submit prompt (all focusless UIA).
+      Use for session handoff when context reaches 90%+.
+  slack send|reply|upload|screenshot|listen|catch-up
+      Slack messaging (Socket Mode, always-on prompt forwarding).
+
+=== Detail Commands ===================================================
+
+Inspection:
+  windows [filter] [--uia] [--deep] [--process <name>] [--limit N]
+      List visible windows in Z-order. --uia: also search UIA elements.
+  inspect <grap>[#<uia-scope>] [--depth N] [--win32] [--filter <pattern>]
+      Dump UIA tree of a window. # narrows to UIA element by name.
+      --filter: search A11Y elements. Ex: *App*#*Panel*
+  win-click <window-title> <x> <y> [--uia]
+      Click a coordinate inside a window + detect UIA element.
+  focus [--title <text>] [--delay N] [--depth N] [--win32] [-b]
+      Inspect the currently focused window (countdown + dump).
+  watch [--duration N] [--live] [--win32] [--interval N]
+      Real-time element tracking under mouse cursor.
+
+  tab-select <grap>[#<uia-scope>] --aid <id> [--list|--select <text>|--index N]
+      Focusless tab switching via UIA SelectionItem pattern.
+      # scopes to specific form. Ex: *App*#*Panel* --aid 1000
+
+Automation:
+  click <window-title> <form-id> [button-text] [--combo N INDEX]
+      Click a button in MDI form (lower-level than 'do').
+  dialog-click <dialog-title> [button-index]
+      Click a button in a top-level dialog (physical click).
+  toolbar-ocr <window-title> [--click "text"] [--save]
+      OCR-scan MFC toolbar panes + click by text match.
+  titlebar <window-title> <form-id> [button-index] [--ocr]
+      Access custom title bar buttons (focusless PostMessage).
+  form-dump <window-title> <form-id> [--depth N]
+      Recursively dump all controls in an MDI child form.
+
+Testing & Analysis:
+  validate <scenario.yaml>
+      Validate a YAML scenario file (syntax + structure check).
+  uia-test <grap>[#<uia-scope>] [--invoke <name>]
+      Systematic 7-phase MFC UIA pattern test with zoom overlay.
+      # narrows UIA root. Ex: *App*#*Panel* --invoke BtnName
+  chart-analyze <window-title|image.png> [--form <id>] [--candles N]
+      Extract OHLC+volume from chart screenshots (3 strategies).
+      --tooltip: Y-axis recalibration. --debug: overlay image.
+  tooltip-probe <process-name> [--capture]
+      Enumerate tooltip windows for a process.
+  hts-stress <form.xmf> [-n 20] [--pattern repeat|memory|ctx-only]
+      HTS MDI stress test with memory tracking.
+
+Utility:
+  snapshot <window-title> [--tag N] [--depth N]
+      One-shot diagnostic: UIA tree + screenshot + OCR.
+  knowhow write|read|web|web-list
+      Record/read per-control automation notes.
+  skill list|show|contribute|export|import
+      Manage executable automation skills (YAML-like structured knowledge).
+  schedule add|list|remove|clear
+      Manage scheduled prompts for auto-recovery.
+  logcat [regex] [file1.glob] [file2.glob ...] [options]
+      Stream/search logs. grep-style: first arg=content regex, rest=file globs.
+      --hq              Include wkappbot.hq/logs + openclaw dirs
+      --past <dur>      Scan existing files (e.g. 1h, 30m, 2d). Without -f: grep-style exit.
+      -f, --follow      Live tail after --past scan
+      --timeout <dur>   Auto-exit after duration (e.g. 30s, 5m)
+      -r[=N]            Recursive. -r=unlimited, -r=3=depth 3
+      --dbg [pid]       Capture OutputDebugString (DBWIN_BUFFER shared memory)
+      --json            Structural JSON key+value matching
+      -A/-B/-C N        After/before/context lines
+      -v -l -c -m N     Invert, filenames-only, count, max-matches
+      -i / -n           Case-insensitive / line numbers
+      Grap patterns: wildcards, regex: prefix, ';' OR, path-segment ';' expansion.
+  grep / grap  <pattern> [files]   (logcat aliases, grep-compat arg order -- run `grap --help` for details)
+  ask gpt|gemini|claude "question" [file.png] [--slack] [--new-tab]
+      Ask AI via CDP (focusless). Auto-closes blank tabs, validates URL.
+  ask triad "question" [--debate [N]]
+      Parallel GPT + Gemini + Claude. --debate: dialectic loop (max 3 rounds, cross-prompting).
+      --debate N: early exit at N consensus. Without --debate: R0 only (one answer each).
+  chat ["question"] [-p] [--no-fallback]
+      Claude Code CLI passthrough. On rate-limit markers -> auto-fallback to ask triad.
+      No args: exec claude interactively (inherits stdio).
+  agent gemini|gpt|claude|triad "task" [--max-steps N] [--fresh]
+      Autonomous sub-agent loop with filesystem + web tools.
+  agent checkpoint [--label "text"]
+      Save mid-session snapshot of all tracked files (before compile / risky change).
+      Tracked: every a11y file-write is registered in agent-session.json (persistent).
+  agent dump-patch [--out file.patch] [--apply]
+      git diff HEAD -> unified patch + per-checkpoint diffs saved to repo root.
+      Patch header includes: apply / reverse / checkpoint-restore / original-restore hints.
+  agent session-status
+      Show tracked files + checkpoints in current agent session.
+  agent session-clear
+      Delete agent-session.json + agent-checkpoints/ (start fresh).
+  win-move <window-title> [--right-top] [--x N --y N]
+      Move a window to a specific position.
+  screen off [--no-check]
+      Turn off monitor immediately.
+  com ls|use|current|methods|call
+      COM adapter commands (session per folder).
+  telegram send "text"
+      Send message via Telegram (A11Y-first).
+  suggest "text" [file.png]
+      Send suggestion/feature request to Slack (auto-tags CWD workspace).
+      ! Write in ENGLISH -- Korean = 2-3x token cost. Short & precise wins.
+  suggest resolve <ts> "note"
+      Mark suggestion resolved + Slack thread reply.
+  claude-usage
+      Probe Claude Desktop usage (session/weekly %) via UIA. Slack alerts at 85%/95%.
+  prompt-probe [names...] [--names a,b,c] [--depth N] [--limit N] [--all]
+      Probe prompt candidates with thread-author names + dump UIA hits/submit state.
+
+General Options:
+  -v, --verbose         Verbose output
+  --report <dir>        Generate HTML report in directory
+  --timeout <duration>  Hard kill after N time (exit 124). e.g. 30, 2m, 500ms
+  -h, --help            Show this help message
+
+Rules (for fellow Claude Code agents):
+  * Questions to user: ALWAYS send via BOTH Slack AND here simultaneously.
+    (Do not ask only in Slack or only here - always both!)
+  * AppBotEye auto-launches for all commands (except eye/slack/help/validate).
+  * Slack + Prompt forwarding + keyword monitoring: ALWAYS ON (no disable flags).
+  * On prompt input failure: diagnose foreground window + share via Slack.
+  * NEVER create options to disable forwarding to Claude or disable AppBotEye.
+
+Data Directory:
+  Runtime data (profiles, logs, handlers, output) stored in:
+  {exe_dir}/wkappbot.hq/
+
 
 === help-a11y ===
-  CMD: wkappbot a11y --help --no-regression
-  {"_":"LAUNCH","pid":4012,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot a11y --help --no-regression
+  {"_":"LAUNCH","pid":3996,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (43 more lines)
-  EXITCODE: 0
+  ... (43 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":3996,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] a11y --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=a11y --help --no-regression[0m
+a11y <action> <grap>[#uia-scope] [options]
+Universal accessibility control: UIA -> Win32 -> SendInput 3-tier fallback.
+
+Actions: close  minimize  maximize  restore  focus  move  resize
+         read  find  highlight  invoke  click  toggle  expand  collapse
+         select  scroll  type  set-value  set-range
+         clipboard  clipboard-read  clipboard-write  wait  eval
+
+Grap patterns:
+  AI target language for windows and accessibility nodes.
+  Humans browse windows; AIs point with grap.
+  Interactive actions stop at the first exact match.
+  Full lookup stays array-shaped for ranking and review.
+  "*App*"              glob wildcard
+  "regex:btn_\\d+"     regex
+  "*App*;*Calc*"       OR (semicolon)
+  "App#MenuBar"        # = UIA scope drill-down
+  "Chrome#ChatGPT#btn" tab portal (auto tab switch)
+  "adb://device#elem"  Android ADB
+
+Key options:
+  --nth N / N~ / ~N / 2~4 / 1,3~   which match (default: first)
+  --all                      apply to all matches
+  --depth N                  UIA tree depth
+  --force                    skip safety guards
+  --hotkey                   type: label/menu dispatch (not raw keys)
+  --eval-js "js"             pre-hook or primary output (web)
+
+Examples:
+  a11y invoke "*MenuBar*#*File*"
+  a11y type "*edit*" "hello world"
+  a11y type "*app*#*MenuBar*" "File/Save" --hotkey
+  a11y read "*Chrome*#chatgpt.com" --eval-js "document.title"
+  a11y close "*Chrome*" --nth 2~
+
+Skills for 'a11y': (wkappbot skill read <id>)
+  - a11y close safety: ambiguity + focus-node diagnostics  [a11y-close-safety-ambiguity-focus-node-diagnostics] [unclassified]
+  - a11y find - output format and process resolution  [a11y-find] [operator/project (mixed)]
+  - a11y playbook writing  [a11y-playbook-writing] [project (pure)]
+  - a11y Command Cheatsheet - Operator View for Claude and Codex  [a11y-command-cheatsheet] [unclassified]
 
 === help-windows ===
-  CMD: wkappbot windows --help --no-regression
-  {"_":"LAUNCH","pid":6076,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot windows --help --no-regression
+  {"_":"LAUNCH","pid":2100,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (11 more lines)
-  EXITCODE: 0
+  ... (11 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":2100,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] windows --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows --help --no-regression[0m
+windows [grap] [--deep] [--process <name>] [--cmd <substr>]
+List top-level windows with title, class, PID, size.
+
+No args: all visible windows. With grap: filter by pattern.
+--deep: include child windows. --process: filter by process name.
+
+Skills for 'windows': (wkappbot skill read <id>)
+  - Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)  [anthropic-computer-use-cross-platform] [user/developer/operator (mixed)]
 
 === help-file ===
-  CMD: wkappbot file --help --no-regression
-  {"_":"LAUNCH","pid":3052,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot file --help --no-regression
+  {"_":"LAUNCH","pid":788,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (34 more lines)
-  EXITCODE: 0
+  ... (34 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":788,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] file --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file --help --no-regression[0m
+file <subcommand> [options]
+File operations with 4-stage encoding detection (UTF-8/CP949).
+
+Subcommands:
+  open <path>[:line[:col]]
+      Smart open in responsible VS Code window, then goto line/column.
+  read <path> [--offset N] [--limit N] [--encoding 949|utf-16]
+      Read with line numbers. .pdf -> auto-routes to read-pdf.
+      Aliases: --path/--file, --start/--end/--count, --no-line-numbers.
+  write <path> [--encoding N] (--stdin | --text "..." | --file <src>) [--append]
+      Auto backup ON. Aliases: --path, --content, --source-file, --dry-run.
+  edit <old> <new> <path> [--replace-all] [--context N] [--tab-size N]
+      Indent-based block context. C-style escapes (\\n \\t \\r \\\\).
+      Same old+new = search-only (no write). --old-file/--new-file for Korean args.
+      Option aliases also work: --old-string/--text/--path/--dry-run.
+  grep <regex> [--path <dir>] [--type <ext>] [-i] [-C N] [--max N]
+      Regex search. ';' OR in --path: "D:/A;B" expands.
+      Aliases: --pattern/--query, --root, --file.
+  glob <pattern> [--path <dir>]
+      ** glob. NOTE: ALWAYS use **/ prefix: "**/*.cs" not "*.cs".
+      Alias: --pattern.
+
+Aliases: file-open, file-read, file-edit, file-grep, file-glob (hyphenated)
+wkedit.exe -- busybox symlink -- file edit auto-routing
+
+NOTE: CP949 source files -- some WKAppBot sources have Korean in CP949.
+  Check encoding before editing! Corruption = unrecoverable.
+
+Skills for 'file': (wkappbot skill read <id>)
+  - file -- Read/Write/Edit/Grep/Glob Cheatsheet  [file-command-cheatsheet] [operator (pure)]
+  - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot  [public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot] [unclassified]
 
 === help-skill ===
-  CMD: wkappbot skill --help --no-regression
+  wkappbot skill --help --no-regression
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill --help --no-regression
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill --help --no-regression
@@ -79,102 +440,301 @@ timestamp_utc: 2026-04-28T04:18:32.6541467Z
   Storage: {callerCwd}/skills/ (project, git-tracked)
            {hq}/skills/       (installed, [HQ] tag in list)
   
-  ... (28 more lines)
-  EXITCODE: 0
+  ... (28 more)
+  exit=0
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] skill --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill --help --no-regression[0m
+skill <subcommand> [options]
+AI skill management -- executable knowhow for Claude instances.
+Storage: {callerCwd}/skills/ (project, git-tracked)
+         {hq}/skills/       (installed, [HQ] tag in list)
+
+Subcommands:
+  list [app]                        List skills grouped by app, most recent first
+  read <id>                         Full detail: steps, refs, version
+  search <keyword> [--app X]        Search title/desc/tags/steps
+  contribute --app X --title Y --desc Z
+             [--steps "s1|s2"] [--tags "t1,t2"] [--id <slug>]
+             [--refs "file:line:pattern|..."]
+                                   Create or update (auto version bump)
+  delete <id>                       Remove from project dir
+  install [--app X] [--force]       Copy project -> HQ (runs on publish)
+  export [--app X] [--out f.zip]    Export to zip
+  import <file.zip>                 Import into project dir
+  verify <id>                       Check source_refs still match code
+  audit [--app X]                   Audit all skills for stale/missing refs
+
+Examples:
+  wkappbot skill list
+  wkappbot skill audit
+  wkappbot skill read handoff-checklist
+  wkappbot skill search retry
+  wkappbot skill contribute --app wkappbot-webbot --title "X" --desc "Y" \\
+    --refs "csharp/src/WKAppBot.WebBot/CdpClient.cs::pattern"
+
+Skills for 'skill': (wkappbot skill read <id>)
+  - Skill Audience Taxonomy  [skill-audience-taxonomy] [operator/developer/project/user (mixed)]
+  - Skill Authoring Rules + Contribute & Edit Workflow  [skill-contribute-edit] [operator/developer/project (mixed)]
+  - Codex-Friendly Skill Template  [codex-friendly-skill-template] [operator/developer (mixed)]
+  - Developer Skill Template  [developer-skill-template] [developer (pure)]
 
 === help-schedule ===
-  CMD: wkappbot schedule --help --no-regression
-  {"_":"LAUNCH","pid":4900,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot schedule --help --no-regression
+  {"_":"LAUNCH","pid":6260,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (16 more lines)
-  EXITCODE: 0
+  ... (16 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":6260,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] schedule --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule --help --no-regression[0m
+schedule add|list|remove|clear [options]
+Manage scheduled prompts for auto-delivery to Claude.
+
+schedule add "<prompt>" --at "2026-03-30T15:00" [--repeat 1h]
+schedule list     show pending items
+schedule remove <id>
+schedule clear    remove all
+
+Schedules are executed by Eye (must be running).
+
+Skills for 'schedule': (wkappbot skill read <id>)
+  - Joodeok YouTube Market Schedule Extractor -- Auto-Subtitle Transcript Pipeline  [joodeok-market-schedule-extractor] [unclassified]
+  - AI News Briefing — lunch and dinner automated digest  [ai-news-briefing] [unclassified]
 
 === help-logcat ===
-  CMD: wkappbot logcat --help --no-regression
-  {"_":"LAUNCH","pid":3204,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot logcat --help --no-regression
+  {"_":"LAUNCH","pid":8364,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (27 more lines)
-  EXITCODE: 0
+  ... (27 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":8364,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] logcat --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=logcat --help --no-regression[0m
+logcat [regex] [file1.glob ...] [options]
+Stream or search wkappbot logs. grep-style argument order.
+
+First arg = content regex (';' = OR). Remaining = file globs (default: *.log).
+Path segment ';' OR: "logs/媛;<name>*.log" expands to 3 patterns.
+
+Key options:
+  --hq            include wkappbot.hq/logs (finished logs live here)
+  --past <dur>    scan existing files (1h, 30m, 2d). Without -f: grep-exit.
+  -f / --follow   live tail after --past scan
+  --timeout <dur> auto-exit after N seconds (30s, 5m)
+  --dbg [pid]     capture OutputDebugString via DBWIN_BUFFER shared memory
+  --json          structural JSON key+value matching (AND logic)
+  -i / -n / -C N  case-insensitive / line numbers / context lines
+  -v / -l / -c    invert / filenames-only / count
+
+Examples:
+  logcat "SLACK\|ROUTE" --hq --past 1h
+  logcat "error" *.log --past 30m -f
+  logcat '{"role":"user"}' *.jsonl --json --hq --past 2h
+  grap "keyword" *.log --hq --past 30m     (grep-compat alias)
+
+Skills for 'logcat': (wkappbot skill read <id>)
+  - logcat -- Log Viewer Cheatsheet  [logcat-command-cheatsheet] [operator (pure)]
 
 === help-eye ===
-  CMD: wkappbot eye --help --no-regression
-  {"_":"LAUNCH","pid":8996,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot eye --help --no-regression
+  {"_":"LAUNCH","pid":2956,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (28 more lines)
-  EXITCODE: 0
+  ... (28 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":2956,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] eye --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=eye --help --no-regression[0m
+eye [options]
+WK AppBot Eye -- persistent Slack daemon + status overlay.
+Runs as background process, auto-spawned by most commands.
+
+Key behaviors:
+  - Receives Slack messages -> queues to slack_queue/ -> routes to Claude
+  - Posts Eye status card to Slack (context%, current task, cwd)
+  - Auto-deletes stale idle messages on restart (spam prevention)
+  - Hot-swap: detects .new.exe -> transparent swap, no restart needed
+
+eye tick           one-shot status check (ctx%, cards, queue stats)
+eye --interval N   loop interval in ms (default: 100)
+
+NOTE: Do NOT spawn Eye directly -- let normal commands trigger it.
+NOTE: eye tick does NOT spawn Eye (by design).
+
+Queue: wkappbot.hq/runtime/slack_queue/*.json
+  Each received Slack message = one file, drain every 1s.
+  [EYE_QUEUE] in tick output shows pending/processing counts.
+
+Skills for 'eye': (wkappbot skill read <id>)
+  - Eye Slack Thread -- Live Streaming Structure & CCABot Slot Design  [eye-slack-thread-streaming-structure] [project (pure)]
+  - Always-On AI Automation Daemon -- AppBot Eye Internals  [always-on-ai-automation-daemon-appbot-eye-internals] [project (pure)]
+  - Admin Eye 2-phase broadcast close for clean hand-over  [admin-eye-broadcast-close-handover] [project (pure)]
+  - Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral  [elevated-eye-admin-pipe-server] [project (pure)]
 
 === help-slack ===
-  CMD: wkappbot slack --help --no-regression
-  {"_":"LAUNCH","pid":6812,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot slack --help --no-regression
+  {"_":"LAUNCH","pid":6116,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (22 more lines)
-  EXITCODE: 0
+  ... (22 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":6116,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] slack --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=slack --help --no-regression[0m
+slack <subcommand> [options]
+Slack messaging via Bot API (Socket Mode).
+
+Subcommands:
+  send "<msg>" [file.png]             send to main channel
+  reply "<msg>" --msg <ts> [file.png] thread reply
+  upload <file> [--msg <ts>]          upload file (optionally to thread)
+  route --queue                       drain slack_queue/ (internal, Eye only)
+  route --file <path>                 single message route (test use)
+  route '<json>'                      inline JSON route (test use)
+
+RULE: Always reply to Slack messages IN SLACK via `slack reply --msg <ts>`.
+  Answering only in the Claude Code prompt is NOT acceptable.
+NOTE: `slack route` is an internal Eye command -- do NOT call manually unless testing.
+
+Skills for 'slack': (wkappbot skill read <id>)
+  - slack -- Send & Reply Cheatsheet  [slack-command-cheatsheet] [operator (pure)]
+  - Eye Slack Thread -- Live Streaming Structure & CCABot Slot Design  [eye-slack-thread-streaming-structure] [project (pure)]
+  - AI News Briefing — lunch and dinner automated digest  [ai-news-briefing] [unclassified]
 
 === help-ask ===
-  CMD: wkappbot ask --help --no-regression
-  {"_":"LAUNCH","pid":8260,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot ask --help --no-regression
+  {"_":"LAUNCH","pid":8416,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (21 more lines)
-  EXITCODE: 0
+  ... (21 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":8416,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] ask --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=ask --help --no-regression[0m
+ask gpt|gemini|claude "<question>" [file.png] [--slack] [--new-tab]
+Ask AI via CDP (Chrome DevTools Protocol, focusless).
+
+ask triad "<question>" [--debate [N]]
+  Parallel GPT + Gemini + Claude. --debate = triad-style multi-round synthesis.
+
+ask gpt|gemini|claude (agent mode):
+  Autonomous sub-agent loop with tools.
+
+NOTE: Always ask in ENGLISH -- Korean = 3-4x token waste.
+NOTE: CDP requires Chrome/Edge open with target AI tab.
+NOTE: Result artifact = chat text only (CDP eval DOM read for full content).
+
+Skills for 'ask': (wkappbot skill read <id>)
+  - ask -- AI Delegation Cheatsheet  [ask-command-cheatsheet] [operator (pure)]
+  - 막히면 삼두에 위임하라 (토큰 절약)  [ask-triad-when-uncertain] [operator (pure)]
+  - Triad Ask: Simultaneous Q, 정반합 Debate, Tool Loop, Agent Mode, Session Recovery  [triad-ask-simultaneous-q-debate-tool-loop-agent-mode] [operator (pure)]
+  - Web AI Ask Infrastructure: Pump, CDP Worker, Editor Send Paths  [web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths] [project (pure)]
 
 === help-gc ===
-  CMD: wkappbot gc --help --no-regression
-  {"_":"LAUNCH","pid":4168,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot gc --help --no-regression
+  {"_":"LAUNCH","pid":6512,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (10 more lines)
-  EXITCODE: 0
+  ... (10 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":6512,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] gc --help --no-regression[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=gc --help --no-regression[0m
+gc [pattern] [--days N] [--sweep]
+Garbage collect old logs, temp files, stale caches.
+--days N: only files older than N days (default: 7).
+--sweep: aggressive cleanup.
 
-=== windows-list ===
-  CMD: wkappbot windows
-  {"_":"LAUNCH","pid":8912,"sid":2
-  ,"fg":"0x101E8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (30 more lines)
-  EXITCODE: 0
+Skills for 'gc': (wkappbot skill read <id>)
+  - logcat -- Log Viewer Cheatsheet  [logcat-command-cheatsheet] [operator (pure)]
+
+------------------------------------------------------------
+  2. Skill system
+------------------------------------------------------------
 
 === skill-list ===
-  CMD: wkappbot skill list
+  wkappbot skill list
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill list
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
@@ -183,11 +743,12 @@ timestamp_utc: 2026-04-28T04:18:32.6541467Z
       - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot v1.1 [6d ago] [unclassified] - The public kiexpert/wkappbot launcher must use WKAPPBOT_HOME env var or %USERPROFILE%/.wkappbot as the default data root instead of AppContext.BaseDirectory. Dev builds keep D:/GitHub/WKAppBot/bin.
       - Launcher console encoding: 3-mode policy for interactive + piped + UTF-8 terminals v1.0 [10d ago] [unclassified] - Set Console.OutputEncoding per mode so multi-byte chars (Korean CP949) render correctly everywhere: redirected streams force UTF-8 (inter-process standard), UTF-8 terminal keeps UTF-8, CP949 conhost uses CP949 with ? fallback. Explicit StreamWriter needed for redirected streams because .NET defaults to OS ACP.
       - a11y close safety: ambiguity + focus-node diagnostics v1.0 [10d ago] [unclassified] - Close action defaults: multi-match without narrower -> abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -> dump UIA focused element so the blocker is visible
-  ... (98 more lines)
-  EXITCODE: 0
+  ... (98 more)
+  exit=0
+  [ASSERT OK] skill-list has wkappbot app
 
 === skill-search ===
-  CMD: wkappbot skill search grap
+  wkappbot skill search grap
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill search grap
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill search grap
@@ -196,75 +757,379 @@ timestamp_utc: 2026-04-28T04:18:32.6541467Z
     [hts-heroes] wkappbot-run-hts-launch-loading-trace [unclassified] - wkappbot exec/run managed launcher + stdin-inject + Ctrl+C/Z control chars
     [hts-xingq] mdi-form-targeting [project (pure)] - MDI 자식폼 타겟팅
     [wkappbot] a11y-close-safety-ambiguity-focus-node-diagnostics [unclassified] - a11y close safety: ambiguity + focus-node diagnostics
-  ... (15 more lines)
-  EXITCODE: 0
+  ... (15 more)
+  exit=0
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] skill search grap[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill search grap[0m
+[31;1m[SKILL] 17 match(es):[0m
+  [hts-heroes] hts-testing-cheatsheet [unclassified] - HTS Testing Cheatsheet (form-dump uia-test do scan chart analyze-hack dbgview)
+  [hts-heroes] wkappbot-run-hts-launch-loading-trace [unclassified] - wkappbot exec/run managed launcher + stdin-inject + Ctrl+C/Z control chars
+  [hts-xingq] mdi-form-targeting [project (pure)] - MDI 자식폼 타겟팅
+  [wkappbot] a11y-close-safety-ambiguity-focus-node-diagnostics [unclassified] - a11y close safety: ambiguity + focus-node diagnostics
+  [wkappbot] a11y-find [operator/project (mixed)] - a11y find - output format and process resolution
+  [wkappbot] a11y-playbook-writing [project (pure)] - a11y playbook writing
+  [wkappbot] compete-roadmap-2026q2 [unclassified] - Competition Response Roadmap 2026-Q2 (Gemini draft)
+  [wkappbot] find-any-window-element-your-way-grap-multi-modal-search [project (pure)] - Find Any Window Element Your Way -- grap Multi-Modal Search
+  [wkappbot] grap-alias-system [project (pure)] - GRAP Alias System
+  [wkappbot] grap-target [operator/project (mixed)] - grap-target
+  [wkappbot-workflow] a11y-command-cheatsheet [unclassified] - a11y Command Cheatsheet - Operator View for Claude and Codex
+  [wkappbot-workflow] anthropic-computer-use-cross-platform [user/developer/operator (mixed)] - Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)
+  [wkappbot-workflow] diagnostic-commands-cheatsheet [unclassified] - Diagnostic Commands Cheatsheet (whisper validate claude-usage eye tick)
+  [wkappbot-workflow] grap [project (pure)] - grap -- UI Element Address System (Window + UIA Scope + Web + ADB)
+  [wkappbot-workflow] inspect-before-automate [operator (pure)] - 자동화 전 반드시 inspect 먼저
+  [wkappbot-workflow] lm-wiki-personal-knowledge-base [user (pure)] - LM Wiki — Personal Knowledge Base with Markdown (Claude Code + Obsidian)
+  [wkappbot-workflow] web-command-cheatsheet [unclassified] - web -- Fetch/Search/Open Cheatsheet (URL-as-target banned, grap required for tab-bound verbs)
 
-=== schedule-list ===
-  CMD: wkappbot schedule list
-  {"_":"LAUNCH","pid":1168,"sid":2
-  ,"fg":"0x101E8"
-  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
-  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
-  ,"chain":[
-  {"pid":6,"name":"?"
-  }]}
-                                                                                  
-  ... (5 more lines)
-  EXITCODE: 0
+  Use: wkappbot skill read <id>
+
+=== skill-read ===
+  wkappbot skill read grap
+  [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
+  [CMD] skill read grap
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill read grap
+  [SKILL] grap -- UI Element Address System (Window + UIA Scope + Web + ADB)
+    ID     : grap
+    App    : wkappbot-workflow
+    Desc   : GRAP = Grab Accessible Pattern -- JSON5-extended universal UI element address. {JSON5-window}#AbsTagPath: identifies any Win32/UIA/web/Android element. a11y find outputs verified '# TARGET "grap" [OK] Nms' for direct copy-paste targeting.
+    Audience: project (pure)
+  ... (116 more)
+  exit=0
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] skill read grap[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill read grap[0m
+[31;1m[SKILL] grap -- UI Element Address System (Window + UIA Scope + Web + ADB)[0m
+  ID     : grap
+  App    : wkappbot-workflow
+  Desc   : GRAP = Grab Accessible Pattern -- JSON5-extended universal UI element address. {JSON5-window}#AbsTagPath: identifies any Win32/UIA/web/Android element. a11y find outputs verified '# TARGET "grap" [OK] Nms' for direct copy-paste targeting.
+  Audience: project (pure)
+  Tags   : grap, pattern, a11y, uia, scope, json5, wildcard, hwnd, adb, tab-portal, find, abs-path, project
+  Steps  :
+    1. [WHAT-IS-GRAP] grap = UI address. Before '#' = which window. After '#' = which UIA element inside.
+Three-tier: Win32 window -> UIA subtree -> web content (CDP).
+a11y find <grap> outputs clean markdown sections to stdout -- paste-ready grap + ready-to-run command.
+NEW FORMAT (v5.13+):
+## FOCUS
+"{hwnd:...,pid:...,proc:'...'}#absTagPath"  <- focused window (dim)
+
+## TARGET
+"{hwnd:...,pid:...,proc:'chrome',domain:'chatgpt.com'}#absTagPath"  <- paste-ready grap
+wkappbot a11y find "..."  <- copy this line to re-run
+[OK] Nms  <- verify mark on line AFTER command (no [[double brackets]])
+WindowTitle -> stderr (noise-free stdout)
+MULTIPLE TARGETS: ## TARGETS N matches header + one ## TARGET block per window.
+    2. [WINDOW-PATTERNS] Before '#' -- addressing a top-level windoD:
+  Substring:   'ChatGPT'                    contains, case-insensitive
+  Wildcard:    '*메모장*'                      * = any chars
+  OR(;):       '*메모장*;*계산기*'           matches either
+  JSON5:       {title:'Claude',proc:'chrome'}  AND logic
+  HWND direct: {hwnd:0x010B084A}             instant lookup
+  HWND bracket:[0012061C]                    inspect/windows output format
+  Regex:       regex:^영웅문                    prefix required
+    3. [JSON5-SPEC] JSON5-extended grap syntax -- official window address grammar.
+SYNTAX: {field:value, field:value, ...}  -- all fields AND'd
+  Single-quoted strings OK: {proc:'chrome'}
+  Unquoted keys OK:         {proc:'chrome',domain:'claude.ai'}
+  Trailing comma OK:        {proc:'chrome',}
+  Hex literals OK:          {hwnd:0x010B084A}
+FIELDS (all optional, combine freely):
+  hwnd:   0x010B084A    Win32 HWND -- instant exact lookup, session-scoped
+  pid:    19016         process ID -- session-scoped
+  proc:   'chrome'      process name (no .exe), case-insensitive
+  domain: 'claude.ai'   browser domain via CDP -- most stable web identifier
+  title:  'Claude'      window title substring (30-char cap)
+  cls:    'Chrome_WidgetWin_1'  Win32 window class -- essential for MFC/old apps
+  cid:    100           Win32 control ID
+  url:    'https://...' browser URL substring via CDP
+OPERATORS:
+  AND (default):    {proc:'chrome',domain:'chatgpt.com'}
+  Array OR:         {title:['ChatGPT','Claude']}  -- matches if title contains either
+  Glob in value:    {title:'*AppBot*'}             -- * and ? work in string values
+  Regex in value:   {title:/AppBot.*/}             -- /regex/ literal, full .NET regex
+  OR at top level:  use ;-syntax before '#':  '*메모장*;*계산기*'
+COMPACT GRAP RULE (# TARGET verified output):
+  browser  -> {hwnd,pid,proc,domain}         no cls/title/url
+  MFC/old  -> {hwnd,pid,proc,cls}            cls essential; no accessibility tree = needs class
+  modern   -> {hwnd,pid,proc}               proc sufficient
+  NEVER include title/url in stored graps -- volatile, session-specific
+    4. [SCOPE-CHAIN] After '#' -- UIA element drill-down. Each segment = one tree level:
+  '*App*#*Button*'        find Button anywhere under App
+  '*App*#Panel#*OK*'      Panel first, then OK inside
+  '*App*#'               empty scope = drill to keyboard-focused element
+  Depth: up to 25 levels. Match: Name first, AutomationId fallback (both substring).
+  Container-first: Pane/Group preferred over Button/Edit at same level.
+  Regex segment: '*App*#regex:btn_\d+'
+    5. [WIN32-CHILD] '/' drills Win32 child windows (MFC/HTS multi-window apps):
+  'Parent/Child'              Win32 GetChildren, pattern match
+  'Parent/Child#UiaScope'     Win32 drill THEN UIA scope
+  'Window/'                   trailing / = focus-tunnel to focused child + element
+  Used for 영웅문/HTS where UIA tree is fragmented across child HWNDs.
+  Example: '영웅문/실시간계좌창#종목코드Edit'
+    6. [ANDROID] adb:// prefix routes to Android UIA pipeline:
+  'adb://Fold5/*heromts*#해외잔고'          device / package / scope
+  'adb://*heromts*#해외잔고'              auto-detect device
+  'adb://Fold5:outer/*pkg*'            :outer = foldable outer display
+  Format: adb://[device[:display]]/[pkg-grap]#[scope#scope...]
+    7. [NODE-TAG] Element label format in CURSOR/TARGET sections:
+  <Button>              ControlType only
+  <ButtonOK>            ControlType + AutomationId
+  <Button'확인'>         ControlType + Name (single-quoted, no truncation)
+  <Button2Email>        ControlType + SiblingIndex + AutomationId
+  <Group x7>            7 consecutive unnamed Groups (run-length in CURSOR)
+  attrs: ltwh=x,y,w,h  actions="Invoke,..."
+Use as scope: <ButtonOK> -> #OK   <Button'확인'> -> #*확인*
+    8. [ABS-TAG-PATH] Official absolute UIA tag path -- BuildAbsoluteTagPath output.
+Format: Type_aid / Type_Nth / Type -- compressed repeats use //
+  Doc_RootWebArea/Gro_1th/Gro////Gro_main/Gro_thread/Gro//////Edi_msg
+Type = first 3 chars of UIA ControlType:
+  Doc=Document  Gro=Group  Edi=Edit  But=Button  Pan=Pane  Win=Window
+  Tex=Text      Lst=List   Tab=Tab   Tre=Tree     Img=Image  Lnk=Hyperlink
+_aid  = AutomationId (truncated at first '-' for readability)
+_Nth  = sibling index fallback when no AutomationId
+//    = consecutive unnamed same-type nodes compressed (Gro/Gro/Gro -> Gro//)
+Resolution: Type_aid -> ByAutomationId(aid) fast; Type_Nth -> sibling BFS; bare -> name BFS
+VERIFIED: # TARGET line includes [OK] = FindByTitle(compactGrap) confirms correct hwnd
+    9. [FIND-OUTPUT] 'a11y find <grap>' stdout format (v5.13+):
+
+## FOCUS                          (dim) -- focused window section
+"{hwnd,pid,proc,...}#absTagPath"  paste-ready grap (double-quoted)
+
+## TARGET                         (bold cyan) -- matched window section
+"{hwnd,pid,proc,domain,...}#absTagPath"  paste-ready grap with mandatory fields
+wkappbot a11y find "..."          COPY THIS LINE to re-run
+[OK] Nms                          verify mark on line AFTER command
+[stderr] WindowTitle              window title goes to stderr (not captured by pipes)
+
+MANDATORY GRAP FIELDS (BuildFindGrap order):
+  hwnd:        always first -- primary unambiguous identifier
+  pid:         immediately after hwnd (collision safety, same-proc windows)
+  proc:        process name always included
+  domain:      browser/web windows (most stable identifier)
+  file:        file:// browsing windows
+  cls:         legacy MFC/old apps (no accessibility tree)
+  <matchedField>: auto-injected when search matched via cmd/title/uia/etc.
+                  e.g. searching chatgpt.com may match VS Code via cmd -- cmd:'...' injected
+
+MULTIPLE TARGETS: ## TARGETS N matches (outer loop), one ## TARGET block per match.
+All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
+    (+2 [DEV] step(s) hidden -- use --developer to show)
+  Refs   :
+    csharp/src/WKAppBot.Win32/Window/WindowFinder.cs -> "BuildTargetJson5"
+    csharp/src/WKAppBot.CLI/Commands/A11yActions.Read.cs -> "A11yFind"
+    csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs -> "focusGrap"
+  Author : claude
+  Created: 2026-04-07  Version: 1.14
+
+------------------------------------------------------------
+  3. File tools -- basic
+------------------------------------------------------------
 
 === file-read ===
-  CMD: wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":1152,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  {"_":"LAUNCH","pid":5028,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (9 more lines)
-  EXITCODE: 0
+  ... (8 more)
+  exit=0
+  [ASSERT OK] file-read has line 1
 
 === file-grep ===
-  CMD: wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":6936,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
+  {"_":"LAUNCH","pid":2200,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (8 more lines)
-  EXITCODE: 0
+  ... (8 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":2200,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt[0m
+
+[FILE] D:/a/wkappbot-sdk/wkappbot-sdk/smoke-temp/sample.txt
+>     3| line three: wkappbot skill smoke
+
+[GREP] 1 match(es) in 1 file(s)
 
 === file-glob-yaml ===
-  CMD: wkappbot file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  {"_":"LAUNCH","pid":7828,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
+  {"_":"LAUNCH","pid":9000,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (12 more lines)
-  EXITCODE: 0
+  ... (12 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":9000,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
+[31;1m[GLOB] 8 file(s)[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\매매실행중지.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\스크립트오류.yaml
+D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
 
 === file-glob-yml ===
-  CMD: wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
-  {"_":"LAUNCH","pid":6324,"sid":2
-  ,"fg":"0x101E8"
+  wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
+  {"_":"LAUNCH","pid":5240,"sid":2
+  ,"fg":"0x201F6"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (10 more lines)
-  EXITCODE: 0
+  ... (10 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":5240,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest-artifact.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
+[31;1m[GLOB] 6 file(s)[0m
 
-========================================
-  Smoke results: 20 passed, 0 soft-fail, 0 hard-fail
-========================================
-All user-centric smoke checks passed.
+------------------------------------------------------------
+  4. Schedule / Windows / License
+------------------------------------------------------------
+
+=== schedule-list ===
+  wkappbot schedule list
+  {"_":"LAUNCH","pid":6636,"sid":2
+  ,"fg":"0x201F6"
+  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
+  ,"chain":[
+  {"pid":6,"name":"?"
+  }]}
+                                                                                  
+  ... (5 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":6636,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] schedule list[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list[0m
+[SCHEDULE] No schedules
+[31;1m[SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json[0m
+
+=== windows-list ===
+  wkappbot windows
+  {"_":"LAUNCH","pid":2564,"sid":2
+  ,"fg":"0x201F6"
+  ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
+  ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
+  ,"chain":[
+  {"pid":6,"name":"?"
+  }]}
+                                                                                  
+  ... (30 more)
+  exit=0
+[31;1m{"_":"LAUNCH","pid":2564,"sid":2[0m
+[31;1m,"fg":"0x201F6"[0m
+[31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
+[31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
+[31;1m,"chain":[[0m
+[31;1m{"pid":6,"name":"?"[0m
+[31;1m}]}[0m
+[31;1m                                                                                [0m
+[31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
+[31;1m[CMD] windows[0m
+[31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
+-- hot focus --
+  KB [0001021A] "(no title)" (Windows.UI.Input.InputSite.WindowClass) 0x0  [WindowsTerminal]
+    `- [00010218] "DesktopWindowXamlSource" (Windows.UI.Composition.DesktopWindowContentBridge) 1028x626  [WindowsTerminal]
+      `- [000201F6] "C:\ProgramData\GitHub\HostedComputeAgent\hosted..." (CASCADIA_HOSTING_WINDOW_CLASS) 1044x635  [WindowsTerminal] ★
+
+-- windows (Z-order ★=foreground) --
+  [hwnd____] title                                         process:pid         cpu     ws     pm       WxH  flags
+  [00010082] (no title)                                    explorer:7784      1.1%   156M    38M   1024x48 [T^]
+  [000301DA] GDI+ Window (ServiceFabricLocalClusterMana... ServiceFabricLoc   0.0%    40M    28M       1x1 [H]
+  [000201F2] Azure Arc system tray                         AzureArcSysTray:   0.0%    19M     3M    136x39 [H]
+  [000201F6] C:\ProgramData\GitHub\HostedComputeAgent\h... WindowsTerminal:   0.3%    86M    24M  1044x635 *
+  > CASCADIA_HOSTING_WINDOW_CLASS("C:\ProgramData\Gi...")/Windows.UI.Composition.DesktopWindowContentBridge("DesktopWindowXaml...")/Windows.UI.Input.InputSite.WindowClass
+  [00010222] (no title)                                    OpenConsole:8844   0.0%    15M     2M     16x16 [LTN] ^201F6
+  > CASCADIA_HOSTING_WINDOW_CLASS("C:\ProgramData\Gi...")/Windows.UI.Composition.DesktopWindowContentBridge("DesktopWindowXaml...")/Windows.UI.Input.InputSite.WindowClass
+  [000101C8] MS_WebcheckMonitor                            explorer:7784      1.1%   156M    38M   768x519 [H]
+  [000101BA] BluetoothNotificationAreaIconWindowClass      explorer:7784      1.1%   156M    38M    136x39 [H]
+  [0001017E] Battery Meter                                 explorer:7784      1.1%   156M    38M     14x14 [HT]
+  [0001011C] (no title)                                    explorer:7784      1.1%   156M    38M    1009x4 [TN]
+  [00030050] DesktopWindowXamlSource                       ShellHost:7816     0.0%    41M     6M       1x1 [HT]
+  [00030040] Task Host Window                              taskhostw:7848     0.0%    12M     5M    136x39 [H]
+  [00020030] Task Host Window                              taskhostw:7456     0.0%    17M     4M    136x39 [H]
+  [00010038] DWM Notification Window                       dwm:812            0.2%    69M    34M    160x28 [HM]
+  [000101FE] DesktopWindowXamlSource                       WindowsTerminal:   0.3%    86M    24M       1x1 [HT]
+  [000101A6] MiracastConnectionWindow                      explorer:7784      1.1%   156M    38M    136x39 [H]
+  [000100B2] Program Manager                               explorer:7784      1.1%   156M    38M  1024x768 [T]
+
+Total: 16 (--uia: accessibility search, --deep: child windows)
+
+=== license-status ===
+  wkappbot-core license status
+  [CMD] license status
+  [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=license status
+  Unknown command: license
+   UIT
+  exit=1
+  [HARD-FAIL] expected exit 0, got 1
+  [ASSERT FAIL] license shows tier -- 'Tier' not found
+
+[INFO] CI mode -- skipping extended tests.
+       Run with -Extended or locally to enable.
+
+============================================================
+  Smoke results [CI/BASIC]: 23 passed, 0 soft-fail, 2 hard-fail
+============================================================
+[31;1mException: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\smoke-help.ps1:361[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m 361 | [0m … f ($hardFail -gt 0) { [36;1mthrow "Smoke test: $hardFail hard failure(s)"[0m }[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mSmoke test: 2 hard failure(s)[0m
