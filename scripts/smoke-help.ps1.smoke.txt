@@ -1,8 +1,8 @@
-commit: 2034fac43dc6f5ac18094e330f8f6ff49b57e9c3
+commit: f826250a45468677b62ecb4710974c4c568caafe
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
-exitcode: 1
-timestamp_utc: 2026-04-28T14:14:04.3385682Z
+exitcode: 0
+timestamp_utc: 2026-04-28T15:19:40.2251044Z
 
 
 ------------------------------------------------------------
@@ -661,9 +661,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 91 skill(s) - most recent first:
     [wkappbot-sdk]
-      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [3h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
-      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [3h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
-      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [4h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
+      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [4h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
+      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [4h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
+      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [5h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
   ... (101 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
@@ -909,8 +909,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
-  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
   [GLOB] 7 file(s)
+  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
@@ -919,8 +919,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
-D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
 [31;1m[GLOB] 7 file(s)[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
@@ -937,28 +937,26 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] schedule list
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list
-  [SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json
   [SCHEDULE] No schedules
+  [SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] schedule list[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list[0m
-[31;1m[SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json[0m
 [SCHEDULE] No schedules
+[31;1m[SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json[0m
 
 === windows-list ===
   wkappbot windows
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
-  [OVERLAY-GUARD] Suppressed black overlay: 0x100BC cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
-[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100BC cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
@@ -968,17 +966,13 @@ No window found: "wkappbot*"
   Unknown command: license
    UIT
   exit=1
-  [HARD-FAIL] expected exit 0, got 1
-  [ASSERT FAIL] license shows tier -- 'Tier' not found
+  [SOFT] expected exit 0, got 1
+  [SKIP] license command not in this binary -- skipping Tier assertion
 
 [INFO] CI mode -- skipping extended tests.
        Run with -Extended or locally to enable.
 
 ============================================================
-  Smoke results [CI/BASIC]: 22 passed, 1 soft-fail, 2 hard-fail
+  Smoke results [CI/BASIC]: 22 passed, 2 soft-fail, 0 hard-fail
 ============================================================
-[31;1mException: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\smoke-help.ps1:1160[0m
-[31;1m[0m[36;1mLine |[0m
-[31;1m[0m[36;1m[36;1m1160 | [0m … f ($hardFail -gt 0) { [36;1mthrow "Smoke test: $hardFail hard failure(s)"[0m }[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mSmoke test: 2 hard failure(s)[0m
+All smoke checks passed.
