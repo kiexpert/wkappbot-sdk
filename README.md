@@ -1,5 +1,9 @@
 # WKAppBot
 
+[![build-launcher](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml)
+[![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)
+[![Latest Release](https://img.shields.io/github/v/release/kiexpert/wkappbot-sdk?label=download)](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
+
 > *Give AI eyes and hands -- let it use any app, so it can truly help humans.*  
 > All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 
@@ -103,7 +107,18 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 
 ## Installation
 
-Clone this repository to your home directory and build, or download the pre-built binaries from the [latest release](../../releases/latest).
+**Option A — Download pre-built binaries (recommended)**
+
+| File | Description |
+|------|-------------|
+| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — launcher + core, ready to extract |
+| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every successful build → `wkappbot-bin-{run_id}` (90-day retention) |
+
+Extract the zip and skip to the PATH setup below.
+
+**Option B — Clone and build from source**
+
+Clone this repository to your home directory and run `build.cmd`.
 
 **Recommended layout** (mirrors the dev setup — binaries live under `bin\` inside the repo root):
 
