@@ -56,8 +56,38 @@ jobs:
         dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
           --configuration Release -p:SkipDeployLauncher=true -o bin
 
-    # TODO: replace with 'gh release download' from private repo when Core goes closed-source
-    - name: Build core
+    # Fetch core from private dev repo's latest release ZIP; fall back to source build.
+    - name: Fetch core binary (private release)
+      id: fetch_core
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+      run: |
+        if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+          Write-Host 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT not set -- will build from source.'
+          "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          exit 0
+        }
+        Write-Host "Fetching core ZIP from $env:CORE_REPO latest release..."
+        try {
+          $tmp = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path "$_.d" -Force }
+          gh release download --repo $env:CORE_REPO --pattern "*.zip" --dir $tmp --clobber
+          $zip = Get-ChildItem $tmp -Filter "*.zip" | Select-Object -First 1
+          if (-not $zip) { throw "No ZIP found in release" }
+          Expand-Archive -Path $zip.FullName -DestinationPath "$tmp\out" -Force
+          $core = Get-ChildItem "$tmp\out" -Recurse -Filter "wkappbot-core.exe" | Select-Object -First 1
+          if (-not $core) { throw "wkappbot-core.exe not found inside ZIP" }
+          Copy-Item $core.FullName bin/wkappbot-core.exe -Force
+          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $($zip.Name)"
+          "fetched=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        } catch {
+          Write-Host "Fetch failed ($_) -- falling back to source build."
+          "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        }
+
+    - name: Build core (source fallback)
+      if: ${{ steps.fetch_core.outputs.fetched != 'true' }}
       shell: pwsh
       run: |
         dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
