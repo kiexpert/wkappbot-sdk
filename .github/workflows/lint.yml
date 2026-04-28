@@ -1,0 +1,23 @@
+name: lint
+
+on:
+  pull_request:
+    paths: ['csharp/**']
+  workflow_dispatch:
+
+jobs:
+  format:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Check formatting (launcher)
+      shell: pwsh
+      run: |
+        dotnet format csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+          --verify-no-changes --verbosity diagnostic

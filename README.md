@@ -3,6 +3,9 @@
 [![build-launcher](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml)
 [![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)
 [![Latest Release](https://img.shields.io/github/v/release/kiexpert/wkappbot-sdk?label=download)](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
 
 > *Give AI eyes and hands -- let it use any app, so it can truly help humans.*  
 > All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
