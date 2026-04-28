@@ -99,7 +99,8 @@ foreach ($run in $rawRuns) {
     $savedPath = $env:PATH
     $env:PATH  = "$binDir;" + $env:PATH
     $env:WKAPPBOT_WORKER = "1"
-    $smokeLines = & $pwshExe -NoProfile -ExecutionPolicy Bypass -File "scripts\smoke-help.ps1" 2>&1
+    # -BasicOnly for fast release validation; run -Extended separately for deep checks
+    $smokeLines = & $pwshExe -NoProfile -ExecutionPolicy Bypass -File "scripts\smoke-help.ps1" -BasicOnly 2>&1
     $code = $LASTEXITCODE
     $env:PATH = $savedPath
 
