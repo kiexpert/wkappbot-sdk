@@ -50,7 +50,7 @@ jobs:
 
     - name: Setup .NET (only if building)
       if: ${{ steps.dl_artifact.outputs.found != 'true' }}
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 8.0.x
 
