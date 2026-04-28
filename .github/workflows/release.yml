@@ -72,9 +72,16 @@ jobs:
         Write-Host "Fetching core ZIP from $env:CORE_REPO latest release..."
         try {
           $tmp = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path "$_.d" -Force }
-          gh release download --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
-          if (-not (Test-Path bin/wkappbot-core.exe)) { throw "wkappbot-core.exe not found in release assets" }
-          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB))"
+          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+            | ConvertFrom-Json `
+            | Where-Object { $_.tagName -like 'core-*' } `
+            | Sort-Object createdAt -Descending `
+            | Select-Object -First 1 -ExpandProperty tagName
+          if (-not $tag) { throw "No core-* release found in $env:CORE_REPO" }
+          Write-Host "Found: $tag"
+          gh release download --repo $env:CORE_REPO --tag $tag --pattern "wkappbot-core.exe" --dir bin --clobber
+          if (-not (Test-Path bin/wkappbot-core.exe)) { throw "wkappbot-core.exe not found in release $tag" }
+          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $tag"
           "fetched=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
         } catch {
           Write-Host "Fetch failed ($_) -- falling back to source build."
