@@ -1,23 +1,11 @@
-commit: 2680edde1974626f8d437465609afbfd16917dc7
+commit: 29bad0466d991703f42bdd9ba3b00e25f064e9ca
 script: scripts/find-stable-release.ps1
 exitcode: 1
-timestamp_utc: 2026-04-28T12:06:43.1089113Z
+timestamp_utc: 2026-04-28T12:09:33.5699139Z
 
 [local] Using gh auth token for dev repo access.
 === Dev repo workflow check ===
-[31;1mConvertFrom-Json: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\find-stable-release.ps1:54[0m
-[31;1m[0m[36;1mLine |[0m
-[31;1m[0m[36;1m[36;1m  54 | [0m                [36;1mConvertFrom-Json -ErrorAction SilentlyContinue[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mConversion from JSON failed with error: Unexpected character encountered while parsing value: H. Path '', line[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m0, position 0.[0m
   Could not fetch dev repo status (no token or empty result)
 
 === Fetching recent build-launcher runs ===
-[31;1mConvertFrom-Json: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\find-stable-release.ps1:76[0m
-[31;1m[0m[36;1mLine |[0m
-[31;1m[0m[36;1m[36;1m  76 | [0m            [36;1mConvertFrom-Json -ErrorAction SilentlyContinue[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mConversion from JSON failed with error: Unexpected character encountered while parsing value: g. Path '', line[0m
-[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m0, position 0.[0m
-[31;1mWrite-Error: [31;1mNo successful runs found.[0m
+[31;1mWrite-Error: [31;1mNo successful runs found (gh unauthenticated or no runs yet).[0m
