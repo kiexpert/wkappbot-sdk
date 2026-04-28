@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // AppBotPipe.HotSwap.cs -- Hot-swap staging/promotion entry points for AppBotPipe.
 // Linked via csproj: <Compile Include="..\..\Shared\AppBotPipe.HotSwap.cs" Link="Shared\AppBotPipe.HotSwap.cs" />
 //

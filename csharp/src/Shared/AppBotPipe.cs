@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // AppBotPipe.cs -- shared between Launcher (NativeAOT) and Core.
 // Linked via csproj: <Compile Include="..\..\Shared\AppBotPipe.cs" Link="Shared\AppBotPipe.cs" />
 // No project dependencies -- pure kernel32 P/Invoke only.
