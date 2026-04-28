@@ -5,12 +5,13 @@ rem ===========================================================================
 rem  WKAppBot build.cmd  -  Publish, copy, and hot-swap deploy
 rem
 rem  Usage:
-rem    build.cmd               Full build: compile + publish + copy + hot-swap
-rem    build.cmd --deploy-only Skip publish entirely; re-deploy from existing
-rem                            publish output (binaries must already be there)
-rem    build.cmd --no-build    Skip compile; just package + copy + hot-swap.
-rem                            Use when invoked from a csproj post-publish event
-rem                            (MSBuild already compiled; avoids double-compile).
+rem    build.cmd                   Download release binaries if bin\ is empty,
+rem                                then do full source build (launcher + core).
+rem    build.cmd --download-only   Download from latest GitHub Release only;
+rem                                skip source build entirely (no .NET SDK needed).
+rem    build.cmd --deploy-only     Skip publish; re-deploy from existing publish output.
+rem    build.cmd --no-build        Skip compile; just package + copy + hot-swap.
+rem                                Use when invoked from a csproj post-publish event.
 rem
 rem  Deploy target:  <repo>\bin\
 rem    wkappbot.exe       Launcher  (AOT, ~1 MB; starts core, relays pipe cmds,
@@ -42,10 +43,30 @@ set "LAUNCHER_OUT=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\bin\Release\net8.0-win
 set "BIN_DIR=%ROOT_DIR%\bin"
 set "DEPLOY_ONLY=0"
 set "NO_BUILD=0"
-if /I "%~1"=="--deploy-only" set "DEPLOY_ONLY=1"
-if /I "%~1"=="--no-build"    set "NO_BUILD=1"
-if /I "%~2"=="--deploy-only" set "DEPLOY_ONLY=1"
-if /I "%~2"=="--no-build"    set "NO_BUILD=1"
+set "DOWNLOAD_ONLY=0"
+if /I "%~1"=="--deploy-only"   set "DEPLOY_ONLY=1"
+if /I "%~1"=="--no-build"      set "NO_BUILD=1"
+if /I "%~1"=="--download-only" set "DOWNLOAD_ONLY=1"
+if /I "%~2"=="--deploy-only"   set "DEPLOY_ONLY=1"
+if /I "%~2"=="--no-build"      set "NO_BUILD=1"
+
+rem ---------------------------------------------------------------------------
+rem  DOWNLOAD PATH: fetch pre-built binaries from latest GitHub Release
+rem  Skips the full source build -- ideal for first-time clone (no .NET SDK needed)
+rem  Falls through to source build if download fails or binaries already present.
+rem ---------------------------------------------------------------------------
+if "%DEPLOY_ONLY%"=="0" (
+  if not exist "%BIN_DIR%\wkappbot.exe" (
+    echo [BUILD] bin\wkappbot.exe not found -- trying GitHub Release download...
+    call :download_release
+    if "%DOWNLOAD_ONLY%"=="1" exit /b 0
+  ) else (
+    if "%DOWNLOAD_ONLY%"=="1" (
+      echo [BUILD] Binaries already present. Use --deploy-only to redeploy.
+      exit /b 0
+    )
+  )
+)
 
 set "DOTNET_CLI_HOME=%ROOT_DIR%\.dotnet"
 set "DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1"
@@ -221,4 +242,60 @@ if errorlevel 1 (
   echo [BUILD] core publish failed
   exit /b 1
 )
+exit /b 0
+
+:download_release
+rem Download pre-built binaries from latest GitHub Release.
+rem Tries gh CLI first (handles auth for private repos), then falls back
+rem to unauthenticated PowerShell (works only when repo is public).
+echo [BUILD]   Fetching latest release from GitHub...
+set "DL_TMP=%TEMP%\wkappbot-dl-%RANDOM%"
+mkdir "%DL_TMP%" 2>nul
+
+rem --- Try gh CLI (preferred: works for private repos if user is logged in) ---
+where gh >nul 2>nul
+if not errorlevel 1 (
+  echo [BUILD]   Using gh CLI...
+  gh release download --repo kiexpert/wkappbot-sdk --pattern "*.zip" --dir "%DL_TMP%" 2>&1
+  if not errorlevel 1 goto :extract_release
+  echo [BUILD]   gh download failed -- trying unauthenticated...
+)
+
+rem --- Fallback: unauthenticated PowerShell (public repo only) ---
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "try { $r = Invoke-RestMethod 'https://api.github.com/repos/kiexpert/wkappbot-sdk/releases/latest'; ^
+   $a = $r.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1; ^
+   if (!$a) { exit 1 }; ^
+   Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; ^
+   Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
+if errorlevel 1 (
+  echo [BUILD]   Download unavailable -- will build from source.
+  rmdir /s /q "%DL_TMP%" 2>nul
+  exit /b 0
+)
+
+:extract_release
+rem Extract zip and copy binaries to bin\
+for %%F in ("%DL_TMP%\*.zip") do (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%%F' -DestinationPath '%DL_TMP%\out' -Force"
+)
+if exist "%DL_TMP%\out\wkappbot.exe"      copy /y "%DL_TMP%\out\wkappbot.exe"      "%BIN_DIR%\wkappbot.exe"      >nul
+if exist "%DL_TMP%\out\wkappbot-core.exe" copy /y "%DL_TMP%\out\wkappbot-core.exe" "%BIN_DIR%\wkappbot-core.exe" >nul
+rmdir /s /q "%DL_TMP%" 2>nul
+
+if not exist "%BIN_DIR%\wkappbot.exe" (
+  echo [BUILD]   Extract failed -- will build from source.
+  exit /b 0
+)
+echo [BUILD]   Binaries installed from GitHub Release.
+
+rem Seed HQ after download
+if not exist "%BIN_DIR%\wkappbot.hq\skills"   mkdir "%BIN_DIR%\wkappbot.hq\skills"
+if not exist "%BIN_DIR%\wkappbot.hq\handlers" mkdir "%BIN_DIR%\wkappbot.hq\handlers"
+if exist "%ROOT_DIR%\skills"   xcopy /s /q /y "%ROOT_DIR%\skills\*"   "%BIN_DIR%\wkappbot.hq\skills\"   >nul
+if exist "%ROOT_DIR%\handlers" xcopy /s /q /y "%ROOT_DIR%\handlers\*" "%BIN_DIR%\wkappbot.hq\handlers\" >nul
+
+echo [BUILD]   done (downloaded from release)
+rem Signal caller that we already have binaries -- skip source build
+set "DEPLOY_ONLY=1"
 exit /b 0
