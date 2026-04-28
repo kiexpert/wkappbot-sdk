@@ -551,6 +551,9 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
+        // suggest + skill: critical infrastructure -- must work even when Eye is broken.
+        // Route directly to Core unless --only-eye is explicitly requested.
+        var isCoreDirectCmd = (cmd == "suggest" || cmd == "skill") && !onlyEye;
         // --sudo is per-invocation only. Auto-inherit across commands was removed --
         // users pass --sudo explicitly when they want an admin-privileged run.
         // To launch an admin Eye: wkappbot eye --sudo (once).
@@ -565,7 +568,7 @@ partial class Program
         // Route chat straight to Core so ProcessStartInfo with inherited stdio
         // points at the user's actual terminal.
         var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
-        if (!quietFind && cmd != "skill" && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd
+        if (!quietFind && !isCoreDirectCmd && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
