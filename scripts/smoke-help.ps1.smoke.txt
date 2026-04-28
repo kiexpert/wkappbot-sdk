@@ -1,8 +1,8 @@
-commit: 2680edde1974626f8d437465609afbfd16917dc7
+commit: 731924a3e95cfa523f573dffeee6d07c2317ec82
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
-exitcode: 0
-timestamp_utc: 2026-04-28T11:58:18.3554474Z
+exitcode: 1
+timestamp_utc: 2026-04-28T13:52:27.5978816Z
 
 
 ------------------------------------------------------------
@@ -14,12 +14,12 @@ timestamp_utc: 2026-04-28T11:58:18.3554474Z
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] --version
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version
-  wkappbot v6.5.0
+  wkappbot v6.5.21
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] --version[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version[0m
-wkappbot v6.5.0
+wkappbot v6.5.21
 
 === help-root ===
   wkappbot --help
@@ -27,7 +27,7 @@ wkappbot v6.5.0
   [CMD] --help
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help
   
-  WKAppBot v6.5.0 - Windows App Automation Test Framework
+  WKAppBot v6.5.21 - Windows App Automation Test Framework
   Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
   All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
   Your testing, coding, and ideas are appreciated. Let's build together.
@@ -37,7 +37,7 @@ wkappbot v6.5.0
 [31;1m[CMD] --help[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help[0m
 
-WKAppBot v6.5.0 - Windows App Automation Test Framework
+WKAppBot v6.5.21 - Windows App Automation Test Framework
 Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
 All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
@@ -659,12 +659,12 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill list
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
-  [SKILL] 87 skill(s) - most recent first:
-    [wkappbot]
-      - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot v1.1 [6d ago] [unclassified] - The public kiexpert/wkappbot launcher must use WKAPPBOT_HOME env var or %USERPROFILE%/.wkappbot as the default data root instead of AppContext.BaseDirectory. Dev builds keep D:/GitHub/WKAppBot/bin.
-      - Launcher console encoding: 3-mode policy for interactive + piped + UTF-8 terminals v1.0 [10d ago] [unclassified] - Set Console.OutputEncoding per mode so multi-byte chars (Korean CP949) render correctly everywhere: redirected streams force UTF-8 (inter-process standard), UTF-8 terminal keeps UTF-8, CP949 conhost uses CP949 with ? fallback. Explicit StreamWriter needed for redirected streams because .NET defaults to OS ACP.
-      - a11y close safety: ambiguity + focus-node diagnostics v1.0 [10d ago] [unclassified] - Close action defaults: multi-match without narrower -> abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -> dump UIA focused element so the blocker is visible
-  ... (96 more)
+  [SKILL] 91 skill(s) - most recent first:
+    [wkappbot-sdk]
+      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [3h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
+      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [3h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
+      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [4h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
+  ... (101 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
 
@@ -885,16 +885,17 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
   [CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
+  [GLOB] 8 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
   D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
-  D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
   ... (4 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\#32770.yaml
+[31;1m[GLOB] 8 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\expect-recovery-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\examples\focusless-demo.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\LS증권 투혼.yaml
@@ -902,7 +903,6 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\로그인.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\매매실행중지.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\스크립트오류.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
-[31;1m[GLOB] 8 file(s)[0m
 
 === file-glob-yml ===
   wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
@@ -951,31 +951,34 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
-  [OVERLAY-GUARD] Suppressed black overlay: 0x100B0 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
+  [OVERLAY-GUARD] Suppressed black overlay: 0x100B6 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
-[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100B0 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
+[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100B6 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
   wkappbot-core license status
   [CMD] license status
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=license status
-  Tier       : Free (DEV BYPASS active)
-  User       : (none)
-  License at : C:\Users\runneradmin\.wkappbot\license.json
-  File found : False
-  exit=0
-  [ASSERT OK] license shows tier
+  Unknown command: license
+   UIT
+  exit=1
+  [HARD-FAIL] expected exit 0, got 1
+  [ASSERT FAIL] license shows tier -- 'Tier' not found
 
 [INFO] CI mode -- skipping extended tests.
        Run with -Extended or locally to enable.
 
 ============================================================
-  Smoke results [CI/BASIC]: 24 passed, 1 soft-fail, 0 hard-fail
+  Smoke results [CI/BASIC]: 22 passed, 1 soft-fail, 2 hard-fail
 ============================================================
-All smoke checks passed.
+[31;1mException: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\smoke-help.ps1:1160[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m1160 | [0m … f ($hardFail -gt 0) { [36;1mthrow "Smoke test: $hardFail hard failure(s)"[0m }[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mSmoke test: 2 hard failure(s)[0m
