@@ -72,6 +72,7 @@ nul
 .env
 .vs/
 *.ps1
+!scripts/*.ps1
 *.png
 tmp/
 tmp*
