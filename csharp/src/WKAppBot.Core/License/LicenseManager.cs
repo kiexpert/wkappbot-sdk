@@ -124,7 +124,6 @@ public static class LicenseManager
     {
         if (_loaded) return;
         _loaded = true;
-
         try
         {
             var path = LicensePath;
@@ -282,16 +281,15 @@ public static class LicenseManager
         {
             switch (c)
             {
-                case '"': sb.Append("\\""); break;
-                case '\': sb.Append("\\"); break;
-                case '': sb.Append("\b"); break;
-                case '': sb.Append("\f"); break;
-                case '
-': sb.Append("\n"); break;
-                case '': sb.Append("\r"); break;
-                case '	': sb.Append("\t"); break;
+                case '"': sb.Append("\\\""); break;
+                case '\\': sb.Append("\\\\"); break;
+                case '\b': sb.Append("\\b"); break;
+                case '\f': sb.Append("\\f"); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
                 default:
-                    if (c < 0x20) sb.Append($"\u{(int)c:x4}");
+                    if (c < 0x20) sb.Append($"\\u{(int)c:x4}");
                     else sb.Append(c);
                     break;
             }
