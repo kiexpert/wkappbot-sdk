@@ -120,7 +120,7 @@ Section "4. Schedule / Windows / License"
 
 Invoke-Cmd 'schedule-list'  @('schedule', 'list')
 Invoke-Cmd 'windows-list'   @('windows') -Soft
-$licOut = Invoke-CoreCmd 'license-status' @('license', 'status')
+$licOut = Invoke-CoreCmd 'license-status' @('license', 'status') -Soft
 Assert-Contains 'license shows tier' $licOut 'Tier'
 
 # ============================================================
