@@ -1,7 +1,7 @@
 commit: eeb31e1d26047378c717235fc3c3af6c091b8d2e
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-28T16:28:13.1773766Z
+timestamp_utc: 2026-04-28T18:34:46.7304010Z
 
 
 ------------------------------------------------------------
@@ -10,8 +10,8 @@ timestamp_utc: 2026-04-28T16:28:13.1773766Z
 
 === version ===
   wkappbot --version
-  {"_":"LAUNCH","pid":5412,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8900,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -20,8 +20,8 @@ timestamp_utc: 2026-04-28T16:28:13.1773766Z
                                                                                   
   ... (4 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5412,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8900,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -35,8 +35,8 @@ wkappbot v6.0.32
 
 === help-root ===
   wkappbot --help
-  {"_":"LAUNCH","pid":8548,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":9044,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -45,8 +45,8 @@ wkappbot v6.0.32
                                                                                   
   ... (225 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":8548,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":9044,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -281,8 +281,8 @@ Data Directory:
 
 === help-a11y ===
   wkappbot a11y --help --no-regression
-  {"_":"LAUNCH","pid":5924,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":6816,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -291,8 +291,8 @@ Data Directory:
                                                                                   
   ... (43 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5924,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":6816,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -345,8 +345,8 @@ Skills for 'a11y': (wkappbot skill read <id>)
 
 === help-windows ===
   wkappbot windows --help --no-regression
-  {"_":"LAUNCH","pid":9148,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8448,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -355,8 +355,8 @@ Skills for 'a11y': (wkappbot skill read <id>)
                                                                                   
   ... (11 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":9148,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8448,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -377,8 +377,8 @@ Skills for 'windows': (wkappbot skill read <id>)
 
 === help-file ===
   wkappbot file --help --no-regression
-  {"_":"LAUNCH","pid":8096,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8756,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -387,8 +387,8 @@ Skills for 'windows': (wkappbot skill read <id>)
                                                                                   
   ... (34 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":8096,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8756,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -481,8 +481,8 @@ Skills for 'skill': (wkappbot skill read <id>)
 
 === help-schedule ===
   wkappbot schedule --help --no-regression
-  {"_":"LAUNCH","pid":4868,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8160,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -491,8 +491,8 @@ Skills for 'skill': (wkappbot skill read <id>)
                                                                                   
   ... (16 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":4868,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8160,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -518,8 +518,8 @@ Skills for 'schedule': (wkappbot skill read <id>)
 
 === help-logcat ===
   wkappbot logcat --help --no-regression
-  {"_":"LAUNCH","pid":1660,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":5192,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -528,8 +528,8 @@ Skills for 'schedule': (wkappbot skill read <id>)
                                                                                   
   ... (27 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":1660,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":5192,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -566,8 +566,8 @@ Skills for 'logcat': (wkappbot skill read <id>)
 
 === help-eye ===
   wkappbot eye --help --no-regression
-  {"_":"LAUNCH","pid":6524,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":5360,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -576,8 +576,8 @@ Skills for 'logcat': (wkappbot skill read <id>)
                                                                                   
   ... (28 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":6524,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":5360,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -615,8 +615,8 @@ Skills for 'eye': (wkappbot skill read <id>)
 
 === help-slack ===
   wkappbot slack --help --no-regression
-  {"_":"LAUNCH","pid":6100,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":5860,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -625,8 +625,8 @@ Skills for 'eye': (wkappbot skill read <id>)
                                                                                   
   ... (22 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":6100,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":5860,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -658,8 +658,8 @@ Skills for 'slack': (wkappbot skill read <id>)
 
 === help-ask ===
   wkappbot ask --help --no-regression
-  {"_":"LAUNCH","pid":5692,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":7584,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -668,8 +668,8 @@ Skills for 'slack': (wkappbot skill read <id>)
                                                                                   
   ... (21 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":5692,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":7584,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -700,8 +700,8 @@ Skills for 'ask': (wkappbot skill read <id>)
 
 === help-gc ===
   wkappbot gc --help --no-regression
-  {"_":"LAUNCH","pid":7128,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8280,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -710,8 +710,8 @@ Skills for 'ask': (wkappbot skill read <id>)
                                                                                   
   ... (10 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":7128,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8280,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -740,9 +740,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 93 skill(s) - most recent first:
     [wkappbot-sdk]
-      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [5h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
-      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [5h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
-      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [6h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
+      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [7h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
+      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [8h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
+      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [8h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
   ... (103 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
@@ -926,8 +926,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 
 === file-read ===
   wkappbot file read D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":3276,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":5456,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -940,8 +940,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 
 === file-grep ===
   wkappbot file grep skill D:\a\wkappbot-sdk\wkappbot-sdk\smoke-temp\sample.txt
-  {"_":"LAUNCH","pid":9124,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":2284,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -950,8 +950,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
                                                                                   
   ... (8 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":9124,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":2284,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -969,8 +969,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
 
 === file-glob-yaml ===
   wkappbot file glob **/*.yaml --path D:\a\wkappbot-sdk\wkappbot-sdk\handlers
-  {"_":"LAUNCH","pid":8500,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":5912,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -979,8 +979,8 @@ All [DIAG:*] [KNOWHOW:*] -> stderr only. VERDICT suppressed.
                                                                                   
   ... (12 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":8500,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":5912,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -1002,18 +1002,18 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
 
 === file-glob-yml ===
   wkappbot file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
-  {"_":"LAUNCH","pid":7224,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":8200,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
   {"pid":6,"name":"?"
   }]}
                                                                                   
-  ... (11 more)
+  ... (12 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":7224,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":8200,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -1026,11 +1026,12 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\codeql.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
-[31;1m[GLOB] 7 file(s)[0m
+[31;1m[GLOB] 8 file(s)[0m
 
 ------------------------------------------------------------
   4. Schedule / Windows / License
@@ -1038,8 +1039,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 
 === schedule-list ===
   wkappbot schedule list
-  {"_":"LAUNCH","pid":1852,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":1812,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -1048,8 +1049,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
                                                                                   
   ... (5 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":1852,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":1812,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -1064,8 +1065,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 
 === windows-list ===
   wkappbot windows
-  {"_":"LAUNCH","pid":8148,"sid":2
-  ,"fg":"0x201EE"
+  {"_":"LAUNCH","pid":2676,"sid":2
+  ,"fg":"0x1020E"
   ,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."
   ,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"
   ,"chain":[
@@ -1074,8 +1075,8 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
                                                                                   
   ... (30 more)
   exit=0
-[31;1m{"_":"LAUNCH","pid":8148,"sid":2[0m
-[31;1m,"fg":"0x201EE"[0m
+[31;1m{"_":"LAUNCH","pid":2676,"sid":2[0m
+[31;1m,"fg":"0x1020E"[0m
 [31;1m,"fgT":"C:\ProgramData\GitHub\HostedComputeAgent\hosted-compute-a..."[0m
 [31;1m,"cwd":"D:\\a\\wkappbot-sdk\\wkappbot-sdk"[0m
 [31;1m,"chain":[[0m
@@ -1086,30 +1087,30 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
 -- hot focus --
-  KB [00010218] "(no title)" (Windows.UI.Input.InputSite.WindowClass) 0x0  [WindowsTerminal]
-    `- [00010216] "DesktopWindowXamlSource" (Windows.UI.Composition.DesktopWindowContentBridge) 1028x626  [WindowsTerminal]
-      `- [000201EE] "C:\ProgramData\GitHub\HostedComputeAgent\hosted..." (CASCADIA_HOSTING_WINDOW_CLASS) 1044x635  [WindowsTerminal] ★
+  KB [00010220] "(no title)" (Windows.UI.Input.InputSite.WindowClass) 0x0  [WindowsTerminal]
+    `- [0001021E] "DesktopWindowXamlSource" (Windows.UI.Composition.DesktopWindowContentBridge) 1028x626  [WindowsTerminal]
+      `- [0001020E] "C:\ProgramData\GitHub\HostedComputeAgent\hosted..." (CASCADIA_HOSTING_WINDOW_CLASS) 1044x635  [WindowsTerminal] ★
 
 -- windows (Z-order ★=foreground) --
   [hwnd____] title                                         process:pid         cpu     ws     pm       WxH  flags
-  [00010084] (no title)                                    explorer:7400      0.8%   156M    38M   1024x48 [T^]
-  [00050076] GDI+ Window (ServiceFabricLocalClusterMana... ServiceFabricLoc   0.0%    40M    28M       1x1 [H]
-  [00020204] Azure Arc system tray                         AzureArcSysTray:   0.0%    19M     3M    136x39 [H]
-  [000201EE] C:\ProgramData\GitHub\HostedComputeAgent\h... WindowsTerminal:   0.2%    87M    24M  1044x635 *
+  [00010088] (no title)                                    explorer:7848      1.7%   156M    37M   1024x48 [T^]
+  [00040236] GDI+ Window (ServiceFabricLocalClusterMana... ServiceFabricLoc   0.1%    40M    28M       1x1 [H]
+  [0003004C] Azure Arc system tray                         AzureArcSysTray:   0.0%    19M     3M    136x39 [H]
+  [0001020E] C:\ProgramData\GitHub\HostedComputeAgent\h... WindowsTerminal:   0.4%    86M    24M  1044x635 *
   > CASCADIA_HOSTING_WINDOW_CLASS("C:\ProgramData\Gi...")/Windows.UI.Composition.DesktopWindowContentBridge("DesktopWindowXaml...")/Windows.UI.Input.InputSite.WindowClass
-  [00010220] (no title)                                    OpenConsole:8992   0.0%    15M     2M     16x16 [LTN] ^201EE
+  [00010228] (no title)                                    OpenConsole:3196   0.0%    14M     2M     16x16 [LTN] ^1020E
   > CASCADIA_HOSTING_WINDOW_CLASS("C:\ProgramData\Gi...")/Windows.UI.Composition.DesktopWindowContentBridge("DesktopWindowXaml...")/Windows.UI.Input.InputSite.WindowClass
-  [000101A8] BluetoothNotificationAreaIconWindowClass      explorer:7400      0.8%   156M    38M    136x39 [H]
-  [0002019E] MS_WebcheckMonitor                            explorer:7400      0.8%   156M    38M   768x519 [H]
-  [0001016A] Battery Meter                                 explorer:7400      0.8%   156M    38M     14x14 [HT]
-  [00010118] (no title)                                    explorer:7400      0.8%   156M    38M    1009x4 [TN]
-  [00030050] DesktopWindowXamlSource                       ShellHost:7428     0.0%    41M     6M       1x1 [HT]
-  [00030062] Task Host Window                              taskhostw:7460     0.0%    12M     5M    136x39 [H]
-  [00020048] Task Host Window                              taskhostw:3024     0.0%    17M     4M    136x39 [H]
-  [00010038] DWM Notification Window                       dwm:6428           0.2%    69M    34M    160x28 [HM]
-  [000101F8] DesktopWindowXamlSource                       WindowsTerminal:   0.2%    87M    24M       1x1 [HT]
-  [000101A6] MiracastConnectionWindow                      explorer:7400      0.8%   156M    38M    136x39 [H]
-  [000100B0] Program Manager                               explorer:7400      0.8%   156M    38M  1024x768 [T]
+  [000101B4] BluetoothNotificationAreaIconWindowClass      explorer:7848      1.7%   156M    37M    136x39 [H]
+  [000101B0] MS_WebcheckMonitor                            explorer:7848      1.7%   156M    37M   768x519 [H]
+  [0001017C] Battery Meter                                 explorer:7848      1.7%   156M    37M     14x14 [HT]
+  [00010120] (no title)                                    explorer:7848      1.7%   156M    37M    1009x4 [TN]
+  [0003003A] DesktopWindowXamlSource                       ShellHost:7872     0.0%    41M     6M       1x1 [HT]
+  [0002002C] Task Host Window                              taskhostw:7516     0.0%    17M     4M    136x39 [H]
+  [00020048] Task Host Window                              taskhostw:7428     0.0%     6M     3M    136x39 [H]
+  [00010038] DWM Notification Window                       dwm:820            0.3%    69M    34M    160x28 [HM]
+  [00010202] DesktopWindowXamlSource                       WindowsTerminal:   0.4%    86M    24M       1x1 [HT]
+  [000201AC] MiracastConnectionWindow                      explorer:7848      1.7%   156M    37M    136x39 [H]
+  [000100BA] Program Manager                               explorer:7848      1.7%   156M    37M  1024x768 [T]
 
 Total: 16 (--uia: accessibility search, --deep: child windows)
 
