@@ -293,6 +293,7 @@ jobs:
     - name: User-centric smoke test
       shell: pwsh
       env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # allows license status to auth as CI runner (Free tier)
       run: |
         $file    = 'scripts/smoke-help.ps1'
         $outFile = "$file.smoke.txt"
