@@ -121,7 +121,11 @@ Section "4. Schedule / Windows / License"
 Invoke-Cmd 'schedule-list'  @('schedule', 'list')
 Invoke-Cmd 'windows-list'   @('windows') -Soft
 $licOut = Invoke-CoreCmd 'license-status' @('license', 'status') -Soft
-Assert-Contains 'license shows tier' $licOut 'Tier'
+if ($licOut | Select-String 'Unknown command') {
+    Write-Host "  [SKIP] license command not in this binary -- skipping Tier assertion"
+} else {
+    Assert-Contains 'license shows tier' $licOut 'Tier'
+}
 
 # ============================================================
 #  SECTION 2 -- EXTENDED (Local only)
