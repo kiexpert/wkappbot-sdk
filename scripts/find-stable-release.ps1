@@ -50,9 +50,9 @@ Write-Host "=== Dev repo workflow check ==="
 $devWorkflowOk = $true
 if ($DevRepo -and $DevPAT) {
     $env:GH_TOKEN = $DevPAT
-    $devRuns = gh run list --repo $DevRepo --workflow build.yml --limit 3 --json conclusion,displayTitle 2>&1 |
-               ConvertFrom-Json -ErrorAction SilentlyContinue
+    $devRunsRaw = gh run list --repo $DevRepo --workflow build.yml --limit 3 --json conclusion,displayTitle 2>$null
     $env:GH_TOKEN = $null
+    $devRuns = if ($devRunsRaw -and $devRunsRaw.TrimStart().StartsWith('[')) { $devRunsRaw | ConvertFrom-Json -ErrorAction SilentlyContinue } else { $null }
 
     if ($devRuns) {
         $lastConclusion = $devRuns[0].conclusion
@@ -72,9 +72,9 @@ if ($DevRepo -and $DevPAT) {
 
 # ── 2. Get recent successful SDK build runs ────────────────────────────────
 Write-Host "`n=== Fetching recent build-launcher runs ==="
-$rawRuns = gh run list --workflow build.yml --status success --limit $MaxRuns --json "databaseId,headSha,displayTitle,createdAt" 2>&1 |
-           ConvertFrom-Json -ErrorAction SilentlyContinue
-if (!$rawRuns) { Write-Error "No successful runs found."; exit 1 }
+$rawRunsStr = gh run list --workflow build.yml --status success --limit $MaxRuns --json "databaseId,headSha,displayTitle,createdAt" 2>$null
+$rawRuns = if ($rawRunsStr -and $rawRunsStr.TrimStart().StartsWith('[')) { $rawRunsStr | ConvertFrom-Json -ErrorAction SilentlyContinue } else { $null }
+if (!$rawRuns) { Write-Error "No successful runs found (gh unauthenticated or no runs yet)."; exit 1 }
 
 $stableRun = $null
 $results   = @()
