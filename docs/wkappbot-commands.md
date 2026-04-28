@@ -1,6 +1,6 @@
 # WKAppBot Command Reference
 
-> Auto-generated from `wkappbot-core.exe v6.0.35`
+> Auto-generated from `wkappbot-core.exe v6.0.0`
 > Regenerate: `bash scripts/gen-command-ref.sh`
 
 Generated: 2026-04-28
@@ -275,8 +275,8 @@ Examples:
 Skills for 'suggest': (wkappbot skill read <id>)
   - Suggest Triage Playbook  [suggest-triage-playbook] [operator (pure)]
   - 서제스트 관리 워크플로우  [suggest-workflow] [operator (pure)]
+  - SDK suggest and skill filing rules for AI agents  [sdk-suggest-skill-filing-rules] [unclassified]
   - AutoHeal - User Input Protection: Focusless-First + Focus Theft Recovery  [autoheal-userinput-protection] [project (pure)]
-  - AI News Briefing — lunch and dinner automated digest  [ai-news-briefing] [unclassified]
 ```
 
 ---
