@@ -1,0 +1,16 @@
+commit: af4eae27d67c788156075b24971fa137caae9433
+script: scripts/find-stable-release.ps1
+exitcode: 1
+timestamp_utc: 2026-04-28T05:46:28.1098550Z
+
+=== Dev repo workflow check ===
+  DevRepo/DevPAT not set -- skipping dev workflow check
+
+=== Fetching recent build-launcher runs ===
+[31;1mConvertFrom-Json: [0mD:\a\wkappbot-sdk\wkappbot-sdk\scripts\find-stable-release.ps1:68[0m
+[31;1m[0m[36;1mLine |[0m
+[31;1m[0m[36;1m[36;1m  68 | [0m            [36;1mConvertFrom-Json -ErrorAction SilentlyContinue[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m     | [31;1m            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m     | [31;1mConversion from JSON failed with error: Unexpected character encountered while parsing value: g. Path '', line[0m
+[31;1m[0m[36;1m[36;1m[0m[36;1m[0m[36;1m[31;1m[31;1m[36;1m[31;1m[36;1m     | [31;1m0, position 0.[0m
+[31;1mWrite-Error: [31;1mNo successful runs found.[0m
