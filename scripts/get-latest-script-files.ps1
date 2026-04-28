@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $Extensions = @('ps1','py','sh')
-# Exclude GUI/integration test scripts that require a running display or browser
+# Exclude GUI/integration scripts requiring a running display or browser
 $ExcludePathPrefixes = @('experience/')
+# Exclude scripts that require live GitHub auth, network artifacts, or external CI context
+$ExcludeFiles = @('scripts/find-stable-release.ps1')
 $FallbackRecentCount = 100
 $head = (git rev-parse HEAD).Trim()
 if ([string]::IsNullOrWhiteSpace($head)) { throw 'HEAD SHA is required.' }
@@ -14,6 +16,7 @@ foreach ($commit in $commits) {
   $candidateFiles = @(git show --name-only --pretty='' $commit |
     Where-Object { $_ -match $pattern } |
     Where-Object { $f = $_; -not ($ExcludePathPrefixes | Where-Object { $f -like "$_*" }) } |
+    Where-Object { $f = $_; -not ($ExcludeFiles       | Where-Object { $f -eq $_ }) } |
     Sort-Object -Unique)
   if ($candidateFiles.Count -gt 0) {
     $selectedCommit = $commit
