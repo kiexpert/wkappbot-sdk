@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 using System;
 
 namespace WKAppBot.Abstractions.License;

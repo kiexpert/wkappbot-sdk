@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 using System.Collections.Concurrent;
 
 namespace WKAppBot.Shared;

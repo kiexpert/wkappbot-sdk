@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // ProjectRoot.cs -- per-repo identity helper, shared between WKAppBot.CLI and WKAppBot.Launcher.
 // Linked via csproj: <Compile Include="..\Shared\ProjectRoot.cs" Link="Shared\ProjectRoot.cs" />
 //

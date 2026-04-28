@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // AppBotPipe.Admin.cs -- Admin/sudo entry points for AppBotPipe.
 // Linked via csproj: <Compile Include="..\..\Shared\AppBotPipe.Admin.cs" Link="Shared\AppBotPipe.Admin.cs" />
 //
