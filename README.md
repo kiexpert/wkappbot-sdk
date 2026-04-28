@@ -9,6 +9,10 @@
 
 **Windows & Android app automation framework -- focusless, self-healing, AI-native.**
 
+> **Free tier covers all base automation.** CDP browser automation, multi-AI
+> delegation, and `--sudo` admin access are paid Pro tiers. See
+> [PRICING.md](./PRICING.md) for the full comparison.
+
 AI models are powerful reasoners, but they live behind a text interface. They can tell you *how* to click a button -- but they can't click it. WKAppBot bridges that gap: it gives AI agents **eyes** (read any UI, extract text, recognize controls) and **hands** (click, type, scroll, invoke -- without stealing focus), so they can operate existing desktop and mobile apps on behalf of the humans who use them.
 
 No app rewrite required. No API access needed. If a human can use it, WKAppBot can automate it.
@@ -163,6 +167,22 @@ wkappbot skill list
 ```
 
 > **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed — the binary is self-contained.
+
+---
+
+## Activate License
+
+Free tier works out of the box — no signup. To unlock CDP browser automation,
+multi-AI `ask`, `schedule`, or `--sudo` admin access:
+
+```bash
+gh auth login              # authenticate with GitHub
+wkappbot license status    # confirms current tier (Free until you subscribe)
+```
+
+Then follow [SUBSCRIBE.md](./SUBSCRIBE.md) — KIS bank transfer with your GitHub
+username as the memo, accept the GitHub collaborator invite, and the same binary
+unlocks Pro features within 1 hour. See [PRICING.md](./PRICING.md) for tier details.
 
 ---
 
