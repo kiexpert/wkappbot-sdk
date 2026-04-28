@@ -250,79 +250,86 @@ Assert-Contains 'license has expiry or n/a' $licOut2 'Tier|Free|Standard|Pro'
 
 Section "11. Real app automation (a11y)"
 
-# Helper: dismiss Notepad save-dialog (Korean Windows 11 shows ContentDialog)
+# Force-kill test apps (PowerShell Stop-Process avoids wkappbot launcher intercept)
+function Stop-TestApp([string]$procName) {
+    Get-Process $procName -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 300
+    # Second pass for UWP restart race
+    Get-Process $procName -ErrorAction SilentlyContinue |
+        Stop-Process -Force -ErrorAction SilentlyContinue
+    Write-Host "  [CLEANUP] $procName terminated"
+}
+
+# Pre-cleanup: kill any lingering test apps from previous failed runs
+Stop-TestApp 'CalculatorApp'
+Stop-TestApp 'notepad'
+
+# Save-dialog guard for Notepad (graceful first, then force)
 function Close-Notepad {
     & $coreExe a11y invoke "{proc:'notepad'}#*저장 안 함*" --timeout 3 2>&1 | Out-Null
     Start-Sleep -Milliseconds 400
-    & $coreExe a11y invoke "{proc:'notepad'}#*Don't Save*" --timeout 2 2>&1 | Out-Null
-    & $coreExe a11y close "{proc:'notepad'}" --all --timeout 5 2>&1 | Out-Null
+    & $coreExe a11y invoke "{proc:'notepad'}#*Don't Save*"  --timeout 2 2>&1 | Out-Null
+    Start-Sleep -Milliseconds 200
+    Stop-TestApp 'notepad'
 }
 
-# Launch Calculator via exec (built-in preset)
+# -- Calculator: launch → 5+3=8 → close (try/finally guarantees cleanup) --
 Write-Host "`n=== launch-calc ==="
-$launchOut = & $coreExe exec calc --timeout 20 2>&1
-$launchCode = $LASTEXITCODE
-$launchOut | Select-Object -Last 3 | ForEach-Object { Write-Host "  $_" }
+try {
+    $launchOut  = & $coreExe exec calc --timeout 20 2>&1
+    $launchCode = $LASTEXITCODE
+    $launchOut | Select-Object -Last 3 | ForEach-Object { Write-Host "  $_" }
 
-if ($launchCode -eq 0) {
-    $pass++; Write-Host "  [OK] Calculator launched"
+    if ($launchCode -eq 0) {
+        $pass++; Write-Host "  [OK] Calculator launched"
 
-    # a11y find via JSON5 process scope (more reliable than title glob)
-    $findOut = & $coreExe a11y find "{proc:'Calculator'}" --timeout 5 2>&1
-    $target  = ($findOut | Select-String 'TARGET').Line
-    Write-Host "  Target: $target"
+        $findOut = & $coreExe a11y find "{proc:'Calculator'}" --timeout 5 2>&1
+        $target  = ($findOut | Select-String 'TARGET').Line
+        Write-Host "  Target: $target"
 
-    if ($target) {
-        $pass++
-
-        # Click 5 → + → 3 → = via automation_id inside calc scope
-        foreach ($btn in @('num5Button', 'plusButton', 'num3Button', 'equalButton')) {
-            & $coreExe a11y invoke "${btn}#{proc:'Calculator'}" --timeout 5 2>&1 | Out-Null
+        if ($target) {
+            $pass++
+            foreach ($btn in @('num5Button', 'plusButton', 'num3Button', 'equalButton')) {
+                & $coreExe a11y invoke "${btn}#{proc:'Calculator'}" --timeout 5 2>&1 | Out-Null
+            }
+            $readOut2 = & $coreExe a11y read "CalculatorResults#{proc:'Calculator'}" --timeout 5 2>&1
+            $display  = $readOut2 | Select-String '8|Display' | Select-Object -First 1
+            Write-Host "  Display (5+3=8): $display"
+            if ($display) { $pass++; Write-Host "  [OK] Calc result verified" }
+            else           { $softFail++; Write-Host "  [SOFT] Display read empty" }
+        } else {
+            $softFail++; Write-Host "  [SOFT] Calculator window not found"
         }
-
-        # Read display
-        $readOut2 = & $coreExe a11y read "CalculatorResults#{proc:'Calculator'}" --timeout 5 2>&1
-        $display  = $readOut2 | Select-String '8|Display' | Select-Object -First 1
-        Write-Host "  Display (5+3=8): $display"
-        if ($display) { $pass++; Write-Host "  [OK] Calc result verified" }
-        else           { $softFail++; Write-Host "  [SOFT] Display read failed" }
-
-        & $coreExe a11y close "{proc:'Calculator'}" --timeout 5 2>&1 | Out-Null
-        Write-Host "  [OK] Calculator closed"
     } else {
-        $softFail++
-        Write-Host "  [SOFT] Calculator window not found -- grap timeout"
+        $softFail++; Write-Host "  [SOFT] Calculator launch failed (exit=$launchCode)"
     }
-} else {
-    $softFail++
-    Write-Host "  [SOFT] Calculator launch failed (exit=$launchCode)"
+} finally {
+    & $coreExe a11y kill "{proc:'Calculator'}" --timeout 5 2>&1 | Out-Null
+    Write-Host "  [CLEANUP] Calculator killed"
 }
 
-# Notepad: launch, type, read, close (with Korean save-dialog guard)
+# -- Notepad: launch → type → read → close (try/finally guarantees cleanup) --
 Write-Host "`n=== launch-notepad ==="
-$npOut = & $coreExe exec notepad --timeout 20 2>&1
-$npOut | Select-Object -Last 3 | ForEach-Object { Write-Host "  $_" }
+try {
+    $npOut = & $coreExe exec notepad --timeout 20 2>&1
+    $npOut | Select-Object -Last 3 | ForEach-Object { Write-Host "  $_" }
 
-if ($LASTEXITCODE -eq 0) {
-    $pass++; Write-Host "  [OK] Notepad launched"
-
-    # Type via a11y type (SendInput path on Notepad's edit control)
-    & $coreExe a11y type "{proc:'notepad'}" 'WKAppBot smoke test 123' --timeout 5 2>&1 | Out-Null
-    Write-Host "  Type: exit=$LASTEXITCODE"
-
-    # Read back
-    $npRead = & $coreExe a11y read "{proc:'notepad'}" --timeout 5 2>&1
-    if ($npRead | Select-String 'smoke|WKAppBot|123') {
-        $pass++; Write-Host "  [OK] Notepad read-back verified"
+    if ($LASTEXITCODE -eq 0) {
+        $pass++; Write-Host "  [OK] Notepad launched"
+        & $coreExe a11y type "{proc:'notepad'}" 'WKAppBot smoke test 123' --timeout 5 2>&1 | Out-Null
+        Write-Host "  Type: exit=$LASTEXITCODE"
+        $npRead = & $coreExe a11y read "{proc:'notepad'}" --timeout 5 2>&1
+        if ($npRead | Select-String 'smoke|WKAppBot|123') {
+            $pass++; Write-Host "  [OK] Notepad read-back verified"
+        } else {
+            $softFail++; Write-Host "  [SOFT] Notepad content not verified"
+        }
     } else {
-        $softFail++; Write-Host "  [SOFT] Notepad content not verified"
+        $softFail++; Write-Host "  [SOFT] Notepad launch failed"
     }
-
+} finally {
     Close-Notepad
-    Write-Host "  [OK] Notepad closed (save-dialog dismissed if present)"
-} else {
-    $softFail++
-    Write-Host "  [SOFT] Notepad launch failed"
 }
 
 # HQ suggest-approved scripts: run any test-*.sh that exists in local bin/wkappbot.hq/scripts/
