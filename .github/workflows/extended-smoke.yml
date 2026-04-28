@@ -114,7 +114,8 @@ jobs:
           "exitcode: $code  passed: $passed  soft: $soft  hard: $hard"
           "timestamp_utc: $(Get-Date -AsUTC -Format o)"
           ""
-        ) + @($lines) | Set-Content $outFile -Encoding utf8
+        ) + @($lines | Where-Object { $_ -match 'Section |results:|HARD-FAIL|ASSERT FAIL|SKIP-CI|passed|soft-fail' }) |
+          Set-Content $outFile -Encoding utf8
 
         $lines | ForEach-Object { Write-Host $_ }
 
@@ -174,8 +175,9 @@ jobs:
         git add -- '**/*.extended-ci.txt'
         git commit -m 'test: update extended smoke CI sidecar [skip ci]'
         for ($i = 1; $i -le 5; $i++) {
-          git pull --rebase origin main
+          git pull --rebase --autostash origin main
           git push origin HEAD:main
-          if ($LASTEXITCODE -eq 0) { break }
+          if ($LASTEXITCODE -eq 0) { Write-Host "Pushed (attempt $i)"; break }
+          Write-Host "Push attempt $i failed, retrying..."
           Start-Sleep -Seconds (2 * $i)
         }
