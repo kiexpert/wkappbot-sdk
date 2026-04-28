@@ -107,18 +107,20 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 
 ## Installation
 
-**Option A — Download pre-built binaries (recommended)**
+**Clone = install.** That's it.
 
-| File | Description |
-|------|-------------|
-| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — launcher + core, ready to extract |
-| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every successful build → `wkappbot-bin-{run_id}` (90-day retention) |
+```bash
+git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\wkappbot
+cd %USERPROFILE%\wkappbot
+build.cmd
+```
 
-Extract the zip and skip to the PATH setup below.
+Pre-built binaries are also available if you prefer not to build:
 
-**Option B — Clone and build from source**
-
-Clone this repository to your home directory and run `build.cmd`.
+| | |
+|---|---|
+| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — extract anywhere |
+| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every build → `wkappbot-bin-{run_id}` (90-day retention) |
 
 **Recommended layout** (mirrors the dev setup — binaries live under `bin\` inside the repo root):
 
