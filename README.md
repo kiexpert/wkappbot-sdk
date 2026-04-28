@@ -110,8 +110,8 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 **Clone = install.** That's it.
 
 ```bash
-git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\wkappbot
-cd %USERPROFILE%\wkappbot
+git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\Documents\wkappbot
+cd %USERPROFILE%\Documents\wkappbot
 build.cmd
 ```
 
@@ -125,7 +125,7 @@ Pre-built binaries are also available if you prefer not to build:
 **Recommended layout** (mirrors the dev setup — binaries live under `bin\` inside the repo root):
 
 ```
-%USERPROFILE%\wkappbot\          ← git clone target (or any folder you choose)
+%USERPROFILE%\Documents\wkappbot\  ← recommended clone location (easy to find in Explorer)
   bin\
     wkappbot.exe                 ← launcher / busybox entry point
     wkappbot-core.exe            ← core worker (hot-swapped on update)
@@ -142,7 +142,7 @@ Add `bin\` to your `PATH` so `wkappbot` is available in any terminal:
 # PowerShell (permanent, current user)
 [Environment]::SetEnvironmentVariable(
   'PATH',
-  "$env:USERPROFILE\wkappbot\bin;$([Environment]::GetEnvironmentVariable('PATH','User'))",
+  "$env:USERPROFILE\Documents\wkappbot\bin;$([Environment]::GetEnvironmentVariable('PATH','User'))",
   'User'
 )
 ```
