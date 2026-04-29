@@ -94,7 +94,6 @@ jobs:
           Get-ChildItem -Path csharp -Directory -Recurse -Filter obj |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           dotnet clean csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release
-          dotnet clean csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release
         }
 
     - name: Ensure bin dir
@@ -111,8 +110,8 @@ jobs:
           -o bin
 
     # --- Core: fetch pre-built binary from private repo's latest release ---
-    # Downloads the latest release ZIP from WKAPPBOT_CORE_REPO (private dev repo),
-    # extracts wkappbot-core.exe, and places it in bin/. Falls back to source build.
+    # Core source is NOT in this public SDK repo. wkappbot-core.exe is built in the
+    # private dev repo (WKAPPBOT_CORE_REPO) and downloaded here from a core-* release.
     - name: Fetch core binary (private release)
       id: fetch_core
       shell: pwsh
@@ -121,45 +120,24 @@ jobs:
         CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
       run: |
         if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
-          Write-Host 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT not set -- will build from source.'
-          "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-          exit 0
+          throw 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT secrets are required (core source is not in this repo).'
         }
         Write-Host "Fetching wkappbot-core.exe from $env:CORE_REPO (latest core-* release)..."
-        try {
-          # Find the latest core-* tagged release (SDK-specific builds, not the public build-* releases)
-          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
-            | ConvertFrom-Json `
-            | Where-Object { $_.tagName -like 'core-*' } `
-            | Sort-Object createdAt -Descending `
-            | Select-Object -First 1 -ExpandProperty tagName
-          if (-not $tag) {
-            Write-Host "No core-* release found in $env:CORE_REPO -- will build from source."
-            "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          Write-Host "Found: $tag"
-          gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
-          if (-not (Test-Path bin/wkappbot-core.exe)) {
-            Write-Host "wkappbot-core.exe not found in release $tag -- will build from source."
-            "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-            exit 0
-          }
-          Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $tag"
-          "fetched=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
-        } catch {
-          Write-Host "Fetch failed ($_) -- will build from source."
-          "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        # Find the latest core-* tagged release (SDK-specific builds, not the public build-* releases)
+        $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+          | ConvertFrom-Json `
+          | Where-Object { $_.tagName -like 'core-*' } `
+          | Sort-Object createdAt -Descending `
+          | Select-Object -First 1 -ExpandProperty tagName
+        if (-not $tag) {
+          throw "No core-* release found in $env:CORE_REPO."
         }
-
-    - name: Build core (source fallback)
-      if: ${{ steps.fetch_core.outputs.fetched != 'true' }}
-      shell: pwsh
-      run: |
-        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
-          --configuration Release `
-          -p:SkipDeployCore=true `
-          -o bin
+        Write-Host "Found: $tag"
+        gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+        if (-not (Test-Path bin/wkappbot-core.exe)) {
+          throw "wkappbot-core.exe not found in release $tag."
+        }
+        Write-Host "Fetched: $('{0:N1} MB' -f ((Get-Item bin/wkappbot-core.exe).Length / 1MB)) from $tag"
 
     - name: Seed bin/wkappbot.hq
       shell: pwsh
@@ -267,14 +245,28 @@ jobs:
 
     - name: Rebuild bin if missing
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
       run: |
         if ((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe)) {
           Write-Host 'Bin already present.'; exit 0
         }
-        Write-Host 'Bin missing -- fallback rebuild.'
+        Write-Host 'Bin missing -- fallback rebuild (launcher from source, core from private release).'
         New-Item -ItemType Directory -Force -Path bin | Out-Null
         dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
-        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj             --configuration Release -p:SkipDeployCore=true    -o bin
+        if (-not (Test-Path ./bin/wkappbot-core.exe)) {
+          if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+            throw 'wkappbot-core.exe missing and WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT secrets not set.'
+          }
+          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+            | ConvertFrom-Json `
+            | Where-Object { $_.tagName -like 'core-*' } `
+            | Sort-Object createdAt -Descending `
+            | Select-Object -First 1 -ExpandProperty tagName
+          if (-not $tag) { throw "No core-* release found in $env:CORE_REPO." }
+          gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+        }
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
         New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
         if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
