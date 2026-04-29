@@ -1,8 +1,8 @@
-commit: ce749928d8edf6234b420721221fd9b230311af1
+commit: b8093b78b2dd8285dc348d7949073d36bb9cd401
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-29T14:30:49.7911589Z
+timestamp_utc: 2026-04-29T16:13:08.0160905Z
 
 
 ------------------------------------------------------------
@@ -670,9 +670,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 197 skill(s) - most recent first:
     [wkappbot-core]
-      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [10h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
-      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [1d ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
-      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [1d ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
+      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [12h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
+      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [HQ] [1d ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
+      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [HQ] [1d ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
   ... (209 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
@@ -715,9 +715,6 @@ Skills for 'gc': (wkappbot skill read <id>)
   [wkappbot] a11y-screenshot-focusless-window-capture [unclassified] cov=0.01 - a11y screenshot: focusless window capture
   [wkappbot] a11y-close-safety-ambiguity-focus-node-diagnostics [unclassified] cov=0.00 - a11y close safety: ambiguity + focus-node diagnostics
   [wkappbot] compete-roadmap-2026q2 [unclassified] cov=0.00 - Competition Response Roadmap 2026-Q2 (Gemini draft)
-  [wkappbot-core] file-as-scheduler-pending-prompts-pattern [unclassified] cov=0.00 - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern
-  [wkappbot-core] skill-reminder-news-and-invocation-log-discoverability-system [unclassified] cov=0.00 - Skill Reminder News and Invocation Log — discoverability system
-  [wkappbot-core] wknotification-unified-dispatcher-and-file-scheduler [unclassified] cov=0.00 - WkNotification: unified dispatcher + file-based scheduler
   [wkappbot-workflow] a11y-find-deprecated-eval-removal-guard [unclassified] cov=0.00 - A11y Eval Deprecated: AutoRegisterBug Guard on Use
   [wkappbot-workflow] anthropic-computer-use-cross-platform [user/developer/operator (mixed)] cov=0.00 - Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)
   [wkappbot-workflow] claude-cli-automation-patterns-wkappbot-integration [unclassified] cov=0.00 - Claude CLI automation patterns + wkappbot integration
@@ -727,6 +724,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [wkappbot-workflow] lm-wiki-personal-knowledge-base [user (pure)] cov=0.00 - LM Wiki — Personal Knowledge Base with Markdown (Claude Code + Obsidian)
   [hts-heroes] hts-testing-cheatsheet [unclassified] cov=0.00 - HTS Testing Cheatsheet (form-dump uia-test do scan chart analyze-hack dbgview)
   [hts-xingq] mdi-form-targeting [project (pure)] cov=0.00 - MDI 자식폼 타겟팅
+  [wkappbot-core] file-as-scheduler-pending-prompts-pattern [unclassified] cov=0.00 - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern
+  [wkappbot-core] skill-reminder-news-and-invocation-log-discoverability-system [unclassified] cov=0.00 - Skill Reminder News and Invocation Log — discoverability system
+  [wkappbot-core] wknotification-unified-dispatcher-and-file-scheduler [unclassified] cov=0.00 - WkNotification: unified dispatcher + file-based scheduler
 
   Use: wkappbot skill read <id>
 
@@ -982,12 +982,14 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\tests.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
+  [OVERLAY-GUARD] Suppressed black overlay: 0x100D4 cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
+[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100D4 cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
