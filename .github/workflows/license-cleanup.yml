@@ -1,0 +1,66 @@
+name: license-cleanup
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # every Sunday 2am UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Remove expired license entries (>30 days old)
+      run: |
+        python3 - <<'EOF'
+        import json, datetime, sys, os
+
+        path = 'licenses.json'
+        if not os.path.exists(path):
+            print('licenses.json not found -- nothing to clean')
+            sys.exit(0)
+
+        with open(path) as f:
+            data = json.load(f)
+
+        entries = data.get('entries', [])
+        before = len(entries)
+        cutoff = (datetime.datetime.utcnow() - datetime.timedelta(days=30)).isoformat()
+
+        # Remove real (non-dummy) entries older than 30 days
+        # Real entries have tier != 'free' or have an 'added_at' field
+        kept = []
+        removed = 0
+        for e in entries:
+            added = e.get('added_at', '')
+            tier = e.get('tier', 'free')
+            if tier == 'free' and not added:
+                kept.append(e)  # dummy entry, always keep
+            elif added and added < cutoff:
+                print(f"Removing expired entry tier={tier} added={added}")
+                removed += 1
+            else:
+                kept.append(e)
+
+        data['entries'] = kept
+        data['_dummy_count'] = sum(1 for e in kept if e.get('tier') == 'free' and not e.get('added_at'))
+
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        print(f"Cleanup: {before} -> {len(kept)} entries ({removed} expired removed)")
+        EOF
+
+    - name: Commit if changed
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git diff --quiet licenses.json || (
+          git add licenses.json &&
+          git commit -m "chore(licenses): remove expired entries [skip ci]"
+        )
+        git push
