@@ -564,9 +564,9 @@ partial class Program
         // Applies to most commands -- prevents 30s+ stall when Eye is busy but Core can handle it.
         // Excluded: slack (Eye owns WebSocket), ask/newchat (long-running, double-run risk),
         //           logcat/grep/grap (streaming, already excluded below), eye daemon (isEyeDaemon).
-        // suggest/skill: routed directly to Core (bypass Eye entirely) -- no first-output guard needed.
-        var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat"
-                                 && cmd != "suggest" && cmd != "skill";
+        // suggest/skill: also use guard -- Eye handles in-process when fast (~50ms),
+        //                Core fallback if Eye is busy (>=100ms).
+        var isFirstOutputGuardCmd = cmd != "slack" && cmd != "ask" && cmd != "newchat";
         // eye tick / eye hotswap / eye homework: one-shot subcommands -- route through Eye pipe if running
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
@@ -578,9 +578,10 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
-        // suggest + skill: critical infrastructure -- must work even when Eye is broken.
-        // Route directly to Core unless --only-eye is explicitly requested.
-        var isCoreDirectCmd = (cmd == "suggest" || cmd == "skill") && !onlyEye;
+        // suggest + skill: try Eye first (100ms guard) for fast in-process handling,
+        // Core fallback when Eye is busy or broken. Was previously direct-Core-only --
+        // changed 2026-04-29 to give Eye the fast path (~50ms vs 500ms cold-start Core).
+        // Use --only-core to force the legacy direct-Core route.
         // --sudo is per-invocation only. Auto-inherit across commands was removed --
         // users pass --sudo explicitly when they want an admin-privileged run.
         // To launch an admin Eye: wkappbot eye --sudo (once).
@@ -598,7 +599,7 @@ partial class Program
         // newchat uses UIA + SendInput + MouseInput -- must not run in Eye process.
         // Also a critical command that must work even when Eye is broken.
         var isNewchat = string.Equals(cmd, "newchat", StringComparison.OrdinalIgnoreCase);
-        if (!quietFind && !isCoreDirectCmd && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd && !isNewchat
+        if (!quietFind && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd && !isNewchat
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
