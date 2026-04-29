@@ -1,0 +1,6 @@
+commit: e2223b39f31397ac4b0362675bacd71583d41ad2
+script: scripts/purge-insight-skills.sh
+exitcode: 1
+timestamp_utc: 2026-04-29T16:44:55.7677030Z
+
+scripts/purge-insight-skills.sh: line 8: cd: D:/GitHub/wkappbot-sdk: No such file or directory
