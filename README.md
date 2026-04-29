@@ -336,6 +336,14 @@ bin/wkappbot.hq/          runtime HQ -- experience DB, skills, sessions, logs
 
 ---
 
+## Trademark
+
+"WKAppBot" and the AppBot Eye logo are trademarks of kivilab.co.kr.
+You may use the name to accurately describe the software (e.g. "built with WKAppBot").
+Do not use the name to imply endorsement or affiliation without written permission.
+
+---
+
 ## References
 
 - [CLAUDE.md](./CLAUDE.md) -- detailed operational guidance for AI agents
