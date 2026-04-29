@@ -1,0 +1,10 @@
+commit: d53dffbc51c1ed8750054f429db2d8809b13808c
+script: scripts/sync-public-skills.sh
+exitcode: 0
+timestamp_utc: 2026-04-29T09:14:24.1220995Z
+
+
+=== Sync result ===
+  copied:    0
+  redacted:  0
+  skipped:   0 (private content)
