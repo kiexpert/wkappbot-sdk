@@ -9,8 +9,10 @@ DST=D:/GitHub/wkappbot-sdk/skills
 # Categories that contain only public-safe content
 CATEGORIES=(wkappbot wkappbot-core wkappbot-workflow wkappbot-webbot wkappbot-debug claude-desktop competitive)
 
-# SKIP if filename matches these patterns (Korean trading / private projects)
+# SKIP if filename matches these patterns (Korean trading / private projects + implementation internals)
 SKIP_PATTERNS='kiwoom|hantoo|kis-web|super-ant|wkautoquant|nfrunlite|nkrunlite|heroes4|hero4|hero-global|tuhon|xingq|nlrc|joodeok|account-trading|sugeup|super-ant'
+# Implementation-internal: "how we built it" -- not "how to use it"
+IMPL_PATTERNS='admin-eye-|elevated-eye-|elevated-proxy|all-sudo-proxy|eye-handoff-age|eye-tick-elevated|eye-tick-context-warned|eye-findallprompts|eye-health-mouse|eye-slack-thread-streaming|mcp-admin-core-swap|always-on-ai-automation-daemon-appbot-eye|think-eye-card|sudo-elevation-four-layers|sudo-proxy-cp949|wknotification-unified-dispatcher|file-as-scheduler-pending|conpty-enter-intercept|wkchat-conpty|hot-swap-zombie-guard|hot-swap-stuck-orphan|launcher-direct-core-routing|launcher-sudo-cold-start|launcher-aot-build-vswhere|launcher-console-encoding-3-mode|core-worker-logging-launcher|pulsestep-force-mode|iocp-stderr-default-buffered|korean-argv-cp949|ansi-color-output-auto-disable|suggest-safety-defense|suggest-co-resolve-2of2|suggest-cmd-guard|suggest-submit-similarity|suggest-requirement-error|suggest-forward-acknowledge|suggestions-jsonl-json-escape|autoheal-userinput-protection|claude-usage-slack-alert-state|skill-reminder-news-and-invocation|taskkill-compat-shim-a11y'
 
 # SKIP if content matches (Korean trading terms / personal info)
 CONTENT_SKIP_REGEX='키움|한투|영웅문|HTS|MTS\b|nfrunlite|nkrunlite|heroes4|kiwoom-condition|super-ant|wkautoquant|hantoo|kiexpert@naver|dcmmentary@naver'
@@ -29,8 +31,14 @@ for cat in "${CATEGORIES[@]}"; do
     name=$(basename "$src_file")
     dst_file="$dst_dir/$name"
 
-    # Filename-based skip
+    # Filename-based skip (private domain)
     if echo "$name" | grep -iqE "$SKIP_PATTERNS"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+
+    # Filename-based skip (implementation internals -- "how it's built", not "how to use")
+    if echo "$name" | grep -iqE "$IMPL_PATTERNS"; then
       skipped=$((skipped + 1))
       continue
     fi
