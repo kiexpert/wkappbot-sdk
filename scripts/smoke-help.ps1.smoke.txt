@@ -1,8 +1,8 @@
-commit: d5cf1c0c2ee04e78b67f59889e84622ae152ce79
+commit: cf246d1e6e6afe252e0c333e8342c7d7380bfd74
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-28T18:53:14.8940143Z
+timestamp_utc: 2026-04-29T02:51:20.8525186Z
 
 
 ------------------------------------------------------------
@@ -14,12 +14,12 @@ timestamp_utc: 2026-04-28T18:53:14.8940143Z
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] --version
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version
-  wkappbot v6.5.21
+  wkappbot v6.5.47
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] --version[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version[0m
-wkappbot v6.5.21
+wkappbot v6.5.47
 
 === help-root ===
   wkappbot --help
@@ -27,7 +27,7 @@ wkappbot v6.5.21
   [CMD] --help
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help
   
-  WKAppBot v6.5.21 - Windows App Automation Test Framework
+  WKAppBot v6.5.47 - Windows App Automation Test Framework
   Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
   All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
   Your testing, coding, and ideas are appreciated. Let's build together.
@@ -37,7 +37,7 @@ wkappbot v6.5.21
 [31;1m[CMD] --help[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help[0m
 
-WKAppBot v6.5.21 - Windows App Automation Test Framework
+WKAppBot v6.5.47 - Windows App Automation Test Framework
 Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
 All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
@@ -661,9 +661,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 91 skill(s) - most recent first:
     [wkappbot-sdk]
-      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [8h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
-      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [8h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
-      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [9h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
+      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [16h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
+      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [16h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
+      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [17h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
   ... (101 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
@@ -910,25 +910,29 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
   [CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+  [GLOB] 13 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\codeql.yml
-  D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
-  ... (5 more)
+  ... (9 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
+[31;1m[GLOB] 13 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\codeql.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\issue-auto-reply.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\license-cleanup.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\lint.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
-[31;1m[GLOB] 9 file(s)[0m
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\security-scan.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\tests.yml
 
 ------------------------------------------------------------
   4. Schedule / Windows / License
@@ -939,14 +943,14 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] schedule list
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list
-  [SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json
   [SCHEDULE] No schedules
+  [SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] schedule list[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=schedule list[0m
-[31;1m[SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json[0m
 [SCHEDULE] No schedules
+[31;1m[SCHEDULE] File: D:\a\wkappbot-sdk\wkappbot-sdk\bin\wkappbot.hq\runtime\schedule.json[0m
 
 === windows-list ===
   wkappbot windows
