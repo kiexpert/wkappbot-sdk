@@ -1,0 +1,6 @@
+commit: b8093b78b2dd8285dc348d7949073d36bb9cd401
+script: scripts/purge-implementation-skills.sh
+exitcode: 1
+timestamp_utc: 2026-04-29T16:10:03.9008602Z
+
+scripts/purge-implementation-skills.sh: line 6: cd: D:/GitHub/wkappbot-sdk: No such file or directory

@@ -1,7 +1,7 @@
-commit: d53dffbc51c1ed8750054f429db2d8809b13808c
+commit: b8093b78b2dd8285dc348d7949073d36bb9cd401
 script: scripts/sync-public-skills.sh
 exitcode: 0
-timestamp_utc: 2026-04-29T09:14:24.1220995Z
+timestamp_utc: 2026-04-29T16:10:03.9829262Z
 
 
 === Sync result ===
