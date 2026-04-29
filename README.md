@@ -1,4 +1,4 @@
-# WKAppBot
+# WKAppBot — Computer Use, App Use, AppBot
 
 [![build-launcher](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml)
 [![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)
@@ -7,18 +7,20 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
 
-> *Give AI eyes and hands -- let it use any app, so it can truly help humans.*  
-> All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
+> **Computer Use. App Use. AppBot.**  
+> Where AI agents, the existing app ecosystem, and the human at the keyboard share one machine — without fighting for focus.
 
-**Windows & Android app automation framework -- focusless, self-healing, AI-native.**
+**Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent** — focusless, self-healing, AI-native. The open-source bridge between LLMs and the apps humans already use.
 
-> **Free tier covers all base automation.** CDP browser automation, multi-AI
-> delegation, and `--sudo` admin access are paid Pro tiers. See
-> [PRICING.md](./PRICING.md) for the full comparison.
+Computer Use opened the door: AI can now click, type, and read screens. App Use is what comes next — agents that operate **specific apps** the way a power user does, focuslessly, alongside the human, without taking the screen hostage. WKAppBot is the toolkit for that world.
 
-AI models are powerful reasoners, but they live behind a text interface. They can tell you *how* to click a button -- but they can't click it. WKAppBot bridges that gap: it gives AI agents **eyes** (read any UI, extract text, recognize controls) and **hands** (click, type, scroll, invoke -- without stealing focus), so they can operate existing desktop and mobile apps on behalf of the humans who use them.
+> **Free tier covers all base automation.** CDP browser automation, multi-AI delegation (`ask triad`), and `--sudo` admin access are paid Pro tiers. See [PRICING.md](./PRICING.md) for the full comparison.
 
-No app rewrite required. No API access needed. If a human can use it, WKAppBot can automate it.
+AI models are powerful reasoners, but they live behind a text interface. They can tell you *how* to click a button — but they can't click it. WKAppBot bridges that gap: it gives AI agents **eyes** (read any UI, extract text, recognize controls) and **hands** (click, type, scroll, invoke — without stealing focus), so they can operate existing desktop and mobile apps on behalf of the humans who use them.
+
+No app rewrite. No API needed. If a human can use it, WKAppBot can automate it. **Human stays in command.** AI augments, never hijacks.
+
+**Keywords:** computer use · app use · browser use · AppBot · AI agent · RPA · desktop automation · UI automation · UIA · accessibility · focusless · MCP · Claude · GPT · Gemini · Anthropic · Korean HTS · multi-AI
 
 ---
 
