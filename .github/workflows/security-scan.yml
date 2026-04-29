@@ -18,12 +18,12 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: TruffleHog OSS
+    # Filesystem scan (whole repo): avoids the BASE==HEAD bug on first push / force-push.
+    # Trade-off: scans the entire tree every run instead of diff-only.
+    - name: TruffleHog OSS (filesystem scan)
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: ${{ github.event.repository.default_branch }}
-        head: HEAD
         extra_args: --only-verified
 
   gitleaks:

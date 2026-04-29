@@ -7,20 +7,21 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
 
-> **Computer Use. App Use. AppBot.**  
-> Where AI agents, the existing app ecosystem, and the human at the keyboard share one machine — without fighting for focus.
+**Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent.**  
+Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
 
-**Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent** — focusless, self-healing, AI-native. The open-source bridge between LLMs and the apps humans already use.
+## Why this exists
 
-Computer Use opened the door: AI can now click, type, and read screens. App Use is what comes next — agents that operate **specific apps** the way a power user does, focuslessly, alongside the human, without taking the screen hostage. WKAppBot is the toolkit for that world.
+Computer Use lets an AI click, type, and read the screen. **App Use** is the layer above: agents that drive *specific* applications the way a power user does — focuslessly, alongside the human, without seizing the screen.
 
-> **Free tier covers all base automation.** CDP browser automation, multi-AI delegation (`ask triad`), and `--sudo` admin access are paid Pro tiers. See [PRICING.md](./PRICING.md) for the full comparison.
+WKAppBot gives AI agents:
 
-AI models are powerful reasoners, but they live behind a text interface. They can tell you *how* to click a button — but they can't click it. WKAppBot bridges that gap: it gives AI agents **eyes** (read any UI, extract text, recognize controls) and **hands** (click, type, scroll, invoke — without stealing focus), so they can operate existing desktop and mobile apps on behalf of the humans who use them.
+- **Eyes** — read any UI, extract text, recognize controls
+- **Hands** — click, type, scroll, invoke — without stealing focus
 
-No app rewrite. No API needed. If a human can use it, WKAppBot can automate it. **Human stays in command.** AI augments, never hijacks.
+No app rewrite. No vendor API. If a human can use it, WKAppBot can automate it.
 
-**Keywords:** computer use · app use · browser use · AppBot · AI agent · RPA · desktop automation · UI automation · UIA · accessibility · focusless · MCP · Claude · GPT · Gemini · Anthropic · Korean HTS · multi-AI
+> **Free tier covers all base automation.** CDP browser automation, multi-AI delegation (`ask triad`), and `--sudo` admin access are paid Pro tiers. See [PRICING.md](./PRICING.md).
 
 ---
 
@@ -114,7 +115,7 @@ wkappbot skill list
 wkappbot skill read focusless-first-principle
 wkappbot skill read grap
 ```
-Skills capture per-project knowhow -- MFC quirks, CDP gotchas, MTS layout bugs -- so every session starts informed instead of exploring from scratch.
+Skills capture per-project knowhow — UIA quirks, CDP gotchas, owner-drawn-control workarounds — so every session starts informed instead of exploring from scratch.
 
 ### Suggest-Driven Backlog
 ```bash
@@ -170,10 +171,10 @@ build.cmd
 Then add `bin\` to PATH (see [INSTALL.md](docs/INSTALL.md)), open a new terminal, and:
 
 ```bash
-wkappbot --version          # verify install
-wkappbot a11y windows       # list open windows
-wkappbot skill list         # browse built-in knowhow
-wkappbot a11y find "*Notepad*"   # find a window element
+wkappbot --version              # verify install
+wkappbot windows                # list open windows
+wkappbot skill list             # browse built-in knowhow
+wkappbot a11y find "*Notepad*"  # resolve a window element
 ```
 
 ---
@@ -350,7 +351,7 @@ Do not use the name to imply endorsement or affiliation without written permissi
 
 - [CLAUDE.md](./CLAUDE.md) -- detailed operational guidance for AI agents
 - [AGENTS.md](./AGENTS.md) -- shared AI engineering rules
-- `wkappbot skill list` -- accumulated knowhow: grap syntax, MFC quirks, CDP gotchas, and more
+- `wkappbot skill list` — accumulated knowhow: grap syntax, UIA quirks, CDP gotchas, and more
 
 ---
 
