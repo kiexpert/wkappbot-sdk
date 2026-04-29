@@ -1,0 +1,29 @@
+{
+  "id": "agent-canonical-dispatch",
+  "app": "wkappbot-workflow",
+  "title": "Agent command: canonical opts \u002B per-tier translation",
+  "desc": "wkappbot agent \u0027task\u0027 - tier uses Claude-standard canonical flags as universal interface. All AI types (haiku/sonnet/opus/gpt/gemini/codex-mini/triad) share the same arg format. Translation layer converts to each backend. New tiers: gpt, gemini. Session persistence: .wkappbot/agents/last-{tier}.jsonl",
+  "steps": [
+    "Run agent with canonical opts: wkappbot agent \u0027task\u0027 - opus --max-turns 5",
+    "Check last task: wkappbot agent last",
+    "Follow up: wkappbot agent resume \u0027follow-up question\u0027",
+    "New tiers: wkappbot agent \u0027task\u0027 - gpt OR wkappbot agent \u0027task\u0027 - gemini",
+    "Canonical flags: --model \u003Cid\u003E --max-turns N --system \u0027...\u0027 --no-agent --fresh --attach \u003Cfile\u003E --timeout N --no-wait",
+    "Verified 2026-04-21: test-agent-canonical-dispatch.cmd (resolve ts=2026-04-21T04:38)"
+  ],
+  "tags": [
+    "agent",
+    "dispatch",
+    "canonical",
+    "gpt",
+    "gemini",
+    "claude",
+    "codex"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T07:07:36.9146337Z",
+  "updated": "2026-04-21T07:08:25.2013104Z",
+  "version": "1.1"
+}

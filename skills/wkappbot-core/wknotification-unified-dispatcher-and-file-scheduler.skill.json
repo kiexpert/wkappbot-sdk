@@ -1,0 +1,55 @@
+{
+  "id": "wknotification-unified-dispatcher-and-file-scheduler",
+  "app": "wkappbot-core",
+  "title": "WkNotification: unified dispatcher \u002B file-based scheduler",
+  "title_ko": "\uD1B5\uD569 \uC54C\uB9BC \uB514\uC2A4\uD328\uCC98 \u002B \uD30C\uC77C \uAE30\uBC18 \uC2A4\uCF00\uC904\uB7EC",
+  "desc": "Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.",
+  "steps": [
+    "CHANNELS: WkChannel.Slack, Prompt, Speak, Callout, Signal. Entry: WkNotify(n). Builders: WkNotification.ToSlack/ToPrompt/ToBoth/ToSpeak/Signal \u002B .Deferred(DateTime) \u002B .Recurring(TimeSpan).",
+    "ROUTING: RunningInEye=true \u2192 fast-path direct (EyeMcpClient/SlackSendViaApi). RunningInEye=false \u2192 slack_queue/notify_*.json file-queue (drain within ~1s). Prompt\u002BDeliverAfter \u2192 pending_prompts/ (not shared queue).",
+    "FILENAME SCHEMA: prompt_{triggerUtc",
+    "NOW}_{guid8}[,rep=Nh",
+    "Nm",
+    "Ns][,cnt=N].json in {cwd}/.wkappbot/pending_prompts/. Examples: prompt_NOW_abc.json (session-miss), prompt_20260429090000_def,rep=24h,cnt=5.json (daily x5).",
+    "LIFECYCLE: rename on each delivery (update trigger, decrement cnt). cnt=0 \u2192 delete. rep without cnt \u2192 infinite. File IS the schedule -- Eye holds nothing in memory.",
+    "DRAIN TRIGGERS: (1) any wkappbot command from that CWD via OnCommandArrived, (2) Eye startup AuditOnStartup(), (3) successful prompt delivery auto-drains pending for same CWD.",
+    "SESSION-MISS: no target session \u2192 re-append with exponential backoff (30s\u2192300s). No retry limit, no Slack escalation. Waits silently until session appears.",
+    "TIME GATE: filename lexicographic filter -- NOW always passes; yyyyMMddHHmmss passes when \u003C= current time. No JSON parse needed for gate check.",
+    "FAILURE HANDLING: corrupt JSON \u2192 .bad/ folder (slack_queue/.bad/). Eye holds nothing -- restart resumes from files automatically.",
+    "LEGACY MIGRATION: replace direct EyeMcpClient.CallFireAndForget([\u0027prompt\u0027,\u0027send\u0027,...]) with WkNotify(WkNotification.ToPrompt(text, cwd)). Tier1: AppBotEyeClaudeStatusStreamer.cs 309/324/348, AppBotEyeGlobalMode.cs 1167, AppBotEyeSlackHandlers.cs 179."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wknotification-unified-dispatcher-and-file-scheduler",
+      "expect": "WkNotify",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file glob \u0022**/.wkappbot/pending_prompts/prompt_*.json\u0022",
+      "expect": "(any|no files)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "notify",
+    "scheduler",
+    "dispatcher",
+    "pending-prompts",
+    "file-scheduler",
+    "wknotification",
+    "prompt",
+    "slack"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T10:50:13.1193927Z",
+  "updated": "2026-04-28T10:50:13.1194017Z",
+  "version": "1.0"
+}

@@ -1,0 +1,56 @@
+{
+  "id": "file-as-scheduler-pending-prompts-pattern",
+  "app": "wkappbot-core",
+  "title": "File-as-scheduler: pending_prompts/ filename-encoded schedule pattern",
+  "title_ko": "\uD30C\uC77C\uBA85\uC774 \uACE7 \uC2A4\uCF00\uC904 -- pending_prompts \uD328\uD134",
+  "desc": "Zero-memory scheduler: filename encodes trigger time \u002B repeat \u002B countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.",
+  "steps": [
+    "INSIGHT: Store deferred prompts as files in {cwd}/.wkappbot/pending_prompts/. Filename encodes everything -- no JSON parse needed for scheduling decisions.",
+    "FILENAME SCHEMA: prompt_{triggerUtc",
+    "NOW}_{guid8}[,rep=Nh",
+    "Nm",
+    "Ns][,cnt=N].json. triggerUtc=yyyyMMddHHmmss (lexicographic sort = chronological sort). NOW = session-miss retry (no time gate).",
+    "EXAMPLES: prompt_NOW_abc12345.json (session-miss, deliver asap), prompt_20260429090000_def,rep=24h.json (daily forever), prompt_20260429090000_ghi,rep=24h,cnt=5.json (daily 5 times then done).",
+    "TIME GATE: string.Compare(trigger, nowTag) \u003C= 0 -- no JSON parse, no DateTime.Parse. NOW always passes. Sorted files give chronological delivery order.",
+    "LIFECYCLE: rename on delivery \u2192 update trigger to next time, decrement cnt. cnt=0 \u2192 delete. rep without cnt \u2192 rename forever. File born \u2192 evolves \u2192 dies. Eye holds ZERO state in memory.",
+    "ATOMIC CLAIM (race-free): File.Move(f, f\u002B\u0027.processing\u0027, overwrite:false). Only one thread wins. Loser skips. Error \u2192 rename back to .json for next drain retry.",
+    "DRAIN TRIGGERS: (1) OnCommandArrived: any wkappbot cmd from that CWD fires immediately. (2) Eye startup AuditOnStartup. (3) Successful prompt delivery auto-drains siblings. (4) deliver_after: skip until time.",
+    "SESSION-MISS: no target session \u2192 re-append with exponential backoff (30s\u2192300s, infinite retries). No Slack escalation. No retry limit. File waits silently.",
+    "DURABILITY: wkappbot uninstalled \u2192 files survive. Reinstall \u2192 AuditOnStartup finds files \u2192 delivers. The OS is the persistence layer.",
+    "BEAUTY: cnt=5 recurring = 5 files created once, each self-destructs after delivery. OR one file with cnt=5 that renames itself 5 times then deletes. Same result, different philosophy."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file glob \u0022**/.wkappbot/pending_prompts/*.json\u0022",
+      "expect": "(any result)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read file-as-scheduler-pending-prompts-pattern",
+      "expect": "cnt",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "scheduler",
+    "file-based",
+    "pending-prompts",
+    "zero-memory",
+    "pattern",
+    "notify",
+    "recurring",
+    "deferred"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T11:14:28.300666Z",
+  "updated": "2026-04-28T11:14:28.3006748Z",
+  "version": "1.0"
+}

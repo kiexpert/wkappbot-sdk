@@ -1,0 +1,65 @@
+{
+  "id": "suggest-cmd-guard-word-boundary",
+  "app": "wkappbot-core",
+  "title": "suggest resolve CMD guard: word-boundary key extraction fix",
+  "desc": "CMD guard extracts affected commands from suggest text using HasCmdToken helper that checks word boundary after match, preventing short CommandHelpMap keys (e.g. \u0027com\u0027) from false-positiving on longer words (\u0027commands\u0027, \u0027--commit\u0027) in suggest titles.",
+  "steps": [
+    "Use HasCmdToken(text, prefix, key) instead of text.Contains(prefix\u002Bkey): checks char after match is non-alphanumeric",
+    "Example false-positive fixed: \u0027a11y commands\u0027 no longer triggers key \u0027com\u0027 because \u0027commands\u0027[3]=\u0027m\u0027 is alphanumeric",
+    "Example false-positive fixed: \u0027--commit\u0027 no longer triggers key \u0027com\u0027",
+    "Location: SuggestCommand.Resolve.cs, in \u0027Non-merge: extract mentioned commands from suggest text\u0027 block",
+    "If new short CommandHelpMap keys are added, word-boundary is already enforced -- no additional change needed",
+    "Fix location: SuggestCommand.Resolve.cs -- resolve guard pre-load block at lines ~204-217 (v6.2.1 commit e3724001)",
+    "Verified 2026-04-24: test-suggest-list-cmd-guard-word-boundary.sh (resolve ts=2026-04-24T05:32:39)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "exits 0",
+      "prompt": null
+    },
+    {
+      "cmd": "HasCmdToken in SuggestCommand.Resolve.cs",
+      "expect": "word-boundary fix present",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve \u003Cts-of-suggest-with-commands-in-title\u003E",
+      "expect": "CMD guard does NOT extract \u0027com\u0027 from title containing \u0027commands\u0027",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve \u003Cts\u003E",
+      "expect": "CMD guard does NOT extract \u0027com\u0027 from title containing \u0027commands\u0027",
+      "prompt": "word-boundary fix in HasCmdToken prevents short keys matching longer words in suggest text --skill suggest-cmd-guard-word-boundary --commit d0e905a66e06ed7aead9a63678b5a662e599c5ad --class skill-only"
+    },
+    {
+      "cmd": "SuggestCommand.Resolve.cs HasCmdToken",
+      "expect": "word-boundary check present, not Contains",
+      "prompt": "word-boundary fix in HasCmdToken prevents short keys matching longer words in suggest text --skill suggest-cmd-guard-word-boundary --commit d0e905a66e06ed7aead9a63678b5a662e599c5ad --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y click *btn*",
+      "expect": "click executed (ActionExecutor split preserves all actions)",
+      "prompt": "ActionExecutor.cs split into 13 partial files (all under 400 lines) --skill suggest-cmd-guard-word-boundary --commit 638d532f --class ActionExecutor"
+    },
+    {
+      "cmd": "wkappbot a11y find *element*",
+      "expect": "element found (TryFindElement logic intact after split)",
+      "prompt": "ActionExecutor.cs split into 13 partial files (all under 400 lines) --skill suggest-cmd-guard-word-boundary --commit 638d532f --class ActionExecutor"
+    },
+    {
+      "cmd": "wkappbot a11y ocr *Notepad*",
+      "expect": "OCR result returned (Vision/OCR pipeline intact)",
+      "prompt": "ActionExecutor.cs split into 13 partial files (all under 400 lines) --skill suggest-cmd-guard-word-boundary --commit 638d532f --class ActionExecutor"
+    }
+  ],
+  "primary_cmd": "wkappbot suggest list",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T05:34:02.4509446Z",
+  "updated": "2026-04-24T07:20:43.2132036Z",
+  "version": "1.4"
+}

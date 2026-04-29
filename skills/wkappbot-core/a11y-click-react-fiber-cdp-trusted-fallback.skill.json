@@ -1,0 +1,21 @@
+{
+  "id": "a11y-click-react-fiber-cdp-trusted-fallback",
+  "app": "wkappbot-core",
+  "title": "A11y Click: React Fiber \u002B CDP Trusted Click Fallback for Chrome SPAs",
+  "desc": "Chrome React SPA buttons expose UIA Invoke but fire no trusted event. Fallback chain: LegacyIA -\u003E WM_LBUTTON -\u003E TryCdpTrustedClick (Input.dispatchMouseEvent) -\u003E TryReactFiberClickAsync (__reactProps.onClick direct call). Deployed commit a575bece.",
+  "steps": [
+    "CLI click tier order in A11yActions.Click.cs: (1) LegacyIA.DoDefaultAction() focusless, (2) WM_LBUTTON to element hwnd, (3) TryElectronSurfaceClick() WM_LBUTTON to Chrome_RenderWidgetHostHWND, (4) TryCdpTrustedClick() Input.dispatchMouseEvent isTrusted=true, (5) TryReactFiberClickAsync() __reactProps.onClick JS call.",
+    "TryCdpTrustedClick() verifies success via pixel-diff check (\u003E2% change = ok). If click verified, returns immediately. TryReactFiberClickAsync() calls __reactFiber.memoizedProps.onClick for React-controlled buttons where isTrusted enforcement blocks CDP dispatchMouseEvent.",
+    "Known gap: Scenario/ActionExecutor path does NOT include CDP or React fiber tiers -- only UIA Invoke \u002B element-rect SendInput. If Invoke silently succeeds on React buttons (S_OK but no DOM event), the action returns prematurely. Full fix pending; CLI path already handles this.",
+    "Verified 2026-04-22: test-a11y-find-click-react-fiber-fallback.sh (resolve ts=2026-04-21T10:46)",
+    "pixel-diff skip for focus-only elements: Text/Edit/Document/Custom ControlType don\u0027t change visually on click -- CDP TrustedClick now skips pixel-diff for these types and trusts the dispatchMouseEvent result directly",
+    "Verified 2026-04-22: experience/tests/skill/read/test-a11y-click-cdp-trusted-pixel-diff.sh (resolve ts=2026-04-22T12:13)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:14:23.3634447Z",
+  "updated": "2026-04-22T20:00:51.8010971Z",
+  "version": "1.6"
+}

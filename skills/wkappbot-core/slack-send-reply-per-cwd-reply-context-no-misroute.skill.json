@@ -1,0 +1,29 @@
+{
+  "id": "slack-send-reply-per-cwd-reply-context-no-misroute",
+  "app": "wkappbot-core",
+  "title": "slack send/reply: per-CWD reply context prevents cross-project thread misroute",
+  "desc": "SaveReplyContext stored channel+threadTs in a single hq-wide file;  from project A therefore replayed the threadTs last saved by project B, misrouting briefings across projects. Fixed: filename now keyed by SHA256-hash-8 of caller CWD AND the plaintext CWD is stored+verified on load. Stale cross-project contexts are refused with an explicit log line.",
+  "steps": [
+    "slack send saves context at DataDir/slack_reply_ctx.<cwd-hash>.txt with cwd/channel/thread fields",
+    "slack reply loads from the same per-cwd filename",
+    "If stored cwd in the file mismatches caller cwd (legacy shared file), load returns null with a warn log and reply refuses to post",
+    "Hash uses SHA256 of lowercased+trim-slash cwd so path casing doesn't split contexts",
+    "Effect: auto-briefings from DG-WKAppBot and DG-WkAutoQuant never overwrite each other's thread context",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T12:16:40)"
+  ],
+  "tags": [
+    "slack",
+    "send",
+    "reply",
+    "route",
+    "cwd",
+    "misroute",
+    "per-project"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T12:20:02.9771137Z",
+  "updated": "2026-04-19T12:29:27.2668389Z",
+  "version": "1.1"
+}

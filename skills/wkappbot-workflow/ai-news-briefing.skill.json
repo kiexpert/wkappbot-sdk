@@ -2,7 +2,7 @@
   "id": "ai-news-briefing",
   "app": "wkappbot-workflow",
   "title": "AI News Briefing \u2014 lunch and dinner automated digest",
-  "desc": "Twice-daily (11:00, 18:00) automated AI news search, filter for WKAppBot relevance, register as suggests, announce via speak \u002B slack. Runs as a scheduled bash script driven by wkappbot web search \u002B ask gemini \u002B suggest \u002B speak pipeline.",
+  "desc": "Twice-daily (11:00, 18:00) AI news digest -- see ai-news-to-suggests for the full pipeline including Gemini filter and improvement workflow.",
   "steps": [
     "OVERVIEW: automated AI news digest at 11:00 (lunch) and 18:00 (dinner). Searches 5 keyword queries, filters via Gemini for WKAppBot relevance, registers top 3 as suggests, announces one-line summary via TTS, posts full briefing to Slack.",
     "SEARCH KEYWORDS: \u0027AI desktop automation 2026\u0027, \u0027Windows accessibility API AI\u0027, \u0027Claude computer use update\u0027, \u0027UI automation agent framework\u0027, \u0027LLM tool use MCP update\u0027. Tunable \u2014 add domain-specific terms as WKAppBot evolves.",
@@ -13,7 +13,8 @@
     "COST: 5 web searches \u002B 1 Gemini call per run = ~10 API calls/day. Minimal token usage since search results are short and Gemini prompt is focused.",
     "KNOWN ISSUE: Gemini ask can hang if rate-limited or network slow. Script needs --timeout on ask command to prevent indefinite wait. TODO: add 30s timeout to ask gemini call.",
     "SUGGEST TAG: all news items tagged [AI-NEWS] in suggest text for easy filtering via \u0027wkappbot suggest list\u0027 grep.",
-    "EXIT ADMIN SESSION: briefing runs as user (no --sudo needed). No admin Eye involvement."
+    "EXIT ADMIN SESSION: briefing runs as user (no --sudo needed). No admin Eye involvement.",
+    "Verified 2026-04-22: scripts/test-heal-check-news-scores-daily-issue.sh (resolve ts=2026-04-22T12:00)"
   ],
   "tags": [
     "news",
@@ -29,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-17T03:55:34.0207283Z",
-  "updated": "2026-04-17T03:55:34.0207392Z",
-  "version": "1.0"
+  "updated": "2026-04-22T20:09:33.8864777Z",
+  "version": "1.2"
 }

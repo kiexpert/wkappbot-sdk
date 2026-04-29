@@ -1,0 +1,41 @@
+{
+  "id": "ai-news-competitive-eval",
+  "app": "wkappbot-core",
+  "title": "AI-NEWS Competitive Analysis Evaluation Protocol",
+  "desc": "Evaluate AI-NEWS suggests: extract pattern, check WKAppBot coverage, close with analysis note",
+  "steps": [
+    "Extract core pattern from HN/YT post title",
+    "Check if WKAppBot already has equivalent (MCP, CDP a11y ask, eye)",
+    "If applicable: queue as feature with concrete note",
+    "If duplicate/covered: close with competitive analysis note",
+    "wkappbot ask/skill/suggest commands cover most AI-NEWS patterns",
+    "Verified 2026-04-26: test-skill-read-ai-news-eval.sh (resolve ts=2026-04-22T20:56:36.8218989Z)",
+    "Verified 2026-04-26: test-ask-gemini-ai-news-eval.sh (resolve ts=2026-04-22T20:56:23.6741813Z)",
+    "Verified 2026-04-26: test-ask-gemini-ai-news.sh (resolve ts=2026-04-22T20:56:13.5446175Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gemini \u0027evaluate CDP self-healing pattern\u0027",
+      "expect": "WKAppBot CDP already covers",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ai-news",
+      "expect": "returns ai-news-competitive-eval",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest audit",
+      "expect": "AI-NEWS resolved after evaluation, no code change",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T11:10:26.0174844Z",
+  "updated": "2026-04-26T13:04:46.3977073Z",
+  "version": "1.4"
+}

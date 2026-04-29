@@ -1,0 +1,21 @@
+{
+  "id": "repo-maintenance-gc-cleanup-and-pre-release-git-audit",
+  "app": "wkappbot",
+  "title": "repo maintenance: gc cleanup and pre-release git audit",
+  "desc": "Pre-release git audit workflow: check tracked files, scrub secrets, use wkappbot gc to clean objects.",
+  "steps": [
+    "Run wkappbot gc --sweep to remove orphaned git objects after history rewrites or large file removals.",
+    "Check git-tracked hq and runtime files: git ls-files ",
+    " grep -E \u0027hq",
+    "runtime\u0027 should return empty (these dirs are gitignored).",
+    "Verify no secrets committed: git log --all --oneline --diff-filter=A -- \u0027*.env\u0027 \u0027*.key\u0027 \u0027*secret*\u0027 should return empty.",
+    "Verified 2026-04-22: test-gc-public-repo.sh (resolve ts=2026-04-17T09:22:39.8300971Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:53:13.8184823Z",
+  "updated": "2026-04-22T03:54:48.3134899Z",
+  "version": "1.1"
+}

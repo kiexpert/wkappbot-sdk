@@ -1,0 +1,19 @@
+{
+  "id": "a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern",
+  "app": "wkappbot-core",
+  "title": "a11y set-value: 50ms delay \u002B read-back warning for Win11 RichTextBox and Chrome stale ValuePattern",
+  "desc": "DoSetValue() now waits 50ms after ValuePattern.SetValue and reads back via ReadElementValue. If empty, logs stale-cache warning. Fixes silent expect/assert failures on Win11 RichEditD2DPT.",
+  "steps": [
+    "ActionExecutor.cs DoSetValue: Thread.Sleep(50) after vp.Pattern.SetValue(text). ReadElementValue() checks Value then TextPattern then Name. If read-back empty and text non-empty: logs stale cache warning. a11y set-value affected command. Win11 Notepad RichEditD2DPT and Chrome input workaround.",
+    "If stale warning appears: try type_text instead (uses WM_CHAR/EM_REPLACESEL tiers which bypass UIA cache).",
+    "Root cause: Win11 RichEditD2DPT and Chrome accessibility bridge don\u0027t sync ValuePattern.Value synchronously after SetValue COM call.",
+    "Verified 2026-04-21: test-set-value-readback.sh (resolve ts=2026-04-17T09:12)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:21:34.2527207Z",
+  "updated": "2026-04-21T18:22:19.3003679Z",
+  "version": "1.3"
+}

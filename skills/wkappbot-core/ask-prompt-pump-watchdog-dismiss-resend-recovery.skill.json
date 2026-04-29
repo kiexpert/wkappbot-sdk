@@ -1,0 +1,38 @@
+{
+  "id": "ask-prompt-pump-watchdog-dismiss-resend-recovery",
+  "app": "wkappbot-core",
+  "title": "ask prompt pump: watchdog dismiss+resend recovery before BUG-AUTO",
+  "desc": "AskCommands.CdpPromptPump watchdog fires when editor retains text 10s after submit -- cause is usually a promo popover (Claude CoWork, Gemini copyright) eating the click. Watchdog now runs DismissDialogAsync + SendPromptAsync re-fire before declaring stuck; only actual unrecoverable cases hit AutoRegisterBug.",
+  "steps": [
+    "Pump arms watchdog after last append",
+    "T+7s: check editor text length; if >0 editor still has content",
+    "Recovery call DismissDialogAsync -- closes CoWork promo banners, Gemini copyright dialogs, X-icon popovers",
+    "Re-fire SendPromptAsync",
+    "T+10s: recheck; if still stuck BUG-AUTO with 'recovery failed' hint",
+    "Quiet when no popover (NONE return); self-heals when popover was the blocker",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T05:29)",
+    "Verified 2026-04-22: test-file-grep-pump-watchdog.sh (resolve ts=2026-04-20T06:28:51.1783280Z)"
+  ],
+  "tags": [
+    "ask",
+    "chat",
+    "prompt-pump",
+    "watchdog",
+    "cowork",
+    "dismiss",
+    "recovery"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers3.cs",
+      "line": null,
+      "pattern": "DismissDialogAsync",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:20:00.8153579Z",
+  "updated": "2026-04-22T03:22:50.2642085Z",
+  "version": 2
+}

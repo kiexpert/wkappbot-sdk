@@ -1,0 +1,47 @@
+{
+  "id": "claude-session-handoff",
+  "app": "wkappbot",
+  "title": "Claude session handoff: find previous session JSONL and extract context",
+  "desc": "Finds the previous Claude Code session JSONL file for the current project under ~/.claude/projects/\u003Cslug\u003E/, reads the last ~120 lines, and extracts human/assistant text turns to reconstruct handoff context. Run at the start of a new session when the user asks to continue from the last session.",
+  "steps": [
+    "1. Derive project slug: convert CWD path (drive letter \u002B slashes) to hyphens, e.g. D:/GitHub/WkAutoQuant -\u003E d--GitHub-WkAutoQuant",
+    "2. List JSONL files sorted by mtime descending: ls -lt ~/.claude/projects/\u003Cslug\u003E/*.jsonl ",
+    " head -5. Current session is index [0], previous session is index [1]",
+    "3. Read last 120 lines of the previous session JSONL via PowerShell: Get-Content \u003Cpath\u003E -Encoding UTF8 -Tail 120",
+    "4. For each line parse JSON; extract role \u002B message.content text fields. Skip blank lines, API errors, system hooks. Print [role] \u003Ctext[:600]\u003E per substantive turn",
+    "5. Synthesize handoff summary: last user request, last assistant state, unfinished action items, pending confirmations, open file edits",
+    "6. Report to user: what was happening, what was left unfinished, proposed next step"
+  ],
+  "requirements": [
+    {
+      "cmd": "ls -lt ~/.claude/projects/d--GitHub-WkAutoQuant/*.jsonl | head -5",
+      "expect": "lists 5 JSONL files with timestamps; [0]=current session [1]=previous session",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Content \u003Cprev.jsonl\u003E -Encoding UTF8 -Tail 120 piped through ConvertFrom-Json per line",
+      "expect": "extracts role\u002Btext turns without mojibake, skips API errors and empty lines",
+      "prompt": null
+    },
+    {
+      "cmd": "handoff synthesis step",
+      "expect": "output contains last user request summary plus unfinished action items list plus proposed next step; never outputs raw JSONL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "session",
+    "handoff",
+    "context",
+    "continuity",
+    "jsonl",
+    "claude"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T12:09:30.6523896Z",
+  "updated": "2026-04-24T12:09:30.6523987Z",
+  "version": "1.0"
+}

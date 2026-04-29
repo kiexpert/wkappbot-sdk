@@ -1,0 +1,30 @@
+{
+  "id": "competitive-browser-cdp-mcp-tools",
+  "app": "competitive",
+  "title": "Chrome DevTools MCP vs WKAppBot CDP: general browser debugging gap",
+  "desc": "chrome-devtools-mcp exposes full DevTools surface (network, console, perf, screenshots) as MCP tools. WKAppBot has narrow CDP for Slack/ChatGPT/Claude prompt injection -- not a general-purpose browser MCP server. Gap exists.",
+  "steps": [
+    "chrome-devtools-mcp (Google): wraps CDP as MCP tools for network inspection, console logs, performance traces, screenshots, and page interaction for any web app.",
+    "WKAppBot CDP scope: prompt injection into Slack/ChatGPT/Claude via wkappbot ask/newchat, attachment upload, page key singleton pump. wkappbot mcp exposes a11y/win-click/windows -- not browser DevTools.",
+    "Gap: WKAppBot does not expose a general-purpose DevTools MCP server for arbitrary web debugging or network inspection. Targeted prompt automation is covered, general CDP debug surface is not.",
+    "Action: consider wkappbot-cdp-mcp subcommand exposing network/console/screenshot tools for any Chrome tab via MCP -- tracked as MCP interop suggest."
+  ],
+  "tags": [
+    "competitive",
+    "browser",
+    "cdp",
+    "mcp",
+    "devtools",
+    "chrome",
+    "network",
+    "console",
+    "gap",
+    "NEWS"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T03:02:43.8831602Z",
+  "updated": "2026-04-23T03:02:43.883171Z",
+  "version": "1.0"
+}

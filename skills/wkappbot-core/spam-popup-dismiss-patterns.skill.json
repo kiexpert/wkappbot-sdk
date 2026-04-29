@@ -1,0 +1,47 @@
+{
+  "id": "spam-popup-dismiss-patterns",
+  "app": "wkappbot-core",
+  "title": "Spam popup dismiss: WM_CLOSE patterns \u002B OneDrive toast screenshot heuristic",
+  "desc": "Two-tier spam dismissal. Tier1: WM_CLOSE by cls/title substring (HncUpdateTray=Coupang ads, OneDrive Win32). Tier2: OneDrive WinRT toast via screenshot blue-pixel heuristic then mouse-click X. Runs hourly in briefing bot.",
+  "steps": [
+    "Tier1 WM_CLOSE: EnumWindows match (cls_substr,title_substr) pairs, PostMessage WM_CLOSE (non-elevated works for HncUpdateTray)",
+    "Tier2 toast: grab monitor bottom-right 520x232px, numpy R\u003C100 G\u003C150 B\u003E180 blue mask, click X at (right-35, top\u002B18)",
+    "HncUpdateTray.exe shows Coupang ads as ToastForm WPF windows -- WM_CLOSE works",
+    "OneDrive WinRT toast has no HWND -- screenshot only",
+    "run_local_ai_news_collect.py main() calls _dismiss_spam_popups() first each cycle"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "no ToastForm",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/run_local_ai_news_collect.py",
+      "expect": "spam dismissed",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/run_local_ai_news_collect.py",
+      "expect": "OneDrive toast X clicked",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "spam",
+    "popup",
+    "toast",
+    "OneDrive",
+    "Coupang",
+    "HncUpdateTray",
+    "WM_CLOSE",
+    "screenshot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T06:00:59.6344864Z",
+  "updated": "2026-04-26T06:00:59.6344955Z",
+  "version": "1.0"
+}

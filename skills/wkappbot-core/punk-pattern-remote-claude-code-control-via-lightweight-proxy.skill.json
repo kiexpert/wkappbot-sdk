@@ -1,0 +1,23 @@
+{
+  "id": "punk-pattern-remote-claude-code-control-via-lightweight-proxy",
+  "app": "wkappbot-core",
+  "title": "[PUNK / Twill.ai] Remote Claude Code Control \u002B Agent Delegation \u2014 Eye remote pattern",
+  "desc": "PUNK (punkcode.rocks) and Twill.ai (YC S25) show demand for lightweight remote agent control \u002B result delivery. Maps to WKAppBot Eye architecture: eye tick, newchat, Slack async loop.",
+  "steps": [
+    "PUNK PATTERN: lightweight HTTP/WS proxy sits between Claude Code CLI and the operator. Exposes: session status, prompt injection, output streaming. Maps to WKAppBot: eye (daemon), eye tick (status), newchat (prompt injection), slack (async channel)."
+  ],
+  "tags": [
+    "remote",
+    "claude-code",
+    "proxy",
+    "eye",
+    "newchat",
+    "session"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:15:17.5676714Z",
+  "updated": "2026-04-22T10:17:50.4900524Z",
+  "version": "1.1"
+}

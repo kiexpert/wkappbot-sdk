@@ -1,0 +1,31 @@
+{
+  "id": "taskkill-compat-shim-a11y-first-kill-routing",
+  "app": "wkappbot-core",
+  "title": "taskkill compat shim: a11y-first kill routing",
+  "desc": "taskkill.exe is a busybox symlink to wkappbot that translates classic taskkill flags (/F /T /PID /IM) into anchored regex grap patterns for a11y kill. Exact image-name match prevents over-matching (notepad.exe does NOT kill notepad\u002B\u002B.exe). /FI filter unsupported -- use JSON5 grap directly. Help text served via CommandHelpMap (fixed suggest #15).",
+  "steps": [
+    "Invoke via taskkill.exe (busybox symlink) OR wkappbot taskkill -- both routed through TaskkillCompatCommand.",
+    "/PID N maps to regex:^\\[N\\] (anchored PID prefix). /IM name maps to regex:^\\[\\d\u002B\\]name\\.exe$ (exact, anchored image name).",
+    "Bare positional: digits -\u003E /PID, *.exe -\u003E /IM, else passed as grap pattern. Multiple targets dispatch one a11y kill per target.",
+    "/F is ignored (a11y kill is force by default). /T tree-kill is noted -- a11y kill already sweeps child processes. /FI filter triggers a warning with grap workaround.",
+    "For complex filters use grap directly: wkappbot a11y kill {proc:\u0027...\u0027,title:\u0027...\u0027} -- the shim covers taskkill\u0027s classic subset only.",
+    "Run \u0027wkappbot taskkill --help\u0027 to see the full help served from CommandHelpMap.",
+    "Verified 2026-04-21: test-taskkill-help.cmd (resolve ts=2026-04-20T04:06)"
+  ],
+  "tags": [
+    "operator",
+    "taskkill",
+    "kill",
+    "a11y",
+    "grap",
+    "compat",
+    "shim",
+    "busybox"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T05:29:34.0120523Z",
+  "updated": "2026-04-21T05:30:11.9339541Z",
+  "version": "1.1"
+}

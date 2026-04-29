@@ -1,0 +1,20 @@
+{
+  "id": "guard-cdp-probe-ports-against-low-port-discard-values",
+  "app": "wkappbot-debug",
+  "title": "Guard CDP probe ports against low-port/discard values",
+  "desc": "When DevTools CDP endpoint is auto-detected (GetPropW \u0027wkappbot.cdp\u0027 or --remote-debugging-port= regex), the resulting port can be 0/9/low-privileged leftover from stale/corrupted props. Probing 127.0.0.1:\u003Clow\u003E throws HttpRequestException that cascades into any caller path (slack send/list, suggest, etc) and surfaces in RunMain top-level catch as a crash report.",
+  "steps": [
+    "Validate CDP port in [1024, 65535] BEFORE issuing the HTTP probe. 0/negative/port\u003C1024 are never legit user-mode CDP endpoints.",
+    "Wrap CDP HTTP calls with typed catch (HttpRequestException, TaskCanceledException) and fall through to empty result instead of bubbling.",
+    "Never rely on \u0027port \u003E 0\u0027 alone -- GetPropW may return stray low values for Electron windows that briefly had the prop set then lost it.",
+    "Affected file: csharp/src/WKAppBot.Win32/Window/WindowFinder.cs around line 1168. Suggest 2026-04-19T18:22 fixed via v6.0.53. Verify: wkappbot slack send test (exit 0 -- no HttpRequestException on 127.0.0.1:9) and wkappbot slack list --limit 3.",
+    "Verified 2026-04-21: test-slack-port9-fix.cmd (resolve ts=2026-04-19T18:22)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T05:27:33.4507863Z",
+  "updated": "2026-04-21T05:28:05.5546443Z",
+  "version": "1.2"
+}

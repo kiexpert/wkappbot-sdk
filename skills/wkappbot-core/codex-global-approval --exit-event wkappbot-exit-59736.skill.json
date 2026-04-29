@@ -1,0 +1,28 @@
+{
+  "id": "codex-global-approval --exit-event wkappbot-exit-59736",
+  "app": "wkappbot-core",
+  "title": "Codex Global Approval",
+  "desc": "Set Codex CLI to never ask for approval and permit wkappbot execution with broad allow rules.",
+  "steps": [
+    "Open <user-home>\\.codex\\config.toml and keep ask_for_approval = \u0022 never\u0022 with sandbox = \\danger-full-access\\.",
+    "Keep or add the user-level environment variable WKAPPBOT_AUTO_APPROVE_ALL=1 for appbot runs.",
+    "Add narrow allow-prefix rules for wkappbot, python tools\\\\, pip --user, Invoke-WebRequest, winget, and git push.",
+    "Prefer explicit allow prefixes over wildcard OS-wide allow rules.",
+    "Verify the file is saved and note that the change applies to new sessions.",
+    "If the current session still prompts, restart Codex rather than widening rules further."
+  ],
+  "tags": [
+    "codex",
+    "approval",
+    "config",
+    "sandbox",
+    "appbot",
+    "wkappbot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T11:57:12.2177642Z",
+  "updated": "2026-04-21T11:57:12.2177749Z",
+  "version": "1.0"
+}

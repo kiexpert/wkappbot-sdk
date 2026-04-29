@@ -1,0 +1,51 @@
+{
+  "id": "all-ai-global-approval-setup",
+  "app": "wkappbot-workflow",
+  "title": "All AI global approval setup -- Claude Code \u002B Codex one-shot",
+  "title_ko": null,
+  "desc": "Single reference to set up never-ask approval for all AI tools in WKAppBot environment. Run once on new machine or after reset. Covers: Claude Code, Codex CLI.",
+  "steps": [
+    "CLAUDE CODE: edit <user-home>/.claude/settings.json. Set allow array to include Bash(*), PowerShell(*), Read(*), Write(*), Edit(*), Glob(*), Grep(*), WebFetch(*), WebSearch(*), mcp__wkappbot__wkappbot, mcp__wkappbot__wkappbot_cli, Bash(python *). Or use /update-config skill.",
+    "CLAUDE CODE CURRENT (2026-04-28): all core tools allowed globally. additionalDirectories: <user-home>/.claude. Special entries: PowerShell force-swap wkappbot-core, test-run-scenario cmd.",
+    "CODEX CLI: edit <user-home>/.codex/config.toml. Set ask_for_approval = \u0027never\u0027 to disable all prompts globally.",
+    "CODEX CURRENT (2026-04-28): model=gpt-5.4-mini, reasoning=medium, ask_for_approval=never. Trusted projects: C:\\, <repo-root>, D:\\GitHub\\WkAutoQuant, D:\\GitHub\\personal-docs.",
+    "CODEX TRUST NEW REPO: add [projects.\u0027D:\\GitHub\\RepoName\u0027] trust_level = \u0027trusted\u0027 to ~/.codex/config.toml for each new project dir.",
+    "CODEX QUICK SETUP: codex config set ask_for_approval never (if CLI supports config subcommand), or manually edit config.toml.",
+    "VERIFY ALL: claude --version shows no approval prompts on tool use. codex exec -s workspace-write -C <repo-root> \u0027echo ok\u0027 completes without prompt."
+  ],
+  "requirements": [
+    {
+      "cmd": "cat <user-home>/.claude/settings.json",
+      "expect": "Bash",
+      "prompt": null
+    },
+    {
+      "cmd": "cat <user-home>/.codex/config.toml",
+      "expect": "ask_for_approval = .never.",
+      "prompt": null
+    },
+    {
+      "cmd": "cat <user-home>/.codex/config.toml",
+      "expect": "WKAppBot",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "claude-code",
+    "codex",
+    "approval",
+    "global",
+    "setup",
+    "onboarding",
+    "settings",
+    "permissions",
+    "never-ask"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T14:04:56.2835294Z",
+  "updated": "2026-04-28T14:04:56.2835411Z",
+  "version": "1.0"
+}

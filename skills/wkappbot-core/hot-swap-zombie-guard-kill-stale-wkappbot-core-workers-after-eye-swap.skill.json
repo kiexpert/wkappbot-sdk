@@ -1,0 +1,19 @@
+{
+  "id": "hot-swap-zombie-guard-kill-stale-wkappbot-core-workers-after-eye-swap",
+  "app": "wkappbot-core",
+  "title": "hot-swap zombie guard: kill stale wkappbot-core workers after Eye swap",
+  "desc": "After Eye hot-swap, old wkappbot-core MCP/analyze/slack-route workers are not killed by CoreSwapWatcher alone. A post-swap scan kills all wkappbot-core processes except self and new Eye.",
+  "steps": [
+    "After new Eye process is ready, scan Process.GetProcessesByName(\u0027wkappbot-core\u0027) and kill all except self (Environment.ProcessId) and new Eye pid.",
+    "Log count of killed stale workers via Console.Error [EYE:HOT-SWAP].",
+    "PulseStep.Mark(\u0027stale-cores-killed\u0027) after the loop.",
+    "Verified 2026-04-23: experience/tests/eye/test-eye-tick-periodic-stale-core-reaper.sh (resolve ts=2026-04-23T03:46:09.4737710Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T04:28:55.1776442Z",
+  "updated": "2026-04-23T05:47:39.6797294Z",
+  "version": "1.1"
+}

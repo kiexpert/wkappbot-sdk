@@ -1,0 +1,21 @@
+{
+  "id": "hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] OculOS \u2013 Give AI agents control of your desktop via MCP \u2014 AI computer-use pattern reference",
+  "desc": "Study OculOS\u0027s MCP desktop-control surface to enrich WKAppBot\u0027s \u0060ShouldRouteToMcp()\u0060 dispatch with richer action types. Source: https://github.com/IamLumae/DirectShell (score=5, auto-generated from ai-news-briefing 2026-04-22 19:51)",
+  "steps": [
+    "SOURCE: OculOS \u2013 Give AI agents control of your desktop via MCP -- https://github.com/IamLumae/DirectShell"
+  ],
+  "tags": [
+    "ai-news",
+    "computer-use",
+    "auto-skill",
+    "hn"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:48:36.7465938Z",
+  "updated": "2026-04-22T10:51:35.7324151Z",
+  "version": "1.2"
+}

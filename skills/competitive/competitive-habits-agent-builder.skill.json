@@ -1,0 +1,28 @@
+{
+  "id": "competitive-habits-agent-builder",
+  "app": "competitive",
+  "title": "Habits agent builder vs WKAppBot: declarative vs execution-layer",
+  "desc": "Habits is open-source declarative agent-loop runtime (cron\u002BLLM\u002Btool-call YAML). WKAppBot Eye\u002Bskills\u002BYAML scenario already covers this pattern. WKAppBot\u0027s a11y/Win32/CDP execution layer is the moat Habits lacks.",
+  "steps": [
+    "Habits: declarative agent loops -- define triggers, conditions, and actions as habits that fire on schedule or event. YAML-based, LLM reasoning, tool-call execution.",
+    "WKAppBot Eye acts as persistent event-driven daemon (FSW \u002B Slack \u002B watchdog). Skills = structured step chains. YAML scenarios = same declarative trigger-action model.",
+    "Habits has no Windows a11y, no UIA/Win32/SendInput stack, no CDP browser control -- it runs at LLM orchestration layer only.",
+    "Verdict: not-applicable. WKAppBot value is the a11y/Win32/CDP execution layer. Habits pattern is already covered by Eye \u002B skills \u002B scenario. wkappbot suggest runtime, evaluate open-source patterns"
+  ],
+  "tags": [
+    "competitive",
+    "habits",
+    "agents",
+    "runtime",
+    "evaluate",
+    "open-source",
+    "NEWS",
+    "suggest"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T03:21:31.7283005Z",
+  "updated": "2026-04-23T03:21:31.7283144Z",
+  "version": "1.0"
+}

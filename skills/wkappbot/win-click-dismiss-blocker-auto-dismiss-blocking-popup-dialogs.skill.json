@@ -1,0 +1,21 @@
+{
+  "id": "win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs",
+  "app": "wkappbot",
+  "title": "win-click --dismiss-blocker: auto-dismiss blocking popup dialogs",
+  "desc": "When win-click reports physical click blocked by a dialog, --dismiss-blocker calls TryDismissBlocker on the blocking #32770 window, waits 400ms, then retries the original click.",
+  "steps": [
+    "Blocking scenario: physReport.ActiveBlocker != null means a popup/dialog is covering the target window and physical click cannot proceed.",
+    "With --dismiss-blocker: calls readiness.TryDismissBlocker(hWnd, blocker), then re-probes readiness after 400ms. If blocker persists, returns error with blocker title.",
+    "Without --dismiss-blocker (default): error message now includes hint \u0027(use --dismiss-blocker to auto-dismiss)\u0027 instead of silent fail.",
+    "Verified 2026-04-22: test-win-click-dismiss-blocker.sh (resolve ts=2026-04-21T17:56:01.0957686Z)",
+    "Verified 2026-04-22: scripts/test-win-click-child-window-parent-blocker.sh (resolve ts=2026-04-22T20:10)",
+    "Verified 2026-04-22: scripts/test-win-click-printwindow-gpu-fallback.sh (resolve ts=2026-04-22T19:34)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:41:19.5391162Z",
+  "updated": "2026-04-22T20:20:20.8072852Z",
+  "version": "1.3"
+}

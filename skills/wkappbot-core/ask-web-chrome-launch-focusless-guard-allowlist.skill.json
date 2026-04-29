@@ -1,0 +1,27 @@
+{
+  "id": "ask-web-chrome-launch-focusless-guard-allowlist",
+  "app": "wkappbot-core",
+  "title": "ask/web Chrome launch: AppBotPipe focusless guard allowlist",
+  "desc": "ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft). AppBotPipe.StartTracked's focusless guard used to block every Verb-less UseShellExecute, killing Chrome startup and breaking ask/web/triad paths. Guard now allowlists WindowStyle=Minimized/Hidden since they're inherently non-focus-stealing.",
+  "steps": [
+    "AppBotPipe.StartTracked blocks UseShellExecute=true unless Verb=runas OR WindowStyle is Minimized/Hidden",
+    "ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized + --window-size/--window-position so Chrome starts minimized at known bounds",
+    "Focus stays on user's current app; CDP port 9222 comes up; ask/web/triad work without Chrome stealing foreground",
+    "If Chrome fails to launch again check the AppBotPipe guard logs for 'focusless violation' message"
+  ],
+  "tags": [
+    "ask",
+    "web",
+    "chrome",
+    "cdp",
+    "focusless-first",
+    "appbotpipe",
+    "guard"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:19:31.7027418Z",
+  "updated": "2026-04-19T07:19:31.7027528Z",
+  "version": "1.0"
+}

@@ -1,0 +1,19 @@
+{
+  "id": "korean-argv-cp949-fix-tryrecoverutf8argv-at-main-entry-recovers-createprocessa-mangled-args",
+  "app": "wkappbot-core",
+  "title": "Korean argv CP949 fix: TryRecoverUtf8Argv at Main() entry recovers CreateProcessA mangled args",
+  "desc": "Korean text passed from Git Bash gets mangled by CreateProcessA CP949 conversion. TryRecoverUtf8Argv() detects and recovers at Program.Main() entry.",
+  "steps": [
+    "Algorithm: GetCommandLineA() raw bytes -\u003E strict UTF-8 decode -\u003E if valid: CommandLineToArgvW re-parse. CP949 lead bytes (0xBE, 0xB3) fail UTF-8 check -\u003E CreateProcessW callers pass unchanged. Affects speak/slack/prompt/a11y with Korean content. Fix deployed 2026-04-20 commit tagged in news-20260420-sudo-encoding.",
+    "speak command: wkappbot speak [Korean text] from Git Bash now correctly passes to TTS. Exit 0 confirmed.",
+    "slack send and a11y find with Korean window title also fixed by same TryRecoverUtf8Argv path.",
+    "Verified 2026-04-21: test-speak-korean-argv.sh (resolve ts=2026-04-18T10:08)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:17:00.965284Z",
+  "updated": "2026-04-21T18:17:40.2585403Z",
+  "version": "1.3"
+}

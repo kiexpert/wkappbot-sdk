@@ -1,0 +1,68 @@
+{
+  "id": "naver-mail-compose-spa-read-fiber",
+  "app": "wkappbot-webbot",
+  "title": "Naver Mail Compose: Read React SPA state via CDP fiber props",
+  "desc": "Naver mail compose fields (subject, recipient, attachment) invisible to standard a11y tree. Use --eval-js with React fiber traversal.",
+  "steps": [
+    "Find visible inputs: Array.from(document.querySelectorAll(\u0027input,textarea\u0027)).filter(e=\u003E{var r=e.getBoundingClientRect();return r.width\u003E10\u0026\u0026r.height\u003E10})",
+    "Read subject value via eval-js on chrome domain mail.naver.com: Array.from(document.querySelectorAll(\u0027input,textarea\u0027)).find(e=\u003E{var r=e.getBoundingClientRect();return r.width\u003E50\u0026\u0026(e.type===\u0027text\u0027",
+    "",
+    "e.className.includes(\u0027subject\u0027)",
+    "",
+    "e.placeholder)})?.value",
+    "",
+    "\u0027\u0027",
+    "Read recipients via eval-js: Array.from(document.querySelectorAll(\u0027[class*=recipient],[class*=addr],[class*=tag]\u0027)).map(e=\u003Ee.textContent.trim()).filter(t=\u003Et.includes(\u0027@\u0027)).join(\u0027,\u0027)",
+    "Read attachments via eval-js: Array.from(document.querySelectorAll(\u0027[class*=file],[class*=attach]\u0027)).map(e=\u003Ee.textContent.trim()).filter(t=\u003Et.length\u003E2).join(\u0027,\u0027)",
+    "React fiber direct: var fk=Object.keys(el).find(k=\u003Ek.startsWith(\u0027__reactFiber\u0027)); el[fk]?.memoizedProps?.value",
+    "Verified 2026-04-26: test-a11y-read-naver-mail-react-fiber.sh (resolve ts=2026-04-26T07:48:53)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y read \u0027{proc:chrome,domain:mail.naver.com}\u0027 --eval-js",
+      "expect": "non-empty subject value",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \u0027{proc:chrome,domain:mail.naver.com}\u0027 --eval-js",
+      "expect": "recipient email",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \u0027{proc:chrome,domain:mail.naver.com}\u0027 --eval-js",
+      "expect": "attachment filename",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \u0022*\uBA54\uC77C\uC4F0\uAE30*\u0022 --eval-js \u0022...\u0022",
+      "expect": "returns non-empty subject value from Naver mail compose",
+      "prompt": "React fiber CDP eval skill documented --skill naver-mail-compose-spa-read-fiber --commit a0f0219071c4255e3a0437e99b17bf23a7e873fd --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y find \u0022*\uBA54\uC77C\uC4F0\uAE30*\u0022 \u0022\uBC1B\uB294\uC0AC\uB78C\u0022",
+      "expect": "returns element with recipient email address as accessible value",
+      "prompt": "React fiber CDP eval skill documented --skill naver-mail-compose-spa-read-fiber --commit a0f0219071c4255e3a0437e99b17bf23a7e873fd --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y read \u0022*\uBA54\uC77C\uC4F0\uAE30*\u0022",
+      "expect": "attachment filename visible in a11y tree when file is attached",
+      "prompt": "React fiber CDP eval skill documented --skill naver-mail-compose-spa-read-fiber --commit a0f0219071c4255e3a0437e99b17bf23a7e873fd --class skill-only"
+    }
+  ],
+  "primary_cmd": "wkappbot a11y read \u0022*\uBA54\uC77C\uC4F0\uAE30*\u0022 --eval-js \u0022...\u0022",
+  "tags": [
+    "naver",
+    "mail",
+    "react",
+    "spa",
+    "cdp",
+    "fiber",
+    "compose"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T07:54:01.9237394Z",
+  "updated": "2026-04-26T07:54:39.4891127Z",
+  "version": "1.2"
+}

@@ -1,0 +1,20 @@
+{
+  "id": "admin-eye-hot-swap-known-gap-options-for-fix",
+  "app": "wkappbot",
+  "title": "admin Eye hot-swap: known gap, options for fix",
+  "desc": "Admin Eye currently has no FSW watcher. After normal Eye hot-swaps to a new wkappbot-core.exe, the admin Eye pipe (wkappbot_elevated) continues running the old binary. Options: version-check on each sudo invocation, admin Eye self-restart on stamp change, or document as acceptable (admin Eye is short-lived).",
+  "steps": [
+    "Current state: normal Eye FSW watches wkappbot-core.new.exe and renames it. Admin Eye (elevated) has no FSW, starts once per UAC elevation, runs old binary until user terminates session.",
+    "Option 1 (recommended): SudoHandler checks binary stamp on each --sudo invocation. If stamp changed, terminates old admin Eye \u002B re-spawns with UAC prompt. Cost: extra UAC prompt on first command after hot-swap.",
+    "Option 2 (lightweight): Admin Eye watches its own exe path for mtime change (poll every 30s). On change, sets a flag; next command request triggers self-exit so launcher re-spawns.",
+    "Workaround (current): restart admin Eye manually by killing it in Task Manager or using wkappbot eye (which terminates and re-spawns all Eye processes).",
+    "Verified 2026-04-22: test-eye-tick-compete-roadmap.sh (resolve ts=2026-04-20T07:27:59.4226427Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:45:19.4916043Z",
+  "updated": "2026-04-22T03:46:20.033505Z",
+  "version": "1.1"
+}

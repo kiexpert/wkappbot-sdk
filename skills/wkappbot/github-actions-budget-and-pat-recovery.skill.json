@@ -1,0 +1,48 @@
+{
+  "id": "github-actions-budget-and-pat-recovery",
+  "app": "wkappbot",
+  "title": "GitHub Actions budget exhausted \u002B GH_PAT recovery",
+  "title_ko": null,
+  "desc": "Two common silent CI failures: (1) budget exhausted runs fail under 10s, (2) GH_PAT missing causes sync 403. Both look like normal failures in run list.",
+  "steps": [
+    "SYMPTOM: runs fail in under 15s. Check gh run view --log-failed for billing or 403 clues.",
+    "BUDGET FIX: edit Actions row at github.com/settings/billing/budgets and raise limit. CDP read: wkappbot a11y read with eval-js document.body.innerText on billing tab.",
+    "GH_PAT MISSING: sync push logs blank GH_PAT then fatal 403. Check: gh secret list --repo kiexpert/WKAppBot",
+    "PAT FIX: gh secret set GH_PAT --repo kiexpert/WKAppBot --body TOKEN where TOKEN comes from gh auth token",
+    "RERUN: gh run rerun RUNID. Check result with gh run list."
+  ],
+  "requirements": [
+    {
+      "cmd": "gh secret list --repo kiexpert/WKAppBot",
+      "expect": "GH_PAT",
+      "prompt": null
+    },
+    {
+      "cmd": "gh run list --workflow=sync-public.yml --limit 1",
+      "expect": "success",
+      "prompt": null
+    },
+    {
+      "cmd": "gh run list --workflow=build.yml --limit 1",
+      "expect": "success",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "github",
+    "actions",
+    "budget",
+    "pat",
+    "ci",
+    "403",
+    "sync",
+    "billing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T14:01:52.3360878Z",
+  "updated": "2026-04-28T14:01:52.3361018Z",
+  "version": "1.0"
+}

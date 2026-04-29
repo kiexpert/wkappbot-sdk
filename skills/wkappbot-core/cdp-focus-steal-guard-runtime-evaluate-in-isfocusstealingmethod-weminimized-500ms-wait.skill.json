@@ -1,0 +1,21 @@
+{
+  "id": "cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait",
+  "app": "wkappbot-core",
+  "title": "CDP focus-steal guard: Runtime.evaluate in IsFocusStealingMethod \u002B weMinimized \u002B 500ms wait",
+  "desc": "Runtime.evaluate can activate Chrome tab and steal fg. Fix: add to IsFocusStealingMethod (unconditional). Track weMinimized to prevent spurious post-restore. Wait 50x10ms for IsIconic before sending CDP (eliminates RACE where minimize command sent but Chrome not yet minimized).",
+  "steps": [
+    "IsFocusStealingMethod includes Runtime.evaluate unconditionally (removed expression-based IsFocusRiskExpression conditional).",
+    "Track weMinimized=true when we call ShowWindowNative -- only restore Chrome if weMinimized (prevents restoring already-minimized Chrome on every eval).",
+    "After ShowWindowNative(SW_SHOWMINNOACTIVE), wait 50x10ms for IsIconic() to confirm minimize completed before sending CDP command (RACE fix).",
+    "Verified 2026-04-23: experience/tests/cdp/test-cdp-runtime-evaluate-focus-steal-guard.sh (resolve ts=2026-04-22T23:40:01). Page.navigate also added to IsFocusStealingMethod \u002B knownGuarded (2026-04-28, commit b0ccd8e4) -- tab navigation activates Chrome window just like Page.bringToFront."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T04:41:42.1000666Z",
+  "updated": "2026-04-28T02:34:32.339484Z",
+  "version": "1.3"
+}

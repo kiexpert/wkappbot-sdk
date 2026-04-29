@@ -1,0 +1,21 @@
+{
+  "id": "hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] Self-healing browser harness via direct CDP \u2014 AI computer-use pattern reference",
+  "desc": "Benchmark self-healing selector logic against WKAppBot\u0027s CdpClient to improve resilience when DOM structure changes. Source: https://github.com/browser-use/browser-harness (score=4, auto-generated from ai-news-briefing 2026-04-23 11:24)",
+  "steps": [
+    "SOURCE: Self-healing browser harness via direct CDP -- https://github.com/browser-use/browser-harness"
+  ],
+  "tags": [
+    "ai-news",
+    "computer-use",
+    "auto-skill",
+    "hn"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T11:39:48.2875646Z",
+  "updated": "2026-04-23T02:25:44.6138775Z",
+  "version": "1.4"
+}

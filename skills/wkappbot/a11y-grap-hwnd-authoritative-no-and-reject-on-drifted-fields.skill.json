@@ -1,0 +1,28 @@
+{
+  "id": "a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields",
+  "app": "wkappbot",
+  "title": "a11y grap: explicit hwnd is authoritative in FindByMultiField",
+  "desc": "When grap pattern contains {hwnd:0x...} plus proc/title/cls hints, the hwnd is authoritative: IsWindow(hwnd) only, no AND-match on other fields. Fields drift across hot-swap rename, Chrome navigations, and dynamic dialog titles -- any drift used to drop the match to empty and caller fell through to closest-match enumeration, returning a wrong sibling popup on Hero4/HeroGlobal with 4+ #32770 dialogs.",
+  "steps": [
+    "If grap dict has hwnd field and IsWindow(hwnd) returns the single WindowInfo (no AND-match on other fields)",
+    "Prior behavior AND-matched pid/title/cls/proc/domain/url/cmd -- any drift returned empty list",
+    "Empty result let callers enumerate and pick closest match (often wrong sibling)",
+    "Now: hwnd is the truth; other fields are captured hints not constraints",
+    "Use this when writing grap from 'a11y find' TARGET line -- the hwnd remains valid across hot-swap"
+  ],
+  "tags": [
+    "a11y",
+    "grap",
+    "hwnd",
+    "windowfinder",
+    "hts",
+    "mfc",
+    "sibling-popup"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:19:42.8806467Z",
+  "updated": "2026-04-19T07:19:42.8806574Z",
+  "version": "1.0"
+}

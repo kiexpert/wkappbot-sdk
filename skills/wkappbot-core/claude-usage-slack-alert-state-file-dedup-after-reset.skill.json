@@ -1,0 +1,28 @@
+{
+  "id": "claude-usage-slack-alert-state-file-dedup-after-reset",
+  "app": "wkappbot-core",
+  "title": "claude-usage: state-file dedup prevents Slack spam after reset",
+  "desc": "claude-usage used to post a Slack alert every call if thresholds tripped -- scheduled hourly runs spammed CRITICAL. Now persists {level, ts, weekly, session} to %LOCALAPPDATA%/WKAppBot/claude-usage-alert-state.json. Same-level cooldown 1h; escalation (WARNING->CRITICAL) bypasses cooldown; NONE transition clears state so post-reset alerts fire fresh.",
+  "steps": [
+    "Compute newLevel: NONE, WARNING (>=85), CRITICAL (>=95), SESSION (session >=90)",
+    "Load last state from claude-usage-alert-state.json",
+    "Suppress if newLevel == lastLevel and <1h since last post",
+    "Escalation (rank up) posts immediately regardless of cooldown",
+    "NONE transition from non-NONE: clear state so post-reset fresh alerts work",
+    "Persist new state after successful post"
+  ],
+  "tags": [
+    "claude-usage",
+    "slack",
+    "alert",
+    "dedup",
+    "state-file",
+    "reset-detection"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:19:23.3069926Z",
+  "updated": "2026-04-19T07:19:23.3070037Z",
+  "version": "1.0"
+}

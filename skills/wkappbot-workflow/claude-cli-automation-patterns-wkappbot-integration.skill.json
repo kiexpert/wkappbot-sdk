@@ -1,0 +1,42 @@
+{
+  "id": "claude-cli-automation-patterns-wkappbot-integration",
+  "app": "wkappbot-workflow",
+  "title": "Claude CLI automation patterns + wkappbot integration",
+  "desc": "Operational knowhow for invoking claude -p in unattended pipelines, handling rc=1-but-success, system/user prompt split, bypassPermissions, max-budget, Korean argv workarounds, and orchestration with wkappbot (ask/slack/speak). Distilled from 2026-04-18/19 WkAutoQuant autonomous morning cycle build sessions.",
+  "steps": [
+    "[FLAG TRIO for autonomous] claude -p --permission-mode bypassPermissions --max-budget-usd 1.0 --append-system-prompt-file mission.txt (stdin = short imperative user prompt). This is the canonical unattended-agent invocation. Print mode, bypasses UAC-style permission prompts, caps API spend, loads mission via FILE not argv (argv length + encoding risks).",
+    "[SYSTEM vs USER SPLIT — critical] Long missions (>2000 chars) in user prompt cause META-CONFUSION: Claude writes meta-instructions for itself instead of executing. Fix: put mission in --append-system-prompt-file + short imperative user prompt via STDIN (echo ... ",
+    " claude -p ...). Validated 2026-04-19 fix for rc=1 silent failures.",
+    "[rc=1 BUT SUCCESS TRAP] In bypassPermissions mode with tool use, claude CLI can return rc=1 even though Write/Bash/Edit tools completed successfully. NEVER trust exit code alone — verify by ARTIFACT check (file exists + recent mtime + size > threshold). Pattern: if rc != 0 and not artifact_ok: fail; else: treat as success.",
+    "[MAX BUDGET CALIBRATION] --max-budget-usd 0.50 too low for mission mode (Claude hits budget mid-analysis → rc=1 + partial STUDY_MD). 1.00 is sweet spot for our hourly cycles (actual spend 0.10-0.30). Scale with mission complexity.",
+    "[PROMPT FILE vs ARG] --append-system-prompt (arg) works up to ~7600 chars on Windows; argv length + CP949 encoding cause rc=1 at 8587+ chars. --append-system-prompt-file (FILE) bypasses both limits — always preferred for >5000 char missions.",
+    "[KOREAN ARGV CP949 ISSUE] From Git Bash → wkappbot (or any CreateProcessA child), Korean argv gets reinterpreted as CP949 and mangled. Workarounds: (1) hwnd-direct grap instead of Korean title match, (2) English-only content for Slack/speak/prompt, (3) write UTF-8 file + pass ASCII file path arg. See skill korean-argv-cp949-hell-with-wkappbot-from-bash.",
+    "[WKAPPBOT INTEGRATION] (a) wkappbot slack send 'msg' — final-stage notification (rc=0 reliable). (b) wkappbot speak 'text' --bg — background TTS, Korean OK via Python subprocess (list args use CreateProcessW, not CP949). (c) wkappbot ask gpt",
+    "gemini",
+    "claude 'q' — web CDP delegation, browser session must be alive. (d) wkappbot ask triad 'q' --debate — 정반합 (thesis-antithesis-synthesis) 3-model parallel; requires logged-in web sessions for all 3 providers.",
+    "[TRIAD KNOWN ISSUES] Triad fails when all 3 browser sessions expire simultaneously. Fallback per-model via AskAndCapture retries. Session recovery 50pct success. Prompt size >4000 chars increases failure rate. Keep triad queries under 3000 chars + domain terms explicit.",
+    "[NODE PATH for subprocess launch] claude.cmd needs node.exe on PATH. In Python subprocess: env_extra = {PATH: r'C:\\Program Files\\nodejs;' + os.environ.get('PATH', '')}. Without it: 'node not recognized as internal/external command' error.",
+    "[STUDY_MD WRITE CONFLICT] If Claude writes auto_study MD via Write tool AND orchestrator Python also writes captured stdout to same path, second write overwrites first. Pattern: in full mission mode, check if file exists with size > expected threshold before Python writes fallback. Preserve Claude's direct write.",
+    "[NO-NEW-CHAT AT TOKEN LIMIT] claude -p respects session limits per Claude auth. When user near weekly cap, -p invocations fail silently (rc=1, out_len small). Always check wkappbot claude-usage to preempt.",
+    "[STREAMING vs COMPLETE] claude -p returns only final text. For real-time progress, use --output-format stream-json. Useful for long missions (>2min) with user status bar.",
+    "[SLACK THREAD RELAY BREAKS] wkappbot's Slack thread → Claude relay is flaky. Pattern: messages intended for Claude get mis-routed to fg Claude instance based on foreground heuristic. Monitor /suggest queue for mis-routes. Acknowledge via wkappbot slack reply to silence stale threads."
+  ],
+  "tags": [
+    "claude-cli",
+    "wkappbot",
+    "automation",
+    "ai-orchestration",
+    "bypassPermissions",
+    "stdin-stdout",
+    "korean-argv",
+    "mission-mode",
+    "rc-1-trap",
+    "cost-budget"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T15:39:23.4471579Z",
+  "updated": "2026-04-19T15:39:23.4471689Z",
+  "version": "1.0"
+}
