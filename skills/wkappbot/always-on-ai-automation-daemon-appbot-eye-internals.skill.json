@@ -1,24 +1,29 @@
-﻿{
-    "id":  "always-on-ai-automation-daemon-appbot-eye-internals",
-    "app":  "wkappbot",
-    "title":  "Always-On AI Automation Daemon -- AppBot Eye Internals",
-    "desc":  "Eye = always-on overlay + Slack daemon + MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) + 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp -> defers if admin pipe busy -> skips same failed stamp -> spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.",
-    "steps":  [
-
-              ],
-    "tags":  [
-                 "eye",
-                 "mcp",
-                 "hotswap",
-                 "architecture",
-                 "admin",
-                 "daemon",
-                 "fsw",
-                 "project"
-             ],
-    "source_refs":  null,
-    "author":  "claude",
-    "created":  "2026-04-07T04:53:02.2511472Z",
-    "updated":  "2026-04-07T04:53:02.2511739Z",
-    "version":  "1.1"
+{
+  "id": "always-on-ai-automation-daemon-appbot-eye-internals",
+  "app": "wkappbot",
+  "title": "Always-On AI Automation Daemon -- AppBot Eye Internals",
+  "desc": "Eye = always-on overlay \u002B Slack daemon \u002B MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) \u002B 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp -\u003E defers if admin pipe busy -\u003E skips same failed stamp -\u003E spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.",
+  "steps": [
+    "Guardian watchdog (v6.1): AppBotEyeWindow has internal render-freeze detector; AppBotEyeCommands has external guardian with gentle-swap -\u003E WM_CLOSE escalation when WPF render thread freezes while IPC remains alive",
+    "Eye render-freeze detection: AppBotEyeWindow.OnCloakTick() writes unix timestamp to runtime/eye-render-tick.txt on the WPF Dispatcher thread every tick. Guardian reads this file; if age \u003E 60s, render thread is considered frozen.",
+    "Guardian recovery: gentle-swap (eye tick --swap-now) at 60s freeze, WM_CLOSE at longer freeze threshold. IPC heartbeat and WPF render heartbeat are independent -- IPC alive does NOT mean render alive.",
+    "Verified 2026-04-22: scripts/test-eye-tick-render-freeze-guardian.sh (resolve ts=2026-04-22T12:00)",
+    "Verified 2026-04-22: scripts/test-eye-tick-ai-news-briefing-batch.sh (resolve ts=2026-04-22T20:20)"
+  ],
+  "tags": [
+    "eye",
+    "mcp",
+    "hotswap",
+    "architecture",
+    "admin",
+    "daemon",
+    "fsw",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:53:02.2511472Z",
+  "updated": "2026-04-22T20:22:41.1790721Z",
+  "version": "1.8"
 }

@@ -1,20 +1,20 @@
 {
   "id": "wkappbot-build-verify-workflow",
   "app": "wkappbot-core",
-  "title": "WKAppBot build \u002B verify workflow (for AI code agents)",
+  "title": "WKAppBot build + verify workflow (for AI code agents)",
   "desc": "How to build and verify WKAppBot after code changes. Required reading for Codex / Haiku / any AI CLI delegated to refactor or edit wkappbot source. Covers the single publish command, green-build signature, hot-swap staging output, and failure diagnosis.",
   "steps": [
-    "Single build command (Release mode, all projects): C:/Program Files/dotnet/dotnet publish D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity minimal",
-    "Working directory: anywhere, but D:/GitHub/WKAppBot is canonical. Must use the quoted Program Files path on Windows; plain dotnet may hit an older SDK",
+    "Single build command (Release mode, all projects): C:/Program Files/dotnet/dotnet publish <repo-root>/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity minimal",
+    "Working directory: anywhere, but <repo-root> is canonical. Must use the quoted Program Files path on Windows; plain dotnet may hit an older SDK",
     "Green-build signature (last 3 lines of output): wkappbot-core.new.exe staged for hot-swap AND skills installed to HQ. Exit code 0. Presence of warning CS8604 or similar nullable warnings is fine -- only CS-prefixed errors block",
     "Typical red-build signatures: error CS0xxx (compile error), error MSB (msbuild error), FileNotFoundException on copy. Show the error line; do not retry blindly",
     "Timeout budget: 180-300 seconds on warm build (incremental), up to 420 seconds on cold. Use timeout 300000 ms when calling via Bash tool",
     "After successful build the canonical wkappbot-core.exe is NOT yet updated. The launcher rename-swap happens on next wkappbot invocation (hot-swap layer 3). Running wkappbot --version triggers the swap",
     "Launcher auto-swap failing? See hot-swap operator cheatsheet (hot-swap-stuck-orphan-mcp-workers-kill-force-swap). Short answer: wkappbot --sudo --force-swap eye tick when admin orphan blocks",
     "For a quick smoke check post-build: wkappbot --version should print the expected base version (currently 6.0.x). wkappbot exec list should list built-in presets including codex notepad calc",
-    "Refactor verification loop: 1. make change 2. dotnet publish 3. check last 3 lines for staged \u002B skills installed 4. wkappbot --version to force swap 5. wkappbot \u003Caffected-command\u003E smoke test 6. git add \u002B commit ONLY after steps 2-5 all green",
+    "Refactor verification loop: 1. make change 2. dotnet publish 3. check last 3 lines for staged + skills installed 4. wkappbot --version to force swap 5. wkappbot <affected-command> smoke test 6. git add + commit ONLY after steps 2-5 all green",
     "Common refactor-breaking error: CS0246 (type or namespace not found) usually means a new file was created but not referenced OR an extracted method left a dangling reference. Read the error location and verify both sites",
-    "Project structure (relevant for where to place new partials): csharp/src/WKAppBot.CLI/Commands/ for CLI command handlers. csharp/src/WKAppBot.Win32/ for Win32 P/Invoke \u002B UIA. csharp/src/WKAppBot.WebBot/ for CDP. csharp/src/WKAppBot.Vision/ for Tesseract \u002B OCR. csharp/src/WKAppBot.Core/ for ScenarioRunner and ActionExecutor",
+    "Project structure (relevant for where to place new partials): csharp/src/WKAppBot.CLI/Commands/ for CLI command handlers. csharp/src/WKAppBot.Win32/ for Win32 P/Invoke + UIA. csharp/src/WKAppBot.WebBot/ for CDP. csharp/src/WKAppBot.Vision/ for Tesseract + OCR. csharp/src/WKAppBot.Core/ for ScenarioRunner and ActionExecutor",
     "Partial-class pattern (for splits): new file must have namespace WKAppBot.CLI (or matching namespace) AND internal partial class Program (or matching container). No using-statement changes beyond what the extracted code actually uses"
   ],
   "tags": [
@@ -28,26 +28,7 @@
     " cheatsheet",
     " refactor-safety"
   ],
-  "source_refs": [
-    {
-      "file": "csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
-      "file": "csharp/Directory.Build.props",
-      "line": null,
-      "pattern": null,
-      "note": null
-    },
-    {
-      "file": "CLAUDE.md",
-      "line": null,
-      "pattern": "Build \u0026 Deploy",
-      "note": null
-    }
-  ],
+  "source_refs": [],
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-19T16:44:12.0816945Z",

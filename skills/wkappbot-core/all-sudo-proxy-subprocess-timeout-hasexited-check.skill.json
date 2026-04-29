@@ -1,0 +1,23 @@
+{
+  "id": "all-sudo-proxy-subprocess-timeout-hasexited-check",
+  "app": "wkappbot-core",
+  "title": "All sudo-proxy subprocess timeout: HasExited fast-path",
+  "desc": "wkappbot --sudo proxies to admin Eye; 30s WaitForExitAsync timeout must check proc.HasExited to distinguish real hang from grandchild-pipe-hold; affects all sudo-routed commands",
+  "steps": [
+    "In .NET 8, Process.WaitForExitAsync with redirected stdout/stderr waits for BOTH process exit AND stream EOF",
+    "If child exits cleanly but grandchild (daemon) inherits stdout pipe, WaitForExitAsync stalls on stream-EOF half and fires 30s timeout with stdoutDone=False",
+    "Fix (ElevatedEyeProxy.cs ExecuteCommand): on OperationCanceledException, call proc.Refresh() \u002B check proc.HasExited. If true, grace-drain streams 2s then return ExitCode=proc.ExitCode as success",
+    "Only when HasExited=false is it a true hang -- then kill tree \u002B return -1 with timeout Error. Post-exit 3s drain path also no longer tags Error since grandchild holding pipe is a success case, not retry-worthy",
+    "Affects all wkappbot --sudo \u003Ccmd\u003E invocations that route through ElevatedEyeClient.ExecuteViaProxy",
+    "Verified 2026-04-21: test-sudo-proxy-stdout-drain.cmd (resolve ts=2026-04-21T04:29)",
+    "Verified 2026-04-22: test-sudo-stdout-utf8.sh (resolve ts=2026-04-21T03:27:42.9565479Z)",
+    "Verified 2026-04-22: test-eye-tick-context-warned-persist.sh (resolve ts=2026-04-21T03:32:04.5603600Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T05:53:08.9004912Z",
+  "updated": "2026-04-22T03:24:36.371782Z",
+  "version": "1.7"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "launcher-direct-core-routing-for-critical-cmds",
+  "app": "wkappbot-core",
+  "title": "Launcher direct-Core routing for critical commands (suggest/skill)",
+  "title_ko": "\uB7F0\uCC98 \uD06C\uB9AC\uD2F0\uCEEC \uBA85\uB839 Core \uC9C1\uC811 \uB77C\uC6B0\uD305",
+  "desc": "suggest and skill bypass Eye entirely (isCoreDirectCmd) and route directly to Core. IOCP relay handles encoding: _needsTranscode=false -\u003E raw byte pipe copy; true -\u003E TranscodeStream UTF-8-\u003ECP949. --only-eye overrides to force Eye.",
+  "steps": [
+    "PROBLEM: suggest/skill going through Eye pipe can fail silently when Eye is broken. These commands are critical infrastructure -- must always work regardless of Eye state.",
+    "ROUTING FIX (Program.cs): var isCoreDirectCmd = (cmd == \u0022suggest\u0022 ",
+    "",
+    " cmd == \u0022skill\u0022) \u0026\u0026 !onlyEye; -- added before Eye pipe block condition. Eye pipe block condition: !isCoreDirectCmd removes both commands from Eye routing.",
+    "ENCODING: Core runs as DETACHED_PROCESS -\u003E no console -\u003E OutputEncoding falls back to CP949 (Korean Windows). IOCP relay (IocpPipeRelay.cs line 242) handles: _needsTranscode=true -\u003E TranscodeStream(rawStdout, _consoleCodePage) converts UTF-8 output to CP949; _needsTranscode=false (Git Bash / UTF-8 terminal) -\u003E raw byte pipe copy (no overhead).",
+    "UTF-8 TERMINAL DETECTION (Program.cs ~line 156): isUtf8Term = (sysCP==65001) OR MSYSTEM OR TERM OR TERM_PROGRAM env vars. Git Bash sets MSYSTEM -\u003E isUtf8Term=true -\u003E _needsTranscode=false -\u003E raw pipe copy.",
+    "--only-eye OVERRIDE: if --only-eye passed, isCoreDirectCmd=false -\u003E Eye routing attempted. Useful for debugging Eye pipe issues with suggest/skill.",
+    "isFirstOutputGuardCmd: also excludes suggest\u002Bskill since they no longer hit Eye pipe; cleanup prevents stale 100ms guard logic from interfering."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "exit 0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "exit 0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read launcher-direct-core-routing-for-critical-cmds",
+      "expect": "isCoreDirectCmd",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "launcher",
+    "routing",
+    "suggest",
+    "skill",
+    "encoding",
+    "iocp",
+    "direct-core",
+    "critical"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T07:16:42.5377851Z",
+  "updated": "2026-04-28T07:16:42.5377942Z",
+  "version": "1.0"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "codex-global-approval",
+  "app": "wkappbot-core",
+  "title": "Codex Global Approval",
+  "desc": "Set Codex CLI to never ask for approval and use danger-full-access in the global config.",
+  "steps": [
+    "Open <user-home>\\.codex\\config.toml.",
+    "Set ask_for_approval = \u0022 never\\.",
+    "Set"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T11:51:57.6580303Z",
+  "updated": "2026-04-21T11:51:57.6580428Z",
+  "version": "1.0"
+}

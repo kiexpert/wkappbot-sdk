@@ -1,0 +1,19 @@
+{
+  "id": "chore-resolved-claude-md-delegation-rules-already-mandatory",
+  "app": "wkappbot-core",
+  "title": "CHORE resolved: CLAUDE.md delegation rules already mandatory",
+  "desc": "Project CLAUDE.md delegation rules already mandatory with Haiku/Codex/Opus routing. Suggest closed as stale.",
+  "steps": [
+    "Project CLAUDE.md at <repo-root>/CLAUDE.md already contains DELEGATION RULES MANDATORY section. Haiku for chores, Codex for execution, Opus for hard/design tasks. No update needed -- global CLAUDE.md already applied.",
+    "Haiku for chores (grep/read/survey). Codex for execution (refactors/multi-file). Opus for design/judgment.",
+    "Triad for hard/ambiguous planning. Session model stays Sonnet throughout.",
+    "Applies to all commands via agent routing policy: all chore tasks use Haiku, all execution via Codex, all design/judgment via Opus."
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:13:27.8277987Z",
+  "updated": "2026-04-21T18:13:57.6774298Z",
+  "version": "1.4"
+}

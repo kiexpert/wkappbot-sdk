@@ -1,0 +1,47 @@
+{
+  "id": "mdi-child-focusless-raise-swp-noactivate",
+  "app": "wkappbot-core",
+  "title": "MDI child z-order raise without focus steal (SetWindowPos SWP_NOACTIVATE)",
+  "title_ko": "MDI \uC790\uC2DD\uCC3D \uD3EC\uCEE4\uC2A4\uB9AC\uC2A4 Z\uC21C\uC11C \uC62C\uB9AC\uAE30",
+  "desc": "BringWindowToTop steals focus before SetWindowPos(SWP_NOACTIVATE) can suppress it. Use SetWindowPos(HWND_TOP\u002BSWP_NOACTIVATE) only -- raises MDI child in z-order without activating. Applies to a11y inspect/screenshot on elevated MDI apps.",
+  "steps": [
+    "WRONG: BringWindowToTop(hwnd) then SetWindowPos(HWND_TOP\u002BSWP_NOACTIVATE) -- BringWindowToTop activates the window first, defeating SWP_NOACTIVATE.",
+    "CORRECT: SetWindowPos(hwnd, HWND_TOP, 0,0,0,0, SWP_NOMOVE",
+    "SWP_NOSIZE",
+    "SWP_NOACTIVATE) alone raises z-order without focus steal.",
+    "CONTEXT: InspectionCommands.Capture.cs MDI child form capture -- form.Handle raised before PrintWindow capture. BringWindowToTop was removed in commit c0a53964.",
+    "VERIFY: wkappbot a11y inspect on elevated MDI app must not steal user focus. FocusStealSentinel must not fire during a11y inspect."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep \u0022BringWindowToTop\u0022 \u0022<repo-root>/csharp/src/WKAppBot.CLI/Commands/InspectionCommands.Capture.cs\u0022",
+      "expect": "(no output)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect \u0022*Code*\u0022",
+      "expect": "no focus steal",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "mdi",
+    "focusless",
+    "swp-noactivate",
+    "inspect",
+    "capture",
+    "z-order"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T09:07:33.1364289Z",
+  "updated": "2026-04-28T09:07:33.136438Z",
+  "version": "1.0"
+}

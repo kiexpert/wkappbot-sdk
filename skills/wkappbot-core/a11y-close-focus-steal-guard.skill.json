@@ -1,0 +1,40 @@
+{
+  "id": "a11y-close-focus-steal-guard",
+  "app": "wkappbot-core",
+  "title": "a11y close and trusted-click FocusSafe guard",
+  "desc": "FocusSafe.ShouldYieldToActiveUser guard added before a11y close and trusted-click operations to prevent focus stealing when user is active (idleMs\u003C1500). Mirrors InspectionCommands guard pattern.",
+  "steps": [
+    "A11yCommand.WindowActions.cs:221 -- guard before all 3 close tiers (UIA/WM_CLOSE/Kill)",
+    "AskCommands.Attachments.FileInput.cs:300 -- guard before trusted-click menu-item",
+    "AskCommands.Attachments.FileInput.cs:341 -- guard before trusted-click upload-btn",
+    "--force flag bypasses guard for explicit kill intent",
+    "Returns false/yields silently when user active; logs [A11Y:CLOSE] user active",
+    "Verified 2026-04-26: test-a11y-close-focussteal-guard.sh (resolve ts=2026-04-24T07:02:43.6860617Z)",
+    "Verified 2026-04-26: test-ask-trusted-click-focussteal-guard.sh (resolve ts=2026-04-24T07:09:06.2514013Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y close target (user idle \u003E 1500ms)",
+      "expect": "window closes normally",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y close target (user active \u003C 1500ms)",
+      "expect": "[A11Y:CLOSE] user active -- skip, returns non-zero",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y close target --force (user active)",
+      "expect": "ignores guard, closes anyway",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T10:54:50.5789191Z",
+  "updated": "2026-04-26T11:07:07.5459149Z",
+  "version": "1.2"
+}

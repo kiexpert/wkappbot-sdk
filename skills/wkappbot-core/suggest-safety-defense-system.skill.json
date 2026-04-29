@@ -1,0 +1,48 @@
+{
+  "id": "suggest-safety-defense-system",
+  "app": "wkappbot-core",
+  "title": "Suggest Safety: Anti-Fake-Resolve Defense System",
+  "desc": "4-layer defense against fake bulk-resolves: git auto-commit on state change, pre-op snapshot, DataDir migration guard, suggest audit command",
+  "steps": [
+    "Git auto-commit after every resolve/merge/submit (SuggestCommand.GitCommit.cs): chore(suggest): action ts",
+    "Pre-op snapshot before resolve/merge: suggestions.bak.{ts}.jsonl, 7d retention",
+    "DataDir migration guard on Eye start: copies suggestions.jsonl from legacy path if new DataDir empty",
+    "suggest audit: compares new vs legacy DataDir line counts, exit 1 on SPLIT-BRAIN",
+    "Verified 2026-04-26: test-suggest-resolve-coresolve.sh (resolve ts=2026-04-26T10:16:45.4935729Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest audit",
+      "expect": "[SUGGEST:AUDIT] open=N history=M status=OK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve ts note --skill X --evidence Y",
+      "expect": "git auto-commits suggestions.jsonl immediately after",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest audit (after DataDir migration)",
+      "expect": "detects split-brain, exit 1 with WARN:SPLIT-BRAIN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve \u003Cts\u003E note",
+      "expect": "suggestions.jsonl auto-committed to git immediately; output includes git commit hash",
+      "prompt": "suggest-safety: git auto-commit on state change safeguards defense. Commit e6ed3ad9."
+    },
+    {
+      "cmd": "wkappbot eye (new DataDir, missing suggestions.jsonl)",
+      "expect": "auto-copies from previous DataDir with [WARN] log line",
+      "prompt": "suggest-safety: git auto-commit on state change safeguards defense. Commit e6ed3ad9."
+    }
+  ],
+  "primary_cmd": "wkappbot suggest resolve \u003Cts\u003E note",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T12:27:39.7360826Z",
+  "updated": "2026-04-26T12:31:25.8144694Z",
+  "version": "1.2"
+}

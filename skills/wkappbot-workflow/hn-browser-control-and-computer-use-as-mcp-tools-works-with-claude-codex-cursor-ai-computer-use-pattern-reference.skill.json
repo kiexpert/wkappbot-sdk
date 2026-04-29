@@ -1,0 +1,21 @@
+{
+  "id": "hn-browser-control-and-computer-use-as-mcp-tools-works-with-claude-codex-cursor-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] Browser control and computer use as MCP tools \u2013 works with Claude, Codex, Cursor \u2014 AI computer-use pattern reference",
+  "desc": "Integrate browser-control MCP patterns into WKAppBot\u0027s Eye MCP architecture to extend CDP-based automation with standardized tool surface. Source: https://github.com/huseyinstif/oculos (score=4, auto-generated from ai-news-briefing 2026-04-22 19:51)",
+  "steps": [
+    "SOURCE: Browser control and computer use as MCP tools \u2013 works with Claude, Codex, Cursor -- https://github.com/huseyinstif/oculos"
+  ],
+  "tags": [
+    "ai-news",
+    "computer-use",
+    "auto-skill",
+    "hn"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:48:34.493247Z",
+  "updated": "2026-04-22T10:51:33.439101Z",
+  "version": "1.2"
+}

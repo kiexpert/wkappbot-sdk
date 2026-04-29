@@ -1,0 +1,29 @@
+{
+  "id": "ask-cdp-uia-focus-steal-coverage-via-sentinel",
+  "app": "wkappbot-core",
+  "title": "ask-*/triad CDP focus-steal coverage via sentinel user-active yield",
+  "desc": "ask gpt / ask claude / ask gemini / ask triad all route through ChromeLauncher + CDP attach which used to steal foreground focus (UIA hwnd attach, SetForegroundWindow). Combined mitigations this session: AppBotPipe allowlist for Minimized Chrome launch, RestoreFocusWithRetryAsync user-active silent yield, VisionWorker sentinel Checkpoint bracket for CDP tab activation.",
+  "steps": [
+    "ask gpt path: ChromeLauncher spawn minimized -> CDP port 9222 attach -> editor target -> send prompt",
+    "ask claude path: same as gpt but claude.ai target + CoWork dismiss before send",
+    "ask gemini path: same Chrome CDP with Gemini copyright dialog dismiss",
+    "ask triad: parallel fan-out to gpt+claude+gemini each with own focus-steal sentinel",
+    "Sentinel bails silently if user-idle <1.5s mid-retry (prevents fighting intentional user focus switch)",
+    "VisionWorker CheckpointFocus bracket catches theft at the CDP-call seam not at end of pipeline",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-17T09:21:08)"
+  ],
+  "tags": [
+    "ask",
+    "cdp",
+    "uia",
+    "focus-steal",
+    "sentinel",
+    "chrome"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:53:04.33337Z",
+  "updated": "2026-04-19T07:59:17.6249945Z",
+  "version": "1.1"
+}

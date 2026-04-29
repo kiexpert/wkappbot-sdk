@@ -1,0 +1,33 @@
+{
+  "id": "a11y-find-deprecated-eval-removal-guard",
+  "app": "wkappbot-workflow",
+  "title": "A11y Eval Deprecated: AutoRegisterBug Guard on Use",
+  "desc": "a11y eval action is deprecated and scheduled for removal; AutoRegisterBug fires on every call, creating a bug-auto suggest entry to track callers. Migrate callers to a11y read/type/set-value.",
+  "steps": [
+    "a11y eval is deprecated. When called, it prints \u0027[DEPRECATED] a11y eval is scheduled for removal\u0027 to stderr and calls AutoRegisterBug() to create a bug-auto suggest entry. This allows tracking which callers still use eval.",
+    "To migrate away from eval: replace \u0027a11y eval \u003Chwnd\u003E\u0027 with \u0027a11y read \u003Cgrap\u003E\u0027 to read element value, or \u0027a11y type \u003Cgrap\u003E \u003Ctext\u003E\u0027 to type text. The eval action evaluated JS-like expressions -- use explicit actions instead.",
+    "If bug-auto USAGE-DEPRECATED suggests keep appearing, find the scenario YAML or script that calls \u0027a11y eval\u0027 and replace it. Use \u0027wkappbot file grep eval --path scenarios --type yaml\u0027 to locate callers.",
+    "Verified 2026-04-21: test-a11y-find-deprecated-eval-guard.sh (resolve ts=2026-04-20T11:45)",
+    "Verified 2026-04-26: test-a11y-eval-deprecated.sh (resolve ts=2026-04-23T11:08:32.8921534Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y eval expr",
+      "expect": "USAGE-DEPRECATED BUG-AUTO registered on each use",
+      "prompt": "USAGE-DEPRECATED a11y eval: BUG-AUTO guard working as expected. Backward compat maintained."
+    },
+    {
+      "cmd": "wkappbot a11y find target",
+      "expect": "preferred alternative to eval command",
+      "prompt": "USAGE-DEPRECATED a11y eval: BUG-AUTO guard working as expected. Backward compat maintained."
+    }
+  ],
+  "primary_cmd": "wkappbot a11y eval expr",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:30:18.9272077Z",
+  "updated": "2026-04-26T13:05:49.7207453Z",
+  "version": "1.6"
+}

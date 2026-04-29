@@ -1,0 +1,19 @@
+{
+  "id": "file-symlink-and-file-link-create-symbolic-and-hard-links",
+  "app": "wkappbot",
+  "title": "file symlink and file link: create symbolic and hard links",
+  "desc": "wkappbot file symlink \u003Ctarget\u003E \u003Clinkname\u003E creates a symbolic link for files or directories. wkappbot file link \u003Ctarget\u003E \u003Clinkname\u003E creates a hard link (files only, same volume). Both commands require the link path to not already exist.",
+  "steps": [
+    "Use \u0027wkappbot file symlink \u003Ctarget\u003E \u003Clinkname\u003E\u0027 to create a symbolic link. Works for both files and directories. Requires SeCreateSymbolicLinkPrivilege (developer mode or admin).",
+    "Use \u0027wkappbot file link \u003Ctarget\u003E \u003Clinkname\u003E\u0027 to create a hard link. Files only, same drive. Unlike symlinks, hard links survive target deletion.",
+    "Both commands print the created link path on success. They fail if \u003Clinkname\u003E already exists. Use \u0027wkappbot file glob\u0027 to verify before creating.",
+    "Verified 2026-04-22: test-file-symlink.sh (resolve ts=2026-04-22T03:10:50.7346432Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:33:39.8205618Z",
+  "updated": "2026-04-22T03:33:46.7798873Z",
+  "version": "1.1"
+}

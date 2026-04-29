@@ -1,0 +1,31 @@
+{
+  "id": "wkappbot-windows-focus-flag-and-no-filter-relevance-mode",
+  "app": "wkappbot-workflow",
+  "title": "wkappbot windows -- focus flag and no-filter relevance mode",
+  "desc": "Two new windows command modes: (1) --focus shows focused child hwnd \u002B proper grap expression per window. (2) no-filter mode shows only wkappbot-related windows ranked by coverage score.",
+  "steps": [
+    "[FOCUS-FLAG] wkappbot windows [filter] --focus: for each window shows (a) KB focus child hwnd\u002Bclass via GetGUIThreadInfo, (b) UIA leaf ControlType\u002Bposition\u002Beditable, (c) proper paste-ready grap: {hwnd,pid,proc,cls}#AbsTagPath built via BuildTargetJson5\u002BBuildAbsoluteTagPath -- same format as a11y find output. Use when you need the grap for the currently focused element without running a11y find.",
+    "[NO-FILTER-MODE] wkappbot windows (no args): instead of listing all windows, shows only wkappbot-related windows ranked by coverage score. Pass 1 (fast): proc-cov*3 \u002B title-cov*2 \u002B class-cov*1. Pass 2 (batch WMI, only for score==0 windows): cmdline-cov*2 via single SELECT ProcessId,CommandLine FROM Win32_Process WHERE ProcessId IN (...) query. Sort: score desc, foreground tiebreak. Symbols: wkappbot/wkappbot-core/a11y/WK AppBot/WhisperRing.",
+    "[COVERAGE-FORMULA] coverage(field, sym) = matched_length / field_length (0..1). Plain string: matched_length = sym.Length. Regex (regex: prefix): matched_length = Regex.Match(field, pattern).Length -- NOT pattern length (avoids wrong coverage for OR-regex like regex:a",
+    "bb). Exact match -\u003E 1.0 (100%). Partial -\u003E proportional. Source: InspectionCommands.Windows.cs Coverage() local function.",
+    "[CONVERTED-TO-A11Y-FIND] wkappbot windows was converted to a11y find in v6.1. It is now a thin alias: \u0027wkappbot windows \u003Cgrap\u003E\u0027 == \u0027wkappbot a11y find \u003Cgrap\u003E\u0027. All windows command options (--focus, --filter, --process, --class, coverage scoring) are now part of the a11y find pipeline. Prefer wkappbot a11y find directly for full output format and # TARGET / # END stable grap lines."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "windows",
+    "focus",
+    "grap",
+    "coverage",
+    "scoring",
+    "relevance",
+    "a11y",
+    "hwnd"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T16:52:20.4444696Z",
+  "updated": "2026-04-23T11:54:58.0381587Z",
+  "version": "1.1"
+}

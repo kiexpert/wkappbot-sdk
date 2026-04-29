@@ -1,0 +1,48 @@
+{
+  "id": "schedule-cmd-bash-windows",
+  "app": "wkappbot",
+  "title": "schedule --cmd bash/sh/python on Windows: auto-resolve interpreter path",
+  "desc": "wkappbot schedule add --cmd \u0027bash script.sh\u0027 auto-resolves bash to Git bash path on Windows. ResolveShellCommand at registration and execution.",
+  "steps": [
+    "schedule --cmd \u0027bash script.sh\u0027 auto-resolves \u0027bash\u0027 to C:\\Program Files\\Git\\bin\\bash.exe at registration (NOTE printed) and execution (auto-applied before Spawn)",
+    "FindInterpreterPath checks Git bash, usr/bin, WSL, then PATH for bash/sh/python/node",
+    "If not found: WARNING printed; execution fails explicitly with clear error in schedule list",
+    "Fix: ScheduleCommands.ResolveShellCommand \u002B AppBotEyeSlackHandlers.ExecuteScheduleItem",
+    "Verified 2026-04-24: test-schedule-bash-windows.sh (resolve ts=2026-04-24T11:52:43)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot schedule add --cmd \u0027bash test.sh\u0027 --at 1m",
+      "expect": "NOTE.*resolved",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule list",
+      "expect": "bash",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep \u0027ResolveShellCommand\u0027 --path csharp/src/WKAppBot.CLI/Commands/ScheduleCommands.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule add \u0027bash test.sh\u0027 --at now",
+      "expect": "WARNING: bash not found",
+      "prompt": "Fixed: ResolveShellCommand auto-resolves bash at registration and execution --skill schedule-cmd-bash-windows --commit 3911909deab058b31021176af41ff0189accf2e5 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot schedule add \u0027bash test.sh\u0027 --at now --shell \u0027C:\\Program Files\\Git\\bin\\bash.exe\u0027",
+      "expect": "scheduled",
+      "prompt": "Fixed: ResolveShellCommand auto-resolves bash at registration and execution --skill schedule-cmd-bash-windows --commit 3911909deab058b31021176af41ff0189accf2e5 --class skill-only"
+    }
+  ],
+  "primary_cmd": "wkappbot schedule add \u0027bash test.sh\u0027 --at now",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T13:17:38.8096774Z",
+  "updated": "2026-04-24T13:19:04.8411535Z",
+  "version": "1.2"
+}

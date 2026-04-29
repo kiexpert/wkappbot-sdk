@@ -1,0 +1,19 @@
+{
+  "id": "suggest-forward-acknowledge-and-close-stale-cross-system-forwards",
+  "app": "wkappbot",
+  "title": "Suggest FORWARD: acknowledge and close stale cross-system forwards",
+  "desc": "WkAutoQuant and other systems may FORWARD observation notes to WKAppBot suggest backlog. These are informational bridges, not bugs. Acknowledge once, then resolve as acknowledged if no code action needed.",
+  "steps": [
+    "When a suggest has type FORWARD with no actionable code change, resolve it as \u0027acknowledged\u0027 with a note explaining why no fix is needed.",
+    "Check if the forwarded observation is covered by an existing skill or already handled in code. If yes, reference the skill in the resolve note.",
+    "If the forwarded item reveals an actual bug, file a new suggest with proper BUG type and keep the FORWARD resolved separately.",
+    "Verified 2026-04-22: test-suggest-list-notebook-recovery.sh (resolve ts=2026-04-17T09:22:01.4148633Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:24:10.7943021Z",
+  "updated": "2026-04-22T03:50:16.2345144Z",
+  "version": "1.1"
+}

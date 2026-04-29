@@ -1,0 +1,51 @@
+{
+  "id": "quantbot-user-input-protection-guard",
+  "app": "wkappbot-workflow",
+  "title": "Quantbot user input protection: WM_SETFOCUS focus-steal guard",
+  "desc": "auto_dismiss_hts_popups.py steals keyboard/mouse focus every 1-5s via WM_SETFOCUS (lines 454,534,677). Focusless replacement: WM_SETTEXT \u002B EN_CHANGE instead of WM_SETFOCUS \u002B WM_CHAR. Covers diagnosis, fix pattern, and trigger file cleanup.",
+  "steps": [
+    "PROBLEM: win32gui.SendMessage(hwnd, WM_SETFOCUS, 0, 0) transfers system input focus to target control. Any loop with this call disrupts user typing/cursor position.",
+    "DETECTION: auto_dismiss_hts_popups.py -- line 454 _enter_pin_if_needed, line 534 _enter_stock_code_if_needed (1s loop while C:/temp/hts_stock_code.txt exists), line 677 _enter_qty_if_needed (1s loop while C:/temp/hts_stock_qty.txt exists).",
+    "FOCUSLESS TEXT INPUT PATTERN: win32gui.SendMessage(edit_hwnd, win32con.WM_SETTEXT, 0, text) sets text; then win32gui.SendMessage(parent_hwnd, win32con.WM_COMMAND, (win32con.EN_CHANGE\u003C\u003C16)",
+    "ctrl_id, edit_hwnd) notifies parent. No WM_SETFOCUS needed.",
+    "FOCUSLESS CHAR-BY-CHAR PATTERN (MFC masked fields): for ch in text: win32api.SendMessage(edit_hwnd, win32con.WM_CHAR, ord(ch), 0). MFC CMaskedEdit accepts WM_CHAR without focus -- remove the preceding WM_SETFOCUS call.",
+    "FIX LINE 454 PIN: Remove SendMessage(eh, WM_SETFOCUS,..) before the WM_CHAR loop. WM_CHAR delivers to target without focus transfer.",
+    "FIX LINE 534 STOCK CODE: Replace WM_SETFOCUS \u002B WM_CHAR sequence with WM_SETTEXT(code_edit, stock_code) \u002B WM_COMMAND EN_CHANGE to parent.",
+    "FIX LINE 677 QTY: Same -- WM_SETTEXT(target_edit, qty_str) \u002B WM_COMMAND EN_CHANGE. Remove WM_SETFOCUS entirely.",
+    "TRIGGER FILE CLEANUP: hts_stock_code.txt and hts_stock_qty.txt must be deleted after order completion. Persistent files cause 1-second loop to fire indefinitely.",
+    "VERIFY focusless: run foreground monitor while script active -- foreground window must not change during automation steps."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep \u0022WM_SETFOCUS\u0022 \u0022D:/GitHub/WkAutoQuant/scripts/auto_dismiss_hts_popups.py\u0022",
+      "expect": "WM_SETFOCUS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read quantbot-user-input-protection-guard",
+      "expect": "WM_SETTEXT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file glob \u0022C:/temp/hts_stock_*.txt\u0022",
+      "expect": "(no files)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "focus-steal",
+    "quantbot",
+    "python",
+    "wm-setfocus",
+    "focusless",
+    "hts",
+    "user-input-protection"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T06:16:19.9589113Z",
+  "updated": "2026-04-28T06:16:19.9589197Z",
+  "version": "1.0"
+}

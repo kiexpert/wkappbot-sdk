@@ -1,0 +1,38 @@
+{
+  "id": "think-eye-card-overlay",
+  "app": "wkappbot-core",
+  "title": "Think Eye: per-workspace VS Code status card overlay",
+  "desc": "EyeCard WPF overlay spawned by Eye per VS Code window. Upper-right 5px. Dim 50% unfocused, transparent hover-when-focused, WS_EX_TRANSPARENT click-through, IsIconic hide on minimize. GetCursorPos poll avoids MouseEnter/Leave flicker.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye-card",
+      "expect": "card appears upper-right of VS Code window",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye-card --hwnd 0x1234 --cwd D:/path",
+      "expect": "[EYE-CARD] Standalone",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "eye-card spawned pid=",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "overlay",
+    "wpf",
+    "vscode",
+    "think-eye"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-25T08:54:49.2161649Z",
+  "updated": "2026-04-25T08:54:49.2161736Z",
+  "version": "1.0"
+}

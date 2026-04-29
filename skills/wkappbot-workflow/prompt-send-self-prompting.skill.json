@@ -26,23 +26,7 @@
     "agent",
     "uia"
   ],
-  "source_refs": [
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/PromptCommand.cs",
-      "line": 174,
-      "pattern": "AllowFocusSteal = true"
-    },
-    {
-      "file": "csharp/src/WKAppBot.Win32/Window/ClaudePromptHelper.Input.cs",
-      "line": 133,
-      "pattern": "TextPattern2.InsertTextAtSelection"
-    },
-    {
-      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs",
-      "line": 1071,
-      "pattern": "--when-idle"
-    }
-  ],
+  "source_refs": [],
   "author": "claude",
   "created": "2026-04-09T12:37:36.0000000Z",
   "updated": "2026-04-09T12:37:36.0000000Z",

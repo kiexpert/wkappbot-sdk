@@ -1,0 +1,19 @@
+{
+  "id": "win-click-coordinate-system-window-relative-vs-abs-screen-coords",
+  "app": "wkappbot",
+  "title": "win-click coordinate system: window-relative vs --abs screen coords",
+  "desc": "win-click x y uses window-relative coords (from window top-left including title bar). Use --abs for absolute screen coordinates. Output shows both relX,relY and resolved screenX,screenY for debugging.",
+  "steps": [
+    "Default: x y = pixels from window top-left (including title bar and borders). GetWindowRect gives window origin; screenX = wRect.Left \u002B x.",
+    "Use --abs flag to pass absolute screen coordinates (e.g. from GetCursorPos or another tool\u0027s screen-coord output). Eye logs both rel and screen coords on click.",
+    "Debugging tip: the click output line prints \u0027(relX,relY) -\u003E screen (screenX,screenY)\u0027 so you can verify the transform. If clicking wrong location, compare this output with the actual target pixel.",
+    "Verified 2026-04-22: test-win-click-abs-coords.sh (resolve ts=2026-04-19T05:52:55.0785051Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:38:29.6618697Z",
+  "updated": "2026-04-22T03:38:38.1589086Z",
+  "version": "1.1"
+}

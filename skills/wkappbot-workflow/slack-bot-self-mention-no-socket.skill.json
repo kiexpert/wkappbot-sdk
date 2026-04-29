@@ -1,0 +1,33 @@
+{
+  "id": "slack-bot-self-mention-no-socket",
+  "app": "wkappbot-workflow",
+  "title": "Slack Bot Self-Mention Does NOT Trigger Socket Events \u2014 Routing Limitation",
+  "desc": "Critical limitation discovered 2026-04-17: when a Slack bot posts a message containing its own @mention (via chat.postMessage with bot token OR via incoming webhook belonging to the SAME app), Slack does NOT fire app_mention events. wkappbot Eye listens via Socket Mode for app_mention events only, so self-mentions silently fail to route to Claude Desktop. Future sessions trying to auto-trigger Eye routing from GitHub Actions or scheduled scripts WILL hit this wall. This skill documents the workarounds that DO work.",
+  "steps": [
+    "THE WALL: Slack intentionally does not fire app_mention events when the mentioning author is the SAME APP as the mentioned bot. This applies to (a) chat.postMessage with bot xoxb- token, (b) incoming webhooks belonging to the same app, (c) scheduled messages from same app. Eye Socket Mode only subscribes to app_mention events, so self-mentions are invisible to Eye routing.",
+    "SYMPTOM: message posts successfully to Slack channel, renders correctly with \u003C@U...\u003E mention shown as @botname in blue, but Eye does nothing. No log entries, no Claude Desktop prompt, no ask response. Complete silent failure.",
+    "WORKAROUND 1 (RECOMMENDED): User OAuth token xoxp-. Install app with chat:write under \u0027User Token Scopes\u0027 (not just Bot Token Scopes). Reinstall to workspace. User OAuth Token appears on Install Page. Posts made with xoxp- appear as authored by the USER, not the bot. Eye sees a real user mentioning the bot \u2192 app_mention fires \u2192 routing works.",
+    "WORKAROUND 2: Second Slack app. Create a separate app (call it \u0027WkAutoBot\u0027 or similar) just for posting. It has its own bot_token. When it mentions wkappbot, that\u0027s cross-app mention \u2192 app_mention fires for wkappbot. More management overhead but no user-consent coupling.",
+    "WORKAROUND 3: Real human posts manually. Simplest. User sees briefing data, types \u0027@wkappbot please analyze\u0027, gets response. Not automated but works end-to-end for ad-hoc use.",
+    "WORKAROUND 4 (BAD): Don\u0027t use Slack routing at all. Use local Claude Code with wkappbot MCP directly. Ad-hoc prompt \u0027please brief me\u0027 with MCP tools reading market_data \u002B retrospective DB. No Slack intermediary. Manual trigger but no OAuth setup.",
+    "VERIFICATION TEST: After any Slack integration change, post a test message and check both (a) chat.postMessage returns ok=true with valid ts, AND (b) Eye logs show a routing attempt within 5 seconds. If (a) succeeds but (b) is silent, you hit the self-mention wall.",
+    "CODE PATTERN for xoxp- routing: payload = {\u0027channel\u0027: C, \u0027text\u0027: msg, \u0027as_user\u0027: True, \u0027link_names\u0027: True}; post with Authorization: Bearer ${xoxp_token}. Message appears from the user who installed the app. scripts/post_briefing_request.py in kiexpert/WkAutoQuant implements this as mode=\u0027user\u0027.",
+    "HOW TO FIND BOT user_id: curl -H \u0027Authorization: Bearer $bot_token\u0027 https://slack.com/api/auth.test. Returns user_id field. Use that as \u003C@user_id\u003E in message text for mentions.",
+    "SIGNS you\u0027re hitting this wall: Slack channel history shows your message, ts is valid, Korean/emojis render correctly, mention is formatted blue, but Claude Desktop shows nothing, Eye log shows no app_mention event for that ts. Don\u0027t debug the message format \u2014 it\u0027s the sender identity that\u0027s the problem."
+  ],
+  "tags": [
+    "slack",
+    "socket-mode",
+    "app-mention",
+    "routing",
+    "limitation",
+    "bot-workaround",
+    "oauth"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T19:04:37.5014802Z",
+  "updated": "2026-04-16T19:04:37.5014908Z",
+  "version": "1.0"
+}

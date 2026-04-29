@@ -1,0 +1,24 @@
+{
+  "id": "skill-coverage-ranking-news",
+  "app": "wkappbot",
+  "title": "skill search/news: coverage-based ranking \u002B skill news command",
+  "desc": "skill search ranks by SkillCoverageScore (sum of tok.Length/field.Length per match). skill news shows recently updated skills; accepts optional query for coverage-ranked filtering. Shared SkillCoverageScore() helper also used by PrintSkillHintOnError.",
+  "steps": [
+    "wkappbot skill search \u003Ckeyword\u003E  -- returns all matches ranked by coverage score (cov=X.XX shown per result)\nwkappbot skill news [query] [--days N]  -- lists skills updated in last N days (default 7). With query: coverage-ranked. Without: sorted by LastActivity.\nCoverage score = sum over all (token, field) pairs where field.Contains(token): tok.Length / field.Length. Fields: id, title, desc, best-matching tag. Higher = token covers larger fraction of matched field.\nPrintSkillHintOnError (on non-zero exit) also uses SkillCoverageScore() -- same ranking for error-time skill hints (threshold \u003E= 0.3)."
+  ],
+  "tags": [
+    "skill",
+    "search",
+    "news",
+    "ranking",
+    "coverage",
+    "operator",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-20T08:11:20.2665528Z",
+  "updated": "2026-04-20T08:11:20.2665781Z",
+  "version": "1.0"
+}
