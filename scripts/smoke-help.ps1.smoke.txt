@@ -1,8 +1,8 @@
-commit: d53dffbc51c1ed8750054f429db2d8809b13808c
+commit: ce749928d8edf6234b420721221fd9b230311af1
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-29T09:19:20.3955820Z
+timestamp_utc: 2026-04-29T14:30:49.7911589Z
 
 
 ------------------------------------------------------------
@@ -670,9 +670,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 197 skill(s) - most recent first:
     [wkappbot-core]
-      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [5h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
-      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [22h ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
-      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [22h ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
+      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [10h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
+      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [1d ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
+      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [1d ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
   ... (209 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
