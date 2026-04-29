@@ -1,0 +1,402 @@
+{
+  "_comment": "License registry. Hash = sha256(github_id + SALT) where SALT is binary-only.",
+  "_dummy_count": 99,
+  "entries": [
+    {
+      "h": "1aeb1baa5d9728b0829d25ac562f877702e944454cf1378fe6c55c440f967dd5",
+      "tier": "free"
+    },
+    {
+      "h": "7237bdd1350979cac877ec1a4c3e84d356b8dd4aaf6e4c63d269e1b651f28e92",
+      "tier": "free"
+    },
+    {
+      "h": "163db4df39ae10c11a301159c82abe720c0f1d7ebb7a847f8ad0fcfca950b7d6",
+      "tier": "free"
+    },
+    {
+      "h": "02412a0229f48a540b06537d6691781e677dde94f8539944d5f0c5c0a7e613ad",
+      "tier": "free"
+    },
+    {
+      "h": "c2783b7e4825431e9580bbf8ac140f1ac35db1853689ca9d78efafa84a4019ee",
+      "tier": "free"
+    },
+    {
+      "h": "f5c8a20b6699bd64c66e3faab59f91dbb1c0dc689a39675eaba3dda1453e84db",
+      "tier": "free"
+    },
+    {
+      "h": "ba9d5cbad037461619abfdae66be57b48bced71b226e8508f9326037829a4e25",
+      "tier": "free"
+    },
+    {
+      "h": "558c41ca373a2e2cd622cebcaa98497299987f33b5db72e387286e21d7784858",
+      "tier": "free"
+    },
+    {
+      "h": "3a5c1e3147e36fc86a5927a3e45875dfe5e7c5bad3fbb0b7576a6b12128fd2d0",
+      "tier": "free"
+    },
+    {
+      "h": "1788908ed2bb6fb82ffa5d1d5cc8fda933e6bef7a253ec9d3fdc71b2b5f84dd3",
+      "tier": "free"
+    },
+    {
+      "h": "1b60d86197430dc41a8d6f07b1f9629b48d5d4ce75c26994b1ae3856ebfa5677",
+      "tier": "free"
+    },
+    {
+      "h": "2e097adc29fc6983db2dfb90ac7eb2685f81d5e2d4182030dc2b473437cffad0",
+      "tier": "free"
+    },
+    {
+      "h": "d8cc12e174e58237867b53b31ed72ffb84b6300f4de7fe1478e5d1b05cada2b3",
+      "tier": "free"
+    },
+    {
+      "h": "f0238ae75f2ff9659ea65d656309d72a45b370ebc0c93bfdbff2feb3dcca28ce",
+      "tier": "free"
+    },
+    {
+      "h": "0b602b9465480fcfdf8fda8c988c0f03b8582ebb59346975107ee15c3c39d819",
+      "tier": "free"
+    },
+    {
+      "h": "33dcb078dfc135afb03a7c99d309951d50185e8600f1ccb6327b6de6b7403ee2",
+      "tier": "free"
+    },
+    {
+      "h": "ec0d29bfe2f4f01c0691fdcca9ffde1c0b7500a6c2fea6a9837e9bd0b2dcbdb3",
+      "tier": "free"
+    },
+    {
+      "h": "24aa14ee38f3fa95543d809ae50aa9194546c3140056e015905b04cfaa2cc360",
+      "tier": "free"
+    },
+    {
+      "h": "d26c829288993a6aa3cf76aca6a12f6951e7899c797d67a011b603f9c4be9a3d",
+      "tier": "free"
+    },
+    {
+      "h": "b2434bfe58f50b4f6db7c96144470abd672628357ba7a92f3e998c5322af1e14",
+      "tier": "free"
+    },
+    {
+      "h": "ba341295b4c30b6dddbeb690efd30bd7c44727ed21effeb50f5481cd42e11001",
+      "tier": "free"
+    },
+    {
+      "h": "1c6ce6ca912bb9d8fde5b9eeebe5f3520ba16ca1d0f589f28cd850684917006e",
+      "tier": "free"
+    },
+    {
+      "h": "e04d815777328791ce834be226389d21840af4f60aff49a3b629349c34171997",
+      "tier": "free"
+    },
+    {
+      "h": "00dec90a88df09cd105aef954f1215fbf4be5c5654dfd7caef3c26d4e2475247",
+      "tier": "free"
+    },
+    {
+      "h": "13fd0f3b29c86f85358079517a95d8386417fdfac0945a9a1df0013bd175120c",
+      "tier": "free"
+    },
+    {
+      "h": "c8dc7d1bd3908217aeb1bcc41ff86f723a7bb9407ec2335b35496f8dd1f8395d",
+      "tier": "free"
+    },
+    {
+      "h": "61f9b03b5fed63ed40fea9e03c82488dd3a43cbfebca0c9fd78a3973583b9a23",
+      "tier": "free"
+    },
+    {
+      "h": "d08799dec1d9ada439e1a9333f143fe70444e6dc0ccaad17d07b407d716fef01",
+      "tier": "free"
+    },
+    {
+      "h": "4bd47ac97b47749b1d1ab6d55ae7ec7e387aba41f60d1e66d8251a0bcd60845f",
+      "tier": "free"
+    },
+    {
+      "h": "69517d47c30b2d8b3f10db8044d4d5db05d618b2443a5dcceae82b2f37f9b457",
+      "tier": "free"
+    },
+    {
+      "h": "2d9889355ea18c20b0ab4260eb2198967e86d94693b7ed792ae98a8b6d3aff38",
+      "tier": "free"
+    },
+    {
+      "h": "5dbe63ff235a687d22985517ffb219c2d188760270f35f4bc2720856cb05b117",
+      "tier": "free"
+    },
+    {
+      "h": "a0d2af8174c15ffb08474efb808a58b80f9c1568476c97dc81fb5e289dba3c5f",
+      "tier": "free"
+    },
+    {
+      "h": "3b6809486bf145cd514305cae9edfa7ec658566a36244e1da41420136bccab20",
+      "tier": "free"
+    },
+    {
+      "h": "3a8477d87f5757e5cba1c616c06ae623564d334550e027b858d71669d88defd0",
+      "tier": "free"
+    },
+    {
+      "h": "ab6c5f0b62d230eec07d127fca214b51c4ff4c925159f77881005b713625adc3",
+      "tier": "free"
+    },
+    {
+      "h": "6da2ddf510bf14068621199107ce224f16c31d8ce005c339e0484f9a34951ed4",
+      "tier": "free"
+    },
+    {
+      "h": "a84011db77ce96eab8a39549fe027723cadfac02e54b9ae9101bc02c03a90068",
+      "tier": "free"
+    },
+    {
+      "h": "0572efab92033f628b006ae734fab6f0af7be2af819a7b1828c3b0b7ca1167c6",
+      "tier": "free"
+    },
+    {
+      "h": "d8dc2296c7aa41f18a50b875dbf98b7b9c70b093bb6a0d1468611a297ce94c1d",
+      "tier": "free"
+    },
+    {
+      "h": "573acfe8aefe18e4eafa97bd87bf663ea09a354b94bc3b2bccb6a7fdfe4e55f6",
+      "tier": "free"
+    },
+    {
+      "h": "94636da94a0bcc188eb603495b70f21506f77479d0df9d45f27220fb28e669fa",
+      "tier": "free"
+    },
+    {
+      "h": "bc02105fdfee431a46d08320cb35225366ddd03e365f59dbcdb1a4ac37f78ee5",
+      "tier": "free"
+    },
+    {
+      "h": "baf669d9dc26d3742da11013cfd00f6deebb22db8733d1fcbe00490ad3c1afda",
+      "tier": "free"
+    },
+    {
+      "h": "fb16688c2d87b2ceef0d09dfc4a2fa305006a9758f66e8759301ecd0360b4e7e",
+      "tier": "free"
+    },
+    {
+      "h": "b991e4e45ea0f2a338cbbd217fe653fbd86da736f32dc3cb26a42e5c0d690ff3",
+      "tier": "free"
+    },
+    {
+      "h": "2294f3119383a54947b97c49a1df3da9777638fec1cc3120c2edcdde113210ec",
+      "tier": "free"
+    },
+    {
+      "h": "455040c4c0c9679371aea76330dd5f13519c986ea5e143c923cd40837030edda",
+      "tier": "free"
+    },
+    {
+      "h": "e1aaadf2e691e25de949aa64b86bd403b51d94ea0ec5bea4544913dcb4d0f25e",
+      "tier": "free"
+    },
+    {
+      "h": "0cb9f9c3ca75f0ed0a2a503a696ef3df9a4e68d8c3d3597008a5a34b02c00851",
+      "tier": "free"
+    },
+    {
+      "h": "3ea56385a6309623aede66f7fc85eb8901293de1749f0f3b169970bae20a117d",
+      "tier": "free"
+    },
+    {
+      "h": "37836509323e20ecd15da7d3517a89e162c841fd751181981c360b9877d38835",
+      "tier": "free"
+    },
+    {
+      "h": "611ce55986d8717797dd058ef8dd1da5270442f898c2c05a1987fdb5b0386ee2",
+      "tier": "free"
+    },
+    {
+      "h": "67a78ae5a014497e3ff188ea06628e43603ae88fbc69b1ffff8df038ffce5273",
+      "tier": "free"
+    },
+    {
+      "h": "58603f80a53608d907b30e8797f1670fc4973cd1c1063188b164e0431b0fe2e2",
+      "tier": "free"
+    },
+    {
+      "h": "7d8dc101d695a6aeb59b9ec39bec1c0bd0ea4eca6b10ff6a46b8b0412fe9aea9",
+      "tier": "free"
+    },
+    {
+      "h": "230ccf292122bf5cfc26130cee252c3cdd948a5dad0998c54ecbac314f07c587",
+      "tier": "free"
+    },
+    {
+      "h": "246eec578494fa118e4873072d2c69125badf1c55585f88cf616ccf2b6ddb8d5",
+      "tier": "free"
+    },
+    {
+      "h": "c2519acb53000c1248608621cbb6f643238a99d0760409261e68a307aaecf001",
+      "tier": "free"
+    },
+    {
+      "h": "35ca3e031989efd2799743842c7a8d44b016dd91bd863eff705252dd00a9a0d9",
+      "tier": "free"
+    },
+    {
+      "h": "a33f96364dec1b8bb5a60c83e94be200378cb964bf4657a5a8b2e7156a1e30dc",
+      "tier": "free"
+    },
+    {
+      "h": "75be376190f3a52b0c33f7de30b76a325a07513c117ec8219ffb0b55796e96f7",
+      "tier": "free"
+    },
+    {
+      "h": "eee58e57288b2aa7d0ea1414afc3aded5929b115ddfee8407c22126f7611e2ac",
+      "tier": "free"
+    },
+    {
+      "h": "5d4c65f8e20a35b3d66d0acf3bf670e707cab38f7583298670d634e4e7212ceb",
+      "tier": "free"
+    },
+    {
+      "h": "efd66a4215ae79f6dc3d45e93b5c9ba23901a83ab20c34553e79feef119ee4ed",
+      "tier": "free"
+    },
+    {
+      "h": "31c0c9406b3c66e880b544549275f07e0576e8144004f2698e00f4d9a9645d58",
+      "tier": "free"
+    },
+    {
+      "h": "3a8bf020e75e9cd2598c7275ea0fcc9a4f07715f4afa1c1a6ca96a78ef941533",
+      "tier": "free"
+    },
+    {
+      "h": "05b576c896887b73d02eb88cdac71745ec3ccce1d53e49307fc6d6508550c0ee",
+      "tier": "free"
+    },
+    {
+      "h": "fa8c78248d20d599d264917c0f055a031a02e82839554b84839e8f536fd7b06b",
+      "tier": "free"
+    },
+    {
+      "h": "5f0e26804be7597b234d9c113e5079c6d89941347782b810ac1889f78d9e26e3",
+      "tier": "free"
+    },
+    {
+      "h": "84aa3f023fdd031d1f90cd4c07f06e1cad6a59da5c38cad228b698dd36707f52",
+      "tier": "free"
+    },
+    {
+      "h": "5f59b91e18c205997de7349baf58790e6cd24aaad10839371f8414a51d9e81eb",
+      "tier": "free"
+    },
+    {
+      "h": "918f0f27ba26a282ff30d5dc6f97e46f80e78509a62448b535feed4b3821625b",
+      "tier": "free"
+    },
+    {
+      "h": "cdd00246a29bdee0b3e16dea9dabbaecfd4fd3ea4f1b93c80f11a5d4fb7c42e4",
+      "tier": "free"
+    },
+    {
+      "h": "7a73c363aa9bd3beb4935cc71012f14cc6308bc9caf9f26c422949dd9f5de605",
+      "tier": "free"
+    },
+    {
+      "h": "6731ffac95548d0f5876b13414a895def64fcec7db9df4197c30032d70a9fd91",
+      "tier": "free"
+    },
+    {
+      "h": "4b040495a30d6d7e3e9a091d571138ec1b661b842187ff8d564520e3e730f8bf",
+      "tier": "free"
+    },
+    {
+      "h": "6e3e19db37cc0664c370ef7bea4478e02ee2935ea55a332489f4927bb89a9b7b",
+      "tier": "free"
+    },
+    {
+      "h": "c593bd49fccd9dfe876d9096731ebfdab12b4d38d9cac37b113c691ae2d58e2f",
+      "tier": "free"
+    },
+    {
+      "h": "1a720c0cc9da044ba87fd6f01c1a4bd10359b3c8cf3ddf6ade6e103f49825788",
+      "tier": "free"
+    },
+    {
+      "h": "48ef40e7baa9eb1ce13782d7e48393c8161a868c6620d8a39a1652f2830d048c",
+      "tier": "free"
+    },
+    {
+      "h": "561b07d3787104b87b6bbe6feab1b80f74ec8ee3b5b50377316aa2cf273cdba0",
+      "tier": "free"
+    },
+    {
+      "h": "26369a847c7b5b30bbe30601f8407b629a32656405f401ba8ec6fb1dc4c149bd",
+      "tier": "free"
+    },
+    {
+      "h": "da36156a689fc537710101c8ea0fb8614b3c87dacfc08e29b2f3a8babfeb86e8",
+      "tier": "free"
+    },
+    {
+      "h": "50c47b483e81e4485f6321ddfed4c4e5b510bce2dfe440d4d2c829fca6bb6080",
+      "tier": "free"
+    },
+    {
+      "h": "8437730781a4f4e2598e4db79e005470f64131a3180a56800c0f9943fb8ba30d",
+      "tier": "free"
+    },
+    {
+      "h": "189d6d424da074c72943aeca366b4652f12d445d80272004a913247055055b4b",
+      "tier": "free"
+    },
+    {
+      "h": "d5e93843fc3690b6f636544417fa6083bb1af495fe75736da5c54635d76878b5",
+      "tier": "free"
+    },
+    {
+      "h": "645ded03bc2ae0be0c6ba65bf43163f71da4bbebac7dd372f1189548a3dd2b0a",
+      "tier": "free"
+    },
+    {
+      "h": "2758ef53c72fb11267a3c997f2730877a05aee204d445142e68bae56ab17b686",
+      "tier": "free"
+    },
+    {
+      "h": "a48b2e76ee7908f201f380853718c13969a536773711960b8b904bc04574182e",
+      "tier": "free"
+    },
+    {
+      "h": "7743541653159a053c3388a90e699784f186272f1ae4d5392809295cf79f5eba",
+      "tier": "free"
+    },
+    {
+      "h": "0368e5e020ef2fce8213e1d8dcfd427d9e2109a34548c9ec5f129aab0971f48b",
+      "tier": "free"
+    },
+    {
+      "h": "49598be2bc6cbaaecab98f59277b80e08f5eff9f7b5ae1eb972e05c411800b6f",
+      "tier": "free"
+    },
+    {
+      "h": "3f29ac57a83a8b7cd358f9af5b3c912d75eb76672296850e1ce7c90ab1db2ff0",
+      "tier": "free"
+    },
+    {
+      "h": "0dc82024fb068a69270a90d626723a4e0d02ec6e514b5665dcc9859ff96f57ac",
+      "tier": "free"
+    },
+    {
+      "h": "e2f8046d194817589949a28cf908cdf00c90ad780b9e8fa01625e193cfd780e5",
+      "tier": "free"
+    },
+    {
+      "h": "c3eec6b92298fa71a9e6f33578fcfb5eb78e9b6174c5efadb040e5bf11bbe062",
+      "tier": "free"
+    },
+    {
+      "h": "5362809f093a87c902bda983268c1f958ea5fd0bda215688a29008bcf62aaa05",
+      "tier": "free"
+    }
+  ]
+}
