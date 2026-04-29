@@ -21,10 +21,10 @@ jobs:
     - name: Run unit tests
       shell: pwsh
       run: |
-        dotnet test csharp/tests/WKAppBot.Tests/WKAppBot.Tests.csproj `
-          --verbosity minimal `
-          --logger "trx;LogFileName=results.trx" `
-          --collect:"XPlat Code Coverage"
+        # WKAppBot.Tests project was part of the private source and is no longer
+        # present in this public SDK repo. Test coverage is handled in the private
+        # dev repo. This step is a no-op placeholder to keep the workflow green.
+        Write-Host "No public unit tests to run (private source removed)."
 
     - name: Upload test results
       if: ${{ always() }}
@@ -32,3 +32,4 @@ jobs:
       with:
         name: test-results
         path: '**/*.trx'
+        if-no-files-found: ignore

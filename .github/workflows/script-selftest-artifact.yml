@@ -49,6 +49,9 @@ jobs:
         "PIP_DISABLE_PIP_VERSION_CHECK=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
     - name: Run latest script self-test and persist sidecar
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        WKAPPBOT_CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
       run: |
         if ('${{ github.event_name }}' -ne 'push') {
           Write-Host 'Skip script self-test on workflow_dispatch.'
@@ -66,8 +69,20 @@ jobs:
         if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) {
           Write-Host 'Official bin missing. Rebuilding fallback bin in artifact workflow.'
           New-Item -ItemType Directory -Force -Path bin | Out-Null
-          dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
           dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+          $coreRepo = $env:WKAPPBOT_CORE_REPO
+          $ghToken  = $env:GH_TOKEN
+          if ($coreRepo -and $ghToken) {
+            $tag = gh release list --repo $coreRepo --json tagName,createdAt `
+              | ConvertFrom-Json `
+              | Where-Object { $_.tagName -like 'core-*' } `
+              | Sort-Object createdAt -Descending `
+              | Select-Object -First 1 -ExpandProperty tagName
+            if ($tag) {
+              gh release download $tag --repo $coreRepo --pattern "wkappbot-core.exe" --dir bin --clobber
+              Write-Host "Fetched core from $tag"
+            }
+          }
         }
         if (!((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe))) { throw 'bin restore/rebuild failed for script self-test artifact workflow' }
         $bash = Get-Command bash -ErrorAction SilentlyContinue
