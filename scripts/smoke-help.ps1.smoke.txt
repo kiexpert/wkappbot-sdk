@@ -1,8 +1,8 @@
-commit: cf246d1e6e6afe252e0c333e8342c7d7380bfd74
+commit: d53dffbc51c1ed8750054f429db2d8809b13808c
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-29T02:51:20.8525186Z
+timestamp_utc: 2026-04-29T09:19:20.3955820Z
 
 
 ------------------------------------------------------------
@@ -14,12 +14,12 @@ timestamp_utc: 2026-04-29T02:51:20.8525186Z
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] --version
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version
-  wkappbot v6.5.47
+  wkappbot v6.6.0
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] --version[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--version[0m
-wkappbot v6.5.47
+wkappbot v6.6.0
 
 === help-root ===
   wkappbot --help
@@ -27,7 +27,7 @@ wkappbot v6.5.47
   [CMD] --help
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help
   
-  WKAppBot v6.5.47 - Windows App Automation Test Framework
+  WKAppBot v6.6.0 - Windows App Automation Test Framework
   Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
   All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
   Your testing, coding, and ideas are appreciated. Let's build together.
@@ -37,7 +37,7 @@ wkappbot v6.5.47
 [31;1m[CMD] --help[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=--help[0m
 
-WKAppBot v6.5.47 - Windows App Automation Test Framework
+WKAppBot v6.6.0 - Windows App Automation Test Framework
 Give AI eyes and hands -- operate any app, help any human. No API, no rewrite needed.
 All AI agents welcome -- Claude, GPT, Gemini, Copilot, and beyond.
 Your testing, coding, and ideas are appreciated. Let's build together.
@@ -325,7 +325,7 @@ Skills for 'a11y': (wkappbot skill read <id>)
   No args: finds wkappbot* windows. Use a11y find directly for full options.
   
   Skills for 'windows': (wkappbot skill read <id>)
-  ... (1 more)
+  ... (4 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows --help --no-regression[0m
@@ -335,7 +335,10 @@ Alias: wkappbot windows <grap> == wkappbot a11y find <grap>
 No args: finds wkappbot* windows. Use a11y find directly for full options.
 
 Skills for 'windows': (wkappbot skill read <id>)
+  - wkappbot windows -- focus flag and no-filter relevance mode  [wkappbot-windows-focus-flag-and-no-filter-relevance-mode] [unclassified]
+  - OculOS vs WKAppBot: UIA-as-MCP desktop agent control  [competitive-oculos-desktop-mcp] [unclassified]
   - Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)  [anthropic-computer-use-cross-platform] [user/developer/operator (mixed)]
+  - Codex CLI usage inside WKAppBot  [codex-cli-wkappbot-usage] [project (pure)]
 
 === help-file ===
   wkappbot file --help --no-regression
@@ -347,7 +350,7 @@ Skills for 'windows': (wkappbot skill read <id>)
   
   Subcommands:
     open <path>[:line[:col]]
-  ... (26 more)
+  ... (28 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file --help --no-regression[0m
@@ -382,6 +385,8 @@ NOTE: CP949 source files -- some WKAppBot sources have Korean in CP949.
 
 Skills for 'file': (wkappbot skill read <id>)
   - file -- Read/Write/Edit/Grep/Glob Cheatsheet  [file-command-cheatsheet] [operator (pure)]
+  - file symlink and file link: create symbolic and hard links  [file-symlink-and-file-link-create-symbolic-and-hard-links] [unclassified]
+  - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern  [file-as-scheduler-pending-prompts-pattern] [unclassified]
   - Public launcher DataDir: use WKAPPBOT_HOME or %USERPROFILE%/.wkappbot  [public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot] [unclassified]
 
 === help-skill ===
@@ -443,10 +448,10 @@ Examples:
     --refs "csharp/src/WKAppBot.WebBot/CdpClient.cs::pattern"
 
 Skills for 'skill': (wkappbot skill read <id>)
+  - skill search/news: coverage-based ranking + skill news command  [skill-coverage-ranking-news] [operator/project (mixed)]
   - Skill Audience Taxonomy  [skill-audience-taxonomy] [operator/developer/project/user (mixed)]
   - Skill Authoring Rules + Contribute & Edit Workflow  [skill-contribute-edit] [operator/developer/project (mixed)]
-  - Codex-Friendly Skill Template  [codex-friendly-skill-template] [operator/developer (mixed)]
-  - Developer Skill Template  [developer-skill-template] [developer (pure)]
+  - Skill Reminder News and Invocation Log — discoverability system  [skill-reminder-news-and-invocation-log-discoverability-system] [unclassified]
 
 === help-schedule ===
   wkappbot schedule --help --no-regression
@@ -458,7 +463,7 @@ Skills for 'skill': (wkappbot skill read <id>)
   
   schedule add "<prompt>" --at "2026-03-30T15:00" [--repeat 1h]
   schedule list     show pending items
-  ... (8 more)
+  ... (10 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] schedule --help --no-regression[0m
@@ -475,7 +480,9 @@ Schedules are executed by Eye (must be running).
 
 Skills for 'schedule': (wkappbot skill read <id>)
   - Joodeok YouTube Market Schedule Extractor -- Auto-Subtitle Transcript Pipeline  [joodeok-market-schedule-extractor] [unclassified]
+  - schedule --cmd bash/sh/python on Windows: auto-resolve interpreter path  [schedule-cmd-bash-windows] [unclassified]
   - AI News Briefing — lunch and dinner automated digest  [ai-news-briefing] [unclassified]
+  - AI News to Suggests -- fetch, filter, queue, and act on improvement items  [ai-news-to-suggests] [unclassified]
 
 === help-logcat ===
   wkappbot logcat --help --no-regression
@@ -554,9 +561,9 @@ Queue: wkappbot.hq/runtime/slack_queue/*.json
 
 Skills for 'eye': (wkappbot skill read <id>)
   - Eye Slack Thread -- Live Streaming Structure & CCABot Slot Design  [eye-slack-thread-streaming-structure] [project (pure)]
+  - Eye handoff: age guard prevents false-positive on session start  [eye-handoff-age-guard] [unclassified]
   - Always-On AI Automation Daemon -- AppBot Eye Internals  [always-on-ai-automation-daemon-appbot-eye-internals] [project (pure)]
   - Admin Eye 2-phase broadcast close for clean hand-over  [admin-eye-broadcast-close-handover] [project (pure)]
-  - Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral  [elevated-eye-admin-pipe-server] [project (pure)]
 
 === help-slack ===
   wkappbot slack --help --no-regression
@@ -568,7 +575,7 @@ Skills for 'eye': (wkappbot skill read <id>)
   
   Subcommands:
     send "<msg>" [file.png]             send to main channel
-  ... (14 more)
+  ... (15 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] slack --help --no-regression[0m
@@ -589,9 +596,10 @@ RULE: Always reply to Slack messages IN SLACK via `slack reply --msg <ts>`.
 NOTE: `slack route` is an internal Eye command -- do NOT call manually unless testing.
 
 Skills for 'slack': (wkappbot skill read <id>)
+  - Slack Bot Self-Mention Does NOT Trigger Socket Events — Routing Limitation  [slack-bot-self-mention-no-socket] [unclassified]
   - slack -- Send & Reply Cheatsheet  [slack-command-cheatsheet] [operator (pure)]
+  - slack send/reply: per-CWD reply context prevents cross-project thread misroute  [slack-send-reply-per-cwd-reply-context-no-misroute] [unclassified]
   - Eye Slack Thread -- Live Streaming Structure & CCABot Slot Design  [eye-slack-thread-streaming-structure] [project (pure)]
-  - AI News Briefing — lunch and dinner automated digest  [ai-news-briefing] [unclassified]
 
 === help-ask ===
   wkappbot ask --help --no-regression
@@ -622,10 +630,10 @@ NOTE: CDP requires Chrome/Edge open with target AI tab.
 NOTE: Result artifact = chat text only (CDP eval DOM read for full content).
 
 Skills for 'ask': (wkappbot skill read <id>)
+  - ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted  [ask-gpt-editor-wait-tag-and-rescue-fallback] [unclassified]
   - ask -- AI Delegation Cheatsheet  [ask-command-cheatsheet] [operator (pure)]
-  - 막히면 삼두에 위임하라 (토큰 절약)  [ask-triad-when-uncertain] [operator (pure)]
-  - Triad Ask: Simultaneous Q, 정반합 Debate, Tool Loop, Agent Mode, Session Recovery  [triad-ask-simultaneous-q-debate-tool-loop-agent-mode] [operator (pure)]
-  - Web AI Ask Infrastructure: Pump, CDP Worker, Editor Send Paths  [web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths] [project (pure)]
+  - ask-*/triad CDP focus-steal coverage via sentinel user-active yield  [ask-cdp-uia-focus-steal-coverage-via-sentinel] [unclassified]
+  - ask/web Chrome launch: AppBotPipe focusless guard allowlist  [ask-web-chrome-launch-focusless-guard-allowlist] [unclassified]
 
 === help-gc ===
   wkappbot gc --help --no-regression
@@ -637,7 +645,7 @@ Skills for 'ask': (wkappbot skill read <id>)
   --days N: only files older than N days (default: 7).
   --sweep: aggressive cleanup.
   
-  ... (2 more)
+  ... (3 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] gc --help --no-regression[0m
@@ -648,6 +656,7 @@ Garbage collect old logs, temp files, stale caches.
 --sweep: aggressive cleanup.
 
 Skills for 'gc': (wkappbot skill read <id>)
+  - repo maintenance: gc cleanup and pre-release git audit  [repo-maintenance-gc-cleanup-and-pre-release-git-audit] [unclassified]
   - logcat -- Log Viewer Cheatsheet  [logcat-command-cheatsheet] [operator (pure)]
 
 ------------------------------------------------------------
@@ -659,12 +668,12 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill list
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
-  [SKILL] 91 skill(s) - most recent first:
-    [wkappbot-sdk]
-      - SDK deployment session handoff (2026-04-28) (sdk-deployment-session-2026-04-28) v1.1 [16h ago] [unclassified] - Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.
-      - SDK release playbook (version bump + publish) (sdk-release-playbook) v1.2 [16h ago] [unclassified] - Step-by-step release process for kiexpert/wkappbot-sdk. Covers version alignment with dev repo, pre-release checklist, build/test, docs regen, tagging, and post-release verification. PRIVATE: not for public SDK skills/.
-      - Launcher maintenance guide (public SDK) (sdk-launcher-maintenance) v1.2 [17h ago] [unclassified] - How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Build commands, hot-swap, pipe relay debug, CI, and public-release checklist.
-  ... (101 more)
+  [SKILL] 197 skill(s) - most recent first:
+    [wkappbot-core]
+      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [5h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
+      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [22h ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
+      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [22h ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
+  ... (209 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
 
@@ -673,35 +682,51 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] skill search grap
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill search grap
-  [DBG] kws=grap hits=17
-  [SKILL] 17 match(es):
+  [DBG] kws=grap hits=33
+  [SKILL] 33 match(es):
     [wkappbot-workflow] grap [project (pure)] cov=2.09 - grap -- UI Element Address System (Window + UIA Scope + Web + ADB)
     [wkappbot] grap-target [operator/project (mixed)] cov=1.74 - grap-target
     [wkappbot] grap-alias-system [project (pure)] cov=1.54 - GRAP Alias System
-  ... (16 more)
+  ... (32 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] skill search grap[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill search grap[0m
-[31;1m[DBG] kws=grap hits=17[0m
-[31;1m[SKILL] 17 match(es):[0m
+[31;1m[DBG] kws=grap hits=33[0m
+[31;1m[SKILL] 33 match(es):[0m
   [wkappbot-workflow] grap [project (pure)] cov=2.09 - grap -- UI Element Address System (Window + UIA Scope + Web + ADB)
   [wkappbot] grap-target [operator/project (mixed)] cov=1.74 - grap-target
   [wkappbot] grap-alias-system [project (pure)] cov=1.54 - GRAP Alias System
   [wkappbot] find-any-window-element-your-way-grap-multi-modal-search [project (pure)] cov=1.17 - Find Any Window Element Your Way -- grap Multi-Modal Search
+  [wkappbot] a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields [unclassified] cov=1.14 - a11y grap: explicit hwnd is authoritative in FindByMultiField
+  [wkappbot-core] taskkill-compat-shim-a11y-first-kill-routing [operator (pure)] cov=1.02 - taskkill compat shim: a11y-first kill routing
+  [wkappbot-workflow] wkappbot-windows-focus-flag-and-no-filter-relevance-mode [unclassified] cov=1.02 - wkappbot windows -- focus flag and no-filter relevance mode
   [wkappbot] a11y-playbook-writing [project (pure)] cov=1.01 - a11y playbook writing
   [wkappbot] a11y-find [operator/project (mixed)] cov=1.00 - a11y find - output format and process resolution
   [wkappbot-workflow] a11y-command-cheatsheet [unclassified] cov=0.81 - a11y Command Cheatsheet - Operator View for Claude and Codex
   [hts-heroes] wkappbot-run-hts-launch-loading-trace [unclassified] cov=0.81 - wkappbot exec/run managed launcher + stdin-inject + Ctrl+C/Z control chars
   [wkappbot-workflow] web-command-cheatsheet [unclassified] cov=0.35 - web -- Fetch/Search/Open Cheatsheet (URL-as-target banned, grap required for tab-bound verbs)
-  [hts-heroes] hts-testing-cheatsheet [unclassified] cov=0.00 - HTS Testing Cheatsheet (form-dump uia-test do scan chart analyze-hack dbgview)
-  [hts-xingq] mdi-form-targeting [project (pure)] cov=0.00 - MDI 자식폼 타겟팅
+  [wkappbot-core] a11y-kill-json5-grap-support [unclassified] cov=0.32 - a11y kill JSON5 grap support
+  [wkappbot-core] screenshot-grap-bbox [unclassified] cov=0.30 - screenshot: smart multi-grap compositing with painter's algorithm
+  [wkappbot-workflow] a11y-find-verify-miss-empty-grap-guard [unclassified] cov=0.20 - A11y Ambiguity Guard: Skip Verify MISS for Empty {} Grap
+  [wkappbot-core] a11y-auto-find-grap-verify-skip-miss-report-for-empty-pattern-wpf-overlays [unclassified] cov=0.12 - a11y auto-find grap verify: skip MISS report for empty {} pattern (WPF overlays)
+  [wkappbot-core] screenshot-mask-transparency [unclassified] cov=0.02 - screenshot --mask: transparency outside target rects
+  [wkappbot] competitive-analysis-css-selectors-rust-perf-scenario-expect-xp-sharing [unclassified] cov=0.02 - Competitive analysis: CSS selectors, Rust perf, scenario expect, XP sharing
+  [wkappbot] a11y-screenshot-focusless-window-capture [unclassified] cov=0.01 - a11y screenshot: focusless window capture
   [wkappbot] a11y-close-safety-ambiguity-focus-node-diagnostics [unclassified] cov=0.00 - a11y close safety: ambiguity + focus-node diagnostics
   [wkappbot] compete-roadmap-2026q2 [unclassified] cov=0.00 - Competition Response Roadmap 2026-Q2 (Gemini draft)
+  [wkappbot-core] file-as-scheduler-pending-prompts-pattern [unclassified] cov=0.00 - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern
+  [wkappbot-core] skill-reminder-news-and-invocation-log-discoverability-system [unclassified] cov=0.00 - Skill Reminder News and Invocation Log — discoverability system
+  [wkappbot-core] wknotification-unified-dispatcher-and-file-scheduler [unclassified] cov=0.00 - WkNotification: unified dispatcher + file-based scheduler
+  [wkappbot-workflow] a11y-find-deprecated-eval-removal-guard [unclassified] cov=0.00 - A11y Eval Deprecated: AutoRegisterBug Guard on Use
   [wkappbot-workflow] anthropic-computer-use-cross-platform [user/developer/operator (mixed)] cov=0.00 - Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)
+  [wkappbot-workflow] claude-cli-automation-patterns-wkappbot-integration [unclassified] cov=0.00 - Claude CLI automation patterns + wkappbot integration
+  [wkappbot-workflow] claude-token-optimization [unclassified] cov=0.00 - Claude Token Optimization — Exploration, Context & Search
   [wkappbot-workflow] diagnostic-commands-cheatsheet [unclassified] cov=0.00 - Diagnostic Commands Cheatsheet (whisper validate claude-usage eye tick)
   [wkappbot-workflow] inspect-before-automate [operator (pure)] cov=0.00 - 자동화 전 반드시 inspect 먼저
   [wkappbot-workflow] lm-wiki-personal-knowledge-base [user (pure)] cov=0.00 - LM Wiki — Personal Knowledge Base with Markdown (Claude Code + Obsidian)
+  [hts-heroes] hts-testing-cheatsheet [unclassified] cov=0.00 - HTS Testing Cheatsheet (form-dump uia-test do scan chart analyze-hack dbgview)
+  [hts-xingq] mdi-form-targeting [project (pure)] cov=0.00 - MDI 자식폼 타겟팅
 
   Use: wkappbot skill read <id>
 
@@ -742,12 +767,12 @@ WindowTitle -> stderr (noise-free stdout)
 MULTIPLE TARGETS: ## TARGETS N matches header + one ## TARGET block per window.
     2. [WINDOW-PATTERNS] Before '#' -- addressing a top-level windoD:
   Substring:   'ChatGPT'                    contains, case-insensitive
-  Wildcard:    '*메모장*'                      * = any chars
-  OR(;):       '*메모장*;*계산기*'           matches either
+  Wildcard:    '*Notepad*'                      * = any chars
+  OR(;):       '*Notepad*;*Calculator*'           matches either
   JSON5:       {title:'Claude',proc:'chrome'}  AND logic
   HWND direct: {hwnd:0x010B084A}             instant lookup
   HWND bracket:[0012061C]                    inspect/windows output format
-  Regex:       regex:^영웅문                    prefix required
+  Regex:       regex:^AppName                    prefix required
     3. [JSON5-SPEC] JSON5-extended grap syntax -- official window address grammar.
 SYNTAX: {field:value, field:value, ...}  -- all fields AND'd
   Single-quoted strings OK: {proc:'chrome'}
@@ -768,7 +793,7 @@ OPERATORS:
   Array OR:         {title:['ChatGPT','Claude']}  -- matches if title contains either
   Glob in value:    {title:'*AppBot*'}             -- * and ? work in string values
   Regex in value:   {title:/AppBot.*/}             -- /regex/ literal, full .NET regex
-  OR at top level:  use ;-syntax before '#':  '*메모장*;*계산기*'
+  OR at top level:  use ;-syntax before '#':  '*Notepad*;*Calculator*'
 COMPACT GRAP RULE (# TARGET verified output):
   browser  -> {hwnd,pid,proc,domain}         no cls/title/url
   MFC/old  -> {hwnd,pid,proc,cls}            cls essential; no accessibility tree = needs class
@@ -781,12 +806,12 @@ COMPACT GRAP RULE (# TARGET verified output):
   Depth: up to 25 levels. Match: Name first, AutomationId fallback (both substring).
   Container-first: Pane/Group preferred over Button/Edit at same level.
   Regex segment: '*App*#regex:btn_\d+'
-    5. [WIN32-CHILD] '/' drills Win32 child windows (MFC/HTS multi-window apps):
+    5. [WIN32-CHILD] '/' drills Win32 child windows (MFC/legacy multi-child-window apps):
   'Parent/Child'              Win32 GetChildren, pattern match
   'Parent/Child#UiaScope'     Win32 drill THEN UIA scope
   'Window/'                   trailing / = focus-tunnel to focused child + element
-  Used for 영웅문/HTS where UIA tree is fragmented across child HWNDs.
-  Example: '영웅문/실시간계좌창#종목코드Edit'
+  Used for AppName/legacy apps where UIA tree is fragmented across child HWNDs.
+  Example: 'AppName/MainPanel#InputField'
     6. [ANDROID] adb:// prefix routes to Android UIA pipeline:
   'adb://Fold5/*heromts*#해외잔고'          device / package / scope
   'adb://*heromts*#해외잔고'              auto-detect device
