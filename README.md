@@ -124,6 +124,58 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 
 ---
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Your terminal / Claude Code / Codex / any AI agent     │
+└───────────────────────┬─────────────────────────────────┘
+                        │ wkappbot <command>
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│  wkappbot.exe  (MIT launcher, ~1 MB, AOT)               │
+│  • routes CLI args → core via named pipe                │
+│  • hot-swap: detects .new.exe, drains, renames atomic   │
+│  • license check via GitHub collaborator API            │
+└───────────────────────┬─────────────────────────────────┘
+                        │ named pipe  wkappbot_eye_ipc_{hash}
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│  wkappbot-core.exe  (closed, ~25 MB, single-file)       │
+│  • all CLI commands: a11y, ask, skill, eye, file, …     │
+│  • AppBot Eye daemon: Slack socket + MCP broker         │
+│  • UIA / Win32 / CDP / ADB automation engines           │
+│  • Vision / OCR pipeline + Experience DB                │
+└─────────────────────────────────────────────────────────┘
+         │ UIA / Win32                │ CDP (DevTools)
+         ▼                            ▼
+   Windows apps                 Chrome / Edge
+   (WPF, MFC, UWP)              (web apps, AI chat)
+```
+
+Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root}/.wkappbot/hq/`).
+
+---
+
+## 60-second quickstart
+
+```bat
+git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\Documents\wkappbot
+cd %USERPROFILE%\Documents\wkappbot
+build.cmd
+```
+
+Then add `bin\` to PATH (see [INSTALL.md](docs/INSTALL.md)), open a new terminal, and:
+
+```bash
+wkappbot --version          # verify install
+wkappbot a11y windows       # list open windows
+wkappbot skill list         # browse built-in knowhow
+wkappbot a11y find "*Notepad*"   # find a window element
+```
+
+---
+
 ## Installation
 
 **Clone = install.** That's it.
