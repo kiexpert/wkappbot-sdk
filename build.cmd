@@ -2,13 +2,17 @@
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem ===========================================================================
-rem  WKAppBot build.cmd  -  Publish, copy, and hot-swap deploy
+rem  WKAppBot SDK build.cmd  -  Build launcher + download core, then deploy
+rem
+rem  Public SDK note: only the launcher source ships in this repo.
+rem  wkappbot-core.exe is built in the private dev repo and downloaded
+rem  from a GitHub Release (see :download_release).
 rem
 rem  Usage:
-rem    build.cmd                   Download release binaries if bin\ is empty,
-rem                                then do full source build (launcher + core).
+rem    build.cmd                   Download release binaries (always required
+rem                                for core), then build launcher from source.
 rem    build.cmd --download-only   Download from latest GitHub Release only;
-rem                                skip source build entirely (no .NET SDK needed).
+rem                                skip launcher source build (no .NET SDK needed).
 rem    build.cmd --deploy-only     Skip publish; re-deploy from existing publish output.
 rem    build.cmd --no-build        Skip compile; just package + copy + hot-swap.
 rem                                Use when invoked from a csproj post-publish event.
@@ -16,7 +20,7 @@ rem
 rem  Deploy target:  <repo>\bin\
 rem    wkappbot.exe       Launcher  (AOT, ~1 MB; starts core, relays pipe cmds,
 rem                                  handles hot-swap trigger)
-rem    wkappbot-core.exe  Core      (single-file ~25 MB; all CLI logic + Eye loop)
+rem    wkappbot-core.exe  Core      (single-file ~25 MB; downloaded binary)
 rem
 rem  Hot-swap flow (Eye is running):
 rem    1. csproj post-publish target copies core  -> wkappbot-core.new.exe
@@ -36,9 +40,7 @@ rem DOTNET_EXE: prefer system install, fall back to repo-local dotnet
 set "DOTNET_EXE=dotnet"
 if exist "C:\Program Files\dotnet\dotnet.exe" set "DOTNET_EXE=C:\Program Files\dotnet\dotnet.exe"
 
-set "CLI_PROJ=%ROOT_DIR%\csharp\src\WKAppBot.CLI\WKAppBot.CLI.csproj"
 set "LAUNCHER_PROJ=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj"
-set "CLI_OUT=%ROOT_DIR%\csharp\src\WKAppBot.CLI\bin\Release\net8.0-windows10.0.22621.0\win-x64\publish"
 set "LAUNCHER_OUT=%ROOT_DIR%\csharp\src\WKAppBot.Launcher\bin\Release\net8.0-windows\win-x64\publish"
 set "BIN_DIR=%ROOT_DIR%\bin"
 set "DEPLOY_ONLY=0"
@@ -52,12 +54,12 @@ if /I "%~2"=="--no-build"      set "NO_BUILD=1"
 
 rem ---------------------------------------------------------------------------
 rem  DOWNLOAD PATH: fetch pre-built binaries from latest GitHub Release
-rem  Skips the full source build -- ideal for first-time clone (no .NET SDK needed)
-rem  Falls through to source build if download fails or binaries already present.
+rem  Core is binary-only in this public SDK (no source) -- always required.
+rem  Launcher source build follows below; --download-only short-circuits it.
 rem ---------------------------------------------------------------------------
 if "%DEPLOY_ONLY%"=="0" (
-  if not exist "%BIN_DIR%\wkappbot.exe" (
-    echo [BUILD] bin\wkappbot.exe not found -- trying GitHub Release download...
+  if not exist "%BIN_DIR%\wkappbot-core.exe" (
+    echo [BUILD] bin\wkappbot-core.exe not found -- fetching from GitHub Release...
     call :download_release
     if "%DOWNLOAD_ONLY%"=="1" exit /b 0
   ) else (
@@ -90,28 +92,26 @@ if errorlevel 1 (
 echo [BUILD] dotnet: %DOTNET_EXE%
 
 if "%DEPLOY_ONLY%"=="0" (
-  echo [1/4] Publish launcher (AOT, single-file, self-contained)
+  echo [1/3] Publish launcher (AOT, single-file, self-contained)
   call :publish_launcher
-  if errorlevel 1 exit /b 1
-
-  echo [2/4] Publish core (single-file, self-contained)
-  call :publish_core
   if errorlevel 1 exit /b 1
 
   if not exist "%LAUNCHER_OUT%\wkappbot.exe" (
     echo [BUILD] Missing launcher output: "%LAUNCHER_OUT%\wkappbot.exe"
     exit /b 1
   )
-  if not exist "%CLI_OUT%\wkappbot-core.exe" (
-    echo [BUILD] Missing core output: "%CLI_OUT%\wkappbot-core.exe"
+  if not exist "%BIN_DIR%\wkappbot-core.exe" (
+    echo [BUILD] Missing core binary: "%BIN_DIR%\wkappbot-core.exe"
+    echo [BUILD]   wkappbot-core.exe is downloaded, not built from source in this SDK.
+    echo [BUILD]   Re-run build.cmd to fetch it from GitHub Release.
     exit /b 1
   )
 ) else (
   echo [BUILD] deploy-only mode (skip publish)
 )
 
-echo [3/4] Deploy binaries to %BIN_DIR%
-rem Core deploy: handled by csproj post-publish target (copies to .new.exe for hot-swap).
+echo [2/3] Deploy binaries to %BIN_DIR%
+rem Core was already placed in %BIN_DIR% by :download_release.
 
 rem Launcher deploy: rename current to .old, put new at original path.
 rem Running launcher can be renamed on Windows NTFS; new connections use the new file.
@@ -157,7 +157,7 @@ del /q "%BIN_DIR%\wkappbot.dll" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot.deps.json" >nul 2>nul
 del /q "%BIN_DIR%\wkappbot.runtimeconfig.json" >nul 2>nul
 
-echo [4/4] Eye tick trigger (hot-swap detect + pipe drain)
+echo [3/3] Eye tick trigger (hot-swap detect + pipe drain)
 call "%BIN_DIR%\wkappbot-core.exe" eye tick --timeout 15 >nul 2>nul
 
 rem Hot-swap watchdog:
@@ -224,26 +224,6 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:publish_core
-echo [BUILD]   proj : %CLI_PROJ%
-echo [BUILD]   out  : %CLI_OUT%\wkappbot-core.exe
-if "%NO_BUILD%"=="1" (
-  echo [BUILD]   step : dotnet publish --no-build --no-restore (package only^)
-  "%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore --no-build -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
-  if errorlevel 1 ( echo [BUILD] core publish failed & exit /b 1 )
-  exit /b 0
-)
-echo [BUILD]   step : dotnet publish (no-restore)
-"%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true --no-restore -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
-if not errorlevel 1 exit /b 0
-echo [BUILD]   step : dotnet publish (with restore)
-"%DOTNET_EXE%" publish "%CLI_PROJ%" --configuration Release --runtime win-x64 --self-contained true -m:1 -v minimal /p:PublishSingleFile=true /p:PublishTrimmed=false /p:PublishReadyToRun=false /p:PublishAot=false
-if errorlevel 1 (
-  echo [BUILD] core publish failed
-  exit /b 1
-)
-exit /b 0
-
 :download_release
 rem Download pre-built binaries from latest GitHub Release.
 rem Tries gh CLI first (handles auth for private repos), then falls back
@@ -269,9 +249,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
    Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; ^
    Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
 if errorlevel 1 (
-  echo [BUILD]   Download unavailable -- will build from source.
+  echo [BUILD]   Download unavailable. wkappbot-core.exe must be obtained
+  echo [BUILD]   from a GitHub Release (no source available in this repo).
   rmdir /s /q "%DL_TMP%" 2>nul
-  exit /b 0
+  exit /b 1
 )
 
 :extract_release
@@ -283,9 +264,9 @@ if exist "%DL_TMP%\out\wkappbot.exe"      copy /y "%DL_TMP%\out\wkappbot.exe"   
 if exist "%DL_TMP%\out\wkappbot-core.exe" copy /y "%DL_TMP%\out\wkappbot-core.exe" "%BIN_DIR%\wkappbot-core.exe" >nul
 rmdir /s /q "%DL_TMP%" 2>nul
 
-if not exist "%BIN_DIR%\wkappbot.exe" (
-  echo [BUILD]   Extract failed -- will build from source.
-  exit /b 0
+if not exist "%BIN_DIR%\wkappbot-core.exe" (
+  echo [BUILD]   Extract failed -- core binary missing from release ZIP.
+  exit /b 1
 )
 echo [BUILD]   Binaries installed from GitHub Release.
 
@@ -296,6 +277,6 @@ if exist "%ROOT_DIR%\skills"   xcopy /s /q /y "%ROOT_DIR%\skills\*"   "%BIN_DIR%
 if exist "%ROOT_DIR%\handlers" xcopy /s /q /y "%ROOT_DIR%\handlers\*" "%BIN_DIR%\wkappbot.hq\handlers\" >nul
 
 echo [BUILD]   done (downloaded from release)
-rem Signal caller that we already have binaries -- skip source build
-set "DEPLOY_ONLY=1"
+rem In --download-only mode the caller exits immediately after this returns;
+rem otherwise the launcher is rebuilt from source and redeployed below.
 exit /b 0

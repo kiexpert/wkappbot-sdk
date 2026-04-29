@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 using System.Diagnostics;
 using System.Text;
 using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
@@ -77,7 +76,7 @@ partial class Program
             Console.Error.WriteLine("██                                                                        ██");
             Console.Error.WriteLine("████████████████████████████████████████████████████████████████████████████");
             Console.Error.WriteLine("██                                                                        ██");
-            Console.Error.WriteLine($"██   admin Eye pipe \\.\pipe\wkappbot_elevated was REACHABLE              ██");
+            Console.Error.WriteLine($"██   admin Eye pipe \\\\.\\pipe\\wkappbot_elevated was REACHABLE              ██");
             Console.Error.WriteLine($"██   but did NOT complete handshake within {budgetMs,4}ms budget                 ██");
             Console.Error.WriteLine($"██   (actual elapsed: {elapsedMs,5}ms)                                          ██");
             Console.Error.WriteLine("██                                                                        ██");
@@ -106,13 +105,12 @@ partial class Program
             var hqDir = Path.Combine(exeDir, "wkappbot.hq");
             Directory.CreateDirectory(hqDir);
             var jsonlPath = Path.Combine(hqDir, "suggestions.jsonl");
-            var cwdEsc = Environment.CurrentDirectory.Replace("\", "\\").Replace("\"", "\\"");
-            var argsJoined = string.Join(" ", args).Replace("\", "\\").Replace("\"", "\\"");
-            var exSuffix = exMessage != null ? $" ex=\\"{exMessage.Replace("\", "\\").Replace("\"", "\\"")}\\"" : "";
+            var cwdEsc = Environment.CurrentDirectory.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var argsJoined = string.Join(" ", args).Replace("\\", "\\\\").Replace("\"", "\\\"");
+            var exSuffix = exMessage != null ? $" ex=\\\"{exMessage.Replace("\\", "\\\\").Replace("\"", "\\\"")}\\\"" : "";
             var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
-            var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\"{argsJoined}\\"{exSuffix}";
-            var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}
-";
+            var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\\"{argsJoined}\\\"{exSuffix}";
+            var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}\n";
             File.AppendAllText(jsonlPath, line, new System.Text.UTF8Encoding(false));
         }
         catch { /* best-effort -- if we cannot even write the suggest, stay silent */ }
@@ -256,16 +254,16 @@ partial class Program
             var fgHwnd = GetForegroundWindow();
             var fgTitle = "";
             try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
-            // Build JSON with stealth  after each field -- cursor resets, no wrap
+            // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
             {
             var err = Console.Error;
-            void F(string s) { err.Write(s); err.Write(''); } // field + reset cursor
+            void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
             F($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
             if (consoleHwnd != IntPtr.Zero) F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
             if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
-            F($",\"cwd\":\"{cwd.Replace("\","\\")}\"");
+            F($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
             // Parent chain
             F(",\"chain\":[");
             var chainPid = myPid;
@@ -290,7 +288,7 @@ partial class Program
                 chainPid = pp;
             }
             err.Write("]}");
-            err.Write("" + new string(' ', 80) + ""); // final erase
+            err.Write("\r" + new string(' ', 80) + "\r"); // final erase
             err.Flush();
             }
         }
@@ -370,8 +368,7 @@ partial class Program
         // bash->PowerShell CP949/UTF-8 mismatch that corrupts Korean command-line args.
         // Scan after busybox prepend so implicit command is already present if needed.
         // File format: one arg per line, empty lines ignored. No quoting needed.
-        // Usage: printf '%s
-' a11y type "hello" > /tmp/a.txt && wkappbot --args-file /tmp/a.txt
+        // Usage: printf '%s\n' a11y type "hello" > /tmp/a.txt && wkappbot --args-file /tmp/a.txt
         {
             var argsFileIdx = Array.FindIndex(args, a => a == "--args-file");
             if (argsFileIdx >= 0 && argsFileIdx + 1 < args.Length)
@@ -404,11 +401,11 @@ partial class Program
         // "unreachable" under moderate load and leaking a confusing log line even though
         // Core correctly reused. Only --sudo invocations pay the cost; everyone else
         // still sees a 100ms probe elsewhere in the stack. Core's own Ping is untouched.
-        // Pipe path: \.\pipe\wkappbot_elevated
+        // Pipe path: \\.\pipe\wkappbot_elevated
         //
         // HANDSHAKE-MISS detection rule (v6.0.1 fix, 2026-04-21, 34x merged suggest):
         //   The PRESENCE of the pipe file in the NT namespace is the authoritative
-        //   "server started" signal. If \.\pipe\wkappbot_elevated does NOT exist,
+        //   "server started" signal. If \\.\pipe\wkappbot_elevated does NOT exist,
         //   admin Eye is simply not running yet (cold start) -- quiet fallthrough,
         //   NEVER a handshake miss regardless of ConnectAsync elapsed time.
         //   Handshake miss only fires when: pipe file EXISTS but ConnectAsync
@@ -420,7 +417,7 @@ partial class Program
             const int sudoProbeMs = 1500;
 
             // Cheap existence check -- doesn't consume a connection, doesn't block.
-            bool pipeFileExists = File.Exists($@"\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
+            bool pipeFileExists = File.Exists($@"\\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
 
             bool probeAlive = false;
             bool handshakeFailure = false; // pipe file existed but server didn't answer in budget
@@ -463,7 +460,7 @@ partial class Program
                     // Pipe file existed at the start of the probe but ConnectAsync failed.
                     // Re-check: did the pipe file disappear during the probe? (Admin Eye
                     // may have exited/crashed mid-probe -- not a zombie, just a race.)
-                    bool stillExists = File.Exists($@"\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
+                    bool stillExists = File.Exists($@"\\.\pipe\wkappbot_elevated_{WKAppBot.CLI.ProjectRoot.Hash8()}");
                     if (!stillExists)
                     {
                         Console.Error.WriteLine($"[LAUNCHER:SUDO] admin Eye pipe disappeared during probe ({elapsedMs}ms) -- Core will spawn");
@@ -670,8 +667,7 @@ partial class Program
                 foreach (var a in forwardArgs) _tp.StartInfo.ArgumentList.Add(a);
                 _tp.Start();
                 var _lDbg = Path.Combine(@"C:\Temp", "launcher_relay_dbg.txt");
-                void LDbg(string s) { try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}
-"); } catch { } }
+                void LDbg(string s) { try { File.AppendAllText(_lDbg, $"{_sw.ElapsedMilliseconds}ms {s}\n"); } catch { } }
                 LDbg($"spawn done pid={_tp.Id}");
                 prof("UseShellExecute spawn done, waiting for relay");
 
@@ -970,10 +966,10 @@ partial class Program
         {
             var k = kv.Key?.ToString() ?? "";
             if (strip.Contains(k)) continue;
-            sb.Append(k).Append('=').Append(kv.Value?.ToString() ?? "").Append(' ');
+            sb.Append(k).Append('=').Append(kv.Value?.ToString() ?? "").Append('\0');
         }
-        sb.Append("WKAPPBOT_RELAY_FILE=").Append(relayFilePath).Append(' ');
-        sb.Append(' '); // double-null terminator
+        sb.Append("WKAPPBOT_RELAY_FILE=").Append(relayFilePath).Append('\0');
+        sb.Append('\0'); // double-null terminator
         var bytes = Encoding.Unicode.GetBytes(sb.ToString());
         var ptr = System.Runtime.InteropServices.Marshal.AllocHGlobal(bytes.Length);
         System.Runtime.InteropServices.Marshal.Copy(bytes, 0, ptr, bytes.Length);
@@ -987,9 +983,9 @@ partial class Program
     /// </summary>
     static IntPtr SpawnDetachedCore(string core, string[] args, IntPtr envBlock)
     {
-        var cmd = new StringBuilder($"\"{core.Replace("\"", "\\"")}\"");
-        foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\"")).Append('"');
-        var cmdArr = (cmd.ToString() + " ").ToCharArray();
+        var cmd = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
+        foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
+        var cmdArr = (cmd.ToString() + "\0").ToCharArray();
         var si = new STARTUPINFOW { cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>() };
         bool ok = CreateProcessW(null, cmdArr, IntPtr.Zero, IntPtr.Zero, false,
             DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_UNICODE_ENVIRONMENT,
@@ -1021,9 +1017,9 @@ partial class Program
         if (hLauncherOut != IntPtr.Zero && hLauncherOut != (IntPtr)(-1)) SetHandleInformation(hLauncherOut, HANDLE_FLAG_INHERIT, 0);
         if (hLauncherErr != IntPtr.Zero && hLauncherErr != (IntPtr)(-1)) SetHandleInformation(hLauncherErr, HANDLE_FLAG_INHERIT, 0);
 
-        var cmd = new StringBuilder($"\"{core.Replace("\"", "\\"")}\"");
-        foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\"")).Append('"');
-        var cmdArr = (cmd.ToString() + " ").ToCharArray();
+        var cmd = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
+        foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
+        var cmdArr = (cmd.ToString() + "\0").ToCharArray();
         var si = new STARTUPINFOW
         {
             cb = System.Runtime.InteropServices.Marshal.SizeOf<STARTUPINFOW>(),
@@ -1158,8 +1154,7 @@ partial class Program
         {
             try
             {
-                Console.Error.WriteLine("
---- Error Log ---");
+                Console.Error.WriteLine("\n--- Error Log ---");
                 foreach (var (ms, msg) in _stderrBuf)
                     Console.Error.WriteLine($"[+{ms / 1000.0:F1}s] {msg}");
             }
