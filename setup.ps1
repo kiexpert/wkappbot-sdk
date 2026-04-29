@@ -18,6 +18,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Fail-fast: this SDK only targets Windows.
+if (-not $IsWindows -and $PSVersionTable.PSVersion.Major -ge 6) {
+    Write-Host "[FAIL] WKAppBot SDK is Windows-only -- detected non-Windows OS" -ForegroundColor Red
+    exit 1
+}
+if ($PSVersionTable.PSVersion.Major -lt 5) {
+    Write-Host "[FAIL] PowerShell 5.1+ required -- found $($PSVersionTable.PSVersion)" -ForegroundColor Red
+    exit 1
+}
+
 function Write-Ok    { param($Msg) Write-Host "[OK] $Msg" -ForegroundColor Green }
 function Write-Skip  { param($Msg) Write-Host "[SKIP] $Msg" -ForegroundColor DarkGray }
 function Write-Step  { param($Msg) Write-Host "[..] $Msg" -ForegroundColor Cyan }
@@ -80,11 +90,23 @@ if (Test-Path -LiteralPath $configPath -PathType Leaf) {
     $slackCh  = '#general'
     if (-not $NonInteractive) {
         try {
-            $slackUrl = Read-Host "Slack webhook URL (leave blank to skip)"
+            do {
+                $slackUrl = Read-Host "Slack webhook URL (leave blank to skip)"
+                if (-not $slackUrl) { break }
+                # Validate: must start with https://hooks.slack.com/services/
+                if ($slackUrl -match '^https://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/[A-Za-z0-9]+$') {
+                    break
+                }
+                Write-Warn2 "Invalid format. Expected: https://hooks.slack.com/services/T.../B.../...(retry or blank to skip)"
+            } while ($true)
         } catch { $slackUrl = '' }
         try {
             $chInput = Read-Host "Slack channel [#general]"
-            if ($chInput) { $slackCh = $chInput }
+            if ($chInput) {
+                # Auto-prefix with # if user typed plain name
+                if ($chInput -notmatch '^#') { $chInput = "#$chInput" }
+                $slackCh = $chInput
+            }
         } catch { }
     }
 
@@ -148,6 +170,32 @@ try {
 } catch {
     Write-Err "eye tick failed: $($_.Exception.Message)"
     exit 1
+}
+
+# ---------------------------------------------------------------- 4. gh auth check (paid tier hint)
+Write-Step "checking gh auth (required for paid tier)"
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if (-not $ghCmd) {
+    Write-Skip "gh CLI not installed -- Free tier only. Install: winget install GitHub.cli"
+    Write-Host "        Paid tiers (CDP 100k/mo, Sudo 500k/mo) require gh auth login + GitHub invite acceptance."
+} else {
+    try {
+        $ghStatus = & gh auth status 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $loginLine = $ghStatus | Select-String -Pattern 'Logged in to github\.com' | Select-Object -First 1
+            if ($loginLine) {
+                Write-Ok "gh auth: $($loginLine.Line.Trim())"
+                Write-Host "        For paid tier: see SUBSCRIBE.md -- after payment, accept GitHub invite at github.com/invitations"
+            } else {
+                Write-Skip "gh auth status OK (no login line parsed)"
+            }
+        } else {
+            Write-Warn2 "gh not logged in -- run: gh auth login"
+            Write-Host "        Free tier works without login. Paid tiers require gh auth + invite acceptance (SUBSCRIBE.md)."
+        }
+    } catch {
+        Write-Warn2 "gh auth probe failed: $($_.Exception.Message)"
+    }
 }
 
 Write-Host ''
