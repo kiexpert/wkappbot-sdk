@@ -92,8 +92,9 @@ jobs:
       if: ${{ steps.fetch_core.outputs.fetched != 'true' }}
       shell: pwsh
       run: |
-        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj `
-          --configuration Release -p:SkipDeployCore=true -o bin
+        Write-Host "::error::Core binary unavailable: WKAPPBOT_CORE_PAT/WKAPPBOT_CORE_REPO not set or fetch failed."
+        Write-Host "Set the secrets and re-run, or upload wkappbot-core.exe manually to the release."
+        exit 1
 
     - name: Seed bin/wkappbot.hq
       shell: pwsh

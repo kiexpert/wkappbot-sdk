@@ -31,6 +31,9 @@ jobs:
           ${{ runner.os }}-wkappbot-build-
     - name: Fallback rebuild official bin when missing
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
       run: |
         if ((Test-Path ./bin/wkappbot.exe) -and (Test-Path ./bin/wkappbot-core.exe)) {
           Write-Host 'Official bin already present.'
@@ -38,8 +41,22 @@ jobs:
         }
         Write-Host 'Official bin missing. Rebuilding fallback bin in artifact workflow.'
         New-Item -ItemType Directory -Force -Path bin | Out-Null
-        dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release -p:SkipDeployCore=true -o bin
         dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release -p:SkipDeployLauncher=true -o bin
+        if ($env:CORE_REPO -and $env:GH_TOKEN) {
+          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+            | ConvertFrom-Json `
+            | Where-Object { $_.tagName -like 'core-*' } `
+            | Sort-Object createdAt -Descending `
+            | Select-Object -First 1 -ExpandProperty tagName
+          if ($tag) {
+            gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+            Write-Host "Fetched core from $tag"
+          } else {
+            Write-Host "::warning::No core-* release found in $env:CORE_REPO"
+          }
+        } else {
+          Write-Host "::warning::WKAPPBOT_CORE_PAT/WKAPPBOT_CORE_REPO not set -- wkappbot-core.exe unavailable"
+        }
     - name: Verify official binary folder
       shell: pwsh
       run: |
