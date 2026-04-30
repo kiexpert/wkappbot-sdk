@@ -206,7 +206,7 @@ rem Ask Claude what this tool can do, in the user's language (detected via code 
 if exist "%BIN_DIR%\wkappbot.exe" (
   "%BIN_DIR%\wkappbot.exe" help > "%TEMP%\wkappbot-help-tmp.txt" 2>nul
   for /f "tokens=3 delims=: " %%A in ('chcp') do set "CODEPAGE=%%A"
-  set "AI_PROMPT=WKAppBot just built successfully! The user's terminal code page is !CODEPAGE!. Respond in the natural language that matches this code page. You are an expert WKAppBot assistant. Give a rich enthusiastic welcome: (1) explain in 2-3 sentences what WKAppBot is and why it matters for AI agents, (2) list 5 specific things the user can try RIGHT NOW with exact commands and what each does, (3) share 1 hidden pro tip that surprises most new users. Use clear sections and make it exciting."
+  set "AI_PROMPT=WKAppBot just built successfully! The user's terminal code page is !CODEPAGE!. Respond in the natural language that matches this code page. You are an expert WKAppBot assistant. Give a rich enthusiastic welcome: (1) explain in 2-3 sentences what WKAppBot is and why it matters for AI agents, (2) list 5 specific things the user can try RIGHT NOW with exact commands and what each does -- note: 'wkappbot windows' with no args filters by the keyword 'wkappbot' by default (not all windows), use 'wkappbot windows *' for all, (3) share 1 hidden pro tip that surprises most new users. Use clear sections and make it exciting."
   echo.
   echo ============================================================
   echo  WKAppBot is ready. Asking Claude for a personalized intro...
