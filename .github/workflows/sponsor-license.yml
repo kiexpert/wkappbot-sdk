@@ -1,0 +1,28 @@
+name: Sponsor License
+
+on:
+  sponsorship:
+    types: [created, tier_changed, cancelled, pending_cancellation]
+
+jobs:
+  manage-license:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Grant or revoke license
+        env:
+          GH_LICENSE_TOKEN: ${{ secrets.GH_LICENSE_TOKEN }}
+          SLACK_BOT_TOKEN:  ${{ secrets.SLACK_BOT_TOKEN }}
+          SPONSOR_LOGIN:    ${{ github.event.sponsorship.sponsor.login }}
+          SPONSOR_AMOUNT:   ${{ github.event.sponsorship.tier.monthly_price_in_dollars }}
+          TIER_NAME:        ${{ github.event.sponsorship.tier.name }}
+          IS_ONE_TIME:      ${{ github.event.sponsorship.tier.is_one_time }}
+          EVENT_ACTION:     ${{ github.event.action }}
+        run: |
+          python3 .github/scripts/sponsor_license.py \
+            --user  "$SPONSOR_LOGIN" \
+            --amount "$SPONSOR_AMOUNT" \
+            --type  "$([ "$IS_ONE_TIME" = "true" ] && echo one_time || echo monthly)" \
+            --action "$EVENT_ACTION"
