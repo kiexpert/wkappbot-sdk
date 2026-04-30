@@ -211,7 +211,7 @@ if exist "%BIN_DIR%\wkappbot.exe" (
   if "!CODEPAGE!"=="932"  set "AI_PROMPT=wkappbotのビルドが完了しました。helpの出力を見て、今すぐできること3つを簡潔に教えてください。"
   if "!CODEPAGE!"=="936"  set "AI_PROMPT=wkappbot构建完成！根据help输出，简短告诉我现在可以做的3件事。"
   echo [BUILD] Asking Claude what you can do now...
-  "%BIN_DIR%\wkappbot.exe" ask claude "!AI_PROMPT!" --file "%TEMP%\wkappbot-help-tmp.txt" 2>nul || echo [BUILD] (Claude not available -- try: wkappbot ask claude "!AI_PROMPT!")
+  "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" 2>nul || echo [BUILD] (Claude CLI not available -- try: wkappbot chat "!AI_PROMPT!")
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
 
