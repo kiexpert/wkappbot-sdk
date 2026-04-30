@@ -58,3 +58,13 @@ wkappbot skill list             # 내장 노하우 브라우즈
 ```
 
 > **어떤 앱이든 자동화 가능.** 앱 수정 불필요, 벤더 API 불필요. 사람이 쓸 수 있으면 WKAppBot이 자동화할 수 있습니다.
+
+---
+
+<div style="text-align:center;padding:1rem 0">
+
+WKAppBot이 도움이 됐다면 커피 한 잔 ☕
+
+[![PayPal Donate](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal)](https://paypal.me/kiexpert)
+
+</div>

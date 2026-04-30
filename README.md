@@ -7,6 +7,7 @@
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
 [![Docs](https://img.shields.io/badge/docs-kiexpert.github.io-blue)](https://kiexpert.github.io/wkappbot-sdk/)
+[![Sponsor](https://img.shields.io/badge/sponsor-PayPal-00457C?logo=paypal)](https://paypal.me/kiexpert)
 
 **Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent.**  
 Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
@@ -367,6 +368,14 @@ Do not use the name to imply endorsement or affiliation without written permissi
 - [CLAUDE.md](./CLAUDE.md) -- detailed operational guidance for AI agents
 - [AGENTS.md](./AGENTS.md) -- shared AI engineering rules
 - `wkappbot skill list` — accumulated knowhow: grap syntax, UIA quirks, CDP gotchas, and more
+
+---
+
+## Support This Project
+
+If WKAppBot saves you time, consider buying me a coffee ☕
+
+[![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal)](https://paypal.me/kiexpert)
 
 ---
 
