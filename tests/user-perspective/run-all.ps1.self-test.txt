@@ -1,0 +1,65 @@
+commit: 2dac96e2477ecac39755d4d2d272318e86a3d9a6
+script: tests/user-perspective/run-all.ps1
+exitcode: 2
+timestamp_utc: 2026-04-30T03:17:15.1439671Z
+
+
+────────────────────────────────────────────────────────────
+
+=== Stage 1: Installation ===
+
+  [PASS] bin\wkappbot.exe present
+  [PASS] bin\wkappbot-core.exe present
+  [PASS] wkappbot reachable from PATH
+  [PASS] --version returns 'wkappbot v'
+  [PASS] version >= 6.0
+  [PASS] wkappbot.hq created
+  [FAIL] build_info.json present
+
+Stage 1 result: 6 passed, 1 failed
+
+────────────────────────────────────────────────────────────
+
+=== Stage 2: Basic CLI ===
+
+  [PASS] --help exits 0
+  [PASS] --help mentions a11y
+  [PASS] skill list exits 0
+  [PASS] skill list shows wkappbot skills
+  [PASS] skill read grap exits 0
+  [PASS] file read exits 0
+  [PASS] file read returns content
+  [PASS] file grep exits 0
+  [PASS] file grep finds match
+  [PASS] file glob finds yml files
+  [PASS] schedule list exits 0
+  [PASS] windows exits 0
+  [PASS] eye --help exits 0
+  [PASS] ask --help exits 0
+  [PASS] gc --help exits 0
+
+Stage 2 result: 15 passed, 0 warned, 0 failed
+
+────────────────────────────────────────────────────────────
+
+=== Stage 3: Automation (Desktop) ===
+
+  [SKIP] Desktop tests skipped (headless / CI mode)
+
+────────────────────────────────────────────────────────────
+
+=== Stage 4: License ===
+
+  [FAIL] license status exits 0
+  [FAIL] license status shows Tier
+  [PASS] license shows tier name
+  [PASS] SUBSCRIBE.md URL reachable
+  [PASS] skill list works on Free tier
+  [PASS] invalid license activate returns non-zero
+  [PASS] gh auth: authenticated (paid tier ready)
+
+Stage 4 result: 5 passed, 0 warned, 2 failed
+
+============================================================
+  FAILED STAGES: 01-install.ps1, 04-license.ps1
+============================================================

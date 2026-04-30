@@ -1,0 +1,17 @@
+commit: 2dac96e2477ecac39755d4d2d272318e86a3d9a6
+script: tests/user-perspective/04-license.ps1
+exitcode: 1
+timestamp_utc: 2026-04-30T03:17:02.2800362Z
+
+
+=== Stage 4: License ===
+
+  [FAIL] license status exits 0
+  [FAIL] license status shows Tier
+  [PASS] license shows tier name
+  [PASS] SUBSCRIBE.md URL reachable
+  [PASS] skill list works on Free tier
+  [PASS] invalid license activate returns non-zero
+  [PASS] gh auth: authenticated (paid tier ready)
+
+Stage 4 result: 5 passed, 0 warned, 2 failed
