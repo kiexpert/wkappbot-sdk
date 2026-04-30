@@ -64,7 +64,7 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ## Core Features
 
-### grap -- Universal Element Address
+### grap (Grab Accessible Pattern) -- Universal Element Address
 
 > *Human sees windows; AI points with grap.*
 
