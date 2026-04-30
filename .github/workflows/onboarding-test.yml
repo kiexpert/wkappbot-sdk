@@ -34,7 +34,7 @@ jobs:
         Write-Host $out
         $out | Set-Content help_output.txt -Encoding utf8
 
-    - name: Validate with AI (Groq -> Gemini fallback)
+    - name: Validate help output + AI summary (Groq->Cerebras->Gemini)
       shell: python
       env:
         GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
@@ -44,6 +44,15 @@ jobs:
         import os, sys, json, urllib.request, urllib.error
 
         help_text = open("help_output.txt", encoding="utf-8").read()
+
+        # Primary check: help output must contain required keywords (no AI needed)
+        required = ["a11y", "grap", "CDP", "wkappbot"]
+        missing = [kw for kw in required if kw not in help_text]
+        if missing:
+            print(f"FAIL: help output missing required keywords: {missing}")
+            sys.exit(1)
+        print(f"Help output check PASS: {required}")
+
         prompt = (
             "This is the output of `wkappbot help`. "
             "List 5 key things this tool can do. Be specific, under 100 words total.\n\n"
@@ -110,7 +119,7 @@ jobs:
                     print(f"SKIP {name}: HTTP {e.code} -- trying next\n{err}")
 
         if reply is None:
-            print("SKIP: all providers rate-limited or unavailable")
+            print("AI summary SKIP: all providers unavailable -- help output check already passed")
             sys.exit(0)
 
         keywords = ["a11y", "grap", "cdp", "automation", "window", "click", "ai"]
@@ -118,7 +127,6 @@ jobs:
         print(f"\nMatched keywords: {found} ({len(found)}/7)")
 
         if len(found) >= 2:
-            print("\nPASS")
+            print("\nAI summary PASS")
         else:
-            print("\nFAIL -- fewer than 2 expected keywords in AI response")
-            sys.exit(1)
+            print("\nAI summary WARN -- fewer than 2 keywords (non-blocking)")
