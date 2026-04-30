@@ -212,7 +212,16 @@ if exist "%BIN_DIR%\wkappbot.exe" (
   echo  WKAppBot is ready. Asking Claude for a personalized intro...
   echo ============================================================
   echo.
-  "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" 2>nul || echo [BUILD] (Claude CLI not available -- run: wkappbot chat "!AI_PROMPT!")
+  "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" > "%TEMP%\wkappbot-welcome.txt" 2>nul || echo [BUILD] (Claude CLI not available -- run: wkappbot chat "!AI_PROMPT!")
+  type "%TEMP%\wkappbot-welcome.txt"
+  rem Speak the opening line aloud (TTS + karaoke overlay)
+  for /f "usebackq delims=" %%L in ("%TEMP%\wkappbot-welcome.txt") do (
+    set "SPEAK_LINE=%%L"
+    goto :speak_welcome
+  )
+  :speak_welcome
+  "%BIN_DIR%\wkappbot.exe" speak "!SPEAK_LINE!" --bg 2>nul
+  del /q "%TEMP%\wkappbot-welcome.txt" 2>nul
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
 
