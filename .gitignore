@@ -87,6 +87,11 @@ agent-checkpoints/
 agent-patch-*.patch
 !bin/wkappbot.hq/suggestions_history.jsonl
 
+# Node / Vitepress
+node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
 # Private/internal artifacts -- not for public SDK
 .mcp.json
 .claude/
