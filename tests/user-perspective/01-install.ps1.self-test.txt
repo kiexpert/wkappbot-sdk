@@ -1,0 +1,17 @@
+commit: 2dac96e2477ecac39755d4d2d272318e86a3d9a6
+script: tests/user-perspective/01-install.ps1
+exitcode: 1
+timestamp_utc: 2026-04-30T03:16:46.9426690Z
+
+
+=== Stage 1: Installation ===
+
+  [PASS] bin\wkappbot.exe present
+  [PASS] bin\wkappbot-core.exe present
+  [PASS] wkappbot reachable from PATH
+  [PASS] --version returns 'wkappbot v'
+  [PASS] version >= 6.0
+  [PASS] wkappbot.hq created
+  [FAIL] build_info.json present
+
+Stage 1 result: 6 passed, 1 failed

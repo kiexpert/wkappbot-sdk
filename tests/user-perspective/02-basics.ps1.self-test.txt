@@ -1,0 +1,25 @@
+commit: 2dac96e2477ecac39755d4d2d272318e86a3d9a6
+script: tests/user-perspective/02-basics.ps1
+exitcode: 0
+timestamp_utc: 2026-04-30T03:16:53.8410513Z
+
+
+=== Stage 2: Basic CLI ===
+
+  [PASS] --help exits 0
+  [PASS] --help mentions a11y
+  [PASS] skill list exits 0
+  [PASS] skill list shows wkappbot skills
+  [PASS] skill read grap exits 0
+  [PASS] file read exits 0
+  [PASS] file read returns content
+  [PASS] file grep exits 0
+  [PASS] file grep finds match
+  [PASS] file glob finds yml files
+  [PASS] schedule list exits 0
+  [PASS] windows exits 0
+  [PASS] eye --help exits 0
+  [PASS] ask --help exits 0
+  [PASS] gc --help exits 0
+
+Stage 2 result: 15 passed, 0 warned, 0 failed

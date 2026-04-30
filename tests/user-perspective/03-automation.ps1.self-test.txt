@@ -1,0 +1,9 @@
+commit: 2dac96e2477ecac39755d4d2d272318e86a3d9a6
+script: tests/user-perspective/03-automation.ps1
+exitcode: 0
+timestamp_utc: 2026-04-30T03:16:54.5032896Z
+
+
+=== Stage 3: Automation (Desktop) ===
+
+  [SKIP] Desktop tests skipped (headless / CI mode)
