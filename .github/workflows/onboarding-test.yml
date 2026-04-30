@@ -60,7 +60,11 @@ jobs:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read())
         except urllib.error.HTTPError as e:
-            print(f"Gemini API error {e.code}: {e.read().decode()}", file=sys.stderr)
+            body = e.read().decode()
+            if e.code == 429:
+                print(f"⏭ SKIP — Gemini rate limit (429). Try again later.\n{body}")
+                sys.exit(0)
+            print(f"Gemini API error {e.code}: {body}", file=sys.stderr)
             sys.exit(1)
 
         gemini_reply = data["candidates"][0]["content"]["parts"][0]["text"]
