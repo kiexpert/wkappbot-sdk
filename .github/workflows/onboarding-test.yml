@@ -34,9 +34,10 @@ jobs:
         Write-Host $out
         $out | Set-Content help_output.txt -Encoding utf8
 
-    - name: Validate with Gemini
+    - name: Validate with AI (Groq -> Gemini fallback)
       shell: python
       env:
+        GROQ_API_KEY:   ${{ secrets.GROQ_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         import os, sys, json, urllib.request, urllib.error
@@ -48,34 +49,60 @@ jobs:
             + help_text
         )
 
-        api_key = os.environ["GEMINI_API_KEY"]
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/models/"
-            "gemini-2.0-flash:generateContent?key=" + api_key
-        )
-        body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
-        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+        def call_groq(api_key):
+            body = json.dumps({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200,
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions",
+                data=body,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read())["choices"][0]["message"]["content"]
 
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read())
-        except urllib.error.HTTPError as e:
-            body = e.read().decode()
-            if e.code == 429:
-                print(f"SKIP: Gemini rate limit (429). Try again later.\n{body}")
-                sys.exit(0)
-            print(f"Gemini API error {e.code}: {body}", file=sys.stderr)
-            sys.exit(1)
+        def call_gemini(api_key):
+            body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                "gemini-2.0-flash:generateContent?key=" + api_key
+            )
+            req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read())["candidates"][0]["content"]["parts"][0]["text"]
 
-        gemini_reply = data["candidates"][0]["content"]["parts"][0]["text"]
-        print("Gemini response:\n" + gemini_reply)
+        reply = None
+        for name, fn, key_env in [
+            ("Groq",   call_groq,   "GROQ_API_KEY"),
+            ("Gemini", call_gemini, "GEMINI_API_KEY"),
+        ]:
+            key = os.environ.get(key_env, "")
+            if not key:
+                print(f"SKIP {name}: no API key")
+                continue
+            try:
+                reply = fn(key)
+                print(f"[{name}] response:\n{reply}")
+                break
+            except urllib.error.HTTPError as e:
+                err = e.read().decode()
+                if e.code == 429:
+                    print(f"SKIP {name}: rate limit (429) -- trying next")
+                else:
+                    print(f"SKIP {name}: HTTP {e.code} -- trying next\n{err}")
+
+        if reply is None:
+            print("SKIP: all providers rate-limited or unavailable")
+            sys.exit(0)
 
         keywords = ["a11y", "grap", "cdp", "automation", "window", "click", "ai"]
-        found = [kw for kw in keywords if kw in gemini_reply.lower()]
+        found = [kw for kw in keywords if kw in reply.lower()]
         print(f"\nMatched keywords: {found} ({len(found)}/7)")
 
         if len(found) >= 2:
-            print("\n✅ PASS")
+            print("\nPASS")
         else:
-            print("\n❌ FAIL — fewer than 2 expected keywords in Gemini response")
+            print("\nFAIL -- fewer than 2 expected keywords in AI response")
             sys.exit(1)
