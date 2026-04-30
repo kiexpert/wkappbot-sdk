@@ -214,9 +214,9 @@ if exist "%BIN_DIR%\wkappbot.exe" (
   echo.
   "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" > "%TEMP%\wkappbot-welcome.txt" 2>nul || echo [BUILD] (Claude CLI not available -- run: wkappbot chat "!AI_PROMPT!")
   type "%TEMP%\wkappbot-welcome.txt"
-  rem Speak full text aloud -- strip code fences, collapse to one line for TTS
-  for /f "usebackq delims=" %%L in (`powershell -NoProfile -Command "((Get-Content '%TEMP%\wkappbot-welcome.txt' -Encoding UTF8 | Where-Object { $_ -notmatch '^``' + '`' -and $_ -notmatch '^#' -and $_ -notmatch '^---' -and $_.Trim() -ne '' } | ForEach-Object { $_.Trim() }) -join ' ')"`) do set "SPEAK_ALL=%%L"
-  "%BIN_DIR%\wkappbot.exe" speak "!SPEAK_ALL!" --bg 2>nul
+  rem Speak full text aloud -- PowerShell handles Unicode end-to-end (no cmd for/f encoding loss)
+  powershell -NoProfile -Command ^
+    "$t = ((Get-Content '%TEMP%\wkappbot-welcome.txt' -Encoding UTF8 | Where-Object { $_ -notmatch '^``' + '`' -and $_ -notmatch '^#' -and $_ -notmatch '^---' -and $_.Trim() -ne '' } | ForEach-Object { $_.Trim() }) -join ' '); & '%BIN_DIR%\wkappbot.exe' speak $t --bg" 2>nul
   del /q "%TEMP%\wkappbot-welcome.txt" 2>nul
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
