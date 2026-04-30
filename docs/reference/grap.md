@@ -1,6 +1,7 @@
 # grap 패턴 레퍼런스
 
-> **grap** = glob/regex/OR(`;`)/`#UIA-scope`/`{JSON5}` 다중필드 AND
+> **grap** = **Grab Accessible Pattern**  
+> glob/regex/OR(`;`)/`#UIA-scope`/`{JSON5}` 다중필드 AND
 
 grap은 WKAppBot의 통합 UI 요소 주소 언어입니다. Win32 윈도우, UIA 노드, 웹 페이지, Android 앱의 모든 요소를 하나의 문법으로 표현합니다.
 

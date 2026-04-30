@@ -30,7 +30,7 @@ features:
     title: AI-Native
     details: GPT·Gemini·Claude에 병렬 위임, CDP로 라이브 브라우저 AI 세션 주입, 토큰 예산 소진 시 자동 핸드오프. 같은 바이너리가 자동화와 AI 위임을 모두 처리합니다.
   - icon: 🌐
-    title: grap — Universal Element Address
+    title: grap — Grab Accessible Pattern
     details: Win32, UIA, 웹, Android의 모든 UI 요소를 단일 주소로. 와일드카드, OR, CSS 셀렉터, UIA 스코프, ADB 경로를 하나의 문법으로.
   - icon: 📱
     title: Android 지원

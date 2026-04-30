@@ -4,7 +4,7 @@
 
 > *사람은 창을 찾아보고, AI는 grap으로 가리킨다.*
 
-grap은 Win32, UIA, 웹, Android의 모든 UI 요소를 표현하는 단일 주소 언어입니다.
+**grap** = **Grab Accessible Pattern** — Win32, UIA, 웹, Android의 모든 UI 요소를 표현하는 단일 주소 언어입니다.
 
 ```
 *Notepad*               → 와일드카드: 제목에 "Notepad" 포함
