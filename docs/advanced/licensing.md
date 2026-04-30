@@ -43,7 +43,7 @@ Launcher는 자유롭게 사용·수정·배포할 수 있습니다. Core는 개
 | `run` YAML 시나리오 | ✅ | ✅ | ✅ |
 | `skill` 시스템 | ✅ | ✅ | ✅ |
 | `speak` (TTS) | ✅ | ✅ | ✅ |
-| `file`, `logcat` | ✅ | ✅ | ✅ |
+| `file`, `logcat`, `gc` | ✅ | ✅ | ✅ |
 | **CDP 브라우저 자동화** | — | ✅ | ✅ |
 | **`ask` (triad / gpt / gemini)** | — | ✅ | ✅ |
 | **`schedule`** | — | ✅ | ✅ |
