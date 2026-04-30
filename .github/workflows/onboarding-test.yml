@@ -21,7 +21,7 @@ jobs:
           | Select-Object -First 1
         if (-not $asset) { throw 'No zip asset found in latest release.' }
         Write-Host "Downloading: $($asset.name)"
-        Invoke-WebRequest -Uri $asset.browserDownloadUrl -OutFile release.zip
+        Invoke-WebRequest -Uri $asset.url -OutFile release.zip
         Expand-Archive release.zip -DestinationPath release -Force
 
     - name: Run wkappbot help
