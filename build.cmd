@@ -212,12 +212,20 @@ if exist "%BIN_DIR%\wkappbot.exe" (
   echo  WKAppBot is ready. Asking Claude for a personalized intro...
   echo ============================================================
   echo.
+  rem Check Claude CLI is configured before calling (avoids interactive setup screen on first run)
+  set "CLAUDE_CREDS=%USERPROFILE%\.claude\.credentials.json"
+  if not exist "!CLAUDE_CREDS!" (
+    echo [BUILD] Claude CLI not configured yet -- skipping AI welcome.
+    echo [BUILD] To enable: run 'claude' once to log in, then rebuild.
+    goto :skip_claude
+  )
   "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" > "%TEMP%\wkappbot-welcome.txt" 2>nul || echo [BUILD] (Claude CLI not available -- run: wkappbot chat "!AI_PROMPT!")
   type "%TEMP%\wkappbot-welcome.txt"
   rem Speak full text aloud -- PowerShell handles Unicode end-to-end (no cmd for/f encoding loss)
   powershell -NoProfile -Command ^
     "$in = $false; $t = (((Get-Content '%TEMP%\wkappbot-welcome.txt' -Encoding UTF8 | ForEach-Object { if ($_ -match '^``' + '`') { $in = !$in } elseif (-not $in -and $_ -notmatch '^#' -and $_ -notmatch '^---' -and $_ -notmatch '^[*_``>\|]' -and $_.Trim() -ne '') { $_.Trim() } }) -join ' ') -replace '[^\p{L}\p{N}\p{P}\p{Z}]', ''); & '%BIN_DIR%\wkappbot.exe' speak $t --bg" 2>nul
   del /q "%TEMP%\wkappbot-welcome.txt" 2>nul
+  :skip_claude
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
 
