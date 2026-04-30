@@ -201,6 +201,20 @@ if exist "%BIN_DIR%\wkappbot-core.exe" del /q "%BIN_DIR%\wkappbot-core.new.exe" 
 del /q "%BIN_DIR%\wkappbot-core.old.exe" >nul 2>nul
 
 echo [BUILD] done
+
+rem Ask Claude what this tool can do, in the user's language (detected via code page)
+if exist "%BIN_DIR%\wkappbot.exe" (
+  "%BIN_DIR%\wkappbot.exe" help > "%TEMP%\wkappbot-help-tmp.txt" 2>nul
+  for /f "tokens=3 delims=: " %%A in ('chcp') do set "CODEPAGE=%%A"
+  set "AI_PROMPT=WKAppBot build complete. Based on the help output, list 3 things I can do right now. Be brief."
+  if "!CODEPAGE!"=="949"  set "AI_PROMPT=방금 wkappbot 빌드 완료! help 출력 보고 지금 당장 할 수 있는 것 3가지만 짧게 알려줘."
+  if "!CODEPAGE!"=="932"  set "AI_PROMPT=wkappbotのビルドが完了しました。helpの出力を見て、今すぐできること3つを簡潔に教えてください。"
+  if "!CODEPAGE!"=="936"  set "AI_PROMPT=wkappbot构建完成！根据help输出，简短告诉我现在可以做的3件事。"
+  echo [BUILD] Asking Claude what you can do now...
+  "%BIN_DIR%\wkappbot.exe" ask claude "!AI_PROMPT!" --file "%TEMP%\wkappbot-help-tmp.txt" 2>nul || echo [BUILD] (Claude not available -- try: wkappbot ask claude "!AI_PROMPT!")
+  del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
+)
+
 exit /b 0
 
 :publish_launcher
