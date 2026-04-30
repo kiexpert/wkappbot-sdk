@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
+[![Docs](https://img.shields.io/badge/docs-kiexpert.github.io-blue)](https://kiexpert.github.io/wkappbot-sdk/)
 
 **Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent.**  
 Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
@@ -157,6 +158,20 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 ```
 
 Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root}/.wkappbot/hq/`).
+
+---
+
+## 📚 Documentation
+
+**→ [kiexpert.github.io/wkappbot-sdk](https://kiexpert.github.io/wkappbot-sdk/)**
+
+| | |
+|---|---|
+| [설치 가이드](https://kiexpert.github.io/wkappbot-sdk/guide/install) | 클론·빌드·PATH 설정 |
+| [빠른 시작 (10분)](https://kiexpert.github.io/wkappbot-sdk/guide/quickstart) | 첫 자동화까지 |
+| [CLI 명령어 레퍼런스](https://kiexpert.github.io/wkappbot-sdk/reference/commands) | 전체 명령 + 출력 샘플 |
+| [grap 패턴](https://kiexpert.github.io/wkappbot-sdk/reference/grap) | Grab Accessible Pattern 문법 |
+| [트러블슈팅](https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting) | 자주 겪는 문제 해결 |
 
 ---
 
