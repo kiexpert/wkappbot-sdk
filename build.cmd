@@ -206,12 +206,16 @@ rem Ask Claude what this tool can do, in the user's language (detected via code 
 if exist "%BIN_DIR%\wkappbot.exe" (
   "%BIN_DIR%\wkappbot.exe" help > "%TEMP%\wkappbot-help-tmp.txt" 2>nul
   for /f "tokens=3 delims=: " %%A in ('chcp') do set "CODEPAGE=%%A"
-  set "AI_PROMPT=WKAppBot build complete. Based on the help output, list 3 things I can do right now. Be brief."
-  if "!CODEPAGE!"=="949"  set "AI_PROMPT=방금 wkappbot 빌드 완료! help 출력 보고 지금 당장 할 수 있는 것 3가지만 짧게 알려줘."
-  if "!CODEPAGE!"=="932"  set "AI_PROMPT=wkappbotのビルドが完了しました。helpの出力を見て、今すぐできること3つを簡潔に教えてください。"
-  if "!CODEPAGE!"=="936"  set "AI_PROMPT=wkappbot构建完成！根据help输出，简短告诉我现在可以做的3件事。"
-  echo [BUILD] Asking Claude what you can do now...
-  "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" 2>nul || echo [BUILD] (Claude CLI not available -- try: wkappbot chat "!AI_PROMPT!")
+  set "AI_PROMPT=WKAppBot just built successfully! You are an expert WKAppBot assistant. Give a rich, enthusiastic welcome: (1) explain in 2-3 sentences what WKAppBot fundamentally is and why it matters for AI agents, (2) list 5 specific things the user can try RIGHT NOW with exact commands and what each does, (3) share 1 pro tip that surprises most new users. Format with clear sections and make it exciting."
+  if "!CODEPAGE!"=="949"  set "AI_PROMPT=WKAppBot 빌드 성공! 당신은 WKAppBot 전문가야. 다음을 멋지게 출력해줘: (1) WKAppBot이 무엇이고 왜 AI 에이전트에게 혁신적인지 2~3문장으로 설명, (2) 지금 바로 실행해볼 수 있는 명령어 5가지를 실제 예시와 함께 상세히 소개, (3) 대부분의 신규 유저가 놀라는 숨겨진 기능 1가지 소개. 섹션을 나눠서 흥미롭게 작성해줘."
+  if "!CODEPAGE!"=="932"  set "AI_PROMPT=WKAppBot のビルドが完了しました！WKAppBot の専門家として、(1) WKAppBot とは何か・AIエージェントにとってなぜ革新的かを2〜3文で、(2) 今すぐ試せるコマンド5つを具体例付きで、(3) 新規ユーザーが驚く隠れた機能1つを、セクション分けして魅力的に紹介してください。"
+  if "!CODEPAGE!"=="936"  set "AI_PROMPT=WKAppBot 构建成功！作为 WKAppBot 专家，请精彩介绍：(1) WKAppBot 是什么、为何对 AI 智能体具有革命性意义（2-3句），(2) 现在可以立即尝试的5个命令及具体示例，(3) 让新用户惊喜的1个隐藏功能。分节排版，生动有趣。"
+  echo.
+  echo ============================================================
+  echo  WKAppBot is ready. Asking Claude for a personalized intro...
+  echo ============================================================
+  echo.
+  "%BIN_DIR%\wkappbot.exe" chat "!AI_PROMPT!" 2>nul || echo [BUILD] (Claude CLI not available -- run: wkappbot chat "!AI_PROMPT!")
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
 
