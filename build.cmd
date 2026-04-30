@@ -216,7 +216,7 @@ if exist "%BIN_DIR%\wkappbot.exe" (
   type "%TEMP%\wkappbot-welcome.txt"
   rem Speak full text aloud -- PowerShell handles Unicode end-to-end (no cmd for/f encoding loss)
   powershell -NoProfile -Command ^
-    "$t = ((Get-Content '%TEMP%\wkappbot-welcome.txt' -Encoding UTF8 | Where-Object { $_ -notmatch '^``' + '`' -and $_ -notmatch '^#' -and $_ -notmatch '^---' -and $_.Trim() -ne '' } | ForEach-Object { $_.Trim() }) -join ' '); & '%BIN_DIR%\wkappbot.exe' speak $t --bg" 2>nul
+    "$in = $false; $t = (((Get-Content '%TEMP%\wkappbot-welcome.txt' -Encoding UTF8 | ForEach-Object { if ($_ -match '^``' + '`') { $in = !$in } elseif (-not $in -and $_ -notmatch '^#' -and $_ -notmatch '^---' -and $_ -notmatch '^[*_``>\|]' -and $_.Trim() -ne '') { $_.Trim() } }) -join ' ') -replace '[^\p{L}\p{N}\p{P}\p{Z}]', ''); & '%BIN_DIR%\wkappbot.exe' speak $t --bg" 2>nul
   del /q "%TEMP%\wkappbot-welcome.txt" 2>nul
   del /q "%TEMP%\wkappbot-help-tmp.txt" 2>nul
 )
