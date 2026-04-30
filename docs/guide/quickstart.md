@@ -126,6 +126,24 @@ wkappbot run test-notepad.yaml        # 실행
 
 ---
 
+## AI에게 맞춤 설명 받기
+
+설치 후 막막하다면 `wkappbot help` 출력을 그대로 AI에 붙여넣고 물어보세요:
+
+```bash
+wkappbot help
+```
+
+출력 전체를 복사한 뒤 Claude(또는 ChatGPT·Gemini)에 다음처럼 보내면 됩니다:
+
+```
+wkappbot help 출력이야. 이 앱봇으로 나한테 맞게 설명해줘.
+```
+
+내 PC에 설치된 버전 기준으로, 내 상황에 맞는 설명을 바로 얻을 수 있습니다.
+
+---
+
 ## 다음 단계
 
 - [핵심 개념](/guide/concepts) — grap, Eye 데몬, 5-tier 검색 이해

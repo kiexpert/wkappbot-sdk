@@ -59,6 +59,14 @@ wkappbot skill list             # 내장 노하우 브라우즈
 
 > **어떤 앱이든 자동화 가능.** 앱 수정 불필요, 벤더 API 불필요. 사람이 쓸 수 있으면 WKAppBot이 자동화할 수 있습니다.
 
+**AI에게 맞춤 설명 받기** — `wkappbot help` 출력을 복사해 Claude(또는 ChatGPT·Gemini)에 붙여넣고 이렇게 물어보세요:
+
+```
+wkappbot help 출력이야. 이 앱봇으로 나한테 맞게 설명해줘.
+```
+
+내 버전 기준으로 맞춤 설명을 즉시 받을 수 있습니다.
+
 ---
 
 <div style="text-align:center;padding:1rem 0">

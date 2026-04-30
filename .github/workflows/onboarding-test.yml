@@ -1,0 +1,77 @@
+name: onboarding-test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * 1'  # Monday 9am UTC
+
+jobs:
+  onboarding-test:
+    runs-on: windows-latest
+    steps:
+    - name: Download latest wkappbot release
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $asset = gh release view --repo kiexpert/wkappbot-sdk --json assets `
+          | ConvertFrom-Json `
+          | Select-Object -ExpandProperty assets `
+          | Where-Object { $_.name -like '*.zip' } `
+          | Select-Object -First 1
+        if (-not $asset) { throw 'No zip asset found in latest release.' }
+        Write-Host "Downloading: $($asset.name)"
+        Invoke-WebRequest -Uri $asset.browserDownloadUrl -OutFile release.zip
+        Expand-Archive release.zip -DestinationPath release -Force
+
+    - name: Run wkappbot help
+      shell: pwsh
+      id: help
+      run: |
+        $exe = Get-ChildItem -Recurse -Filter wkappbot.exe release | Select-Object -First 1
+        if (-not $exe) { throw 'wkappbot.exe not found in release zip.' }
+        $out = & $exe.FullName help 2>&1 | Out-String
+        Write-Host $out
+        $out | Set-Content help_output.txt -Encoding utf8
+
+    - name: Validate with Gemini
+      shell: python
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        import os, sys, json, urllib.request, urllib.error
+
+        help_text = open("help_output.txt", encoding="utf-8").read()
+        prompt = (
+            "This is the output of `wkappbot help`. "
+            "List 5 key things this tool can do. Be specific, under 100 words total.\n\n"
+            + help_text
+        )
+
+        api_key = os.environ["GEMINI_API_KEY"]
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            "gemini-1.5-flash:generateContent?key=" + api_key
+        )
+        body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
+        req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            print(f"Gemini API error {e.code}: {e.read().decode()}", file=sys.stderr)
+            sys.exit(1)
+
+        gemini_reply = data["candidates"][0]["content"]["parts"][0]["text"]
+        print("Gemini response:\n" + gemini_reply)
+
+        keywords = ["a11y", "grap", "cdp", "automation", "window", "click", "ai"]
+        found = [kw for kw in keywords if kw in gemini_reply.lower()]
+        print(f"\nMatched keywords: {found} ({len(found)}/7)")
+
+        if len(found) >= 2:
+            print("\n✅ PASS")
+        else:
+            print("\n❌ FAIL — fewer than 2 expected keywords in Gemini response")
+            sys.exit(1)
