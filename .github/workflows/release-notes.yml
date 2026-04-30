@@ -1,0 +1,26 @@
+name: Release Notes Generator
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Korean release notes with Groq
+        env:
+          GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG:       ${{ github.event.release.tag_name }}
+          RELEASE_NAME:      ${{ github.event.release.name }}
+          PREV_TAG:          ${{ github.event.release.target_commitish }}
+        run: python3 .github/scripts/release-notes.py
