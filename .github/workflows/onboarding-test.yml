@@ -37,8 +37,9 @@ jobs:
     - name: Validate with AI (Groq -> Gemini fallback)
       shell: python
       env:
-        GROQ_API_KEY:   ${{ secrets.GROQ_API_KEY }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
+        GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+        CEREBRAS_API_KEY:  ${{ secrets.CEREBRAS_API_KEY }}
       run: |
         import os, sys, json, urllib.request, urllib.error
 
@@ -63,6 +64,20 @@ jobs:
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.loads(r.read())["choices"][0]["message"]["content"]
 
+        def call_cerebras(api_key):
+            body = json.dumps({
+                "model": "llama-3.3-70b",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 200,
+            }).encode()
+            req = urllib.request.Request(
+                "https://api.cerebras.ai/v1/chat/completions",
+                data=body,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read())["choices"][0]["message"]["content"]
+
         def call_gemini(api_key):
             body = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
             url = (
@@ -75,8 +90,9 @@ jobs:
 
         reply = None
         for name, fn, key_env in [
-            ("Groq",   call_groq,   "GROQ_API_KEY"),
-            ("Gemini", call_gemini, "GEMINI_API_KEY"),
+            ("Groq",     call_groq,     "GROQ_API_KEY"),
+            ("Cerebras", call_cerebras, "CEREBRAS_API_KEY"),
+            ("Gemini",   call_gemini,   "GEMINI_API_KEY"),
         ]:
             key = os.environ.get(key_env, "")
             if not key:
