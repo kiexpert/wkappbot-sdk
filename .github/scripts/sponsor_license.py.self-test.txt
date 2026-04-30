@@ -1,0 +1,9 @@
+commit: 73eb85c3020cbbd79145b9b481d826ac77e9c5ad
+script: .github/scripts/sponsor_license.py
+exitcode: 2
+timestamp_utc: 2026-04-30T15:28:33.6248851Z
+
+usage: sponsor_license.py [-h] --user USER [--amount AMOUNT]
+                          [--type {one_time,monthly}]
+                          --action {created,tier_changed,cancelled,pending_cancellation}
+sponsor_license.py: error: the following arguments are required: --user, --action
