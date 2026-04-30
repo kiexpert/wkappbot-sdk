@@ -40,6 +40,13 @@ export default defineConfig({
             { text: '핵심 개념', link: '/guide/concepts' },
           ],
         },
+        {
+          text: '도움말',
+          items: [
+            { text: 'FAQ', link: '/faq' },
+            { text: '트러블슈팅', link: '/guide/troubleshooting' },
+          ],
+        },
       ],
       '/reference/': [
         {
