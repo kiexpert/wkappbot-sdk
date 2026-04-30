@@ -1,0 +1,87 @@
+name: Site Health Check
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 매일 새벽 1시 UTC (한국 오전 10시)
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Check key pages
+        id: check
+        run: |
+          BASE="https://kiexpert.github.io/wkappbot-sdk"
+          PAGES=(
+            "/"
+            "/guide/install"
+            "/guide/quickstart"
+            "/reference/commands"
+            "/reference/grap"
+            "/guide/troubleshooting"
+          )
+          FAILED=""
+          for page in "${PAGES[@]}"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${BASE}${page}")
+            if [ "$STATUS" != "200" ]; then
+              echo "FAIL: ${page} → ${STATUS}"
+              FAILED="${FAILED} ${page}(${STATUS})"
+            else
+              echo "OK:   ${page}"
+            fi
+          done
+          if [ -n "$FAILED" ]; then
+            echo "failed=${FAILED}" >> $GITHUB_OUTPUT
+            echo "status=failure" >> $GITHUB_OUTPUT
+          else
+            echo "status=ok" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Slack on failure
+        if: steps.check.outputs.status == 'failure'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          MSG="🚨 *wkappbot-sdk 문서 사이트 이상 감지*\n실패 페이지: ${{ steps.check.outputs.failed }}\n사이트: https://kiexpert.github.io/wkappbot-sdk/"
+          curl -s -X POST "https://slack.com/api/chat.postMessage" \
+            -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"channel\":\"C0APNELH2LR\",\"text\":\"$MSG\"}"
+
+      - name: Open GitHub issue on failure
+        if: steps.check.outputs.status == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --label "site-health" --state open --json number --jq '.[0].number' -R kiexpert/wkappbot-sdk)
+          if [ -z "$EXISTING" ]; then
+            gh issue create \
+              --title "🚨 [자동] 문서 사이트 접속 오류" \
+              --body "### 감지된 문제\n\n실패 페이지: ${{ steps.check.outputs.failed }}\n\n자동 감지 워크플로우: [site-health.yml](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/site-health.yml)\n\n_해결되면 이 이슈를 닫아주세요._" \
+              --label "site-health,bug" \
+              -R kiexpert/wkappbot-sdk
+          else
+            echo "이미 열린 site-health 이슈 #${EXISTING} 있음 — 중복 생성 건너뜀"
+          fi
+
+      - name: Notify Slack on recovery
+        if: steps.check.outputs.status == 'ok'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          # 열린 site-health 이슈 있을 때만 회복 알림 (이전에 장애 있었을 때)
+          EXISTING=$(gh issue list --label "site-health" --state open --json number --jq '.[0].number' -R kiexpert/wkappbot-sdk 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            curl -s -X POST "https://slack.com/api/chat.postMessage" \
+              -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{\"channel\":\"C0APNELH2LR\",\"text\":\"✅ *wkappbot-sdk 문서 사이트 정상 복구*\"}"
+            gh issue close "$EXISTING" --comment "사이트 정상 복구 확인 (자동 닫힘)" -R kiexpert/wkappbot-sdk
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

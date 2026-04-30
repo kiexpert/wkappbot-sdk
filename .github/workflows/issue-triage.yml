@@ -1,0 +1,102 @@
+name: Issue Auto-Triage
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    # Skip bots and PRs-converted-to-issues
+    if: github.event.issue.user.type != 'Bot'
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Triage with Gemini
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GH_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER:   ${{ github.event.issue.number }}
+          ISSUE_TITLE:    ${{ github.event.issue.title }}
+          ISSUE_BODY:     ${{ github.event.issue.body }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, json, urllib.request, subprocess
+
+          title  = os.environ.get("ISSUE_TITLE", "")
+          body   = os.environ.get("ISSUE_BODY", "")
+          number = os.environ.get("ISSUE_NUMBER", "")
+          apikey = os.environ.get("GEMINI_API_KEY", "")
+
+          if not apikey:
+              print("GEMINI_API_KEY not set — skipping triage")
+              exit(0)
+
+          prompt = f"""You are a helpful support assistant for WKAppBot — a Windows UI automation tool for AI agents (Claude, GPT, Gemini). Launcher is MIT open source; core binary is closed source.
+
+A user opened this GitHub issue:
+Title: {title}
+Body: {body}
+
+Tasks:
+1. Classify as one of: bug / question / feature-request / documentation
+2. Pick 1-2 most relevant docs links from:
+   - 설치: https://kiexpert.github.io/wkappbot-sdk/guide/install
+   - 빠른시작: https://kiexpert.github.io/wkappbot-sdk/guide/quickstart
+   - CLI 레퍼런스: https://kiexpert.github.io/wkappbot-sdk/reference/commands
+   - grap 패턴: https://kiexpert.github.io/wkappbot-sdk/reference/grap
+   - YAML 시나리오: https://kiexpert.github.io/wkappbot-sdk/reference/scenarios
+   - 트러블슈팅: https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting
+   - FAQ: https://kiexpert.github.io/wkappbot-sdk/faq
+   - 요금: https://kiexpert.github.io/wkappbot-sdk/pricing
+3. Write a short, friendly Korean reply (2-4 sentences) that acknowledges the issue and points to relevant docs. If it looks like a bug, ask for wkappbot --version and wkappbot eye tick output.
+
+Respond ONLY with JSON: {{"type": "bug|question|feature-request|documentation", "label": "same value", "comment": "Korean reply text"}}"""
+
+          payload = json.dumps({
+              "contents": [{"parts": [{"text": prompt}]}],
+              "generationConfig": {"temperature": 0.3, "maxOutputTokens": 512}
+          }).encode()
+
+          req = urllib.request.Request(
+              f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={apikey}",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST"
+          )
+          with urllib.request.urlopen(req, timeout=30) as resp:
+              result = json.loads(resp.read())
+
+          raw = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+          # strip markdown code fences if present
+          if raw.startswith("```"):
+              raw = raw.split("```")[1]
+              if raw.startswith("json"):
+                  raw = raw[4:]
+          parsed = json.loads(raw.strip())
+
+          comment = parsed.get("comment", "")
+          label   = parsed.get("label", "question")
+
+          if not comment:
+              print("Empty comment from Gemini — skipping")
+              exit(0)
+
+          footer = "\n\n---\n🤖 *자동 응답 · [공식 문서](https://kiexpert.github.io/wkappbot-sdk/) · 추가 문의: kiexpert@kivilab.co.kr*"
+          full_comment = comment + footer
+
+          # post comment
+          subprocess.run(
+              ["gh", "issue", "comment", number, "--body", full_comment],
+              check=True
+          )
+          # add label (ignore if label doesn't exist)
+          subprocess.run(
+              ["gh", "issue", "edit", number, "--add-label", label],
+              capture_output=True
+          )
+          print(f"Triaged #{number} as '{label}'")
+          PYEOF
