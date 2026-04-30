@@ -77,6 +77,7 @@ nul
 *.ps1
 !scripts/*.ps1
 !setup.ps1
+!tests/**/*.ps1
 *.png
 tmp/
 tmp*
@@ -92,6 +93,7 @@ agent-patch-*.patch
 csharp/**/.wkappbot/
 docs/handoff/
 docs/handoff_*.md
+docs/session-bugs-*.md
 scripts/slack_merge_threads.py
 approval-policy.json
 wkappbot*.zip
