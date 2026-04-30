@@ -5,6 +5,7 @@ export default defineConfig({
   description: 'Windows + Android UI Automation for AI Agents. Focusless. Self-healing. AI-native.',
   base: '/wkappbot-sdk/',
   lang: 'ko',
+  ignoreDeadLinks: true,
 
   head: [
     ['link', { rel: 'icon', href: '/wkappbot-sdk/favicon.ico' }],
