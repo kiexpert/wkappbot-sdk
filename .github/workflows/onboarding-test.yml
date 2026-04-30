@@ -62,7 +62,7 @@ jobs:
         except urllib.error.HTTPError as e:
             body = e.read().decode()
             if e.code == 429:
-                print(f"⏭ SKIP — Gemini rate limit (429). Try again later.\n{body}")
+                print(f"SKIP: Gemini rate limit (429). Try again later.\n{body}")
                 sys.exit(0)
             print(f"Gemini API error {e.code}: {body}", file=sys.stderr)
             sys.exit(1)
