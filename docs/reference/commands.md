@@ -359,6 +359,19 @@ Plan usage: 45% (claude.ai/settings/usage)
 
 ---
 
+## `wkappbot dismiss`
+
+팝업·차단 다이얼로그를 자동 감지해 닫습니다. OCR로 중요도를 확인해 실수로 닫으면 안 되는 창은 건너뜁니다.
+
+```bash
+wkappbot dismiss "*업데이트*"        # 제목 패턴으로 닫기
+wkappbot dismiss "*오류*;*경고*"     # OR 패턴
+```
+
+모든 `a11y` 액션의 pre-flight 파이프라인에 자동 포함됩니다(`blocker dismiss` 단계).
+
+---
+
 ## `wkappbot speak`
 
 ```bash

@@ -40,7 +40,7 @@ wkappbot a11y find "*계산기*"
 5. Coordinate-based                 ← 마지막 수단
 ```
 
-결과는 Experience DB(`wkappbot.hq/experience/`)에 캐싱되어, 다음 실행부터 비싼 티어를 건너뜁니다.
+결과는 Experience DB(`bin/wkappbot.hq/experience/`)에 캐싱되어, 다음 실행부터 비싼 티어를 건너뜁니다.
 
 ---
 
