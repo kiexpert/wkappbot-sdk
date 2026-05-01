@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+import base64, json, math, os, re, sys, urllib.request
+from datetime import datetime, timezone, timedelta
+
+PRIVATE_REPO  = "kiexpert/wkappbot-private"
+SLACK_CHANNEL = "C0APNELH2LR"
+GH_API        = "https://api.github.com"
+GH_TOKEN      = os.environ.get("GH_LICENSE_TOKEN", "")
+SLACK_TOKEN   = os.environ.get("SLACK_BOT_TOKEN", "")
+PP_CLIENT_ID  = os.environ.get("PAYPAL_CLIENT_ID", "")
+PP_SECRET     = os.environ.get("PAYPAL_CLIENT_SECRET", "")
+STATE_PATH    = f"/repos/{PRIVATE_REPO}/contents/paypal_state.json"
+MAX_IDS       = 1000
+
+
+def gh(method, path, body=None):
+    url = f"{GH_API}{path}"
+    data = json.dumps(body).encode() if body else None
+    req = urllib.request.Request(
+        url, data=data, method=method,
+        headers={
+            "Authorization": f"Bearer {GH_TOKEN}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read()) if r.status not in (204, 404) else None
+    except urllib.error.HTTPError as e:
+        print(f"GitHub API {method} {path} → {e.code}: {e.read().decode()}")
+        return None
+
+
+def slack_notify(msg):
+    if not SLACK_TOKEN:
+        print(f"[Slack skip] {msg}")
+        return
+    payload = json.dumps({"channel": SLACK_CHANNEL, "text": msg}).encode()
+    req = urllib.request.Request(
+        "https://slack.com/api/chat.postMessage",
+        data=payload,
+        headers={"Authorization": f"Bearer {SLACK_TOKEN}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            result = json.loads(r.read())
+            if not result.get("ok"):
+                print(f"Slack error: {result.get('error')}")
+    except Exception as e:
+        print(f"Slack failed: {e}")
+
+
+def tier_from_amount(amount):
+    return "sudo" if amount >= 363 else "cdp"
+
+
+def put_license_file(user, payload):
+    path = f"/repos/{PRIVATE_REPO}/contents/licenses/{user}.json"
+    encoded = base64.b64encode(json.dumps(payload, indent=2).encode()).decode()
+    existing = gh("GET", path)
+    body = {"message": f"chore(licenses): grant {user} via paypal [skip ci]", "content": encoded}
+    if existing and existing.get("sha"):
+        body["sha"] = existing["sha"]
+    gh("PUT", path, body)
+
+
+def grant(user, days, amount):
+    tier = tier_from_amount(amount)
+    now  = datetime.now(timezone.utc)
+    exp  = now + timedelta(days=days)
+    result = gh("PUT", f"/repos/{PRIVATE_REPO}/collaborators/{user}", {"permission": "read"})
+    if result is None:
+        print(f"Note: collaborator PUT returned no body for {user}")
+    existing = gh("GET", f"/repos/{PRIVATE_REPO}")
+    if existing:
+        put_license_file(user, {
+            "github_user": user,
+            "tier": tier,
+            "expires_at": exp.isoformat(),
+            "days": days,
+            "amount_usd": amount,
+            "granted_at": now.isoformat(),
+            "source": "paypal",
+        })
+    slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal)")
+    print(f"Granted: {user} tier={tier} days={days} expires={exp.date()}")
+
+
+def paypal_token():
+    creds = base64.b64encode(f"{PP_CLIENT_ID}:{PP_SECRET}".encode()).decode()
+    req = urllib.request.Request(
+        "https://api-m.paypal.com/v1/oauth2/token",
+        data=b"grant_type=client_credentials",
+        headers={"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read())["access_token"]
+
+
+def paypal_transactions(token, start_date, end_date):
+    params = (
+        f"start_date={urllib.parse.quote(start_date)}"
+        f"&end_date={urllib.parse.quote(end_date)}"
+        f"&fields=all&transaction_status=S"
+    )
+    req = urllib.request.Request(
+        f"https://api-m.paypal.com/v2/reporting/transactions?{params}",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = json.loads(r.read())
+    return data.get("transaction_details", [])
+
+
+def load_state():
+    raw = gh("GET", STATE_PATH)
+    if raw and raw.get("content"):
+        content = base64.b64decode(raw["content"]).decode()
+        state = json.loads(content)
+        state["_sha"] = raw.get("sha")
+        return state
+    return {"processed_ids": [], "last_checked": None, "_sha": None}
+
+
+def save_state(state):
+    sha = state.pop("_sha", None)
+    encoded = base64.b64encode(json.dumps(state, indent=2).encode()).decode()
+    body = {"message": "chore(paypal): update state [skip ci]", "content": encoded}
+    if sha:
+        body["sha"] = sha
+    gh("PUT", STATE_PATH, body)
+
+
+def parse_github_user(note):
+    if not note:
+        return None
+    m = re.search(r"@?([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?)", note)
+    return m.group(1) if m else None
+
+
+def main():
+    if not GH_TOKEN or not PP_CLIENT_ID or not PP_SECRET:
+        print("Error: missing required env vars")
+        sys.exit(1)
+
+    import urllib.parse
+
+    state = load_state()
+    processed = set(state.get("processed_ids", []))
+    now = datetime.now(timezone.utc)
+    last_checked = state.get("last_checked")
+    start_date = last_checked if last_checked else (now - timedelta(hours=24)).isoformat()
+    end_date = now.isoformat()
+
+    token = paypal_token()
+    transactions = paypal_transactions(token, start_date, end_date)
+    print(f"Fetched {len(transactions)} transactions since {start_date}")
+
+    for tx in transactions:
+        info = tx.get("transaction_info", {})
+        tid = info.get("transaction_id", "")
+        if not tid or tid in processed:
+            continue
+
+        note = info.get("transaction_note", "")
+        amount_str = info.get("transaction_amount", {}).get("value", "0")
+        amount = float(amount_str)
+        days = max(1, math.floor(amount * 30 / 100)) if amount > 0 else 0
+
+        if days <= 0:
+            slack_notify(f"⚠️ PayPal tx {tid}: amount=${amount:.2f} yields 0 days — skipped")
+            processed.add(tid)
+            continue
+
+        user = parse_github_user(note)
+        if not user:
+            payer = tx.get("payer_info", {})
+            payer_email = payer.get("email_address", "unknown")
+            slack_notify(f"⚠️ PayPal tx {tid}: no GitHub username in note '{note}' (payer: {payer_email}, ${amount:.2f}) — manual follow-up needed")
+            processed.add(tid)
+            continue
+
+        grant(user, days, amount)
+        processed.add(tid)
+
+    ids_list = list(processed)[-MAX_IDS:]
+    state["processed_ids"] = ids_list
+    state["last_checked"] = end_date
+    save_state(state)
+    print("State updated.")
+
+
+if __name__ == "__main__":
+    main()
