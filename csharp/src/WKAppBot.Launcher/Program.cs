@@ -1123,7 +1123,11 @@ partial class Program
         return 0; // unreachable
     }
 
-    static void TerminateSelf(uint code) => TerminateProcess(GetCurrentProcess(), code);
+    static void TerminateSelf(uint code)
+    {
+        ChromeProfileSync.WaitForPendingSync();
+        TerminateProcess(GetCurrentProcess(), code);
+    }
 
     /// <summary>Core exe path override (--core flag). Null = default (wkappbot-core.exe next to launcher).</summary>
     static string? _coreExePath;
@@ -1159,11 +1163,6 @@ partial class Program
         // MaybeLiveSwap so every exit path through the centralized exit
         // point triggers it.
         RunPendingHardlinkHealOnExit();
-
-        // Wait for pending Chrome profile sync before exit -- blocking call (max 2s timeout).
-        // Chrome may have writes in progress; without this wait, profile data (prefs, history,
-        // extensions) is lost when the OS closes file handles mid-sync.
-        ChromeProfileSync.WaitForPendingSync();
 
         // Restore original stderr FIRST (bypass buffer), then write error log
         if (_originalStderr != null) Console.SetError(_originalStderr);
