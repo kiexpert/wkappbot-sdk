@@ -66,7 +66,8 @@ def write_license_file(user, expires_at):
     body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
     if existing and existing.get("sha"):
         body["sha"] = existing["sha"]
-    gh("PUT", path, body)
+    result = gh("PUT", path, body)
+    print(f"License file {'updated' if existing else 'created'}: {path} -> {'ok' if result else 'failed/no-body'}")
 
 
 def grant(user, days, amount):
