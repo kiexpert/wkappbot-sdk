@@ -9,6 +9,8 @@ GH_TOKEN      = os.environ.get("GH_LICENSE_TOKEN", "")
 SLACK_TOKEN   = os.environ.get("SLACK_BOT_TOKEN", "")
 PP_CLIENT_ID  = os.environ.get("PAYPAL_CLIENT_ID", "")
 PP_SECRET     = os.environ.get("PAYPAL_CLIENT_SECRET", "")
+# Default: production. Override PAYPAL_API_BASE=https://api-m.sandbox.paypal.com for sandbox testing.
+PP_API_BASE   = os.environ.get("PAYPAL_API_BASE", "https://api-m.paypal.com")
 STATE_PATH    = f"/repos/{LICENSE_REPO}/contents/.github/paypal_state.json"
 MAX_IDS       = 1000
 
@@ -84,7 +86,7 @@ def grant(user, days, amount):
 def paypal_token():
     creds = base64.b64encode(f"{PP_CLIENT_ID}:{PP_SECRET}".encode()).decode()
     req = urllib.request.Request(
-        "https://api-m.sandbox.paypal.com/v1/oauth2/token",
+        f"{PP_API_BASE}/v1/oauth2/token",
         data=b"grant_type=client_credentials",
         headers={"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
@@ -100,7 +102,7 @@ def paypal_transactions(token, start_date, end_date):
         f"&fields=all&transaction_status=S"
     )
     req = urllib.request.Request(
-        f"https://api-m.sandbox.paypal.com/v2/reporting/transactions?{params}",
+        f"{PP_API_BASE}/v2/reporting/transactions?{params}",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
