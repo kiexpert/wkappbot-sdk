@@ -70,9 +70,24 @@ def write_license_file(user, expires_at):
     print(f"License file {'updated' if existing else 'created'}: {path} -> {'ok' if result else 'failed/no-body'}")
 
 
+def _read_expiry(user):
+    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
+    existing = gh("GET", path)
+    if existing and existing.get("content"):
+        try:
+            data = json.loads(base64.b64decode(existing["content"]))
+            return datetime.fromisoformat(data["expires"])
+        except Exception:
+            pass
+    return None
+
+
 def grant(user, days, amount):
     tier = tier_from_amount(amount)
-    exp  = datetime.now(timezone.utc) + timedelta(days=days)
+    now  = datetime.now(timezone.utc)
+    prev = _read_expiry(user)
+    base = prev if prev and prev > now else now
+    exp  = base + timedelta(days=days)
     gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
     write_license_file(user, exp.isoformat())
     slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal) expires {exp.date()}")

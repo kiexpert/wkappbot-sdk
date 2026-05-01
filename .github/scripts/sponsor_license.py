@@ -4,7 +4,7 @@
 Usage:
   python sponsor_license.py --user <login> --amount <usd> --type <one_time|monthly> --action <created|tier_changed|cancelled|pending_cancellation>
 """
-import argparse, json, math, os, sys, urllib.request
+import argparse, base64, json, math, os, sys, urllib.request
 from datetime import datetime, timezone, timedelta
 
 LICENSE_REPO   = "kiexpert/wkappbot-sdk"
@@ -82,9 +82,24 @@ def write_license_file(user: str, expires_at: str):
     gh("PUT", path, body)
 
 
+def _read_expiry(user: str):
+    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
+    existing = gh("GET", path)
+    if existing and existing.get("content"):
+        try:
+            data = json.loads(base64.b64decode(existing["content"]))
+            return datetime.fromisoformat(data["expires"])
+        except Exception:
+            pass
+    return None
+
+
 def grant(user: str, days: int, amount: float, license_type: str):
     tier = tier_from_amount(amount)
-    exp  = datetime.now(timezone.utc) + timedelta(days=days)
+    now  = datetime.now(timezone.utc)
+    prev = _read_expiry(user)
+    base = prev if prev and prev > now else now
+    exp  = base + timedelta(days=days)
 
     gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
     write_license_file(user, exp.isoformat())
