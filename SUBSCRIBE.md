@@ -59,10 +59,10 @@ your tier. If `gh` is not installed or not authenticated, you stay on Free tier.
 
 ## Pending Invite UX
 
-Until you accept the invite, wkappbot shows a non-blocking blue toast bottom-right:
-`[wkappbot] Pending GitHub invite — click to accept`. Free features keep working;
-CDP/Sudo stay locked. Accept at github.com/notifications → toast clears on the next
-wkappbot startup.
+Until you accept the invite, wkappbot shows a non-blocking blue toast bottom-right
+with a **GitHub 알림 확인** button (links to github.com/notifications, auto-dismisses
+after 15 seconds). Free features keep working; CDP/Sudo stay locked. Accept the invite
+→ toast clears on the next wkappbot startup.
 
 ---
 
@@ -90,8 +90,8 @@ If `tier: Free` after you've paid and accepted: re-run `gh auth login`, then ret
 
 - **Renew**: transfer again with the same memo before the 30-day expiry. The detector
   re-grants automatically on the next hourly poll.
-- **Cancel**: simply don't renew. Permissions auto-revoke at the 30-day mark via
-  `check_expirations()`. No action required from you.
+- **Cancel**: simply don't renew. Permissions auto-revoke at your expiry date
+  (check with `wkappbot license status`). No action required from you.
 
 ---
 
