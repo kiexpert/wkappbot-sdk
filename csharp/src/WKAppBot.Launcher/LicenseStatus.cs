@@ -41,11 +41,21 @@ static class LicenseStatus
         var cdpEnabled   = tier != "Free";
         var sudoEnabled  = perm is "write" or "admin";
 
+        var expires = await GetExpiryAsync(http, user);
+
         Console.WriteLine($"  User    : @{user}");
         Console.WriteLine($"  Repo    : {Repo}");
         Console.WriteLine($"  Tier    : {tier}");
         Console.WriteLine($"  CDP     : {(cdpEnabled  ? "✓ enabled" : "✗ not licensed")}");
         Console.WriteLine($"  Sudo    : {(sudoEnabled  ? "✓ enabled" : "✗ not licensed")}");
+        if (expires.HasValue)
+        {
+            var remaining = expires.Value - DateTime.UtcNow;
+            if (remaining.TotalSeconds > 0)
+                Console.WriteLine($"  Expires : {expires.Value:yyyy-MM-dd HH:mm} UTC  ({FormatRemaining(remaining)} remaining)");
+            else
+                Console.WriteLine($"  Expires : {expires.Value:yyyy-MM-dd HH:mm} UTC  (EXPIRED)");
+        }
         if (isPending)
             Console.WriteLine("  Note    : Invitation pending — CDP active immediately, accept to confirm.");
         if (tier == "Free")
@@ -97,6 +107,30 @@ static class LicenseStatus
             return doc.RootElement.GetProperty("login").GetString();
         }
         catch { return null; }
+    }
+
+    static async Task<DateTime?> GetExpiryAsync(HttpClient http, string user)
+    {
+        try
+        {
+            var json = await http.GetStringAsync(
+                $"https://api.github.com/repos/{Repo}/contents/.github/licenses/{user}.json");
+            using var doc = JsonDocument.Parse(json);
+            var encoded = doc.RootElement.GetProperty("content").GetString() ?? "";
+            var content = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded.Replace("\n", "")));
+            using var inner = JsonDocument.Parse(content);
+            if (inner.RootElement.TryGetProperty("expires", out var exp))
+                return DateTime.Parse(exp.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+        }
+        catch { }
+        return null;
+    }
+
+    static string FormatRemaining(TimeSpan t)
+    {
+        if (t.TotalDays >= 1) return $"{(int)t.TotalDays}일 {t.Hours}시간";
+        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}시간 {t.Minutes}분";
+        return $"{(int)t.TotalMinutes}분";
     }
 
     static async Task<(string perm, bool isPending)> GetPermissionAsync(HttpClient http, string user)
