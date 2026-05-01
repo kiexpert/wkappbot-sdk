@@ -57,26 +57,43 @@ def tier_from_amount(amount):
     return "sudo" if amount >= 363 else "cdp"
 
 
-def write_license_file(user, expires_at):
-    import base64
-    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
-    content = json.dumps({"expires": expires_at}).encode()
-    encoded = base64.b64encode(content).decode()
-    existing = gh("GET", path)
-    body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
-    if existing and existing.get("sha"):
-        body["sha"] = existing["sha"]
-    result = gh("PUT", path, body)
-    print(f"License file {'updated' if existing else 'created'}: {path} -> {'ok' if result else 'failed/no-body'}")
-
-
-def _read_expiry(user):
+def _fetch_license(user):
     path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
     existing = gh("GET", path)
-    if existing and existing.get("content"):
+    if not existing:
+        return path, None, {}
+    sha = existing.get("sha")
+    data = {}
+    if existing.get("content"):
         try:
-            data = json.loads(base64.b64decode(existing["content"]))
-            return datetime.fromisoformat(data["expires"])
+            raw = json.loads(base64.b64decode(existing["content"]))
+            # migrate old flat schema {"expires": "..."} → {"cdp": "..."}
+            if "expires" in raw and "cdp" not in raw and "sudo" not in raw:
+                data = {"cdp": raw["expires"]}
+            else:
+                data = raw
+        except Exception:
+            pass
+    return path, sha, data
+
+
+def write_license_file(user, tier, expires_at):
+    path, sha, data = _fetch_license(user)
+    data[tier] = expires_at
+    encoded = base64.b64encode(json.dumps(data).encode()).decode()
+    body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
+    if sha:
+        body["sha"] = sha
+    result = gh("PUT", path, body)
+    print(f"License file {'updated' if sha else 'created'}: {path} -> {'ok' if result else 'failed/no-body'}")
+
+
+def _read_expiry(user, tier):
+    _, _, data = _fetch_license(user)
+    raw = data.get(tier)
+    if raw:
+        try:
+            return datetime.fromisoformat(raw)
         except Exception:
             pass
     return None
@@ -84,12 +101,13 @@ def _read_expiry(user):
 
 def grant(user, days, amount):
     tier = tier_from_amount(amount)
+    perm = "write" if tier == "sudo" else "read"
     now  = datetime.now(timezone.utc)
-    prev = _read_expiry(user)
+    prev = _read_expiry(user, tier)
     base = prev if prev and prev > now else now
     exp  = base + timedelta(days=days)
-    gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
-    write_license_file(user, exp.isoformat())
+    gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": perm})
+    write_license_file(user, tier, exp.isoformat())
     slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal) expires {exp.date()}")
     print(f"Granted: {user} tier={tier} days={days} expires={exp.date()}")
 
