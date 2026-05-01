@@ -1,0 +1,22 @@
+name: member-joined
+
+on:
+  member:
+    types: [added]
+
+jobs:
+  extend-license:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Extend license for invite delay
+      env:
+        GH_LICENSE_TOKEN: ${{ secrets.GH_LICENSE_TOKEN }}
+        SLACK_BOT_TOKEN:  ${{ secrets.SLACK_BOT_TOKEN }}
+        MEMBER_LOGIN:     ${{ github.event.member.login }}
+        ACCEPTED_AT:      ${{ github.event.member.updated_at }}
+      run: python3 .github/scripts/member_joined.py
