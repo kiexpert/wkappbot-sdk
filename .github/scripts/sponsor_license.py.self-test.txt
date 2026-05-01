@@ -1,7 +1,7 @@
-commit: 73eb85c3020cbbd79145b9b481d826ac77e9c5ad
+commit: c52b1886cbe1e190dc6e94077fc7a089e9715fa5
 script: .github/scripts/sponsor_license.py
 exitcode: 2
-timestamp_utc: 2026-04-30T15:28:33.6248851Z
+timestamp_utc: 2026-05-01T06:39:01.0739999Z
 
 usage: sponsor_license.py [-h] --user USER [--amount AMOUNT]
                           [--type {one_time,monthly}]
