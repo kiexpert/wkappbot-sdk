@@ -1,8 +1,8 @@
-commit: e2223b39f31397ac4b0362675bacd71583d41ad2
+commit: c8e84428f8f4999fbe29bfda44e7ec23e8463203
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-04-29T16:48:01.9907661Z
+timestamp_utc: 2026-05-01T07:10:53.7350918Z
 
 
 ------------------------------------------------------------
@@ -670,9 +670,9 @@ Skills for 'gc': (wkappbot skill read <id>)
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=skill list
   [SKILL] 197 skill(s) - most recent first:
     [wkappbot-core]
-      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [HQ] [13h ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
-      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [HQ] [1d ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
-      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [HQ] [1d ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
+      - SDK Multi-Repo Deployment & Commercial Launch Checklist (wkappbot-sdk-multi-repo-deploy) v1.4 [HQ] [2d ago] [unclassified] - Complete deployment guide: per-repo Eye isolation, DataDir/pipe architecture, config.json setup, SDK packaging (MIT launcher + closed core), GitHub Release workflow, onboarding, and commercial launch checklist
+      - File-as-scheduler: pending_prompts/ filename-encoded schedule pattern (파일명이 곧 스케줄 -- pending_prompts 패턴) (file-as-scheduler-pending-prompts-pattern) v1.0 [HQ] [2d ago] [unclassified] - Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.
+      - WkNotification: unified dispatcher + file-based scheduler (통합 알림 디스패처 + 파일 기반 스케줄러) (wknotification-unified-dispatcher-and-file-scheduler) v1.0 [HQ] [2d ago] [unclassified] - Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead -- file IS the schedule.
   ... (209 more)
   exit=0
   [ASSERT OK] skill-list has wkappbot app
@@ -935,28 +935,35 @@ D:\a\wkappbot-sdk\wkappbot-sdk\handlers\접속끊김.yaml
   [CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
-  [GLOB] 13 file(s)
+  [GLOB] 20 file(s)
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
   D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\codeql.yml
-  ... (9 more)
+  ... (16 more)
   exit=0
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=file glob **/*.yml --path D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\admin-history-cleanup.yml
-[31;1m[GLOB] 13 file(s)[0m
+[31;1m[GLOB] 20 file(s)[0m
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build-sidecar-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\build.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\codeql.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\docs.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\extended-smoke.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\issue-auto-reply.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\issue-triage.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\license-cleanup.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\lint.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\onboarding-test.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\paypal-license.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release-notes.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\release.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest-artifact.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\script-selftest.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\security-scan.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\site-health.yml
+D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\sponsor-license.yml
 D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\tests.yml
 
 ------------------------------------------------------------
@@ -982,14 +989,12 @@ D:\a\wkappbot-sdk\wkappbot-sdk\.github\workflows\tests.yml
   [LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway
   [CMD] windows
   [LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows
-  [OVERLAY-GUARD] Suppressed black overlay: 0x100CA cls=Progman 1024x768 avg_brightness=36 layered=False count=1
   No window found: "wkappbot*"
   exit=1
   [SOFT] expected exit 0, got 1
 [31;1m[LAUNCHER:WARN] CreateProcessW breakaway denied err=5 -- retry without breakaway[0m
 [31;1m[CMD] windows[0m
 [31;1m[LAUNCH:CORE] cwd=D:\a\wkappbot-sdk\wkappbot-sdk hwnd=0x cmd=windows[0m
-[31;1m[OVERLAY-GUARD] Suppressed black overlay: 0x100CA cls=Progman 1024x768 avg_brightness=36 layered=False count=1[0m
 No window found: "wkappbot*"
 
 === license-status ===
