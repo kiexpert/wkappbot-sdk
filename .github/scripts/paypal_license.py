@@ -57,10 +57,23 @@ def tier_from_amount(amount):
     return "sudo" if amount >= 363 else "cdp"
 
 
+def write_license_file(user, expires_at):
+    import base64
+    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
+    content = json.dumps({"expires": expires_at}).encode()
+    encoded = base64.b64encode(content).decode()
+    existing = gh("GET", path)
+    body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
+    if existing and existing.get("sha"):
+        body["sha"] = existing["sha"]
+    gh("PUT", path, body)
+
+
 def grant(user, days, amount):
     tier = tier_from_amount(amount)
     exp  = datetime.now(timezone.utc) + timedelta(days=days)
     gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
+    write_license_file(user, exp.isoformat())
     slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal) expires {exp.date()}")
     print(f"Granted: {user} tier={tier} days={days} expires={exp.date()}")
 
