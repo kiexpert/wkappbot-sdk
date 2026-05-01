@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      test_user:
+        description: 'GitHub username to grant test license (skips PayPal API)'
+        required: false
+      test_amount:
+        description: 'Test amount in USD (default 8 = 2 days)'
+        required: false
+        default: '8'
 
 jobs:
   process-paypal:
@@ -17,4 +25,6 @@ jobs:
           PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
           GH_LICENSE_TOKEN: ${{ secrets.GH_LICENSE_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          TEST_USER: ${{ inputs.test_user }}
+          TEST_AMOUNT: ${{ inputs.test_amount }}
         run: python3 .github/scripts/paypal_license.py

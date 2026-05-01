@@ -127,11 +127,24 @@ def parse_github_user(note):
 
 
 def main():
-    if not GH_TOKEN or not PP_CLIENT_ID or not PP_SECRET:
-        print("Error: missing required env vars")
+    if not GH_TOKEN:
+        print("Error: GH_LICENSE_TOKEN not set")
         sys.exit(1)
 
     import urllib.parse
+
+    # Test mode: skip PayPal API, directly grant to test user
+    test_user = os.environ.get("TEST_USER", "").strip()
+    if test_user:
+        test_amount = float(os.environ.get("TEST_AMOUNT", "8"))
+        days = max(1, math.floor(test_amount * 30 / 100))
+        print(f"[TEST MODE] Granting {days} days to @{test_user} (${test_amount:.0f})")
+        grant(test_user, days, test_amount)
+        return
+
+    if not PP_CLIENT_ID or not PP_SECRET:
+        print("Error: PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET not set")
+        sys.exit(1)
 
     state = load_state()
     processed = set(state.get("processed_ids", []))
