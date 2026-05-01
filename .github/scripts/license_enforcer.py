@@ -128,7 +128,18 @@ def enforce():
             print(f"    → skip (admin)")
             continue
 
-        if desired is None and current is not None:
+        if desired is None and current == "write":
+            # write → read first; full revoke happens next cycle once CDP also confirmed gone
+            gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
+            data.pop("sudo", None)
+            write_license_file(path, sha, data,
+                f"chore(licenses): downgrade @{user} all tiers expired → cdp-only pending revoke [skip ci]")
+            msg = f"⬇️ @{user} all tiers expired — stepped down to read (will revoke next cycle)"
+            slack_notify(msg)
+            changes.append(msg)
+            print(f"    → STEP-DOWN write→read (revoke next cycle)")
+
+        elif desired is None and current == "read":
             gh("DELETE", f"/repos/{LICENSE_REPO}/collaborators/{user}")
             if sha:
                 delete_license_file(path, sha,
