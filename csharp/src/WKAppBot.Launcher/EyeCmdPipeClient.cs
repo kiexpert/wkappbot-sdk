@@ -204,9 +204,15 @@ internal static class EyeCmdPipeClient
     /// </summary>
     static IntPtr ResolveCallerTerminalHwnd()
     {
-        // PRIMARY: walk Launcher's own parent process chain -> find terminal window.
-        // Launcher always runs from a shell inside a terminal, so this is deterministic
-        // and independent of which window happens to have focus (e.g., IDE/editor).
+        // Windows Terminal: each tab has its own CASCADIA_HOSTING_WINDOW_CLASS top-level
+        // window. When user types a command in a WT tab, that specific tab's CASCADIA
+        // window IS the foreground -- so GetForegroundWindow() gives the exact tab hwnd.
+        var fg = GetForegroundWindow();
+        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg)))
+            return fg; // WT tab or other terminal directly in foreground
+
+        // Foreground is not a terminal (IDE, browser, etc.) -- walk Launcher's parent
+        // process chain to find the hosting window (VS Code integrated terminal, etc.)
         var ancestorPids = new HashSet<uint>();
         try
         {
@@ -223,26 +229,20 @@ internal static class EyeCmdPipeClient
 
         if (ancestorPids.Count > 0)
         {
-            // Find any visible top-level window owned by an ancestor process.
-            // No class filter -- caller window may be Windows Terminal, Chrome widget,
-            // VS Code (Electron), or any other container. Closest ancestor wins.
             IntPtr match = IntPtr.Zero;
-            
             EnumWindows((hWnd, _) =>
             {
                 if (!IsWindowVisible(hWnd)) return true;
                 if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
                 GetWindowThreadProcessId(hWnd, out uint wpid);
                 if (!ancestorPids.Contains(wpid)) return true;
-                // prefer the closest ancestor (lowest depth in chain)
                 match = hWnd;
                 return false;
             }, IntPtr.Zero);
             if (match != IntPtr.Zero) return match;
         }
 
-        // FALLBACK: foreground window
-        return GetForegroundWindow();
+        return fg; // last resort
     }
 
     static bool IsTerminalClass(string cls)
