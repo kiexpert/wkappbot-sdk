@@ -3,9 +3,10 @@
 
 Runs on a schedule. For each .github/licenses/{user}.json:
   - sudo valid            → ensure "write" permission
-  - sudo expired, cdp ok  → downgrade to "read"
-  - both expired          → revoke collaborator access
+  - sudo expired, cdp ok  → downgrade to "read", remove sudo key from file
+  - both expired          → revoke collaborator access, delete file
 Skips "admin" users (repo owners) to avoid accidental lockout.
+All changes leave a git commit so history serves as an audit log.
 """
 import base64, json, os, sys, urllib.request
 from datetime import datetime, timezone
@@ -31,10 +32,10 @@ def gh(method, path, body=None):
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.loads(r.read()) if r.length != 0 else {}
     except urllib.error.HTTPError as e:
-        body = e.read().decode()
+        err = e.read().decode()
         if e.code == 404:
             return None
-        print(f"[warn] {method} {path} → HTTP {e.code}: {body[:200]}")
+        print(f"[warn] {method} {path} → HTTP {e.code}: {err[:200]}")
         return None
 
 
@@ -56,22 +57,35 @@ def list_license_files():
     return [i["name"][:-5] for i in items if i["name"].endswith(".json")]
 
 
-def read_expiries(user):
+def fetch_license(user):
     path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
     existing = gh("GET", path)
-    if not existing or not existing.get("content"):
-        return None, None
-    try:
-        raw = json.loads(base64.b64decode(existing["content"]))
-        # handle old flat schema
-        if "expires" in raw and "cdp" not in raw and "sudo" not in raw:
-            raw = {"cdp": raw["expires"]}
-        cdp  = datetime.fromisoformat(raw["cdp"])  if "cdp"  in raw else None
-        sudo = datetime.fromisoformat(raw["sudo"]) if "sudo" in raw else None
-        return cdp, sudo
-    except Exception as e:
-        print(f"[warn] Failed to parse license for {user}: {e}")
-        return None, None
+    if not existing:
+        return path, None, {}
+    sha = existing.get("sha")
+    data = {}
+    if existing.get("content"):
+        try:
+            raw = json.loads(base64.b64decode(existing["content"]))
+            if "expires" in raw and "cdp" not in raw and "sudo" not in raw:
+                data = {"cdp": raw["expires"]}
+            else:
+                data = raw
+        except Exception as e:
+            print(f"[warn] Failed to parse license for {user}: {e}")
+    return path, sha, data
+
+
+def write_license_file(path, sha, data, commit_msg):
+    encoded = base64.b64encode(json.dumps(data).encode()).decode()
+    body = {"message": commit_msg, "content": encoded}
+    if sha:
+        body["sha"] = sha
+    gh("PUT", path, body)
+
+
+def delete_license_file(path, sha, commit_msg):
+    gh("DELETE", path, {"message": commit_msg, "sha": sha})
 
 
 def get_permission(user):
@@ -100,9 +114,11 @@ def enforce():
     changes = []
 
     for user in users:
-        cdp_exp, sudo_exp = read_expiries(user)
-        desired = desired_permission(cdp_exp, sudo_exp)
-        current = get_permission(user)
+        path, sha, data = fetch_license(user)
+        cdp_exp  = _parse_dt(data.get("cdp"))
+        sudo_exp = _parse_dt(data.get("sudo"))
+        desired  = desired_permission(cdp_exp, sudo_exp)
+        current  = get_permission(user)
 
         cdp_str  = cdp_exp.strftime("%Y-%m-%d")  if cdp_exp  else "none"
         sudo_str = sudo_exp.strftime("%Y-%m-%d") if sudo_exp else "none"
@@ -114,29 +130,47 @@ def enforce():
 
         if desired is None and current is not None:
             gh("DELETE", f"/repos/{LICENSE_REPO}/collaborators/{user}")
+            if sha:
+                delete_license_file(path, sha,
+                    f"chore(licenses): revoke @{user} — all tiers expired [skip ci]")
             msg = f"🔒 @{user} license expired — collaborator access revoked"
             slack_notify(msg)
             changes.append(msg)
             print(f"    → REVOKED")
+
         elif desired == "read" and current == "write":
             gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
+            # remove sudo key from file so history is clean
+            data.pop("sudo", None)
+            write_license_file(path, sha, data,
+                f"chore(licenses): downgrade @{user} sudo expired → cdp [skip ci]")
             msg = f"⬇️ @{user} sudo expired — downgraded to CDP (read)"
             slack_notify(msg)
             changes.append(msg)
             print(f"    → DOWNGRADED write→read")
+
         elif desired == "write" and current != "write":
             gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "write"})
             msg = f"⬆️ @{user} sudo active — upgraded to write"
             slack_notify(msg)
             changes.append(msg)
             print(f"    → UPGRADED to write")
+
         else:
             print(f"    → ok (no change)")
 
     print(f"\nDone. {len(changes)} change(s).")
-    if changes:
-        for c in changes:
-            print(f"  {c}")
+    for c in changes:
+        print(f"  {c}")
+
+
+def _parse_dt(val):
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(val)
+    except Exception:
+        return None
 
 
 if __name__ == "__main__":
