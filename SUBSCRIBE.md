@@ -8,11 +8,11 @@ auth, no license keys to lose. Pay once, get added as a collaborator on
 
 ## Quick Start (3 steps)
 
-1. **Authenticate GitHub locally** — `gh auth login` (HTTPS, browser flow).
-2. **Bank-transfer the tier price** to KIS with your **GitHub username as the memo**.
-3. **Accept the collaborator invite** that arrives at <https://github.com/notifications>.
+1. **GitHub 로그인** — `gh auth login` (HTTPS, browser flow)
+2. **결제** — PayPal · KIS이체 · GitHub Sponsors 중 하나 → **메모에 GitHub 아이디** 필수
+3. **초대 수락** — <https://github.com/notifications> 에서 수락
 
-License auto-activates within 1 hour of confirmed payment.
+→ 수분~1시간 내 자동 활성화. 자세한 결제 방법: [PRICING.md](./PRICING.md)
 
 ---
 
@@ -28,28 +28,11 @@ All Free features remain free forever — Pro tiers add capabilities, never gate
 
 ---
 
-## Payment Instructions (KIS bank transfer)
+## Payment Methods
 
-| Field | Value |
-|-------|-------|
-| Bank | 한국투자증권 (KIS) |
-| Account number | `43420089-01` |
-| Account holder | 김기일 |
-| Amount | 100,000 KRW (CDP) or 500,000 KRW (Sudo) |
-| Memo (입금자명 / 표시내용) | **your GitHub username** — REQUIRED for auto-detection |
+→ See **[PRICING.md](./PRICING.md)** for full instructions (PayPal / KIS / GitHub Sponsors).
 
-The detector polls the KIS account hourly, parses the memo field, and runs:
-
-```bash
-gh api repos/kiexpert/wkappbot-sdk/collaborators/{your_id} -X PUT -f permission=read   # CDP
-gh api repos/kiexpert/wkappbot-sdk/collaborators/{your_id} -X PUT -f permission=write  # Sudo
-```
-
-You'll receive a GitHub email + notification with the invite. License activates the
-moment you accept.
-
-> If your transfer memo doesn't match a real GitHub username, the system can't grant
-> access. Double-check the spelling before you transfer.
+**공통 주의사항**: 메모/입금자명에 GitHub 아이디를 정확히 적어야 자동 처리됩니다.
 
 ---
 
@@ -92,11 +75,10 @@ wkappbot license status
 Sample output:
 
 ```
-account     : your-github-id
-tier        : CDP        (permission=read)
-expires     : 2026-05-29 (29 days remaining)
-unlocks     : cdp, ask, schedule
-pending     : (none)
+  User    : @your-github-id
+  Tier    : CDP
+  CDP     : ✓ enabled  (expires 2026-05-29, 29일 0시간 remaining)
+  Sudo    : ✗ not licensed
 ```
 
 If `tier: Free` after you've paid and accepted: re-run `gh auth login`, then retry
