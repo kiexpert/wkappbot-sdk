@@ -1,6 +1,6 @@
-commit: b501f987713afc58c81235389200b9cd4959e452
+commit: 1b5594b2b206ad2fdb1c7aa1eeac377edd3b83ab
 script: .github/scripts/paypal_license.py
 exitcode: 1
-timestamp_utc: 2026-05-01T07:16:24.3274896Z
+timestamp_utc: 2026-05-01T07:18:20.5886962Z
 
 Error: GH_LICENSE_TOKEN not set
