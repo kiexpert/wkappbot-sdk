@@ -204,11 +204,9 @@ internal static class EyeCmdPipeClient
     /// </summary>
     static IntPtr ResolveCallerTerminalHwnd()
     {
-        var fg = GetForegroundWindow();
-        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg)))
-            return fg;
-
-        // Walk ancestor pids: Launcher -> shell (cmd/bash) -> WindowsTerminal -> ...
+        // PRIMARY: walk Launcher's own parent process chain -> find terminal window.
+        // Launcher always runs from a shell inside a terminal, so this is deterministic
+        // and independent of which window happens to have focus (e.g., IDE/editor).
         var ancestorPids = new HashSet<uint>();
         try
         {
@@ -223,24 +221,28 @@ internal static class EyeCmdPipeClient
         }
         catch { }
 
-        if (ancestorPids.Count == 0) return fg;
-
-        IntPtr match = IntPtr.Zero;
-        EnumWindows((hWnd, _) =>
+        if (ancestorPids.Count > 0)
         {
-            if (!IsWindowVisible(hWnd)) return true;
-            // top-level only
-            if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
-            var cls = GetClass(hWnd);
-            if (!string.Equals(cls, "CASCADIA_HOSTING_WINDOW_CLASS", StringComparison.OrdinalIgnoreCase))
-                return true;
-            GetWindowThreadProcessId(hWnd, out uint wpid);
-            if (!ancestorPids.Contains(wpid)) return true;
-            match = hWnd;
-            return false; // stop
-        }, IntPtr.Zero);
+            IntPtr match = IntPtr.Zero;
+            EnumWindows((hWnd, _) =>
+            {
+                if (!IsWindowVisible(hWnd)) return true;
+                if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
+                var cls = GetClass(hWnd);
+                if (!string.Equals(cls, "CASCADIA_HOSTING_WINDOW_CLASS", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                GetWindowThreadProcessId(hWnd, out uint wpid);
+                if (!ancestorPids.Contains(wpid)) return true;
+                match = hWnd;
+                return false; // stop
+            }, IntPtr.Zero);
+            if (match != IntPtr.Zero) return match;
+        }
 
-        return match != IntPtr.Zero ? match : fg;
+        // FALLBACK: foreground window (covers edge cases where terminal is not in process chain)
+        var fg = GetForegroundWindow();
+        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg))) return fg;
+        return fg; // last resort
     }
 
     static bool IsTerminalClass(string cls)
