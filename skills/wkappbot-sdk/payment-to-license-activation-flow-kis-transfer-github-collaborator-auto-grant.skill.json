@@ -8,15 +8,16 @@
     "Pricing: 100,000 KRW = CDP tier (read permission), 500,000 KRW = Sudo tier (write permission); transfer to KIS account [YOUR_KIS_ACCOUNT].",
     "Memo (depositor name field) MUST be the payer\u0027s GitHub username verbatim; mismatched memo blocks auto-grant.",
     "Detector: scripts/kis_payment_watcher.py polls KIS hourly, parses memo field, extracts github_id and amount, derives tier (100k=read, 500k=write).",
-    "Grant: detector calls \u0027gh api repos/kiexpert/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read\u0027 (or write); tx_key recorded with 30-day expiry.",
-    "Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right (15s auto-dismiss, non-blocking); CDP/Sudo features stay locked, Free features keep working.",
-    "Acceptance: user clicks GitHub notifications -\u003E View invitation -\u003E Accept; on next wkappbot startup LicenseManager.Permission becomes \u0027read\u0027/\u0027write\u0027 and gated features unlock; toast clears.",
-    "Expiry: 30 days from grant; check_expirations() in same script auto-revokes via \u0027gh api ... -X DELETE\u0027; user drops back to Free tier silently.",
-    "Renewal: pay again with same memo; new tx_key issued, permission re-granted on next hourly poll, expiry extended; no manual intervention.",
-    "Tier upgrade (CDP -\u003E Sudo): pay 500k with same memo; detector overwrites permission=read with permission=write on next poll.",
-    "Verification: \u0027wkappbot license status\u0027 shows account, tier, permission, expiry days remaining, pending invites.",
-    "License check (LicenseManager.cs): reads GitHub collaborator permission on kiexpert/wkappbot-sdk. read=CDP, write=Sudo, admin=dev. Pending invite treated as read immediately. No expiry enforcement in C# yet -- revocation is external (cron or manual).",
-    "License check (LicenseManager.cs): reads GitHub collaborator permission on kiexpert/wkappbot-sdk. read=CDP, write=Sudo, admin=dev. Pending invite treated as read immediately. No expiry enforcement in C# yet -- revocation is external (cron or manual)."
+    "Grant: detector calls \u0027gh api repos/kiexpert/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read\u0027 (or write); tx_key recorded with expiry date in commit message.",
+    "Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right with \u0027GitHub notification check\u0027 button (auto-dismiss 15s, non-blocking); CDP/Sudo features stay locked, Free features keep working.",
+    "Acceptance: user clicks GitHub notifications -\u003E View invitation -\u003E Accept; on next wkappbot startup license check returns tier and gated features unlock; toast clears.",
+    "Expiry: tracked in .github/licenses/{user} commit message (tier=cdp\u002Bsudo cdp=\u003CISO8601\u003E sudo=\u003CISO8601\u003E). Duration = floor(amount_usd * 30 / 100) days: USD100=30d, USD200=60d, USD363=108d. C# enforces expiry: sudoActive requires perm=write/admin \u002B tierStr contains sudo \u002B sudoExpiry \u003E now(). Revocation: remove collaborator OR let expiry date pass.",
+    "Renewal: pay again with same memo; new tx_key issued, permission re-granted, commit message updated with new expiry date.",
+    "Tier upgrade (CDP -\u003E Sudo): pay 500k with same memo; detector overwrites permission=read with permission=write, updates commit expiry.",
+    "Verification: \u0027wkappbot license status\u0027 shows User/Tier/CDP/Sudo with expiry countdown. Command is Launcher-owned fast-exit -- never reaches Core.",
+    "License check architecture (LicenseStatus.cs): 2 API calls. Call 1: POST api.github.com/graphql -- {viewer{login} repository{viewerPermission}} -- returns login \u002B perm in one shot, tamper-proof. Call 2: GET /repos/.../commits?path=.github/licenses/{user} -- parse tier=, cdp=, sudo= from trusted commit message (author must be in TrustedAuthors set).",
+    "Token auth: (1) GH_TOKEN/GITHUB_TOKEN env var, (2) hosts.yml oauth_token, (3) \u0027gh auth token\u0027 keyring fallback. If all fail, prints login guidance and exits 1.",
+    "SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01, verify on future edits): (1) Cancel section used to say \u0027at the 30-day mark\u0027 -- WRONG; expiry = floor(amount_usd*30/100) days, not always 30. Fixed to \u0027at your expiry date (check with wkappbot license status)\u0027. (2) Pending invite section used to say \u0027click to accept\u0027 -- INACCURATE; actual toast shows GitHub notification check button \u002B 15s auto-dismiss. Both fixed in SUBSCRIBE.md."
   ],
   "requirements": [
     {
@@ -73,6 +74,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-28T18:32:32.1139765Z",
-  "updated": "2026-05-01T06:39:17.9160301Z",
-  "version": "1.2"
+  "updated": "2026-05-01T09:48:12.5761741Z",
+  "version": "1.6"
 }

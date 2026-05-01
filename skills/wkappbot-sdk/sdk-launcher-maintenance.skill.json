@@ -13,7 +13,8 @@
     "Debug tracing: WKAPPBOT_DEBUG=1 enables relay log at %TEMP%\\wkappbot_relay_dbg.txt. Do not hardcode C:\\Temp in source",
     "CI: build.yml builds launcher\u002Bcore. extended-smoke.yml runs 188 tests on windows-latest. Triggers on push to csharp/ and smoke script changes",
     "Public-safe checklist: no hardcoded dev paths, no API keys, no D:\\GitHub\\WKAppBot refs in Launcher source. Run audit before PR",
-    "Suggest/skill filing: run D:\\GitHub\\WKAppBot\\bin\\wkappbot-core.exe from d:\\GitHub\\wkappbot-sdk CWD. Never cd to WKAppBot first (breaks project tracking)"
+    "Suggest/skill filing: run D:\\GitHub\\WKAppBot\\bin\\wkappbot-core.exe from d:\\GitHub\\wkappbot-sdk CWD. Never cd to WKAppBot first (breaks project tracking)",
+    "license status: Launcher-owned fast-exit (Program.cs, before Eye pipe routing). Calls LicenseStatus.PrintAsync() directly -- Core never receives this command. Token: GH_TOKEN env \u003E hosts.yml \u003E gh auth token keyring fallback. AOT constraint: do NOT use JsonSerializer.Serialize(anonymous type) -- use manual string escaping instead (IL3050/IL2026 errors)."
   ],
   "requirements": [
     {
@@ -45,6 +46,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-28T09:36:40.5432654Z",
-  "updated": "2026-04-28T09:37:24.6663646Z",
-  "version": "1.2"
+  "updated": "2026-05-01T08:47:42.4215097Z",
+  "version": "1.4"
 }

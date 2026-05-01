@@ -1,0 +1,69 @@
+{
+  "id": "wkappbot-business-plan-draft",
+  "app": "wkappbot",
+  "title": "WkAppBot Monetization Strategy -- Pricing Tiers and Product Lines",
+  "title_ko": null,
+  "desc": "WkAppBot Monetization Strategy -- Pricing Tiers, GitHub Collaborator Auth, and Feature Gates",
+  "steps": [
+    "TIERS: Free=all base features / Pro=100,000 KRW/mo (CDP browser automation \u002B private skill repo) / Business=500,000 KRW/mo (Pro \u002B --sudo elevated process access) / Enterprise=negotiated (Business \u002B hosted private skill registry \u002B team HQ sync \u002B audit logs)",
+    "PREMIUM FEATURES: (1) --sudo: admin process access for Kiwoom/HTS/elevated apps -- killer feature, impossible to replicate without. (2) CDP: Chrome direct control, macro-resistant sites, session automation. (3) --ocr Vision: Gemini Vision for legacy/custom UI that a11y cannot read. (4) ask triad: GPT\u002BGemini\u002BClaude parallel 3-model analysis. (5) Private skill namespace: company knowhow as executable skills.",
+    "SKILL REGISTRY = npm for AI knowhow: wkappbot skill repo add github.com/company/skills --token XXX, then skill sync installs company/* namespace to all team HQ. New hire onboarding = one sync command. Skill update = auto-push whole team. skill verify in CI detects broken skills on code change.",
+    "TARGET MARKETS: Pro=individual heavy traders and developers. Business=small asset managers and trading firms (corporate card pays -- 500,000 KRW/mo is trivial vs HTS automation ROI). Enterprise=corporations replacing internal manuals with executable skill packs, team HQ registry.",
+    "PRICING PSYCHOLOGY: --sudo users are already business users on corporate card. Price Business tier for the company budget, not the individual wallet. Bloomberg terminal costs millions KRW/year -- 500,000 KRW/mo for full HTS automation is a bargain. Enterprise tier: no public price, always negotiate upward.",
+    "FUTURE EXPANSION: public skill marketplace (sharing economy for AI knowhow), per-seat Enterprise licensing, white-label OEM for securities firms, API tier for programmatic skill management.",
+    "AUTH MODEL: GitHub ID required for Pro/Business/Enterprise. Free tier = no login. Paid tiers = GitHub OAuth. License validated by checking customer repo membership or org role via gh api. No GitHub ID = Free only. Benefits: no separate auth system to build, audit trail via GitHub activity, skill repo access control via org/team permissions, PAT-based license revocation.",
+    "BOOT LICENSE CHECK: Eye startup calls gh api /repos/owner/wkappbot-licenses/contents/customers/{github_id}.json, decodes base64 JSON, checks tier \u002B expires_at \u003E now(). Result cached in memory for session. Offline fallback: last known license cached locally (grace period 7 days). Revocation: owner deletes file \u002B push = next boot denies access.",
+    "EXPIRY via git history: commit timestamp IS the license start date -- no expires_at field needed. Eye boot checks: gh api get file \u002B committed_at timestamp. If now() - committed_at \u003E 30 days = expired, treat as unlicensed. Renewal = owner deletes \u002B re-commits file (new timestamp = new 30-day window). Optional: GitHub Action cron runs monthly, deletes files older than 30 days automatically. Customer renews by paying again. Zero date-tracking logic needed -- git log is the billing ledger.",
+    "LICENSE FILE: single public file in wkappbot repo -- raw.githubusercontent.com/kiexpert/wkappbot/main/licenses.json. Eye boot: plain HTTP GET, no auth needed. Schema: [{github_id, tier, committed_at}]. Expiry: now()-committed_at \u003E 30 days = unlicensed. GitHub IDs are already public so no PII exposure. File managed by Claude Code on owner\u0027s instruction: customer pays -\u003E owner says \u0027add customer123 as Business\u0027 -\u003E Claude commits licenses.json update \u002B push. Renewal: owner says \u0027renew customer123\u0027 -\u003E Claude updates committed_at via re-commit. Zero infrastructure: no server, no database, no payment processor needed at MVP stage.",
+    "ONBOARDING FUNNEL: Beginner manual step 1 = create GitHub account, step 2 = install gh CLI, step 3 = install wkappbot, step 4 = use Free tier. No GitHub account = no gh CLI = Free only, self-enforcing. Paying users already have gh installed (wkappbot itself is a gh CLI heavy user -- gh issue/run/api used everywhere). Onboarding flow IS the license auth setup. GitHub account creation = customer becomes licensable. gh install = license verification infra complete.",
+    "LICENSE OBFUSCATION via bucket sharding: pre-generate 100 random UUID folder names in licenses repo (always exist, mostly empty \u002B a few dummy files). User bucket = sha256(github_id \u002B salt) % 100 -\u003E maps to preset folder list[idx]. License file path: buckets/[random_folder]/[sha256_hash].json. Observer sees 100 folders, some files, cannot count real customers or enumerate IDs. Even 1 customer looks like 100. wkappbot: compute bucket index -\u003E GET that specific path -\u003E 404 = unlicensed, 200 = parse tier \u002B committed_at. Dummy files in empty buckets add noise. Folder names are random UUIDs generated once at repo init, hardcoded in binary alongside SALT.",
+    "FINAL LICENSE DESIGN: single public file, ~100 lines. 99 dummy hashes (tier=free) \u002B real customer hashes mixed in. wkappbot: one HTTP GET -\u003E scan for sha256(github_id\u002BSALT) match -\u003E found=tier, not found=free. Observer cannot distinguish real customers from dummies. No folders, no sharding, no complexity. Add new customer: insert real hash, pad dummies back to ~100 lines, commit. Simplest possible implementation.",
+    "SCALE TRIGGER: when real customers exceed 100 lines, that means the business is genuinely succeeding -- invest in proper infra then (bucket sharding, hosted registry, payment automation). Until then: single file MVP. Premature optimization is the root of all evil.",
+    "DISTRIBUTION: open-core model. Launcher = open source public repo (gh auth \u002B license check \u002B binary download \u002B auto-update). Core binary = closed source private (--sudo, CDP, --ocr, triad). Launcher open source builds trust -- users can audit exactly what it does. Actual IP stays in core binary. Classic open-core: MySQL CE vs Enterprise, GitLab CE vs EE. Claude Code manages distribution repo: cuts releases, uploads binaries, updates licenses.json on customer payment.",
+    "LAUNCHER REPO: kiexpert/WKAppBot (local: d:/GitHub/WKAppBot). Currently private -- launcher distribution plan requires either making repo public or splitting launcher into separate public repo. Core binary stays private. licenses.json lives in same or separate public repo. Claude Code has local access to manage releases and license commits.",
+    "COLLABORATOR MGMT: repo owner (kiexpert) invites via GitHub Settings \u003E Collaborators or: gh api repos/kiexpert/wkappbot-sdk/collaborators/{user} -X PUT -f permission=read|write. Only admin can invite/modify/remove -- write collaborators cannot escalate themselves. Monthly: remove expired collaborators = license expired.",
+    "IMPLEMENTED AUTH (2026-04-29): GitHub collaborator permission on kiexpert/wkappbot-sdk checked via direct HTTPS to api.github.com (no gh binary). Token from %APPDATA%/GitHub CLI/hosts.yml or GH_TOKEN/GITHUB_TOKEN env. Result cached per session. WKAPPBOT_LICENSE_MOCK env var: dev-only override, guarded by IsDevEnvironment() -- see step 20 for security details.",
+    "IMPLEMENTED TIERS (2026-04-27): none=Free / read=CDP 100,000 KRW/mo / write=Sudo 500,000 KRW/mo / admin=Dev (contributor only). LicenseManager.Permission fetches once per session, IsLicensed()=read\u002B, IsSudoLicensed()=write\u002B, IsContributor()=admin. Inviting as read collaborator = paid member badge on GitHub profile.",
+    "IMPLEMENTED GATES (2026-04-27): (1) CDP -- HTML overlay injected via Runtime.evaluate every 1min \u002B SendAsync C# gate blocks all commands until dismissed (DOM bypass impossible). (2) Sudo -- admin Eye WPF popup after 1min, commands queued silently, Later button = downgrade to normal Eye via ShellExecute. (3) WhisperRing -- IsContributor() admin-only spawn guard.",
+    "WKAPPBOT_LICENSE_MOCK SECURITY (2026-04-29): Dev-only override. Guard: IsDevEnvironment() runs \u0027git remote get-url origin\u0027 in project root -- must match \u0027kiexpert/wkappbot-sdk\u0027 (private SDK repo, exact match). Attack analysis: (1) gh binary replacement: irrelevant -- auth uses direct HTTPS to api.github.com, gh not invoked. (2) hosts.yml manipulation \u002B fake token: irrelevant for mock -- mock check never calls API. (3) DNS spoofing fake GitHub API server: irrelevant for mock -- git remote is read from local .git/config, no network call. (4) Clone public WKAppBot repo: BLOCKED -- origin is kiexpert/WKAppBot, not kiexpert/wkappbot-sdk. (5) Set remote to wkappbot-sdk URL: partially mitigated -- git remote get-url succeeds without push access, but private repo URL is not publicly known. (6) Source recompile: NOT mitigated -- determined attackers with source can remove any check. CONCLUSION: mock is a dev convenience, not a security boundary. Real license enforcement is the GitHub collaborator API check in FetchPermission() which runs for actual IsLicensed/IsSudoLicensed calls regardless of mock.",
+    "SDK COLLABORATOR SPEC for wkappbot-sdk maintainer (2026-04-29): To grant a paying user license access, the SDK repo maintainer must: (1) Invite GitHub user as collaborator: gh api repos/kiexpert/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read (Pro/CDP), write (Business/Sudo), admin (Dev/Contributor). (2) Permission mapping: read=IsLicensed() true (CDP tier), write=IsSudoLicensed() true (Sudo tier), admin=IsContributor() true (Dev tier). (3) Revoke: remove collaborator = license expired immediately on next boot. (4) No separate license file needed -- GitHub collaborator list IS the license database. (5) Verification URL wkappbot calls: GET https://api.github.com/repos/kiexpert/wkappbot-sdk/collaborators/{github_id}/permission -- returns {permission: none|read|write|admin}. (6) Token source on user machine: ~/.config/gh/hosts.yml (gh CLI OAuth) or GH_TOKEN/GITHUB_TOKEN env var -- user must have gh auth login done once.",
+    "REFUND POLICY (MVP): no refund after GitHub invite accepted \u002B license activated. Before acceptance: full refund within 24h on request. Partial month: no pro-rata. Reason: GitHub collaborator grant is instantaneous -- no per-seat metering possible at MVP stage. Document in landing page footer.",
+    "ENFORCEMENT MODEL (soft nag, NOT hard block): Free users get 1 minute of free use on any paid feature. After 1 min, a purchase-prompt popup fires -- every 1 minute thereafter. (1) CDP -- HTML overlay injected via Runtime.evaluate after 1min grace; SendAsync C# gate queues all CDP commands until user dismisses (DOM bypass impossible); re-fires every 1min. (2) Sudo -- admin Eye WPF popup after 1min grace; commands queued silently; Later button = downgrade to normal Eye. Re-fires every 1min. (3) WhisperRing -- IsContributor() hard guard, no nag. Design intent: low friction for evaluation, persistent purchase motivation after 1min.",
+    "ENFORCEMENT MODEL DETAIL (code refs): 1-min free grace -\u003E purchase nag -\u003E dismiss -\u003E 1-min free -\u003E repeat. CDP: CdpLicenseNag.cs IntervalMs=60000; RunNagLoopAsync() delays 1min (grace), then loops: re-fetch permission, if unlicensed inject fullscreen JS overlay via Runtime.evaluate, set cdp.SendGate=GateAsync so all CDP SendAsync calls block until overlay dismissed, after dismiss delay 1min then repeat. Registered via CdpClient.PostConnectHook in Program.cs:307 -- all CDP connections covered. Sudo: AppBotEyeGlobalMode.LicenseNag.cs; Task.Delay(1min) then ShowLicenseNagPopup(); ElevatedLicensePauseGate (TaskCompletionSource) queues all sudo commands while WPF popup open; Purchase -\u003E restart 1-min timer; Later/Downgrade -\u003E DowngradeToNormalEye (ShellExecute eye, admin exits). Wired at AppBotEyeGlobalMode.cs:453. Pending-invite: non-blocking blue toast bottom-right, 15s auto-dismiss, repeats every 5min (informational only). WhisperRing: IsContributor() hard guard at spawn -- no nag, just denied.",
+    "SUDO NAG PIPE BEHAVIOR (ElevatedEyeProxy.cs:253-261): ALL admin pipe commands EXCEPT __eye_tick__ are blocked while ElevatedLicensePauseGate != null (await gate.Task.WaitAsync -- client keeps pipe open, no timeout, no error visible to caller). Eye tick passes through unblocked so Eye stays alive during popup. CANCEL/DOWNGRADE sequence (LicenseNag.cs:51-65): (1) gate released first -- ElevatedLicensePauseGate=null, tcs.TrySetResult() -- queued commands unblock; (2) immediately after: DowngradeToNormalEye() spawns normal Eye via ShellExecute then Environment.Exit(0). Result: unblocked commands get pipe-broken error (admin Eye process gone); Launcher falls back to normal Eye or Core for next call. PURCHASE sequence: gate released same way, then StartElevatedLicenseNagTimer (another 1-min grace)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkappbot-business-plan-draft",
+      "expect": "TIERS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-business-plan-draft",
+      "expect": "SKILL REGISTRY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-business-plan-draft",
+      "expect": "PRICING PSYCHOLOGY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "business",
+    "monetization",
+    "pricing",
+    "saas",
+    "skill-registry",
+    "wkappbot",
+    "strategy",
+    "product"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T08:49:32.5486064Z",
+  "updated": "2026-05-01T09:45:01.15919Z",
+  "version": "1.21"
+}

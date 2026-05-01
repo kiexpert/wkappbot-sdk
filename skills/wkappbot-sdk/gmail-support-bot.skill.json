@@ -1,0 +1,48 @@
+{
+  "id": "gmail-support-bot",
+  "app": "wkappbot-sdk",
+  "title": "Gmail Support Bot \u2014 OAuth2 setup \u002B auto-reply flow",
+  "title_ko": null,
+  "desc": "Auto-read and reply to license/support emails at kiexpert@kivilab.co.kr via Gmail API OAuth2 Desktop flow.",
+  "steps": [
+    "Credentials in D:\\GitHub\\WKAppBot\\.env: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET=GOCSPX-..., GMAIL_REFRESH_TOKEN. Project: kiexpert-kivilab, app: wkappbot-gmail (Desktop OAuth2, created 2026-04-29). Old secret disabled 2026-05-01.",
+    "Script: .github/scripts/gmail_support_bot.py. Run: python gmail_support_bot.py. Flags: --dry-run. Env deps: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GH_LICENSE_TOKEN (optional), SLACK_BOT_TOKEN (optional).",
+    "Auto-reply routing: (1) activation/license -\u003E GH API perm \u002B expiry lookup; (2) refund -\u003E 7-day policy; (3) renewal -\u003E payment info; (4) feature/usage -\u003E docs; (5) fallback -\u003E human handoff.",
+    "Post-reply: applies Gmail label wkappbot-support, removes UNREAD. Slack notification to C0APNELH2LR on each reply.",
+    "Refresh token expiry: if unused 6\u002B months or revoked, re-run OAuth flow in Python, capture localhost:8765 callback code, exchange for new GMAIL_REFRESH_TOKEN, update .env.",
+    "Auth scopes: gmail.modify (read \u002B send \u002B label, no delete). Redirect URI: http://localhost:8765.",
+    "OAUTH SETUP LESSONS (salpil 2026-05-01): (1) wkappbot web open fails with lockfile -- Chrome already on port 9222 not 9223. Use CDP port 9222 with suppress_origin=True via Python websocket. (2) Chrome hwnd visible window is NOT hwnd:0x5C14E2 (zero-size bg window) -- find visible Chrome via Win32 EnumWindows\u002BGetWindowRect pid filter. (3) DOM click and mouse_event at viewport coords fail on Google consent page -- use wkappbot a11y invoke instead: wkappbot a11y invoke {hwnd:CHROME_HWND,domain:accounts.google.com}#Doc_RootWebArea//*Allow*. CORRECT approach. (4) Auth code expires instantly if token exchange fails (e.g. cp949 UnicodeDecodeError) -- always decode response as utf-8. Need fresh code on exchange failure. (5) Consent page tab URL contains signin/oauth/consent (not accountchooser). (6) After a11y invoke Allow, check Chrome CDP tabs for localhost:8765 URL and extract code param. Summary: use wkappbot a11y invoke, not raw Python mouse clicks."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep GMAIL_CLIENT_ID D:/GitHub/WKAppBot/.env",
+      "expect": "GMAIL_CLIENT_ID",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep GMAIL_REFRESH_TOKEN D:/GitHub/WKAppBot/.env",
+      "expect": "GMAIL_REFRESH_TOKEN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep gmail_support_bot D:/GitHub/wkappbot-sdk/.github/scripts/gmail_support_bot.py",
+      "expect": "gmail_support_bot",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "gmail",
+    "oauth2",
+    "support",
+    "license",
+    "email",
+    "automation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T11:04:16.5468118Z",
+  "updated": "2026-05-01T11:26:06.2891436Z",
+  "version": "1.1"
+}
