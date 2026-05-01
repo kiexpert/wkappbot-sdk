@@ -103,41 +103,34 @@ static class LicenseStatus
     }
 
     static readonly HashSet<string> TrustedAuthors = ["kiexpert", "github-actions[bot]"];
+    static readonly System.Text.RegularExpressions.Regex ExpRe =
+        new(@"(cdp|sudo)=(\S+)", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     static async Task<(DateTime? cdp, DateTime? sudo)> GetExpiryAsync(HttpClient http, string user)
     {
         try
         {
-            // Verify the most recent commit to this file is by a trusted author
-            var commitsJson = await http.GetStringAsync(
-                $"https://api.github.com/repos/{Repo}/commits?path=.github/licenses/{user}.json&per_page=1");
-            using var commitsDoc = JsonDocument.Parse(commitsJson);
-            var commits = commitsDoc.RootElement;
-            if (commits.GetArrayLength() > 0)
-            {
-                var latest    = commits[0];
-                var login     = latest.TryGetProperty("author", out var a) && a.ValueKind != JsonValueKind.Null
-                                ? (a.TryGetProperty("login", out var l) ? l.GetString() : "") : "";
-                var name      = latest.GetProperty("commit").GetProperty("author").GetProperty("name").GetString() ?? "";
-                if (!TrustedAuthors.Contains(login ?? "") && !TrustedAuthors.Contains(name))
-                    return (null, null);  // tampered — treat as expired
-            }
-
+            // 1 API call: latest commit on .github/licenses/{user} → trusted check + expiry from message
             var json = await http.GetStringAsync(
-                $"https://api.github.com/repos/{Repo}/contents/.github/licenses/{user}.json");
+                $"https://api.github.com/repos/{Repo}/commits?path=.github/licenses/{user}&sha=main&per_page=1");
             using var doc = JsonDocument.Parse(json);
-            var encoded = doc.RootElement.GetProperty("content").GetString() ?? "";
-            var content = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded.Replace("\n", "")));
-            using var inner = JsonDocument.Parse(content);
-            var root = inner.RootElement;
+            if (doc.RootElement.GetArrayLength() == 0) return (null, null);
 
+            var latest = doc.RootElement[0];
+            var login  = latest.TryGetProperty("author", out var a) && a.ValueKind != JsonValueKind.Null
+                         ? (a.TryGetProperty("login", out var l) ? l.GetString() ?? "" : "") : "";
+            var name   = latest.GetProperty("commit").GetProperty("author").GetProperty("name").GetString() ?? "";
+            if (!TrustedAuthors.Contains(login) && !TrustedAuthors.Contains(name))
+                return (null, null);  // tampered — treat as expired
+
+            var msg = latest.GetProperty("commit").GetProperty("message").GetString() ?? "";
             DateTime? cdp = null, sudo = null;
-            if (root.TryGetProperty("cdp", out var cdpEl))
-                cdp = DateTime.Parse(cdpEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
-            if (root.TryGetProperty("sudo", out var sudoEl))
-                sudo = DateTime.Parse(sudoEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
-            if (cdp == null && root.TryGetProperty("expires", out var expEl))
-                cdp = DateTime.Parse(expEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            foreach (System.Text.RegularExpressions.Match m in ExpRe.Matches(msg))
+            {
+                var dt = DateTime.Parse(m.Groups[2].Value, null, System.Globalization.DateTimeStyles.RoundtripKind);
+                if (m.Groups[1].Value == "cdp")  cdp  = dt;
+                if (m.Groups[1].Value == "sudo") sudo = dt;
+            }
             return (cdp, sudo);
         }
         catch { }
