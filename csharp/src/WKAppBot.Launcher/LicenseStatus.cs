@@ -41,21 +41,13 @@ static class LicenseStatus
         var cdpEnabled   = tier != "Free";
         var sudoEnabled  = perm is "write" or "admin";
 
-        var expires = await GetExpiryAsync(http, user);
+        var (cdpExpiry, sudoExpiry) = await GetExpiryAsync(http, user);
 
         Console.WriteLine($"  User    : @{user}");
         Console.WriteLine($"  Repo    : {Repo}");
         Console.WriteLine($"  Tier    : {tier}");
-        Console.WriteLine($"  CDP     : {(cdpEnabled  ? "✓ enabled" : "✗ not licensed")}");
-        Console.WriteLine($"  Sudo    : {(sudoEnabled  ? "✓ enabled" : "✗ not licensed")}");
-        if (expires.HasValue)
-        {
-            var remaining = expires.Value - DateTime.UtcNow;
-            if (remaining.TotalSeconds > 0)
-                Console.WriteLine($"  Expires : {expires.Value:yyyy-MM-dd HH:mm} UTC  ({FormatRemaining(remaining)} remaining)");
-            else
-                Console.WriteLine($"  Expires : {expires.Value:yyyy-MM-dd HH:mm} UTC  (EXPIRED)");
-        }
+        Console.WriteLine($"  CDP     : {(cdpEnabled  ? "✓ enabled" : "✗ not licensed")}{FormatExpiryInline(cdpExpiry)}");
+        Console.WriteLine($"  Sudo    : {(sudoEnabled  ? "✓ enabled" : "✗ not licensed")}{FormatExpiryInline(sudoExpiry)}");
         if (isPending)
             Console.WriteLine("  Note    : Invitation pending — CDP active immediately, accept to confirm.");
         if (tier == "Free")
@@ -109,7 +101,7 @@ static class LicenseStatus
         catch { return null; }
     }
 
-    static async Task<DateTime?> GetExpiryAsync(HttpClient http, string user)
+    static async Task<(DateTime? cdp, DateTime? sudo)> GetExpiryAsync(HttpClient http, string user)
     {
         try
         {
@@ -119,11 +111,30 @@ static class LicenseStatus
             var encoded = doc.RootElement.GetProperty("content").GetString() ?? "";
             var content = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encoded.Replace("\n", "")));
             using var inner = JsonDocument.Parse(content);
-            if (inner.RootElement.TryGetProperty("expires", out var exp))
-                return DateTime.Parse(exp.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            var root = inner.RootElement;
+
+            // new per-tier schema: {"cdp": "...", "sudo": "..."}
+            DateTime? cdp = null, sudo = null;
+            if (root.TryGetProperty("cdp", out var cdpEl))
+                cdp = DateTime.Parse(cdpEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            if (root.TryGetProperty("sudo", out var sudoEl))
+                sudo = DateTime.Parse(sudoEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            // fallback: old flat schema {"expires": "..."} treated as cdp
+            if (cdp == null && root.TryGetProperty("expires", out var expEl))
+                cdp = DateTime.Parse(expEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
+            return (cdp, sudo);
         }
         catch { }
-        return null;
+        return (null, null);
+    }
+
+    static string FormatExpiryInline(DateTime? expiry)
+    {
+        if (!expiry.HasValue) return "";
+        var remaining = expiry.Value - DateTime.UtcNow;
+        return remaining.TotalSeconds > 0
+            ? $"  (expires {expiry.Value:yyyy-MM-dd}, {FormatRemaining(remaining)} remaining)"
+            : $"  (EXPIRED {expiry.Value:yyyy-MM-dd})";
     }
 
     static string FormatRemaining(TimeSpan t)
