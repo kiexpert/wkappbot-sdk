@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""license_store.py — Read/write license data on the `licenses` branch.
+"""license_store.py — Read/write license data in .github/licenses/ on main.
 
 Storage model:
-  Branch : licenses  (orphan, one file per user, amend + force-push)
-  File   : {user}    — placeholder for listing; content unused
+  File   : .github/licenses/{user}  — placeholder (content unused)
   Commit : chore(licenses): @{user} tier=cdp+sudo cdp=<iso> sudo=<iso> [skip ci]
-           └─ ALL data (tier + expiry) lives in the commit message → 1 API call to read
+           └─ ALL data lives in the commit message → 1 API call to read
   Trust  : commit author must be in TRUSTED_AUTHORS; untrusted latest = immediate expire
+  Access : private repo — only collaborators can see; app reads own file only
 """
 import base64, json, os, re, urllib.request
 from datetime import datetime
 
 LICENSE_REPO    = "kiexpert/wkappbot-sdk"
-LICENSE_BRANCH  = "licenses"
+LICENSE_BRANCH  = "main"
+LICENSE_PATH    = ".github/licenses"
 GH_API          = "https://api.github.com"
 GH_TOKEN        = os.environ.get("GH_LICENSE_TOKEN", "")
 TRUSTED_AUTHORS = {"kiexpert", "github-actions[bot]"}
@@ -47,7 +48,7 @@ def read(user: str) -> tuple[str | None, dict[str, datetime | None]]:
     Returns (tier_str, {cdp, sudo}) or (None, {}) if untrusted/missing.
     """
     commits = _gh("GET", f"/repos/{LICENSE_REPO}/commits"
-                         f"?path={user}&sha={LICENSE_BRANCH}&per_page=1") or []
+                         f"?path={LICENSE_PATH}/{user}&sha={LICENSE_BRANCH}&per_page=1") or []
     if not commits:
         return None, {}
 
@@ -83,16 +84,16 @@ def write(user: str, tier: str, cdp_exp: datetime | None, sudo_exp: datetime | N
     body: dict = {"message": msg, "content": encoded, "branch": LICENSE_BRANCH}
     if existing_sha:
         body["sha"] = existing_sha
-    _gh("PUT", f"/repos/{LICENSE_REPO}/contents/{user}", body)
+    _gh("PUT", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}/{user}", body)
 
 
 def get_file_sha(user: str) -> str | None:
-    obj = _gh("GET", f"/repos/{LICENSE_REPO}/contents/{user}?ref={LICENSE_BRANCH}")
+    obj = _gh("GET", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}/{user}?ref={LICENSE_BRANCH}")
     return obj.get("sha") if obj else None
 
 
 def delete(user: str, sha: str, reason: str):
-    _gh("DELETE", f"/repos/{LICENSE_REPO}/contents/{user}", {
+    _gh("DELETE", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}/{user}", {
         "message": f"chore(licenses): revoke @{user} — {reason} [skip ci]",
         "sha": sha,
         "branch": LICENSE_BRANCH,
@@ -100,5 +101,5 @@ def delete(user: str, sha: str, reason: str):
 
 
 def list_users() -> list[str]:
-    items = _gh("GET", f"/repos/{LICENSE_REPO}/contents/?ref={LICENSE_BRANCH}") or []
+    items = _gh("GET", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}?ref={LICENSE_BRANCH}") or []
     return [i["name"] for i in items if i.get("type") == "file" and i["name"] != "README.md"]
