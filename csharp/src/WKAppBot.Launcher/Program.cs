@@ -1160,6 +1160,11 @@ partial class Program
         // point triggers it.
         RunPendingHardlinkHealOnExit();
 
+        // Wait for pending Chrome profile sync before exit -- blocking call (max 2s timeout).
+        // Chrome may have writes in progress; without this wait, profile data (prefs, history,
+        // extensions) is lost when the OS closes file handles mid-sync.
+        ChromeProfileSync.WaitForPendingSync();
+
         // Restore original stderr FIRST (bypass buffer), then write error log
         if (_originalStderr != null) Console.SetError(_originalStderr);
         if (code != 0 && _stderrBuf != null && _stderrBuf.Count > 0 && !_suppressErrorLog)
