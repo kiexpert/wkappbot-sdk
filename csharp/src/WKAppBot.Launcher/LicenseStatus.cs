@@ -5,58 +5,161 @@ namespace WKAppBot.Launcher;
 
 static class LicenseStatus
 {
-    const string Repo = "kiexpert/wkappbot-sdk";
+    const string Owner = "kiexpert";
+    const string RepoName = "wkappbot-sdk";
+    const string Repo = $"{Owner}/{RepoName}";
 
     internal static async Task<int> PrintAsync()
     {
         var token = GetToken();
         if (string.IsNullOrEmpty(token))
         {
-            Console.Error.WriteLine("[license] No GitHub token found. Set GH_TOKEN or log in with: gh auth login");
+            Console.Error.WriteLine("[license] GitHub 인증이 필요해요.");
+            Console.Error.WriteLine("          → gh auth login");
+            Console.Error.WriteLine("          또는 GH_TOKEN=<token> wkappbot license status");
             return 1;
         }
 
         using var http = MakeClient(token);
 
-        // Get current user
-        var user = await GetCurrentUserAsync(http);
+        // Call 1: GraphQL — viewer.login + viewerPermission in one shot
+        var (user, perm) = await GetIdentityAndPermissionAsync(http);
         if (user == null)
         {
-            Console.Error.WriteLine("[license] Failed to get GitHub user identity.");
+            Console.Error.WriteLine("[license] GitHub 인증 실패. 토큰을 확인해주세요.");
             return 1;
         }
 
-        // Check collaborator permission
-        var (perm, isPending) = await GetPermissionAsync(http, user);
+        // Call 2: latest trusted commit → tier + expiry from commit message
+        var (tierStr, cdpExpiry, sudoExpiry) = await GetLicenseAsync(http, user);
 
-        // Determine tier
+        var now         = DateTime.UtcNow;
+        var sudoActive  = tierStr?.Contains("sudo") == true
+                          && (!sudoExpiry.HasValue || sudoExpiry.Value > now);
+        var cdpEnabled  = tierStr != null || perm is "read" or "write" or "admin";
+        var sudoEnabled = perm is "write" or "admin";
+
         var tier = perm switch
         {
             "admin" => "Dev",
-            "write" => "Sudo",
+            "write" => tierStr?.Contains("sudo") == true ? "Sudo" : "CDP",
             "read"  => "CDP",
-            _       => isPending ? "CDP (pending invite)" : "Free",
+            _       => tierStr != null ? "CDP (invite pending)" : "Free",
         };
 
-        var cdpEnabled   = tier != "Free";
-        var sudoEnabled  = perm is "write" or "admin";
-
-        var (cdpExpiry, sudoExpiry) = await GetExpiryAsync(http, user);
-
         Console.WriteLine($"  User    : @{user}");
-        Console.WriteLine($"  Repo    : {Repo}");
         Console.WriteLine($"  Tier    : {tier}");
-        var sudoActive = sudoEnabled && (!sudoExpiry.HasValue || sudoExpiry.Value > DateTime.UtcNow);
-        Console.WriteLine($"  CDP     : {CdpStatusIcon(cdpEnabled, cdpExpiry, sudoActive)}{CdpExpiryInline(cdpExpiry, sudoActive)}");
-        Console.WriteLine($"  Sudo    : {StatusIcon(sudoEnabled, sudoExpiry)}{FormatExpiryInline(sudoExpiry)}");
-        if (isPending)
-            Console.WriteLine("  Note    : Invitation pending — CDP active immediately, accept to confirm.");
+        Console.WriteLine($"  CDP     : {CdpIcon(cdpEnabled, cdpExpiry, sudoActive)}{CdpExpiry(cdpExpiry, sudoActive)}");
+        Console.WriteLine($"  Sudo    : {Icon(sudoEnabled, sudoExpiry)}{ExpiryInline(sudoExpiry)}");
+        if (tier == "CDP (invite pending)")
+            Console.WriteLine("  Note    : 초대장 수락 후 기능이 활성화돼요 → github.com/notifications");
         if (tier == "Free")
-            Console.WriteLine("  Info    : See https://kiexpert.github.io/wkappbot-sdk/guide/pricing for upgrade.");
+            Console.WriteLine($"  Info    : https://github.com/{Repo}/blob/main/PRICING.md");
         return 0;
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────
+    // ── API calls ──────────────────────────────────────────────────────────────
+
+    static async Task<(string? user, string? perm)> GetIdentityAndPermissionAsync(HttpClient http)
+    {
+        const string query = """
+            {
+              viewer { login }
+              repository(owner: "kiexpert", name: "wkappbot-sdk") {
+                viewerPermission
+              }
+            }
+            """;
+        try
+        {
+            var body = JsonSerializer.Serialize(new { query });
+            var resp = await http.PostAsync("https://api.github.com/graphql",
+                new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            var data  = doc.RootElement.GetProperty("data");
+            var login = data.GetProperty("viewer").GetProperty("login").GetString();
+            var vp    = data.GetProperty("repository").TryGetProperty("viewerPermission", out var vpEl)
+                        ? vpEl.GetString()?.ToLowerInvariant() : null;
+            // GraphQL returns ADMIN/WRITE/READ/TRIAGE/MAINTAIN/null
+            var perm  = vp switch { "admin" => "admin", "write" => "write", "read" => "read", _ => "none" };
+            return (login, perm);
+        }
+        catch { return (null, null); }
+    }
+
+    static readonly HashSet<string> TrustedAuthors = ["kiexpert", "github-actions[bot]"];
+    static readonly System.Text.RegularExpressions.Regex ExpRe  =
+        new(@"(cdp|sudo)=(\S+)", System.Text.RegularExpressions.RegexOptions.Compiled);
+    static readonly System.Text.RegularExpressions.Regex TierRe =
+        new(@"tier=([\w+]+)",    System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    static async Task<(string? tier, DateTime? cdp, DateTime? sudo)> GetLicenseAsync(HttpClient http, string user)
+    {
+        try
+        {
+            var json = await http.GetStringAsync(
+                $"https://api.github.com/repos/{Repo}/commits?path=.github/licenses/{user}&sha=main&per_page=1");
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.GetArrayLength() == 0) return (null, null, null);
+
+            var c     = doc.RootElement[0];
+            var login = c.TryGetProperty("author", out var a) && a.ValueKind != JsonValueKind.Null
+                        ? (a.TryGetProperty("login", out var l) ? l.GetString() ?? "" : "") : "";
+            var name  = c.GetProperty("commit").GetProperty("author").GetProperty("name").GetString() ?? "";
+            if (!TrustedAuthors.Contains(login) && !TrustedAuthors.Contains(name))
+                return (null, null, null);
+
+            var msg     = c.GetProperty("commit").GetProperty("message").GetString() ?? "";
+            var tierStr = TierRe.Match(msg) is { Success: true } tm ? tm.Groups[1].Value : null;
+            DateTime? cdp = null, sudo = null;
+            foreach (System.Text.RegularExpressions.Match m in ExpRe.Matches(msg))
+            {
+                var dt = DateTime.Parse(m.Groups[2].Value, null, System.Globalization.DateTimeStyles.RoundtripKind);
+                if (m.Groups[1].Value == "cdp")  cdp  = dt;
+                if (m.Groups[1].Value == "sudo") sudo = dt;
+            }
+            return (tierStr, cdp, sudo);
+        }
+        catch { return (null, null, null); }
+    }
+
+    // ── display helpers ────────────────────────────────────────────────────────
+
+    static string Icon(bool on, DateTime? exp)
+    {
+        if (!on) return "✗ not licensed";
+        if (exp.HasValue && exp.Value <= DateTime.UtcNow) return "✗ expired";
+        return "✓ enabled";
+    }
+
+    static string CdpIcon(bool on, DateTime? cdpExp, bool sudoActive)
+    {
+        if (!on) return "✗ not licensed";
+        if (sudoActive) return "✓ enabled";
+        if (cdpExp.HasValue && cdpExp.Value <= DateTime.UtcNow) return "✗ expired";
+        return "✓ enabled";
+    }
+
+    static string CdpExpiry(DateTime? cdpExp, bool sudoActive) =>
+        sudoActive ? "  (included with Sudo)" : ExpiryInline(cdpExp);
+
+    static string ExpiryInline(DateTime? exp)
+    {
+        if (!exp.HasValue) return "";
+        var r = exp.Value - DateTime.UtcNow;
+        return r.TotalSeconds > 0
+            ? $"  (expires {exp.Value:yyyy-MM-dd}, {FmtRemaining(r)} remaining)"
+            : $"  (EXPIRED {exp.Value:yyyy-MM-dd})";
+    }
+
+    static string FmtRemaining(TimeSpan t)
+    {
+        if (t.TotalDays >= 1)  return $"{(int)t.TotalDays}일 {t.Hours}시간";
+        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}시간 {t.Minutes}분";
+        return $"{(int)t.TotalMinutes}분";
+    }
+
+    // ── auth ───────────────────────────────────────────────────────────────────
 
     static string? GetToken() =>
         Environment.GetEnvironmentVariable("GH_TOKEN")
@@ -89,119 +192,5 @@ static class LicenseStatus
         c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         c.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         return c;
-    }
-
-    static async Task<string?> GetCurrentUserAsync(HttpClient http)
-    {
-        try
-        {
-            var json = await http.GetStringAsync("https://api.github.com/user");
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.GetProperty("login").GetString();
-        }
-        catch { return null; }
-    }
-
-    static readonly HashSet<string> TrustedAuthors = ["kiexpert", "github-actions[bot]"];
-    static readonly System.Text.RegularExpressions.Regex ExpRe =
-        new(@"(cdp|sudo)=(\S+)", System.Text.RegularExpressions.RegexOptions.Compiled);
-
-    static async Task<(DateTime? cdp, DateTime? sudo)> GetExpiryAsync(HttpClient http, string user)
-    {
-        try
-        {
-            // 1 API call: latest commit on .github/licenses/{user} → trusted check + expiry from message
-            var json = await http.GetStringAsync(
-                $"https://api.github.com/repos/{Repo}/commits?path=.github/licenses/{user}&sha=main&per_page=1");
-            using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.GetArrayLength() == 0) return (null, null);
-
-            var latest = doc.RootElement[0];
-            var login  = latest.TryGetProperty("author", out var a) && a.ValueKind != JsonValueKind.Null
-                         ? (a.TryGetProperty("login", out var l) ? l.GetString() ?? "" : "") : "";
-            var name   = latest.GetProperty("commit").GetProperty("author").GetProperty("name").GetString() ?? "";
-            if (!TrustedAuthors.Contains(login) && !TrustedAuthors.Contains(name))
-                return (null, null);  // tampered — treat as expired
-
-            var msg = latest.GetProperty("commit").GetProperty("message").GetString() ?? "";
-            DateTime? cdp = null, sudo = null;
-            foreach (System.Text.RegularExpressions.Match m in ExpRe.Matches(msg))
-            {
-                var dt = DateTime.Parse(m.Groups[2].Value, null, System.Globalization.DateTimeStyles.RoundtripKind);
-                if (m.Groups[1].Value == "cdp")  cdp  = dt;
-                if (m.Groups[1].Value == "sudo") sudo = dt;
-            }
-            return (cdp, sudo);
-        }
-        catch { }
-        return (null, null);
-    }
-
-    static string StatusIcon(bool enabled, DateTime? expiry)
-    {
-        if (!enabled) return "✗ not licensed";
-        if (expiry.HasValue && expiry.Value <= DateTime.UtcNow) return "✗ expired";
-        return "✓ enabled";
-    }
-
-    static string CdpStatusIcon(bool enabled, DateTime? cdpExpiry, bool sudoActive)
-    {
-        if (!enabled) return "✗ not licensed";
-        if (sudoActive) return "✓ enabled";  // sudo covers cdp regardless
-        if (cdpExpiry.HasValue && cdpExpiry.Value <= DateTime.UtcNow) return "✗ expired";
-        return "✓ enabled";
-    }
-
-    static string CdpExpiryInline(DateTime? cdpExpiry, bool sudoActive)
-    {
-        if (sudoActive) return "  (included with Sudo)";
-        return FormatExpiryInline(cdpExpiry);
-    }
-
-    static string FormatExpiryInline(DateTime? expiry)
-    {
-        if (!expiry.HasValue) return "";
-        var remaining = expiry.Value - DateTime.UtcNow;
-        return remaining.TotalSeconds > 0
-            ? $"  (expires {expiry.Value:yyyy-MM-dd}, {FormatRemaining(remaining)} remaining)"
-            : $"  (EXPIRED {expiry.Value:yyyy-MM-dd})";
-    }
-
-    static string FormatRemaining(TimeSpan t)
-    {
-        if (t.TotalDays >= 1) return $"{(int)t.TotalDays}일 {t.Hours}시간";
-        if (t.TotalHours >= 1) return $"{(int)t.TotalHours}시간 {t.Minutes}분";
-        return $"{(int)t.TotalMinutes}분";
-    }
-
-    static async Task<(string perm, bool isPending)> GetPermissionAsync(HttpClient http, string user)
-    {
-        try
-        {
-            var resp = await http.GetAsync($"https://api.github.com/repos/{Repo}/collaborators/{user}/permission");
-            if (resp.IsSuccessStatusCode)
-            {
-                using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-                var p = doc.RootElement.GetProperty("permission").GetString() ?? "none";
-                return (p, false);
-            }
-        }
-        catch { }
-
-        // Check pending invitation
-        try
-        {
-            var json = await http.GetStringAsync($"https://api.github.com/repos/{Repo}/invitations");
-            using var doc = JsonDocument.Parse(json);
-            foreach (var inv in doc.RootElement.EnumerateArray())
-            {
-                var login = inv.GetProperty("invitee").GetProperty("login").GetString();
-                if (string.Equals(login, user, StringComparison.OrdinalIgnoreCase))
-                    return ("read", true);
-            }
-        }
-        catch { }
-
-        return ("none", false);
     }
 }
