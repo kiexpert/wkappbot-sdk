@@ -70,57 +70,25 @@ def calc_days(amount: float, license_type: str) -> int:
 
 # ── grant / revoke ────────────────────────────────────────────────────────────
 
-def _fetch_license(user: str):
-    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
-    existing = gh("GET", path)
-    if not existing:
-        return path, None, {}
-    sha = existing.get("sha")
-    data: dict = {}
-    if existing.get("content"):
-        try:
-            raw = json.loads(base64.b64decode(existing["content"]))
-            # migrate old flat schema {"expires": "..."} → {"cdp": "..."}
-            if "expires" in raw and "cdp" not in raw and "sudo" not in raw:
-                data = {"cdp": raw["expires"]}
-            else:
-                data = raw
-        except Exception:
-            pass
-    return path, sha, data
-
-
-def write_license_file(user: str, tier: str, expires_at: str):
-    path, sha, data = _fetch_license(user)
-    data[tier] = expires_at
-    encoded = base64.b64encode(json.dumps(data).encode()).decode()
-    body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
-    if sha:
-        body["sha"] = sha
-    gh("PUT", path, body)
-
-
-def _read_expiry(user: str, tier: str):
-    _, _, data = _fetch_license(user)
-    raw = data.get(tier)
-    if raw:
-        try:
-            return datetime.fromisoformat(raw)
-        except Exception:
-            pass
-    return None
-
-
 def grant(user: str, days: int, amount: float, license_type: str):
+    from license_store import read, write, get_file_sha
     tier = tier_from_amount(amount)
     perm = "write" if tier == "sudo" else "read"
     now  = datetime.now(timezone.utc)
-    prev = _read_expiry(user, tier)
+
+    _, expiries = read(user)
+    prev = expiries.get(tier)
     base = prev if prev and prev > now else now
     exp  = base + timedelta(days=days)
 
+    new_cdp  = exp if tier == "cdp"  else expiries.get("cdp")
+    new_sudo = exp if tier == "sudo" else expiries.get("sudo")
+    existing_tiers = {t for t, v in expiries.items() if v} | {tier}
+    tier_str = "+".join(sorted(existing_tiers))
+
+    sha = get_file_sha(user)
     gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": perm})
-    write_license_file(user, tier, exp.isoformat())
+    write(user, tier_str, new_cdp, new_sudo, existing_sha=sha)
 
     kind = "one-time" if license_type == "one_time" else "monthly"
     slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} {kind}) expires {exp.date()}")

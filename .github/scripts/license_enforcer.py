@@ -50,60 +50,6 @@ def slack_notify(msg):
     ), timeout=10)
 
 
-def list_license_files():
-    items = gh("GET", f"/repos/{LICENSE_REPO}/contents/.github/licenses")
-    if not items:
-        return []
-    return [i["name"][:-5] for i in items if i["name"].endswith(".json")]
-
-
-TRUSTED_AUTHORS = {"kiexpert", "github-actions[bot]"}
-
-
-def fetch_license(user):
-    file_path = f".github/licenses/{user}.json"
-    api_path  = f"/repos/{LICENSE_REPO}/contents/{file_path}"
-
-    # If the most recent commit is not by a trusted author → treat as tampered, return empty
-    commits = gh("GET", f"/repos/{LICENSE_REPO}/commits?path={file_path}&per_page=1") or []
-    if commits:
-        latest = commits[0]
-        login = (latest.get("author") or {}).get("login", "")
-        name  = latest.get("commit", {}).get("author", {}).get("name", "")
-        if login not in TRUSTED_AUTHORS and name not in TRUSTED_AUTHORS:
-            print(f"[TAMPER] @{user} last commit by '{login or name}' — treating as expired")
-            slack_notify(f"⚠️ TAMPER DETECTED: @{user} license file last commit by '{login or name}' — forcing expiry")
-            head = gh("GET", api_path)
-            sha = head.get("sha") if head else None
-            return api_path, sha, {}  # empty = all expired
-
-    existing = gh("GET", api_path)
-    if not existing:
-        return api_path, None, {}
-    sha = existing.get("sha")
-    data = {}
-    if existing.get("content"):
-        try:
-            raw = json.loads(base64.b64decode(existing["content"]))
-            if "expires" in raw and "cdp" not in raw and "sudo" not in raw:
-                data = {"cdp": raw["expires"]}
-            else:
-                data = raw
-        except Exception as e:
-            print(f"[warn] Failed to parse license for {user}: {e}")
-    return api_path, sha, data
-
-
-def write_license_file(path, sha, data, commit_msg):
-    encoded = base64.b64encode(json.dumps(data).encode()).decode()
-    body = {"message": commit_msg, "content": encoded}
-    if sha:
-        body["sha"] = sha
-    gh("PUT", path, body)
-
-
-def delete_license_file(path, sha, commit_msg):
-    gh("DELETE", path, {"message": commit_msg, "sha": sha})
 
 
 def get_permission(user):
@@ -123,7 +69,8 @@ def desired_permission(cdp_exp, sudo_exp):
 
 
 def enforce():
-    users = list_license_files()
+    from license_store import list_users, read, write, get_file_sha
+    users = list_users()
     if not users:
         print("No license files found.")
         return
@@ -132,11 +79,12 @@ def enforce():
     changes = []
 
     for user in users:
-        path, sha, data = fetch_license(user)
-        cdp_exp  = _parse_dt(data.get("cdp"))
-        sudo_exp = _parse_dt(data.get("sudo"))
+        tier_str, expiries = read(user)
+        cdp_exp  = expiries.get("cdp")
+        sudo_exp = expiries.get("sudo")
         desired  = desired_permission(cdp_exp, sudo_exp)
         current  = get_permission(user)
+        sha      = get_file_sha(user)
 
         cdp_str  = cdp_exp.strftime("%Y-%m-%d")  if cdp_exp  else "none"
         sudo_str = sudo_exp.strftime("%Y-%m-%d") if sudo_exp else "none"
@@ -147,11 +95,9 @@ def enforce():
             continue
 
         if desired is None and current == "write":
-            # write → read first; full revoke happens next cycle once CDP also confirmed gone
             gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
-            data.pop("sudo", None)
-            write_license_file(path, sha, data,
-                f"chore(licenses): downgrade @{user} all tiers expired → cdp-only pending revoke [skip ci]")
+            from license_store import write as ls_write
+            ls_write(user, "cdp", cdp_exp, None, existing_sha=sha)
             msg = f"⬇️ @{user} all tiers expired — stepped down to read (will revoke next cycle)"
             slack_notify(msg)
             changes.append(msg)
@@ -160,8 +106,8 @@ def enforce():
         elif desired is None and current == "read":
             gh("DELETE", f"/repos/{LICENSE_REPO}/collaborators/{user}")
             if sha:
-                delete_license_file(path, sha,
-                    f"chore(licenses): revoke @{user} — all tiers expired [skip ci]")
+                from license_store import delete as ls_delete
+                ls_delete(user, sha, "all tiers expired")
             msg = f"🔒 @{user} license expired — collaborator access revoked"
             slack_notify(msg)
             changes.append(msg)
@@ -169,10 +115,8 @@ def enforce():
 
         elif desired == "read" and current == "write":
             gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
-            # remove sudo key from file so history is clean
-            data.pop("sudo", None)
-            write_license_file(path, sha, data,
-                f"chore(licenses): downgrade @{user} sudo expired → cdp [skip ci]")
+            from license_store import write as ls_write
+            ls_write(user, "cdp", cdp_exp, None, existing_sha=sha)
             msg = f"⬇️ @{user} sudo expired — downgraded to CDP (read)"
             slack_notify(msg)
             changes.append(msg)
