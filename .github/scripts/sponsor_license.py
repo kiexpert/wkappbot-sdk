@@ -7,7 +7,7 @@ Usage:
 import argparse, json, math, os, sys, urllib.request
 from datetime import datetime, timezone, timedelta
 
-PRIVATE_REPO   = "kiexpert/wkappbot-private"
+LICENSE_REPO   = "kiexpert/wkappbot-sdk"
 SLACK_CHANNEL  = "C0APNELH2LR"
 GH_API         = "https://api.github.com"
 GH_TOKEN       = os.environ.get("GH_LICENSE_TOKEN", "")
@@ -68,40 +68,6 @@ def calc_days(amount: float, license_type: str) -> int:
     return 30  # monthly flat
 
 
-def repo_exists() -> bool:
-    result = gh("GET", f"/repos/{PRIVATE_REPO}")
-    if result is None:
-        print(f"Warning: {PRIVATE_REPO} not accessible or does not exist — proceeding anyway")
-        return False
-    return True
-
-
-# ── license file in private repo ─────────────────────────────────────────────
-
-def put_license_file(user: str, payload: dict):
-    path = f"/repos/{PRIVATE_REPO}/contents/licenses/{user}.json"
-    content = json.dumps(payload, indent=2)
-    import base64
-    encoded = base64.b64encode(content.encode()).decode()
-
-    existing = gh("GET", path)
-    body = {"message": f"chore(licenses): grant {user} [skip ci]",
-            "content": encoded}
-    if existing and existing.get("sha"):
-        body["sha"] = existing["sha"]
-    gh("PUT", path, body)
-
-
-def delete_license_file(user: str):
-    path = f"/repos/{PRIVATE_REPO}/contents/licenses/{user}.json"
-    existing = gh("GET", path)
-    if existing and existing.get("sha"):
-        gh("DELETE", path, {
-            "message": f"chore(licenses): revoke {user} [skip ci]",
-            "sha": existing["sha"],
-        })
-
-
 # ── grant / revoke ────────────────────────────────────────────────────────────
 
 def grant(user: str, days: int, amount: float, license_type: str):
@@ -109,32 +75,15 @@ def grant(user: str, days: int, amount: float, license_type: str):
     now  = datetime.now(timezone.utc)
     exp  = now + timedelta(days=days)
 
-    # Add collaborator (read access = licensed)
-    result = gh("PUT", f"/repos/{PRIVATE_REPO}/collaborators/{user}",
-                {"permission": "read"})
-    if result is None:
-        print(f"Note: collaborator PUT returned no body (may be 204 OK or repo missing)")
-
-    # Write license metadata file
-    if repo_exists():
-        put_license_file(user, {
-            "github_user": user,
-            "tier": tier,
-            "expires_at": exp.isoformat(),
-            "days": days,
-            "amount_usd": amount,
-            "granted_at": now.isoformat(),
-        })
+    gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
 
     kind = "one-time" if license_type == "one_time" else "monthly"
-    slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} {kind})")
+    slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} {kind}) expires {exp.date()}")
     print(f"Granted: {user} tier={tier} days={days} expires={exp.date()}")
 
 
 def revoke(user: str):
-    gh("DELETE", f"/repos/{PRIVATE_REPO}/collaborators/{user}")
-    if repo_exists():
-        delete_license_file(user)
+    gh("DELETE", f"/repos/{LICENSE_REPO}/collaborators/{user}")
     slack_notify(f"❌ @{user} license revoked")
     print(f"Revoked: {user}")
 

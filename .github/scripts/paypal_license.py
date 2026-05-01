@@ -2,14 +2,14 @@
 import base64, json, math, os, re, sys, urllib.request
 from datetime import datetime, timezone, timedelta
 
-PRIVATE_REPO  = "kiexpert/wkappbot-private"
+LICENSE_REPO  = "kiexpert/wkappbot-sdk"
 SLACK_CHANNEL = "C0APNELH2LR"
 GH_API        = "https://api.github.com"
 GH_TOKEN      = os.environ.get("GH_LICENSE_TOKEN", "")
 SLACK_TOKEN   = os.environ.get("SLACK_BOT_TOKEN", "")
 PP_CLIENT_ID  = os.environ.get("PAYPAL_CLIENT_ID", "")
 PP_SECRET     = os.environ.get("PAYPAL_CLIENT_SECRET", "")
-STATE_PATH    = f"/repos/{PRIVATE_REPO}/contents/paypal_state.json"
+STATE_PATH    = f"/repos/{LICENSE_REPO}/contents/.github/paypal_state.json"
 MAX_IDS       = 1000
 
 
@@ -57,35 +57,11 @@ def tier_from_amount(amount):
     return "sudo" if amount >= 363 else "cdp"
 
 
-def put_license_file(user, payload):
-    path = f"/repos/{PRIVATE_REPO}/contents/licenses/{user}.json"
-    encoded = base64.b64encode(json.dumps(payload, indent=2).encode()).decode()
-    existing = gh("GET", path)
-    body = {"message": f"chore(licenses): grant {user} via paypal [skip ci]", "content": encoded}
-    if existing and existing.get("sha"):
-        body["sha"] = existing["sha"]
-    gh("PUT", path, body)
-
-
 def grant(user, days, amount):
     tier = tier_from_amount(amount)
-    now  = datetime.now(timezone.utc)
-    exp  = now + timedelta(days=days)
-    result = gh("PUT", f"/repos/{PRIVATE_REPO}/collaborators/{user}", {"permission": "read"})
-    if result is None:
-        print(f"Note: collaborator PUT returned no body for {user}")
-    existing = gh("GET", f"/repos/{PRIVATE_REPO}")
-    if existing:
-        put_license_file(user, {
-            "github_user": user,
-            "tier": tier,
-            "expires_at": exp.isoformat(),
-            "days": days,
-            "amount_usd": amount,
-            "granted_at": now.isoformat(),
-            "source": "paypal",
-        })
-    slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal)")
+    exp  = datetime.now(timezone.utc) + timedelta(days=days)
+    gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
+    slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} PayPal) expires {exp.date()}")
     print(f"Granted: {user} tier={tier} days={days} expires={exp.date()}")
 
 
