@@ -102,10 +102,27 @@ static class LicenseStatus
         catch { return null; }
     }
 
+    static readonly HashSet<string> TrustedAuthors = ["kiexpert", "github-actions[bot]"];
+
     static async Task<(DateTime? cdp, DateTime? sudo)> GetExpiryAsync(HttpClient http, string user)
     {
         try
         {
+            // Verify the most recent commit to this file is by a trusted author
+            var commitsJson = await http.GetStringAsync(
+                $"https://api.github.com/repos/{Repo}/commits?path=.github/licenses/{user}.json&per_page=1");
+            using var commitsDoc = JsonDocument.Parse(commitsJson);
+            var commits = commitsDoc.RootElement;
+            if (commits.GetArrayLength() > 0)
+            {
+                var latest    = commits[0];
+                var login     = latest.TryGetProperty("author", out var a) && a.ValueKind != JsonValueKind.Null
+                                ? (a.TryGetProperty("login", out var l) ? l.GetString() : "") : "";
+                var name      = latest.GetProperty("commit").GetProperty("author").GetProperty("name").GetString() ?? "";
+                if (!TrustedAuthors.Contains(login ?? "") && !TrustedAuthors.Contains(name))
+                    return (null, null);  // tampered — treat as expired
+            }
+
             var json = await http.GetStringAsync(
                 $"https://api.github.com/repos/{Repo}/contents/.github/licenses/{user}.json");
             using var doc = JsonDocument.Parse(json);
@@ -114,13 +131,11 @@ static class LicenseStatus
             using var inner = JsonDocument.Parse(content);
             var root = inner.RootElement;
 
-            // new per-tier schema: {"cdp": "...", "sudo": "..."}
             DateTime? cdp = null, sudo = null;
             if (root.TryGetProperty("cdp", out var cdpEl))
                 cdp = DateTime.Parse(cdpEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
             if (root.TryGetProperty("sudo", out var sudoEl))
                 sudo = DateTime.Parse(sudoEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
-            // fallback: old flat schema {"expires": "..."} treated as cdp
             if (cdp == null && root.TryGetProperty("expires", out var expEl))
                 cdp = DateTime.Parse(expEl.GetString()!, null, System.Globalization.DateTimeStyles.RoundtripKind);
             return (cdp, sudo);

@@ -57,11 +57,29 @@ def list_license_files():
     return [i["name"][:-5] for i in items if i["name"].endswith(".json")]
 
 
+TRUSTED_AUTHORS = {"kiexpert", "github-actions[bot]"}
+
+
 def fetch_license(user):
-    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
-    existing = gh("GET", path)
+    file_path = f".github/licenses/{user}.json"
+    api_path  = f"/repos/{LICENSE_REPO}/contents/{file_path}"
+
+    # If the most recent commit is not by a trusted author → treat as tampered, return empty
+    commits = gh("GET", f"/repos/{LICENSE_REPO}/commits?path={file_path}&per_page=1") or []
+    if commits:
+        latest = commits[0]
+        login = (latest.get("author") or {}).get("login", "")
+        name  = latest.get("commit", {}).get("author", {}).get("name", "")
+        if login not in TRUSTED_AUTHORS and name not in TRUSTED_AUTHORS:
+            print(f"[TAMPER] @{user} last commit by '{login or name}' — treating as expired")
+            slack_notify(f"⚠️ TAMPER DETECTED: @{user} license file last commit by '{login or name}' — forcing expiry")
+            head = gh("GET", api_path)
+            sha = head.get("sha") if head else None
+            return api_path, sha, {}  # empty = all expired
+
+    existing = gh("GET", api_path)
     if not existing:
-        return path, None, {}
+        return api_path, None, {}
     sha = existing.get("sha")
     data = {}
     if existing.get("content"):
@@ -73,7 +91,7 @@ def fetch_license(user):
                 data = raw
         except Exception as e:
             print(f"[warn] Failed to parse license for {user}: {e}")
-    return path, sha, data
+    return api_path, sha, data
 
 
 def write_license_file(path, sha, data, commit_msg):
