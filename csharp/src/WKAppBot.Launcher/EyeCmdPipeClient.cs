@@ -223,26 +223,26 @@ internal static class EyeCmdPipeClient
 
         if (ancestorPids.Count > 0)
         {
+            // Find any visible top-level window owned by an ancestor process.
+            // No class filter -- caller window may be Windows Terminal, Chrome widget,
+            // VS Code (Electron), or any other container. Closest ancestor wins.
             IntPtr match = IntPtr.Zero;
+            uint matchDepth = uint.MaxValue;
             EnumWindows((hWnd, _) =>
             {
                 if (!IsWindowVisible(hWnd)) return true;
                 if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
-                var cls = GetClass(hWnd);
-                if (!string.Equals(cls, "CASCADIA_HOSTING_WINDOW_CLASS", StringComparison.OrdinalIgnoreCase))
-                    return true;
                 GetWindowThreadProcessId(hWnd, out uint wpid);
                 if (!ancestorPids.Contains(wpid)) return true;
+                // prefer the closest ancestor (lowest depth in chain)
                 match = hWnd;
-                return false; // stop
+                return false;
             }, IntPtr.Zero);
             if (match != IntPtr.Zero) return match;
         }
 
-        // FALLBACK: foreground window (covers edge cases where terminal is not in process chain)
-        var fg = GetForegroundWindow();
-        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg))) return fg;
-        return fg; // last resort
+        // FALLBACK: foreground window
+        return GetForegroundWindow();
     }
 
     static bool IsTerminalClass(string cls)
