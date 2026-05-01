@@ -70,12 +70,24 @@ def calc_days(amount: float, license_type: str) -> int:
 
 # ── grant / revoke ────────────────────────────────────────────────────────────
 
+def write_license_file(user: str, expires_at: str):
+    import base64
+    path = f"/repos/{LICENSE_REPO}/contents/.github/licenses/{user}.json"
+    content = json.dumps({"expires": expires_at}).encode()
+    encoded = base64.b64encode(content).decode()
+    existing = gh("GET", path)
+    body = {"message": f"chore(licenses): grant @{user} [skip ci]", "content": encoded}
+    if existing and existing.get("sha"):
+        body["sha"] = existing["sha"]
+    gh("PUT", path, body)
+
+
 def grant(user: str, days: int, amount: float, license_type: str):
     tier = tier_from_amount(amount)
-    now  = datetime.now(timezone.utc)
-    exp  = now + timedelta(days=days)
+    exp  = datetime.now(timezone.utc) + timedelta(days=days)
 
     gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
+    write_license_file(user, exp.isoformat())
 
     kind = "one-time" if license_type == "one_time" else "monthly"
     slack_notify(f"✅ @{user} granted {days} days {tier.upper()} access (${amount:.0f} {kind}) expires {exp.date()}")
