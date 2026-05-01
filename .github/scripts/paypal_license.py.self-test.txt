@@ -1,6 +1,6 @@
-commit: c52b1886cbe1e190dc6e94077fc7a089e9715fa5
+commit: 09ac71e619ba0c0b73dd45af9c156fe4d06850e5
 script: .github/scripts/paypal_license.py
 exitcode: 1
-timestamp_utc: 2026-05-01T06:39:00.8000475Z
+timestamp_utc: 2026-05-01T06:56:22.6607651Z
 
-Error: missing required env vars
+Error: GH_LICENSE_TOKEN not set
