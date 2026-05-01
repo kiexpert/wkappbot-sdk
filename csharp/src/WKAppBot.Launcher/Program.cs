@@ -362,6 +362,17 @@ partial class Program
             return 1; // unreachable
         }
 
+        // license status: Launcher-owned command (needs GitHub token, no Core needed)
+        if (args.Length >= 2
+            && args[0].Equals("license", StringComparison.OrdinalIgnoreCase)
+            && args[1].Equals("status",  StringComparison.OrdinalIgnoreCase))
+        {
+            var rc = LicenseStatus.PrintAsync().GetAwaiter().GetResult();
+            Console.Out.Flush();
+            TerminateSelf((uint)rc);
+            return rc; // unreachable
+        }
+
         // Encoding: app.manifest activeCodePage=UTF-8 sets CP65001 at OS load.
 
         // --args-file <path>: read args from UTF-8 text file (one arg per line) to bypass

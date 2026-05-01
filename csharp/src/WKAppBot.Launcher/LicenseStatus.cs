@@ -34,10 +34,11 @@ static class LicenseStatus
         var (tierStr, cdpExpiry, sudoExpiry) = await GetLicenseAsync(http, user);
 
         var now         = DateTime.UtcNow;
-        var sudoActive  = tierStr?.Contains("sudo") == true
-                          && (!sudoExpiry.HasValue || sudoExpiry.Value > now);
         var cdpEnabled  = tierStr != null || perm is "read" or "write" or "admin";
         var sudoEnabled = perm is "write" or "admin";
+        var sudoActive  = sudoEnabled
+                          && tierStr?.Contains("sudo") == true
+                          && (!sudoExpiry.HasValue || sudoExpiry.Value > now);
 
         var tier = perm switch
         {
@@ -72,7 +73,9 @@ static class LicenseStatus
             """;
         try
         {
-            var body = JsonSerializer.Serialize(new { query });
+            var escaped = query.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", "\\n");
+            var body = $"{{\"query\":\"{escaped}\"}}";
+
             var resp = await http.PostAsync("https://api.github.com/graphql",
                 new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
@@ -168,18 +171,39 @@ static class LicenseStatus
 
     static string? TryReadGhCliToken()
     {
+        // Try hosts.yml first (plain oauth_token entry)
         try
         {
             var hostsFile = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "GitHub CLI", "hosts.yml");
-            if (!File.Exists(hostsFile)) return null;
-            foreach (var line in File.ReadAllLines(hostsFile))
+            if (File.Exists(hostsFile))
             {
-                var t = line.Trim();
-                if (t.StartsWith("oauth_token:"))
-                    return t["oauth_token:".Length..].Trim();
+                foreach (var line in File.ReadAllLines(hostsFile))
+                {
+                    var t = line.Trim();
+                    if (t.StartsWith("oauth_token:"))
+                        return t["oauth_token:".Length..].Trim();
+                }
             }
+        }
+        catch { }
+
+        // Fallback: `gh auth token` reads from system keyring
+        try
+        {
+            using var p = new System.Diagnostics.Process();
+            p.StartInfo = new System.Diagnostics.ProcessStartInfo("gh", "auth token")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError  = true,
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
+            };
+            p.Start();
+            var tok = p.StandardOutput.ReadToEnd().Trim();
+            p.WaitForExit(3000);
+            if (p.ExitCode == 0 && !string.IsNullOrEmpty(tok)) return tok;
         }
         catch { }
         return null;
