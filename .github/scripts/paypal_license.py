@@ -111,9 +111,17 @@ def paypal_transactions(token, start_date, end_date):
         f"https://api-m.sandbox.paypal.com/v2/reporting/transactions?{params}",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.loads(r.read())
-    return data.get("transaction_details", [])
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read())
+        return data.get("transaction_details", [])
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        if e.code == 404:
+            print(f"PayPal transactions: no results (404) — likely no transactions in range or Transaction Search not enabled on app")
+            return []
+        print(f"PayPal transactions API error {e.code}: {body}")
+        return []
 
 
 def load_state():
