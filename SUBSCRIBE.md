@@ -1,44 +1,86 @@
-# Subscribe to wkappbot
+# wkappbot 구독하기
 
-wkappbot uses **GitHub collaborator permissions** as its license system — no separate
-auth, no license keys to lose. Pay once, get added as a collaborator on
-`kiexpert/wkappbot-sdk`, and the binary you already have unlocks Pro features.
+> **라이선스 키 없음. 별도 계정 없음.** GitHub 계정 하나로 즉시 활성화.
 
 ---
 
-## Quick Start (3 steps)
+## 요금제 한눈에 보기
 
-1. **GitHub 로그인** — `gh auth login` (HTTPS, browser flow)
-2. **결제** — PayPal · KIS이체 · GitHub Sponsors 중 하나 → **메모에 GitHub 아이디** 필수
-3. **초대 수락** — <https://github.com/notifications> 에서 수락
+| | Free | CDP | Sudo |
+|--|:--:|:--:|:--:|
+| **가격** | 무료 | ₩140,000 / $100 | ₩500,000 / $363 |
+| **기간** | 영구 | 30일 | 108일 |
+| UIA / Win32 / Android 자동화 | ✅ | ✅ | ✅ |
+| 시나리오 실행, skill 시스템 | ✅ | ✅ | ✅ |
+| **CDP 브라우저 자동화** | ❌ | ✅ | ✅ |
+| **`ask` AI 위임 (triad/GPT/Gemini)** | ❌ | ✅ | ✅ |
+| **`schedule` 예약 실행** | ❌ | ✅ | ✅ |
+| **`--sudo` 관리자 프로세스 접근** | ❌ | ❌ | ✅ |
 
-→ 수분~1시간 내 자동 활성화. 자세한 결제 방법: [PRICING.md](./PRICING.md)
-
----
-
-## Tier Comparison
-
-| Tier  | Price (KRW/mo) | GitHub permission | Unlocks |
-|-------|---------------:|-------------------|---------|
-| Free  | 0              | (none / public)   | a11y, inspect, run, scenario, skill, speak, file, logcat |
-| CDP   | 100,000        | `read`            | Free + CDP browser automation, `ask` AI (triad/gpt/gemini), `schedule` |
-| Sudo  | 500,000        | `write`           | CDP + `--sudo` elevated admin process access (Kiwoom HTS, admin apps) |
-
-All Free features remain free forever — Pro tiers add capabilities, never gate the basics.
+> 결제는 **누적**됩니다 — 남은 기간 위에 쌓이며, 기간이 리셋되지 않아요.
 
 ---
 
-## Payment Methods
+## 결제 방법
 
-→ See **[PRICING.md](./PRICING.md)** for full instructions (PayPal / KIS / GitHub Sponsors).
+### 💳 A. PayPal (해외 / 즉시)
 
-**공통 주의사항**: 메모/입금자명에 GitHub 아이디를 정확히 적어야 자동 처리됩니다.
+1. **paypal.me/kiexpert** 에서 결제
+2. **메모에 GitHub 아이디 입력** ← 필수!
+3. 완료 — 수분 내 자동 활성화
+
+### 🏦 B. 국내 이체
+
+| 항목 | 내용 |
+|------|------|
+| 은행 | 한국투자증권 (KIS) |
+| 계좌번호 | `43420089-01` (김기일) |
+| CDP 금액 | ₩140,000 |
+| Sudo 금액 | ₩500,000 |
+| **입금자명** | **GitHub 아이디** ← 필수! |
+
+> 입금자명이 달라도 처리 가능하지만 지연될 수 있어요.  
+> 처리 후 1시간 이내 자동 활성화.
+
+### ⭐ C. GitHub Sponsors
+
+1. **[github.com/sponsors/kiexpert](https://github.com/sponsors/kiexpert)** 방문
+2. 티어 선택 후 구독
+3. 완료 — 즉시 자동 활성화
 
 ---
 
-## GitHub Account Requirement
+## 활성화 3단계
 
-A GitHub account is required because the license check uses `gh` CLI under the hood.
+```
+1️⃣  결제  →  2️⃣  GitHub 초대 수락  →  3️⃣  wkappbot 재실행
+```
+
+**1단계 — 결제**  
+위 방법 중 하나로 결제. 메모/입금자명에 GitHub 아이디 필수.
+
+**2단계 — 초대 수락**  
+이메일 또는 GitHub 알림에서 `kiexpert/wkappbot-sdk` 초대 수락.  
+→ [github.com/notifications](https://github.com/notifications) 에서 확인
+
+**3단계 — 확인**  
+```bash
+wkappbot license status
+```
+```
+  User    : @your-github-id
+  Tier    : CDP
+  CDP     : ✓ enabled  (expires 2026-06-01, 29일 남음)
+  Sudo    : ✗ not licensed
+```
+
+> 아직 `Free`로 나오면 → `gh auth login` 재실행 후 다시 확인
+
+---
+
+## GitHub 계정 / CLI 설치
+
+라이선스 확인에 GitHub CLI가 필요해요 (한 번만 설정).
 
 ```bash
 # Windows
@@ -46,57 +88,42 @@ winget install --id GitHub.cli
 
 # macOS
 brew install gh
+```
 
-# Authenticate
+```bash
+# 로그인 (최초 1회)
 gh auth login
 # → GitHub.com → HTTPS → Login with browser
 ```
 
-wkappbot reads your auth at startup and queries the collaborator API to determine
-your tier. If `gh` is not installed or not authenticated, you stay on Free tier.
+---
+
+## 자주 묻는 질문
+
+**활성화까지 얼마나 걸리나요?**  
+PayPal / GitHub Sponsors → 수분 내. KIS 이체 → 최대 1시간.  
+초대 이메일을 수락해야 최종 활성화됩니다.
+
+**초대를 수락하기 전에도 사용할 수 있나요?**  
+네. 수락 전에도 Free 기능은 정상 작동해요.  
+wkappbot이 초대 대기 중임을 알림으로 표시해줍니다.
+
+**추가 결제하면 어떻게 되나요?**  
+남은 기간 위에 일수가 쌓입니다.  
+예) 15일 남은 상태에서 ₩140,000 결제 → 45일로 연장.
+
+**해지하려면?**  
+별도 절차 없음 — 그냥 갱신하지 않으면 돼요.  
+만료일에 자동으로 Free 티어로 전환됩니다.
+
+**환불은요?**  
+초대 수락 후 7일 이내 비례 환불 가능.  
+kiexpert@kivilab.co.kr 로 GitHub ID + 결제일 전송해주세요.
 
 ---
 
-## Pending Invite UX
+## 문의
 
-Until you accept the invite, wkappbot shows a non-blocking blue toast bottom-right
-with a **GitHub 알림 확인** button (links to github.com/notifications, auto-dismisses
-after 15 seconds). Free features keep working; CDP/Sudo stay locked. Accept the invite
-→ toast clears on the next wkappbot startup.
-
----
-
-## Verify Your License
-
-```bash
-wkappbot license status
-```
-
-Sample output:
-
-```
-  User    : @your-github-id
-  Tier    : CDP
-  CDP     : ✓ enabled  (expires 2026-05-29, 29일 0시간 remaining)
-  Sudo    : ✗ not licensed
-```
-
-If `tier: Free` after you've paid and accepted: re-run `gh auth login`, then retry
-`wkappbot license status`. Still stuck → email below.
-
----
-
-## Renew / Cancel
-
-- **Renew**: transfer again with the same memo before the 30-day expiry. The detector
-  re-grants automatically on the next hourly poll.
-- **Cancel**: simply don't renew. Permissions auto-revoke at your expiry date
-  (check with `wkappbot license status`). No action required from you.
-
----
-
-## Contact
-
-- **License / payment / activation** → [Open GitHub Issue](../../issues/new?template=license_question.md) (auto-reply in minutes)
-- **Email** → kiexpert@kivilab.co.kr
-- Bug reports / feature requests: `wkappbot suggest "..."` or open a GitHub issue.
+- 📮 **라이선스 / 결제 문제** → [GitHub Issue](../../issues/new?template=license_question.md) (수분 내 답변)
+- 📧 **이메일** → kiexpert@kivilab.co.kr
+- 🐛 **버그 / 기능 요청** → `wkappbot suggest "..."` 또는 GitHub Issue
