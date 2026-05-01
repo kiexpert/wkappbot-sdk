@@ -46,7 +46,8 @@ static class LicenseStatus
         Console.WriteLine($"  User    : @{user}");
         Console.WriteLine($"  Repo    : {Repo}");
         Console.WriteLine($"  Tier    : {tier}");
-        Console.WriteLine($"  CDP     : {StatusIcon(cdpEnabled, cdpExpiry)}{FormatExpiryInline(cdpExpiry)}");
+        var sudoActive = sudoEnabled && (!sudoExpiry.HasValue || sudoExpiry.Value > DateTime.UtcNow);
+        Console.WriteLine($"  CDP     : {CdpStatusIcon(cdpEnabled, cdpExpiry, sudoActive)}{CdpExpiryInline(cdpExpiry, sudoActive)}");
         Console.WriteLine($"  Sudo    : {StatusIcon(sudoEnabled, sudoExpiry)}{FormatExpiryInline(sudoExpiry)}");
         if (isPending)
             Console.WriteLine("  Note    : Invitation pending — CDP active immediately, accept to confirm.");
@@ -133,6 +134,20 @@ static class LicenseStatus
         if (!enabled) return "✗ not licensed";
         if (expiry.HasValue && expiry.Value <= DateTime.UtcNow) return "✗ expired";
         return "✓ enabled";
+    }
+
+    static string CdpStatusIcon(bool enabled, DateTime? cdpExpiry, bool sudoActive)
+    {
+        if (!enabled) return "✗ not licensed";
+        if (sudoActive) return "✓ enabled";  // sudo covers cdp regardless
+        if (cdpExpiry.HasValue && cdpExpiry.Value <= DateTime.UtcNow) return "✗ expired";
+        return "✓ enabled";
+    }
+
+    static string CdpExpiryInline(DateTime? cdpExpiry, bool sudoActive)
+    {
+        if (sudoActive) return "  (included with Sudo)";
+        return FormatExpiryInline(cdpExpiry);
     }
 
     static string FormatExpiryInline(DateTime? expiry)
