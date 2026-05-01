@@ -46,8 +46,8 @@ static class LicenseStatus
         Console.WriteLine($"  User    : @{user}");
         Console.WriteLine($"  Repo    : {Repo}");
         Console.WriteLine($"  Tier    : {tier}");
-        Console.WriteLine($"  CDP     : {(cdpEnabled  ? "✓ enabled" : "✗ not licensed")}{FormatExpiryInline(cdpExpiry)}");
-        Console.WriteLine($"  Sudo    : {(sudoEnabled  ? "✓ enabled" : "✗ not licensed")}{FormatExpiryInline(sudoExpiry)}");
+        Console.WriteLine($"  CDP     : {StatusIcon(cdpEnabled, cdpExpiry)}{FormatExpiryInline(cdpExpiry)}");
+        Console.WriteLine($"  Sudo    : {StatusIcon(sudoEnabled, sudoExpiry)}{FormatExpiryInline(sudoExpiry)}");
         if (isPending)
             Console.WriteLine("  Note    : Invitation pending — CDP active immediately, accept to confirm.");
         if (tier == "Free")
@@ -126,6 +126,13 @@ static class LicenseStatus
         }
         catch { }
         return (null, null);
+    }
+
+    static string StatusIcon(bool enabled, DateTime? expiry)
+    {
+        if (!enabled) return "✗ not licensed";
+        if (expiry.HasValue && expiry.Value <= DateTime.UtcNow) return "✗ expired";
+        return "✓ enabled";
     }
 
     static string FormatExpiryInline(DateTime? expiry)
