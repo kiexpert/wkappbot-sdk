@@ -227,7 +227,7 @@ internal static class EyeCmdPipeClient
             // No class filter -- caller window may be Windows Terminal, Chrome widget,
             // VS Code (Electron), or any other container. Closest ancestor wins.
             IntPtr match = IntPtr.Zero;
-            uint matchDepth = uint.MaxValue;
+            
             EnumWindows((hWnd, _) =>
             {
                 if (!IsWindowVisible(hWnd)) return true;
