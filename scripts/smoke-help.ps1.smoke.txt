@@ -1,8 +1,8 @@
-commit: c8e84428f8f4999fbe29bfda44e7ec23e8463203
+commit: 8b8e9053ab680f1ee64c0ae3e72bd1033d1ffdeb
 workflow: build-launcher/smoke
 script: scripts/smoke-help.ps1
 exitcode: 0
-timestamp_utc: 2026-05-01T07:10:53.7350918Z
+timestamp_utc: 2026-05-01T07:24:19.1095282Z
 
 
 ------------------------------------------------------------
