@@ -92,7 +92,7 @@ def grant(user, days, amount):
 def paypal_token():
     creds = base64.b64encode(f"{PP_CLIENT_ID}:{PP_SECRET}".encode()).decode()
     req = urllib.request.Request(
-        "https://api-m.paypal.com/v1/oauth2/token",
+        "https://api-m.sandbox.paypal.com/v1/oauth2/token",
         data=b"grant_type=client_credentials",
         headers={"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
@@ -108,7 +108,7 @@ def paypal_transactions(token, start_date, end_date):
         f"&fields=all&transaction_status=S"
     )
     req = urllib.request.Request(
-        f"https://api-m.paypal.com/v2/reporting/transactions?{params}",
+        f"https://api-m.sandbox.paypal.com/v2/reporting/transactions?{params}",
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req, timeout=30) as r:
