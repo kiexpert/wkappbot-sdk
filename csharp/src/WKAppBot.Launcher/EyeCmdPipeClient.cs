@@ -49,8 +49,11 @@ internal static class EyeCmdPipeClient
             var w = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
             var r = new StreamReader(pipe, leaveOpen: true);
 
-            // Prepend CWD + foreground HWND hint so Eye can resolve caller window directly
-            var fgHwnd = GetForegroundWindow();
+            // Prepend CWD + caller-terminal HWND hint so Eye can resolve caller window directly.
+            // ResolveCallerTerminalHwnd() prefers the actual Windows Terminal hosting our shell
+            // (process-tree match) over GetForegroundWindow() -- the IDE/editor window often has
+            // focus when the user runs commands from an integrated terminal.
+            var fgHwnd = ResolveCallerTerminalHwnd();
             var hwndPrefix = fgHwnd != IntPtr.Zero ? $"__hwnd:0x{fgHwnd.ToInt64():X8}" : null;
             var prefixes = new[] { $"__cwd:{Environment.CurrentDirectory}" }
                 .Concat(hwndPrefix != null ? new[] { hwndPrefix } : Array.Empty<string>());
@@ -165,6 +168,107 @@ internal static class EyeCmdPipeClient
     }
 
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder cls, int max);
+
+    delegate bool EnumWindowsProcDelegate(IntPtr hWnd, IntPtr lParam);
+    [DllImport("user32.dll")]
+    static extern bool EnumWindows(EnumWindowsProcDelegate proc, IntPtr lParam);
+
+    [DllImport("ntdll.dll")]
+    static extern int NtQueryInformationProcess(IntPtr handle, int infoClass, byte[] info, int infoLen, ref int retLen);
+
+    // Terminal-host window classes (matches PromptCommand.TerminalInject.cs).
+    // Only CASCADIA + classic console are addressable via PostMessage; PseudoConsoleWindow
+    // and VirtualConsoleClass are listed for completeness even though we won't pick them
+    // here unless the foreground happens to be one.
+    static readonly string[] TerminalClasses =
+    {
+        "CASCADIA_HOSTING_WINDOW_CLASS",
+        "PseudoConsoleWindow",
+        "VirtualConsoleClass",
+        "ConsoleWindowClass",
+    };
+
+    /// <summary>
+    /// Resolve the hwnd of the terminal where the user typed this command.
+    ///   1. If foreground window is a known terminal class -> use it (covers normal CLI use).
+    ///   2. Otherwise walk OUR ancestor process chain (Launcher -> shell -> Windows Terminal)
+    ///      and find a CASCADIA window whose pid is in that chain. This handles the case
+    ///      where the user runs commands inside an IDE's integrated terminal: the IDE window
+    ///      has focus, but the actual ConPTY host (WindowsTerminal.exe) is our great-ancestor.
+    ///   3. Fallback to foreground (preserves legacy behavior if neither hit).
+    /// </summary>
+    static IntPtr ResolveCallerTerminalHwnd()
+    {
+        var fg = GetForegroundWindow();
+        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg)))
+            return fg;
+
+        // Walk ancestor pids: Launcher -> shell (cmd/bash) -> WindowsTerminal -> ...
+        var ancestorPids = new HashSet<uint>();
+        try
+        {
+            int pid = Environment.ProcessId;
+            for (int depth = 0; depth < 8 && pid > 0; depth++)
+            {
+                var parent = GetParentPid(pid);
+                if (parent <= 0 || parent == pid) break;
+                ancestorPids.Add((uint)parent);
+                pid = parent;
+            }
+        }
+        catch { }
+
+        if (ancestorPids.Count == 0) return fg;
+
+        IntPtr match = IntPtr.Zero;
+        EnumWindows((hWnd, _) =>
+        {
+            if (!IsWindowVisible(hWnd)) return true;
+            // top-level only
+            if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
+            var cls = GetClass(hWnd);
+            if (!string.Equals(cls, "CASCADIA_HOSTING_WINDOW_CLASS", StringComparison.OrdinalIgnoreCase))
+                return true;
+            GetWindowThreadProcessId(hWnd, out uint wpid);
+            if (!ancestorPids.Contains(wpid)) return true;
+            match = hWnd;
+            return false; // stop
+        }, IntPtr.Zero);
+
+        return match != IntPtr.Zero ? match : fg;
+    }
+
+    static bool IsTerminalClass(string cls)
+    {
+        foreach (var t in TerminalClasses)
+            if (string.Equals(cls, t, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    static string GetClass(IntPtr hWnd)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        GetClassNameW(hWnd, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
+    static int GetParentPid(int pid)
+    {
+        try
+        {
+            var handle = System.Diagnostics.Process.GetProcessById(pid).Handle;
+            var pbi = new byte[48]; // PROCESS_BASIC_INFORMATION
+            int retLen = 0;
+            NtQueryInformationProcess(handle, 0, pbi, pbi.Length, ref retLen);
+            return (int)BitConverter.ToInt64(pbi, 24); // InheritedFromUniqueProcessId
+        }
+        catch { return 0; }
+    }
 
     // CharSet.Unicode: prevents char[] from being marshaled as ANSI bytes.
     // Without it, Korean chars become '?' before Win32 sees them.
