@@ -1,0 +1,6 @@
+commit: 6a80df918df58f1c2cba5903eb469e3ee92ec98d
+script: .github/scripts/paypal_license.py
+exitcode: 1
+timestamp_utc: 2026-05-01T05:09:51.0936073Z
+
+Error: missing required env vars
