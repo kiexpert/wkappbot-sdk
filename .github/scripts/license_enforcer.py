@@ -98,7 +98,7 @@ def enforce():
             gh("PUT", f"/repos/{LICENSE_REPO}/collaborators/{user}", {"permission": "read"})
             from license_store import write as ls_write
             ls_write(user, "cdp", cdp_exp, None, existing_sha=sha)
-            msg = f"⬇️ @{user} all tiers expired — stepped down to read (will revoke next cycle)"
+            msg = f"⬇️ @{user} all tiers expired — grace step-down write→read (expiry already past, revoke next cycle)"
             slack_notify(msg)
             changes.append(msg)
             print(f"    → STEP-DOWN write→read (revoke next cycle)")
