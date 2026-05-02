@@ -1,0 +1,51 @@
+name: AI News Prefetch
+
+on:
+  schedule:
+    - cron: '0 2,10 * * *'   # 11:00 KST / 19:00 KST (UTC+9)
+  workflow_dispatch:
+
+jobs:
+  prefetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout WKAppBot
+        uses: actions/checkout@v4
+        with:
+          repository: kiexp/WKAppBot
+          token: ${{ secrets.WKAPPBOT_PAT }}
+          path: wkappbot
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run prefetch (Linux-adapted)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          sed 's/python\.exe/python3/g' \
+            wkappbot/bin/wkappbot.hq/scripts/ai-news-prefetch.sh \
+            > /tmp/prefetch.sh
+          chmod +x /tmp/prefetch.sh
+
+          # Override wkappbot ask claude → claude API call via env key
+          # Script falls back gracefully when claude CLI absent
+          cd wkappbot
+          bash /tmp/prefetch.sh
+
+      - name: Commit & push results
+        run: |
+          cd wkappbot
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bin/wkappbot.hq/data/ai-news-local.jsonl
+          if git diff --staged --quiet; then
+            echo "No new items"
+          else
+            COUNT=$(grep -c '{' bin/wkappbot.hq/data/ai-news-local.jsonl 2>/dev/null || echo 0)
+            git commit -m "chore(ai-news): prefetch ${COUNT} items [skip ci]"
+            git push
+          fi
