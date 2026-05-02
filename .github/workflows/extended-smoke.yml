@@ -144,6 +144,7 @@ jobs:
         "passed=$passed" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
         "soft=$soft"     | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
         "hard=$hard"     | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+        exit 0  # hard-fail gate handled by separate step below
 
     # ── Job summary ───────────────────────────────────────────────────────────
     - name: Write Job Summary
@@ -196,10 +197,12 @@ jobs:
         if ($changed.Count -eq 0) { Write-Host 'No sidecar changes.'; exit 0 }
         git add -- '**/*.extended-ci.txt'
         git commit -m 'test: update extended smoke CI sidecar [skip ci]'
+        $ok = $false
         for ($i = 1; $i -le 5; $i++) {
           git pull --rebase --autostash origin main
           git push origin HEAD:main
-          if ($LASTEXITCODE -eq 0) { Write-Host "Pushed (attempt $i)"; break }
+          if ($LASTEXITCODE -eq 0) { $ok = $true; Write-Host "Pushed (attempt $i)"; break }
           Write-Host "Push attempt $i failed, retrying..."
           Start-Sleep -Seconds (2 * $i)
         }
+        if (-not $ok) { Write-Host 'All push attempts failed (branch protection) — skipping'; exit 0 }
