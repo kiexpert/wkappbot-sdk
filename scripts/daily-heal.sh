@@ -15,8 +15,8 @@ FAIL=0
 # ── E. EYE ──────────────────────────────────────────────────────────
 echo "## E. Eye & Sessions"
 EYE=$(wkappbot eye tick 2>/dev/null || true)
-echo "$EYE" | grep -E "ctx=|세션:|sessions|ctx%" | head -5
-CTX=$(echo "$EYE" | grep -oE 'ctx=[0-9]+' | grep -oE '[0-9]+' | head -1)
+echo "$EYE" | grep -E "ctx=|세션:|sessions|ctx%" | head -5 || true
+CTX=$(echo "$EYE" | grep -oE 'ctx=[0-9]+' | grep -oE '[0-9]+' | head -1 || true)
 if [ "${CTX:-0}" -gt 80 ]; then
   echo "  ❌ ctx=${CTX}% — newchat 필요"
   FAIL=$((FAIL+1))
