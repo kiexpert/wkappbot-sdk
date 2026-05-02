@@ -1,0 +1,176 @@
+name: ux-audit
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 01:00 UTC daily (10:00 KST)
+  push:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'SUBSCRIBE.md'
+      - 'PRICING.md'
+      - '.github/workflows/ux-audit.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: User Experience Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # ── 1. Docs site pages (GitHub Pages) ─────────────────────────────
+    - name: Check docs pages (GitHub Pages)
+      run: |
+        BASE="https://kiexpert.github.io/wkappbot-sdk"
+        PAGES=(
+          ""               # home
+          "/guide/install"
+          "/guide/quickstart"
+          "/guide/pricing"
+          "/reference/cli"
+        )
+        FAIL=0
+        for page in "${PAGES[@]}"; do
+          URL="${BASE}${page}"
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+          if [ "$CODE" = "200" ]; then
+            echo "✅ $URL ($CODE)"
+          else
+            echo "❌ $URL ($CODE)"
+            FAIL=$((FAIL+1))
+          fi
+        done
+        [ $FAIL -eq 0 ] || { echo "::error::$FAIL docs page(s) unreachable"; exit 1; }
+
+    # ── 2. Markdown link validation ────────────────────────────────────
+    - name: Validate markdown links
+      run: |
+        pip install markdown-link-check 2>/dev/null || npm install -g markdown-link-check
+        FAIL=0
+        for f in README.md SUBSCRIBE.md PRICING.md docs/guide/*.md docs/index.md; do
+          [ -f "$f" ] || continue
+          echo "Checking $f..."
+          # Check external links (http/https only, skip anchors & relative paths)
+          grep -oE 'https?://[^)> "]+' "$f" | sort -u | while read url; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -L "$url" 2>/dev/null || echo "000")
+            if [ "$CODE" = "200" ] || [ "$CODE" = "301" ] || [ "$CODE" = "302" ]; then
+              echo "  ✅ $url"
+            else
+              echo "  ❌ $url ($CODE)"
+              echo "FAIL" >> /tmp/link_fail.txt
+            fi
+          done
+        done
+        FAIL_COUNT=$(wc -l < /tmp/link_fail.txt 2>/dev/null || echo 0)
+        [ "$FAIL_COUNT" -eq 0 ] || echo "::warning::$FAIL_COUNT broken link(s) found"
+
+    # ── 3. Release notes completeness ─────────────────────────────────
+    - name: Check latest release notes
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        RELEASE=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName,body -q '.[0]')
+        TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['tagName'])")
+        BODY=$(echo "$RELEASE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('body','')))")
+        echo "Latest release: $TAG (body: ${BODY} chars)"
+        if [ "${BODY}" -lt 100 ]; then
+          echo "::error::Release $TAG has no/minimal release notes (${BODY} chars < 100)"
+          exit 1
+        fi
+        echo "✅ Release notes OK ($BODY chars)"
+        # Check required sections
+        BODY_TEXT=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('body',''))")
+        for section in "Install" "Compatibility" "What's New"; do
+          if echo "$BODY_TEXT" | grep -qi "$section"; then
+            echo "  ✅ Section '$section' present"
+          else
+            echo "  ⚠️  Section '$section' missing"
+          fi
+        done
+
+    # ── 4. Release asset validation ────────────────────────────────────
+    - name: Verify release zip contents
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName -q '.[0].tagName')
+        echo "Checking assets for $TAG..."
+        ASSETS=$(gh release view "$TAG" --repo kiexpert/wkappbot-sdk --json assets -q '.assets[].name')
+        echo "Assets: $ASSETS"
+        # Must have a zip
+        if echo "$ASSETS" | grep -q "\.zip$"; then
+          echo "✅ Release zip found"
+          # Download and inspect
+          mkdir -p /tmp/release-check
+          ZIP=$(echo "$ASSETS" | grep "\.zip$" | head -1)
+          gh release download "$TAG" --repo kiexpert/wkappbot-sdk \
+            --pattern "*.zip" --dir /tmp/release-check
+          unzip -l /tmp/release-check/*.zip | grep -E "wkappbot\.exe|wkappbot-core\.exe"
+          CORE=$(unzip -l /tmp/release-check/*.zip | grep -c "wkappbot-core\.exe" || echo 0)
+          LAUNCHER=$(unzip -l /tmp/release-check/*.zip | grep -c "wkappbot\.exe" || echo 0)
+          [ "$CORE" -gt 0 ]    && echo "✅ wkappbot-core.exe in zip" || { echo "❌ wkappbot-core.exe MISSING"; exit 1; }
+          [ "$LAUNCHER" -gt 0 ] && echo "✅ wkappbot.exe in zip"     || { echo "❌ wkappbot.exe MISSING"; exit 1; }
+        else
+          echo "::error::No zip asset found in release $TAG"
+          exit 1
+        fi
+
+    # ── 5. Install instructions sanity ────────────────────────────────
+    - name: Validate install doc steps
+      run: |
+        # Extract and validate PowerShell snippets from docs
+        FAIL=0
+        for doc in README.md SUBSCRIBE.md docs/guide/install.md; do
+          [ -f "$doc" ] || continue
+          # Find powershell code blocks and check they're non-empty
+          COUNT=$(grep -c '```powershell' "$doc" 2>/dev/null || echo 0)
+          echo "$doc: $COUNT PowerShell blocks"
+          if [ "$COUNT" -eq 0 ] && [ "$doc" = "docs/guide/install.md" ]; then
+            echo "  ⚠️  No PowerShell examples in install guide"
+          fi
+          # Check that required commands are mentioned
+          for cmd in "wkappbot" "wkappbot eye tick" "wkappbot --version"; do
+            if grep -q "$cmd" "$doc" 2>/dev/null; then
+              echo "  ✅ '$cmd' mentioned in $doc"
+            fi
+          done
+        done
+
+    # ── 6. README key sections ─────────────────────────────────────────
+    - name: Check README completeness
+      run: |
+        FAIL=0
+        for section in "Install" "Quick" "License" "Pricing" "FAQ\|Support\|Help"; do
+          if grep -qiE "$section" README.md; then
+            echo "✅ README section '$section'"
+          else
+            echo "❌ README missing section '$section'"
+            FAIL=$((FAIL+1))
+          fi
+        done
+        # Check badge/shield present
+        if grep -qE "!\[" README.md; then
+          echo "✅ README has badges"
+        else
+          echo "⚠️  README has no badges (shields.io etc.)"
+        fi
+        [ $FAIL -eq 0 ] || { echo "::error::$FAIL required README sections missing"; exit 1; }
+
+    # ── Summary ───────────────────────────────────────────────────────
+    - name: Write job summary
+      if: always()
+      run: |
+        echo "## 🔍 UX Audit Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+        echo "| Docs pages (GitHub Pages) | see step log |" >> $GITHUB_STEP_SUMMARY
+        echo "| Markdown links | see step log |" >> $GITHUB_STEP_SUMMARY
+        echo "| Release notes completeness | see step log |" >> $GITHUB_STEP_SUMMARY
+        echo "| Release zip contents | see step log |" >> $GITHUB_STEP_SUMMARY
+        echo "| Install doc validation | see step log |" >> $GITHUB_STEP_SUMMARY
+        echo "| README completeness | see step log |" >> $GITHUB_STEP_SUMMARY
