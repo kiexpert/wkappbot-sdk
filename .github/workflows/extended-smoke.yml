@@ -38,7 +38,13 @@ jobs:
 
         $runId = $runs[0].databaseId
         Write-Host "Using artifact from build run $runId"
-        gh run download $runId --name "wkappbot-bin-$runId" --dir bin 2>&1 | Out-Null
+        gh run download $runId --name "wkappbot-bin-$runId" --dir bin
+        $dlExit = $LASTEXITCODE
+        if ($dlExit -ne 0) {
+          Write-Host "Download failed (exit $dlExit) -- will build from source."
+          "found=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          exit 0
+        }
 
         if ((Test-Path bin/wkappbot.exe) -and (Test-Path bin/wkappbot-core.exe)) {
           Write-Host "Artifact ready: $((Get-Item bin/wkappbot-core.exe).Length/1MB)MB core"
