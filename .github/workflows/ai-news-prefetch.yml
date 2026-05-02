@@ -22,30 +22,27 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run prefetch (Linux-adapted)
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Collect raw HN + YouTube (no Claude)
         run: |
+          # CI=true skips the Claude filter step in the script
+          # Only raw data collection: HN Algolia + YouTube RSS
           sed 's/python\.exe/python3/g' \
             wkappbot/bin/wkappbot.hq/scripts/ai-news-prefetch.sh \
             > /tmp/prefetch.sh
           chmod +x /tmp/prefetch.sh
-
-          # Override wkappbot ask claude → claude API call via env key
-          # Script falls back gracefully when claude CLI absent
           cd wkappbot
-          bash /tmp/prefetch.sh
+          CI=true bash /tmp/prefetch.sh
 
-      - name: Commit & push results
+      - name: Commit raw results
         run: |
           cd wkappbot
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add bin/wkappbot.hq/data/ai-news-local.jsonl
+          git add bin/wkappbot.hq/data/ai-news-raw.jsonl
           if git diff --staged --quiet; then
             echo "No new items"
           else
-            COUNT=$(grep -c '{' bin/wkappbot.hq/data/ai-news-local.jsonl 2>/dev/null || echo 0)
-            git commit -m "chore(ai-news): prefetch ${COUNT} items [skip ci]"
+            COUNT=$(grep -c '{' bin/wkappbot.hq/data/ai-news-raw.jsonl 2>/dev/null || echo 0)
+            git commit -m "chore(ai-news): raw prefetch ${COUNT} items [skip ci]"
             git push
           fi
