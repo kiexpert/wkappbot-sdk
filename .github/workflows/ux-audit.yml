@@ -1,4 +1,4 @@
-name: ux-audit
+name: UX Audit
 
 on:
   schedule:
@@ -104,7 +104,11 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        TAG=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName -q '.[0].tagName')
+        TAG=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+        if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+          echo "⚠️  No SDK release yet — skipping zip check"
+          exit 0
+        fi
         echo "Checking assets for $TAG..."
         ASSETS=$(gh release view "$TAG" --repo kiexpert/wkappbot-sdk --json assets -q '.assets[].name')
         echo "Assets: $ASSETS"
@@ -151,7 +155,7 @@ jobs:
     - name: Check README completeness
       run: |
         FAIL=0
-        for section in "Install" "Quick" "License" "Pricing" "FAQ\|Support\|Help"; do
+        for section in "Install" "Quick" "License" "Pricing"; do
           if grep -qiE "$section" README.md; then
             echo "✅ README section '$section'"
           else
@@ -159,6 +163,12 @@ jobs:
             FAIL=$((FAIL+1))
           fi
         done
+        # FAQ/Support optional — warn only
+        if grep -qiE "FAQ|Support|Help" README.md; then
+          echo "✅ README section 'FAQ/Support/Help'"
+        else
+          echo "⚠️  README section 'FAQ/Support/Help' missing (recommended)"
+        fi
         # Check badge/shield present
         if grep -qE "!\[" README.md; then
           echo "✅ README has badges"

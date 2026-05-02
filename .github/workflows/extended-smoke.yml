@@ -1,4 +1,4 @@
-name: extended-smoke
+name: Extended Smoke Tests
 
 on:
   schedule:

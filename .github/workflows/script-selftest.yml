@@ -1,4 +1,4 @@
-name: script-selftest
+name: Script Self-Test
 
 on:
   push:

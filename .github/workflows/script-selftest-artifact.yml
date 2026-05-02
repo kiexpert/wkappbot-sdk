@@ -1,4 +1,4 @@
-name: script-selftest-sidecar-artifact
+name: Script Self-Test (Artifact)
 
 on:
   push:
