@@ -27,11 +27,14 @@ jobs:
       run: |
         BASE="https://kiexpert.github.io/wkappbot-sdk"
         PAGES=(
-          ""               # home
+          ""                    # home
           "/guide/install"
           "/guide/quickstart"
-          "/guide/pricing"
-          "/reference/cli"
+          "/guide/concepts"
+          "/pricing"
+          "/reference/commands"
+          "/reference/grap"
+          "/advanced/licensing"
         )
         FAIL=0
         for page in "${PAGES[@]}"; do
