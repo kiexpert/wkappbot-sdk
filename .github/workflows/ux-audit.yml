@@ -76,8 +76,12 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        RELEASE=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName,body -q '.[0]')
-        TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin)['tagName'])")
+        RELEASE=$(gh release list --repo kiexpert/wkappbot-sdk --limit 1 --json tagName,body -q '.[0]' 2>/dev/null || echo "")
+        if [ -z "$RELEASE" ] || [ "$RELEASE" = "null" ] || [ "$RELEASE" = "[]" ]; then
+          echo "⚠️  No SDK release yet — skipping release notes check"
+          exit 0
+        fi
+        TAG=$(echo "$RELEASE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tagName','?'))")
         BODY=$(echo "$RELEASE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('body','')))")
         echo "Latest release: $TAG (body: ${BODY} chars)"
         if [ "${BODY}" -lt 100 ]; then
