@@ -1,4 +1,4 @@
-name: admin-history-cleanup
+name: Admin History Cleanup
 on:
   workflow_dispatch:
     inputs:

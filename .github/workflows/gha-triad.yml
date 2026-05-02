@@ -1,4 +1,4 @@
-name: gha-triad
+name: GHA Triad Debate
 
 on:
   workflow_dispatch:

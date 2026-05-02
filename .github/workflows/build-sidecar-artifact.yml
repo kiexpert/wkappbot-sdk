@@ -1,4 +1,4 @@
-name: build-smoke-sidecar-artifact
+name: Build Smoke (Artifact)
 
 on:
   push:

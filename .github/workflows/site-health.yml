@@ -4,10 +4,12 @@ on:
   schedule:
     - cron: '0 1 * * *'   # 매일 새벽 1시 UTC (한국 오전 10시)
   workflow_dispatch:
+  push:
 
 jobs:
   health:
     runs-on: ubuntu-latest
+    if: github.event_name != 'push'
     permissions:
       issues: write
 

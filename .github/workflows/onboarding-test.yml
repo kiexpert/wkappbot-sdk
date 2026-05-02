@@ -1,4 +1,4 @@
-name: onboarding-test
+name: Onboarding Test
 
 on:
   workflow_dispatch:
