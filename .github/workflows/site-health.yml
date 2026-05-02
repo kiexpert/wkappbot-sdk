@@ -73,6 +73,7 @@ jobs:
       - name: Notify Slack on recovery
         if: steps.check.outputs.status == 'ok'
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
           # 열린 site-health 이슈 있을 때만 회복 알림 (이전에 장애 있었을 때)
@@ -84,6 +85,3 @@ jobs:
               -d "{\"channel\":\"C0APNELH2LR\",\"text\":\"✅ *wkappbot-sdk 문서 사이트 정상 복구*\"}"
             gh issue close "$EXISTING" --comment "사이트 정상 복구 확인 (자동 닫힘)" -R kiexpert/wkappbot-sdk
           fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
