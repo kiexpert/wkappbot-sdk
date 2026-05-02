@@ -1,0 +1,79 @@
+// Issue auto-reply templates and routing logic
+// Called from .github/workflows/issue-auto-reply.yml via actions/github-script
+
+module.exports = async ({ context, github }) => {
+  const title = context.payload.issue.title.toLowerCase();
+  const user  = context.payload.issue.user.login;
+
+  const isLicense = title.includes('[license]') || title.includes('license')
+                 || title.includes('activation') || title.includes('payment');
+  const isBug     = title.includes('[bug]')
+                 || context.payload.issue.labels?.some(l => l.name === 'bug');
+  const isFeature = title.includes('[feat]') || title.includes('feature')
+                 || context.payload.issue.labels?.some(l => l.name === 'enhancement');
+
+  let reply = '';
+
+  if (isLicense) {
+    reply = [
+      `Hi @${user}, thanks for reaching out about licensing!`,
+      '',
+      "Here's a quick checklist that resolves most activation issues:",
+      '',
+      '1. **Did you include your GitHub username in the transfer memo?**',
+      '   The payment detector matches the memo field to a GitHub account. A typo → no invite.',
+      '',
+      '2. **Check your GitHub notifications** — [github.com/notifications](https://github.com/notifications)',
+      '   Look for a collaborator invite from `kiexpert/wkappbot-sdk`. Accept it, then run:',
+      '   ```',
+      '   wkappbot license status',
+      '   ```',
+      '',
+      '3. **Timing** — activation can take up to 1 hour after the bank transfer settles.',
+      '',
+      '4. **Still not working?** Please reply with:',
+      '   - Your GitHub username (the exact string you put in the transfer memo)',
+      '   - Transfer date and amount (no account number needed)',
+      '   - Output of `wkappbot license status`',
+      '',
+      'Full flow: [SUBSCRIBE.md](../blob/main/SUBSCRIBE.md)',
+    ].join('\n');
+  } else if (isBug) {
+    reply = [
+      `Hi @${user}, thanks for the bug report!`,
+      '',
+      'We\'ll triage this shortly. To help us reproduce faster, please include:',
+      '- `wkappbot --version` output',
+      '- OS (Windows 10/11) and Python version if relevant',
+      '- Minimal repro steps',
+      '- Any error output from `wkappbot.hq/logs/`',
+      '',
+      'We typically respond within 1–2 business days.',
+    ].join('\n');
+  } else if (isFeature) {
+    reply = [
+      `Hi @${user}, thanks for the feature request!`,
+      '',
+      'We\'ll review this and add it to the backlog. If this is business-critical for you,',
+      'mention your use-case and tier (CDP/Sudo) — prioritization follows customer need.',
+    ].join('\n');
+  } else {
+    reply = [
+      `Hi @${user}, thanks for opening this issue!`,
+      '',
+      'We\'ll get back to you shortly. For faster resolution:',
+      '- **License/payment questions** → see [SUBSCRIBE.md](../blob/main/SUBSCRIBE.md)',
+      '- **Bug reports** → include `wkappbot --version` and error logs',
+      '- **Email** → kiexpert@kivilab.co.kr',
+      '',
+      'Typical response time: 1–2 business days.',
+    ].join('\n');
+  }
+
+  await github.rest.issues.createComment({
+    owner: context.repo.owner,
+    repo:  context.repo.repo,
+    issue_number: context.issue.number,
+    body: reply,
+  });
+};
