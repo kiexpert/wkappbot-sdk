@@ -98,7 +98,7 @@ def webbot_logged_in(ai: str) -> bool:
 
     SESSION_COOKIES = {
         "gpt":    (["chatgpt.com", "openai.com"], ["__Secure-next-auth.session-token"]),
-        "claude": (["claude.ai"],                 ["sessionKey", "lastActiveOrg", "CH_SESSION"]),
+        "claude": (["claude.ai"],                 ["__ssid", "ARID", "anthropic-device-id"]),
         "gemini": (["google.com"],                ["__Secure-3PSID", "SID"]),
     }
     if ai not in SESSION_COOKIES:
