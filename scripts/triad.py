@@ -80,25 +80,59 @@ def probe(ai: str, timeout: int = 15) -> bool:
 
 def webbot_logged_in(ai: str) -> bool:
     """
-    Pre-check: is the CDP webbot session active and logged in?
-    Calls `wkappbot inspect <ai>` (fast, no prompt send) to detect
-    whether the tab/page exists and has a logged-in prompt input.
-    Returns False immediately if wkappbot returns an error or no window found.
+    Cookie-based login check — reads wkappbot.hq Chrome profile SQLite DB.
+    Fast (<0.1s), no CDP required. Returns False if cookie absent/expired.
     """
-    try:
-        cmd = [WKAPPBOT, "inspect", ai, "--timeout", "5"]
-        r = subprocess.run(cmd, capture_output=True, timeout=8, env={**os.environ})
-        out = r.stdout.decode("utf-8", errors="replace").lower()
-        err = r.stderr.decode("utf-8", errors="replace").lower()
-        combined = out + err
-        # Consider logged-in if inspect finds the prompt element
-        if r.returncode != 0:
-            return False
-        if any(x in combined for x in ["not found", "no window", "no tab", "error", "timeout"]):
-            return False
-        return True
-    except Exception:
+    import sqlite3, shutil, datetime, tempfile
+
+    hq = pathlib.Path(os.environ.get("WKAPPBOT_HQ",
+        r"D:\GitHub\WKAppBot\bin\wkappbot.hq"))
+    # Main wkappbot Chrome profile first; fall back to hash-named profiles
+    candidate_dbs = [hq / "chrome-profile" / "Default" / "Network" / "Cookies"]
+    profiles_dir = hq / "chrome-profiles"
+    if profiles_dir.exists():
+        for d in sorted(profiles_dir.iterdir()):
+            p = d / "Default" / "Network" / "Cookies"
+            if p.exists():
+                candidate_dbs.append(p)
+
+    SESSION_COOKIES = {
+        "gpt":    (["chatgpt.com", "openai.com"], ["__Secure-next-auth.session-token"]),
+        "claude": (["claude.ai"],                 ["sessionKey", "lastActiveOrg", "CH_SESSION"]),
+        "gemini": (["google.com"],                ["__Secure-3PSID", "SID"]),
+    }
+    if ai not in SESSION_COOKIES:
         return False
+
+    domains, keys = SESSION_COOKIES[ai]
+    epoch = datetime.datetime(1601, 1, 1, tzinfo=datetime.timezone.utc)
+    now_us = int((datetime.datetime.now(datetime.timezone.utc) - epoch).total_seconds() * 1_000_000)
+
+    for db_path in candidate_dbs:
+        tmp = tempfile.mktemp(suffix=".db")
+        try:
+            shutil.copy2(str(db_path), tmp)
+        except (PermissionError, OSError):
+            continue  # DB locked by running Chrome — try next profile
+        try:
+            con = sqlite3.connect(tmp)
+            dom_q = " OR ".join(f"host_key LIKE '%{d}'" for d in domains)
+            key_q = " OR ".join(f"name='{k}'" for k in keys)
+            cur = con.execute(
+                f"SELECT length(encrypted_value), expires_utc FROM cookies "
+                f"WHERE ({dom_q}) AND ({key_q})"
+            )
+            for enc_len, exp in cur.fetchall():
+                if enc_len > 0 and (exp == 0 or exp > now_us):
+                    return True
+            con.close()
+        except Exception:
+            pass
+        finally:
+            try: os.unlink(tmp)
+            except: pass
+
+    return False
 
 # ── Candidate pool (quality-ranked) ───────────────────────────────────────
 
