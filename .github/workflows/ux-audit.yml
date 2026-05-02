@@ -27,7 +27,7 @@ jobs:
       run: |
         BASE="https://kiexpert.github.io/wkappbot-sdk"
         PAGES=(
-          ""                    # home
+          "/"                   # home
           "/guide/install"
           "/guide/quickstart"
           "/guide/concepts"
