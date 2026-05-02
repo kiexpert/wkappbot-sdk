@@ -1,7 +1,7 @@
 #!/bin/bash
 # wkappbot-sdk daily system heal — runs at midnight (00:00 KST)
 # Output: markdown report; Claude reads and heals any ❌ items found.
-set -euo pipefail
+set -uo pipefail
 
 REPO="kiexpert/wkappbot-sdk"
 CORE_REPO="kiexpert/WKAppBot"
@@ -130,13 +130,13 @@ icon_c='✅' if confirm==0 else '⚠️'
 icon_r='✅' if coresolve==0 else '⚠️'
 print(f'  {icon_c} 컨펌 대기: {confirm}건')
 print(f'  {icon_r} Pending co-resolve: {coresolve}건')
-" 2>/dev/null
+" 2>/dev/null || true
 echo ""
 
 # ── R. RELEASE ───────────────────────────────────────────────────────
 echo "## R. SDK Release"
 gh release list --repo "$REPO" --limit 1 2>/dev/null \
-  | awk '{printf "  Latest: %s (%s)\n", $1, $3}'
+  | awk '{printf "  Latest: %s (%s)\n", $1, $3}' || true
 echo ""
 
 # ── SUMMARY ──────────────────────────────────────────────────────────
