@@ -84,6 +84,9 @@ def grant(user, days, amount):
 
 
 def paypal_token():
+    if not PP_CLIENT_ID or not PP_SECRET:
+        print("PayPal credentials not configured — skipping (no PAYPAL_CLIENT_ID/SECRET)")
+        sys.exit(0)
     creds = base64.b64encode(f"{PP_CLIENT_ID}:{PP_SECRET}".encode()).decode()
     req = urllib.request.Request(
         f"{PP_API_BASE}/v1/oauth2/token",
@@ -91,8 +94,14 @@ def paypal_token():
         headers={"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read())["access_token"]
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read())["access_token"]
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print(f"PayPal credentials invalid or not Live (401) — skipping until Live credentials are configured")
+            sys.exit(0)
+        raise
 
 
 def paypal_transactions(token, start_date, end_date):
