@@ -190,23 +190,29 @@ Format your response as:
 
 def build_pool() -> list:
     """Return ordered list of (name, caller) candidates.
-    Primary trio first; extras fill in if primaries are rate-limited."""
+    Primary trio first; Groq sub-models fill in when primaries rate-limit."""
     pool = []
+    # Primary trio (different providers = diverse perspectives)
     if os.environ.get("GEMINI_API_KEY"):
-        pool.append(("gemini-flash", call_gemini))
+        pool.append(("gemini-flash",    call_gemini))
     if os.environ.get("GROQ_API_KEY"):
-        pool.append(("groq-llama70b", call_groq))
+        pool.append(("groq-llama3.3",   call_groq))      # Llama 3.3 70B
     if os.environ.get("CEREBRAS_API_KEY"):
-        pool.append(("cerebras-qwen", call_cerebras))
-    # Extra slots: second Groq model, second Gemini model
+        pool.append(("cerebras-qwen",   call_cerebras))
+    # Groq backup models — different architectures, same key!
     if os.environ.get("GROQ_API_KEY"):
-        def _groq2(p): return call_openai_compat(p,
+        def _qwen3(p): return call_openai_compat(p,
             "https://api.groq.com/openai/v1", os.environ["GROQ_API_KEY"],
-            "llama-3.1-70b-versatile", "Groq-3.1")
-        pool.append(("groq-llama31", _groq2))
-    if os.environ.get("GEMINI_API_KEY"):
-        def _gemini15(p): return call_gemini(p, model="gemini-1.5-flash")
-        pool.append(("gemini-1.5flash", _gemini15))
+            "qwen/qwen3-32b", "Groq-Qwen3")
+        def _llama4(p): return call_openai_compat(p,
+            "https://api.groq.com/openai/v1", os.environ["GROQ_API_KEY"],
+            "meta-llama/llama-4-scout-17b-16e-instruct", "Groq-Llama4")
+        def _gpt120b(p): return call_openai_compat(p,
+            "https://api.groq.com/openai/v1", os.environ["GROQ_API_KEY"],
+            "openai/gpt-oss-120b", "Groq-GPT120B")
+        pool.append(("groq-qwen3-32b",  _qwen3))         # Qwen3 32B
+        pool.append(("groq-llama4",     _llama4))        # Llama 4 Scout
+        pool.append(("groq-gpt120b",    _gpt120b))       # GPT-OSS 120B
     return pool
 
 def _ok(ans: str) -> bool:
