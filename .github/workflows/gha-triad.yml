@@ -13,7 +13,7 @@ on:
         type: string
 
 jobs:
-  # ── Round 1: Thesis — 3 free AIs answer independently ─────────────────
+  # ── Round 1: Thesis ────────────────────────────────────────────────────
   thesis:
     name: "R1 Thesis — ${{ matrix.ai }}"
     runs-on: ubuntu-latest
@@ -25,77 +25,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Call ${{ matrix.ai }} API
+    - name: Call ${{ matrix.ai }} (thesis)
       env:
-        QUESTION: ${{ inputs.question }}
+        QUESTION:         ${{ inputs.question }}
         GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
         GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      run: |
-        python3 - <<'EOF'
-        import os, json, urllib.request, sys
+      run: python3 scripts/triad_gha.py thesis "${{ matrix.ai }}" "$QUESTION"
 
-        question = os.environ["QUESTION"]
-        ai = "${{ matrix.ai }}"
-
-        PROMPT = f"""Question / Task:
-        {question}
-
-        Give your best, complete answer. Be concise but thorough. Max 300 words."""
-
-        def call_gemini(p):
-            key = os.environ["GEMINI_API_KEY"]
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
-            body = json.dumps({"contents": [{"parts": [{"text": p}]}]}).encode()
-            req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.load(r)["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-        def call_compat(p, base, key, model):
-            body = json.dumps({"model": model, "messages": [{"role": "user", "content": p}], "max_tokens": 1024}).encode()
-            req = urllib.request.Request(f"{base}/chat/completions", data=body,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}",
-                         "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.load(r)["choices"][0]["message"]["content"].strip()
-
-        def call_groq_fallback(p, model):
-            return call_compat(p, "https://api.groq.com/openai/v1",
-                               os.environ["GROQ_API_KEY"], model)
-
-        try:
-            if ai == "gemini":
-                try:
-                    answer = call_gemini(PROMPT)
-                except Exception as e:
-                    print(f"[gemini failed: {e}] -> falling back to groq/qwen3-32b", file=sys.stderr)
-                    answer = call_groq_fallback(PROMPT, "qwen/qwen3-32b")
-            elif ai == "groq":
-                answer = call_compat(PROMPT, "https://api.groq.com/openai/v1",
-                    os.environ["GROQ_API_KEY"], "llama-3.3-70b-versatile")
-            else:
-                try:
-                    answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
-                        os.environ["CEREBRAS_API_KEY"], "qwen-3-235b-a22b-instruct-2507")
-                except Exception as e:
-                    print(f"[cerebras failed: {e}] -> falling back to groq/llama-4-scout", file=sys.stderr)
-                    answer = call_groq_fallback(PROMPT, "meta-llama/llama-4-scout-17b-16e-instruct")
-        except Exception as e:
-            answer = f"[ERROR: {e}]"
-            sys.exit(1)
-
-        print(answer)
-        with open(f"r1-{ai}.txt", "w") as f:
-            f.write(answer)
-        EOF
-
-    - name: Upload R1 artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: r1-${{ matrix.ai }}
         path: r1-${{ matrix.ai }}.txt
 
-  # ── Round 2: Antithesis — each AI critiques the other two ─────────────
+  # ── Round 2: Antithesis ────────────────────────────────────────────────
   antithesis:
     name: "R2 Antithesis — ${{ matrix.ai }}"
     needs: thesis
@@ -108,90 +51,27 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Download all R1 artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         pattern: r1-*
         merge-multiple: true
 
     - name: Critique as ${{ matrix.ai }}
       env:
-        QUESTION: ${{ inputs.question }}
+        QUESTION:         ${{ inputs.question }}
         GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
         GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      run: |
-        python3 - <<'EOF'
-        import os, json, urllib.request, sys
+      run: python3 scripts/triad_gha.py antithesis "${{ matrix.ai }}" "$QUESTION"
 
-        ai = "${{ matrix.ai }}"
-        question = os.environ["QUESTION"]
-        others = {k: open(f"r1-{k}.txt").read() for k in ["gemini","groq","cerebras"] if k != ai}
-        others_text = "\n\n".join(f"[{k.upper()}]\n{v}" for k,v in others.items())
-
-        PROMPT = f"""Original question: {question}
-
-        Two other AIs answered this question:
-        {others_text}
-
-        Your task: Write a critical counter-argument or improvement.
-        Identify weaknesses, missing points, or alternative perspectives. Max 200 words."""
-
-        def call_gemini(p):
-            key = os.environ["GEMINI_API_KEY"]
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={key}"
-            body = json.dumps({"contents": [{"parts": [{"text": p}]}]}).encode()
-            req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.load(r)["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-        def call_compat(p, base, key, model):
-            body = json.dumps({"model": model, "messages": [{"role": "user", "content": p}], "max_tokens": 512}).encode()
-            req = urllib.request.Request(f"{base}/chat/completions", data=body,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}",
-                         "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
-            with urllib.request.urlopen(req, timeout=60) as r:
-                return json.load(r)["choices"][0]["message"]["content"].strip()
-
-        def call_groq_fallback(p, model):
-            return call_compat(p, "https://api.groq.com/openai/v1",
-                               os.environ["GROQ_API_KEY"], model)
-
-        try:
-            if ai == "gemini":
-                try:
-                    answer = call_gemini(PROMPT)
-                except Exception as e:
-                    print(f"[gemini failed: {e}] -> falling back to groq/qwen3-32b", file=sys.stderr)
-                    answer = call_groq_fallback(PROMPT, "qwen/qwen3-32b")
-            elif ai == "groq":
-                answer = call_compat(PROMPT, "https://api.groq.com/openai/v1",
-                    os.environ["GROQ_API_KEY"], "llama-3.3-70b-versatile")
-            else:
-                try:
-                    answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
-                        os.environ["CEREBRAS_API_KEY"], "qwen-3-235b-a22b-instruct-2507")
-                except Exception as e:
-                    print(f"[cerebras failed: {e}] -> falling back to groq/llama-4-scout", file=sys.stderr)
-                    answer = call_groq_fallback(PROMPT, "meta-llama/llama-4-scout-17b-16e-instruct")
-        except Exception as e:
-            answer = f"[ERROR: {e}]"
-            sys.exit(1)
-
-        print(answer)
-        with open(f"r2-{ai}.txt", "w") as f:
-            f.write(answer)
-        EOF
-
-    - name: Upload R2 artifact
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: r2-${{ matrix.ai }}
         path: r2-${{ matrix.ai }}.txt
 
-  # ── Round 3: Synthesis — Claude Opus (fallback: Groq) ─────────────────
+  # ── Round 3: Synthesis ─────────────────────────────────────────────────
   synthesis:
-    name: "R3 Synthesis — Claude Opus"
+    name: "R3 Synthesis"
     needs: antithesis
     runs-on: ubuntu-latest
     permissions:
@@ -201,114 +81,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v4
       with:
         pattern: 'r[12]-*'
         merge-multiple: true
 
-    - name: Synthesis (Opus → Groq fallback)
+    - name: Synthesize (Opus → Groq fallback)
       env:
         QUESTION:          ${{ inputs.question }}
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
-      run: |
-        python3 - <<'EOF'
-        import os, json, urllib.request
+      run: python3 scripts/triad_gha.py synthesis "$QUESTION"
 
-        q = os.environ["QUESTION"]
-        read = lambda f: open(f).read() if os.path.exists(f) else "[not available]"
-
-        PROMPT = f"""You are the synthesis judge in a three-way AI debate.
-
-## Original Question
-{q}
-
-## Round 1 — Independent Answers (정/Thesis)
-### Gemini
-{read("r1-gemini.txt")}
-
-### Groq (Llama-3)
-{read("r1-groq.txt")}
-
-### Cerebras (Llama-3)
-{read("r1-cerebras.txt")}
-
-## Round 2 — Counter-Arguments (반/Antithesis)
-### Gemini critiques the others
-{read("r2-gemini.txt")}
-
-### Groq critiques the others
-{read("r2-groq.txt")}
-
-### Cerebras critiques the others
-{read("r2-cerebras.txt")}
-
-## Your Task — Final Synthesis (합/Synthesis)
-1. Identify the strongest points from all 6 responses
-2. Note where the AIs agree vs. genuinely disagree
-3. Resolve disagreements with your own best judgment
-4. Output a definitive synthesized answer
-
-Structure your response as:
-**Points of consensus:** ...
-**Key disagreements & resolution:** ...
-**Final answer:** (clear, complete, actionable)
-"""
-
-        def call_anthropic(prompt):
-            key = os.environ.get("ANTHROPIC_API_KEY","")
-            if not key:
-                raise ValueError("ANTHROPIC_API_KEY not set")
-            body = json.dumps({
-                "model": "claude-opus-4-7",
-                "max_tokens": 2048,
-                "messages": [{"role": "user", "content": prompt}],
-            }).encode()
-            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body, headers={
-                "Content-Type": "application/json",
-                "x-api-key": key,
-                "anthropic-version": "2023-06-01",
-            }, method="POST")
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return json.load(r)["content"][0]["text"].strip()
-
-        def call_groq(prompt):
-            key = os.environ.get("GROQ_API_KEY","")
-            body = json.dumps({"model": "llama-3.3-70b-versatile", "max_tokens": 2048,
-                               "messages": [{"role": "user", "content": prompt}]}).encode()
-            req = urllib.request.Request("https://api.groq.com/openai/v1/chat/completions",
-                data=body, headers={"Content-Type": "application/json",
-                                    "Authorization": f"Bearer {key}",
-                                    "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return json.load(r)["choices"][0]["message"]["content"].strip()
-
-        synth_ai = "opus"
-        try:
-            synthesis = call_anthropic(PROMPT)
-            synth_ai = "opus"
-        except Exception as e:
-            print(f"[Opus failed: {e}] -> falling back to Groq", flush=True)
-            synthesis = call_groq(PROMPT)
-            synth_ai = "groq"
-
-        print(synthesis)
-
-        md = f"# 🧠 Triad Synthesis\n\n**Question:** {q}\n\n**Synthesized by:** {synth_ai}\n\n---\n\n{synthesis}\n\n"
-        md += "<details><summary>Round 1 — Thesis</summary>\n\n"
-        for ai in ["gemini","groq","cerebras"]:
-            md += f"**{ai.title()}:** {read(f'r1-{ai}.txt')}\n\n"
-        md += "</details>\n\n<details><summary>Round 2 — Antithesis</summary>\n\n"
-        for ai in ["gemini","groq","cerebras"]:
-            md += f"**{ai.title()} critique:** {read(f'r2-{ai}.txt')}\n\n"
-        md += "</details>\n"
-        with open("synthesis.md", "w") as f:
-            f.write(md)
-        EOF
-
-    - name: Upload synthesis
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: triad-synthesis
         path: synthesis.md
@@ -324,6 +109,6 @@ Structure your response as:
 
     - name: Write job summary
       run: |
-        echo "## 🧠 Triad Synthesis Complete" >> $GITHUB_STEP_SUMMARY
+        echo "## Triad Synthesis Complete" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         cat synthesis.md >> $GITHUB_STEP_SUMMARY
