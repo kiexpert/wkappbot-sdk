@@ -28,21 +28,34 @@ echo ""
 # ── C. CI HEALTH ─────────────────────────────────────────────────────
 echo "## C. CI Status"
 echo "### SDK (kiexpert/wkappbot-sdk)"
-gh run list --repo "$REPO" --limit 6 --json status,name,conclusion,workflowName 2>/dev/null \
+gh run list --repo "$REPO" --limit 20 --json status,name,conclusion,workflowName 2>/dev/null \
   | python3 -c "
 import sys,json
 runs=json.load(sys.stdin)
 seen=set()
 for r in runs:
     wf=r.get('workflowName',r['name'])
+    # skip ghost runs: path-style names like '.github/workflows/foo.yml' have no real jobs
+    if wf.startswith('.github/'): continue
     if wf in seen: continue
     seen.add(wf)
     c=r['conclusion'] or r['status']
-    icon='✅' if c=='success' else ('⏳' if c=='in_progress' else '❌')
+    icon='✅' if c=='success' else ('⏳' if c in ('in_progress','queued') else '❌')
     print(f'  {icon} {wf[:55]:55s} {c}')
 " 2>/dev/null
-SDK_FAIL=$(gh run list --repo "$REPO" --limit 6 --json conclusion 2>/dev/null \
-  | python3 -c "import sys,json; runs=json.load(sys.stdin); print(sum(1 for r in runs if r['conclusion'] not in ('success',None,'')))" 2>/dev/null || echo 0)
+SDK_FAIL=$(gh run list --repo "$REPO" --limit 20 --json conclusion,workflowName 2>/dev/null \
+  | python3 -c "
+import sys,json
+runs=json.load(sys.stdin)
+seen=set()
+fail=0
+for r in runs:
+    wf=r.get('workflowName','')
+    if wf.startswith('.github/') or wf in seen: continue
+    seen.add(wf)
+    if r['conclusion'] not in ('success',None,'','skipped'): fail+=1
+print(fail)
+" 2>/dev/null || echo 0)
 [ "${SDK_FAIL}" -gt 0 ] && FAIL=$((FAIL+SDK_FAIL))
 
 echo ""
@@ -57,7 +70,7 @@ for r in runs:
     if wf in seen: continue
     seen.add(wf)
     c=r['conclusion'] or r['status']
-    icon='✅' if c=='success' else ('⏳' if c=='in_progress' else '❌')
+    icon='✅' if c=='success' else ('⏳' if c in ('in_progress','queued') else '❌')
     print(f'  {icon} {wf[:55]:55s} {c}')
 " 2>/dev/null
 echo ""
