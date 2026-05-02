@@ -54,19 +54,32 @@ jobs:
         def call_compat(p, base, key, model):
             body = json.dumps({"model": model, "messages": [{"role": "user", "content": p}], "max_tokens": 1024}).encode()
             req = urllib.request.Request(f"{base}/chat/completions", data=body,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}, method="POST")
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}",
+                         "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
             with urllib.request.urlopen(req, timeout=60) as r:
                 return json.load(r)["choices"][0]["message"]["content"].strip()
 
+        def call_groq_fallback(p, model):
+            return call_compat(p, "https://api.groq.com/openai/v1",
+                               os.environ["GROQ_API_KEY"], model)
+
         try:
             if ai == "gemini":
-                answer = call_gemini(PROMPT)
+                try:
+                    answer = call_gemini(PROMPT)
+                except Exception as e:
+                    print(f"[gemini failed: {e}] -> falling back to groq/qwen3-32b", file=sys.stderr)
+                    answer = call_groq_fallback(PROMPT, "qwen/qwen3-32b")
             elif ai == "groq":
                 answer = call_compat(PROMPT, "https://api.groq.com/openai/v1",
                     os.environ["GROQ_API_KEY"], "llama-3.3-70b-versatile")
             else:
-                answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
-                    os.environ["CEREBRAS_API_KEY"], "llama-3.3-70b")
+                try:
+                    answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
+                        os.environ["CEREBRAS_API_KEY"], "qwen-3-235b-a22b-instruct-2507")
+                except Exception as e:
+                    print(f"[cerebras failed: {e}] -> falling back to groq/llama-4-scout", file=sys.stderr)
+                    answer = call_groq_fallback(PROMPT, "meta-llama/llama-4-scout-17b-16e-instruct")
         except Exception as e:
             answer = f"[ERROR: {e}]"
             sys.exit(1)
@@ -135,19 +148,32 @@ jobs:
         def call_compat(p, base, key, model):
             body = json.dumps({"model": model, "messages": [{"role": "user", "content": p}], "max_tokens": 512}).encode()
             req = urllib.request.Request(f"{base}/chat/completions", data=body,
-                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}, method="POST")
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}",
+                         "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
             with urllib.request.urlopen(req, timeout=60) as r:
                 return json.load(r)["choices"][0]["message"]["content"].strip()
 
+        def call_groq_fallback(p, model):
+            return call_compat(p, "https://api.groq.com/openai/v1",
+                               os.environ["GROQ_API_KEY"], model)
+
         try:
             if ai == "gemini":
-                answer = call_gemini(PROMPT)
+                try:
+                    answer = call_gemini(PROMPT)
+                except Exception as e:
+                    print(f"[gemini failed: {e}] -> falling back to groq/qwen3-32b", file=sys.stderr)
+                    answer = call_groq_fallback(PROMPT, "qwen/qwen3-32b")
             elif ai == "groq":
                 answer = call_compat(PROMPT, "https://api.groq.com/openai/v1",
                     os.environ["GROQ_API_KEY"], "llama-3.3-70b-versatile")
             else:
-                answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
-                    os.environ["CEREBRAS_API_KEY"], "llama-3.3-70b")
+                try:
+                    answer = call_compat(PROMPT, "https://api.cerebras.ai/v1",
+                        os.environ["CEREBRAS_API_KEY"], "qwen-3-235b-a22b-instruct-2507")
+                except Exception as e:
+                    print(f"[cerebras failed: {e}] -> falling back to groq/llama-4-scout", file=sys.stderr)
+                    answer = call_groq_fallback(PROMPT, "meta-llama/llama-4-scout-17b-16e-instruct")
         except Exception as e:
             answer = f"[ERROR: {e}]"
             sys.exit(1)
@@ -163,7 +189,7 @@ jobs:
         name: r2-${{ matrix.ai }}
         path: r2-${{ matrix.ai }}.txt
 
-  # ── Round 3: Synthesis — Claude Opus ──────────────────────────────────
+  # ── Round 3: Synthesis — Claude Opus (fallback: Groq) ─────────────────
   synthesis:
     name: "R3 Synthesis — Claude Opus"
     needs: antithesis
@@ -181,10 +207,11 @@ jobs:
         pattern: 'r[12]-*'
         merge-multiple: true
 
-    - name: Claude Opus synthesis
+    - name: Synthesis (Opus → Groq fallback)
       env:
         QUESTION:          ${{ inputs.question }}
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
       run: |
         python3 - <<'EOF'
         import os, json, urllib.request
@@ -192,7 +219,7 @@ jobs:
         q = os.environ["QUESTION"]
         read = lambda f: open(f).read() if os.path.exists(f) else "[not available]"
 
-        PROMPT = f"""You are Claude Opus, the synthesis judge in a three-way AI debate.
+        PROMPT = f"""You are the synthesis judge in a three-way AI debate.
 
 ## Original Question
 {q}
@@ -228,29 +255,53 @@ Structure your response as:
 **Key disagreements & resolution:** ...
 **Final answer:** (clear, complete, actionable)
 """
-        key = os.environ["ANTHROPIC_API_KEY"]
-        body = json.dumps({
-            "model": "claude-opus-4-7",
-            "max_tokens": 2048,
-            "messages": [{"role": "user", "content": PROMPT}],
-        }).encode()
-        req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body, headers={
-            "Content-Type": "application/json",
-            "x-api-key": key,
-            "anthropic-version": "2023-06-01",
-        }, method="POST")
-        with urllib.request.urlopen(req, timeout=120) as r:
-            d = json.load(r)
-        synthesis = d["content"][0]["text"].strip()
+
+        def call_anthropic(prompt):
+            key = os.environ.get("ANTHROPIC_API_KEY","")
+            if not key:
+                raise ValueError("ANTHROPIC_API_KEY not set")
+            body = json.dumps({
+                "model": "claude-opus-4-7",
+                "max_tokens": 2048,
+                "messages": [{"role": "user", "content": prompt}],
+            }).encode()
+            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=body, headers={
+                "Content-Type": "application/json",
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+            }, method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.load(r)["content"][0]["text"].strip()
+
+        def call_groq(prompt):
+            key = os.environ.get("GROQ_API_KEY","")
+            body = json.dumps({"model": "llama-3.3-70b-versatile", "max_tokens": 2048,
+                               "messages": [{"role": "user", "content": prompt}]}).encode()
+            req = urllib.request.Request("https://api.groq.com/openai/v1/chat/completions",
+                data=body, headers={"Content-Type": "application/json",
+                                    "Authorization": f"Bearer {key}",
+                                    "User-Agent": "WKAppBot-Triad/1.0"}, method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return json.load(r)["choices"][0]["message"]["content"].strip()
+
+        synth_ai = "opus"
+        try:
+            synthesis = call_anthropic(PROMPT)
+            synth_ai = "opus"
+        except Exception as e:
+            print(f"[Opus failed: {e}] -> falling back to Groq", flush=True)
+            synthesis = call_groq(PROMPT)
+            synth_ai = "groq"
+
         print(synthesis)
 
-        md = f"# 🧠 Triad Synthesis\n\n**Question:** {q}\n\n---\n\n{synthesis}\n\n"
+        md = f"# 🧠 Triad Synthesis\n\n**Question:** {q}\n\n**Synthesized by:** {synth_ai}\n\n---\n\n{synthesis}\n\n"
         md += "<details><summary>Round 1 — Thesis</summary>\n\n"
         for ai in ["gemini","groq","cerebras"]:
-            md += f"**{ai.title()}:** {open(f'r1-{ai}.txt').read()}\n\n"
+            md += f"**{ai.title()}:** {read(f'r1-{ai}.txt')}\n\n"
         md += "</details>\n\n<details><summary>Round 2 — Antithesis</summary>\n\n"
         for ai in ["gemini","groq","cerebras"]:
-            md += f"**{ai.title()} critique:** {open(f'r2-{ai}.txt').read()}\n\n"
+            md += f"**{ai.title()} critique:** {read(f'r2-{ai}.txt')}\n\n"
         md += "</details>\n"
         with open("synthesis.md", "w") as f:
             f.write(md)
