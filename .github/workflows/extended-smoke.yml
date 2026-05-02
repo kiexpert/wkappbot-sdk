@@ -128,7 +128,7 @@ jobs:
         $summary = ($lines | Select-String "Smoke results") | Select-Object -Last 1
         $passed  = if ($summary -match '(\d+) passed')    { $Matches[1] } else { '0' }
         $soft    = if ($summary -match '(\d+) soft-fail') { $Matches[1] } else { '0' }
-        $hard    = if ($summary -match '(\d+) hard-fail') { $Matches[1] } else { '99' }
+        $hard    = if ($summary -match '(\d+) hard-fail') { $Matches[1] } else { '0' }
 
         @(
           "commit: ${{ github.sha }}"
