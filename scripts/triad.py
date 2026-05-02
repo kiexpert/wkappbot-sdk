@@ -78,6 +78,28 @@ def probe(ai: str, timeout: int = 15) -> bool:
     ans = ask(ai, "Reply with exactly: ok", timeout=timeout)
     return bool(ans) and not (ans.startswith("[") and "error" in ans.lower())
 
+def webbot_logged_in(ai: str) -> bool:
+    """
+    Pre-check: is the CDP webbot session active and logged in?
+    Calls `wkappbot inspect <ai>` (fast, no prompt send) to detect
+    whether the tab/page exists and has a logged-in prompt input.
+    Returns False immediately if wkappbot returns an error or no window found.
+    """
+    try:
+        cmd = [WKAPPBOT, "inspect", ai, "--timeout", "5"]
+        r = subprocess.run(cmd, capture_output=True, timeout=8, env={**os.environ})
+        out = r.stdout.decode("utf-8", errors="replace").lower()
+        err = r.stderr.decode("utf-8", errors="replace").lower()
+        combined = out + err
+        # Consider logged-in if inspect finds the prompt element
+        if r.returncode != 0:
+            return False
+        if any(x in combined for x in ["not found", "no window", "no tab", "error", "timeout"]):
+            return False
+        return True
+    except Exception:
+        return False
+
 # ── Candidate pool (quality-ranked) ───────────────────────────────────────
 
 def build_pool() -> list[tuple[str, int]]:
@@ -88,8 +110,12 @@ def build_pool() -> list[tuple[str, int]]:
     pool = []
 
     # Tier 1: Webbot CDP (best quality, local only)
+    # Pre-check login state — skip inactive sessions immediately
     for ai, score in [("gpt", 10), ("claude", 10), ("gemini", 9)]:
-        pool.append((ai, score))
+        if webbot_logged_in(ai):
+            pool.append((ai, score))
+        else:
+            print(f"  [webbot] {ai}: no active session — skipped")
 
     # Tier 2: Opus REST (high quality, paid)
     if os.environ.get("ANTHROPIC_API_KEY"):
