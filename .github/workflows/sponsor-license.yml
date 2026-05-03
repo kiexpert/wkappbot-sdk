@@ -4,13 +4,20 @@ on:
   sponsorship:
     types: [created, tier_changed, cancelled, pending_cancellation]
 
+permissions:
+  contents: read
+
 jobs:
   manage-license:
     runs-on: ubuntu-latest
+    environment: license-production
+    concurrency:
+      group: license-grant
+      cancel-in-progress: false
     if: github.event_name != 'push'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
       - name: Grant or revoke license
         env:

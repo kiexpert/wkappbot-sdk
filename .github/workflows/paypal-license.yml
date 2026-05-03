@@ -13,11 +13,18 @@ on:
         required: false
         default: '8'
 
+permissions:
+  contents: read
+
 jobs:
   process-paypal:
     runs-on: ubuntu-latest
+    environment: license-production
+    concurrency:
+      group: license-grant
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
       - name: Guard test mode (admin-only)
         if: ${{ inputs.test_user != '' }}

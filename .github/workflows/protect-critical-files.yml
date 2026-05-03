@@ -10,6 +10,11 @@ on:
       - '.github/scripts/license_store.py'
       - '.github/CODEOWNERS'
       - '.github/workflows/protect-critical-files.yml'
+      - 'PRICING.md'
+      - 'SUBSCRIBE.md'
+
+permissions:
+  contents: read
 
 jobs:
   block:
@@ -17,9 +22,7 @@ jobs:
     steps:
       - name: Block critical file changes via PR
         run: |
-          echo "🚨 SECURITY: This PR modifies critical license/payment files."
+          echo "SECURITY: This PR modifies critical license/payment files."
           echo ""
-          echo "These files cannot be merged via PR — push directly to main as admin."
-          echo "Changed files that triggered this block:"
-          echo "${{ toJson(github.event.pull_request.changed_files) }}"
+          echo "These files cannot be merged via PR -- push directly to main as admin."
           exit 1
