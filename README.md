@@ -12,6 +12,14 @@
 **Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent.**  
 Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
 
+---
+
+> 🤖 **Let your AI agent control any Windows app — without screen takeover.**  
+> 🔥 **Self-healing UIA + Vision fallback — works even when the DOM lies.**  
+> ⚡ **Multi-AI triad (GPT + Gemini + Claude) in one command.**
+
+---
+
 ## Why this exists
 
 Computer Use lets an AI click, type, and read the screen. **App Use** is the layer above: agents that drive *specific* applications the way a power user does — focuslessly, alongside the human, without seizing the screen.
@@ -37,6 +45,28 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 **AI-native** -- The same binary that runs automation also delegates to GPT, Gemini, and Claude in parallel, streams prompts into live browser AI sessions via CDP, and manages its own context handoff when token budgets run low.
 
+### How it stacks up
+
+| Feature | WKAppBot | Playwright | PyAutoGUI | AutoHotkey |
+|---------|----------|------------|-----------|------------|
+| Focusless operation | ✅ | ❌ | ❌ | ❌ |
+| UIA + Win32 + CDP unified | ✅ | Web only | Mouse/KB only | Win32 only |
+| Self-healing Vision fallback | ✅ | ❌ | ❌ | ❌ |
+| AI-native (LLM delegation) | ✅ | ❌ | ❌ | ❌ |
+| Android via ADB | ✅ | ❌ | ❌ | ❌ |
+| MFC/HTS owner-drawn support | ✅ | ❌ | ❌ | Partial |
+
+---
+
+## 🚀 What's New in v6.5
+
+- **Per-repo Eye isolation** — every `git clone` gets its own daemon and DataDir (`{root}/.wkappbot/hq/`). No more cross-project state bleed; multiple checkouts can run in parallel safely.
+- **ECDSA offline license system** — license tokens verify locally with an embedded ECDSA public key. No phone-home, no network dependency for activation, no leaks of which app is being automated.
+- **Dev core CI auto-release pipeline** — push to `main` triggers a build that publishes `wkappbot-core.new.exe` straight to the latest release. Hot-swap watchdog picks it up live; users update without restarting.
+- **GitHub collaborator-based Pro tier** — accept a repo invite, the same binary unlocks CDP browser automation, multi-AI `ask`, scheduling, and `--sudo` admin within an hour. No license file shuffling.
+
+→ Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
+
 ---
 
 ## OS Support
@@ -61,6 +91,18 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 | Browser AI (Claude, GPT, Gemini) | CDP prompt pump, cross-prompt chunking, attachment lock |
 | Android apps | ADB + Accessibility tree (`adb://device/...` grap) |
 | Owner-drawn controls with no UIA | CCA segmentation -> OCR -> Vision API fallback chain |
+
+---
+
+## Real-World Use Cases
+
+These are the kinds of jobs WKAppBot was actually built to handle — not theoretical demos:
+
+- **AI-driven trading on Korean HTS terminals.** LS증권 HTS 투혼 is built on MFC owner-drawn controls that no UIA tool can see. WKAppBot's CCA + OCR + Vision fallback locks onto chart panels, order forms, and balance grids, so an AI agent can read positions, place orders, and verify fills without screen scraping.
+- **Browser AI session automation.** Pump prompts straight into a live Claude / ChatGPT / Gemini browser tab over CDP — no copy-paste, no clipboard race, no losing the conversation. Cross-prompt chunking handles long inputs; attachment lock prevents stray drops.
+- **Multi-monitor focusless automation.** UIA Invoke / Value / Toggle never steal focus. The user keeps typing in another app on another monitor while WKAppBot drives a headless workflow in the background.
+- **Android app control via ADB.** `adb://device/...` graps reach into the accessibility tree of any phone or emulator, including foldables (Galaxy Fold5 tested), with the same command surface as Windows automation.
+- **Auto-dismiss Hancom / Office popups.** `wkappbot dismiss` plus a handler YAML eats save-prompt, license-nag, and "do you want to update?" dialogs across 한컴오피스, MS Office, and updater stacks — keeping batch jobs from stalling overnight.
 
 ---
 
@@ -376,6 +418,21 @@ Do not use the name to imply endorsement or affiliation without written permissi
 If WKAppBot saves you time, consider buying me a coffee ☕
 
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal)](https://paypal.me/kiexpert)
+
+---
+
+## ⭐ Star History & Community
+
+[![Stars](https://img.shields.io/github/stars/kiexpert/wkappbot-sdk?style=social)](https://github.com/kiexpert/wkappbot-sdk/stargazers)
+[![Forks](https://img.shields.io/github/forks/kiexpert/wkappbot-sdk?style=social)](https://github.com/kiexpert/wkappbot-sdk/network/members)
+[![Issues](https://img.shields.io/github/issues/kiexpert/wkappbot-sdk)](https://github.com/kiexpert/wkappbot-sdk/issues)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=kiexpert/wkappbot-sdk&type=Date)](https://star-history.com/#kiexpert/wkappbot-sdk&Date)
+
+- 💬 **Questions or design discussions?** Join us on [GitHub Discussions](https://github.com/kiexpert/wkappbot-sdk/discussions).
+- 🐛 **Found a bug or have a feature request?** Open an [issue](https://github.com/kiexpert/wkappbot-sdk/issues).
+- 🛠 **Built something with WKAppBot?** Open a PR to add your project to a community showcase — we'd love to feature it.
+- ⭐ **Liking the project?** Drop a star — it genuinely helps surface this work to other developers.
 
 ---
 
