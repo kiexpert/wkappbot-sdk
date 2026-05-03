@@ -3,7 +3,6 @@ name: Sponsor License
 on:
   sponsorship:
     types: [created, tier_changed, cancelled, pending_cancellation]
-  push:
 
 jobs:
   manage-license:
