@@ -77,13 +77,13 @@ def push_pending_prompt(repo, target_cwd, message):
         with open(prompt_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
 
-        # Commit and push
+        # Commit and push (force-add to bypass .gitignore on .wkappbot/)
         env = {**os.environ,
                "GIT_AUTHOR_NAME": "skill-check-bot",
                "GIT_AUTHOR_EMAIL": "ci@wkappbot",
                "GIT_COMMITTER_NAME": "skill-check-bot",
                "GIT_COMMITTER_EMAIL": "ci@wkappbot"}
-        subprocess.run(["git", "-C", tmpdir, "add", ".wkappbot/"], env=env, check=True, capture_output=True)
+        subprocess.run(["git", "-C", tmpdir, "add", "-f", ".wkappbot/"], env=env, check=True, capture_output=True)
         subprocess.run(
             ["git", "-C", tmpdir, "commit", "-m", f"ci: skill-check failure notification [{guid[:6]}]"],
             env=env, check=True, capture_output=True
@@ -116,12 +116,14 @@ def main():
         by_repo.setdefault((repo, cwd), []).append((skill_path, errs))
 
     for (repo, cwd), items in by_repo.items():
-        lines = [f"[SKILL-CHECK CI ❌] {len(items)} skill(s) failed validation in {os.environ.get('GITHUB_REPOSITORY','?')}"]
+        lines = [f"🚨 [SKILL-CHECK CI FAILED] {len(items)} skill(s) rejected in {os.environ.get('GITHUB_REPOSITORY','?')}"]
         for skill_path, errs in items:
-            lines.append(f"\n• {os.path.basename(skill_path)}")
+            lines.append(f"\n❌ {os.path.basename(skill_path)}")
             for e in errs[:3]:
                 lines.append(f"  → {e}")
-        lines.append(f"\nFix and re-push. Details: {run_url}")
+        lines.append(f"\n⚠️  반드시 `wkappbot skill edit <id>` 또는 `wkappbot skill contribute` 명령으로만 스킬을 수정하세요!")
+        lines.append(f"직접 .skill.json 파일 편집은 엄격히 금지 — | 구분자 파괴, 인코딩 오류, 버전 누락 발생.")
+        lines.append(f"\n🔗 CI 상세: {run_url}")
         message = "\n".join(lines)
         push_pending_prompt(repo, cwd, message)
 
