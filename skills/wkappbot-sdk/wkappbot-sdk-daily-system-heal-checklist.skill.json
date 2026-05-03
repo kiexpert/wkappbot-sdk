@@ -3,13 +3,17 @@
   "app": "wkappbot-sdk",
   "title": "wkappbot-sdk daily system heal checklist",
   "title_ko": null,
-  "desc": "Daily midnight health check for wkappbot-sdk. Checks: (E) Eye ctx%, (C) CI status SDK\u002BCore repo, (S) news briefing schedule 4 recurring jobs, (G) git working tree clean, (L) license count \u002B enforcer, (P) suggest backlog confirms, (R) latest SDK release. Script: D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh. Scheduled at 00:00 daily. Output is markdown with check/cross per section and FAIL count summary. Claude reads output and heals any failing items.",
+  "desc": "Daily midnight health check for wkappbot-sdk \u002B cross-repo audit. Sections: (E) Eye ctx%, (C) CI SDK\u002BCore, (S) briefing schedule, (G) git clean, (L) license, (P) suggest backlog, (R) release, (X) cross-repo: all-repo CI, GitHub Pages reachability, README media assets, releases, PayPal secrets. Script: D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh.",
   "steps": [
     "1. Run: bash \u0027D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh\u0027",
     "2. Read output -- each section has check or cross icon",
     "3. Heal any cross items: E=newchat if ctx over 80%, C=rerun or fix failing CI, S=re-register 4 briefing schedules if count under 4, G=commit untracked changes, L=check license enforcer workflow, P=confirm or resolve pending suggests",
     "4. Re-run script to verify all checks pass",
-    "5. Slack send heal summary"
+    "5. Slack send heal summary",
+    "X. Cross-Repo Audit: X1=all repos CI status (SDK/WKAppBot/WkAutoQuant/bitwisdomk), X2=GitHub Pages HTTP 200 check, X3=README media files exist, X4=latest release tags, X5=PayPal secrets present",
+    "X. Cross-Repo Audit: X1=all repos CI status (SDK/WKAppBot/WkAutoQuant/bitwisdomk), X2=GitHub Pages HTTP 200 check, X3=README media files exist, X4=latest release tags, X5=PayPal secrets present",
+    "X10: WkAutoQuant daemon alive check",
+    "X10: WkAutoQuant daemon alive check"
   ],
   "requirements": [
     {
@@ -41,6 +45,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T05:15:48.8437073Z",
-  "updated": "2026-05-02T05:15:48.8437162Z",
-  "version": "1.0"
+  "updated": "2026-05-03T12:27:20.4249208Z",
+  "version": "1.4"
 }
