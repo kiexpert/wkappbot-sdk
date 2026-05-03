@@ -102,6 +102,15 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 These are the kinds of jobs WKAppBot was actually built to handle — not theoretical demos:
 
+### 🤖 AI Trading Bot — Built with Sudo License
+
+| 🔐 AUTO PIN ENTRY | 📊 ALL SYSTEMS READY | 🧠 PORTFOLIO ANALYSIS |
+|:-:|:-:|:-:|
+| ![](docs/screenshots/wkappbot-sudo-demo-pin-entry.jpg) | ![](docs/screenshots/wkappbot-sudo-demo-all-ready.jpg) | ![](docs/screenshots/wkappbot-sudo-demo-portfolio.jpg) |
+| Legacy HTS에 보안 PIN 자동 입력 | 모든 창 자동 배치 — 준비 완료 | AI가 22종목 매수/제외 자동 판단 |
+
+> **Sudo 라이선스**로 이런 봇을 직접 만들 수 있습니다 → **[라이선스 보기](./PRICING.md)**
+
 - **AI-driven trading on Korean HTS terminals.** LS증권 HTS 투혼 is built on MFC owner-drawn controls that no UIA tool can see. WKAppBot's CCA + OCR + Vision fallback locks onto chart panels, order forms, and balance grids, so an AI agent can read positions, place orders, and verify fills without screen scraping.
 - **Browser AI session automation.** Pump prompts straight into a live Claude / ChatGPT / Gemini browser tab over CDP — no copy-paste, no clipboard race, no losing the conversation. Cross-prompt chunking handles long inputs; attachment lock prevents stray drops.
 - **Multi-monitor focusless automation.** UIA Invoke / Value / Toggle never steal focus. The user keeps typing in another app on another monitor while WKAppBot drives a headless workflow in the background.
