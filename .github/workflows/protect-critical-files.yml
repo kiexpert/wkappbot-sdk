@@ -10,6 +10,9 @@ on:
       - '.github/scripts/license_store.py'
       - '.github/CODEOWNERS'
       - '.github/workflows/protect-critical-files.yml'
+      - '.github/workflows/admin-history-cleanup.yml'
+      - '.github/workflows/license-cleanup.yml'
+      - '.github/workflows/member-joined.yml'
       - 'PRICING.md'
       - 'SUBSCRIBE.md'
 

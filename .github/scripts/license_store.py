@@ -20,6 +20,14 @@ TRUSTED_AUTHORS = {"kiexpert", "github-actions[bot]"}
 
 _TIER_RE = re.compile(r'tier=([\w+]+)')
 _EXP_RE  = re.compile(r'(cdp|sudo)=(\S+)')
+_USER_RE = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9\-]{0,38}$')  # GitHub username rules
+
+
+def _validate_user(user: str) -> str:
+    """Reject path-traversal and invalid GitHub usernames before any API call."""
+    if not user or not _USER_RE.match(user):
+        raise ValueError(f"Invalid GitHub username: {user!r}")
+    return user
 
 
 def _gh(method, path, body=None):
@@ -44,6 +52,7 @@ def _gh(method, path, body=None):
 
 
 def read(user: str) -> tuple[str | None, dict[str, datetime | None]]:
+    user = _validate_user(user)
     """1 API call: GET latest commit → check author → parse tier + expiry from message.
     Returns (tier_str, {cdp, sudo}) or (None, {}) if untrusted/missing.
     """
@@ -74,6 +83,7 @@ def read(user: str) -> tuple[str | None, dict[str, datetime | None]]:
 def write(user: str, tier: str, cdp_exp: datetime | None, sudo_exp: datetime | None,
           existing_sha: str | None = None):
     """Write/update license. Pass existing_sha to update in place (amend-style)."""
+    user = _validate_user(user)
     parts = [f"tier={tier}"]
     if cdp_exp:
         parts.append(f"cdp={cdp_exp.isoformat()}")
@@ -88,11 +98,13 @@ def write(user: str, tier: str, cdp_exp: datetime | None, sudo_exp: datetime | N
 
 
 def get_file_sha(user: str) -> str | None:
+    user = _validate_user(user)
     obj = _gh("GET", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}/{user}?ref={LICENSE_BRANCH}")
     return obj.get("sha") if obj else None
 
 
 def delete(user: str, sha: str, reason: str):
+    user = _validate_user(user)
     _gh("DELETE", f"/repos/{LICENSE_REPO}/contents/{LICENSE_PATH}/{user}", {
         "message": f"chore(licenses): revoke @{user} — {reason} [skip ci]",
         "sha": sha,

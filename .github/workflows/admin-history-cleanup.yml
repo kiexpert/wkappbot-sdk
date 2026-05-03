@@ -16,7 +16,13 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Restrict to repo admin only
+        run: |
+          if [ "${{ github.actor }}" != "kiexpert" ]; then
+            echo "ERROR: Admin History Cleanup is restricted to repo admin only."
+            exit 1
+          fi
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with:
           fetch-depth: 0
           ref: ${{ github.event.inputs.target_branch || 'main' }}
