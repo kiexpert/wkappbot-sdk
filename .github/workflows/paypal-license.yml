@@ -19,6 +19,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Guard test mode (admin-only)
+        if: ${{ inputs.test_user != '' }}
+        run: |
+          if [ "${{ github.actor }}" != "kiexpert" ]; then
+            echo "ERROR: test_user input is restricted to repo admin only."
+            exit 1
+          fi
+
       - name: Process PayPal transactions
         env:
           PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
