@@ -1,0 +1,25 @@
+name: Protect Critical Files
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/paypal-license.yml'
+      - '.github/workflows/sponsor-license.yml'
+      - '.github/scripts/paypal_license.py'
+      - '.github/scripts/sponsor_license.py'
+      - '.github/scripts/license_store.py'
+      - '.github/CODEOWNERS'
+      - '.github/workflows/protect-critical-files.yml'
+
+jobs:
+  block:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block critical file changes via PR
+        run: |
+          echo "🚨 SECURITY: This PR modifies critical license/payment files."
+          echo ""
+          echo "These files cannot be merged via PR — push directly to main as admin."
+          echo "Changed files that triggered this block:"
+          echo "${{ toJson(github.event.pull_request.changed_files) }}"
+          exit 1
