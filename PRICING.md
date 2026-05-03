@@ -33,7 +33,7 @@ Four tiers. No license keys. **Your GitHub account is your license.**
 
 ## How to Pay
 
-Pick any one — all activate automatically within minutes.
+Pick any one — both activate automatically within minutes.
 
 ### 💳 Option A — PayPal (fastest, international, **자동 활성화**)
 
@@ -47,15 +47,7 @@ Pick any one — all activate automatically within minutes.
 2. **Memo에 GitHub 아이디** 적기 (필수!)
 3. 끝 — 수분 내 자동 활성화
 
-### 🏦 Option B — KIS 이체 (국내, 1시간 내 수동 처리)
-| 항목 | 내용 |
-|------|------|
-| 은행 | 한국투자증권 (KIS) |
-| 계좌 | `43420089-01` (김기일) |
-| 금액 | Trial: ₩10,000 / CDP: ₩140,000 / Sudo: ₩500,000 |
-| **입금자명** | **GitHub 아이디** (필수!) |
-
-### ⭐ Option C — GitHub Sponsors (**자동 활성화**)
+### ⭐ Option B — GitHub Sponsors (**자동 활성화**)
 1. **github.com/sponsors/kiexpert** 방문
 2. 금액 선택 ($8 = Trial 2일 / $100 = CDP 30일 / $363 = Sudo 108일)
 3. 끝 — 즉시 자동 활성화
@@ -84,7 +76,7 @@ CDP tier = `read` permission. Sudo tier = `write` permission.
 ## FAQ
 
 **활성화까지 얼마나 걸리나요?**
-PayPal/Sponsors → 수분 내. KIS 이체 → 입금 확인 후 1시간 이내.
+PayPal → 수분 내. GitHub Sponsors → 즉시.
 GitHub 초대 이메일 수락 → `wkappbot license status` 로 확인.
 
 **추가 결제하면 어떻게 되나요?**
