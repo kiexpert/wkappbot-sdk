@@ -1,0 +1,47 @@
+{
+  "id": "cdp-prompt-pump-focusless-enter",
+  "app": "wkappbot-core",
+  "title": "CDP Prompt Pump \u2014 Focusless Enter and ProseMirror Auto-Submit",
+  "title_ko": null,
+  "desc": "How the CDP prompt pump works, why ProseMirror ignores JS KeyboardEvent, and how SendPromptFocuslessAsync (DOM.focus \u002B Input.dispatchKeyEvent) bypasses the focus-steal-guard for background Claude tabs.",
+  "steps": [
+    "Pump: ArmPromptPumpAsync sets 200ms setInterval, fires trySend after idleMs of stable content (default 1s = 5 ticks)",
+    "trySend order: form.requestSubmit then button.click then KeyboardEvent then CDP_SIGNAL flag",
+    "ProseMirror (Claude tiptap) ignores synthetic JS KeyboardEvent but dispatchEvent returns true so pump thinks KEY_ENTER succeeded \u2014 content stays",
+    "Fix: SendPromptFocuslessAsync uses CDP DOM.focus nodeId (bypasses Runtime.evaluate / focus-steal-guard) then Input.dispatchKeyEvent",
+    "InjectToSingle calls ArmPromptPumpAsync after AppendContentEditableAsync so each AI auto-submits independently",
+    "Moderator broadcast only goes to pending AIs not finished ones to avoid stranded text in editor"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask claude ok",
+      "expect": "ok",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask groq ok",
+      "expect": "ok",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask triad ok",
+      "expect": "gemini|gpt|claude",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "pump",
+    "prosemirror",
+    "claude",
+    "triad",
+    "focusless"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-02T08:15:07.626594Z",
+  "updated": "2026-05-02T08:15:07.6266036Z",
+  "version": "1.0"
+}
