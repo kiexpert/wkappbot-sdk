@@ -139,6 +139,154 @@ gh release list --repo "$REPO" --limit 1 2>/dev/null \
   | awk '{printf "  Latest: %s (%s)\n", $1, $3}' || true
 echo ""
 
+# ── X. CROSS-REPO AUDIT ──────────────────────────────────────────────
+echo "## X. Cross-Repo System Audit"
+
+# X1. All repos CI status (wkappbot-sdk, WKAppBot, WkAutoQuant, bitwisdomk)
+echo "### X1. All Repos CI (latest per workflow)"
+for REPO_X in "kiexpert/wkappbot-sdk" "kiexpert/WKAppBot" "kiexpert/WkAutoQuant" "bitwisdomk/bitwisdomk"; do
+  LATEST=$(gh run list --repo "$REPO_X" --limit 1 --json workflowName,conclusion 2>/dev/null \
+    | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'no runs')" 2>/dev/null || echo "?")
+  ICON="✅"; [ "$LATEST" = "failure" ] && { ICON="❌"; FAIL=$((FAIL+1)); }
+  printf "  %s %-40s %s\n" "$ICON" "$REPO_X" "$LATEST"
+done
+echo ""
+
+# X2. GitHub Pages reachability (bitwisdomk landing page)
+echo "### X2. GitHub Pages"
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://bitwisdomk.github.io/bitwisdomk/" 2>/dev/null || echo "?")
+if [ "$HTTP" = "200" ]; then
+  echo "  ✅ bitwisdomk.github.io/bitwisdomk/ → ${HTTP}"
+else
+  echo "  ❌ bitwisdomk.github.io/bitwisdomk/ → ${HTTP}"
+  FAIL=$((FAIL+1))
+fi
+# wkappbot-sdk Pages
+HTTP2=$(curl -s -o /dev/null -w "%{http_code}" "https://kiexpert.github.io/wkappbot-sdk/" 2>/dev/null || echo "?")
+if [ "$HTTP2" = "200" ]; then
+  echo "  ✅ kiexpert.github.io/wkappbot-sdk/ → ${HTTP2}"
+else
+  echo "  ❌ kiexpert.github.io/wkappbot-sdk/ → ${HTTP2}"
+  FAIL=$((FAIL+1))
+fi
+echo ""
+
+# X3. README media files exist in wkappbot-sdk
+echo "### X3. README Media Assets (wkappbot-sdk)"
+SDK_DIR_CHECK="$SDK_DIR"
+for ASSET in "wkappbot-sudo-license-demo-preview.gif" "docs/wkappbot-sudo-license-demo.mp4" \
+             "docs/screenshots/wkappbot-sudo-demo-pin-entry.jpg" \
+             "docs/screenshots/wkappbot-sudo-demo-all-ready.jpg" \
+             "docs/screenshots/wkappbot-sudo-demo-portfolio.jpg"; do
+  if [ -f "$SDK_DIR_CHECK/$ASSET" ]; then
+    echo "  ✅ $ASSET"
+  else
+    echo "  ❌ $ASSET MISSING"
+    FAIL=$((FAIL+1))
+  fi
+done
+echo ""
+
+# X4. Releases — latest tag matches expected pattern
+echo "### X4. Releases"
+SDK_REL=$(gh release list --repo "kiexpert/wkappbot-sdk" --limit 1 2>/dev/null | awk '{print $1}' || echo "?")
+CORE_REL=$(gh release list --repo "kiexpert/WKAppBot" --limit 1 2>/dev/null | awk '{print $1}' || echo "?")
+echo "  wkappbot-sdk latest : $SDK_REL"
+echo "  WKAppBot latest     : $CORE_REL"
+echo ""
+
+# X5. PayPal secrets present
+echo "### X5. Secrets"
+PP_ID=$(gh secret list --repo "kiexpert/wkappbot-sdk" 2>/dev/null | grep -c "PAYPAL_CLIENT_ID" || echo 0)
+PP_SEC=$(gh secret list --repo "kiexpert/wkappbot-sdk" 2>/dev/null | grep -c "PAYPAL_CLIENT_SECRET" || echo 0)
+[ "$PP_ID" -ge 1 ] && echo "  ✅ PAYPAL_CLIENT_ID" || { echo "  ❌ PAYPAL_CLIENT_ID missing"; FAIL=$((FAIL+1)); }
+[ "$PP_SEC" -ge 1 ] && echo "  ✅ PAYPAL_CLIENT_SECRET" || { echo "  ❌ PAYPAL_CLIENT_SECRET missing"; FAIL=$((FAIL+1)); }
+echo ""
+
+# X6. All repos git status — uncommitted changes check
+echo "### X6. Git Status — All Repos"
+for REPO_DIR in "D:/GitHub/wkappbot-sdk" "D:/GitHub/WKAppBot" "D:/GitHub/bitwisdomk" "D:/GitHub/WkAutoQuant"; do
+  RNAME=$(basename "$REPO_DIR")
+  DIRTY=$(git -C "$REPO_DIR" status --short 2>/dev/null | grep -v "^??" | wc -l || echo "?")
+  UNTRACK=$(git -C "$REPO_DIR" status --short 2>/dev/null | grep "^??" | wc -l || echo "?")
+  BRANCH=$(git -C "$REPO_DIR" branch --show-current 2>/dev/null || echo "?")
+  AHEAD=$(git -C "$REPO_DIR" rev-list @{u}..HEAD --count 2>/dev/null || echo "0")
+  if [ "${DIRTY:-0}" -gt 0 ]; then
+    echo "  ❌ $RNAME — ${DIRTY} modified, ${UNTRACK} untracked (branch: $BRANCH)"
+    FAIL=$((FAIL+1))
+  elif [ "${AHEAD:-0}" -gt 0 ]; then
+    echo "  ⚠️  $RNAME — ${AHEAD} commits not pushed (branch: $BRANCH)"
+  else
+    echo "  ✅ $RNAME — clean (branch: $BRANCH, untracked: ${UNTRACK})"
+  fi
+done
+echo ""
+
+# X7. All repos CI — ALL workflows last 10 runs, flag any persistent failures
+echo "### X7. CI Deep Check — All Repos"
+for REPO_X in "kiexpert/wkappbot-sdk" "kiexpert/WKAppBot" "kiexpert/WkAutoQuant"; do
+  echo "  #### $REPO_X"
+  gh run list --repo "$REPO_X" --limit 20 --json workflowName,conclusion 2>/dev/null \
+    | python3 -c "
+import sys,json,collections
+runs=json.load(sys.stdin)
+wf_results=collections.defaultdict(list)
+for r in runs:
+    wf=r.get('workflowName','?')
+    if wf.startswith('.github/'): continue
+    wf_results[wf].append(r['conclusion'])
+for wf,results in sorted(wf_results.items()):
+    last=results[0]; fails=sum(1 for r in results if r=='failure')
+    icon='✅' if last=='success' else ('⏳' if last in ('in_progress','queued') else '❌')
+    streak=' ⚠️ RECURRING FAILURE' if fails>=2 else ''
+    print(f'    {icon} {wf[:50]:50s} last={last} fail={fails}{streak}')
+" 2>/dev/null || echo "    (no data)"
+done
+echo ""
+
+# X8. README broken tag check — video tags, wrong URLs
+echo "### X8. README Integrity Check"
+for README in "D:/GitHub/wkappbot-sdk/README.md" "D:/GitHub/WKAppBot/README.md" "D:/GitHub/bitwisdomk/docs/index.html"; do
+  RNAME=$(basename "$(dirname "$README")")/$(basename "$README")
+  # Check for <video> tags (don't render on GitHub)
+  VID=$(grep -c "<video" "$README" 2>/dev/null || echo 0)
+  # Check for dead image references (local paths that don't exist)
+  BAD_IMGS=$(grep -oE '!\[[^]]*\]\(([^)]+)\)' "$README" 2>/dev/null \
+    | grep -oE '\(([^)]+)\)' | tr -d '()' \
+    | grep -v '^http' \
+    | while read -r p; do
+        FULL="$(dirname "$README")/$p"
+        [ ! -f "$FULL" ] && echo "$p"
+      done | wc -l 2>/dev/null || echo 0)
+  STATUS="✅"
+  MSG=""
+  [ "${VID:-0}" -gt 0 ] && { STATUS="❌"; MSG="$MSG <video> tag found (won't render on GitHub);"; FAIL=$((FAIL+1)); }
+  [ "${BAD_IMGS:-0}" -gt 0 ] && { STATUS="⚠️"; MSG="$MSG ${BAD_IMGS} broken image ref(s);"; }
+  echo "  $STATUS $RNAME${MSG:+ — $MSG}"
+done
+echo ""
+
+# X9. GitHub Actions — sponsor-license.yml push trigger guard
+echo "### X9. Workflow Config Sanity"
+if grep -q "^  push:" "$SDK_DIR/.github/workflows/sponsor-license.yml" 2>/dev/null; then
+  echo "  ❌ sponsor-license.yml has 'push:' trigger — causes false failures on every push"
+  FAIL=$((FAIL+1))
+else
+  echo "  ✅ sponsor-license.yml trigger clean"
+fi
+# Check for workflows with if: != 'push' guard mismatches
+echo ""
+
+# X10. WkAutoQuant daemon alive
+echo "### X10. WkAutoQuant Daemon"
+QUANT_PID=$(cat "D:/GitHub/WkAutoQuant/.wkappbot/daemon.pid" 2>/dev/null || echo "")
+if [ -n "$QUANT_PID" ] && kill -0 "$QUANT_PID" 2>/dev/null; then
+  echo "  ✅ WkAutoQuant daemon alive (PID=$QUANT_PID)"
+else
+  echo "  ⚠️  WkAutoQuant daemon not running (expected if market closed)"
+fi
+echo ""
+
 # ── SUMMARY ──────────────────────────────────────────────────────────
 echo "---"
 if [ "$FAIL" -eq 0 ]; then
