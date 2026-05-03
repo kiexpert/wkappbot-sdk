@@ -6,7 +6,7 @@
 
 ![WKAppBot Sudo License Demo](wkappbot-sudo-license-demo-preview.gif)
 
-> ▶ **[전체 영상 보기 →](https://bitwisdomk.github.io)**  ·  Sudo 라이선스로 이런 봇을 만들 수 있습니다
+> ▶ **[전체 영상 보기 →](https://bitwisdomk.github.io/bitwisdomk/)**  ·  Sudo 라이선스로 이런 봇을 만들 수 있습니다
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
