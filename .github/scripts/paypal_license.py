@@ -193,7 +193,8 @@ def main():
         note = info.get("transaction_note", "")
         amount_str = info.get("transaction_amount", {}).get("value", "0")
         amount = float(amount_str)
-        days = max(1, math.floor(amount * 30 / 100)) if amount > 0 else 0
+        MAX_DAYS_PER_GRANT = 180  # cap: prevent runaway stacking from large single payments
+        days = min(MAX_DAYS_PER_GRANT, max(1, math.floor(amount * 30 / 100))) if amount > 0 else 0
 
         if days <= 0:
             slack_notify(f"⚠️ PayPal tx {tid}: amount=${amount:.2f} yields 0 days — skipped")
