@@ -102,10 +102,15 @@ jobs:
       if: ${{ inputs.post_to_issue != '' }}
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        ISSUE_NUMBER: ${{ inputs.post_to_issue }}
+        REPO: ${{ github.repository }}
       run: |
-        gh issue comment ${{ inputs.post_to_issue }} \
-          --repo ${{ github.repository }} \
-          --body-file synthesis.md
+        # Validate issue number is numeric only (prevent shell injection)
+        if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+          echo "ERROR: post_to_issue must be a numeric issue number."
+          exit 1
+        fi
+        gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file synthesis.md
 
     - name: Write job summary
       run: |

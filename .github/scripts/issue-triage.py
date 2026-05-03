@@ -2,9 +2,12 @@
 """Issue auto-triage: Gemini (primary) → Groq (fallback)"""
 import os, json, urllib.request, subprocess, sys
 
-title  = os.environ.get("ISSUE_TITLE", "")
-body   = os.environ.get("ISSUE_BODY", "")
+title  = os.environ.get("ISSUE_TITLE", "")[:200]   # truncate: limit prompt injection surface
+body   = os.environ.get("ISSUE_BODY",  "")[:1000]  # truncate: limit prompt injection surface
 number = os.environ.get("ISSUE_NUMBER", "")
+if not number.isdigit():                            # validate: prevent shell arg injection
+    print(f"Invalid ISSUE_NUMBER: {number!r} — skipping")
+    sys.exit(0)
 gemini = os.environ.get("GEMINI_API_KEY", "")
 groq   = os.environ.get("GROQ_API_KEY", "")
 
