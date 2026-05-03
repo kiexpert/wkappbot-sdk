@@ -36,3 +36,4 @@ jobs:
           TEST_USER: ${{ inputs.test_user }}
           TEST_AMOUNT: ${{ inputs.test_amount }}
         run: python3 .github/scripts/paypal_license.py
+# test
