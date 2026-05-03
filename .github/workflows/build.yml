@@ -49,7 +49,11 @@ jobs:
           "changed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           exit 0
         }
-        $files   = git diff --name-only $before $after
+        # Fetch $before if not present (e.g. Dependabot branches)
+        if (-not (git cat-file -e "${before}^{commit}" 2>$null; $?)) {
+          git fetch origin $before 2>$null
+        }
+        $files   = git diff --name-only $before $after 2>$null
         $changed = @($files | Where-Object {
           $_ -match '^(csharp/|handlers/|skills/|scripts/smoke-help\.ps1|\.github/workflows/build\.yml$)'
         })

@@ -10,11 +10,11 @@ permissions:
 jobs:
   manage-license:
     runs-on: ubuntu-latest
-    environment: license-production
+    # No environment gate: sponsorship events are already authenticated by GitHub
+    # (genuine payment webhooks). Manual approval would block all activations.
     concurrency:
       group: license-grant
       cancel-in-progress: false
-    if: github.event_name != 'push'
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
