@@ -62,9 +62,11 @@ def tier_from_amount(amount: float) -> str:
     return "cdp"  # covers both >= 73 and small one-time
 
 
+MAX_DAYS_PER_GRANT = 180  # cap: prevent runaway stacking from large single payments
+
 def calc_days(amount: float, license_type: str) -> int:
     if license_type == "one_time":
-        return math.floor(amount * 30 / 100)
+        return min(MAX_DAYS_PER_GRANT, math.floor(amount * 30 / 100))
     return 30  # monthly flat
 
 

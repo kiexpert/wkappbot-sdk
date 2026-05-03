@@ -5,6 +5,9 @@ on:
     - cron: '0 2,10 * * *'   # 11:00 KST / 19:00 KST (UTC+9)
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   prefetch:
     runs-on: ubuntu-latest

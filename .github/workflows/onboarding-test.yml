@@ -5,6 +5,9 @@ on:
   schedule:
     - cron: '0 9 * * 1'  # Monday 9am UTC
 
+permissions:
+  contents: read
+
 jobs:
   onboarding-test:
     runs-on: windows-latest

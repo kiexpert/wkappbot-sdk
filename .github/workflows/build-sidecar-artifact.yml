@@ -10,6 +10,9 @@ on:
       - '.github/workflows/build-sidecar-artifact.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   smoke_sidecar:
     runs-on: windows-latest
