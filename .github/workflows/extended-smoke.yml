@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 15      # hard cap -- 188 tests should finish in ~5 min
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       with:
         fetch-depth: 0
 
@@ -56,13 +56,13 @@ jobs:
 
     - name: Setup .NET (only if building)
       if: ${{ steps.dl_artifact.outputs.found != 'true' }}
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
       with:
         dotnet-version: 8.0.x
 
     - name: Restore NuGet cache (only if building)
       if: ${{ steps.dl_artifact.outputs.found != 'true' }}
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: |
           ~/.nuget/packages

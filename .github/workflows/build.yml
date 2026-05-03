@@ -32,7 +32,7 @@ jobs:
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       with:
         fetch-depth: 0
     - name: Detect changes
@@ -61,17 +61,17 @@ jobs:
     if: ${{ needs.detect.outputs.changed == 'true' }}
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       with:
         fetch-depth: 0  # full history needed for git pickaxe patch version counting
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
       with:
         dotnet-version: 8.0.x
 
     - name: Restore NuGet cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: |
           ~/.nuget/packages
@@ -81,7 +81,7 @@ jobs:
           ${{ runner.os }}-nuget-
 
     - name: Restore build cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: |
           bin
@@ -93,7 +93,7 @@ jobs:
 
     - name: Restore build state
       id: restore_state
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: .ci-state/build
         key: ${{ runner.os }}-sdk-build-state-${{ github.run_id }}
@@ -201,7 +201,7 @@ jobs:
 
     - name: Save build cache
       if: ${{ always() }}
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: |
           bin
@@ -210,14 +210,14 @@ jobs:
 
     - name: Save build state
       if: ${{ always() }}
-      uses: actions/cache/save@v5
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: .ci-state/build
         key: ${{ runner.os }}-sdk-build-state-${{ github.run_id }}
 
     - name: Upload bin artifact
       if: ${{ always() }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
       with:
         name: wkappbot-bin-${{ github.run_id }}
         path: |
@@ -234,17 +234,17 @@ jobs:
     permissions:
       contents: write
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       with:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
       with:
         dotnet-version: 8.0.x
 
     - name: Restore cached bin
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: bin
         key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
@@ -254,7 +254,7 @@ jobs:
 
     - name: Download bin artifact
       if: ${{ needs.build.result == 'success' }}
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
       with:
         name: wkappbot-bin-${{ github.run_id }}
         path: bin

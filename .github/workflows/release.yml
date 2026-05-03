@@ -29,7 +29,7 @@ jobs:
         fetch-depth: 0
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
       with:
         dotnet-version: 8.0.x
 
@@ -49,7 +49,7 @@ jobs:
 
     # ── Build ──────────────────────────────────────────────────────────────────
     - name: Restore NuGet cache
-      uses: actions/cache/restore@v5
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5
       with:
         path: |
           ~/.nuget/packages

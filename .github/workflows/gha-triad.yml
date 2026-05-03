@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
     - name: Call ${{ matrix.ai }} (thesis)
       env:
@@ -33,7 +33,7 @@ jobs:
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
       run: python3 scripts/triad_gha.py thesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
       with:
         name: r1-${{ matrix.ai }}
         path: r1-${{ matrix.ai }}.txt
@@ -49,9 +49,9 @@ jobs:
       fail-fast: false
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
       with:
         pattern: r1-*
         merge-multiple: true
@@ -64,7 +64,7 @@ jobs:
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
       run: python3 scripts/triad_gha.py antithesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
       with:
         name: r2-${{ matrix.ai }}
         path: r2-${{ matrix.ai }}.txt
@@ -79,9 +79,9 @@ jobs:
       issues: write
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
       with:
         pattern: 'r[12]-*'
         merge-multiple: true
@@ -93,7 +93,7 @@ jobs:
         GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
       run: python3 scripts/triad_gha.py synthesis "$QUESTION"
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
       with:
         name: triad-synthesis
         path: synthesis.md
