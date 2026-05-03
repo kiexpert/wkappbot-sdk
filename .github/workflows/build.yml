@@ -10,9 +10,25 @@ on:
       - '.github/workflows/build.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Restrict manual dispatch to admin
+        run: |
+          if [ "${{ github.actor }}" != "kiexpert" ]; then
+            echo "ERROR: Manual build dispatch is restricted to repo admin only."
+            exit 1
+          fi
+
   detect:
     runs-on: windows-latest
+    needs: [guard]
+    if: always() && (needs.guard.result == 'success' || needs.guard.result == 'skipped')
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
     steps:

@@ -13,6 +13,8 @@ on:
       - '.github/workflows/admin-history-cleanup.yml'
       - '.github/workflows/license-cleanup.yml'
       - '.github/workflows/member-joined.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/build.yml'
       - 'PRICING.md'
       - 'SUBSCRIBE.md'
 
