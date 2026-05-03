@@ -17,3 +17,9 @@ jobs:
 
       - name: Validate skill structure
         run: python3 .github/scripts/validate_skills.py
+
+      - name: Notify skill author via pending_prompts
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GH_LICENSE_TOKEN }}
+        run: python3 .github/scripts/notify_skill_author.py
