@@ -1,0 +1,46 @@
+{
+  "id": "reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works",
+  "app": "wkappbot-core",
+  "title": "reddit flair modal Add button: UIA-invisible, CDP trusted click fails, only physical click works",
+  "title_ko": null,
+  "desc": "Reddit flair modal dialog buttons (Add, Cancel) are NOT exposed in UIA tree. Only the X-close button appears as UIA Button. a11y click falls back to WM_LBUTTON PostMessage which Chrome modal ignores. CDP eval-js querySelector click also fails (isTrusted=false). Only SendInput physical click works. Workaround: select radio via UIA (aid=post-flair-radio-input-N), then user clicks Add manually. X-button UIA pos offset to Add button: approx -3px X, \u002B418px Y.",
+  "steps": [
+    "1. a11y find shows only X-close button (32x33px) as UIA Button in modal -- Add and Cancel buttons missing from UIA tree",
+    "2. a11y click grap fails -- fallback to WM_LBUTTON PostMessage which Chrome modal ignores (NeedsPhysicalClick)",
+    "3. CDP eval-js querySelector click fires but isTrusted=false -- React modal ignores it",
+    "4. Select flair radio via: wkappbot a11y invoke grap#Rad_post-flair-radio-input-1",
+    "5. User must physically click Add -- or use screen coords: X-button UIA pos \u002B (0, \u002B418) approx",
+    "6. Bug filed suggest ts=1777661314.941499 -- fix = CDP Input.dispatchMouseEvent or --cdp-xy flag"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find {hwnd:CHROME,domain:\u0027www.reddit.com\u0027} --all",
+      "expect": "only But X-close (32x33) visible; Add and Cancel absent from output",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y invoke {hwnd:CHROME,domain:\u0027www.reddit.com\u0027}#Rad_post-flair-radio-input-1",
+      "expect": "[A11Y] Done: 1 ok -- radio selected",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y click {hwnd:CHROME,domain:\u0027www.reddit.com\u0027}#But*Add*",
+      "expect": "[A11Y] Done: 0 ok 1 fail -- physical click required",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "reddit",
+    "chrome",
+    "modal",
+    "uia",
+    "flair"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T18:54:28.190449Z",
+  "updated": "2026-05-01T18:54:28.190458Z",
+  "version": "1.0"
+}

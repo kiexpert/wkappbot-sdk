@@ -1,0 +1,53 @@
+{
+  "id": "paypal-developer-cdp-login",
+  "app": "paypal-developer",
+  "title": "PayPal Developer Dashboard CDP Login and App Creation",
+  "title_ko": null,
+  "desc": "CDP automation for developer.paypal.com. Key lessons: login field interaction rules, Live/Sandbox switching, Create App with Transaction Search permission for paypal_license.py.",
+  "steps": [
+    "NEVER touch password/email fields via CDP -- clears browser autofill silently, login fails",
+    "NEVER use title-based grap on Korean PayPal page -- encoding corruption in grap pattern",
+    "Best login: wkappbot a11y invoke \u0027{hwnd:CHROME_HWND,domain:www.paypal.com}#But_btnLogin\u0027 when autofill already filled",
+    "Switch Live/Sandbox: JS click -- Array.from(document.querySelectorAll(\u0027button\u0027)).find(b=\u003Eb.textContent.trim()===\u0027Live\u0027).click()",
+    "Create App: Merchant type, enable Transaction Search permission (required for Transactions API)",
+    "Live creds: developer.paypal.com/dashboard/applications/live -- requires Business account",
+    "Store as GitHub Secrets: PAYPAL_CLIENT_ID \u002B PAYPAL_CLIENT_SECRET on wkappbot-sdk repo",
+    "sandbox vs live: URL shows /sandbox even after clicking Live -- use direct navigation location.href=\u0027https://developer.paypal.com/dashboard/applications/live\u0027 to force switch|Live credentials require PayPal Business account -- \u0027Upgrade your account to PayPal for Business to view live credentials\u0027 shown in yellow banner if still on personal account",
+    "sandbox vs live: URL shows /sandbox even after clicking Live -- use direct navigation location.href=\u0027https://developer.paypal.com/dashboard/applications/live\u0027 to force switch|Live credentials require PayPal Business account -- \u0027Upgrade your account to PayPal for Business to view live credentials\u0027 shown in yellow banner if still on personal account",
+    "Private repo NOT needed for license system -- collaborator goes to kiexpert/wkappbot-sdk (matches LicenseManager.cs). PayPal state.json stored in wkappbot-sdk/.github/paypal_state.json. Audit trail = GitHub invite history \u002B Slack notifications, no metadata files needed.",
+    "Private repo NOT needed for license system -- collaborator goes to kiexpert/wkappbot-sdk (matches LicenseManager.cs). PayPal state.json stored in wkappbot-sdk/.github/paypal_state.json. Audit trail = GitHub invite history \u002B Slack notifications, no metadata files needed.",
+    "Cookie consent popup \u002B 2FA Next button: both block CDP synthetic events (dispatchEvent, .click(), PostMessage). 2FA page uses React synthetic events. Only physical mouse click works. Workaround: user must manually click Next \u002B enter OTP. Then take over after login for credential extraction. Document this so automation starts AFTER 2FA completion.",
+    "Cookie consent popup: blocks UIA find (no buttons visible) and synthetic dispatchEvent. Only physical click works -- move window on-screen first: wkappbot win-move then physical mouse click at (X=558, Y=468) for accept button. PostMessage and CDP dispatchEvent both blocked by PayPal popup."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick | grep -c ctx",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list | grep -c id",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows | grep -c TARGETS",
+      "expect": "1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "paypal",
+    "cdp",
+    "developer",
+    "login",
+    "api-credentials"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T05:19:06.0274082Z",
+  "updated": "2026-05-02T09:04:36.5206038Z",
+  "version": "1.8"
+}
