@@ -152,13 +152,13 @@ for REPO_X in "kiexpert/wkappbot-sdk" "kiexpert/WKAppBot" "kiexpert/WkAutoQuant"
 done
 echo ""
 
-# X2. GitHub Pages reachability (bitwisdomk landing page)
+# X2. GitHub Pages reachability (SDK landing page)
 echo "### X2. GitHub Pages"
-HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://bitwisdomk.github.io/bitwisdomk/" 2>/dev/null || echo "?")
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://kiexpert.github.io/wkappbot-sdk/landing.html" 2>/dev/null || echo "?")
 if [ "$HTTP" = "200" ]; then
-  echo "  ✅ bitwisdomk.github.io/bitwisdomk/ → ${HTTP}"
+  echo "  ✅ kiexpert.github.io/wkappbot-sdk/landing.html → ${HTTP}"
 else
-  echo "  ❌ bitwisdomk.github.io/bitwisdomk/ → ${HTTP}"
+  echo "  ❌ kiexpert.github.io/wkappbot-sdk/landing.html → ${HTTP}"
   FAIL=$((FAIL+1))
 fi
 # wkappbot-sdk Pages

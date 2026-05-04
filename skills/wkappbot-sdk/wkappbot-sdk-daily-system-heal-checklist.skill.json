@@ -7,11 +7,11 @@
   "steps": [
     "1. Run: bash \u0027D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh\u0027",
     "2. Read output -- each section has check or cross icon",
-    "3. Heal any cross items: E=newchat if ctx over 80%, C=rerun or fix failing CI, S=re-register 4 briefing schedules if count under 4, G=commit untracked changes, L=check license enforcer workflow, P=confirm or resolve pending suggests",
-    "4. Re-run script to verify all checks pass",
-    "5. Slack send heal summary",
-    "X. Cross-Repo Audit: X1=all repos CI status (SDK/WKAppBot/WkAutoQuant/bitwisdomk), X2=GitHub Pages HTTP 200 check, X3=README media files exist, X4=latest release tags, X5=PayPal secrets present",
-    "X. Cross-Repo Audit: X1=all repos CI status (SDK/WKAppBot/WkAutoQuant/bitwisdomk), X2=GitHub Pages HTTP 200 check, X3=README media files exist, X4=latest release tags, X5=PayPal secrets present",
+    "C (CI heal loop): When any CI failures exist, enter a fix loop using Claude Code /loop or autonomous repeat until all non-infra failures are resolved. Rules: (1) NEVER ask the user -- make the best autonomous choice. (2) For each failing workflow: gh run view --log-failed to read error, identify root cause, fix code/workflow, commit with UTF8NoBOM message, push. (3) Loop: after each push wait ~60s then re-check gh run list. Repeat until all fixable failures pass. (4) Known infra-only failures to SKIP (not block): core-* binary missing (needs private CORE_REPO release), sponsor-license.yml sponsorship event (needs GitHub Sponsors account). (5) Track fixed vs skipped in a summary. (6) If stuck on same error after 2 attempts, file a suggest and move on.",
+    "4. Re-run heal script to verify all checks pass. If any check is still failing: do NOT stop -- make the best autonomous choice. For CI failures: enter fix loop (see step 3). For auth/interactive blockers: call ScheduleWakeup(60s) with same prompt for one-shot retry. NEVER wait silently for user input.",
+    "5. Workflow name audit (add to weekly check): run \u0027Get-ChildItem .github/workflows/*.yml | ForEach-Object { (Get-Content .FullName | Select-String \u0022 ^name:\\)",
+    "6. Slack send heal summary. LOOP RULE: this entire checklist MUST run as a /loop until all non-infra issues are resolved. Use ScheduleWakeup(120s) after each push/fix to recheck. Known infra-skip (never loop on these): core-* binary missing (needs private CORE_REPO release), sponsor-license sponsorship event (needs GitHub Sponsors). Exit loop only when latest commit\u0027s runs show no fixable failures.",
+    "7. Landing page consistency check (kiexpert.github.io/wkappbot-sdk/landing.html): (a) Use wkappbot a11y read to read pricing section -- compare with PRICING.md and SUBSCRIBE.md. Verify CDP price, Sudo price, and Trial tier match. (b) Check landing page link in README.md points to correct URL. (c) Check docs/public/landing.html matches landing page if SDK serves its own. Fix any price or content drift before release.",
     "X10: WkAutoQuant daemon alive check",
     "X10: WkAutoQuant daemon alive check"
   ],
@@ -45,6 +45,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T05:15:48.8437073Z",
-  "updated": "2026-05-03T12:27:20.4249208Z",
-  "version": "1.4"
+  "updated": "2026-05-04T05:15:30.5891687Z",
+  "version": "1.14"
 }

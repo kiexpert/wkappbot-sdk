@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WKAppBot — Windows UI Automation</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0e0e12;
+      --card: #1a1a20;
+      --border: rgba(255,255,255,.08);
+      --red: #f55;
+      --red-dim: rgba(255,80,80,.15);
+      --text: #e0e0e0;
+      --muted: #888;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(14,14,18,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-weight: 800; font-size: 17px; letter-spacing: -.3px; }
+    .logo span { color: var(--red); }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; transition: color .15s; }
+    nav a:hover { color: #fff; }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-cta {
+      background: var(--red); color: #fff !important;
+      padding: 7px 18px; border-radius: 7px; font-weight: 600;
+    }
+    .nav-cta:hover { opacity: .85; }
+
+    /* HERO */
+    .hero {
+      text-align: center;
+      padding: 100px 24px 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,60,60,.12) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: var(--red-dim); color: var(--red);
+      border: 1px solid rgba(255,80,80,.3);
+      border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase; margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: clamp(36px, 6vw, 64px);
+      font-weight: 800; letter-spacing: -1.5px;
+      line-height: 1.1; margin-bottom: 20px;
+    }
+    .hero h1 em { color: var(--red); font-style: normal; }
+    .hero p {
+      font-size: 18px; color: var(--muted); max-width: 540px;
+      margin: 0 auto 40px;
+    }
+    .hero-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary {
+      background: var(--red); color: #fff;
+      padding: 13px 28px; border-radius: 9px;
+      font-size: 15px; font-weight: 700; text-decoration: none;
+      box-shadow: 0 4px 20px rgba(255,60,60,.35);
+      transition: opacity .15s;
+    }
+    .btn-primary:hover { opacity: .85; }
+    .btn-secondary {
+      background: var(--card); color: var(--text);
+      border: 1px solid var(--border);
+      padding: 13px 28px; border-radius: 9px;
+      font-size: 15px; font-weight: 600; text-decoration: none;
+      transition: border-color .15s;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,.25); }
+
+    /* FEATURES */
+    section { padding: 80px 24px; max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      text-align: center; color: var(--red); font-size: 12px;
+      font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      text-align: center; font-size: clamp(26px, 4vw, 40px);
+      font-weight: 800; letter-spacing: -.5px; margin-bottom: 48px;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 28px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feature-card:hover { border-color: rgba(255,80,80,.3); transform: translateY(-3px); }
+    .feature-icon { font-size: 28px; margin-bottom: 14px; }
+    .feature-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .feature-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+    /* PRICING */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px; align-items: start;
+    }
+    .pricing-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; position: relative;
+    }
+    .pricing-card.featured {
+      border-color: var(--red);
+      box-shadow: 0 0 0 1px var(--red), 0 8px 32px rgba(255,60,60,.2);
+    }
+    .pricing-badge {
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--red); color: #fff;
+      font-size: 11px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; padding: 4px 14px; border-radius: 20px;
+    }
+    .pricing-tier { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+    .pricing-price { font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 4px; }
+    .pricing-price span { font-size: 16px; font-weight: 500; color: var(--muted); }
+    .pricing-desc { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+    .pricing-features { list-style: none; margin-bottom: 28px; }
+    .pricing-features li {
+      font-size: 14px; padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .pricing-features li:last-child { border-bottom: none; }
+    .check { color: #4caf50; font-size: 13px; }
+    .cross { color: var(--muted); font-size: 13px; }
+    .pricing-btn {
+      display: block; width: 100%; text-align: center;
+      padding: 12px; border-radius: 9px; font-size: 14px;
+      font-weight: 700; text-decoration: none; transition: opacity .15s;
+    }
+    .pricing-btn.primary { background: var(--red); color: #fff; }
+    .pricing-btn.secondary {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .pricing-btn:hover { opacity: .8; }
+
+    /* HOW TO */
+    .steps { display: flex; flex-direction: column; gap: 0; max-width: 600px; margin: 0 auto; }
+    .step { display: flex; gap: 20px; padding: 24px 0; border-bottom: 1px solid var(--border); }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--red-dim); color: var(--red);
+      font-weight: 800; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .step h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .step p { font-size: 14px; color: var(--muted); }
+    code {
+      background: rgba(255,255,255,.07); border-radius: 4px;
+      padding: 2px 7px; font-size: 13px; font-family: monospace;
+    }
+    .pay-method {
+      background: rgba(255,255,255,.03); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px; margin-top: 10px;
+    }
+    .pay-method strong { color: var(--text); }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 24px; text-align: center;
+      font-size: 13px; color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: #fff; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">WK<span>App</span>Bot</div>
+  <div class="nav-links">
+    <a href="https://github.com/kiexpert/wkappbot-sdk">GitHub</a>
+    <a href="https://kiexpert.github.io/wkappbot-sdk/guide/">Docs</a>
+    <a href="#pricing" class="nav-cta">라이선스 구매</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Windows UI Automation Framework</div>
+  <h1>앱을 <em>자동화</em>하는<br>가장 강력한 방법</h1>
+  <p>UIA · Win32 · CDP · OCR 5단계 폴백으로 어떤 Windows 앱도 자동화합니다.</p>
+  <div class="hero-btns">
+    <a href="#pricing" class="btn-primary">🛒 라이선스 구매</a>
+    <a href="https://github.com/kiexpert/wkappbot-sdk" class="btn-secondary">⭐ GitHub</a>
+  </div>
+</div>
+
+<!-- DEMO VIDEO -->
+<section id="demo" style="text-align:center; padding: 60px 24px;">
+  <div class="section-label">Live Demo</div>
+  <h2 class="section-title" style="margin-bottom:12px;">이런 걸 만들 수 있어요</h2>
+  <p style="color:var(--muted); margin-bottom:32px; font-size:15px;">
+    WKAppBot SDK로 구축한 실전 AI 트레이딩 봇 — 수동 클릭 없이 완전 자동화
+  </p>
+  <div style="max-width:860px; margin:0 auto; border-radius:14px; overflow:hidden;
+              border:1px solid var(--border); box-shadow:0 0 60px rgba(255,80,80,.12);">
+    <video controls autoplay muted loop playsinline
+           style="width:100%; display:block; background:#000;">
+      <source src="wkappbot-sudo-license-demo.mp4" type="video/mp4">
+    </video>
+  </div>
+  <p style="margin-top:24px; color:var(--muted); font-size:14px;">
+    💡 <strong style="color:var(--text);">Sudo 라이선스</strong>를 구매하면 당신도 이런 봇을 직접 만들 수 있어요
+    &nbsp;·&nbsp;
+    <a href="#pricing" style="color:var(--red); text-decoration:none;">라이선스 보기 →</a>
+  </p>
+
+  <!-- Screenshot strip -->
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; max-width:960px; margin:40px auto 0;">
+    <div style="border-radius:10px; overflow:hidden; border:1px solid var(--border);">
+      <img src="screenshots/wkappbot-sudo-demo-pin-entry.jpg" style="width:100%; display:block;">
+      <div style="padding:10px 14px; font-size:12px; color:var(--muted);">🔐 보안 PIN 자동 입력</div>
+    </div>
+    <div style="border-radius:10px; overflow:hidden; border:1px solid var(--border);">
+      <img src="screenshots/wkappbot-sudo-demo-all-ready.jpg" style="width:100%; display:block;">
+      <div style="padding:10px 14px; font-size:12px; color:var(--muted);">📊 전체 시스템 자동 준비</div>
+    </div>
+    <div style="border-radius:10px; overflow:hidden; border:1px solid var(--border);">
+      <img src="screenshots/wkappbot-sudo-demo-portfolio.jpg" style="width:100%; display:block;">
+      <div style="padding:10px 14px; font-size:12px; color:var(--muted);">🤖 22종목 AI 자동 분석</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section>
+  <div class="section-label">Features</div>
+  <h2 class="section-title">왜 WKAppBot인가?</h2>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🔍</div>
+      <h3>5단계 요소 탐색</h3>
+      <p>UIA → Vision Cache → OCR → Vision API → 좌표 방식으로 어떤 UI도 찾아냅니다.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌐</div>
+      <h3>CDP 브라우저 자동화</h3>
+      <p>Chrome DevTools Protocol로 JavaScript 렌더링 페이지도 완벽하게 제어합니다.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>관리자 권한 자동화</h3>
+      <p>--sudo 옵션으로 UAC 승격 없이 HTS · 증권사 등 관리자 앱을 자동화합니다.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎙️</div>
+      <h3>WhisperRing 음성 입력</h3>
+      <p>실시간 음성 인식으로 모든 앱에 포커스리스 텍스트 입력을 지원합니다.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>AI 통합</h3>
+      <p>GPT · Gemini · Claude 3-way triad 분석으로 복잡한 자동화 판단을 AI에게 위임합니다.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Eye 데몬</h3>
+      <p>항상 실행 중인 Eye 프로세스로 명령 실행 지연 없이 즉시 자동화를 수행합니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title">심플한 요금제</h2>
+  <div class="pricing-grid">
+
+    <!-- Free -->
+    <div class="pricing-card">
+      <div class="pricing-tier">FREE</div>
+      <div class="pricing-price">₩0</div>
+      <div class="pricing-desc">기본 기능으로 시작해보세요</div>
+      <ul class="pricing-features">
+        <li><span class="check">✓</span> a11y UI 자동화</li>
+        <li><span class="check">✓</span> 스킬 시스템</li>
+        <li><span class="check">✓</span> Eye 데몬</li>
+        <li><span class="cross">✗</span> CDP 자동화</li>
+        <li><span class="cross">✗</span> --sudo 관리자 모드</li>
+        <li><span class="cross">✗</span> WhisperRing</li>
+      </ul>
+      <a href="https://github.com/kiexpert/wkappbot-sdk" class="pricing-btn secondary">GitHub에서 시작</a>
+    </div>
+
+    <!-- Trial -->
+    <div class="pricing-card">
+      <div class="pricing-tier">TRIAL</div>
+      <div class="pricing-price">₩10,000 <span>/ 2일</span></div>
+      <div class="pricing-desc">짧게 체험해보세요</div>
+      <ul class="pricing-features">
+        <li><span class="check">✓</span> Free 모든 기능</li>
+        <li><span class="check">✓</span> CDP 브라우저 자동화</li>
+        <li><span class="check">✓</span> --sudo 관리자 모드</li>
+        <li><span class="check">✓</span> 2일간 풀 액세스</li>
+        <li><span class="cross">✗</span> WhisperRing</li>
+      </ul>
+      <a href="#how-to-buy" class="pricing-btn secondary">체험 시작</a>
+    </div>
+
+    <!-- CDP -->
+    <div class="pricing-card featured">
+      <div class="pricing-badge">인기</div>
+      <div class="pricing-tier">CDP</div>
+      <div class="pricing-price">₩140,000 <span>/ 30일</span></div>
+      <div class="pricing-desc">브라우저 자동화가 필요한 개발자</div>
+      <ul class="pricing-features">
+        <li><span class="check">✓</span> Free 모든 기능</li>
+        <li><span class="check">✓</span> CDP 브라우저 자동화</li>
+        <li><span class="check">✓</span> GitHub collaborator 배지</li>
+        <li><span class="check">✓</span> 우선 기술 지원</li>
+        <li><span class="cross">✗</span> --sudo 관리자 모드</li>
+        <li><span class="cross">✗</span> WhisperRing</li>
+      </ul>
+      <a href="#how-to-buy" class="pricing-btn primary">구매하기</a>
+    </div>
+
+    <!-- Sudo -->
+    <div class="pricing-card">
+      <div class="pricing-tier">SUDO</div>
+      <div class="pricing-price">₩500,000 <span>/ 108일</span></div>
+      <div class="pricing-desc">HTS · 증권사 앱 자동화 전문가</div>
+      <ul class="pricing-features">
+        <li><span class="check">✓</span> CDP 모든 기능</li>
+        <li><span class="check">✓</span> --sudo 관리자 모드 무제한</li>
+        <li><span class="check">✓</span> HTS · 관리자 앱 자동화</li>
+        <li><span class="check">✓</span> 전용 기술 지원</li>
+        <li><span class="cross">✗</span> WhisperRing</li>
+      </ul>
+      <a href="#how-to-buy" class="pricing-btn primary">구매하기</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- HOW TO BUY -->
+<section id="how-to-buy">
+  <div class="section-label">How to Buy</div>
+  <h2 class="section-title">구매 방법</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <h4>GitHub 계정 준비</h4>
+        <p>WKAppBot 라이선스는 GitHub 계정으로 관리됩니다. <a href="https://github.com" style="color:var(--red)">github.com</a>에서 계정을 만드세요.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <h4>입금</h4>
+        <p>아래 결제 수단 중 편한 방법을 선택하세요. <strong>입금 메모 / 입금자명에는 반드시 GitHub ID</strong>를 적어주세요.</p>
+        <div class="pay-method">
+          <strong>💳 PayPal</strong> (해외 · 카드 가능)<br>
+          <a href="https://paypal.me/kiexpert" style="color:var(--red); text-decoration:none;">paypal.me/kiexpert</a> · 메모: GitHub ID
+        </div>
+        <div class="pay-method">
+          <strong>🏦 KIS 한국투자증권 이체</strong> (국내)<br>
+          계좌: <code>43420089-01</code> 김기일 · 입금자명: GitHub ID
+        </div>
+        <div class="pay-method">
+          <strong>💖 GitHub Sponsors</strong> (월 구독)<br>
+          <a href="https://github.com/sponsors/kiexpert" style="color:var(--red); text-decoration:none;">github.com/sponsors/kiexpert</a>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <h4>자동 권한 부여</h4>
+        <p>입금 확인 후 <code>kiexpert/wkappbot-sdk</code> 레포에 collaborator로 초대됩니다. GitHub 알림을 확인하세요.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div>
+        <h4>gh CLI 인증 후 사용</h4>
+        <p><code>gh auth login</code> 으로 인증하면 WKAppBot이 자동으로 권한을 인식합니다.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p style="margin-bottom:8px">
+    <a href="https://github.com/kiexpert/wkappbot-sdk">GitHub</a> ·
+    <a href="https://github.com/kiexpert/wkappbot-sdk/issues">Issues</a> ·
+    <a href="https://kiexpert.github.io/wkappbot-sdk/guide/">Docs</a>
+  </p>
+  <p>© 2026 WKAppBot · Built by <a href="https://github.com/kiexpert">kiexpert</a></p>
+</footer>
+
+</body>
+</html>
