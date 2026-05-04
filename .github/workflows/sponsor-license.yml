@@ -1,13 +1,18 @@
 name: Sponsor License
 
 on:
-  sponsorship:
-    types: [created, tier_changed, cancelled, pending_cancellation]
   workflow_dispatch:
     inputs:
       sponsor_login:
-        description: "GitHub sponsor login (manual trigger)"
-        required: false
+        description: "GitHub sponsor login"
+        required: true
+      sponsor_amount:
+        description: "Monthly amount in USD"
+        required: true
+      event_action:
+        description: "Action: created / cancelled / tier_changed"
+        required: true
+        default: "created"
 
 permissions:
   contents: read
@@ -28,11 +33,11 @@ jobs:
         env:
           GH_LICENSE_TOKEN: ${{ secrets.GH_LICENSE_TOKEN }}
           SLACK_BOT_TOKEN:  ${{ secrets.SLACK_BOT_TOKEN }}
-          SPONSOR_LOGIN:    ${{ github.event.sponsorship.sponsor.login }}
-          SPONSOR_AMOUNT:   ${{ github.event.sponsorship.tier.monthly_price_in_dollars }}
-          TIER_NAME:        ${{ github.event.sponsorship.tier.name }}
-          IS_ONE_TIME:      ${{ github.event.sponsorship.tier.is_one_time }}
-          EVENT_ACTION:     ${{ github.event.action }}
+          SPONSOR_LOGIN:    ${{ github.event.inputs.sponsor_login }}
+          SPONSOR_AMOUNT:   ${{ github.event.inputs.sponsor_amount }}
+          TIER_NAME:        ""
+          IS_ONE_TIME:      "false"
+          EVENT_ACTION:     ${{ github.event.inputs.event_action }}
         run: |
           python3 .github/scripts/sponsor_license.py \
             --user  "$SPONSOR_LOGIN" \
