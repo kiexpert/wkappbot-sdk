@@ -1,0 +1,11 @@
+[allowlist]
+  description = "Historical commits from before C# source strip — secrets rotated"
+  commits = [
+    "48bea62771ce457903ae84bb4ae6ba4531ff1c03",
+    "139fba3a7ac8a745ef6be4e8dd398117ac4e5926",
+    "d649a64b00c425474e61b61993497c1086ac5b19",
+    "9249c69d51c25b6a605ce8a61b6c60f2eb887ea5",
+    "0b71760d815420d165c0c612282a579841fdcf74",
+    "d8fe6b72246c2ffcfaca881797c24a95711470db",
+    "9ec3a2d197f98ab55febdde484bc1db37e41f2f9",
+  ]

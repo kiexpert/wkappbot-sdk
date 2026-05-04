@@ -29,12 +29,12 @@ jobs:
         run: |
           # CI=true skips the Claude filter step in the script
           # Only raw data collection: HN Algolia + YouTube RSS
-          sed 's/python\.exe/python3/g' \
-            wkappbot/bin/wkappbot.hq/scripts/ai-news-prefetch.sh \
-            > /tmp/prefetch.sh
-          chmod +x /tmp/prefetch.sh
           cd wkappbot
-          CI=true bash /tmp/prefetch.sh
+          sed 's/python\.exe/python3/g' \
+            bin/wkappbot.hq/scripts/ai-news-prefetch.sh \
+            > bin/wkappbot.hq/scripts/prefetch-ci.sh
+          chmod +x bin/wkappbot.hq/scripts/prefetch-ci.sh
+          CI=true bash bin/wkappbot.hq/scripts/prefetch-ci.sh
 
       - name: Commit raw results
         run: |
