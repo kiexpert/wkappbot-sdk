@@ -154,11 +154,11 @@ echo ""
 
 # X2. GitHub Pages reachability (SDK landing page)
 echo "### X2. GitHub Pages"
-HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://kiexpert.github.io/wkappbot-sdk/landing.html" 2>/dev/null || echo "?")
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://kiexpert.github.io/wkappbot-sdk/" 2>/dev/null || echo "?")
 if [ "$HTTP" = "200" ]; then
-  echo "  ✅ kiexpert.github.io/wkappbot-sdk/landing.html → ${HTTP}"
+  echo "  ✅ kiexpert.github.io/wkappbot-sdk/ → ${HTTP}"
 else
-  echo "  ❌ kiexpert.github.io/wkappbot-sdk/landing.html → ${HTTP}"
+  echo "  ❌ kiexpert.github.io/wkappbot-sdk/ → ${HTTP}"
   FAIL=$((FAIL+1))
 fi
 # wkappbot-sdk Pages
