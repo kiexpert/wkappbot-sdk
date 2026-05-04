@@ -75,6 +75,14 @@
 - **Bandaid/workaround code (땜빵)** -- if you find yourself duplicating existing logic, adding local "; OR" splits, or wrapping a proper function with ad-hoc retry loops, STOP. Fix the shared function instead. Bandaids compound: future Claude/Codex sessions burn tokens untangling your workaround, then re-add their own on top. Rule of thumb: if the same concept exists elsewhere in the codebase, reuse it -- don't reinvent a narrower version.
 - **Stopping when blocked (FORBIDDEN)** -- NEVER halt and wait for the user when an error or blocker is hit. Always make the best autonomous choice. If genuinely stuck (auth prompt, interactive input, unresolvable conflict), call `ScheduleWakeup(delaySeconds: 60)` with the same task prompt so the next iteration retries. One-shot re-entry beats silent stall every time.
 
+### Loop / Autonomous Task Rule (MANDATORY)
+When asked to "run until done", "loop until clean", or given a recurring task:
+1. Use `/loop` or `ScheduleWakeup` -- never single-shot and stop.
+2. CI fix loop: `gh run list` → fix failures → push → `ScheduleWakeup(120s)` → repeat.
+3. Blockers: `ScheduleWakeup(60s)` with same prompt -- next iteration retries best choice.
+4. Infra-only failures (core-* binary, unregistered services): classify SKIP, declare done.
+5. Exit: all fixable failures resolved in latest commit's runs → stop, report summary.
+
 ---
 
 ## Overview
