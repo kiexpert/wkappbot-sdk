@@ -11,9 +11,9 @@
     "4. Re-run heal script to verify all checks pass. If any check is still failing: do NOT stop -- make the best autonomous choice. For CI failures: enter fix loop (see step 3). For auth/interactive blockers: call ScheduleWakeup(60s) with same prompt for one-shot retry. NEVER wait silently for user input.",
     "5. Workflow name audit (add to weekly check): run \u0027Get-ChildItem .github/workflows/*.yml | ForEach-Object { (Get-Content .FullName | Select-String \u0022 ^name:\\)",
     "6. Slack send heal summary. LOOP RULE: this entire checklist MUST run as a /loop until all non-infra issues are resolved. Use ScheduleWakeup(120s) after each push/fix to recheck. Known infra-skip (never loop on these): core-* binary missing (needs private CORE_REPO release), sponsor-license sponsorship event (needs GitHub Sponsors). Exit loop only when latest commit\u0027s runs show no fixable failures.",
-    "7. Landing page consistency check (kiexpert.github.io/wkappbot-sdk/landing.html): (a) Use wkappbot a11y read to read pricing section -- compare with PRICING.md and SUBSCRIBE.md. Verify CDP price, Sudo price, and Trial tier match. (b) Check landing page link in README.md points to correct URL. (c) Check docs/public/landing.html matches landing page if SDK serves its own. Fix any price or content drift before release.",
-    "X10: WkAutoQuant daemon alive check",
-    "X10: WkAutoQuant daemon alive check"
+    "7. Landing page consistency check (kiexpert.github.io/wkappbot-sdk/landing.html): (a) Use wkappbot a11y read to read pricing section -- compare with PRICING.md and SUBSCRIBE.md. Verify CDP price, Sudo price, and Trial tier match. (b) Check landing page link in README.md points to correct URL. (c) Check docs/public/landing.html matches latest pricing before release. Fix any price or content drift.",
+    "8. Repo root file audit: check root file count (target under 20 non-hidden files). Flag any: (a) build artifacts like *.log or build output txt, (b) accidental files with no extension or PS arg names, (c) zip/binary archives that belong in releases not root, (d) scripts that belong in scripts/, (e) media files that belong in docs/. Run: Get-ChildItem wkappbot-sdk root and count. File suggest for each, fix trivial ones immediately. Goal: README and standard GitHub files only at root.",
+    "9. POST-HEAL MONITORING LOOP (MANDATORY after all steps complete): Use /loop with ScheduleWakeup(300s) to run a side-effect and comprehensive check every 5 minutes. Each iteration checks: (a) gh run list -- any new CI failures since last check? (b) wkappbot process health -- zombie cores? (c) Eye alive? (d) Any new suggest auto-filed? Track a consecutive-clean counter. Rules: if any issue found: reset counter to 0, fix it, continue loop. If 3 consecutive iterations show NO new issues: declare heal complete, send Slack summary, stop loop. Counter resets on ANY finding. Exit condition: consecutiveClean \u003E= 3."
   ],
   "requirements": [
     {
@@ -45,6 +45,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T05:15:48.8437073Z",
-  "updated": "2026-05-04T05:15:30.5891687Z",
-  "version": "1.14"
+  "updated": "2026-05-04T05:57:58.1477516Z",
+  "version": "1.19"
 }

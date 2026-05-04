@@ -77,12 +77,15 @@ echo ""
 
 # ── S. SCHEDULE ───────────────────────────────────────────────────────
 echo "## S. News Briefing Schedule"
-PENDING_DIR="D:/GitHub/WKAppBot/bin/wkappbot.hq/.wkappbot/pending_prompts"
-REC=$(find "$PENDING_DIR" -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
+SCHED_TASKS=("WKAppBot_Briefing_1100" "WKAppBot_AI_News_1110" "WKAppBot_Briefing_1800" "WKAppBot_AI_News_1810")
+REC=0
+for task in "${SCHED_TASKS[@]}"; do
+  schtasks /query /tn "\\${task}" /fo LIST 2>/dev/null | grep -q "TaskName" && REC=$((REC+1))
+done
 if [ "$REC" -ge 4 ]; then
-  echo "  ✅ Recurring schedules: ${REC}개 (pending_prompts)"
+  echo "  ✅ Recurring schedules: ${REC}개/4개 (schtasks)"
 else
-  echo "  ❌ Recurring schedules: ${REC}개 — 4개 필요 (11:00/11:10/18:00/18:10)"
+  echo "  ❌ Recurring schedules: ${REC}개/4개 — WKAppBot_Briefing_1100/1800 + WKAppBot_AI_News_1110/1810 필요"
   FAIL=$((FAIL+1))
 fi
 echo ""
