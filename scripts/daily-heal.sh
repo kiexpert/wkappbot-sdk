@@ -177,7 +177,7 @@ echo ""
 # X3. README media files exist in wkappbot-sdk
 echo "### X3. README Media Assets (wkappbot-sdk)"
 SDK_DIR_CHECK="$SDK_DIR"
-for ASSET in "wkappbot-sudo-license-demo-preview.gif" "docs/wkappbot-sudo-license-demo.mp4" \
+for ASSET in "docs/wkappbot-sudo-license-demo-preview.gif" "docs/wkappbot-sudo-license-demo.mp4" \
              "docs/screenshots/wkappbot-sudo-demo-pin-entry.jpg" \
              "docs/screenshots/wkappbot-sudo-demo-all-ready.jpg" \
              "docs/screenshots/wkappbot-sudo-demo-portfolio.jpg"; do
