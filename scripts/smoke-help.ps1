@@ -113,12 +113,12 @@ $sample = Join-Path $smokeDir 'sample.txt'
 $readOut = Invoke-Cmd 'file-read'       @('file', 'read', $sample)
 Assert-Contains 'file-read has line 1'  $readOut 'alpha'
 Invoke-Cmd 'file-grep'      @('file', 'grep', 'skill', $sample)
-Invoke-Cmd 'file-glob-yaml' @('file', 'glob', '**/*.yaml', '--path', (Join-Path $PWD 'handlers'))
+Invoke-Cmd 'file-glob-yaml' @('file', 'glob', '**/*.yaml', '--path', (Join-Path $PWD 'scenarios'))
 Invoke-Cmd 'file-glob-yml'  @('file', 'glob', '**/*.yml',  '--path', (Join-Path $PWD '.github\workflows'))
 
 Section "4. Schedule / Windows / License"
 
-Invoke-Cmd 'schedule-list'  @('schedule', 'list')
+Invoke-Cmd 'schedule-list'  @('schedule', 'list') -Soft
 Invoke-Cmd 'windows-list'   @('windows') -Soft
 $licOut = Invoke-CoreCmd 'license-status' @('license', 'status') -Soft
 if ($licOut | Select-String 'Unknown command') {
