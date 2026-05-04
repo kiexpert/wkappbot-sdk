@@ -77,10 +77,10 @@ echo ""
 
 # ── S. SCHEDULE ───────────────────────────────────────────────────────
 echo "## S. News Briefing Schedule"
-SCHED_OUT=$(wkappbot schedule list 2>/dev/null || true)
-REC=$(echo "$SCHED_OUT" | grep -c "recurring" 2>/dev/null || echo 0)
+PENDING_DIR="D:/GitHub/WKAppBot/bin/wkappbot.hq/.wkappbot/pending_prompts"
+REC=$(find "$PENDING_DIR" -name "*.json" 2>/dev/null | wc -l | tr -d ' ')
 if [ "$REC" -ge 4 ]; then
-  echo "  ✅ Recurring schedules: ${REC}개 (11:00 prefetch/briefing, 18:00 prefetch/briefing)"
+  echo "  ✅ Recurring schedules: ${REC}개 (pending_prompts)"
 else
   echo "  ❌ Recurring schedules: ${REC}개 — 4개 필요 (11:00/11:10/18:00/18:10)"
   FAIL=$((FAIL+1))
