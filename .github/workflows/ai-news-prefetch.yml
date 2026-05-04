@@ -16,7 +16,7 @@ jobs:
       - name: Checkout WKAppBot
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with:
-          repository: kiexp/WKAppBot
+          repository: kiexpert/WKAppBot
           token: ${{ secrets.WKAPPBOT_PAT }}
           path: wkappbot
 
