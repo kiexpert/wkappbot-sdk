@@ -71,13 +71,11 @@ jobs:
     - name: Seed bin/wkappbot.hq
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
         if (Test-Path wkappbot.hq) {
           Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
         }
-        Copy-Item -Path skills/*   -Destination bin/wkappbot.hq/skills   -Recurse -Force
-        Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force
+        Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force
 
     - name: Prepare PATH and Python cache dirs
       shell: pwsh

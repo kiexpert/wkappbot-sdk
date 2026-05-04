@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'csharp/**'
-      - 'handlers/**'
       - 'scripts/smoke-help.ps1'
       - '.github/workflows/build.yml'
       - '.github/workflows/build-sidecar-artifact.yml'

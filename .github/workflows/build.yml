@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'csharp/**'
-      - 'handlers/**'
       - 'skills/**'
       - 'scripts/smoke-help.ps1'
       - '.github/workflows/build.yml'
@@ -162,13 +161,11 @@ jobs:
     - name: Seed bin/wkappbot.hq
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
         if (Test-Path wkappbot.hq) {
           Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force
         }
-        if (Test-Path skills)   { Copy-Item -Path skills/*   -Destination bin/wkappbot.hq/skills   -Recurse -Force }
-        if (Test-Path handlers) { Copy-Item -Path handlers/* -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+        if (Test-Path skills) { Copy-Item -Path skills/* -Destination bin/wkappbot.hq/skills -Recurse -Force }
 
     - name: Write build info
       shell: pwsh
@@ -287,20 +284,16 @@ jobs:
           if (-not $tag) { throw "No core-* release found in $env:CORE_REPO." }
           gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
         }
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
         if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
-        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills   -Recurse -Force }
-        if (Test-Path handlers)    { Copy-Item -Path handlers/*    -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills -Recurse -Force }
 
     - name: Seed bin/wkappbot.hq
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills   | Out-Null
-        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/handlers | Out-Null
+        New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
         if (Test-Path wkappbot.hq) { Copy-Item -Path wkappbot.hq/* -Destination bin/wkappbot.hq -Recurse -Force }
-        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills   -Recurse -Force }
-        if (Test-Path handlers)    { Copy-Item -Path handlers/*    -Destination bin/wkappbot.hq/handlers -Recurse -Force }
+        if (Test-Path skills)      { Copy-Item -Path skills/*      -Destination bin/wkappbot.hq/skills -Recurse -Force }
 
     - name: User-centric smoke test
       shell: pwsh

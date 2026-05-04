@@ -100,10 +100,8 @@ jobs:
     - name: Seed bin/wkappbot.hq
       shell: pwsh
       run: |
-        New-Item -Force -ItemType Directory bin/wkappbot.hq/skills   | Out-Null
-        New-Item -Force -ItemType Directory bin/wkappbot.hq/handlers | Out-Null
-        if (Test-Path skills)   { Copy-Item skills/*   bin/wkappbot.hq/skills   -Recurse -Force }
-        if (Test-Path handlers) { Copy-Item handlers/* bin/wkappbot.hq/handlers -Recurse -Force }
+        New-Item -Force -ItemType Directory bin/wkappbot.hq/skills | Out-Null
+        if (Test-Path skills) { Copy-Item skills/* bin/wkappbot.hq/skills -Recurse -Force }
 
     - name: Verify binary
       shell: pwsh
