@@ -50,12 +50,12 @@ jobs:
           exit 0
         }
         # Fetch $before if not present (e.g. Dependabot branches)
-        if (-not (git cat-file -e "${before}^{commit}" 2>$null; $?)) {
+        if (-not $(git cat-file -e "${before}^{commit}" 2>$null; $?)) {
           git fetch origin $before 2>$null
         }
         $files   = git diff --name-only $before $after 2>$null
         $changed = @($files | Where-Object {
-          $_ -match '^(csharp/|handlers/|skills/|scripts/smoke-help\.ps1|\.github/workflows/build\.yml$)'
+          $_ -match '^(csharp/|skills/|scripts/smoke-help\.ps1|\.github/workflows/build\.yml$)'
         })
         $out = if ($changed.Count -gt 0) { 'true' } else { 'false' }
         "changed=$out" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
