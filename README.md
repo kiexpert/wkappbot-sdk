@@ -4,7 +4,7 @@
 [![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)
 [![Latest Release](https://img.shields.io/github/v/release/kiexpert/wkappbot-sdk?label=download)](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 
-![WKAppBot Sudo License Demo](wkappbot-sudo-license-demo-preview.gif)
+![WKAppBot Sudo License Demo](docs/wkappbot-sudo-license-demo-preview.gif)
 
 > ▶ **[전체 영상 보기 →](https://bitwisdomk.github.io/bitwisdomk/)**  ·  Sudo 라이선스로 이런 봇을 만들 수 있습니다
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
