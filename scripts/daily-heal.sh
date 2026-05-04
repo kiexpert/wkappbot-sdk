@@ -80,7 +80,7 @@ echo "## S. News Briefing Schedule"
 SCHED_TASKS=("WKAppBot_Briefing_1100" "WKAppBot_AI_News_1110" "WKAppBot_Briefing_1800" "WKAppBot_AI_News_1810")
 REC=0
 for task in "${SCHED_TASKS[@]}"; do
-  schtasks /query /tn "\\${task}" /fo LIST 2>/dev/null | grep -q "TaskName" && REC=$((REC+1))
+  cmd //c "schtasks /query /tn ${task} /fo LIST" 2>&1 | grep -q "${task}" && REC=$((REC+1))
 done
 if [ "$REC" -ge 4 ]; then
   echo "  ✅ Recurring schedules: ${REC}개/4개 (schtasks)"
