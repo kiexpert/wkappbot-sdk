@@ -6,6 +6,7 @@ SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI"
 P=0; F=0
 
 echo "=== a11y output format: code-level checks ==="
+if [ ! -d "$SRC" ]; then echo "SKIP: private source not available (CI or non-dev machine)"; exit 0; fi
 
 # 1. PrintFocusBlock emits ## FOCUS code-fence to stdout
 if grep -q '## FOCUS' "$SRC/Commands/A11yActions.Output.cs" 2>/dev/null; then
