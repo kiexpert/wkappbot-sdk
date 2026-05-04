@@ -33,7 +33,7 @@ jobs:
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
       run: python3 scripts/triad_gha.py thesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: r1-${{ matrix.ai }}
         path: r1-${{ matrix.ai }}.txt
@@ -64,7 +64,7 @@ jobs:
         CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
       run: python3 scripts/triad_gha.py antithesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: r2-${{ matrix.ai }}
         path: r2-${{ matrix.ai }}.txt
@@ -93,7 +93,7 @@ jobs:
         GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
       run: python3 scripts/triad_gha.py synthesis "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
       with:
         name: triad-synthesis
         path: synthesis.md
