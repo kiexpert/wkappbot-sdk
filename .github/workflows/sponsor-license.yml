@@ -3,6 +3,11 @@ name: Sponsor License
 on:
   sponsorship:
     types: [created, tier_changed, cancelled, pending_cancellation]
+  workflow_dispatch:
+    inputs:
+      sponsor_login:
+        description: "GitHub sponsor login (manual trigger)"
+        required: false
 
 permissions:
   contents: read

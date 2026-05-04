@@ -1,4 +1,4 @@
-name: member-joined
+name: Member Joined
 
 on:
   member:
