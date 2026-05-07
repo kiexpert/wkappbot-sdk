@@ -1,0 +1,23 @@
+commit: pending (post-c517bd91)
+script: scripts/test-ask-optimization.ps1
+exitcode: 0 (BASIC)
+timestamp_utc: 2026-05-06T15:31:00Z
+mode: BASIC (5 passed / 0 warned / 0 failed)
+
+What this script does now (v2):
+- BASIC (-Quick or no flags): help, skill registration, source wiring -- ~3s, no live calls
+- FULL  (-Full):              + live ask claude/gpt/gemini/triad dispatch + wait for [ASK_FULL_ANSWER_END]
+- BENCHMARK (-Benchmark):     FULL + per-provider dispatch latency (ms) + completion time (ms)
+                              + bench-results.json (timestamp, commit, dispatchMs, completionMs)
+                              + optional -Baseline path.json regression diff
+                                  fail if dispatch regression > -DispatchRegressionMs (default 500ms)
+                                  fail if completion regression > -CompletionRegressionMs (default 5000ms)
+
+Tuning workflow:
+1. Pin baseline:        powershell -File scripts/test-ask-optimization.ps1 -Benchmark -ResultsPath benchmarks/last-known-good.json
+2. Make a change.
+3. Verify:              powershell -File scripts/test-ask-optimization.ps1 -Benchmark -Baseline benchmarks/last-known-good.json
+4. If improved + stable, re-pin baseline (step 1 again).
+
+CLI-parity goal: dispatch latency <300ms cold, <100ms warm.
+Live FULL/BENCHMARK runs not yet validated -- requires Eye + CDP + provider tabs ready.

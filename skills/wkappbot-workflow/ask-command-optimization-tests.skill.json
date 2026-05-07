@@ -1,0 +1,51 @@
+{
+  "id": "ask-command-optimization-tests",
+  "app": "wkappbot-workflow",
+  "title": "ask command optimization smoke tests",
+  "title_ko": null,
+  "desc": "Smoke-test, route-validate, and benchmark wkappbot ask for Claude, GPT, Gemini, triad. Three modes: BASIC (help/wiring), FULL (live dispatch + final-answer wait), BENCHMARK (FULL + dispatch/completion timings + JSON output + optional baseline regression check). Use after changing ask routing, prompt-pump, CDP worker, or any path on the user-perceived speed-of-dispatch axis.",
+  "steps": [
+    "MODES: -Quick (alias BASIC) checks help, skill registration, source wiring (no live calls). -Full performs live dispatch + final-answer detection. -Benchmark = -Full + per-provider dispatch latency + completion time + JSON results + optional -Baseline diff. Default (no flags) = BASIC.",
+    "BENCHMARK output: bench-results.json with timestamp_utc, commit, dispatchMs, completionMs per provider. Use -ResultsPath to override path. Track this file across commits to spot regressions.",
+    "BASELINE diff: -Baseline path.json compares against previous run. Fails if dispatch regression > -DispatchRegressionMs (default 500) or completion > -CompletionRegressionMs (default 5000). Pin a known-good baseline before optimization spikes; re-pin after improvement is verified.",
+    "TUNING TARGETS: dispatch latency = launcher + Core + provider-pick + log-spawn time before 'dispatched to background' line. CLI parity goal: <300ms cold, <100ms warm. Completion time = end-to-end: dispatch start to [ASK_FULL_ANSWER_END] marker (TITLE: + FILE_TITLE: present).",
+    "RUN PATTERNS: local quick check before commit -> -Quick; before merge -> -Full; nightly perf tracker -> -Benchmark -Baseline benchmarks/last-known-good.json. CI is BASIC-only by default to avoid live API costs."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -File scripts/test-ask-optimization.ps1 -Quick",
+      "expect": "0 failed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask --help --no-regression",
+      "expect": "ask gpt",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ask --app wkappbot-workflow",
+      "expect": "ask-command-optimization-tests",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "optimization",
+    "smoke",
+    "routing",
+    "triad",
+    "claude",
+    "gpt",
+    "gemini",
+    "regression",
+    "benchmark",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": "scripts/test-ask-optimization.ps1",
+  "author": "claude",
+  "created": "2026-05-06T08:19:01.7417786Z",
+  "updated": "2026-05-07T00:30:00Z",
+  "version": "1.8"
+}

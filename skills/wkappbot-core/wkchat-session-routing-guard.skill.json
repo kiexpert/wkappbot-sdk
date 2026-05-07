@@ -1,0 +1,48 @@
+{
+  "id": "wkchat-session-routing-guard",
+  "app": "wkappbot-core",
+  "title": "wkchat session routing guard -- nested calls stay session-aware",
+  "title_ko": null,
+  "desc": "wkchat starts an interactive chat session. When the current or parent process already carries a chat session marker, descendant wkappbot calls stay in session-aware routing mode so nested launches do not re-enter interactive chat.",
+  "steps": [
+    "Chat sessions set and inherit WKAPPBOT_CHAT_SESSION=1",
+    "Use wkappbot chat for interactive REPL only; nested commands inside the session must be treated as single-shot calls",
+    "If a child launch needs interactive chat behavior, clear the session marker in the parent shell before starting it",
+    "Verify the live behavior with wkappbot chat --help and wkappbot skill read wkchat-session-routing-guard",
+    "Keep the outer chat guard in the launcher; nested chat sessions still inherit WKAPPBOT_CHAT_SESSION=1 for child routing",
+    "When the session guard is active, Launcher keeps chat on the interactive stdio path and skips Eye routing"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot chat --help",
+      "expect": "chat [\u0022question\u0022] [-p] [--no-fallback]",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list wkappbot-core",
+      "expect": "wkchat-session-routing-guard",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkchat-session-routing-guard",
+      "expect": "WKAPPBOT_CHAT_SESSION=1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkchat",
+    "chat",
+    "session",
+    "launcher",
+    "routing",
+    "operator",
+    "reference"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "codex",
+  "created": "2026-05-06T00:00:00Z",
+  "updated": "2026-05-06T16:50:00Z",
+  "version": "1.8"
+}
