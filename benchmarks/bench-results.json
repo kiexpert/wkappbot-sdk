@@ -1,24 +1,34 @@
 ﻿{
-    "timestamp_utc":  "2026-05-07T01:08:07.4247355Z",
-    "commit":  "d1431dd8",
+    "timestamp_utc":  "2026-05-07T04:06:57.0561625Z",
+    "commit":  "0af021b3",
     "iteration":  1,
     "thresholds":  {
-                       "goodMs":  300,
-                       "warnMs":  800
+                       "dispatchGoodMs":  300,
+                       "dispatchWarnMs":  800,
+                       "completionGoodSec":  30,
+                       "completionWarnSec":  60,
+                       "finalAnswerTimeoutSec":  90
                    },
     "dispatchMs":  {
-                       "gemini":  53,
-                       "gpt":  55,
-                       "claude":  53,
-                       "triad":  57
+                       "gemini":  52,
+                       "gpt":  53,
+                       "claude":  77497,
+                       "triad":  48
                    },
+    "completionSec":  {
+                          "gemini":  51,
+                          "gpt":  -1
+                      },
     "routingFailed":  [
-
+                          "claude"
                       ],
     "slowProviders":  [
 
                       ],
-    "pass":  9,
-    "warn":  1,
-    "fail":  0
+    "hangProviders":  [
+                          "gpt"
+                      ],
+    "pass":  7,
+    "warn":  0,
+    "fail":  2
 }
