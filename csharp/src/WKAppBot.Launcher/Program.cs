@@ -780,6 +780,14 @@ partial class Program
         // dead handle. Fix: spawn Core with fully inherited stdio, no redirection.
         if (isChatCmd)
         {
+            // Nested chat (parent process chain already has a chat session):
+            // switch to one-shot mode so interactive stdio doesn't corrupt the parent session.
+            if (inheritedChatSession)
+            {
+                int nestedCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
+                AppBotExit(nestedCode);
+                return nestedCode; // unreachable
+            }
             int chatCode = RunCoreInheritedStdio(relayArgs);
             AppBotExit(chatCode);
             return chatCode; // unreachable

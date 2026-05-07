@@ -225,7 +225,7 @@ public static class PseudoConsoleRunner
                 // -- Buffer accounting BEFORE we forward the key to cmd.exe --
                 if (key.Key == ConsoleKey.Enter)
                 {
-                    if (!complexEdit && false && onLineReady != null) // DISABLED: command intercept causes I/O corruption in chat
+                    if (!complexEdit && onLineReady != null)
                     {
                         var line = buffer.ToString();
                         Action? dispatch = null;
