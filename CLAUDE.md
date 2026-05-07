@@ -17,6 +17,8 @@
 
 ### Language / Communication
 - **Final responses to user: Korean, polite 해요체 (-요 form). NEVER informal speech.**
+- Do not imitate the user's speech style or dialect.
+- Never use `소`체 or casual speech.
 - Source code / comments / CLAUDE.md / skills / memory / commits / docs -> **English only, no exceptions**
 - **Questions**: `wkappbot slack send "question"` + send in prompt simultaneously (Slack-only forbidden)
 - **Slack replies**: always reply in thread (`--msg TS` if TS available, else `send`)
@@ -206,6 +208,12 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
 - **ctx% = JSONL ÷ ~20MB** -- prepare handoff at 8MB, immediate handoff at 10MB
 - **Goal**: ~10MB or less per session. Aggressive token optimization!
 - **Handoff**: `wkappbot newchat "prompt"` -- passes work summary to new chat
+- **Handoff primer**: run this first after load/compact when continuing a session:
+  ```bash
+  wkappbot skill read claude-session-handoff
+  wkappbot skill read handoff-checklist
+  wkappbot skill read handoff-send-best-practice
+  ```
 - **MEMORY.md**: 200-line limit. Overflow -> split into `memory/` topic files
 
 ## Encoding Policy

@@ -555,6 +555,15 @@ partial class Program
         var cmd = forwardArgs[0].ToLowerInvariant();
         prof($"cmd={cmd}");
         var relayArgs = forwardArgs;
+        var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
+        var inheritedChatSession = Environment.GetEnvironmentVariable("WKAPPBOT_CHAT_SESSION") == "1";
+        var isChatSession = isChatCmd || inheritedChatSession;
+        if (isChatSession)
+        {
+            // Chat sessions are inherited by child launches so nested wkappbot calls
+            // keep the launcher in session-aware routing mode.
+            Environment.SetEnvironmentVariable("WKAPPBOT_CHAT_SESSION", "1");
+        }
 
         // mcp: Launcher holds the stdio pipe to Claude Code and manages Core lifecycle
         if (cmd == "mcp")
@@ -582,7 +591,7 @@ partial class Program
         var eyeSubcmd = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
         var isEyeDaemon = cmd == "eye"
             && eyeSubcmd is not ("tick" or "hotswap" or "homework" or "shutdown");
-        var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1";
+        var isWorkerMode = Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") == "1" || isChatSession;
         // hack-* workers are long-running -> bypass Eye pipe (would timeout)
         var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
             && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
@@ -605,8 +614,8 @@ partial class Program
         // Those need direct terminal stdio -- NOT the Eye pipe, which would trap
         // the child's stdin/stdout inside a unidirectional pipe to the Eye process.
         // Route chat straight to Core so ProcessStartInfo with inherited stdio
-        // points at the user's actual terminal.
-        var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
+        // points at the user's actual terminal. When invoked from a chat session,
+        // the inherited session marker keeps descendants in worker/single-shot mode.
         // newchat uses UIA + SendInput + MouseInput -- must not run in Eye process.
         // Also a critical command that must work even when Eye is broken.
         var isNewchat = string.Equals(cmd, "newchat", StringComparison.OrdinalIgnoreCase);

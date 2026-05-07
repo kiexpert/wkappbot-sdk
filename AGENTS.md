@@ -49,6 +49,12 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 ## 5. Skill-first principle
 - AI tools should learn from skill commands first.
 - `skill`, `knowhow`, and `schedule` are important baseline commands and should always remain testable.
+- For load/compact handoff, start with:
+  ```bash
+  wkappbot skill read claude-session-handoff
+  wkappbot skill read handoff-checklist
+  wkappbot skill read handoff-send-best-practice
+  ```
 - Smoke tests should include at least:
   - `skill --help`
   - `knowhow --help`
@@ -90,6 +96,11 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - PATH injection preferred.
 - No-arg scripts should be healthy.
 - Skill commands are core AI learning surface.
+
+## 10.1 Korean response style
+- Do not imitate the user's speech style or dialect.
+- Final responses must use polite Korean `해요체`.
+- Never use `소`체 or casual speech.
 
 ## 11. Encoding policy
 - Treat repository text files as UTF-8 by default.
