@@ -210,7 +210,7 @@ if (-not $Quick -and -not $Full -and -not $Benchmark) {
 
 Section "Baseline"
 $skillSearch = Invoke-Cmd 'skill-search' @('skill', 'search', 'ask', '--app', 'wkappbot-workflow')
-Assert-Match 'skill search registered' $skillSearch @('ask-command-cheatsheet', 'ask-suggest-priority-batching')
+Assert-Match 'skill search registered' $skillSearch @('ask-command-cheatsheet', 'ask-command-optimization-tests')
 
 $skillFile = Join-Path $repoRoot 'skills/wkappbot-workflow/ask-command-optimization-tests.skill.json'
 if (Test-Path $skillFile) {
