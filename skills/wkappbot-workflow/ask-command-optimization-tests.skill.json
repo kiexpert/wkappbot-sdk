@@ -3,28 +3,29 @@
   "app": "wkappbot-workflow",
   "title": "ask command optimization smoke tests",
   "title_ko": null,
-  "desc": "Smoke-test, route-validate, and benchmark wkappbot ask for Claude, GPT, Gemini, triad. Three modes: BASIC (help/wiring), FULL (live dispatch + final-answer wait), BENCHMARK (FULL + dispatch/completion timings + JSON output + optional baseline regression check). Use after changing ask routing, prompt-pump, CDP worker, or any path on the user-perceived speed-of-dispatch axis.",
+  "desc": "Smoke test script for ask optimization: dispatch latency, CDP port isolation, a11y eval block, cdp field in grap. Run: powershell -File scripts/test-ask-optimization.ps1 -Full",
   "steps": [
-    "MODES: -Quick (alias BASIC) checks help, skill registration, source wiring (no live calls). -Full performs live dispatch + final-answer detection. -Benchmark = -Full + per-provider dispatch latency + completion time + JSON results + optional -Baseline diff. Default (no flags) = BASIC.",
-    "BENCHMARK output: bench-results.json with timestamp_utc, commit, dispatchMs, completionMs per provider. Use -ResultsPath to override path. Track this file across commits to spot regressions.",
-    "BASELINE diff: -Baseline path.json compares against previous run. Fails if dispatch regression > -DispatchRegressionMs (default 500) or completion > -CompletionRegressionMs (default 5000). Pin a known-good baseline before optimization spikes; re-pin after improvement is verified.",
-    "TUNING TARGETS: dispatch latency = launcher + Core + provider-pick + log-spawn time before 'dispatched to background' line. CLI parity goal: <300ms cold, <100ms warm. Completion time = end-to-end: dispatch start to [ASK_FULL_ANSWER_END] marker (TITLE: + FILE_TITLE: present).",
-    "RUN PATTERNS: local quick check before commit -> -Quick; before merge -> -Full; nightly perf tracker -> -Benchmark -Baseline benchmarks/last-known-good.json. CI is BASIC-only by default to avoid live API costs."
+    "Run: powershell -File D:/GitHub/wkappbot-sdk/scripts/test-ask-optimization.ps1 -Full",
+    "BASIC mode: skill-search \u002B ask-help routing only",
+    "FULL mode adds: CDP Port Isolation, Dispatch Latency (claude/gpt/gemini/triad), CDP Basic Tests (cdp open/find/read/eval-block), Agent routing",
+    "CDP Basic Tests: (1) cdp open grap contains cdp:{port} (2) a11y find cdp:{port} filters foreign Chromes (3) a11y read --eval-js works as eval replacement (4) a11y eval is BLOCKED",
+    "Thresholds: dispatch GOOD \u003C300ms WARN \u003E800ms BUG. Agent routing GOOD \u003C800ms",
+    "On fail: check [CDP:PORT] log via ask log file, check wkappbot-core.new.exe was hotswapped"
   ],
   "requirements": [
     {
-      "cmd": "powershell -File scripts/test-ask-optimization.ps1 -Quick",
-      "expect": "0 failed",
+      "cmd": "powershell -File scripts/test-ask-optimization.ps1",
+      "expect": "pass=N fail=0",
       "prompt": null
     },
     {
-      "cmd": "wkappbot ask --help --no-regression",
-      "expect": "ask gpt",
+      "cmd": "wkappbot ask claude ping",
+      "expect": "dispatch \u003C300ms",
       "prompt": null
     },
     {
-      "cmd": "wkappbot skill search ask --app wkappbot-workflow",
-      "expect": "ask-command-optimization-tests",
+      "cmd": "wkappbot a11y eval test",
+      "expect": "REMOVED in output",
       "prompt": null
     }
   ],
@@ -46,6 +47,6 @@
   "regression_script": "scripts/test-ask-optimization.ps1",
   "author": "claude",
   "created": "2026-05-06T08:19:01.7417786Z",
-  "updated": "2026-05-07T00:30:00Z",
-  "version": "1.8"
+  "updated": "2026-05-07T09:20:32.7439869Z",
+  "version": "1.11"
 }

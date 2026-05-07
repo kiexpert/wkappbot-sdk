@@ -1,0 +1,41 @@
+{
+  "id": "slack-app-token-renewal",
+  "app": "wkappbot-workflow",
+  "title": "slack-app-token-renewal",
+  "title_ko": null,
+  "desc": "WKAppBot Slack App-Level Token renewal. Use when Eye logs: apps.connections.open failed: invalid_auth",
+  "steps": [
+    "Open api.slack.com/apps in Chrome",
+    "Find WKAppBot app (App ID: A0APH6RJ1AA) and click",
+    "Basic Information -\u003E App-Level Tokens -\u003E Generate Token and Scopes",
+    "Token Name: wkappbot-socket, Add Scope: connections:write, Click Generate",
+    "Copy xapp-1-A0APH6RJ1AA-... token",
+    "Update app_token in both: wkappbot-sdk/bin/wkappbot.hq/profiles/slack_exp/webhook.json AND WKAppBot/bin/wkappbot.hq/profiles/slack_exp/webhook.json",
+    "wkappbot eye hotswap then verify no invalid_auth in Eye log"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot slack send hello",
+      "expect": "message sent without Failed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "Slack=True or socket=True in status",
+      "prompt": null
+    },
+    {
+      "cmd": "cat D:/GitHub/WKAppBot/bin/wkappbot.hq/profiles/slack_exp/webhook.json",
+      "expect": "app_token contains xapp-1-A0APH6RJ1AA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T07:39:13.8993643Z",
+  "updated": "2026-05-07T07:39:13.899373Z",
+  "version": "1.0"
+}

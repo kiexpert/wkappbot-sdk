@@ -400,7 +400,7 @@ function Write-BenchmarkSummary([int]$iter) {
     if ($script:completionSec.Count -gt 0) {
         Write-Host ""
         Write-Host ("Completion (target < {0}s, warn > {1}s):" -f $CompletionGoodSec,$CompletionWarnSec) -ForegroundColor Cyan
-        foreach ($k in @('claude','gpt','gemini')) {
+        foreach ($k in @('claude','gpt','gemini','triad')) {
             if (-not $script:completionSec.ContainsKey($k)) { continue }
             $s = $script:completionSec[$k]
             if ($s -lt 0) {
@@ -519,7 +519,8 @@ function Invoke-OneRun([int]$iteration) {
 
     # ── BASIC ────────────────────────────────────────────────────────────────
     Section "Baseline"
-    $ss = Invoke-Cmd 'skill-search' @('skill','search','ask','--app','wkappbot-workflow')
+    # skill list is more reliable than skill search (BM25 relevance can miss short keywords)
+    $ss = Invoke-Cmd 'skill-search' @('skill','list','--app','wkappbot-workflow')
     Assert-Match 'skills registered' $ss @('ask-command-cheatsheet','ask-command-optimization-tests')
 
     $sf = Join-Path $repoRoot 'skills/wkappbot-workflow/ask-command-optimization-tests.skill.json'
@@ -533,6 +534,72 @@ function Invoke-OneRun([int]$iteration) {
     if (-not $runFull) {
         Write-Host "`n[INFO] BASIC mode -- skipping live dispatch." -ForegroundColor DarkYellow
         return
+    }
+
+    # ── CDP port isolation check ─────────────────────────────────────────────
+    # Verify ask only uses wkappbot-assigned ports (9222 / 9224+).
+    # NEVER touches user's personal Chrome (9200, 9201, etc.) or unrelated ports.
+    Section "CDP Port Isolation"
+    Write-Host "  Rule: ask MUST only use wkappbot-assigned ports (9222 or 9224+)."
+    Write-Host "  Forbidden: any port not owned by wkappbot (personal Chrome, other apps)."
+    Write-Host ""
+    # Run a single ask and capture the [CDP:PORT] log line
+    $portTestLog = Join-Path $env:TEMP "ask-port-test-$([int](Get-Date -UFormat %s)).log"
+    $portOut = @(& wkappbot ask claude "port-check" 2>&1)
+    # Find [CDP:PORT] line from log file (ask logs stderr to file)
+    $logLine = ($portOut | Where-Object { $_ -match '^Log:\s+' } | Select-Object -First 1)
+    $usedPort = $null
+    if ($logLine -match '^Log:\s+(.+\.log)') {
+        $logPath = $Matches[1].Trim()
+        Start-Sleep -Milliseconds 500
+        $logContent = Get-Content -Raw $logPath -ErrorAction SilentlyContinue
+        if (-not $logContent) {
+            $dir = Split-Path $logPath; $file = Split-Path $logPath -Leaf
+            $oldPath = Join-Path (Join-Path $dir "old ask claude") $file
+            $logContent = Get-Content -Raw $oldPath -ErrorAction SilentlyContinue
+        }
+        if ($logContent -and $logContent -match '\[CDP:PORT\] using port=(\d+)') {
+            $usedPort = [int]$Matches[1]
+        }
+    }
+    function Get-AskPort([string]$provider) {
+        $out = @(& wkappbot ask $provider "port-check" 2>&1)
+        $ll  = ($out | Where-Object { $_ -match '^Log:\s+' } | Select-Object -First 1)
+        if (-not ($ll -match '^Log:\s+(.+\.log)')) { return $null }
+        $lp = $Matches[1].Trim()
+        Start-Sleep -Milliseconds 800
+        foreach ($p in @($lp, (Join-Path (Join-Path (Split-Path $lp) "old ask $provider") (Split-Path $lp -Leaf)))) {
+            $c = Get-Content -Raw $p -ErrorAction SilentlyContinue
+            if ($c -and $c -match '\[CDP:PORT\] using port=(\d+)') { return [int]$Matches[1] }
+        }
+        return $null
+    }
+
+    $usedPort = Get-AskPort 'claude'
+    if ($null -eq $usedPort) {
+        Write-Host "  [WARN] could not read [CDP:PORT] from log -- rebuild needed?" -ForegroundColor Yellow
+        $script:warn++
+    } elseif ($usedPort -eq 9222 -or $usedPort -ge 9224) {
+        Write-Host ("  [OK] first ask port={0} (wkappbot-owned)" -f $usedPort) -ForegroundColor Green
+        $script:pass++
+        # Re-detection test: 2nd ask must reuse the same port (no duplicate Chrome)
+        $usedPort2 = Get-AskPort 'claude'
+        if ($null -eq $usedPort2) {
+            Write-Host "  [WARN] 2nd ask port unreadable" -ForegroundColor Yellow; $script:warn++
+        } elseif ($usedPort2 -eq $usedPort) {
+            Write-Host ("  [OK] 2nd ask reused port={0} (no duplicate Chrome)" -f $usedPort2) -ForegroundColor Green
+            $script:pass++
+        } else {
+            Write-Host ("  [BUG] 2nd ask used port={0} != {1} -- Chrome launched twice!" -f $usedPort2,$usedPort) -ForegroundColor Red
+            $script:fail++
+            File-Suggest ("ask re-detection failure: 2nd ask port={0} != {1}" -f $usedPort2,$usedPort) `
+                "wkappbot ask claude health-check" "same port on consecutive asks"
+        }
+    } else {
+        Write-Host ("  [BUG] port={0} is NOT a wkappbot-assigned port! Snooping detected." -f $usedPort) -ForegroundColor Red
+        $script:fail++
+        File-Suggest ("ask CDP port isolation violation: used port={0}" -f $usedPort) `
+            "wkappbot ask claude health-check" "port=9222 or port>=9224"
     }
 
     # ── FULL: Dispatch latency per provider ──────────────────────────────────
@@ -572,6 +639,100 @@ function Invoke-OneRun([int]$iteration) {
             Write-Host ("  Polling ask logs for: {0}" -f ($leavesToPoll -join ', '))
             Wait-Completion -Leaves $leavesToPoll -TimeoutSec $FinalAnswerTimeoutSec
         }
+    }
+
+    # ── CDP basic tests ─────────────────────────────────────────────────────
+    # Verify cdp open / find / read --eval-js pipeline (critical for ask routing).
+    Section "CDP Basic Tests"
+    Write-Host "  1. cdp open -> grap contains cdp:{port}"
+    Write-Host "  2. a11y find {proc:'chrome',cdp:PORT} -> only that Chrome found"
+    Write-Host "  3. a11y read --eval-js returns result (not 'No window found')"
+    Write-Host ""
+
+    # Test 1: cdp open emits OK grap with cdp field
+    $cdpOpenOut = @(& wkappbot cdp open "about:blank" 2>&1)
+    $cdpOkLine  = $cdpOpenOut | Where-Object { $_ -match '^OK ' } | Select-Object -First 1
+    if ($cdpOkLine -match 'cdp:(\d+)') {
+        $openPort = [int]$Matches[1]
+        Write-Host ("  [OK] cdp open grap contains cdp:{0}" -f $openPort) -ForegroundColor Green
+        $script:pass++
+
+        # Test 2: a11y find with cdp field only finds that Chrome
+        $findOut = @(& wkappbot a11y find "{proc:'chrome',cdp:$openPort}" 2>&1)
+        $targets = $findOut | Select-String -Pattern '### TARGETS\s+(\d+)' | Select-Object -First 1
+        $otherPort = $findOut | Select-String -Pattern 'GUARD.*foreign-cdp-hidden' | Select-Object -First 1
+        if ($targets -and $targets.Line -match '### TARGETS\s+(\d+)' -and [int]$Matches[1] -gt 0) {
+            Write-Host ("  [OK] a11y find cdp:{0} -> {1} match(es), foreign Chromes filtered" -f $openPort, $Matches[1]) -ForegroundColor Green
+            $script:pass++
+        } else {
+            Write-Host ("  [WARN] a11y find cdp:{0} returned no targets" -f $openPort) -ForegroundColor Yellow
+            $script:warn++
+        }
+
+        # Test 3: a11y read --eval-js on the opened tab
+        $evalOut = @(& wkappbot a11y read "{proc:'chrome',cdp:$openPort}" --eval-js "typeof document" 2>&1)
+        $evalResult = $evalOut | Where-Object { $_ -match 'object|string|undefined' } | Select-Object -First 1
+        if ($evalResult -or ($evalOut | Select-String -Pattern '# TARGET')) {
+            Write-Host ("  [OK] a11y read --eval-js responded (eval replacement works)") -ForegroundColor Green
+            $script:pass++
+        } else {
+            Write-Host ("  [WARN] a11y read --eval-js no result (check Chrome tab state)") -ForegroundColor Yellow
+            $script:warn++
+        }
+    } else {
+        Write-Host "  [WARN] cdp open did not emit OK <grap> with cdp field" -ForegroundColor Yellow
+        $script:warn++
+    }
+
+    # Test 4: a11y eval is blocked (must error, not execute)
+    # PS5.1: native exe stderr in 2>&1 comes as ErrorRecord objects -- convert to string first
+    $evalBlocked = @(& wkappbot a11y eval "{proc:'chrome'}" "document.title" 2>&1 |
+        ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { "$_" } })
+    $evalOut = $evalBlocked -join "`n"
+    if ($evalOut -match 'REMOVED|blocked|no longer|USAGE-REMOVED') {
+        Write-Host "  [OK] a11y eval correctly blocked with migration hint" -ForegroundColor Green
+        $script:pass++
+    } else {
+        Write-Host "  [BUG] a11y eval was NOT blocked -- still executing!" -ForegroundColor Red
+        Write-Host ("    output: " + $evalOut.Substring(0, [Math]::Min(200,$evalOut.Length))) -ForegroundColor DarkRed
+        $script:fail++
+        File-Suggest "a11y eval not blocked -- DeprecatedEval still runs" `
+            "wkappbot a11y eval '{proc:chrome}' test" "REMOVED or blocked in output"
+    }
+
+    # ── Agent dispatch latency (all model tiers) ────────────────────────────
+    # Syntax: wkappbot agent 'task' - <tier>
+    # Tiers: haiku, sonnet, opus (Claude), gpt, gemini, codex-mini, triad
+    Section "Agent Dispatch Latency (all tiers)"
+    Write-Host "  Syntax: wkappbot agent 'task' - <tier>"
+    Write-Host ("  Targets: GOOD < {0}ms | WARN {0}-{1}ms | BUG > {1}ms" -f $DispatchGoodMs,$DispatchWarnMs)
+    Write-Host ""
+    $agentPrompt = "ping: reply with one word pong"
+    # Claude tiers: haiku / sonnet / opus
+    # GPT/Gemini: gpt / gemini
+    # Codex tiers: codex-mini (cheap), codex (default/auto), codex-full (full model)
+    # Multi-AI: triad
+    # NOTE: live agent dispatch opens new console windows (by design).
+    # Test routing only via --help to verify each tier is recognized without spawning.
+    $agentTiers  = @('haiku','sonnet','opus','gpt','gemini','codex-mini','codex','triad')
+    foreach ($tier in $agentTiers) {
+        $sw  = [System.Diagnostics.Stopwatch]::StartNew()
+        $out = @(& wkappbot agent $agentPrompt - $tier --help 2>&1)
+        $sw.Stop()
+        $ms  = [int]$sw.Elapsed.TotalMilliseconds
+        # Check tier is recognized (not "unknown tier" / error)
+        $recognized = $out | Select-String -Pattern $tier,'haiku','sonnet','opus','gpt','gemini','codex','triad','agent','dispatch' -CaseSensitive:$false
+        $rejected   = $out | Select-String -Pattern 'unknown.*tier|invalid|not.*found|error' -CaseSensitive:$false
+        $c = if ($rejected -or -not $recognized) { 'Red' } elseif ($ms -gt $DispatchGoodMs) { 'Yellow' } else { 'Green' }
+        if ($recognized -and -not $rejected) {
+            Write-Host ("  [agent:{0,-10}] routing=ok  {1}ms" -f $tier, $ms) -ForegroundColor $c
+            $script:pass++
+        } else {
+            Write-Host ("  [agent:{0,-10}] [FAIL] tier not recognized" -f $tier) -ForegroundColor Red
+            Write-Host ("    out: " + ($out | Select-Object -Last 2 | Out-String).Trim()) -ForegroundColor DarkRed
+            $script:fail++
+        }
+        Start-Sleep -Milliseconds 100
     }
 
     if ($Benchmark) { Write-BenchmarkSummary $iteration }

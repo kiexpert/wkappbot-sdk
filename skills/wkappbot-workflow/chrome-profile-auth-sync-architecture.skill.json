@@ -1,0 +1,48 @@
+{
+  "id": "chrome-profile-auth-sync-architecture",
+  "app": "wkappbot-workflow",
+  "title": "chrome-profile-auth-sync-architecture",
+  "title_ko": null,
+  "desc": "WKAppBot Chrome profile auth sync: master-\u003Eproject copy on launch, project-\u003Emaster SQLite merge on exit. Use when sessions expire frequently or cookies not persisting across projects.",
+  "steps": [
+    "ARCHITECTURE: Master profile at {DataDir}/chrome-profiles/master/, per-project at {DataDir}/chrome-profiles/{hash8(cwd)}/",
+    "ON LAUNCH (CopyFromMaster): copies Default/Login Data \u002B Default/Cookies \u002B root Local State (DPAPI key) from master to project. Skip-if-fresh: skips copy if project copy is newer than master. DPAPI Local State MUST travel with Cookies or decryption fails silently",
+    "ON EXIT (MergeBackToMaster): SQLite merge of persistent\u002Bunexpired cookies (is_persistent=1, expires_utc!=0, expires_utc\u003Enow) and new Login Data rows from project back to master. Master Chrome must NOT be running during merge (SQLite corruption risk)",
+    "SESSION COOKIES NOT SYNCED: expires_utc==0 (session-only cookies) are excluded by design. Sites that use only session cookies will always re-auth on Chrome restart -- this is expected",
+    "TROUBLESHOOT auth expiring: 1) Check [CHROME:BOOTSTRAP:ERROR] in Eye log (DPAPI key mismatch) 2) Check MergeBackToMaster ran on last Chrome exit 3) Check master profile path exists: {DataDir}/chrome-profiles/master/Default/Cookies 4) Sites using session-only cookies cannot be persisted via this mechanism",
+    "KEY FILES: ChromeProfileSync.cs (launch copy), ChromeProfileSync.Sql.cs (merge logic), ChromeProfileSync.Watch.cs (FSW live merge driver), ChromeProfileSync.Merge.cs (Local State DPAPI merge)",
+    "IMPORT FROM PERSONAL CHROME: Copy cookies from user\u0027s regular Chrome into master profile. Steps: 1) Close personal Chrome first (SQLite lock). 2) Source: %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Cookies and Login Data. 3) Run MergeBackToMaster(personalChromeDefault, masterDefault) -- same SQLite merge logic, only persistent\u002Bunexpired cookies. 4) Copy Local State os_crypt key from personal Chrome to master if master has no DPAPI key yet. NOTE: personal Chrome uses same Windows user DPAPI key so encrypted_value decrypts correctly.",
+    "IMPORT FROM PERSONAL CHROME: Copy cookies from user\u0027s regular Chrome into master profile. Steps: 1) Close personal Chrome first (SQLite lock). 2) Source: %LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Cookies and Login Data. 3) Run MergeBackToMaster(personalChromeDefault, masterDefault) -- same SQLite merge logic, only persistent\u002Bunexpired cookies. 4) Copy Local State os_crypt key from personal Chrome to master if master has no DPAPI key yet. NOTE: personal Chrome uses same Windows user DPAPI key so encrypted_value decrypts correctly.",
+    "CURRENT BOOTSTRAP FLOW (personal Chrome import): Called once at first launch (guarded by {masterDir}/.bootstrapped sentinel). Code: ChromeLauncher.BootstrapMasterFromSystemChrome() -\u003E CopyIfNewer(systemChrome/Cookies, master/Cookies). BUG: CopyIfNewer does FULL FILE COPY when src.mtime \u003E dst.mtime -- replaces entire master SQLite with personal Chrome file, losing any valid wkappbot session cookies. Trigger: delete .bootstrapped sentinel to re-run.",
+    "CURRENT BOOTSTRAP FLOW (personal Chrome import): Called once at first launch (guarded by {masterDir}/.bootstrapped sentinel). Code: ChromeLauncher.BootstrapMasterFromSystemChrome() -\u003E CopyIfNewer(systemChrome/Cookies, master/Cookies). BUG: CopyIfNewer does FULL FILE COPY when src.mtime \u003E dst.mtime -- replaces entire master SQLite with personal Chrome file, losing any valid wkappbot session cookies. Trigger: delete .bootstrapped sentinel to re-run.",
+    "IMPROVEMENT: Replace CopyIfNewer file-copy with row-level SQLite merge in BootstrapMasterFromSystemChrome. Fix in ChromeLauncher.Profile.cs: instead of File.Copy(src,dst), call ChromeProfileSync.MergeBackToMaster(sysDefault_parent, masterDir) using last_access_utc comparison -- only UPSERT cookies where personal Chrome row has more recent last_access_utc than master row for same (host_key,name,path,source_scheme). This preserves valid master session cookies while importing fresher personal Chrome logins. Additional filter: only merge rows where encrypted_value is non-empty (skip blank/corrupted entries).",
+    "IMPROVEMENT: Replace CopyIfNewer file-copy with row-level SQLite merge in BootstrapMasterFromSystemChrome. Fix in ChromeLauncher.Profile.cs: instead of File.Copy(src,dst), call ChromeProfileSync.MergeBackToMaster(sysDefault_parent, masterDir) using last_access_utc comparison -- only UPSERT cookies where personal Chrome row has more recent last_access_utc than master row for same (host_key,name,path,source_scheme). This preserves valid master session cookies while importing fresher personal Chrome logins. Additional filter: only merge rows where encrypted_value is non-empty (skip blank/corrupted entries).",
+    "2026-05-07 PROFILE RENAME: Chrome profile dirs renamed from chrome-profiles/{hash8cwd}/ to chrome-profiles/cdp={port}/ (e.g. cdp=9222). Port is embedded in folder name -- no separate registry needed. FindRunningChromePort now extracts port via ^cdp=(\\d\u002B)$ regex from user-data-dir leaf. Old {hash}/ dirs auto-migrated on next Chrome launch.",
+    "2026-05-07 PROFILE RENAME: Chrome profile dirs renamed from chrome-profiles/{hash8cwd}/ to chrome-profiles/cdp={port}/ (e.g. cdp=9222). Port is embedded in folder name -- no separate registry needed. FindRunningChromePort now extracts port via ^cdp=(\\d\u002B)$ regex from user-data-dir leaf. Old {hash}/ dirs auto-migrated on next Chrome launch."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask claude ping",
+      "expect": "dispatched (Chrome launched with synced cookies)",
+      "prompt": null
+    },
+    {
+      "cmd": "cat {DataDir}/chrome-profiles/master/Default/Cookies",
+      "expect": "file exists and is non-empty SQLite",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "no CHROME:BOOTSTRAP:ERROR in recent Eye log",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T07:58:16.0014828Z",
+  "updated": "2026-05-07T09:11:12.8581888Z",
+  "version": "1.8"
+}
