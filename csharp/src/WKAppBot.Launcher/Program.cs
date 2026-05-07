@@ -1154,19 +1154,25 @@ partial class Program
     /// <summary>Console output code page (e.g. 949 for Korean CMD). Used by TranscodeStream + EyeCmdPipeClient.</summary>
     internal static int _consoleCodePage;
 
-    /// <summary>Resolve core exe path: --core override, .new.exe if staged, or default.</summary>
+    /// <summary>Resolve core exe path: --core override, .new.exe if newer than current, or default.</summary>
     static string ResolveCoreExe()
     {
         if (_coreExePath != null) return _coreExePath;
         var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        // If a new core is staged, use it directly -- no need to wait for Eye hot-swap.
         var newExe = Path.Combine(dir, "wkappbot-core.new.exe");
+        var curExe = Path.Combine(dir, "wkappbot-core.exe");
+        // Only prefer .new.exe if it is actually newer than the current core.
         if (System.IO.File.Exists(newExe))
         {
-            Console.Error.WriteLine("[LAUNCHER] wkappbot-core.new.exe staged -- using directly");
-            return newExe;
+            var newTime = System.IO.File.GetLastWriteTimeUtc(newExe);
+            var curTime = System.IO.File.Exists(curExe) ? System.IO.File.GetLastWriteTimeUtc(curExe) : System.DateTime.MinValue;
+            if (newTime > curTime)
+            {
+                Console.Error.WriteLine("[LAUNCHER] wkappbot-core.new.exe staged -- using directly");
+                return newExe;
+            }
         }
-        return Path.Combine(dir, "wkappbot-core.exe");
+        return curExe;
     }
 
     /// <summary>
