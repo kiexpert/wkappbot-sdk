@@ -10,6 +10,13 @@ build.cmd
 
 Eye detects the new `wkappbot-core.new.exe` and hot-swaps automatically. No restart needed.
 
+## v7.0 → v7.1
+
+- **CDP port isolation**: each project now gets a deterministic 4-port block (9300-9995) based on SHA256 of the project root path. Foreign Chrome instances are automatically rejected.
+- **IME daemon auto-update**: no more triple-character input after core updates. Eye tick replaces the old IME daemon within 60s.
+- **Tab reuse**: `cdp open` and `ask` commands reuse existing tabs by project CWD hash, not HWND. Same URL from same project always reuses the tab.
+- `build.cmd` upgrade is sufficient -- hot-swap handles the rest.
+
 ## v6.5 → v6.5.x (patch)
 
 Patch releases are backwards-compatible. `git pull && build.cmd` is sufficient.

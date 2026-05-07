@@ -10,7 +10,7 @@
 wkappbot --version
 ```
 ```
-WKAppBot v6.0.0 (core: 6.0.0)
+WKAppBot v7.1.0 (core: 6.0.0)
 ```
 
 ---
