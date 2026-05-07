@@ -69,13 +69,64 @@
     <PrependVsInstallerPath />
   </Target>
 
-  <!-- Post-publish: deploy launcher directly (running exe can be renamed on NTFS) -->
-  <!-- build.cmd renames current→.old-timestamp.exe, then copies new one to original path -->
-  <!-- Standalone publish (no build.cmd): ContinueOnError=true if locked, .new.exe as fallback -->
+  <!-- Post-publish: rename-old + copy-new launcher deploy -->
+  <!-- NTFS allows renaming a running exe; overwrite while locked fails.          -->
+  <!-- Strategy: rename current → .old-{ts}.exe, then copy new → wkappbot.exe.   -->
+  <!-- Also deploys to sibling repos that put wkappbot.exe on PATH (WKAppBot/bin) -->
+  <UsingTask TaskName="DeployLauncherTask"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <PublishExe ParameterType="System.String" Required="true" />
+      <DeployDirs ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        var ts = DateTime.Now.ToString("yyyyMMdd-HHmm");
+        foreach (var dir in DeployDirs.Split(';'))
+        {
+          if (string.IsNullOrWhiteSpace(dir)) continue;
+          Directory.CreateDirectory(dir);
+          var dest = Path.Combine(dir, "wkappbot.exe");
+          var old  = Path.Combine(dir, $"wkappbot.old-{ts}.exe");
+          try
+          {
+            if (File.Exists(dest))
+            {
+              if (File.Exists(old)) File.Delete(old);
+              File.Move(dest, old);
+              Log.LogMessage(MessageImportance.High, $"[Launcher] renamed: wkappbot.exe -> wkappbot.old-{ts}.exe in {dir}");
+            }
+            File.Copy(PublishExe, dest, overwrite: false);
+            // Update busybox symlink aliases
+            foreach (var alias in new[] { "a11y", "wka11y", "wkedit", "grap", "grep" })
+            {
+              var aliasExe = Path.Combine(dir, alias + ".exe");
+              if (File.Exists(aliasExe)) { try { File.Copy(dest, aliasExe, overwrite: true); } catch { } }
+            }
+            Log.LogMessage(MessageImportance.High, $"[Launcher] deployed: wkappbot.exe -> {dir}");
+          }
+          catch (Exception ex)
+          {
+            Log.LogWarning($"[Launcher] deploy failed for {dir}: {ex.Message}");
+          }
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
   <Target Name="DeployLauncher" AfterTargets="CopyNativeBinary" Condition="'$(SkipDeployLauncher)' != 'true'">
-    <MakeDir Directories="$(RepoBin)" />
-    <Copy SourceFiles="$(PublishDir)wkappbot.exe" DestinationFiles="$(RepoBin)\wkappbot.exe" OverwriteReadOnlyFiles="true" ContinueOnError="true" />
-    <Message Text="[Launcher] wkappbot.exe deployed to $(RepoBin)" Importance="high" />
+    <PropertyGroup>
+      <!-- Extra deploy targets: sibling repos under the same parent folder that have a bin/ with wkappbot.exe -->
+      <SiblingWKAppBotBin>$([System.IO.Path]::GetFullPath('$(RepoBin)\..\..\WKAppBot\bin'))</SiblingWKAppBotBin>
+      <ExtraDeployDirs Condition="Exists('$(SiblingWKAppBotBin)\wkappbot.exe')">$(SiblingWKAppBotBin)</ExtraDeployDirs>
+      <AllDeployDirs>$(RepoBin);$(ExtraDeployDirs)</AllDeployDirs>
+    </PropertyGroup>
+    <DeployLauncherTask PublishExe="$(PublishDir)wkappbot.exe" DeployDirs="$(AllDeployDirs)" />
   </Target>
 
 </Project>
