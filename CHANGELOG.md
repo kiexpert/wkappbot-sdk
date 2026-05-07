@@ -3,6 +3,34 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.1.0-sdk] - 2026-05-08
+
+### Added
+- CDP port isolation: SHA256-based deterministic 4-port block per project CWD (9300-9995)
+- `ev-cdp-isolation.ps1`: evidence script verifying CDP isolation fixes (9 checks)
+- IME daemon self-update: exits on newer binary detection (10s check cycle)
+- Eye tick auto-replaces old IME daemon every 60s -- no wkchat restart needed
+- `DeployLauncherTask` in csproj: rename-old + copy-new deploys to all bin dirs on publish
+
+### Changed
+- `DerivePort()`: SHA256 instead of `GetHashCode()` (non-deterministic across processes)
+- Port derivation uses parent process CWD via `NtQueryInformationProcess` (Claude changes dirs)
+- `BuildSandboxKey()`: CWD hash instead of HWND -- stable across sessions
+- Chrome always launched with `--window-position`; geometry file persistence removed
+- `ResolveCoreExe()`: uses `.new.exe` only when newer than current core (timestamp check)
+
+### Fixed
+- `FindRunningChromePortAny()`: rejects unregistered Chrome (registered=0 now skips)
+- Foreign Chrome rejection in `WebOpenCommand` reuse check via 4-port block validation
+- `--port N` outside project block: `AppBotExit(1)` with clear error message
+- `cdp open` sandbox key used HWND → tab duplicated on each session; fixed to CWD hash
+- `CdpTabManager.CreateScoped()` still used HWND for key; unified to SHA256 CWD hash
+- `CdpTabManager.GetSessionTag()` used `GetHashCode()` vs `WebCommands` SHA256 mismatch
+- IME relay: `ImmGetContext` side-effect created IME context on ConPTY -- caused tripling
+- IME relay: proxy always initializes Korean mode; `_koreanMode` syncs with system
+- Chat command intercept disabled in `PseudoConsoleRunner` (caused I/O corruption)
+- Nested `chat` sessions route as one-shot via `WKAPPBOT_CHAT_SESSION` env inheritance
+
 ## [6.5.21-sdk] - 2026-04-29
 
 ### Added
