@@ -291,13 +291,18 @@ Check "Chrome opens on same monitor as caller window" {
         return $true
     }
 
-    # Helper: which monitor does a point land on? Returns monitor index (0=unknown)
+    # Helper: which monitor does a point land on?
     Add-Type -TypeDefinition @"
-using System; using System.Runtime.InteropServices;
-public class MonCheck {
-    [DllImport("user32")] public static extern IntPtr MonitorFromPoint(POINT pt, uint f);
-    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int x, y; }
-    public static IntPtr GetMonitor(int x, int y) => MonitorFromPoint(new POINT{x=x,y=y}, 0);
+using System;
+using System.Runtime.InteropServices;
+[StructLayout(LayoutKind.Sequential)]
+public struct MONPOINT { public int X; public int Y; }
+public static class MonCheck {
+    [DllImport("user32.dll")] public static extern IntPtr MonitorFromPoint(MONPOINT pt, uint dwFlags);
+    public static IntPtr GetMonitor(int x, int y) {
+        var p = new MONPOINT(); p.X = x; p.Y = y;
+        return MonitorFromPoint(p, 0u);
+    }
 }
 "@ -ErrorAction SilentlyContinue
 
@@ -344,9 +349,42 @@ public class MonCheck {
         }
         return $sameMonitor
     } catch {
-        Write-Host "  (SKIP: MonitorFromPoint unavailable)" -ForegroundColor DarkGray
+        Write-Host "  (SKIP: MonitorFromPoint unavailable -- $_)" -ForegroundColor DarkGray
         return $true
     }
+}
+
+# ------------------------------------------------------------------
+# 13. Focus steal check -- foreground window must NOT change to Chrome during cdp open
+# ------------------------------------------------------------------
+Check "cdp open does not steal foreground focus from user" {
+    if ($IsCI -or -not $core) { return $true }
+    $wk = @("D:/SDK/bin/wkappbot.exe","D:/GitHub/WKAppBot/bin/wkappbot.exe") |
+          Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $wk) {
+        Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public static class FgCheck { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }
+"@ -ErrorAction SilentlyContinue
+
+    $fgBefore = [FgCheck]::GetForegroundWindow()
+    $null = & $wk cdp open "https://example.com" 2>&1
+    Start-Sleep -Milliseconds 800
+    $fgAfter = [FgCheck]::GetForegroundWindow()
+
+    $stolen = ($fgBefore -ne [IntPtr]::Zero -and $fgAfter -ne $fgBefore)
+    $fgAfterProc = try { (Get-Process -Id (
+        (Get-WmiObject Win32_Process -Filter "ProcessId=$(
+            [System.Diagnostics.Process]::GetProcessById([int][int64]$fgAfter).Id
+        )" -EA SilentlyContinue).ProcessId
+    ) -EA SilentlyContinue).ProcessName } catch { "?" }
+    Write-Host "  fg_before=0x$($fgBefore.ToString('X')) fg_after=0x$($fgAfter.ToString('X')) proc=$fgAfterProc stolen=$stolen" -ForegroundColor DarkGray
+    if ($stolen) { Write-Host "  WARN: foreground changed during cdp open -- possible focus steal" -ForegroundColor Yellow }
+    return -not $stolen
 }
 
 # ------------------------------------------------------------------
