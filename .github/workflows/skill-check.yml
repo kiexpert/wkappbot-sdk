@@ -4,9 +4,13 @@ on:
   push:
     paths:
       - 'skills/**/*.skill.json'
+      - '.github/scripts/validate_skill_chain.py'
+      - '.github/scripts/validate_skills.py'
   pull_request:
     paths:
       - 'skills/**/*.skill.json'
+      - '.github/scripts/validate_skill_chain.py'
+      - '.github/scripts/validate_skills.py'
 
 permissions:
   contents: read
