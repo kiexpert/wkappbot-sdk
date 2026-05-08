@@ -280,6 +280,76 @@ Check "Tab count stays within TabCap after multiple cdp opens" {
 }
 
 # ------------------------------------------------------------------
+# 12. Chrome opens on SAME monitor as caller window (cross-monitor placement = FAIL)
+# ------------------------------------------------------------------
+Check "Chrome opens on same monitor as caller window" {
+    if ($IsCI -or -not $core) { return $true }
+    $wk = @("D:/SDK/bin/wkappbot.exe","D:/GitHub/WKAppBot/bin/wkappbot.exe") |
+          Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $wk) {
+        Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Helper: which monitor does a point land on? Returns monitor index (0=unknown)
+    Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class MonCheck {
+    [DllImport("user32")] public static extern IntPtr MonitorFromPoint(POINT pt, uint f);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int x, y; }
+    public static IntPtr GetMonitor(int x, int y) => MonitorFromPoint(new POINT{x=x,y=y}, 0);
+}
+"@ -ErrorAction SilentlyContinue
+
+    # Get caller terminal position
+    $callerInfo = & $core a11y find "{proc:'WindowsTerminal',cls:'CASCADIA_HOSTING_WINDOW_CLASS'}" 2>&1 | Out-String
+    $callerPos  = if ($callerInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') { @([int]$Matches[1],[int]$Matches[2]) } else { $null }
+    if (-not $callerPos) {
+        Write-Host "  (SKIP: cannot read terminal position)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Kill Chrome and open fresh
+    Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 800
+    Get-ChildItem "D:/GitHub/WKAppBot/bin/wkappbot.hq/runtime","D:/GitHub/wkappbot-sdk/bin/wkappbot.hq/runtime" `
+        -Filter "cdp_port_*.txt" -ErrorAction SilentlyContinue | Remove-Item -Force
+    $openOut = & $wk cdp open "https://example.com" 2>&1 | Out-String
+    $port = if ($openOut -match 'cdp:(\d+)') { [int]$Matches[1] } else { 0 }
+    Start-Sleep -Milliseconds 1200
+
+    if ($port -eq 0) {
+        Write-Host "  (SKIP: no port from cdp open)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    $null = & $core a11y restore "{proc:'chrome',cdp:$port}" 2>&1
+    Start-Sleep -Milliseconds 600
+
+    $chromeInfo = & $core a11y find "{proc:'chrome',cdp:$port,cls:'Chrome_WidgetWin_1'}" 2>&1 | Out-String
+    $chromePos  = if ($chromeInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') { @([int]$Matches[1],[int]$Matches[2]) } else { $null }
+    if (-not $chromePos) {
+        Write-Host "  (SKIP: cannot read Chrome position)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Compare monitors
+    try {
+        $callerMon = [MonCheck]::GetMonitor($callerPos[0]+50, $callerPos[1]+50)
+        $chromeMon = [MonCheck]::GetMonitor($chromePos[0]+50, $chromePos[1]+50)
+        $sameMonitor = ($callerMon -ne [IntPtr]::Zero -and $callerMon -eq $chromeMon)
+        Write-Host "  caller=($($callerPos[0]),$($callerPos[1])) chrome=($($chromePos[0]),$($chromePos[1])) port=$port same_monitor=$sameMonitor" -ForegroundColor DarkGray
+        if (-not $sameMonitor) {
+            Write-Host "  FAIL: Chrome appeared on different monitor than caller terminal!" -ForegroundColor Red
+        }
+        return $sameMonitor
+    } catch {
+        Write-Host "  (SKIP: MonitorFromPoint unavailable)" -ForegroundColor DarkGray
+        return $true
+    }
+}
+
+# ------------------------------------------------------------------
 Write-Host ""
 Write-Host "=== Results: $pass passed, $errors failed ===" -ForegroundColor $(if ($errors -eq 0) {'Green'} else {'Yellow'})
 exit $errors
