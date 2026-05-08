@@ -3,6 +3,13 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.1.4-sdk] - 2026-05-08
+
+### Fixed
+- **Args leak**: launcher-injected flags (`--exit-event`, `--exit-file`) leaked into `speak` TTS text, `ask` prompts, and `suggest` text — now stripped globally before dispatch
+- **`--caller-pid` preserve**: SpeakCommand needs `--caller-pid` for overlay targeting; fix to only strip `--exit-event`/`--exit-file`, not all launcher flags
+- **Chrome position mismatch auto-report**: `SetWindowBoundsAsync` now verifies actual position post-set; if drift > 50px, auto-files `[BUG-AUTO]` suggest with callstack (Chrome session restore override detection)
+
 ## [7.1.3-sdk] - 2026-05-08
 
 ### Fixed (CRITICAL)
