@@ -24,7 +24,8 @@
     "HACK\\",
     "TEMP\\b\\",
     "\\[DBG\\]' csharp/src/ --include=*.cs. Also wkappbot --help ",
-    " check every listed command exists and works. Fix before release -- first-time users file issues immediately on broken --help."
+    " check every listed command exists and works. Fix before release -- first-time users file issues immediately on broken --help.",
+    "[LITE] Cross-model format check: scan CLAUDE.md and README.md for model-specific formatting that breaks across AI contexts -- LaTeX math ($$...$$), Jupyter-style output blocks, or tool-call XML that only renders in one model. Plain Markdown only. If found: convert to standard Markdown before the next session so any AI (Claude/Gemini/Codex) can read it without confusion."
   ],
   "requirements": [
     {
@@ -77,6 +78,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T13:36:27.8952491Z",
-  "updated": "2026-05-08T13:47:44.693911Z",
-  "version": "1.11"
+  "updated": "2026-05-08T13:50:15.8829922Z",
+  "version": "1.13"
 }
