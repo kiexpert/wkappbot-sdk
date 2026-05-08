@@ -3,6 +3,21 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.2.0-sdk] - 2026-05-08
+
+### Added
+- **CDP dialog auto-handling**: `Page.javascriptDialogOpening` unconditionally handled in `CdpClient` receive loop — auto-dismiss + `[CDP:DIALOG:BLOCKED]` red log + `wkappbot speak` audible alert on every connection
+- **Triad dialog recovery**: `EvalAsync` retries once after dialog auto-dismiss (5s window, 300ms delay) — triad gives 3/3 results even when one tab has a blocking alert
+- **Node error inspection**: `[CDP:NODE-ERROR]` red log + background page dump on node access failures (`No node`/`Cannot find context`/`detached`) — outputs URL, title, readyState, dialog nodes, top-8 interactive targets with selectors for retargeting
+
+### Fixed
+- **`--new-tab` was dead parameter**: now clears `AskTargetRegistry` sandbox key before `GetOrCreateSandboxedTabAsync`, forcing a fresh tab instead of cache reuse
+- **Tab cap enforcement path**: `EnforceTabCapAsync` now fires fire-and-forget on every ask entry (`EnsureCdpConnection`), not just `CdpTabManager.CreateScoped`
+- **Idle tab recycling**: `PurgeIdleTabsAsync` tries to recycle (ping 1s + `Page.navigate` fire-and-forget) before closing — alert dismiss (500ms) before ping, 2s total budget; renderer dead or dialog stuck → kill + new tab
+
+### Changed
+- `RecycleIdleTabAsync`: simplified from 15s (switch 3s + ping 2s + navigate 8s + url-check 2s) to 2s (switch 1s + ping 1s) — navigate fired without waiting, URL validation handled by next ask
+
 ## [7.1.4-sdk] - 2026-05-08
 
 ### Fixed
