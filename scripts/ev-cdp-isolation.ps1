@@ -44,6 +44,21 @@ Start-Sleep -Milliseconds 500
 $core = @("D:/GitHub/WKAppBot/bin/wkappbot-core.new.exe","D:/GitHub/WKAppBot/bin/wkappbot-core.exe") |
         Where-Object { Test-Path $_ } | Select-Object -First 1
 
+# Helper: kill ONLY Chrome instances using wkappbot-managed profiles (not user's Chrome)
+# Prevents auth loss in GPT/Gemini/Claude/Naver/KIS Chromes during tests
+function KillWkappbotChrome {
+    param([string[]]$Ports)
+    $hqProfiles = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles"
+    Get-Process chrome -ErrorAction SilentlyContinue | ForEach-Object {
+        try {
+            $cmd = (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)" -EA SilentlyContinue).CommandLine
+            $isWk = $cmd -match [regex]::Escape($hqProfiles)
+            $inBlock = $Ports.Count -eq 0 -or ($Ports | ForEach-Object { $cmd -match "cdp=$_|cdp $_ |debugging-port=$_" } | Where-Object { $_ })
+            if ($isWk -and $inBlock) { Stop-Process -Id $_.Id -Force -EA SilentlyContinue }
+        } catch {}
+    }
+}
+
 # ------------------------------------------------------------------
 # 1. Port derivation is in 9300-9999 range (not hardcoded 9222)
 # ------------------------------------------------------------------
@@ -207,7 +222,7 @@ Check "Chrome opens near caller window (not legacy position)" -WarnOnly {
     }
 
     # Kill all Chrome for a clean placement test (this test needs fresh Chrome at known position)
-    Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    KillWkappbotChrome @()
     Start-Sleep -Milliseconds 1000
     # Clear port registry so fresh Chrome gets correct port
     Get-ChildItem "D:/GitHub/WKAppBot/bin/wkappbot.hq/runtime","D:/GitHub/wkappbot-sdk/bin/wkappbot.hq/runtime" `
@@ -322,7 +337,7 @@ public static class MonCheck {
     }
 
     # Kill Chrome and open fresh
-    Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    KillWkappbotChrome @()
     Start-Sleep -Milliseconds 800
     Get-ChildItem "D:/GitHub/WKAppBot/bin/wkappbot.hq/runtime","D:/GitHub/wkappbot-sdk/bin/wkappbot.hq/runtime" `
         -Filter "cdp_port_*.txt" -ErrorAction SilentlyContinue | Remove-Item -Force
