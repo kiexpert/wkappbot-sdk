@@ -5,16 +5,16 @@
   "title_ko": null,
   "desc": "wkappbot cdp tools (formerly \u0027web\u0027). Exempt URL-takers: open, fetch, search, tabs, status, close. Tab-bound verbs (navigate, html, url, title, capture, run, file, ocr) REQUIRE grap. OK \u003Cgrap\u003E on stdout includes cdp:{port} field for port-pinned reconnection.",
   "steps": [
-    "Exempt (URL/query OK): open \u003Curl\u003E launches a new tab; fetch \u003Curl\u003E raw HTTP GET (no browser); search \u003Cquery\u003E Google via CDP; tabs, status, close are CDP-port level",
-    "Tab-bound (GRAP REQUIRED): navigate, html, url, title, capture, run, file. First positional MUST be a grap; a URL (http/https/file/chrome/about/javascript/data scheme) triggers a uniform [WEB:\u003CVERB\u003E] grap-required error pointing to a11y find \u002B web open",
-    "Standard error text: grap required as first positional. URL-as-target is banned. Discover grap: wkappbot a11y find \u0022*Chrome*\u0022 --deep. Example: wkappbot web \u003Cverb\u003E \u0022{proc:\u0027chrome\u0027,hwnd:0x...}\u0022 [args]. Open new tab via web open \u003Curl\u003E",
-    "Reconnection contract: every web command that operates on a tab emits OK \u003Cgrap\u003E on STDOUT (in addition to [WEB] TARGET on stderr). Callers can parse stdout for the exact grap to feed the next command",
-    "Title rule: title field is emitted in grap only when the find match came via title (MatchedVia==title). Even then, only the pattern literal core is used (stripped of wildcards, capped 30 chars). Rationale: titles mutate (tab switches, dirty-doc *), so full-title capture invites miss-match on the next copy-paste call",
-    "Example chain: wkappbot web open https://example.com -\u003E parse OK {proc:\u0027chrome\u0027,hwnd:0x..,domain:\u0027example.com\u0027} -\u003E wkappbot a11y read \u0022{proc:\u0027chrome\u0027,hwnd:0x..}\u0022 -\u003E reliable target lock",
-    "web read is REMOVED outright. Use a11y read with a grap instead",
-    "fetch is for raw HTTP where no JS is needed (static HTML, API endpoints); JS-rendered content belongs to a11y read on an open tab",
-    "CDP FIELD in grap: cdp:{port} -- pins connection to exact Chrome instance.\n  Source: OK \u003Cgrap\u003E stdout from \u0027cdp open\u0027 always includes cdp:{port}.\n    wkappbot cdp open https://example.com\n    -\u003E OK {proc:\u0027chrome\u0027,hwnd:0x...,cdp:9224}   \u003C- parse and reuse\n  Why it matters: multiple wkappbot projects share the same Chrome binary;\n    without cdp: pinning, grap may attach to the WRONG project\u0027s Chrome.\n  Renderer process handling: Chrome renderer processes (Chrome_RenderWidgetHostHWND)\n    have no --remote-debugging-port in their cmdline. wkappbot automatically\n    walks up to the parent browser (holder) process to resolve the CDP port,\n    so {cdp:9224} correctly matches renderer windows too.\n  Use cdp: whenever cross-session isolation matters:\n    wkappbot a11y find \u0022{proc:\u0027chrome\u0027,cdp:9224}\u0022\n    wkappbot a11y eval-js \u0022{proc:\u0027chrome\u0027,domain:\u0027claude.ai\u0027,cdp:9224}\u0022 \u0022document.title\u0022",
-    "ask-command-cheatsheet also covers CDP port isolation for ask gpt/gemini/claude paths -- see skill ask-command-cheatsheet for per-ask cdp field usage."
+    "Exempt (URL/query OK): cdp open \u003Curl\u003E launches new tab; fetch \u003Curl\u003E raw HTTP GET (no browser); search \u003Cquery\u003E Google via CDP; tabs, status, close are CDP-port level.",
+    "Tab-bound (GRAP REQUIRED): navigate, html, url, title, capture, run, file. First positional MUST be a grap containing cdp:{port}. A bare URL triggers [WEB:\u003CVERB\u003E] grap-required error.",
+    "Standard error: \u0027grap required as first positional. URL-as-target is banned.\u0027 Fix: run wkappbot cdp open \u003Curl\u003E first, copy the cdp:{port} from OK output, include it in the grap.",
+    "Reconnection contract: every tab-bound command emits OK \u003Cgrap\u003E on STDOUT. Parse stdout for the exact grap to feed the next command.",
+    "CDP PORT IN GRAP (mandatory for all tab-bound commands): cdp:{port} pins connection to exact Chrome instance. Example: {proc:\u0027chrome\u0027,cdp:9300}. Port is SHA256-derived per project (9300-9995). Only cdp open may omit it.",
+    "Title rule: title field emitted only when find match came via title (capped 30 chars, wildcards stripped). Full titles are unstable -- use domain or hwnd for reliable targeting.",
+    "Example chain: wkappbot cdp open https://example.com -\u003E OK {proc:\u0027chrome\u0027,cdp:9300,...} -\u003E wkappbot cdp html \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 -\u003E wkappbot cdp navigate \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 \u0027https://...\u0027",
+    "web read is REMOVED. Use a11y read with a grap instead.",
+    "fetch is for raw HTTP (no JS needed); JS-rendered content needs a11y read on an open tab.",
+    "ask-command-cheatsheet covers CDP port isolation for ask gpt/gemini/claude -- see skill ask-command-cheatsheet."
   ],
   "requirements": null,
   "primary_cmd": null,
@@ -36,6 +36,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T13:00:00Z",
-  "updated": "2026-05-07T13:27:14.5519413Z",
-  "version": "1.17"
+  "updated": "2026-05-08T10:33:52.7683818Z",
+  "version": "1.19"
 }

@@ -1,0 +1,81 @@
+{
+  "id": "mystery-window-diagnosis",
+  "app": "wkappbot-workflow",
+  "title": "Mystery Window / Process Diagnosis: why did this console appear?",
+  "title_ko": null,
+  "desc": "Diagnose any unexpected window or process that appeared without user action. Covers Claude console pop-up, scheduled task consoles, pending_prompts delivery, WkAutoQuant hourly cycle, Eye-spawned subprocesses. Pattern: eye tick -> windows list -> screenshot -> read.",
+  "steps": [
+    "WHEN TO USE: any time a console, Claude session, or process appeared without you starting it. Also when you see an active window with an unfamiliar title and want to know what is running.",
+    "STEP 1 -- eye tick: run wkappbot eye tick. Shows all running Claude sessions with task name, ctx%, and last thought lines. If the mystery window has a recognizable task name (e.g. 'hourly cycle', 'Stage 4'), it is a scheduled automation -- not caused by anything you did.",
+    "STEP 2 -- list windows: run wkappbot windows \"*wkchat*;*claude*;*Claude Code*\" --all. Lists every terminal tab with hwnd, title, process. Look for bare titles like 'claude' (no project prefix) or unfamiliar descriptions.",
+    "STEP 3 -- screenshot: run wkappbot a11y screenshot \"{hwnd:0xXXXX,...}\". Copy the PNG path from SAVED:... line, then use Read tool to view it.",
+    "STEP 4 -- read the screenshot: look for (A) stage labels like 'Stage 4c' or 'hourly cycle' -> scheduled automation. (B) repo/file paths in output -> which project. (C) flags like --permission-mode bypassPermissions -> unattended claude -p run. (D) Korean task summaries -> WkAutoQuant cycle.",
+    "COMMON ORIGINS -- Claude console pop-up: (A) WkAutoQuant hourly cycle: claude -p --permission-mode bypassPermissions on cron, new tab every hour. (B) pending_prompts delivery: Eye injected a pending file into an existing session -- no new window. (C) wkappbot newchat: explicit handoff launched a tab. (D) Eye watchdog restart: VBS killed Eye after 2min, restarted with fresh wkchat. (E) EnsureClaudeGuideSetup: first-run CLAUDE.md append, stderr only, no window.",
+    "BROADER PATTERN -- any mystery process: (1) wkappbot windows <title-glob>. (2) wkappbot a11y inspect {hwnd:...} for PID and cmd. (3) wkappbot windows --process <name> --cmd <substr>. (4) schtasks /query /fo LIST for scheduled tasks. (5) Eye log for restart events."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "클롣\\|크로\\|작업",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows \"*wkchat*\"",
+      "expect": "hwnd\\|grap\\|CASCADIA",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read mystery-window-diagnosis",
+      "expect": "STEP 1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "mystery",
+    "window",
+    "console",
+    "diagnosis",
+    "debug",
+    "unexpected",
+    "appeared",
+    "popped",
+    "why",
+    "claude",
+    "wkchat",
+    "process",
+    "identify",
+    "schedule",
+    "cron",
+    "hourly",
+    "automate",
+    "quant",
+    "pending",
+    "notify",
+    "spawn",
+    "unknown",
+    "investigate",
+    "왜",
+    "콘솔",
+    "뜸",
+    "떴",
+    "정체",
+    "의문",
+    "파악",
+    "디버그",
+    "자동",
+    "스케줄",
+    "분석",
+    "이상해",
+    "뭐야",
+    "이게뭐야",
+    "창",
+    "프로세스"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T12:13:21.9514347Z",
+  "updated": "2026-05-08T12:13:21.9514485Z",
+  "version": "1.0"
+}

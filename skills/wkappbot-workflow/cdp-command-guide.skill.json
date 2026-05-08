@@ -1,0 +1,57 @@
+{
+  "id": "cdp-command-guide",
+  "app": "wkappbot-workflow",
+  "title": "CDP Command Complete Guide",
+  "title_ko": null,
+  "desc": "Beginner-friendly guide to all wkappbot cdp commands: open, navigate, html, capture, eval, tabs. Explains port isolation, grap format, typical session flow, and common errors.",
+  "steps": [
+    "WHAT IS CDP HERE: wkappbot cdp commands control Chrome via Chrome DevTools Protocol. Chrome is launched per-project with an isolated SHA256-derived port (9300-9995). Every cdp command talks to YOUR project\u0027s Chrome only.",
+    "FIRST STEP ALWAYS -- cdp open: wkappbot cdp open \u003Curl\u003E returns OK {proc:\u0027chrome\u0027,cdp:9300,hwnd:0x...,domain:\u0027...\u0027}. ONLY command that auto-detects/launches Chrome. SAVE the cdp:{port} from output.",
+    "cdp:{port} IN GRAP IS MANDATORY for all other commands: {proc:\u0027chrome\u0027,cdp:9300}. Omitting it = error. Bare URL as first arg = error. Copy port from cdp open output.",
+    "NAVIGATE: wkappbot cdp navigate \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 \u0027https://example.com\u0027 -- waits for load. Reuses existing tab or opens new one if host changed.",
+    "READ HTML: wkappbot cdp html \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 -- returns full outerHTML for scraping/inspection.",
+    "CAPTURE: wkappbot cdp capture \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 -- saves PNG screenshot, prints path.",
+    "URL\u002BTITLE: wkappbot cdp url / cdp title with grap -- current page URL or document title.",
+    "EVAL JS: wkappbot a11y read \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 --eval-js \u0027document.title\u0027 -- a11y eval is removed, always use a11y read --eval-js.",
+    "TABS: wkappbot cdp tabs -- list all tabs. wkappbot cdp close \u003Cgrap\u003E -- close current tab.",
+    "PORT FORMULA: SHA256(project-git-root)[0:4] % 174 * 4 \u002B 9300, aligned to 0xFFFC. Same project = same port always. Wrong port = \u0027not in project CDP block\u0027 error.",
+    "TYPICAL FLOW: cdp open \u003Curl\u003E -\u003E save grap -\u003E cdp html \u003Cgrap\u003E -\u003E cdp navigate \u003Cgrap\u003E \u003Curl2\u003E -\u003E a11y read \u003Cgrap\u003E --eval-js \u0027...\u0027 -\u003E cdp capture \u003Cgrap\u003E.",
+    "ERRORS: \u0027grap required\u0027 = passed URL not grap. \u0027not in project CDP block\u0027 = wrong port. \u0027No node with given id\u0027 = DOM changed, re-read html. \u0027[CDP:DIALOG:BLOCKED]\u0027 = JS alert auto-dismissed, command retried."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://github.com",
+      "expect": "OK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp tabs",
+      "expect": "tab",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-command-guide",
+      "expect": "FIRST STEP",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "chrome",
+    "guide",
+    "cheatsheet",
+    "navigate",
+    "html",
+    "capture",
+    "port",
+    "grap",
+    "beginner"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T10:34:33.318371Z",
+  "updated": "2026-05-08T10:34:33.3183797Z",
+  "version": "1.0"
+}
