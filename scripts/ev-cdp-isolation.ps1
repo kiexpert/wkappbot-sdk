@@ -438,9 +438,10 @@ Check "Chrome profile dir contains CDP port (cdp{port}/ layout)" {
     $out = & $wk cdp open "https://example.com" 2>&1 | Out-String
     if ($out -notmatch 'cdp:(\d+)') { Write-Host "  (SKIP: no port)" -ForegroundColor DarkGray; return $true }
     $port = [int]$Matches[1]
-    # Chrome profile dir should be chrome-profiles/cdp{port}/
-    $profileDir = @("D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles/cdp$port") | Where-Object { Test-Path $_ }
-    Write-Host "  port=$port profile_exists=$($null -ne $profileDir)" -ForegroundColor DarkGray
+    # Chrome profile dir -- accepts both cdp{port}/ and cdp={port}/ layouts
+    $profileBase = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles"
+    $profileDir = @("$profileBase/cdp$port", "$profileBase/cdp=$port") | Where-Object { Test-Path $_ } | Select-Object -First 1
+    Write-Host "  port=$port profile_exists=$($null -ne $profileDir) path=$profileDir" -ForegroundColor DarkGray
     return $null -ne $profileDir
 }
 
