@@ -3,6 +3,18 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.1.3-sdk] - 2026-05-08
+
+### Fixed (CRITICAL)
+- **Chat startup loop**: `ChatStartupKeyName()` used `GetHashCode()` (randomized per-process) causing 203 duplicate registry entries under `WKAppBot_Chat_*`. Every reboot launched 203 wkchat processes simultaneously, crashing the system. Fixed to use `DerivePort()` (SHA256-stable) -- key is now `WKAppBot_Chat_{port}` (e.g. `WKAppBot_Chat_9740`), one entry per project.
+- `FindRunningChromePortAny()`: unregistered Chrome (port file missing) was accepted; now requires strict port file match
+- Foreign Chrome rejection in `WebOpenCommand` reuse check via 4-port block
+- `CdpTabManager.GetSessionTag()` used `GetHashCode()` vs SHA256 mismatch with `WebCommands`
+- `CdpTabManager.CreateScoped()` still used HWND for sandbox key; unified to SHA256 CWD hash
+
+### Changed
+- Launcher `ResolveCoreExe()`: only uses `.new.exe` when it is **newer** than current core (timestamp check)
+
 ## [7.1.0-sdk] - 2026-05-08
 
 ### Added
