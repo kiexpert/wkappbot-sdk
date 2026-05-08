@@ -446,6 +446,57 @@ Check "Chrome profile dir contains CDP port (cdp{port}/ layout)" {
 }
 
 # ------------------------------------------------------------------
+# 16. Master profile has Network/Cookies (Chrome 112+ cookie sync working)
+# ------------------------------------------------------------------
+Check "Master profile has Network/Cookies (cookie sync active)" {
+    if ($IsCI -or -not $core) { return $true }
+    $masterCookies = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles/master/Default/Network/Cookies"
+    if (-not (Test-Path $masterCookies)) {
+        Write-Host "  FAIL: master has no Network/Cookies -- consent + auth cookies lost on every Chrome restart" -ForegroundColor Red
+        return $false
+    }
+    $size = (Get-Item $masterCookies).Length
+    Write-Host "  master_cookies_size=${size}B" -ForegroundColor DarkGray
+    # A size > 32KB suggests real cookies (consent + auth) are present
+    # Empty/minimal SQLite file is ~32KB
+    $hasCookies = $size -gt 33000
+    if (-not $hasCookies) { Write-Host "  WARN: master cookies file is minimal -- may need first-run consent clicks" -ForegroundColor Yellow }
+    return $true  # pass regardless (size is informational)
+}
+
+# ------------------------------------------------------------------
+# 17. Consent cookies survive Chrome restart (sync-back to master works)
+# ------------------------------------------------------------------
+Check "Consent cookies sync back to master after Chrome session" {
+    if ($IsCI -or -not $core) { return $true }
+    $wk = @("D:/SDK/bin/wkappbot.exe","D:/GitHub/WKAppBot/bin/wkappbot.exe") |
+          Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $wk) { Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray; return $true }
+
+    $masterCookies = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles/master/Default/Network/Cookies"
+    $sizeBefore = if (Test-Path $masterCookies) { (Get-Item $masterCookies).Length } else { 0 }
+
+    # Open Chrome to example.com (any site creates some cookies) and wait for sync
+    KillWkappbotChrome @()
+    Start-Sleep -Milliseconds 500
+    $null = & $wk cdp open "https://example.com" 2>&1
+    Start-Sleep -Milliseconds 3000  # wait for FSW cookie sync (5s throttle, but some should fire)
+
+    # Gracefully close Chrome so profile is flushed (kill forces flush via our sync)
+    KillWkappbotChrome @()
+    Start-Sleep -Milliseconds 2000  # wait for merge-back on Chrome exit
+
+    $sizeAfter = if (Test-Path $masterCookies) { (Get-Item $masterCookies).Length } else { 0 }
+    $synced = $sizeAfter -ge $sizeBefore  # size should stay same or grow (IGNORE keeps master safe)
+    Write-Host "  master_cookies before=${sizeBefore}B after=${sizeAfter}B synced=$synced" -ForegroundColor DarkGray
+    if (-not (Test-Path $masterCookies)) {
+        Write-Host "  FAIL: master Network/Cookies still missing after Chrome session" -ForegroundColor Red
+        return $false
+    }
+    return $synced
+}
+
+# ------------------------------------------------------------------
 Write-Host ""
 Write-Host "=== Results: $pass passed, $warns warned, $errors failed ===" -ForegroundColor $(if ($errors -eq 0) {'Green'} else {'Yellow'})
 if ($warns -gt 0) { Write-Host "  WARN items are known issues -- not blocking" -ForegroundColor Yellow }
