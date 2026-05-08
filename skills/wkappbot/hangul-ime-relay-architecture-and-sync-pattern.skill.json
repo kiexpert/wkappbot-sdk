@@ -1,0 +1,35 @@
+{
+  "id": "hangul-ime-relay-architecture-and-sync-pattern",
+  "app": "wkappbot",
+  "title": "Hangul IME Relay architecture and sync pattern",
+  "title_ko": null,
+  "desc": "HangulImeRelay WH_KEYBOARD_LL hook: architecture, bugs fixed 2026-05-08 (forced Korean on install), system-IME sync via ImmGetConversionStatus.",
+  "steps": [
+    "Architecture: WH_KEYBOARD_LL hook intercepts keystrokes when Korean mode ON. Composes via ImeProxy (system IME window) or HangulComposer FSM fallback. Toggle: Right Alt (VK_RMENU) or VK_HANGUL (0x15). Bypass: passes through when foreground window has working system IME (e.g. non-ConPTY windows).\nFiles: HangulImeRelay.cs (_koreanMode flag \u002B hook), .Composer.cs (syllable FSM), .ImeProxy.cs (proxy window), .Inject.cs (injection), ImeRelayDaemon.cs (lifecycle).\nBUG 2026-05-08: _koreanMode hardcoded true on install -- fixed to call IsSystemImeKoreanMode() instead.\nBUG 2026-05-08: CreateImeProxy() forced ImmSetOpenStatus(true)\u002BImmSetConversionStatus(1,0) -- fixed to sync from system state.\nIsSystemImeKoreanMode() reads ImmGetContext(GetForegroundWindow()) then ImmGetOpenStatus()\u002BImmGetConversionStatus(). IME_CMODE_NATIVE=1 means Hangul active. Returns false on any failure (safe English default).\nRight Alt handler flips _koreanMode AND passes key to OS to keep relay and system IME in sync."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read hangul-ime-relay-architecture-and-sync-pattern",
+      "expect": "IsSystemImeKoreanMode",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -r IsSystemImeKoreanMode D:/GitHub/WKAppBot/csharp/src",
+      "expect": "HangulImeRelay.ImeProxy.cs",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n _koreanMode D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/HangulImeRelay.cs",
+      "expect": "IsSystemImeKoreanMode",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T16:23:46.03863Z",
+  "updated": "2026-05-07T16:23:46.0386394Z",
+  "version": "1.0"
+}

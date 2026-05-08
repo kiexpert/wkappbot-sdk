@@ -1,0 +1,92 @@
+{
+  "id": "wkappbot-log-search",
+  "app": "wkappbot-workflow",
+  "title": "AppBot Log Explorer",
+  "title_ko": null,
+  "desc": "Find and interpret WKAppBot logs across command-specific files, runtime history, errors.jsonl, skill invocation logs, and caller process chains. Use when tracing ask, suggest, skill, chat, codex, eye, or file behavior, or when you need the right log file after a failure.",
+  "steps": [
+    "Start from .wkappbot/hq/logs/ and .wkappbot/hq/runtime/; use command_history.jsonl as the index when the target log file name is unclear.",
+    "Trace the caller chain first when a process storm is active: inspect Win32_Process ParentProcessId, command lines, and the nearest command_history.jsonl entry to identify the launcher that spawned eye, speak, codex, or chat.",
+    "Map the command to its log family: old ask ..., old eye ..., old skill ..., old file ..., old agent ..., old a11y ..., old prompt ..., and the matching wkappbot-core.exe.out-*.log file.",
+    "For failures, check errors.jsonl first, then the command-specific .log, then command_history.jsonl, then skill_invocations.jsonl or skill_seen.jsonl if the command touched skills.",
+    "For UI or routing stalls, search for FindAllPrompts, focus_stolen, via_eye, resume --last, WKAPPBOT_CHAT_SESSION, timeout, and blocked.",
+    "Use wkappbot logcat for quick filtering when the log file is known, or open the exact command family folder when the command name is known.",
+    "Correlate the timestamp in command_history.jsonl with the nearest wkappbot-core.exe.out-*.log under old \u003Ccommand\u003E/ when the failure happened in a multi-stage run.",
+    "Use scripts/find-wkappbot-caller-chain.ps1 for a fast live caller-chain snapshot before digging through logs.",
+    "For blocked launcher or sudo storms, inspect the live caller chain before digging into log families, and search for WKAPPBOT_SUDO_ACTIVE, --sudo, --timeout, pipeTimeoutMs, control-return, blocking, and semaphore/gate traces.",
+    "[CDP:DIALOG:BLOCKED] log pattern: Chrome JS alert/confirm/beforeunload blocked a11y/CDP commands. Auto-dismissed. Search in ask/web command logs. Also fires wkappbot speak audible alert.",
+    "[CDP:NODE-ERROR] log pattern: node access failure (No node with given id / Cannot find context / detached). Followed by page inspection dump: URL, title, readyState, dialog nodes, top-8 interactive targets with selectors. Use the sel/id fields to retarget.",
+    "[REAPER] log pattern: idle tab recycled (ping\u002Bnavigate) or killed. [REAPER] Recycled = reuse success. [REAPER] Closed = renderer dead or dialog blocking, new tab will be created on next ask.",
+    "[TAB-CAP] log pattern: oldest tab killed to enforce 9-tab limit. Fired on every ask entry (EnforceTabCapAsync)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot logcat \u0022error\u0022 --past 1h",
+      "expect": "filters recent error lines from .log files",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot logcat \u0022FindAllPrompts\u0022 \u0022.wkappbot/hq/logs/old eye/*.log\u0022",
+      "expect": "finds prompt-detection lines in Eye logs",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot logcat \u0022resume --last\u0022 \u0022.wkappbot/hq/logs/old ask codex/*.log\u0022",
+      "expect": "finds Codex resume chatter in ask logs",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read core-worker-logging-launcher-chain",
+      "expect": "shows layered logging and errors.jsonl guidance",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read logcat-command-cheatsheet",
+      "expect": "shows logcat filtering and log directory basics",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File scripts/find-wkappbot-caller-chain.ps1",
+      "expect": "prints the newest matching live process, its parent chain, and the nearest command_history entry",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read elevated-eye-admin-pipe-server",
+      "expect": "shows the admin pipe busy gate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read all-sudo-proxy-subprocess-timeout-hasexited-check",
+      "expect": "shows sudo timeout and drain behavior",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot logcat WKAPPBOT_SUDO_ACTIVE --past 30m",
+      "expect": "finds sudo routing traces",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot logcat timeout --past 30m",
+      "expect": "finds launcher timeout traces",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "log",
+    "logs",
+    "search",
+    "debug",
+    "workflow",
+    "operator",
+    "history",
+    "errors",
+    "command"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-06T09:34:20.4939514Z",
+  "updated": "2026-05-08T07:21:08.3153678Z",
+  "version": "1.5"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "cdp-port-isolation-sha256-4-port-block-per-project-cwd",
+  "app": "wkappbot",
+  "title": "CDP port isolation: SHA256 4-port block per project CWD",
+  "title_ko": null,
+  "desc": "CDP isolation scheme 2026-05-08: SHA256-based deterministic 4-port block per project, foreign Chrome rejection, CWD-hash sandbox keys, live position computation.",
+  "steps": [
+    "PORT: DerivePort(root) = SHA256(path.lower())[0:4] uint32 % 174 * 4 \u002B 9300. Always \u0026 0xFFFC aligned. 174 blocks x 4 ports in 9300-9995.\nROOT: ProjectRoot.Find(parentProcessCWD) -- not raw CWD. Claude moves to subdirs; git root is stable identity. Read via GetParentProcessId \u002B GetProcessCurrentDirectory (NtQueryInformationProcess).\nBLOCK: ports [base..base\u002B3] belong to one project. Collision tries remaining 3 slots. All 4 taken = hard error (intentional).\nFOREIGN REJECT: (1) FindRunningChromePortAny: registered=0 means skip (0!=port). (2) WebOpenCommand: reject if (found\u00260xFFFC)!=(derived\u00260xFFFC). (3) explicit --port: AppBotExit(1) if outside block.\nSANDBOX KEY: BuildSandboxKey uses SHA256(callerCWD)[0:4] not HWND. Format: cmd\u002Bhost\u002BcwdHash4. Stable across sessions unlike HWND.\nPOSITION: always pass --window-position to Chrome. CallerHwnd latched=caller-offset. No latch=ExpectedBounds top-right. ComputePlacementNearCaller() null=no reposition. No geometry file persistence."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-port-isolation-sha256-4-port-block-per-project-cwd",
+      "expect": "SHA256",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n DerivePort D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs",
+      "expect": "SHA256.HashData",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n derivedBlock D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/WebCommands.cs",
+      "expect": "0xFFFC",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T19:02:00.3436516Z",
+  "updated": "2026-05-07T19:02:00.3436617Z",
+  "version": "1.0"
+}

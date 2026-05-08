@@ -1,0 +1,80 @@
+{
+  "id": "ask-suggest-priority-batching",
+  "app": "wkappbot-workflow",
+  "title": "Ask Suggest Priority Batching",
+  "title_ko": null,
+  "desc": "Reduce ask-gpt calls when triaging wkappbot suggest backlogs. Use when you have a page of suggestions and want one GPT ranking pass, then one ask per suggestion in priority order.",
+  "steps": [
+    "SELF-HEAL BEFORE TRIAGE (MANDATORY): verify tools first -- (1) skill read this skill \u002B suggest-workflow: fix stale steps with skill edit. (2) wkappbot ask speed-check: if dead or slow, reopen with --new-tab. (3) wkappbot suggest list: if malformed or errors, fix upstream. Broken tools = fake progress. Heal first, triage second.",
+    "Pull one page: wkappbot suggest list -- keep scope bounded. Do NOT re-triage full backlog at once.",
+    "Before asking GPT, run wkappbot suggest show \u003Cts\u003E for each candidate -- include ts, title, and current status in the GPT prompt for accurate ranking",
+    "Merge obvious duplicates first: wkappbot suggest merge --all-matching PATTERN --dry-run to preview, then without --dry-run. NOTE: (a) --all-matching blocked in WKAppBot maintainer channel -- run from sibling project CWD (e.g. WkAutoQuant) to bypass. (b) merge requires --root-cause, --work, --components, --affected-cmds -- always supply all four or the command errors.",
+    "Fire GPT batch rank once for the whole page (fire-and-forget, background): ask in English to rank by impact, risk, urgency, effort. Immediately continue -- NEVER block waiting for GPT response.",
+    "NO-RESPONSE HANDLING: (1) While ask gpt runs, start own codebase analysis on top items via grep \u002B skill reads in parallel. (2) After 2 minutes without response: re-dispatch with --new-tab, continue triage. (3) If wkappbot ask log shows FindAllPrompts: 0, Chrome AI tabs are closed -- reopen with --new-tab, file BUG-AUTO suggest.",
+    "PER-ITEM ASK IS MANDATORY (NEVER skip): for EVERY suggest item you act on, MUST call wkappbot ask gpt --timeout 20s with ts \u002B title \u002B root-cause question BEFORE writing any code. No ask = no action. Triad for ambiguous items, gpt for clear ones. Fire all asks concurrently then WAIT for all responses -- do NOT proceed until ask results are in hand. If ask response reveals a problem: if small\u002Bsafe, fix inline; otherwise delegate to Opus agent with exact file path, failing evidence, and expected verification step.",
+    "DELEGATION (MANDATORY): Sonnet orchestrates, Opus executes. Brief Opus agent with: suggest ts \u002B title \u002B root-cause from ask \u002B fix path. Opus edits code, builds, writes evidence script, resolves. Sonnet never writes code inline. Pattern: Agent(model:\u0027opus\u0027, prompt:\u0027fix suggest \u003Cts\u003E: \u003Ctitle\u003E. Ask result: \u003Csummary\u003E. Fix: \u003Csteps\u003E.\u0027)",
+    "ASK FAILURE RECOVERY: if ask times out or injection fails -- (1) file BUG-AUTO for the failure. (2) continue triage via codebase analysis only. (3) attempt fix: reopen with --new-tab, check Chrome. Never block on broken ask -- triage continues.",
+    "If ask reveals reusable pattern: wkappbot skill edit \u003Cid\u003E to update the related skill before moving on.",
+    "After fix commit: wkappbot suggest check \u003Cts\u003E to verify regression PASS. Then close via ONE of two paths -- (A) 1st-party resolve: wkappbot suggest resolve \u003Cts\u003E NOTE [see suggest-workflow step 5 for the exact --i-completed-... flag; use that verbatim] --skill \u003Cid\u003E --commit \u003Chash\u003E (creates HALF state with evidence script; Eye auto-confirms hourly when binary newer). (B) 2nd-party confirm (only if suggest is already HALF from another resolver): wkappbot suggest resolve \u003Cts\u003E NOTE --confirm --skill \u003Cid\u003E. See suggest-workflow skill for the long --i-completed flag and DGWCS limitations.",
+    "Recurrence: if bug recurs AFTER fix commit, do NOT resolve old suggest -- file new suggest with post-fix repro date and uncovered code path.",
+    "Next page: reuse same batching prompt. Track page number to avoid re-reading already-ranked items. Repeat from step 2."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "shows active suggestions with ts values",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gpt \u0022 Problem: X. Goal: Y. Best approach?\u0022",
+      "expect": "returns a short English decision or plan",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching",
+      "expect": "shows the one-page batching workflow",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-triage-playbook",
+      "expect": "shows suggest ranking and duplicate-merge guidance",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-command-cheatsheet",
+      "expect": "shows ask gpt / triad / agent delegation basics",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "shows resolve and evidence workflow",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest merge --all-matching pattern --title merged",
+      "expect": "merges obvious duplicates before ranking",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest show \u003Cts\u003E",
+      "expect": "shows one visible suggest with ts and project context",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "gpt",
+    "suggest",
+    "priority",
+    "batching",
+    "triage",
+    "workflow"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-06T07:15:28.141417Z",
+  "updated": "2026-05-08T04:44:21.3940906Z",
+  "version": "1.43"
+}

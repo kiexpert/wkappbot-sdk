@@ -13,9 +13,14 @@
     "cdp open URL -\u003E returns OK {proc:\u0027chrome\u0027,...,cdp:9222}. Use this grap for subsequent a11y commands to pin port",
     "a11y eval REMOVED -- use a11y read/find/click with --eval-js \u0027expr\u0027 instead",
     "a11y find \u0027{proc:chrome,cdp:9222}\u0027 -- only finds Chrome on port 9222, personal Chrome excluded",
-    "Ask dispatch targets: GOOD \u003C300ms ",
-    " WARN 300-800ms ",
-    " BUG \u003E800ms"
+    "Ask dispatch targets: GOOD \u003C300ms",
+    "WARN 300-800ms",
+    "BUG \u003E800ms",
+    "--new-tab flag: NOW FUNCTIONAL -- clears registry entry for the sandbox key, forcing GetOrCreateSandboxedTabAsync to create a fresh tab instead of reusing cache. Use when tab is stuck or needs fresh session.",
+    "Tab cap=9: enforced immediately on every ask entry (EnforceTabCapAsync fire-and-forget). LRU tab closed when \u003E9 registered. Idle tabs (\u003E5min) recycled first: ping(1s) \u002B Page.navigate to base URL -- if ping fails (renderer dead/dialog blocking) tab is killed and new tab allowed.",
+    "[CDP:DIALOG:BLOCKED] red log \u002B wkappbot speak when JS alert/confirm/beforeunload blocks a11y commands. Auto-dismissed via Page.handleJavaScriptDialog. All blocked commands resume automatically.",
+    "[CDP:NODE-ERROR] red log when \u0027No node\u0027/\u0027Cannot find context\u0027/\u0027detached\u0027 errors occur. Dumps: URL, title, readyState, dialog nodes, top-8 interactive targets with selectors for retargeting.",
+    "Triad dialog recovery: if one of 3 parallel asks has a JS alert -- only that tab blocks (others continue). EvalAsync detects recent dialog dismiss (within 5s) and retries once after 300ms delay. Gives 3/3 triad results instead of 2/3 partial."
   ],
   "requirements": [
     {
@@ -50,6 +55,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T13:00:00Z",
-  "updated": "2026-05-07T09:17:21.8462796Z",
-  "version": "1.8"
+  "updated": "2026-05-08T07:24:28.0506165Z",
+  "version": "1.12"
 }

@@ -13,8 +13,8 @@
     "Example chain: wkappbot web open https://example.com -\u003E parse OK {proc:\u0027chrome\u0027,hwnd:0x..,domain:\u0027example.com\u0027} -\u003E wkappbot a11y read \u0022{proc:\u0027chrome\u0027,hwnd:0x..}\u0022 -\u003E reliable target lock",
     "web read is REMOVED outright. Use a11y read with a grap instead",
     "fetch is for raw HTTP where no JS is needed (static HTML, API endpoints); JS-rendered content belongs to a11y read on an open tab",
-    "2026-05-07 CDP FIELD: OK \u003Cgrap\u003E from cdp open now includes cdp:{port} (e.g. {proc:\u0027chrome\u0027,hwnd:0x...,cdp:9222}). Use this grap with a11y find/eval-js to pin connection to exact Chrome port -- prevents cross-session Chrome attach.",
-    "2026-05-07 CDP FIELD: OK \u003Cgrap\u003E from cdp open now includes cdp:{port} (e.g. {proc:\u0027chrome\u0027,hwnd:0x...,cdp:9222}). Use this grap with a11y find/eval-js to pin connection to exact Chrome port -- prevents cross-session Chrome attach."
+    "CDP FIELD in grap: cdp:{port} -- pins connection to exact Chrome instance.\n  Source: OK \u003Cgrap\u003E stdout from \u0027cdp open\u0027 always includes cdp:{port}.\n    wkappbot cdp open https://example.com\n    -\u003E OK {proc:\u0027chrome\u0027,hwnd:0x...,cdp:9224}   \u003C- parse and reuse\n  Why it matters: multiple wkappbot projects share the same Chrome binary;\n    without cdp: pinning, grap may attach to the WRONG project\u0027s Chrome.\n  Renderer process handling: Chrome renderer processes (Chrome_RenderWidgetHostHWND)\n    have no --remote-debugging-port in their cmdline. wkappbot automatically\n    walks up to the parent browser (holder) process to resolve the CDP port,\n    so {cdp:9224} correctly matches renderer windows too.\n  Use cdp: whenever cross-session isolation matters:\n    wkappbot a11y find \u0022{proc:\u0027chrome\u0027,cdp:9224}\u0022\n    wkappbot a11y eval-js \u0022{proc:\u0027chrome\u0027,domain:\u0027claude.ai\u0027,cdp:9224}\u0022 \u0022document.title\u0022",
+    "ask-command-cheatsheet also covers CDP port isolation for ask gpt/gemini/claude paths -- see skill ask-command-cheatsheet for per-ask cdp field usage."
   ],
   "requirements": null,
   "primary_cmd": null,
@@ -36,6 +36,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T13:00:00Z",
-  "updated": "2026-05-07T09:11:05.2251963Z",
-  "version": "1.13"
+  "updated": "2026-05-07T13:27:14.5519413Z",
+  "version": "1.17"
 }
