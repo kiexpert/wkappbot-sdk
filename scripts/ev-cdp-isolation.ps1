@@ -477,15 +477,15 @@ Check "Consent cookies sync back to master after Chrome session" {
     $masterCookies = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles/master/Default/Network/Cookies"
     $sizeBefore = if (Test-Path $masterCookies) { (Get-Item $masterCookies).Length } else { 0 }
 
-    # Open Chrome to example.com (any site creates some cookies) and wait for sync
+    # Open Chrome, wait > 5s cookie-throttle so FSW fires merge-back, then kill.
+    # Force-kill bypasses ProcessExit hook, so FSW-based merge is the only path here.
     KillWkappbotChrome @()
     Start-Sleep -Milliseconds 500
     $null = & $wk cdp open "https://example.com" 2>&1
-    Start-Sleep -Milliseconds 3000  # wait for FSW cookie sync (5s throttle, but some should fire)
+    Start-Sleep -Milliseconds 7000  # must exceed 5s cookie FSW throttle
 
-    # Gracefully close Chrome so profile is flushed (kill forces flush via our sync)
     KillWkappbotChrome @()
-    Start-Sleep -Milliseconds 2000  # wait for merge-back on Chrome exit
+    Start-Sleep -Milliseconds 1500  # settle after kill
 
     $sizeAfter = if (Test-Path $masterCookies) { (Get-Item $masterCookies).Length } else { 0 }
     $synced = $sizeAfter -ge $sizeBefore  # size should stay same or grow (IGNORE keeps master safe)
@@ -540,12 +540,13 @@ Check "Free AI services: consent dismissed + auth state check (global AI secret 
         # 1. Consent popup check + auto-dismiss
         $dismissed = $false
         foreach ($sel in $site.consent) {
-            $chk = & $core cdp run $grap "document.querySelector('$sel')?'FOUND:'+document.querySelector('$sel').innerText.trim().substring(0,20):'none'" 2>&1 | Out-String
+            # Use double-quotes around selector in JS so single-quoted attribute values don't break the string
+            $chk = & $core cdp run $grap "document.querySelector(`"$sel`")?'FOUND:'+document.querySelector(`"$sel`").innerText.trim().substring(0,20):'none'" 2>&1 | Out-String
             if ($chk -match 'FOUND:(.*)') {
                 $btn = $Matches[1].Trim()
                 $popupsFound += "$($site.name)"
                 Write-Host "  CONSENT $($site.name): [$btn] -- auto-clicking" -ForegroundColor Yellow
-                $null = & $core cdp run $grap "document.querySelector('$sel').click()" 2>&1
+                $null = & $core cdp run $grap "document.querySelector(`"$sel`").click()" 2>&1
                 Start-Sleep -Milliseconds 800
                 $dismissed = $true
                 break
@@ -553,7 +554,7 @@ Check "Free AI services: consent dismissed + auth state check (global AI secret 
         }
 
         # 2. Login state check
-        $loginChk = & $core cdp run $grap "document.querySelector('$($site.login)')?'LOGGEDIN':'LOGGEDOUT'" 2>&1 | Out-String
+        $loginChk = & $core cdp run $grap "document.querySelector(`"$($site.login)`")?'LOGGEDIN':'LOGGEDOUT'" 2>&1 | Out-String
         if ($loginChk -match 'LOGGEDIN') {
             $loggedIn += $site.name
             Write-Host "  AUTH $($site.name): logged in [OK]" -ForegroundColor Green
