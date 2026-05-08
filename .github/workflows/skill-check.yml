@@ -21,6 +21,9 @@ jobs:
       - name: Validate skill structure
         run: python3 .github/scripts/validate_skills.py
 
+      - name: Validate skill chain integrity
+        run: python3 .github/scripts/validate_skill_chain.py
+
       - name: Notify skill author via pending_prompts
         if: failure()
         env:
