@@ -48,11 +48,12 @@ $core = @("D:/GitHub/WKAppBot/bin/wkappbot-core.new.exe","D:/GitHub/WKAppBot/bin
 # Prevents auth loss in GPT/Gemini/Claude/Naver/KIS Chromes during tests
 function KillWkappbotChrome {
     param([string[]]$Ports)
-    $hqProfiles = "D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles"
+    # Match both forward-slash and backslash variants (CommandLine uses backslash on Windows)
+    $hqPattern = 'wkappbot\.hq[/\\]chrome-profiles'
     Get-Process chrome -ErrorAction SilentlyContinue | ForEach-Object {
         try {
             $cmd = (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)" -EA SilentlyContinue).CommandLine
-            $isWk = $cmd -match [regex]::Escape($hqProfiles)
+            $isWk = $cmd -match $hqPattern
             $inBlock = $Ports.Count -eq 0 -or ($Ports | ForEach-Object { $cmd -match "cdp=$_|cdp $_ |debugging-port=$_" } | Where-Object { $_ })
             if ($isWk -and $inBlock) { Stop-Process -Id $_.Id -Force -EA SilentlyContinue }
         } catch {}
