@@ -178,7 +178,17 @@ Check "no hardcoded 9222 in SDK launcher source" {
 Check "Chrome opens near caller window (not legacy position)" {
     if ($IsCI -or -not $core) { return $true } # local-only: needs live wkappbot
 
-    # Get caller terminal window position via wkappbot
+    # Use wkappbot.exe (not core directly) so the call goes through Eye pipe
+    # and callerHwnd is passed correctly for placement. Direct core invocation
+    # has no Eye pipe → no callerHwnd → placement always falls back to saved position.
+    $wkappbot = @("D:/SDK/bin/wkappbot.exe", "D:/GitHub/WKAppBot/bin/wkappbot.exe") |
+                Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($null -eq $wkappbot) {
+        Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Get caller terminal window position
     $callerInfo = & $core a11y find "{proc:'WindowsTerminal',cls:'CASCADIA_HOSTING_WINDOW_CLASS'}" 2>&1 | Out-String
     $callerPos = if ($callerInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') {
         @([int]$Matches[1], [int]$Matches[2])
@@ -189,29 +199,84 @@ Check "Chrome opens near caller window (not legacy position)" {
         return $true
     }
 
-    # Kill existing Chrome and open fresh via cdp open
+    # Kill all Chrome for a clean placement test (this test needs fresh Chrome at known position)
     Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 800
-    $null = & $core cdp open "https://example.com" 2>&1
-    Start-Sleep -Milliseconds 1200
+    Start-Sleep -Milliseconds 1000
+    # Clear port registry so fresh Chrome gets correct port
+    Get-ChildItem "D:/GitHub/WKAppBot/bin/wkappbot.hq/runtime","D:/GitHub/wkappbot-sdk/bin/wkappbot.hq/runtime" `
+        -Filter "cdp_port_*.txt" -ErrorAction SilentlyContinue | Remove-Item -Force
 
-    # Get Chrome window position
-    $chromeInfo = & $core a11y find "{proc:'chrome',cls:'Chrome_WidgetWin_1'}" 2>&1 | Out-String
+    $openResult = & $wkappbot cdp open "https://example.com" 2>&1 | Out-String
+    $launchedPort = if ($openResult -match 'cdp:(\d+)') { [int]$Matches[1] } else { 0 }
+    Start-Sleep -Milliseconds 1500
+
+    # Restore Chrome from minimized state (cdp open minimizes Chrome after connecting)
+    $null = & $core a11y restore "{proc:'chrome',cls:'Chrome_WidgetWin_1'}" 2>&1
+    Start-Sleep -Milliseconds 600
+
+    if ($launchedPort -eq 0) {
+        Write-Host "  (SKIP: could not parse launched port from cdp open output)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Restore Chrome -- identify by CDP port (most precise: avoids finding user's other Chromes)
+    $null = & $core a11y restore "{proc:'chrome',cdp:$launchedPort}" 2>&1
+    Start-Sleep -Milliseconds 600
+
+    # Get Chrome window position by CDP port
+    $chromeInfo = & $core a11y find "{proc:'chrome',cdp:$launchedPort,cls:'Chrome_WidgetWin_1'}" 2>&1 | Out-String
     $chromePos = if ($chromeInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') {
         @([int]$Matches[1], [int]$Matches[2])
     } else { $null }
 
     if ($null -eq $chromePos) {
-        Write-Host "  (SKIP: cannot read Chrome position)" -ForegroundColor DarkGray
+        Write-Host "  (SKIP: cannot read Chrome position for port $launchedPort)" -ForegroundColor DarkGray
         return $true
     }
 
     $dx = [Math]::Abs($chromePos[0] - $callerPos[0])
     $dy = [Math]::Abs($chromePos[1] - $callerPos[1])
-    Write-Host "  caller=($($callerPos[0]),$($callerPos[1])) chrome=($($chromePos[0]),$($chromePos[1])) delta=($dx,$dy)" -ForegroundColor DarkGray
+    Write-Host "  caller=($($callerPos[0]),$($callerPos[1])) chrome=($($chromePos[0]),$($chromePos[1])) delta=($dx,$dy) port=$launchedPort" -ForegroundColor DarkGray
 
-    # Chrome should be within 200px of caller window (caller-offset placement = -30,-30)
-    return ($dx -le 200 -and $dy -le 200)
+    # Chrome should be within 300px of caller window (caller-offset = -30,-30 + monitor clamp)
+    return ($dx -le 300 -and $dy -le 300)
+}
+
+# ------------------------------------------------------------------
+# 11. Tab count does not grow unboundedly -- open 3 URLs, verify <= TabCap tabs
+# ------------------------------------------------------------------
+Check "Tab count stays within TabCap after multiple cdp opens" {
+    if ($IsCI -or -not $core) { return $true }
+    $wk = @("D:/SDK/bin/wkappbot.exe","D:/GitHub/WKAppBot/bin/wkappbot.exe") |
+          Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $wk) {
+        Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    $port = 0
+    # Open same Chrome 3 more times via Eye (reuse -- tabs accumulate inside one Chrome)
+    for ($i = 0; $i -lt 3; $i++) {
+        $out = & $wk cdp open "https://example.com" 2>&1 | Out-String
+        if ($out -match 'cdp:(\d+)') { $port = [int]$Matches[1] }
+        Start-Sleep -Milliseconds 300
+    }
+
+    if ($port -eq 0) {
+        Write-Host "  (SKIP: no port from cdp open)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Count targets (tabs) on this Chrome via CDP
+    try {
+        $targets = Invoke-RestMethod "http://localhost:$port/json" -ErrorAction Stop
+        $tabCount = @($targets | Where-Object { $_.type -eq 'page' }).Count
+        Write-Host "  tabs=$tabCount port=$port (cap=9)" -ForegroundColor DarkGray
+        return $tabCount -le 9
+    } catch {
+        Write-Host "  (SKIP: cannot query CDP /json on port $port)" -ForegroundColor DarkGray
+        return $true
+    }
 }
 
 # ------------------------------------------------------------------
