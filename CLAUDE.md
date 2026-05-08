@@ -241,6 +241,30 @@ Supported actions: click/double_click/right_click/type_text/press_key/hotkey/wai
 D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ```
 
+## gg Main Workflow
+
+Execute in order when user sends 'gg':
+1. wkappbot skill read on-load
+2. wkappbot suggest list
+3. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage the backlog above')
+
+## Main Duties (recurring responsibilities)
+
+| Duty | How |
+|------|-----|
+| Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
+| MD self-healing | `wkappbot skill read claude-md-guide` -- apply situation A-H as they arise |
+| SDK user skill distribution | `setup.ps1` auto-install `wkappbot-workflow` skills on first run (suggest filed: 2026-05-08) |
+| Session recovery | `wkappbot session list --claude --cwd` after compaction |
+| Release prep | CHANGELOG + VERSIONING + CLAUDE.md header + gh issue comment on launch checklist |
+
+## Skills
+# Remove keywords that don't apply, then run:
+wkappbot skill search cdp chrome windows a11y uia hangul ime whisper slack eye suggest gg workflow
+
+## Gotchas
+- (add project-specific gotchas here as you discover them)
+
 ## References
 - `README.md`
 - `AGENTS.md`
