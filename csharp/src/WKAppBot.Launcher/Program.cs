@@ -1270,7 +1270,9 @@ partial class Program
                         "```\n" +
                         "wkappbot skill search \"mandatory rules guide\"   # -> claude-md-guide\n" +
                         "wkappbot skill read claude-md-guide\n" +
-                        "```\n");
+                        "```\n" +
+                        "# Or search by topic (remove irrelevant keywords):\n" +
+                        skillSearchGlobal + "\n");
                     Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.Error.WriteLine("[GUIDE] Session-start guidance added to ~/.claude/CLAUDE.md");
                     Console.ResetColor();
@@ -1279,8 +1281,10 @@ partial class Program
             }
 
             // Project CLAUDE.md: create minimal stub if missing, or append skill search if absent
+            const string skillSearchGlobal =
+                "wkappbot skill search session start suggest gg workflow handoff compaction language delegate notify terse rules mandatory";
             const string skillSearchLine =
-                "wkappbot skill search session start suggest gg workflow cdp chrome windows a11y uia hangul ime whisper slack eye handoff compaction";
+                "wkappbot skill search cdp chrome windows a11y uia hangul ime whisper slack eye suggest gg workflow";
             var projMd = Path.Combine(Directory.GetCurrentDirectory(), "CLAUDE.md");
             if (!File.Exists(projMd))
             {
