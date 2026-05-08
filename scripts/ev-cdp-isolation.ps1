@@ -173,6 +173,48 @@ Check "no hardcoded 9222 in SDK launcher source" {
 }
 
 # ------------------------------------------------------------------
+# 10. Chrome placement -- opens near caller window, not at legacy saved position
+# ------------------------------------------------------------------
+Check "Chrome opens near caller window (not legacy position)" {
+    if ($IsCI -or -not $core) { return $true } # local-only: needs live wkappbot
+
+    # Get caller terminal window position via wkappbot
+    $callerInfo = & $core a11y find "{proc:'WindowsTerminal',cls:'CASCADIA_HOSTING_WINDOW_CLASS'}" 2>&1 | Out-String
+    $callerPos = if ($callerInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') {
+        @([int]$Matches[1], [int]$Matches[2])
+    } else { $null }
+
+    if ($null -eq $callerPos) {
+        Write-Host "  (SKIP: cannot read terminal position)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    # Kill existing Chrome and open fresh via cdp open
+    Get-Process chrome -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 800
+    $null = & $core cdp open "https://example.com" 2>&1
+    Start-Sleep -Milliseconds 1200
+
+    # Get Chrome window position
+    $chromeInfo = & $core a11y find "{proc:'chrome',cls:'Chrome_WidgetWin_1'}" 2>&1 | Out-String
+    $chromePos = if ($chromeInfo -match 'pos\s*:\s*\((-?\d+),\s*(-?\d+)\)') {
+        @([int]$Matches[1], [int]$Matches[2])
+    } else { $null }
+
+    if ($null -eq $chromePos) {
+        Write-Host "  (SKIP: cannot read Chrome position)" -ForegroundColor DarkGray
+        return $true
+    }
+
+    $dx = [Math]::Abs($chromePos[0] - $callerPos[0])
+    $dy = [Math]::Abs($chromePos[1] - $callerPos[1])
+    Write-Host "  caller=($($callerPos[0]),$($callerPos[1])) chrome=($($chromePos[0]),$($chromePos[1])) delta=($dx,$dy)" -ForegroundColor DarkGray
+
+    # Chrome should be within 200px of caller window (caller-offset placement = -30,-30)
+    return ($dx -le 200 -and $dy -le 200)
+}
+
+# ------------------------------------------------------------------
 Write-Host ""
 Write-Host "=== Results: $pass passed, $errors failed ===" -ForegroundColor $(if ($errors -eq 0) {'Green'} else {'Yellow'})
 exit $errors
