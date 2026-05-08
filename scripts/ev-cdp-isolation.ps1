@@ -516,7 +516,6 @@ Check "Free AI services: consent dismissed + auth state check (global AI secret 
         @{ name="Grok";        url="https://grok.x.com";              consent=@("div[data-testid='cookie'] button","button[class*='cookie']"); login="[aria-label*='Profile']" }
         @{ name="Copilot";     url="https://copilot.microsoft.com";   consent=@("#onetrust-accept-btn-handler","button[data-bi-id*='cookie']"); login="[aria-label*='Account manager']" }
         @{ name="Perplexity";  url="https://www.perplexity.ai";       consent=@("button[class*='cookie']","[id*='cookie'] button"); login="[aria-label*='profile']" }
-        @{ name="Groq";        url="https://groq.com";                consent=@("[class*='cookie'] button","#onetrust-accept-btn-handler"); login="[href*='dashboard']" }
         @{ name="Naver";       url="https://www.naver.com";           consent=@("button.btn_agree","a.btn_agree"); login=".MyView-module__btn_my___HsHkM,#gnb_login_button" }
     )
 
@@ -556,7 +555,7 @@ Check "Free AI services: consent dismissed + auth state check (global AI secret 
         $loginChk = & $core cdp run $grap "document.querySelector('$($site.login)')?'LOGGEDIN':'LOGGEDOUT'" 2>&1 | Out-String
         if ($loginChk -match 'LOGGEDIN') {
             $loggedIn += $site.name
-            Write-Host "  AUTH $($site.name): logged in ✓" -ForegroundColor Green
+            Write-Host "  AUTH $($site.name): logged in [OK]" -ForegroundColor Green
         } else {
             $loggedOut += $site.name
             Write-Host "  AUTH $($site.name): NOT logged in" -ForegroundColor Yellow
@@ -574,10 +573,69 @@ Check "Free AI services: consent dismissed + auth state check (global AI secret 
     # Fail if majority of AI services are not logged in (likely cookie sync broken)
     $authRate = if ($loggedIn.Count + $loggedOut.Count -gt 0) { $loggedIn.Count / ($loggedIn.Count + $loggedOut.Count) } else { 1 }
     if ($authRate -lt 0.3) {
-        Write-Host "  WARN: <30% of AI services logged in -- master cookie sync may be broken" -ForegroundColor Yellow
+        Write-Host "  WARN: less than 30% of AI services logged in -- master cookie sync may be broken" -ForegroundColor Yellow
         return $false
     }
     return $true
+}
+
+# ------------------------------------------------------------------
+# 19. Free REST AI API key services -- no browser needed, just HTTP + .env keys
+# ------------------------------------------------------------------
+Check "Free REST AI APIs reachable with .env API keys (Groq/Cerebras/Gemini)" -WarnOnly {
+    # Load keys from central secrets file
+    $envFile = "D:/GitHub/.env"
+    $envVars = @{}
+    if (Test-Path $envFile) {
+        Get-Content $envFile | Where-Object { $_ -match '^\s*([A-Z0-9_]+)\s*=\s*(.+)$' } | ForEach-Object {
+            $envVars[$Matches[1]] = $Matches[2].Trim()
+        }
+    }
+
+    $apis = @(
+        @{
+            name    = "Groq"
+            key_var = "GROQ_API_KEY"
+            url     = "https://api.groq.com/openai/v1/models"
+            headers = @{ Authorization = "Bearer {KEY}" }
+        }
+        @{
+            name    = "Cerebras"
+            key_var = "CEREBRAS_API_KEY"
+            url     = "https://api.cerebras.ai/v1/models"
+            headers = @{ Authorization = "Bearer {KEY}" }
+        }
+        @{
+            name    = "Gemini"
+            key_var = "GEMINI_API_KEY"
+            url     = "https://generativelanguage.googleapis.com/v1/models?key={KEY}"
+            headers = @{}
+        }
+    )
+
+    $allOk = $true
+    foreach ($api in $apis) {
+        $key = $envVars[$api.key_var]
+        if ([string]::IsNullOrEmpty($key)) {
+            Write-Host "  SKIP $($api.name): $($api.key_var) not in .env" -ForegroundColor DarkGray
+            continue
+        }
+        try {
+            $url = $api.url -replace '\{KEY\}', $key
+            $hdrs = @{}
+            foreach ($kv in $api.headers.GetEnumerator()) {
+                $hdrs[$kv.Key] = $kv.Value -replace '\{KEY\}', $key
+            }
+            $resp = Invoke-RestMethod $url -Headers $hdrs -TimeoutSec 10 -ErrorAction Stop
+            $count = if ($resp.data) { $resp.data.Count } elseif ($resp.models) { $resp.models.Count } else { "?" }
+            Write-Host "  [OK] $($api.name): $count models available" -ForegroundColor Green
+        } catch {
+            $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { "ERR" }
+            Write-Host "  FAIL $($api.name): HTTP $status -- $_" -ForegroundColor Red
+            $allOk = $false
+        }
+    }
+    return $allOk
 }
 
 # ------------------------------------------------------------------
