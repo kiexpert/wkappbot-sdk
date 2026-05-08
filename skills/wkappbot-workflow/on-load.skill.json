@@ -12,7 +12,8 @@
     "GG TRIGGER: if user message is exactly 'gg'/'ggg', locate '## gg Main Workflow' or '## Main Workflow' in project CLAUDE.md and execute every step sequentially without confirmation. If CLAUDE.md missing or no gg section: follow step 7 to create it first.",
     "COMPACTION RECOVERY (only after compaction -- not every session start): steps 2+3 above already reload rules and context. Additionally: (1) wkappbot session list --claude --cwd for session files. (2) wkappbot session list --codex for Codex sessions. (3) codex resume --last to continue Codex directly. (4) wkappbot skill read claude-md-guide + git log --oneline -10.",
     "HANDOFF COMMAND: if user says 'handoff' or 'continue from last session', run: wkappbot skill read claude-session-handoff -- find previous JSONL (index [1]) and extract context.",
-    "PROJECT MAIN TASKS -- gg section authoring (only when step 5 cannot find a gg section): ask the user what the main recurring tasks are, then write '## gg Main Workflow' in the repo CLAUDE.md. Each step must be an executable command or Agent() call. TEMPLATE: 1. wkappbot skill read on-load 2. wkappbot suggest list 3. Agent(model:opus, prompt:'triage: <list>')."
+    "PROJECT MAIN TASKS -- gg section authoring (only when step 5 cannot find a gg section): ask the user what the main recurring tasks are, then write '## gg Main Workflow' in the repo CLAUDE.md. Each step must be an executable command or Agent() call. TEMPLATE: 1. wkappbot skill read on-load 2. wkappbot suggest list 3. Agent(model:opus, prompt:'triage: <list>').",
+    "SKILL EDIT DISCIPLINE (read every session -- juniors forget this): NEVER directly edit .skill.json files with Edit/Write/wkedit tools. The '|' character is the step separator -- direct edits corrupt step boundaries, miss version bump, and skip catalog registration so the skill disappears from 'skill search'. ALWAYS use: wkappbot skill edit <id> --steps/--add-step/--tags/--desc OR wkappbot skill contribute for new skills. Exception: if you edited directly by mistake, immediately run wkappbot skill install <path> to re-register."
   ],
   "requirements": [
     {
@@ -131,6 +132,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-05-08T14:25:20.5417007Z",
-  "version": "1.41"
+  "updated": "2026-05-08T14:34:26.3072546Z",
+  "version": "1.43"
 }
