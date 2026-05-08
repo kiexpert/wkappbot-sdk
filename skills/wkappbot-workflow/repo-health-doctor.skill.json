@@ -5,20 +5,26 @@
   "title_ko": "레포 건강검진: 이슈·빈섹션·미답댓글 일괄 점검",
   "desc": "Periodic repo health check covering GitHub issues (close Daily reports, triage real bugs), unanswered issue comments, empty CLAUDE.md sections (Gotchas/Skills stubs), and launch checklist progress comments. Run before release or when repo feels stale.",
   "steps": [
-    "WHEN TO RUN: before a release, after a sprint, or when repo feels stale. Also triggered from claude-md-guide situation H (periodic check).",
-    "STEP 1 -- GitHub issues: gh issue list --state open. (A) [Daily] WKAppBot Report entries -> close all: gh issue close <n> --reason completed --comment \"Closing automated daily report\". (B) Real bugs -> check if fixed in recent commits: git log --oneline --since=<issue-date> ",
+    "WHEN TO RUN -- two modes: [LITE] run any time (session start, after big refactor, before committing). [FULL] run before release or when repo feels stale -- includes administrative work that costs context. Quick alias: wkappbot skill read repo-health-doctor and run only [LITE] steps for fast checks.",
+    "[FULL] GitHub issues: gh issue list --state open. (A) [Daily] WKAppBot Report entries -> close all: gh issue close <n> --reason completed --comment \"Closing automated daily report\". (B) Real bugs -> check if fixed in recent commits: git log --oneline --since=<issue-date> ",
     " grep -i <keyword>. If fixed -> close with version. If not -> comment with current status. (C) Feature requests -> comment with roadmap note or file suggest: wkappbot suggest \"title\".",
-    "STEP 2 -- Unanswered issue comments: for each open issue with comments, run gh issue view <n> --comments. Look for questions or requests from external contributors that have no owner reply. Draft a reply and post: gh issue comment <n> --body \"...\".",
-    "STEP 3 -- CLAUDE.md empty sections: Read project CLAUDE.md. Find stub lines: '- (add project-specific gotchas here)', '# Remove keywords that don't apply', empty ## Skills or ## Gotchas. Actions: (A) Skills stub -> run the search line, pick top 3 relevant skills, replace stub with actual reads. (B) Gotchas stub -> scan recent git log and suggest list for lessons learned, fill in real gotchas. (C) Build section missing -> add from actual dotnet publish / npm run / make command.",
-    "STEP 4 -- Launch checklist (if issue #1 exists in repo): gh issue view 1 --comments. Check latest progress comment. If new items were completed since last comment, post an update: list completed items, update progress %, list remaining. Template: '### v<X.Y.Z> release -- <date>' + completed items + current progress + remaining table.",
-    "STEP 5 -- Commit any CLAUDE.md changes: git add CLAUDE.md && git commit -m 'docs: heal CLAUDE.md empty sections'. Push. Then run wkappbot skill read claude-md-guide to verify no drift with README.md.",
-    "README.md sync check: compare README.md against CLAUDE.md and recent commits. (A) Version number in README -> update to current (wkappbot --version). (B) Feature list / architecture section -> verify reflects latest changes from git log --oneline -20. (C) Quick-start commands -> run each one and confirm they still work. (D) Any section that overlaps with CLAUDE.md -> must agree exactly. If drift found: fix both in one commit. Rule: README is the public face -- if a user reads only README, they must get accurate current info.",
-    "AGENTS.md / CLAUDE.md parity (juniors forget this): if both exist, they must agree on shared AI policy -- delegation rules, language, notification method, process kill protection. Run: diff <(grep -A3 '##' CLAUDE.md) <(grep -A3 '##' AGENTS.md) as a sanity check. Any section present in one but absent in the other = drift. Fix in one commit. Codex reads AGENTS.md; Claude reads CLAUDE.md -- if they diverge, the two AIs work with different rules on the same repo.",
-    "Skill source_refs audit (juniors forget after refactors): wkappbot skill audit -- finds skills whose source_refs point to moved/renamed/deleted code. Stale refs waste future sessions (Claude reads the skill, tries the ref, gets confused). Fix: wkappbot skill edit <id> --source-refs updated-path. Do this after every file rename or module split.",
-    "gg section smoke test (user experience gate): actually send 'gg' and verify every step in ## gg Main Workflow runs without error. Common failures: (A) skill ID renamed -> update the read command. (B) suggest list times out -> add --timeout. (C) build command path changed -> fix inline. (D) Agent prompt references removed features -> update. If any step fails silently, the user gets no feedback and thinks gg worked. Fix before committing.",
-    "CI health check: gh run list --limit 5 -- verify latest runs are green. If red: gh run view <id> --log-failed to diagnose. Fix before release. Common CI failures after SDK work: path changes in scripts, new env var not set in secrets, binary size limit exceeded. Never ship a release with a red CI -- users see it on the badge and lose trust immediately.",
-    "Resolved suggests cleanup (SDK growth habit): wkappbot suggest list -- look for HALF state items (1-of-2 resolved) that are actually done. Run wkappbot suggest check <ts> --confirm to complete them. Also look for suggests that describe bugs already fixed in recent commits: close with wkappbot suggest resolve <ts> 'fixed in v<X.Y>'. Stale suggests mislead future sessions into thinking the bug is still open.",
-    "User-facing text audit (user experience): search for debug noise left in production -- grep -r 'Console.Error.Write.*\\[DBG\\]\\|TODO\\|FIXME\\|HACK\\|TEMP\\b' csharp/src/ --include=*.cs. Also check --help output: wkappbot --help | grep -E '^\\s+\\w' -- every listed command should still exist and work. Remove or fix anything that would confuse a first-time user. First impressions matter: a user who hits a broken --help or debug spam in production will file an issue immediately."
+    "[FULL] Unanswered issue comments: for each open issue with comments, run gh issue view <n> --comments. Look for questions from contributors with no owner reply. Post: gh issue comment <n> --body \"...\".",
+    "[LITE] CLAUDE.md empty sections: Read project CLAUDE.md. Find stub lines like '- (add project-specific gotchas here)' or '# Remove keywords that don't apply'. Actions: (A) Skills stub -> run the search line, pick top 3 relevant skills, replace stub with actual reads. (B) Gotchas stub -> scan git log and suggest list for lessons learned, fill real gotchas. (C) Build section missing -> add from actual build command.",
+    "[FULL] Launch checklist (if issue #1 exists): gh issue view 1 --comments. If new items completed since last comment, post update: list completed items, update progress %, list remaining.",
+    "[FULL] CHANGELOG completeness: git log --oneline since last version tag -- every meaningful commit should appear in CHANGELOG.md. Add missing entries before release.",
+    "[LITE] README.md sync: version number, feature list, quickstart commands -- verify all current. Any overlap with CLAUDE.md must agree exactly. Fix both in one commit.",
+    "[LITE] AGENTS.md / CLAUDE.md parity: both must agree on shared AI policy -- delegation, language, notifications, process kill. diff key sections. Fix in one commit. Codex reads AGENTS.md; Claude reads CLAUDE.md -- divergence means two AIs work under different rules.",
+    "[LITE] Skill source_refs audit: wkappbot skill audit -- finds skills whose source_refs point to moved/renamed/deleted code. Fix: wkappbot skill edit <id> to update refs. Do after every file rename or module split.",
+    "[LITE] gg section smoke test: actually run 'gg' and verify every step in ## gg Main Workflow executes without error. Common failures: renamed skill IDs, changed build paths, removed features in Agent prompts. Fix before committing.",
+    "[LITE] Command Grounding -- gg dry-run validator: extract every binary from ## gg Main Workflow. Run where <binary> (Windows) or which <binary>. If not found: append '# [BROKEN] <binary> not in PATH' comment in CLAUDE.md. Common broken patterns: absolute paths from another machine, venv-only python, npm without node_modules, renamed wkappbot subcommands. A CLAUDE.md with [BROKEN] commands trains the AI to retry a failing pattern indefinitely -- fix or remove immediately.",
+    "[FULL] CI health: gh run list --limit 5 -- all green before release. If red: gh run view <id> --log-failed. Never ship with a red CI badge -- users see it and lose trust.",
+    "[FULL] Resolved suggests cleanup: wkappbot suggest list -- HALF state items done in reality -> wkappbot suggest check <ts> --confirm. Suggests describing bugs fixed in recent commits -> close with version note. Stale suggests mislead future sessions.",
+    "[FULL] User-facing text audit: grep -r 'TODO\\",
+    "FIXME\\",
+    "HACK\\",
+    "TEMP\\b\\",
+    "\\[DBG\\]' csharp/src/ --include=*.cs. Also wkappbot --help ",
+    " check every listed command exists and works. Fix before release -- first-time users file issues immediately on broken --help."
   ],
   "requirements": [
     {
@@ -71,6 +77,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T13:36:27.8952491Z",
-  "updated": "2026-05-08T13:41:51.844229Z",
-  "version": "1.7"
+  "updated": "2026-05-08T13:47:44.693911Z",
+  "version": "1.11"
 }
