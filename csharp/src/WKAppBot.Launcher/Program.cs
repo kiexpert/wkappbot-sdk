@@ -1278,22 +1278,40 @@ partial class Program
                 }
             }
 
-            // Project CLAUDE.md: append gg Main Workflow template if missing
+            // Project CLAUDE.md: create minimal stub if missing, or append skill search if absent
+            const string skillSearchLine =
+                "wkappbot skill search session start suggest gg workflow cdp chrome windows a11y uia hangul ime whisper slack eye handoff compaction";
             var projMd = Path.Combine(Directory.GetCurrentDirectory(), "CLAUDE.md");
-            if (File.Exists(projMd))
+            if (!File.Exists(projMd))
+            {
+                var projName = Path.GetFileName(Directory.GetCurrentDirectory());
+                File.WriteAllText(projMd,
+                    $"# {projName} -- AI Session Guide\n\n" +
+                    "## Skills\n" +
+                    "# Remove keywords that don't apply, then run:\n" +
+                    skillSearchLine + "\n\n" +
+                    "## gg Main Workflow\n\n" +
+                    "Execute in order when user sends 'gg':\n" +
+                    "1. wkappbot skill read on-load\n" +
+                    "2. wkappbot suggest list\n" +
+                    "3. Agent(model:opus, prompt:'triage: <paste list above>')\n\n" +
+                    "## Gotchas\n- (add project-specific gotchas here)\n");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.Error.WriteLine($"[GUIDE] Created CLAUDE.md for {projName}");
+                Console.ResetColor();
+                any = true;
+            }
+            else
             {
                 var txt = File.ReadAllText(projMd);
-                if (!txt.Contains("gg Main Workflow") && !txt.Contains("## gg"))
+                if (!txt.Contains("skill search"))
                 {
                     File.AppendAllText(projMd,
-                        "\n\n## gg Main Workflow\n\n" +
-                        "Execute in order when user sends 'gg':\n" +
-                        "1. wkappbot skill read on-load\n" +
-                        "2. wkappbot suggest list\n" +
-                        "3. Agent(model:opus, prompt:'triage: <paste list above>')\n\n" +
-                        "## Gotchas\n- (add project-specific gotchas here)\n");
+                        "\n\n## Skills\n" +
+                        "# Remove keywords that don't apply, then run:\n" +
+                        skillSearchLine + "\n");
                     Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Error.WriteLine($"[GUIDE] gg Main Workflow added to {Path.GetFileName(projMd)}");
+                    Console.Error.WriteLine($"[GUIDE] skill search hint added to {Path.GetFileName(projMd)}");
                     Console.ResetColor();
                     any = true;
                 }
