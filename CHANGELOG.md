@@ -6,9 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [7.2.0-sdk] - 2026-05-08
 
 ### Added
+- **`wkappbot session list`**: unified session discovery for Claude + Codex + Gemini — `--claude`, `--codex`, `--gemini`, `--cwd`, `--days N`, keyword filter; shows slug/thread name, size, age in seconds; chains to `claude-session-handoff` for recovery
 - **CDP dialog auto-handling**: `Page.javascriptDialogOpening` unconditionally handled in `CdpClient` receive loop — auto-dismiss + `[CDP:DIALOG:BLOCKED]` red log + `wkappbot speak` audible alert on every connection
 - **Triad dialog recovery**: `EvalAsync` retries once after dialog auto-dismiss (5s window, 300ms delay) — triad gives 3/3 results even when one tab has a blocking alert
 - **Node error inspection**: `[CDP:NODE-ERROR]` red log + background page dump on node access failures (`No node`/`Cannot find context`/`detached`) — outputs URL, title, readyState, dialog nodes, top-8 interactive targets with selectors for retargeting
+- **`EnsureClaudeGuideSetup`**: auto-creates/appends `CLAUDE.md` on first run — global gets Session Start block (workflow keywords), project gets skill search line (tech-stack keywords) + gg workflow template; 30-day marker prevents repeat
+
+### Fixed
+- **Korean skill search**: `SkillRecord.SearchText` used `JavaScriptEncoder.Default` escaping CJK to `\uXXXX` — switched to `UnsafeRelaxedJsonEscaping` so `wkappbot skill search 뉴비` finds tagged skills
+- **IME Han/Yeong key**: ConPTY has no IME context so `IsSystemImeKoreanMode()` always returned false, immediately overwriting manual toggles via focus-sync. Fixed with 1.2s grace period (`_lastToggleTickMs`) + `ForceSystemImeMode()` calling `ImmSetConversionStatus` directly on the foreground window
 
 ### Fixed
 - **`--new-tab` was dead parameter**: now clears `AskTargetRegistry` sandbox key before `GetOrCreateSandboxedTabAsync`, forcing a fresh tab instead of cache reuse
