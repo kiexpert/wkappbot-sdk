@@ -128,8 +128,12 @@ Check "GeometryFilePath removed -- SaveGeometry is no-op in binary" {
     } elseif (Test-Path ".\bin\wkappbot-core.exe") { ".\bin\wkappbot-core.exe" } else { $null }
     if ($null -eq $core) { return $true } # CI: skip if no local binary
     # Binary should NOT contain the old geometry file path pattern
-    $strings = & strings $core 2>$null | Select-String "chrome_geometry_" | Select-Object -First 1
-    return $null -eq $strings
+    # Use PowerShell-native approach (strings.exe not available on all Windows installs)
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($core)
+        $text  = [System.Text.Encoding]::ASCII.GetString($bytes)
+        return -not $text.Contains("chrome_geometry_")
+    } catch { return $true } # can't read binary → skip
 }
 
 # ------------------------------------------------------------------
