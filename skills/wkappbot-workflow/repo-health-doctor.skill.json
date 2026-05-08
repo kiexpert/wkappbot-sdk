@@ -11,7 +11,8 @@
     "STEP 2 -- Unanswered issue comments: for each open issue with comments, run gh issue view <n> --comments. Look for questions or requests from external contributors that have no owner reply. Draft a reply and post: gh issue comment <n> --body \"...\".",
     "STEP 3 -- CLAUDE.md empty sections: Read project CLAUDE.md. Find stub lines: '- (add project-specific gotchas here)', '# Remove keywords that don't apply', empty ## Skills or ## Gotchas. Actions: (A) Skills stub -> run the search line, pick top 3 relevant skills, replace stub with actual reads. (B) Gotchas stub -> scan recent git log and suggest list for lessons learned, fill in real gotchas. (C) Build section missing -> add from actual dotnet publish / npm run / make command.",
     "STEP 4 -- Launch checklist (if issue #1 exists in repo): gh issue view 1 --comments. Check latest progress comment. If new items were completed since last comment, post an update: list completed items, update progress %, list remaining. Template: '### v<X.Y.Z> release -- <date>' + completed items + current progress + remaining table.",
-    "STEP 5 -- Commit any CLAUDE.md changes: git add CLAUDE.md && git commit -m 'docs: heal CLAUDE.md empty sections'. Push. Then run wkappbot skill read claude-md-guide to verify no drift with README.md."
+    "STEP 5 -- Commit any CLAUDE.md changes: git add CLAUDE.md && git commit -m 'docs: heal CLAUDE.md empty sections'. Push. Then run wkappbot skill read claude-md-guide to verify no drift with README.md.",
+    "README.md sync check: compare README.md against CLAUDE.md and recent commits. (A) Version number in README -> update to current (wkappbot --version). (B) Feature list / architecture section -> verify reflects latest changes from git log --oneline -20. (C) Quick-start commands -> run each one and confirm they still work. (D) Any section that overlaps with CLAUDE.md -> must agree exactly. If drift found: fix both in one commit. Rule: README is the public face -- if a user reads only README, they must get accurate current info."
   ],
   "requirements": [
     {
@@ -64,6 +65,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T13:36:27.8952491Z",
-  "updated": "2026-05-08T13:36:27.8952618Z",
-  "version": "1.0"
+  "updated": "2026-05-08T13:40:05.7245955Z",
+  "version": "1.1"
 }
