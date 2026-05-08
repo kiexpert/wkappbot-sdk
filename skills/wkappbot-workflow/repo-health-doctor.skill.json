@@ -1,0 +1,69 @@
+{
+  "id": "repo-health-doctor",
+  "app": "wkappbot-workflow",
+  "title": "Repo Health Doctor: issues, empty CLAUDE.md sections, unanswered comments",
+  "title_ko": "레포 건강검진: 이슈·빈섹션·미답댓글 일괄 점검",
+  "desc": "Periodic repo health check covering GitHub issues (close Daily reports, triage real bugs), unanswered issue comments, empty CLAUDE.md sections (Gotchas/Skills stubs), and launch checklist progress comments. Run before release or when repo feels stale.",
+  "steps": [
+    "WHEN TO RUN: before a release, after a sprint, or when repo feels stale. Also triggered from claude-md-guide situation H (periodic check).",
+    "STEP 1 -- GitHub issues: gh issue list --state open. (A) [Daily] WKAppBot Report entries -> close all: gh issue close <n> --reason completed --comment \"Closing automated daily report\". (B) Real bugs -> check if fixed in recent commits: git log --oneline --since=<issue-date> ",
+    " grep -i <keyword>. If fixed -> close with version. If not -> comment with current status. (C) Feature requests -> comment with roadmap note or file suggest: wkappbot suggest \"title\".",
+    "STEP 2 -- Unanswered issue comments: for each open issue with comments, run gh issue view <n> --comments. Look for questions or requests from external contributors that have no owner reply. Draft a reply and post: gh issue comment <n> --body \"...\".",
+    "STEP 3 -- CLAUDE.md empty sections: Read project CLAUDE.md. Find stub lines: '- (add project-specific gotchas here)', '# Remove keywords that don't apply', empty ## Skills or ## Gotchas. Actions: (A) Skills stub -> run the search line, pick top 3 relevant skills, replace stub with actual reads. (B) Gotchas stub -> scan recent git log and suggest list for lessons learned, fill in real gotchas. (C) Build section missing -> add from actual dotnet publish / npm run / make command.",
+    "STEP 4 -- Launch checklist (if issue #1 exists in repo): gh issue view 1 --comments. Check latest progress comment. If new items were completed since last comment, post an update: list completed items, update progress %, list remaining. Template: '### v<X.Y.Z> release -- <date>' + completed items + current progress + remaining table.",
+    "STEP 5 -- Commit any CLAUDE.md changes: git add CLAUDE.md && git commit -m 'docs: heal CLAUDE.md empty sections'. Push. Then run wkappbot skill read claude-md-guide to verify no drift with README.md."
+  ],
+  "requirements": [
+    {
+      "cmd": "gh issue list --state open",
+      "expect": "OPEN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read repo-health-doctor",
+      "expect": "STEP 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search repo health",
+      "expect": "repo-health-doctor",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "repo",
+    "health",
+    "doctor",
+    "issues",
+    "github",
+    "daily",
+    "close",
+    "triage",
+    "comments",
+    "unanswered",
+    "claude-md",
+    "empty",
+    "section",
+    "gotchas",
+    "stub",
+    "launch",
+    "checklist",
+    "release",
+    "cleanup",
+    "점검",
+    "이슈",
+    "댓글",
+    "빈섹션",
+    "릴리즈",
+    "건강검진",
+    "정리",
+    "닥터"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T13:36:27.8952491Z",
+  "updated": "2026-05-08T13:36:27.8952618Z",
+  "version": "1.0"
+}
