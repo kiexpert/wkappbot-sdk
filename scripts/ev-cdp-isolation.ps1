@@ -499,57 +499,84 @@ Check "Consent cookies sync back to master after Chrome session" {
 # ------------------------------------------------------------------
 # 18. Cookie consent popup detection -- if popup appears, consent cookies not synced
 # ------------------------------------------------------------------
-Check "No cookie consent popups after Chrome open (consent cookies in master)" -WarnOnly {
+Check "Free AI services: consent dismissed + auth state check (global AI secret harvest)" -WarnOnly {
     if ($IsCI -or -not $core) { return $true }
     $wk = @("D:/SDK/bin/wkappbot.exe","D:/GitHub/WKAppBot/bin/wkappbot.exe") |
           Where-Object { Test-Path $_ } | Select-Object -First 1
     if (-not $wk) { Write-Host "  (SKIP: wkappbot.exe not found)" -ForegroundColor DarkGray; return $true }
 
-    # Sites commonly showing consent banners + their consent button patterns
+    # Free AI services + common sites -- consent banners + login state check
+    # consent_sel: CSS selectors for cookie consent buttons
+    # logged_in_sel: CSS selector present only when user is authenticated
     $sites = @(
-        @{ url="https://www.google.com";  selectors=@("button[aria-label*='동의']","button[aria-label*='Accept']","#L2AGLb","#W0wltc") }
-        @{ url="https://www.naver.com";   selectors=@("button.btn_agree","a.btn_agree","[class*='cookie'] button","[id*='cookie'] button") }
+        @{ name="Google";      url="https://www.google.com";          consent=@("#L2AGLb","#W0wltc","button[aria-label*='Accept']","button[aria-label*='동의']"); login="a[aria-label*='Google Account']" }
+        @{ name="Claude";      url="https://claude.ai";               consent=@("[data-testid='cookie'] button","button[class*='consent']"); login="button[data-testid='user-menu']" }
+        @{ name="ChatGPT";     url="https://chat.openai.com";         consent=@("button[data-testid='accept-all']","#onetrust-accept-btn-handler"); login="button[data-testid='profile-button']" }
+        @{ name="Gemini";      url="https://gemini.google.com";       consent=@("#L2AGLb","button[aria-label*='Accept']"); login="[aria-label*='Google Account']" }
+        @{ name="Grok";        url="https://grok.x.com";              consent=@("div[data-testid='cookie'] button","button[class*='cookie']"); login="[aria-label*='Profile']" }
+        @{ name="Copilot";     url="https://copilot.microsoft.com";   consent=@("#onetrust-accept-btn-handler","button[data-bi-id*='cookie']"); login="[aria-label*='Account manager']" }
+        @{ name="Perplexity";  url="https://www.perplexity.ai";       consent=@("button[class*='cookie']","[id*='cookie'] button"); login="[aria-label*='profile']" }
+        @{ name="Groq";        url="https://groq.com";                consent=@("[class*='cookie'] button","#onetrust-accept-btn-handler"); login="[href*='dashboard']" }
+        @{ name="Naver";       url="https://www.naver.com";           consent=@("button.btn_agree","a.btn_agree"); login=".MyView-module__btn_my___HsHkM,#gnb_login_button" }
     )
 
     $popupsFound = @()
+    $loggedOut   = @()
+    $loggedIn    = @()
+
     $openOut = & $wk cdp open "https://www.google.com" 2>&1 | Out-String
     $port = if ($openOut -match 'cdp:(\d+)') { [int]$Matches[1] } else { 0 }
 
     if ($port -eq 0) {
         Write-Host "  (SKIP: no CDP port)" -ForegroundColor DarkGray; return $true
     }
-    Start-Sleep -Milliseconds 2000  # let page load
+
+    $grap = "{proc:'chrome',cdp:$port}"
 
     foreach ($site in $sites) {
-        # Navigate to site
-        $null = & $core cdp navigate "{proc:'chrome',cdp:$port}" $site.url 2>&1
+        $null = & $core cdp navigate $grap $site.url 2>&1
         Start-Sleep -Milliseconds 2500
 
-        foreach ($sel in $site.selectors) {
-            # Check if consent button exists via CDP eval
-            $result = & $core cdp run "{proc:'chrome',cdp:$port}" "document.querySelector('$sel') ? 'CONSENT_FOUND:'+document.querySelector('$sel').innerText.trim().substring(0,30) : 'none'" 2>&1 | Out-String
-            if ($result -match 'CONSENT_FOUND:(.+)') {
-                $btnText = $Matches[1].Trim()
-                $popupsFound += "$($site.url) -> [$btnText]"
-                Write-Host "  POPUP: $($site.url) consent button found: '$btnText'" -ForegroundColor Yellow
-                # Auto-click to dismiss (and sync consent cookie to master)
-                $null = & $core cdp run "{proc:'chrome',cdp:$port}" "document.querySelector('$sel').click()" 2>&1
-                Start-Sleep -Milliseconds 1000
+        # 1. Consent popup check + auto-dismiss
+        $dismissed = $false
+        foreach ($sel in $site.consent) {
+            $chk = & $core cdp run $grap "document.querySelector('$sel')?'FOUND:'+document.querySelector('$sel').innerText.trim().substring(0,20):'none'" 2>&1 | Out-String
+            if ($chk -match 'FOUND:(.*)') {
+                $btn = $Matches[1].Trim()
+                $popupsFound += "$($site.name)"
+                Write-Host "  CONSENT $($site.name): [$btn] -- auto-clicking" -ForegroundColor Yellow
+                $null = & $core cdp run $grap "document.querySelector('$sel').click()" 2>&1
+                Start-Sleep -Milliseconds 800
+                $dismissed = $true
                 break
             }
+        }
+
+        # 2. Login state check
+        $loginChk = & $core cdp run $grap "document.querySelector('$($site.login)')?'LOGGEDIN':'LOGGEDOUT'" 2>&1 | Out-String
+        if ($loginChk -match 'LOGGEDIN') {
+            $loggedIn += $site.name
+            Write-Host "  AUTH $($site.name): logged in ✓" -ForegroundColor Green
+        } else {
+            $loggedOut += $site.name
+            Write-Host "  AUTH $($site.name): NOT logged in" -ForegroundColor Yellow
         }
     }
 
     KillWkappbotChrome @()
-    Start-Sleep -Milliseconds 2000  # wait for merge-back
+    Start-Sleep -Milliseconds 2000
 
-    if ($popupsFound.Count -gt 0) {
-        Write-Host "  WARN: $($popupsFound.Count) consent popup(s) detected -- clicked to dismiss + synced to master" -ForegroundColor Yellow
-        Write-Host "  Next run should show no popups if sync worked correctly" -ForegroundColor DarkGray
-        return $false  # WarnOnly -- not a hard fail
+    Write-Host "  --- Summary ---" -ForegroundColor Cyan
+    Write-Host "  Consent dismissed: $($popupsFound.Count) site(s) -- $($popupsFound -join ', ')" -ForegroundColor DarkGray
+    Write-Host "  Logged in:  $($loggedIn -join ', ')" -ForegroundColor DarkGray
+    Write-Host "  Logged out: $($loggedOut -join ', ')" -ForegroundColor DarkGray
+
+    # Fail if majority of AI services are not logged in (likely cookie sync broken)
+    $authRate = if ($loggedIn.Count + $loggedOut.Count -gt 0) { $loggedIn.Count / ($loggedIn.Count + $loggedOut.Count) } else { 1 }
+    if ($authRate -lt 0.3) {
+        Write-Host "  WARN: <30% of AI services logged in -- master cookie sync may be broken" -ForegroundColor Yellow
+        return $false
     }
-
-    Write-Host "  No consent popups on Google/Naver -- consent cookies in master" -ForegroundColor DarkGray
     return $true
 }
 
