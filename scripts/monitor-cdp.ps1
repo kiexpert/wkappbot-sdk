@@ -25,7 +25,13 @@ public static class WkWin32 {
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] static extern int  GetWindowTextLength(IntPtr h);
+    [DllImport("user32.dll")] static extern int  GetWindowText(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll")] public  static extern bool IsWindow(IntPtr h);
     delegate bool EnumWinProc(IntPtr h, IntPtr lp);
+    public static string GetTitle(IntPtr h) {
+        int n = GetWindowTextLength(h); if (n <= 0) return "";
+        var sb = new StringBuilder(n + 2); GetWindowText(h, sb, n + 2); return sb.ToString();
+    }
     public static RECT? MainWindowRect(int targetPid) {
         RECT? found = null;
         EnumWindows((h, _) => {
@@ -68,16 +74,80 @@ function Get-CdpInfo([int]$port, [int]$pings = 3) {
                 if ($n -eq 0) {
                     $body  = $resp.Content.ReadAsStringAsync().Result
                     $pages = @(($body | ConvertFrom-Json) | Where-Object { $_.type -eq 'page' })
-                    $titles = $pages | Select-Object -ExpandProperty title
+                    $titles = $pages  # keep full objects for URL + wsUrl
                 }
             }
         } catch {}
     }
-    if ($samples.Count -eq 0) { return @{ LatAvg=-1; LatMin=-1; LatMax=-1; Titles=@() } }
+    if ($samples.Count -eq 0) { return @{ LatAvg=-1; LatMin=-1; LatMax=-1; Pages=@() } }
     $avg = [int](($samples | Measure-Object -Average).Average)
     $min = ($samples | Measure-Object -Minimum).Minimum
     $max = ($samples | Measure-Object -Maximum).Maximum
-    return @{ LatAvg=$avg; LatMin=$min; LatMax=$max; Titles=$titles }
+    return @{ LatAvg=$avg; LatMin=$min; LatMax=$max; Pages=$titles }
+}
+
+# ── CDP WebSocket: query tab idle state (hidden + nav age) ───────────────────
+# Returns @{ Hidden=bool; AgeSec=int } or $null on failure.
+# Sends Runtime.evaluate via WebSocket with 150ms total budget.
+# WebSocket idle query: document.hidden + page age in seconds
+# Returns @{Hidden=bool; AgeSec=int} or $null on failure (150ms budget)
+function Get-TabIdle([string]$wsUrl) {
+    if (-not $wsUrl) { return $null }
+    $ws = $null
+    try {
+        $ws  = New-Object System.Net.WebSockets.ClientWebSocket
+        $uri = [Uri]($wsUrl -replace '^ws://localhost', 'ws://127.0.0.1')
+        $cts = New-Object System.Threading.CancellationTokenSource(150)
+        $ws.ConnectAsync($uri, $cts.Token).Wait(150) | Out-Null
+        if ($ws.State -ne 'Open') { return $null }
+
+        $expr = 'document.hidden+","+Math.round((Date.now()-performance.timing.navigationStart)/1000)'
+        $msg  = "{`"id`":1,`"method`":`"Runtime.evaluate`",`"params`":{`"expression`":`"$expr`"}}"
+        $buf  = [System.Text.Encoding]::UTF8.GetBytes($msg)
+        $ws.SendAsync([System.ArraySegment[byte]]$buf,
+            [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $cts.Token).Wait(100) | Out-Null
+
+        $rbuf   = New-Object byte[] 4096
+        $result = $ws.ReceiveAsync([System.ArraySegment[byte]]$rbuf, $cts.Token).Result
+        $json   = [System.Text.Encoding]::UTF8.GetString($rbuf, 0, $result.Count) | ConvertFrom-Json
+        $val    = $json.result.result.value -split ','
+        return @{ Hidden=($val[0] -eq 'true'); AgeSec=[int]$val[1] }
+    } catch { return $null }
+    finally {
+        if ($ws) {
+            if ($ws.State -eq 'Open') { try { $ws.CloseAsync('NormalClosure','','').Wait(100) } catch {} }
+            $ws.Dispose()
+        }
+    }
+}
+
+# ── CWD -> active session title (eye_ticks.jsonl PromptHwnd, most-recent) ────
+function Build-CwdCallerMap {
+    $map = @{}  # cwd -> window title
+    $tickFile = "$HQ\runtime\eye_ticks.jsonl"
+    if (-not (Test-Path $tickFile)) { return $map }
+    try {
+        # Read last 2000 lines (most recent), keep last valid PromptHwnd per CWD
+        $hwndByCwd = @{}
+        Get-Content $tickFile -Tail 2000 -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $j = $_ | ConvertFrom-Json
+                if ($j.Cwd -and $j.PromptHwnd -and $j.PromptHwnd -ne '') {
+                    $hwndByCwd[$j.Cwd] = $j.PromptHwnd
+                }
+            } catch {}
+        }
+        foreach ($kv in $hwndByCwd.GetEnumerator()) {
+            try {
+                $hwnd = [IntPtr][Convert]::ToInt64($kv.Value.TrimStart('0x'), 16)
+                if ([WkWin32]::IsWindow($hwnd)) {
+                    $title = [WkWin32]::GetTitle($hwnd)
+                    if ($title) { $map[$kv.Key] = $title }
+                }
+            } catch {}
+        }
+    } catch {}
+    return $map
 }
 
 # ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
@@ -135,7 +205,8 @@ function Build-PortCwdMap {
 
 # ── Main enumeration ──────────────────────────────────────────────────────────
 function Get-WkCdpSessions {
-    $portCwdMap = Build-PortCwdMap
+    $portCwdMap    = Build-PortCwdMap
+    $cwdCallerMap  = Build-CwdCallerMap
 
     $all = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" |
            Select-Object ProcessId, ParentProcessId, CreationDate, WorkingSetSize, CommandLine
@@ -191,14 +262,14 @@ function Get-WkCdpSessions {
         if ($tgtPos -match '^-\d{3,}') { $offscreen = $true }  # x < -100 = off-screen target
 
         $cdp      = Get-CdpInfo ([int]$port)
-        $latAvg   = $cdp.LatAvg    # ms avg; -1 = dead/timeout
+        $latAvg   = $cdp.LatAvg
         $latMin   = $cdp.LatMin
         $latMax   = $cdp.LatMax
-        $tabList  = @($cdp.Titles)
-        $tabCount = $tabList.Count
+        $pages    = @($cdp.Pages)   # full /json page objects: title, url, webSocketDebuggerUrl
 
-        $cwd  = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
-        $proj = Split-Path $cwd -Leaf
+        $cwd    = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
+        $proj   = Split-Path $cwd -Leaf
+        $caller = if ($cwdCallerMap.ContainsKey($cwd)) { $cwdCallerMap[$cwd] } else { '' }
 
         [PSCustomObject]@{
             Port      = [int]$port
@@ -216,11 +287,12 @@ function Get-WkCdpSessions {
             LatAvg    = $latAvg
             LatMin    = $latMin
             LatMax    = $latMax
-            TabCount  = $tabCount
-            TabList   = $tabList
+            Pages     = $pages
+            TabCount  = $pages.Count
             StartUrl  = $startUrl
             CWD       = $cwd
             Proj      = $proj
+            Caller    = $caller
         }
     }
 }
@@ -233,6 +305,17 @@ function Show-Once {
         return
     }
 
+    # ── Build global URL duplicate map ───────────────────────────────────────
+    $urlCount = @{}
+    foreach ($s in $sessions) {
+        foreach ($p in $s.Pages) {
+            if ($p.url -and $p.url -notmatch '^chrome') {
+                $k = $p.url -replace '\?.*',''   # ignore query string for dup detection
+                if ($urlCount.ContainsKey($k)) { $urlCount[$k]++ } else { $urlCount[$k] = 1 }
+            }
+        }
+    }
+
     $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9,-14} {10}' -f `
            'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','LAT(avg/mn/mx)','PROJECT (CWD)'
     Write-Host $hdr -ForegroundColor Cyan
@@ -241,42 +324,62 @@ function Show-Once {
     foreach ($s in $sessions) {
         $pr       = "$($s.Procs)/$($s.Renderers)"
 
-        # Latency string: "12/8/31" or "DEAD"
         $latStr   = if ($s.LatAvg -lt 0) { 'DEAD' }
                     else { "$($s.LatAvg)/$($s.LatMin)/$($s.LatMax)" }
-        $latColor = if ($s.LatAvg -lt 0)   { 'Red'    }
+        $latColor = if ($s.LatAvg -lt 0)     { 'Red'    }
                     elseif ($s.LatAvg -gt 50) { 'Yellow' }
-                    else                    { 'Green'  }
+                    else                      { 'Green'  }
 
         $memColor = if ($s.MemMB -gt 2000) { 'Red' } elseif ($s.MemMB -gt 1000) { 'Yellow' } else { 'White' }
-        $rowColor = if ($s.Offscreen)                       { 'Red'    }
-                    elseif ($s.Drift -notin @('OK','n/a'))  { 'Yellow' }
-                    else                                    { 'White'  }
+        $rowColor = if ($s.Offscreen)                      { 'Red'    }
+                    elseif ($s.Drift -notin @('OK','n/a')) { 'Yellow' }
+                    else                                   { 'White'  }
 
         $pre  = '{0,-6} {1,-7} {2,5} ' -f $s.Port, $s.MainPID, $pr
         $mem  = '{0,6} ' -f $s.MemMB
         $mid  = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  ' -f `
                 $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount
         $lat  = '{0,-14} ' -f $latStr
-        $tail = "$($s.Proj)  ($($s.CWD))"
+        $callerShort = if ($s.Caller) { $t = $s.Caller -replace '^\W+',''; "  [« $($t.Substring(0,[Math]::Min(45,$t.Length)))]" } else { '' }
+        $tail = "$($s.Proj)  ($($s.CWD))$callerShort"
 
         if ($rowColor -ne 'White') {
             Write-Host ($pre + $mem + $mid + $lat + $tail) -ForegroundColor $rowColor
         } else {
-            Write-Host $pre  -NoNewline
-            Write-Host $mem  -NoNewline -ForegroundColor $memColor
-            Write-Host $mid  -NoNewline
-            Write-Host $lat  -NoNewline -ForegroundColor $latColor
+            Write-Host $pre -NoNewline; Write-Host $mem -NoNewline -ForegroundColor $memColor
+            Write-Host $mid -NoNewline; Write-Host $lat -NoNewline -ForegroundColor $latColor
             Write-Host $tail
         }
 
-        # Tab list (if -tabs flag or any tabs)
-        if ($tabs -and $s.TabList.Count -gt 0) {
-            foreach ($t in $s.TabList) {
-                Write-Host ("         > $t") -ForegroundColor DarkGray
+        # ── Per-tab detail ────────────────────────────────────────────────────
+        $showTabs = $tabs -or $s.TabCount -gt 0
+        if ($showTabs -and $s.Pages.Count -gt 0) {
+            foreach ($pg in $s.Pages) {
+                $urlBase = $pg.url -replace '\?.*',''
+                $isDup   = ($urlCount.ContainsKey($urlBase) -and $urlCount[$urlBase] -gt 1)
+                $dupTag  = if ($isDup) { ' [DUP]' } else { '' }
+
+                # Idle time via WebSocket (only when -tabs flag to avoid slowdown)
+                $idleTag = ''
+                if ($tabs -and $pg.webSocketDebuggerUrl) {
+                    $idle = Get-TabIdle ($pg.webSocketDebuggerUrl -replace 'localhost','127.0.0.1')
+                    if ($idle) {
+                        $vis    = if ($idle.Hidden) { 'bg' } else { 'fg' }
+                        $ageSec = $idle.AgeSec
+                        $ageDisp = if ($ageSec -gt 3600) { '{0:F1}h' -f ($ageSec/3600) }
+                                   elseif ($ageSec -gt 60) { '{0}m' -f [int]($ageSec/60) }
+                                   else { "${ageSec}s" }
+                        $idleTag = "  [$vis age:$ageDisp]"
+                    }
+                }
+
+                $title   = if ($pg.title) { $pg.title } else { $pg.url }
+                $tabLine = "         > $title$dupTag$idleTag"
+                $tabColor = if ($isDup) { 'Yellow' } else { 'DarkGray' }
+                Write-Host $tabLine -ForegroundColor $tabColor
             }
-        } elseif ($s.TabCount -gt 0 -and $s.StartUrl) {
-            Write-Host ("         > $($s.StartUrl)") -ForegroundColor DarkGray
+        } elseif (-not $tabs -and $s.TabCount -gt 0 -and $s.StartUrl) {
+            Write-Host "         > $($s.StartUrl)" -ForegroundColor DarkGray
         }
     }
 
