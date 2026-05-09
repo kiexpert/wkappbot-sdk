@@ -445,8 +445,69 @@ function Show-Once {
     $summaryColor = if ($sessions | Where-Object Offscreen) { 'Red' } else { 'Yellow' }
     Write-Host ("  {0} session(s)  {1} procs / {2} renderers  {3} tabs  {4} MB total" -f `
         $sessions.Count, $totPro, $totRen, $totTab, $totMem) -ForegroundColor $summaryColor
-    if ($sessions | Where-Object Offscreen) {
-        Write-Host "  [!] Off-screen session(s) detected (TGT-POS x < -100)" -ForegroundColor Red
+
+    # ── Anomaly report ────────────────────────────────────────────────────────
+    $warns = @()
+
+    # Too many Chrome sessions total
+    if ($sessions.Count -gt 5)  { $warns += "[WARN] $($sessions.Count) Chrome sessions running (>5) -- sandbox-miss accumulation likely" }
+
+    foreach ($s in $sessions) {
+        $p = $s.Port
+        # Off-screen target
+        if ($s.Offscreen) { $warns += "[CRIT] Port $p  off-screen TGT-POS $($s.TgtPos) -- Chrome will drift or be invisible" }
+        # Dead CDP
+        if ($s.LatAvg -lt 0) { $warns += "[CRIT] Port $p  LAT=DEAD -- Chrome not responding to CDP" }
+        # High latency
+        if ($s.LatAvg -gt 80) { $warns += "[WARN] Port $p  LAT avg $($s.LatAvg)ms (>80) -- Chrome slow/overloaded" }
+        # Memory
+        if ($s.MemMB -gt 2000) { $warns += "[CRIT] Port $p  MEM $($s.MemMB)MB (>2GB) -- kill and restart" }
+        elseif ($s.MemMB -gt 1000) { $warns += "[WARN] Port $p  MEM $($s.MemMB)MB (>1GB)" }
+        # Tab overload
+        if ($s.TabCount -gt 6) { $warns += "[WARN] Port $p  $($s.TabCount) tabs (>6) -- sandbox-miss accumulation" }
+        # Unknown CWD
+        if ($s.CWD -eq '(unknown)') { $warns += "[INFO] Port $p  CWD unknown -- port-to-CWD mapping gap" }
+        # Old session
+        $ageH = [math]::Round(([int]($s.Age -replace '[^0-9.]','') * $(if ($s.Age -match 'h') {1} elseif ($s.Age -match 'm') {1/60} else {1/3600})), 1)
+        if ($s.Age -match 'h' -and [float]($s.Age -replace 'h','') -gt 10) {
+            $warns += "[WARN] Port $p  age $($s.Age) (>10h) -- consider recycling"
+        }
+        # Position drift
+        if ($s.Drift -notin @('OK','n/a') -and $s.Drift -match 'd') {
+            $nums = [regex]::Matches($s.Drift, '-?\d+')
+            if ($nums.Count -ge 2) {
+                $dx = [math]::Abs([int]$nums[0].Value); $dy = [math]::Abs([int]$nums[1].Value)
+                if ($dx -gt 200 -or $dy -gt 200) {
+                    $warns += "[WARN] Port $p  position drift $($s.Drift) (>200px)"
+                }
+            }
+        }
+        # Alert-blocked tabs
+        $alertTabs = @($s.Pages | Where-Object { $_.webSocketDebuggerUrl } | ForEach-Object {
+            $idle = Get-TabIdle ($_.webSocketDebuggerUrl -replace 'localhost','127.0.0.1')
+            if ($idle -and $idle.Alert) { $_ }
+        })
+        if ($alertTabs.Count -gt 0) {
+            $warns += "[CRIT] Port $p  $($alertTabs.Count) tab(s) blocked by JS alert -- next ask will timeout"
+        }
+        # Dup tabs
+        $dupCount = @($s.Pages | Where-Object {
+            $k = ($_.url -replace '\?.*','')
+            ($urlCount.ContainsKey($k) -and $urlCount[$k] -gt 1)
+        }).Count
+        if ($dupCount -gt 2) { $warns += "[WARN] Port $p  $dupCount duplicate URL tabs" }
+    }
+
+    if ($warns.Count -gt 0) {
+        Write-Host ''
+        Write-Host ('=' * 72) -ForegroundColor DarkGray
+        Write-Host "  ANOMALY REPORT" -ForegroundColor Cyan
+        Write-Host ('=' * 72) -ForegroundColor DarkGray
+        foreach ($w in $warns) {
+            $col = if ($w -match '^\[CRIT\]') { 'Red' } elseif ($w -match '^\[WARN\]') { 'Yellow' } else { 'DarkGray' }
+            Write-Host "  $w" -ForegroundColor $col
+        }
+        Write-Host ('=' * 72) -ForegroundColor DarkGray
     }
 }
 
