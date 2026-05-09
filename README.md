@@ -62,12 +62,13 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ---
 
-## 🚀 What's New in v6.5
+## 🚀 What's New in v7.2
 
-- **Per-repo Eye isolation** — every `git clone` gets its own daemon and DataDir (`{root}/.wkappbot/hq/`). No more cross-project state bleed; multiple checkouts can run in parallel safely.
-- **ECDSA offline license system** — license tokens verify locally with an embedded ECDSA public key. No phone-home, no network dependency for activation, no leaks of which app is being automated.
-- **Dev core CI auto-release pipeline** — push to `main` triggers a build that publishes `wkappbot-core.new.exe` straight to the latest release. Hot-swap watchdog picks it up live; users update without restarting.
-- **GitHub collaborator-based Pro tier** — accept a repo invite, the same binary unlocks CDP browser automation, multi-AI `ask`, scheduling, and `--sudo` admin within an hour. No license file shuffling.
+- **CDP port isolation** — each project CWD gets a dedicated 4-port block (SHA256-derived, range 9300–9995). Parallel sessions never share a Chrome instance.
+- **Korean IME relay daemon** — `ime-relay-daemon` runs as a separate process with a named-mutex singleton (`Global\WkImeRelay`). Han/Yeong toggle works in ConPTY (Windows Terminal) without focus steal.
+- **Taskkill classify + force** — `wkappbot taskkill /IM wkappbot-core.exe` classifies PROTECTED/ZOMBIE/UNKNOWN before killing. `--force <pids>` is the only kill path.
+- **Triad parallel ask** — `wkappbot ask triad "question"` dispatches GPT + Gemini + Claude simultaneously and returns all three answers.
+- **CDP monitor** — `cdp-mon.ps1` shows per-session: CWD, port, memory, position drift, latency (3-ping), duplicate tabs, IME daemon health.
 
 → Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 
