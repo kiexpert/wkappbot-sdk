@@ -90,32 +90,43 @@ function Get-CdpInfo([int]$port, [int]$pings = 3) {
     return @{ LatAvg=$avg; LatMin=$min; LatMax=$max; Pages=$titles }
 }
 
-# ── CDP WebSocket: query tab idle state (hidden + nav age) ───────────────────
-# Returns @{ Hidden=bool; AgeSec=int } or $null on failure.
-# Sends Runtime.evaluate via WebSocket with 150ms total budget.
-# WebSocket idle query: document.hidden + page age in seconds
-# Returns @{Hidden=bool; AgeSec=int} or $null on failure (150ms budget)
+# ── CDP WebSocket: tab health + idle + alert detection ───────────────────────
+# Returns @{ Hidden=bool; AgeSec=int; Alert=bool } or $null on failure.
+#
+# Alert detection: JS alert blocks Runtime.evaluate. Strategy:
+#   1. Connect WebSocket (200ms) -- succeeds even with alert open.
+#   2. Send Runtime.evaluate (300ms tight timeout).
+#   3. If connect OK but receive times out -> alert blocking -> Alert=$true.
+#   4. If connect fails -> tab crashed/gone -> $null.
 function Get-TabIdle([string]$wsUrl) {
     if (-not $wsUrl) { return $null }
     $ws = $null
     try {
         $ws  = New-Object System.Net.WebSockets.ClientWebSocket
         $uri = [Uri]($wsUrl -replace '^ws://localhost', 'ws://127.0.0.1')
-        $cts = New-Object System.Threading.CancellationTokenSource(150)
-        $ws.ConnectAsync($uri, $cts.Token).Wait(150) | Out-Null
-        if ($ws.State -ne 'Open') { return $null }
+        $cts = New-Object System.Threading.CancellationTokenSource(200)
+        $ws.ConnectAsync($uri, $cts.Token).Wait(200) | Out-Null
+        if ($ws.State -ne 'Open') { return $null }  # tab gone / crashed
 
         $expr = 'document.hidden+","+Math.round((Date.now()-performance.timing.navigationStart)/1000)'
         $msg  = "{`"id`":1,`"method`":`"Runtime.evaluate`",`"params`":{`"expression`":`"$expr`"}}"
         $buf  = [System.Text.Encoding]::UTF8.GetBytes($msg)
+        $sendCts = New-Object System.Threading.CancellationTokenSource(100)
         $ws.SendAsync([System.ArraySegment[byte]]$buf,
-            [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $cts.Token).Wait(100) | Out-Null
+            [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $sendCts.Token).Wait(100) | Out-Null
 
-        $rbuf   = New-Object byte[] 4096
-        $result = $ws.ReceiveAsync([System.ArraySegment[byte]]$rbuf, $cts.Token).Result
-        $json   = [System.Text.Encoding]::UTF8.GetString($rbuf, 0, $result.Count) | ConvertFrom-Json
-        $val    = $json.result.result.value -split ','
-        return @{ Hidden=($val[0] -eq 'true'); AgeSec=[int]$val[1] }
+        # Short receive timeout: alert blocks evaluate, so timeout = alert present
+        $rbuf    = New-Object byte[] 4096
+        $recvCts = New-Object System.Threading.CancellationTokenSource(300)
+        try {
+            $result = $ws.ReceiveAsync([System.ArraySegment[byte]]$rbuf, $recvCts.Token).Result
+            $json   = [System.Text.Encoding]::UTF8.GetString($rbuf, 0, $result.Count) | ConvertFrom-Json
+            $val    = $json.result.result.value -split ','
+            return @{ Hidden=($val[0] -eq 'true'); AgeSec=[int]$val[1]; Alert=$false }
+        } catch {
+            # Receive timed out: WebSocket connected but eval blocked -> ALERT
+            return @{ Hidden=$false; AgeSec=-1; Alert=$true }
+        }
     } catch { return $null }
     finally {
         if ($ws) {
@@ -393,11 +404,18 @@ function Show-Once {
                 $isDup   = ($urlCount.ContainsKey($urlBase) -and $urlCount[$urlBase] -gt 1)
                 $dupTag  = if ($isDup) { ' [DUP]' } else { '' }
 
-                # Idle time via WebSocket (only when -tabs flag to avoid slowdown)
-                $idleTag = ''
-                if ($tabs -and $pg.webSocketDebuggerUrl) {
-                    $idle = Get-TabIdle ($pg.webSocketDebuggerUrl -replace 'localhost','127.0.0.1')
-                    if ($idle) {
+                # Alert detection + idle time via WebSocket
+                # Alert check: always run (fast 300ms timeout). Idle: only with -tabs flag.
+                $idleTag  = ''
+                $alertTag = ''
+                if ($pg.webSocketDebuggerUrl) {
+                    $wsTarget = $pg.webSocketDebuggerUrl -replace 'localhost','127.0.0.1'
+                    $idle = Get-TabIdle $wsTarget
+                    if ($null -eq $idle) {
+                        # connect failed -- tab gone/crashed
+                    } elseif ($idle.Alert) {
+                        $alertTag = ' [ALERT]'
+                    } elseif ($tabs) {
                         $vis    = if ($idle.Hidden) { 'bg' } else { 'fg' }
                         $ageSec = $idle.AgeSec
                         $ageDisp = if ($ageSec -gt 3600) { '{0:F1}h' -f ($ageSec/3600) }
@@ -407,9 +425,11 @@ function Show-Once {
                     }
                 }
 
-                $title   = if ($pg.title) { $pg.title } else { $pg.url }
-                $tabLine = "         > $title$dupTag$idleTag"
-                $tabColor = if ($isDup) { 'Yellow' } else { 'DarkGray' }
+                $title    = if ($pg.title) { $pg.title } else { $pg.url }
+                $tabLine  = "         > $title$dupTag$alertTag$idleTag"
+                $tabColor = if ($alertTag)  { 'Red'    }
+                            elseif ($isDup) { 'Yellow' }
+                            else            { 'DarkGray' }
                 Write-Host $tabLine -ForegroundColor $tabColor
             }
         } elseif (-not $tabs -and $s.TabCount -gt 0 -and $s.StartUrl) {
