@@ -43,10 +43,18 @@ public static class WkWin32 {
 # ── Build port -> CWD map from cdp_port_HASH.txt + SHA256(cwd) ───────────────
 function Build-PortCwdMap {
     $map = @{}
-    # Collect candidate CWDs from parent_window_geo files
+    # Collect candidate CWDs: parent_window_geo files + direct git/CLAUDE.md project scan
     $cwds = @()
     Get-ChildItem "$HQ\runtime\parent_window_geo_*.json" -ErrorAction SilentlyContinue | ForEach-Object {
         try { $j = Get-Content $_.FullName -Raw | ConvertFrom-Json; if ($j.cwd) { $cwds += $j.cwd } } catch {}
+    }
+    # Scan known dev roots for project folders (has .git or CLAUDE.md)
+    @('D:\GitHub', 'D:\Projects', 'C:\Users\kiexp\source') | Where-Object { Test-Path $_ } | ForEach-Object {
+        Get-ChildItem $_ -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            if ((Test-Path "$($_.FullName)\.git") -or (Test-Path "$($_.FullName)\CLAUDE.md")) {
+                $cwds += $_.FullName
+            }
+        }
     }
     $cwds = $cwds | Select-Object -Unique
 
