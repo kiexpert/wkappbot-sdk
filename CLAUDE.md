@@ -246,7 +246,8 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 Execute in order when user sends 'gg':
 1. wkappbot skill read on-load
 2. wkappbot suggest list
-3. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage the backlog above')
+3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
+4. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
 
 ## Main Duties (recurring responsibilities)
 
