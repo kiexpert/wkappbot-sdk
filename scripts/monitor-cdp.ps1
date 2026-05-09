@@ -586,12 +586,12 @@ function Show-Once {
         $im = $s.IdleMin
         if ($null -ne $im -and $im -ge $idleThresholdWarn) {
             $tsStr = if ($s.LastCmdTime) { $s.LastCmdTime.ToString('HH:mm:ss') } else { '?' }
-            $killCmd = "Stop-Process -Id $($s.MainPID) -Force  # port $p idle ${im}min"
+            $killCmd = "wkappbot taskkill /F /PID $($s.MainPID)"
             $warns += "[WARN] Port $p  idle ${im}min (last wkappbot cmd: $tsStr) -- Kill: $killCmd"
         }
         if ($killIdle -gt 0 -and $null -ne $im -and $im -ge $killIdle) {
             try {
-                Stop-Process -Id $s.MainPID -Force -ErrorAction Stop
+                & wkappbot taskkill /F /PID $s.MainPID
                 $warns += "[KILLED] Port $p  PID=$($s.MainPID) idle ${im}min (>= threshold ${killIdle}min)"
             } catch {
                 $warns += "[KILL-FAIL] Port $p  PID=$($s.MainPID): $_"
