@@ -1,18 +1,21 @@
 # monitor-cdp.ps1 -- wkappbot Chrome/CDP session monitor
-# Shows per-session: CWD, port, renderers, memory, age, target pos, actual pos, open tabs
+# Shows per-session: CWD, port, procs/renderers, memory, age,
+#                    target pos, actual pos, position drift, open tabs
 #
-# Usage: .\monitor-cdp.ps1          # one-shot
-#        .\monitor-cdp.ps1 -f       # follow (refresh every 3s)
-#        .\monitor-cdp.ps1 -f -i 5  # follow with custom interval
+# Usage: .\monitor-cdp.ps1              # one-shot
+#        .\monitor-cdp.ps1 -f           # follow (refresh every 3s)
+#        .\monitor-cdp.ps1 -f -i 5      # follow, 5s interval
+#        .\monitor-cdp.ps1 -tabs        # show tab list per session
 
 param(
     [switch]$f,
-    [int]$i = 3
+    [int]$i = 3,
+    [switch]$tabs
 )
 
 $HQ = "D:\GitHub\WKAppBot\bin\wkappbot.hq"
 
-# ── Win32 window rect lookup ──────────────────────────────────────────────────
+# ── Win32: actual window rect from PID ───────────────────────────────────────
 Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices; using System.Text;
 public static class WkWin32 {
@@ -22,7 +25,6 @@ public static class WkWin32 {
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] static extern int  GetWindowTextLength(IntPtr h);
-    [DllImport("user32.dll")] static extern int  GetWindowText(IntPtr h, StringBuilder s, int n);
     delegate bool EnumWinProc(IntPtr h, IntPtr lp);
     public static RECT? MainWindowRect(int targetPid) {
         RECT? found = null;
@@ -40,16 +42,40 @@ public static class WkWin32 {
 }
 '@ -ErrorAction SilentlyContinue
 
-# ── Build port -> CWD map from cdp_port_HASH.txt + SHA256(cwd) ───────────────
+# ── CDP tab fetch (Chrome 110+ requires Host:localhost header) ────────────────
+Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
+$global:_WkCdpClient = $null
+
+function Get-CdpTabs([int]$port) {
+    try {
+        if (-not $global:_WkCdpClient) {
+            $global:_WkCdpClient = New-Object System.Net.Http.HttpClient
+            $global:_WkCdpClient.Timeout = [TimeSpan]::FromSeconds(2)
+        }
+        # Use 127.0.0.1 explicitly: on some Win11 machines localhost resolves to ::1 (IPv6)
+        # but Chrome CDP binds only to 127.0.0.1 (IPv4). Host header keeps Chrome happy.
+        $req = New-Object System.Net.Http.HttpRequestMessage(
+            [System.Net.Http.HttpMethod]::Get,
+            "http://127.0.0.1:$port/json")
+        $req.Headers.Host = "localhost"
+        $resp = $global:_WkCdpClient.SendAsync($req).Result
+        if (-not $resp.IsSuccessStatusCode) { return @() }
+        $body = $resp.Content.ReadAsStringAsync().Result
+        $pages = @(($body | ConvertFrom-Json) | Where-Object { $_.type -eq 'page' })
+        return $pages | Select-Object -ExpandProperty title
+    } catch { return @() }
+}
+
+# ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
 function Build-PortCwdMap {
     $map = @{}
-    # Collect candidate CWDs: parent_window_geo files + direct git/CLAUDE.md project scan
+
+    # Candidate CWDs: runtime geo files + git/.CLAUDE.md project scan
     $cwds = @()
     Get-ChildItem "$HQ\runtime\parent_window_geo_*.json" -ErrorAction SilentlyContinue | ForEach-Object {
         try { $j = Get-Content $_.FullName -Raw | ConvertFrom-Json; if ($j.cwd) { $cwds += $j.cwd } } catch {}
     }
-    # Scan known dev roots for project folders (has .git or CLAUDE.md)
-    @('D:\GitHub', 'D:\Projects', 'C:\Users\kiexp\source') | Where-Object { Test-Path $_ } | ForEach-Object {
+    @('D:\GitHub', 'D:\Projects') | Where-Object { Test-Path $_ } | ForEach-Object {
         Get-ChildItem $_ -Directory -ErrorAction SilentlyContinue | ForEach-Object {
             if ((Test-Path "$($_.FullName)\.git") -or (Test-Path "$($_.FullName)\CLAUDE.md")) {
                 $cwds += $_.FullName
@@ -58,7 +84,7 @@ function Build-PortCwdMap {
     }
     $cwds = $cwds | Select-Object -Unique
 
-    # Load all cdp_port files: hash -> port
+    # cdp_port_HASH.txt files: MD5(cwd.lower())[0:8] -> port
     $portFiles = @{}
     Get-ChildItem "$HQ\runtime\cdp_port_*.txt" -ErrorAction SilentlyContinue | ForEach-Object {
         $h = $_.BaseName -replace '^cdp_port_', ''
@@ -66,129 +92,119 @@ function Build-PortCwdMap {
         $portFiles[$h] = $p
     }
 
-    # Path 1: MD5 hash match  (ProjectRoot.Hash8 uses MD5, not SHA256)
-    $md5 = [System.Security.Cryptography.MD5]::Create()
-    foreach ($cwd in $cwds) {
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($cwd.ToLowerInvariant())
-        $hash  = $md5.ComputeHash($bytes)
-        $hex   = [BitConverter]::ToString($hash) -replace '-', ''
-        $h8    = $hex.Substring(0, 8).ToLower()
-        if ($portFiles.ContainsKey($h8)) {
-            $map[$portFiles[$h8]] = $cwd   # port string -> CWD
-        }
-    }
-
-    # Path 2: DerivePort reverse lookup  (SHA256 big-endian -> 9300 + (n%174)*4)
-    # Matches ports not covered by cdp_port files (most projects)
+    $md5    = [System.Security.Cryptography.MD5]::Create()
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
+
     foreach ($cwd in $cwds) {
+        $lower = $cwd.ToLowerInvariant()
         $norm  = [System.IO.Path]::GetFullPath($cwd).ToLowerInvariant()
-        $bytes = [System.Text.Encoding]::UTF8.GetBytes($norm)
-        $hash  = $sha256.ComputeHash($bytes)
-        # ReadUInt32BigEndian from first 4 bytes
-        $n = ([uint32]$hash[0] -shl 24) -bor ([uint32]$hash[1] -shl 16) -bor ([uint32]$hash[2] -shl 8) -bor [uint32]$hash[3]
+
+        # Path 1: MD5 hash -> cdp_port file (ProjectRoot.Hash8 uses MD5)
+        $md5h = [BitConverter]::ToString($md5.ComputeHash(
+                    [System.Text.Encoding]::UTF8.GetBytes($lower))) -replace '-',''
+        $h8   = $md5h.Substring(0,8).ToLower()
+        if ($portFiles.ContainsKey($h8) -and -not $map.ContainsKey($portFiles[$h8])) {
+            $map[$portFiles[$h8]] = $cwd
+        }
+
+        # Path 2: SHA256 DerivePort reverse  (9300 + (ReadUInt32BE(sha256) % 174) * 4)
+        $sha  = $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($norm))
+        $n    = ([uint32]$sha[0] -shl 24) -bor ([uint32]$sha[1] -shl 16) `
+               -bor ([uint32]$sha[2] -shl 8) -bor [uint32]$sha[3]
         $base = 9300 + ($n % 174) * 4
-        # 4-port block: base, base+1, base+2, base+3
         for ($p = $base; $p -le $base+3; $p++) {
-            if (-not $map.ContainsKey("$p")) {
-                $map["$p"] = $cwd
-            }
+            if (-not $map.ContainsKey("$p")) { $map["$p"] = $cwd }
         }
     }
     return $map
 }
 
-# ── Get open tab titles via CDP /json ─────────────────────────────────────────
-function Get-CdpTabs([int]$port) {
-    try {
-        $r = Invoke-RestMethod "http://localhost:$port/json" -TimeoutSec 1 -ErrorAction Stop
-        return $r | Where-Object { $_.type -eq 'page' } | ForEach-Object { $_.title }
-    } catch { return @() }
-}
-
-# ── Main session enumeration ──────────────────────────────────────────────────
+# ── Main enumeration ──────────────────────────────────────────────────────────
 function Get-WkCdpSessions {
     $portCwdMap = Build-PortCwdMap
 
     $all = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" |
            Select-Object ProcessId, ParentProcessId, CreationDate, WorkingSetSize, CommandLine
 
-    # Browser processes: have --remote-debugging-port and wkappbot profile path
     $browsers = $all | Where-Object {
         $_.CommandLine -match '--remote-debugging-port=(\d+)' -and
         $_.CommandLine -match 'wkappbot\.hq[/\\]chrome-profiles'
     }
 
-    # Group by port (one row per CDP session)
     $byPort = @{}
     foreach ($b in $browsers) {
-        $port = if ($b.CommandLine -match '--remote-debugging-port=(\d+)') { $Matches[1] } else { '0' }
-        if (-not $byPort.ContainsKey($port)) { $byPort[$port] = @() }
-        $byPort[$port] += $b
+        $p = if ($b.CommandLine -match '--remote-debugging-port=(\d+)') { $Matches[1] } else { '0' }
+        if (-not $byPort[$p]) { $byPort[$p] = @() }
+        $byPort[$p] += $b
     }
 
     foreach ($port in ($byPort.Keys | Sort-Object { [int]$_ })) {
         $procs = $byPort[$port]
 
-        # Main process = has --window-position in cmdline (browser process)
-        $main = $procs | Where-Object { $_.CommandLine -match '--window-position=' } | Select-Object -First 1
+        $main = ($procs | Where-Object { $_.CommandLine -match '--window-position=' } |
+                 Select-Object -First 1)
         if (-not $main) { $main = $procs | Sort-Object WorkingSetSize -Descending | Select-Object -First 1 }
 
-        # Renderers = child processes of main
-        $rCount = ($all | Where-Object { $_.ParentProcessId -eq $main.ProcessId } | Measure-Object).Count
+        $rCount    = ($all | Where-Object { $_.ParentProcessId -eq $main.ProcessId } | Measure-Object).Count
+        $totalMB   = [math]::Round(($procs | Measure-Object WorkingSetSize -Sum).Sum / 1MB)
 
-        # Total memory (all procs with this port)
-        $totalBytes = ($procs | Measure-Object -Property WorkingSetSize -Sum).Sum
+        $oldest    = ($procs | Sort-Object CreationDate | Select-Object -First 1).CreationDate
+        $age       = (Get-Date) - $oldest
+        $ageStr    = if    ($age.TotalHours   -ge 1) { '{0:F1}h' -f $age.TotalHours   }
+                     elseif ($age.TotalMinutes -ge 1) { '{0:F0}m' -f $age.TotalMinutes }
+                     else                             { '{0:F0}s' -f $age.TotalSeconds  }
 
-        # Age from oldest process in group
-        $oldest = ($procs | Sort-Object CreationDate | Select-Object -First 1).CreationDate
-        $age = (Get-Date) - $oldest
-        $ageStr = if    ($age.TotalHours -ge 1)   { '{0:F1}h' -f $age.TotalHours   }
-                  elseif ($age.TotalMinutes -ge 1) { '{0:F0}m' -f $age.TotalMinutes }
-                  else                             { '{0:F0}s' -f $age.TotalSeconds  }
+        $cmd       = $main.CommandLine
+        $tgtPos    = if ($cmd -match '--window-position=(-?\d+),(-?\d+)') { "$($Matches[1]),$($Matches[2])" } else { '?' }
+        $tgtSize   = if ($cmd -match '--window-size=(\d+),(\d+)')         { "$($Matches[1])x$($Matches[2])" } else { '?' }
+        $startUrl  = if ($cmd -match '"(https?://[^"]+)"$')               { $Matches[1] }
+                     elseif ($cmd -match "(https?://\S+)$")               { $Matches[1] } else { '' }
 
-        # Target position/size from cmdline args
-        $tgtPos  = if ($main.CommandLine -match '--window-position=(-?\d+),(-?\d+)') { "$($Matches[1]),$($Matches[2])" } else { '?' }
-        $tgtSize = if ($main.CommandLine -match '--window-size=(\d+),(\d+)')         { "$($Matches[1])x$($Matches[2])" } else { '?' }
+        $rect      = [WkWin32]::MainWindowRect([int]$main.ProcessId)
+        $actPos    = if ($null -ne $rect) { "$($rect.L),$($rect.T)" }     else { '(min)' }
+        $actSize   = if ($null -ne $rect) { "$($rect.R-$rect.L)x$($rect.B-$rect.T)" } else { '?' }
 
-        # Actual window rect (PowerShell unwraps Nullable<T> automatically)
-        $rect = [WkWin32]::MainWindowRect([int]$main.ProcessId)
-        $actPos  = if ($null -ne $rect) { "$($rect.L),$($rect.T)" } else { '?' }
-        $actSize = if ($null -ne $rect) { "$(($rect.R - $rect.L))x$(($rect.B - $rect.T))" } else { '?' }
-
-        # Drift (target vs actual position)
-        $drift = '?'
-        if ($tgtPos -ne '?' -and $actPos -ne '?' -and $actPos -notmatch '^,') {
+        # Drift
+        $drift = 'n/a'
+        $offscreen = $false
+        if ($tgtPos -ne '?' -and $actPos -ne '(min)') {
             $tp = $tgtPos -split ','; $ap = $actPos -split ','
-            $dx = [int]$ap[0] - [int]$tp[0]; $dy = [int]$ap[1] - [int]$tp[1]
-            $drift = if ($dx -eq 0 -and $dy -eq 0) { 'OK' } else { "dx=$dx dy=$dy" }
+            try {
+                $dx = [int]$ap[0] - [int]$tp[0]; $dy = [int]$ap[1] - [int]$tp[1]
+                $drift = if ($dx -eq 0 -and $dy -eq 0) { 'OK' } else { "d$dx,$dy" }
+            } catch {}
         }
+        if ($tgtPos -match '^-\d{3,}') { $offscreen = $true }  # x < -100 = off-screen target
 
-        # Tabs
-        $tabs    = Get-CdpTabs ([int]$port)
-        $tabStr  = if ($tabs.Count -eq 0) { '(no tabs)' }
-                   elseif ($tabs.Count -eq 1) { $tabs[0] -replace '.{40}$', '...' }
-                   else { "$($tabs.Count) tabs: $($tabs[0] -replace '.{30}$','...')" }
+        $tabList  = Get-CdpTabs ([int]$port)
+        $tabCount = $tabList.Count
 
-        # CWD
         $cwd = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
+        $proj = Split-Path $cwd -Leaf
 
         [PSCustomObject]@{
-            Port     = [int]$port
-            MainPID  = $main.ProcessId
-            Procs    = $procs.Count
-            Renderers= $rCount
-            MemMB    = [math]::Round($totalBytes / 1MB)
-            Age      = $ageStr
-            TgtPos   = $tgtPos
-            ActPos   = $actPos
-            Drift    = $drift
-            Tabs     = $tabStr
-            CWD      = $cwd
+            Port      = [int]$port
+            MainPID   = $main.ProcessId
+            Procs     = $procs.Count
+            Renderers = $rCount
+            MemMB     = $totalMB
+            Age       = $ageStr
+            TgtPos    = $tgtPos
+            TgtSize   = $tgtSize
+            ActPos    = $actPos
+            ActSize   = $actSize
+            Drift     = $drift
+            Offscreen = $offscreen
+            TabCount  = $tabCount
+            TabList   = $tabList
+            StartUrl  = $startUrl
+            CWD       = $cwd
+            Proj      = $proj
         }
     }
 }
 
+# ── Display ───────────────────────────────────────────────────────────────────
 function Show-Once {
     $sessions = @(Get-WkCdpSessions)
     if (-not $sessions -or $sessions.Count -eq 0) {
@@ -196,33 +212,64 @@ function Show-Once {
         return
     }
 
-    Write-Host ('{0,-6} {1,-7} {2,3}/{3,3} {4,6} {5,5}  {6,-13} {7,-13} {8,-12}  {9}' -f `
-        'PORT','PID','P','R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','CWD') -ForegroundColor Cyan
-    Write-Host ('-' * 100) -ForegroundColor DarkGray
+    $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9}' -f `
+           'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','PROJECT (CWD)'
+    Write-Host $hdr -ForegroundColor Cyan
+    Write-Host ('-' * 105) -ForegroundColor DarkGray
 
     foreach ($s in $sessions) {
-        $driftColor = if ($s.Drift -eq 'OK' -or $s.Drift -eq '?') { 'White' } else { 'Red' }
-        $line = '{0,-6} {1,-7} {2,3}/{3,3} {4,6} {5,5}  {6,-13} {7,-13} {8,-12}  {9}' -f `
-            $s.Port, $s.MainPID, $s.Procs, $s.Renderers, $s.MemMB, $s.Age,
-            $s.TgtPos, $s.ActPos, $s.Drift, $s.CWD
-        Write-Host $line -ForegroundColor $driftColor
-        if ($s.Tabs -ne '(no tabs)') {
-            Write-Host ("         tabs: $($s.Tabs)") -ForegroundColor DarkGray
+        $pr       = "$($s.Procs)/$($s.Renderers)"
+        $memColor = if ($s.MemMB -gt 2000) { 'Red' } elseif ($s.MemMB -gt 1000) { 'Yellow' } else { 'White' }
+        $rowColor = if ($s.Offscreen)                 { 'Red'   }
+                    elseif ($s.Drift -notin @('OK','n/a')) { 'Yellow' }
+                    else                              { 'White' }
+
+        $line = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9}' -f `
+            $s.Port, $s.MainPID, $pr, $s.MemMB, $s.Age,
+            $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount,
+            "$($s.Proj)  ($($s.CWD))"
+
+        if ($rowColor -eq 'White') {
+            # Color memory column separately
+            $pre = '{0,-6} {1,-7} {2,5} ' -f $s.Port, $s.MainPID, $pr
+            $mem = '{0,6} ' -f $s.MemMB
+            $rest = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  {5}' -f `
+                $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount,
+                "$($s.Proj)  ($($s.CWD))"
+            Write-Host $pre -NoNewline
+            Write-Host $mem -NoNewline -ForegroundColor $memColor
+            Write-Host $rest
+        } else {
+            Write-Host $line -ForegroundColor $rowColor
+        }
+
+        # Tab list (if -tabs flag or any tabs)
+        if ($tabs -and $s.TabList.Count -gt 0) {
+            foreach ($t in $s.TabList) {
+                Write-Host ("         > $t") -ForegroundColor DarkGray
+            }
+        } elseif ($s.TabCount -gt 0 -and $s.StartUrl) {
+            Write-Host ("         > $($s.StartUrl)") -ForegroundColor DarkGray
         }
     }
 
-    $totMem = ($sessions | Measure-Object -Property MemMB      -Sum).Sum
-    $totRen = ($sessions | Measure-Object -Property Renderers  -Sum).Sum
-    $totPro = ($sessions | Measure-Object -Property Procs      -Sum).Sum
+    $totMem = ($sessions | Measure-Object MemMB     -Sum).Sum
+    $totRen = ($sessions | Measure-Object Renderers -Sum).Sum
+    $totPro = ($sessions | Measure-Object Procs     -Sum).Sum
+    $totTab = ($sessions | Measure-Object TabCount  -Sum).Sum
     Write-Host ''
-    Write-Host ("  {0} session(s)  {1} procs / {2} renderers  {3} MB total" -f `
-        $sessions.Count, $totPro, $totRen, $totMem) -ForegroundColor Yellow
+    $summaryColor = if ($sessions | Where-Object Offscreen) { 'Red' } else { 'Yellow' }
+    Write-Host ("  {0} session(s)  {1} procs / {2} renderers  {3} tabs  {4} MB total" -f `
+        $sessions.Count, $totPro, $totRen, $totTab, $totMem) -ForegroundColor $summaryColor
+    if ($sessions | Where-Object Offscreen) {
+        Write-Host "  [!] Off-screen session(s) detected (TGT-POS x < -100)" -ForegroundColor Red
+    }
 }
 
 if ($f) {
     while ($true) {
         Clear-Host
-        Write-Host ("[CDP Monitor] {0}" -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Green
+        Write-Host ("[CDP Monitor] {0}  (Ctrl+C to stop)" -f (Get-Date -Format 'HH:mm:ss')) -ForegroundColor Green
         Show-Once
         Start-Sleep -Seconds $i
     }
