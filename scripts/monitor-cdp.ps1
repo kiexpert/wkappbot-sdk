@@ -6,12 +6,14 @@
 #        .\monitor-cdp.ps1 -f           # follow (refresh every 3s)
 #        .\monitor-cdp.ps1 -f -i 5      # follow, 5s interval
 #        .\monitor-cdp.ps1 -tabs        # show tab list per session
+#        .\monitor-cdp.ps1 -killIdle 10 # kill Chrome idle >10 min (no wkappbot cmd)
 
 param(
     [switch]$f,
     [int]$i = 3,
     [switch]$tabs,
-    [switch]$nofix   # skip auto-kill of duplicate IME daemons
+    [switch]$nofix,          # skip auto-kill of duplicate IME daemons
+    [int]$killIdle = 0       # kill Chrome sessions idle > N minutes (0 = disabled)
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -142,27 +144,47 @@ function Get-TabIdle([string]$wsUrl) {
 # This is the ground truth: exact CWD + session name, logged per command.
 # Newest log wins per CWD. Works even after Eye has died (logs persist on disk).
 function Build-CwdCallerMap {
-    $map   = @{}  # normalized-cwd -> session name
-    # name= captures up to first space; cwd= is last field (may follow many tokens)
-    $reCmd = [regex]'\[CMD(?:-MCP)?\] name=(\S+).*? cwd=(\S+)'
+    $map     = @{}  # normalized-cwd -> session name
+    $lastCmd = @{}  # normalized-cwd -> [datetime] last cmd time
+    # Eye log lines: "[HH:mm:ss] [CMD] name=... cmd=... cwd=..."
+    $reCmd = [regex]'(?:\[(\d{2}:\d{2}:\d{2})\] )?\[CMD(?:-MCP)?\] name=(\S+).*? cwd=(\S+)'
 
-    # Scan all eye logs newest-first; stop once all CWDs covered
     Get-ChildItem "$HQ\logs\eye.pid=*.log" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | ForEach-Object {
+        $logDate = $_.LastWriteTime.Date
         try {
             $tail = Get-Content $_.FullName -Tail 3000 -Encoding UTF8 -ErrorAction SilentlyContinue
-            for ($i = $tail.Count - 1; $i -ge 0; $i--) {
-                $m = $reCmd.Match($tail[$i])
+            # Forward scan: $lastTs tracks the nearest preceding timestamp for each CMD line.
+            # CMD lines have no [HH:mm:ss] prefix; surrounding NOTIFY/EYE lines do.
+            # Each CMD overwrites temp entries so the LAST occurrence per CWD (newest) wins.
+            $lastTs  = $null
+            $tmpMap  = @{}
+            $tmpTime = @{}
+            for ($li = 0; $li -lt $tail.Count; $li++) {
+                $line = $tail[$li]
+                if ($line -match '^\[(\d{2}:\d{2}:\d{2})\]') { $lastTs = $Matches[1] }
+                $m = $reCmd.Match($line)
                 if ($m.Success) {
-                    $normCwd = $m.Groups[2].Value.Trim().ToLowerInvariant()
-                    if (-not $map.ContainsKey($normCwd)) {
-                        $map[$normCwd] = $m.Groups[1].Value
+                    $nc = $m.Groups[3].Value.Trim().ToLowerInvariant()
+                    $tmpMap[$nc] = $m.Groups[2].Value
+                    if ($lastTs) {
+                        try {
+                            $t = [datetime]::ParseExact($lastTs, 'HH:mm:ss', $null)
+                            $tmpTime[$nc] = $logDate.Add($t.TimeOfDay)
+                        } catch {}
                     }
+                }
+            }
+            # Merge into global maps; files are newest-first so first-seen wins per CWD
+            foreach ($nc in $tmpMap.Keys) {
+                if (-not $map.ContainsKey($nc))     { $map[$nc]     = $tmpMap[$nc] }
+                if (-not $lastCmd.ContainsKey($nc) -and $tmpTime.ContainsKey($nc)) {
+                    $lastCmd[$nc] = $tmpTime[$nc]
                 }
             }
         } catch {}
     }
-    return $map
+    return @{ Map=$map; LastCmd=$lastCmd }
 }
 
 # ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
@@ -220,8 +242,10 @@ function Build-PortCwdMap {
 
 # ── Main enumeration ──────────────────────────────────────────────────────────
 function Get-WkCdpSessions {
-    $portCwdMap    = Build-PortCwdMap
-    $cwdCallerMap  = Build-CwdCallerMap
+    $portCwdMap      = Build-PortCwdMap
+    $callerResult    = Build-CwdCallerMap
+    $cwdCallerMap    = $callerResult.Map
+    $cwdLastCmdMap   = $callerResult.LastCmd
 
     $all = Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" |
            Select-Object ProcessId, ParentProcessId, CreationDate, WorkingSetSize, CommandLine
@@ -250,6 +274,7 @@ function Get-WkCdpSessions {
 
         $oldest    = ($procs | Sort-Object CreationDate | Select-Object -First 1).CreationDate
         $age       = (Get-Date) - $oldest
+        $ageMin    = $age.TotalMinutes
         $ageStr    = if    ($age.TotalHours   -ge 1) { '{0:F1}h' -f $age.TotalHours   }
                      elseif ($age.TotalMinutes -ge 1) { '{0:F0}m' -f $age.TotalMinutes }
                      else                             { '{0:F0}s' -f $age.TotalSeconds  }
@@ -332,34 +357,39 @@ function Get-WkCdpSessions {
         $latMax   = $cdp.LatMax
         $pages    = @($cdp.Pages)   # full /json page objects: title, url, webSocketDebuggerUrl
 
-        $cwd    = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
-        $proj   = Split-Path $cwd -Leaf
-        $normCwd = $cwd.ToLowerInvariant()
-        $caller  = if ($cwdCallerMap.ContainsKey($normCwd)) { $cwdCallerMap[$normCwd] } else { '' }
+        $cwd         = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
+        $proj        = Split-Path $cwd -Leaf
+        $normCwd     = $cwd.ToLowerInvariant()
+        $caller      = if ($cwdCallerMap.ContainsKey($normCwd)) { $cwdCallerMap[$normCwd] } else { '' }
+        $lastCmdTime = if ($cwdLastCmdMap.ContainsKey($normCwd)) { $cwdLastCmdMap[$normCwd] } else { $null }
+        $idleMin     = if ($null -ne $lastCmdTime) { [math]::Round(((Get-Date) - $lastCmdTime).TotalMinutes, 1) } else { $null }
 
         [PSCustomObject]@{
-            Port      = [int]$port
-            MainPID   = $main.ProcessId
-            Procs     = $procs.Count
-            Renderers = $rCount
-            MemMB     = $totalMB
-            Age       = $ageStr
-            TgtPos    = $tgtPos
-            TgtSize   = $tgtSize
-            ActPos    = $actPos
-            ActSize   = $actSize
-            Drift     = $drift
-            Offscreen = $offscreen
-            LatAvg    = $latAvg
-            LatMin    = $latMin
-            LatMax    = $latMax
-            Pages     = $pages
-            TabCount  = $pages.Count
-            StartUrl  = $startUrl
-            LaunchCmd = $launchCmd
-            CWD       = $cwd
-            Proj      = $proj
-            Caller    = $caller
+            Port        = [int]$port
+            MainPID     = $main.ProcessId
+            Procs       = $procs.Count
+            Renderers   = $rCount
+            MemMB       = $totalMB
+            Age         = $ageStr
+            AgeMin      = $ageMin
+            TgtPos      = $tgtPos
+            TgtSize     = $tgtSize
+            ActPos      = $actPos
+            ActSize     = $actSize
+            Drift       = $drift
+            Offscreen   = $offscreen
+            LatAvg      = $latAvg
+            LatMin      = $latMin
+            LatMax      = $latMax
+            Pages       = $pages
+            TabCount    = $pages.Count
+            StartUrl    = $startUrl
+            LaunchCmd   = $launchCmd
+            CWD         = $cwd
+            Proj        = $proj
+            Caller      = $caller
+            LastCmdTime = $lastCmdTime
+            IdleMin     = $idleMin
         }
     }
 }
@@ -549,6 +579,24 @@ function Show-Once {
             ($urlCount.ContainsKey($k) -and $urlCount[$k] -gt 1)
         }).Count
         if ($dupCount -gt 2) { $warns += "[WARN] Port $p  $dupCount duplicate URL tabs" }
+
+        # Idle Chrome detection: warn if no wkappbot cmd in >10min (always shown)
+        # If -killIdle N specified, auto-kill sessions idle > N min
+        $idleThresholdWarn = 10
+        $im = $s.IdleMin
+        if ($null -ne $im -and $im -ge $idleThresholdWarn) {
+            $tsStr = if ($s.LastCmdTime) { $s.LastCmdTime.ToString('HH:mm:ss') } else { '?' }
+            $killCmd = "Stop-Process -Id $($s.MainPID) -Force  # port $p idle ${im}min"
+            $warns += "[WARN] Port $p  idle ${im}min (last wkappbot cmd: $tsStr) -- Kill: $killCmd"
+        }
+        if ($killIdle -gt 0 -and $null -ne $im -and $im -ge $killIdle) {
+            try {
+                Stop-Process -Id $s.MainPID -Force -ErrorAction Stop
+                $warns += "[KILLED] Port $p  PID=$($s.MainPID) idle ${im}min (>= threshold ${killIdle}min)"
+            } catch {
+                $warns += "[KILL-FAIL] Port $p  PID=$($s.MainPID): $_"
+            }
+        }
     }
 
     if ($warns.Count -gt 0) {
