@@ -260,15 +260,55 @@ function Get-WkCdpSessions {
         $startUrl  = if ($cmd -match '"(https?://[^"]+)"$')               { $Matches[1] }
                      elseif ($cmd -match "(https?://\S+)$")               { $Matches[1] } else { '' }
 
-        # Infer the wkappbot command from the Chrome launch URL
-        $launchCmd = if     ($startUrl -like '*chatgpt.com*')     { 'ask gpt' }
-                     elseif ($startUrl -like '*gemini.google*')   { 'ask gemini' }
-                     elseif ($startUrl -like '*claude.ai*')       { 'ask claude' }
-                     elseif ($startUrl -like '*koreainvestment*') { 'cdp open hts' }
-                     elseif ($startUrl -like '*smilegate*')       { 'cdp open smilegate' }
-                     elseif ($startUrl -like '*careers.*')        { 'cdp open careers' }
-                     elseif ($startUrl -ne '')                    { 'cdp open ' + ($startUrl -replace '^https?://([^/?#]+).*','$1') }
-                     else                                          { '(unknown)' }
+        # LAUNCHED-BY: walk parent chain to find the wkappbot command.
+        # 1. Chrome parent alive + specific command in cmdline -> use that.
+        # 2. Parent alive but is Eye server (\beye\b) or dead -> check per-command logs.
+        # 3. Log file wkappbot-core.exe.out-*.CMD.pid=PID.log -> extract CMD.
+        # 4. Fallback: infer from Chrome launch URL.
+        $launchCmd = '(unknown)'
+
+        # Step 1: check alive parent cmdline for specific ask/cdp subcommand
+        $parentPid = $main.ParentProcessId
+        $parentProc = Get-CimInstance Win32_Process -Filter "ProcessId=$parentPid" -ErrorAction SilentlyContinue
+        if ($parentProc -and $parentProc.Name -like '*wkappbot*') {
+            $cl = $parentProc.CommandLine
+            if     ($cl -match '\bask.gpt\b|\bask-gpt\b')         { $launchCmd = 'ask gpt' }
+            elseif ($cl -match '\bask.gemini\b|\bask-gemini\b')   { $launchCmd = 'ask gemini' }
+            elseif ($cl -match '\bask.claude\b|\bask-claude\b')   { $launchCmd = 'ask claude' }
+            elseif ($cl -match '\bask.triad\b|\bask-triad\b')     { $launchCmd = 'ask triad' }
+            elseif ($cl -match '\bcdp.open\b|\bweb.open\b')       { $launchCmd = 'cdp open' }
+            # If it's just Eye server, fall through to log/URL search
+        }
+
+        # Step 2: search per-command log files by parent PID chain (dead parents too)
+        if ($launchCmd -eq '(unknown)') {
+            $checkPids = @($parentPid)
+            if ($parentProc) { $checkPids += $parentProc.ParentProcessId }
+            foreach ($pid2 in $checkPids) {
+                # Only match wkappbot-core command logs, not eye.diag or eye.pid files
+                $logFile = Get-ChildItem "$HQ\logs" -Filter "wkappbot-core.exe.out-*.pid=$pid2.log" -ErrorAction SilentlyContinue |
+                           Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($logFile) {
+                    # Extract command from filename: wkappbot-core.exe.out-YYYYMMDD_HHMMSS.CMD.pid=PID.log
+                    $cmdFromLog = $logFile.BaseName -replace '^wkappbot-core\.exe\.out-\d+_\d+\.(.+)\.pid=\d+$','$1'
+                    if ($cmdFromLog -notmatch 'eye$') {  # skip generic 'eye' command logs
+                        $launchCmd = $cmdFromLog -replace '-',' '
+                        break
+                    }
+                }
+            }
+        }
+
+        # Step 3: fallback -- infer from Chrome launch URL (always reliable)
+        if ($launchCmd -eq '(unknown)' -and $startUrl -ne '') {
+            $launchCmd = if     ($startUrl -like '*chatgpt.com*')     { 'ask gpt' }
+                         elseif ($startUrl -like '*gemini.google*')   { 'ask gemini' }
+                         elseif ($startUrl -like '*claude.ai*')       { 'ask claude' }
+                         elseif ($startUrl -like '*koreainvestment*') { 'cdp open hts' }
+                         elseif ($startUrl -like '*smilegate*')       { 'cdp open smilegate' }
+                         elseif ($startUrl -like '*careers.*')        { 'cdp open careers' }
+                         else { 'cdp open ' + ($startUrl -replace '^https?://([^/?#]+).*','$1') }
+        }
 
         $rect      = [WkWin32]::MainWindowRect([int]$main.ProcessId)
         $actPos    = if ($null -ne $rect) { "$($rect.L),$($rect.T)" }     else { '(min)' }
