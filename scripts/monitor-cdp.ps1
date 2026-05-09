@@ -46,24 +46,38 @@ public static class WkWin32 {
 Add-Type -AssemblyName System.Net.Http -ErrorAction SilentlyContinue
 $global:_WkCdpClient = $null
 
-function Get-CdpTabs([int]$port) {
-    try {
-        if (-not $global:_WkCdpClient) {
-            $global:_WkCdpClient = New-Object System.Net.Http.HttpClient
-            $global:_WkCdpClient.Timeout = [TimeSpan]::FromSeconds(2)
-        }
-        # Use 127.0.0.1 explicitly: on some Win11 machines localhost resolves to ::1 (IPv6)
-        # but Chrome CDP binds only to 127.0.0.1 (IPv4). Host header keeps Chrome happy.
-        $req = New-Object System.Net.Http.HttpRequestMessage(
-            [System.Net.Http.HttpMethod]::Get,
-            "http://127.0.0.1:$port/json")
-        $req.Headers.Host = "localhost"
-        $resp = $global:_WkCdpClient.SendAsync($req).Result
-        if (-not $resp.IsSuccessStatusCode) { return @() }
-        $body = $resp.Content.ReadAsStringAsync().Result
-        $pages = @(($body | ConvertFrom-Json) | Where-Object { $_.type -eq 'page' })
-        return $pages | Select-Object -ExpandProperty title
-    } catch { return @() }
+# Returns hashtable: LatAvg/LatMin/LatMax (ms, -1=dead), Titles (string[])
+# Pings CDP /json 3 times with 100ms timeout; reports avg/min/max.
+# Use 127.0.0.1: on Win11, localhost may resolve to IPv6 ::1 but Chrome binds IPv4 only.
+function Get-CdpInfo([int]$port, [int]$pings = 3) {
+    if (-not $global:_WkCdpClient) {
+        $global:_WkCdpClient = New-Object System.Net.Http.HttpClient
+        $global:_WkCdpClient.Timeout = [TimeSpan]::FromMilliseconds(100)
+    }
+    $samples = @(); $titles = @()
+    for ($n = 0; $n -lt $pings; $n++) {
+        try {
+            $req = New-Object System.Net.Http.HttpRequestMessage(
+                [System.Net.Http.HttpMethod]::Get, "http://127.0.0.1:$port/json")
+            $req.Headers.Host = "localhost"
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $resp = $global:_WkCdpClient.SendAsync($req).Result
+            $sw.Stop()
+            if ($resp.IsSuccessStatusCode) {
+                $samples += [int]$sw.ElapsedMilliseconds
+                if ($n -eq 0) {
+                    $body  = $resp.Content.ReadAsStringAsync().Result
+                    $pages = @(($body | ConvertFrom-Json) | Where-Object { $_.type -eq 'page' })
+                    $titles = $pages | Select-Object -ExpandProperty title
+                }
+            }
+        } catch {}
+    }
+    if ($samples.Count -eq 0) { return @{ LatAvg=-1; LatMin=-1; LatMax=-1; Titles=@() } }
+    $avg = [int](($samples | Measure-Object -Average).Average)
+    $min = ($samples | Measure-Object -Minimum).Minimum
+    $max = ($samples | Measure-Object -Maximum).Maximum
+    return @{ LatAvg=$avg; LatMin=$min; LatMax=$max; Titles=$titles }
 }
 
 # ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
@@ -176,10 +190,14 @@ function Get-WkCdpSessions {
         }
         if ($tgtPos -match '^-\d{3,}') { $offscreen = $true }  # x < -100 = off-screen target
 
-        $tabList  = Get-CdpTabs ([int]$port)
+        $cdp      = Get-CdpInfo ([int]$port)
+        $latAvg   = $cdp.LatAvg    # ms avg; -1 = dead/timeout
+        $latMin   = $cdp.LatMin
+        $latMax   = $cdp.LatMax
+        $tabList  = @($cdp.Titles)
         $tabCount = $tabList.Count
 
-        $cwd = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
+        $cwd  = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
         $proj = Split-Path $cwd -Leaf
 
         [PSCustomObject]@{
@@ -195,6 +213,9 @@ function Get-WkCdpSessions {
             ActSize   = $actSize
             Drift     = $drift
             Offscreen = $offscreen
+            LatAvg    = $latAvg
+            LatMin    = $latMin
+            LatMax    = $latMax
             TabCount  = $tabCount
             TabList   = $tabList
             StartUrl  = $startUrl
@@ -212,35 +233,41 @@ function Show-Once {
         return
     }
 
-    $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9}' -f `
-           'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','PROJECT (CWD)'
+    $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9,-14} {10}' -f `
+           'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','LAT(avg/mn/mx)','PROJECT (CWD)'
     Write-Host $hdr -ForegroundColor Cyan
-    Write-Host ('-' * 105) -ForegroundColor DarkGray
+    Write-Host ('-' * 120) -ForegroundColor DarkGray
 
     foreach ($s in $sessions) {
         $pr       = "$($s.Procs)/$($s.Renderers)"
+
+        # Latency string: "12/8/31" or "DEAD"
+        $latStr   = if ($s.LatAvg -lt 0) { 'DEAD' }
+                    else { "$($s.LatAvg)/$($s.LatMin)/$($s.LatMax)" }
+        $latColor = if ($s.LatAvg -lt 0)   { 'Red'    }
+                    elseif ($s.LatAvg -gt 50) { 'Yellow' }
+                    else                    { 'Green'  }
+
         $memColor = if ($s.MemMB -gt 2000) { 'Red' } elseif ($s.MemMB -gt 1000) { 'Yellow' } else { 'White' }
-        $rowColor = if ($s.Offscreen)                 { 'Red'   }
-                    elseif ($s.Drift -notin @('OK','n/a')) { 'Yellow' }
-                    else                              { 'White' }
+        $rowColor = if ($s.Offscreen)                       { 'Red'    }
+                    elseif ($s.Drift -notin @('OK','n/a'))  { 'Yellow' }
+                    else                                    { 'White'  }
 
-        $line = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9}' -f `
-            $s.Port, $s.MainPID, $pr, $s.MemMB, $s.Age,
-            $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount,
-            "$($s.Proj)  ($($s.CWD))"
+        $pre  = '{0,-6} {1,-7} {2,5} ' -f $s.Port, $s.MainPID, $pr
+        $mem  = '{0,6} ' -f $s.MemMB
+        $mid  = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  ' -f `
+                $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount
+        $lat  = '{0,-14} ' -f $latStr
+        $tail = "$($s.Proj)  ($($s.CWD))"
 
-        if ($rowColor -eq 'White') {
-            # Color memory column separately
-            $pre = '{0,-6} {1,-7} {2,5} ' -f $s.Port, $s.MainPID, $pr
-            $mem = '{0,6} ' -f $s.MemMB
-            $rest = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  {5}' -f `
-                $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount,
-                "$($s.Proj)  ($($s.CWD))"
-            Write-Host $pre -NoNewline
-            Write-Host $mem -NoNewline -ForegroundColor $memColor
-            Write-Host $rest
+        if ($rowColor -ne 'White') {
+            Write-Host ($pre + $mem + $mid + $lat + $tail) -ForegroundColor $rowColor
         } else {
-            Write-Host $line -ForegroundColor $rowColor
+            Write-Host $pre  -NoNewline
+            Write-Host $mem  -NoNewline -ForegroundColor $memColor
+            Write-Host $mid  -NoNewline
+            Write-Host $lat  -NoNewline -ForegroundColor $latColor
+            Write-Host $tail
         }
 
         # Tab list (if -tabs flag or any tabs)
