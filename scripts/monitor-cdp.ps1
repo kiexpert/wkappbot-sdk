@@ -260,6 +260,16 @@ function Get-WkCdpSessions {
         $startUrl  = if ($cmd -match '"(https?://[^"]+)"$')               { $Matches[1] }
                      elseif ($cmd -match "(https?://\S+)$")               { $Matches[1] } else { '' }
 
+        # Infer the wkappbot command from the Chrome launch URL
+        $launchCmd = if     ($startUrl -like '*chatgpt.com*')     { 'ask gpt' }
+                     elseif ($startUrl -like '*gemini.google*')   { 'ask gemini' }
+                     elseif ($startUrl -like '*claude.ai*')       { 'ask claude' }
+                     elseif ($startUrl -like '*koreainvestment*') { 'cdp open hts' }
+                     elseif ($startUrl -like '*smilegate*')       { 'cdp open smilegate' }
+                     elseif ($startUrl -like '*careers.*')        { 'cdp open careers' }
+                     elseif ($startUrl -ne '')                    { 'cdp open ' + ($startUrl -replace '^https?://([^/?#]+).*','$1') }
+                     else                                          { '(unknown)' }
+
         $rect      = [WkWin32]::MainWindowRect([int]$main.ProcessId)
         $actPos    = if ($null -ne $rect) { "$($rect.L),$($rect.T)" }     else { '(min)' }
         $actSize   = if ($null -ne $rect) { "$($rect.R-$rect.L)x$($rect.B-$rect.T)" } else { '?' }
@@ -306,6 +316,7 @@ function Get-WkCdpSessions {
             Pages     = $pages
             TabCount  = $pages.Count
             StartUrl  = $startUrl
+            LaunchCmd = $launchCmd
             CWD       = $cwd
             Proj      = $proj
             Caller    = $caller
@@ -361,10 +372,10 @@ function Show-Once {
         }
     }
 
-    $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9,-14} {10}' -f `
-           'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','LAT(avg/mn/mx)','PROJECT (CWD)'
+    $hdr = '{0,-6} {1,-7} {2,5} {3,6} {4,5}  {5,-13} {6,-13} {7,-10} {8,4}  {9,-14} {10,-14} {11}' -f `
+           'PORT','PID','P/R','MEM(M)','AGE','TGT-POS','ACT-POS','DRIFT','TABS','LAT(avg/mn/mx)','LAUNCHED-BY','PROJECT (CWD)'
     Write-Host $hdr -ForegroundColor Cyan
-    Write-Host ('-' * 120) -ForegroundColor DarkGray
+    Write-Host ('-' * 135) -ForegroundColor DarkGray
 
     foreach ($s in $sessions) {
         $pr       = "$($s.Procs)/$($s.Renderers)"
@@ -385,14 +396,16 @@ function Show-Once {
         $mid  = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  ' -f `
                 $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount
         $lat  = '{0,-14} ' -f $latStr
-        $callerShort = if ($s.Caller) { $t = $s.Caller -replace '^\W+',''; "  [<< $($t.Substring(0,[Math]::Min(45,$t.Length)))]" } else { '' }
+        $launch = '{0,-14} ' -f ($s.LaunchCmd.Substring(0, [Math]::Min(14, $s.LaunchCmd.Length)))
+        $callerShort = if ($s.Caller) { $t = $s.Caller -replace '^\W+',''; "  [<< $($t.Substring(0,[Math]::Min(35,$t.Length)))]" } else { '' }
         $tail = "$($s.Proj)  ($($s.CWD))$callerShort"
 
         if ($rowColor -ne 'White') {
-            Write-Host ($pre + $mem + $mid + $lat + $tail) -ForegroundColor $rowColor
+            Write-Host ($pre + $mem + $mid + $lat + $launch + $tail) -ForegroundColor $rowColor
         } else {
-            Write-Host $pre -NoNewline; Write-Host $mem -NoNewline -ForegroundColor $memColor
-            Write-Host $mid -NoNewline; Write-Host $lat -NoNewline -ForegroundColor $latColor
+            Write-Host $pre    -NoNewline; Write-Host $mem    -NoNewline -ForegroundColor $memColor
+            Write-Host $mid    -NoNewline; Write-Host $lat    -NoNewline -ForegroundColor $latColor
+            Write-Host $launch -NoNewline -ForegroundColor DarkCyan
             Write-Host $tail
         }
 
