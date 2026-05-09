@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "repo-health-doctor",
   "app": "wkappbot-workflow",
   "title": "Repo Health Doctor: issues, empty CLAUDE.md sections, unanswered comments",

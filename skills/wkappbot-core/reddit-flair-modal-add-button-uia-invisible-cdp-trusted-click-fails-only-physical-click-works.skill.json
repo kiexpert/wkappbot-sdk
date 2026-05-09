@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works",
   "app": "wkappbot-core",
   "title": "reddit flair modal Add button: UIA-invisible, CDP trusted click fails, only physical click works",

@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "ask-gpt-editor-wait-tag-and-rescue-fallback",
   "app": "wkappbot-webbot",
   "title": "ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted",

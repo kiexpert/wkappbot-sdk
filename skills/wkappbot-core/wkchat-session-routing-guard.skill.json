@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "wkchat-session-routing-guard",
   "app": "wkappbot-core",
   "title": "wkchat session routing guard -- nested calls stay session-aware",

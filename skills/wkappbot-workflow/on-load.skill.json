@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "on-load",
   "app": "wkappbot-workflow",
   "title": "WKAppBot On-Load Checklist: session start and post-compaction",

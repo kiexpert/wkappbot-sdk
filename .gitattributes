@@ -1,0 +1,15 @@
+# Force LF for all text files (skills, source, docs)
+* text=auto eol=lf
+
+# Skill JSON files: always LF -- wkappbot skill parser is LF-native
+*.skill.json text eol=lf
+
+# Binary files: no line ending conversion
+*.png binary
+*.jpg binary
+*.mp3 binary
+*.mp4 binary
+*.pdf binary
+*.exe binary
+*.dll binary
+*.zip binary

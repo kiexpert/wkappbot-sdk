@@ -1,4 +1,4 @@
-{
+﻿{
   "id": "a11y-find-deprecated-eval-removal-guard",
   "app": "wkappbot-workflow",
   "title": "A11y Eval Deprecated: AutoRegisterBug Guard on Use",
