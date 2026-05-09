@@ -261,6 +261,7 @@ Execute in order when user sends 'gg':
 | **CDP anomaly response** | Red flags: off-screen TGT-POS (x<-100), LAT=DEAD, DUP tabs >3, MEM>2GB/session, >4 Chrome same CWD. Actions: file suggest with cdp-tab-growth.jsonl evidence, fix WaitForEditorA11y timeouts, check sandbox-miss patterns. |
 | **CDP suggest triage** | `wkappbot suggest list` -> resolve stale BUG-AUTO CDP/Chrome/ask-gpt suggests. Use `--class CdpClient --commit <hash> --skill cdp-evalasync-retry-policy`. ChromeLauncher.cs is 817 lines (over cap) -- use CdpClient or Win32 partial instead. |
 | **Doc version audit** | Before release and on ㄱㄱ: grep all root `*.md` for old version strings (v5.x, v6.x). Check SECURITY.md supported-versions table, README What's New section, CHANGELOG header. Fix and push any stale references. |
+| **Doc version sync** | Keep README/AGENTS/CLAUDE/SECURITY/VERSIONING/CHANGELOG consistent with current version. When version bumps: update SECURITY supported-versions, README What's New, VERSIONING current-version line, CHANGELOG header -- all in one commit. Never let version strings drift between files. |
 
 ## Skills
 # Remove keywords that don't apply, then run:
