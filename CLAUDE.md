@@ -266,11 +266,16 @@ Execute in order when user sends 'gg':
 | **Doc version sync** | Keep README/AGENTS/CLAUDE/SECURITY/VERSIONING/CHANGELOG consistent with current version. When version bumps: update SECURITY supported-versions, README What's New, VERSIONING current-version line, CHANGELOG header -- all in one commit. Never let version strings drift between files. |
 
 ## Skills
-# Remove keywords that don't apply, then run:
-wkappbot skill search cdp chrome windows a11y uia hangul ime whisper slack eye suggest gg workflow
+wkappbot skill read suggest-workflow      # suggest submit/resolve/co-resolve rules
+wkappbot skill read grap                  # UI element addressing (window/UIA/CDP/ADB)
+wkappbot skill read cdp-command-guide     # CDP command reference for Chrome automation
+wkappbot skill read a11y-command-cheatsheet  # a11y action cheatsheet
 
 ## Gotchas
-- (add project-specific gotchas here as you discover them)
+- `suggest list` crashes with JsonException if a delta-comment wrote raw JSON into a string field. Workaround: `python3 -c "import json; [print(l[:80]) for l in open('suggestions.jsonl') if json.loads(l)]"` to read valid lines.
+- `wkappbot suggest` silently drops submit when PENDING CO-RESOLVE banner shows. Use `wkappbot-core.exe suggest "..."` to bypass.
+- `skill audit` shows FILE MISSING for `csharp/src/WKAppBot.*` paths — expected in SDK repo (files live in the WKAppBot core repo). Not broken.
+- Chrome translate infobar (auto-shown on Korean pages) blocks CDP injection — it steals focus and intercepts clicks. Dismiss or suppress before automation.
 
 ## References
 - `README.md`
