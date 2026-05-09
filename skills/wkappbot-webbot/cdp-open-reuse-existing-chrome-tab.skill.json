@@ -1,0 +1,74 @@
+{
+  "id": "cdp-open-reuse-existing-chrome-tab",
+  "app": "wkappbot-webbot",
+  "title": "cdp open Reuses Existing Chrome and Opens URL as New Tab",
+  "title_ko": null,
+  "desc": "wkappbot cdp open \u003Curl\u003E first checks for an alive Chrome registered to this project (via Window Property GetLaunchedPort, falling back to FindRunningChromePort over the per-project user-data-dir). When found, it skips ChromeLauncher.LaunchAsync entirely and lets ConnectCdp drive Target.createTarget into a NEW TAB on the existing instance. Only when no live registration is found does it fall through to a fresh Chrome launch. Prevents the duplicate-Chrome-on-9222/9223/9224 storm reported 2026-05-05.",
+  "steps": [
+    "WebOpenCommand entry: set ChromeLauncher.DefaultUserDataDirBase=DataDir and ChromeLauncher.ProjectHash=ProjectRoot.Hash8() so registry lookups see the per-project bucket.",
+    "Reuse probe (priority order): 1) ChromeLauncher.GetLaunchedPort() reads Window Property WKAPPBOT_CDP_PORT_\u003Chash8\u003E on parent console/desktop HWND. 2) Fallback ChromeLauncher.FindRunningChromePort(userDataDir) does WMI/CDP scan tied to this project\u0027s user-data-dir.",
+    "Each candidate port verified live via ChromeLauncher.IsPortActiveAsync; dead ports drop out. WMI/CDP fallback re-binds port via RegisterLaunchedPort so subsequent calls take the fast Window-Property path.",
+    "Reuse path: skip LaunchAsync. Print \u0027Reusing Chrome on port N\u0027. Then ConnectCdp(port, navigateUrl=url) calls GetOrCreateSandboxedTabAsync, which uses Target.createTarget when no host-matching tab exists -- new TAB on existing Chrome, not new process.",
+    "Launch path: only when both reuse probes return 0 (no live Chrome for this project). Falls through to ChromeLauncher.LaunchAsync(port, url) with SHA256-derived port (range 9300-9995, 4-port block per project CWD).",
+    "--new-window opt-out: skips reuse probe, forces new Chrome process. Reserved for isolated-process scenarios.",
+    "Port isolation: ports are SHA256-derived from git project root CWD. Each project gets a fixed 4-port block (e.g. 9300-9303). Never hardcode port numbers -- always use cdp open output."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://github.com",
+      "expect": "First call launches Chrome; emits OK \u003Cgrap\u003E. Window Property and userDataDir-keyed CDP registration both populated.",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://stackoverflow.com",
+      "expect": "Second call prints \u0027[WEB] Reusing Chrome on port N (will open URL as new tab via CDP)\u0027 and \u0027[TAB:GROWTH] sandbox-miss-create before=K after=K\u002B1\u0027. No new Chrome PID, no new CDP port. netstat listing for 922x ports stays identical before and after.",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://example.com --new-window",
+      "expect": "--new-window flag bypasses reuse and launches a fresh Chrome process even when one is registered. Used only when caller explicitly wants isolated processes.",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot cdp open https://github.com",
+  "tags": [
+    "cdp",
+    "open",
+    "reuse",
+    "tab-creation",
+    "Target.createTarget",
+    "chrome-launcher",
+    "duplicate-window-fix"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/WebCommands.cs",
+      "line": 730,
+      "pattern": "WebOpenCommand",
+      "note": "Pre-launch reuse probe: GetLaunchedPort -\u003E FindRunningChromePort -\u003E IsPortActiveAsync gate"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.PortRegistry.cs",
+      "line": 107,
+      "pattern": "GetLaunchedPort",
+      "note": "Per-instance registered port (Window Property)"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.Profile.cs",
+      "line": 110,
+      "pattern": "FindRunningChromePort",
+      "note": "WMI/CDP fallback keyed by user-data-dir"
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs",
+      "line": 118,
+      "pattern": "GetOrCreateSandboxedTabAsync",
+      "note": "Target.createTarget call site for tab creation in existing Chrome"
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-06T01:18:00Z",
+  "updated": "2026-05-08T10:33:57.2851795Z",
+  "version": "1.2"
+}

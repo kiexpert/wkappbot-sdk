@@ -1,0 +1,44 @@
+{
+  "id": "eye-hotswap-stamp-10min-expiry",
+  "app": "wkappbot-core",
+  "title": "Eye _lastFailedSwapStamp 10-min auto-expiry",
+  "title_ko": null,
+  "desc": "_lastFailedSwapStamp permanently blocked future hot-swaps after a single transient failure. _lastFailedSwapStampUtc tracks recording time; 10-min expiry path clears the guard and retries swap automatically.",
+  "steps": [
+    "Pair every _lastFailedSwapStamp mutation with _lastFailedSwapStampUtc",
+    "On stamp match check (UtcNow - stamp) >= 10min and clear if expired",
+    "Log Failed-stamp expired on auto-clear",
+    "Reset both fields together on swap success or NoNewExe path",
+    "Verify with: wkappbot eye hotswap status (after fix; stamp expired after 10 min idle)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye health",
+      "expect": "Failed-stamp expired log on stale stamp >=10min",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "no hotswap-stuck suggest after 10min",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot validate eye-hotswap-stamp-expiry",
+      "expect": "stamp clears after 10min idle",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "hotswap",
+    "stamp",
+    "timeout"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T05:15:44.2817462Z",
+  "updated": "2026-05-09T16:57:15.8486409Z",
+  "version": "1.2"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "ask-gpt-editor-wait-tag-and-rescue-fallback",
+  "app": "wkappbot-webbot",
+  "title": "ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted",
+  "title_ko": null,
+  "desc": "ChatGPT renames #prompt-textarea / its testid faster than we can ship selector chain updates, which used to block all ask gpt commands at EDITOR-WAIT until user intervention. Fixed: after the 10s selector chain exhausts, WaitForChatGptEditorA11y performs a last-resort probe for any visible contenteditable/textbox/textarea, tags it with data-wkappbot-editor-rescue=1, and returns that selector so the ask flow continues. Diagnostic [ASK] EDITOR-DIAG dump still logged so suggest queue captures the new selector the next day.",
+  "steps": [
+    "Primary chain (6 selectors) gets 10s total poll; returns as soon as one resolves",
+    "On exhaust: EDITOR-DIAG eval prints URL + title + counts of visible editables",
+    "Last-resort eval picks the first visible contenteditable/textbox/textarea (>50x10 px) and tags it with data-wkappbot-editor-rescue=1",
+    "Returns '[data-wkappbot-editor-rescue=\"1\"]' so ask gpt / ask triad keeps running",
+    "Rescue path is non-destructive -- a data-* attribute is invisible to the page",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-17T04:54)",
+    "2026-05-09: stale ChatGPT session can cause ask gpt --sync to return only LAUNCH banner. Workaround: --new-session restores pipeline. Resolves suggest 2026-05-08T13:00:35.",
+    "Pipeline kill triage: ask gpt --sync ping returns only LAUNCH banner -> no AI response within timeout -> stale session. Recovery: --new-session.",
+    "Verified 2026-05-09: test-ask-gpt-sync-stale-session.ps1 (resolve ts=2026-05-08T13:00:35)",
+    "2026-05-09 fix(ask): WaitForEditorA11y readyState gate + 1.5s per-call timeout fixes ask gpt / ask gemini / ask claude CDP runtime.evaluate stale-context cluster (commit 59abeed3)",
+    "(removed)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt --sync --timeout 20s ping",
+      "expect": "assistant response visible",
+      "prompt": "[BUG-AUTO] ask gpt --sync ping LAUNCH-only timeout: investigated as stale ChatGPT session pipeline killed. Workaround: --new-session restores AI response within timeout. Triage: not a code defect; pipeline triage script attached and skill updated."
+    },
+    {
+      "cmd": "wkappbot ask log --tail 5",
+      "expect": "last entry shows successful injection",
+      "prompt": "[BUG-AUTO] ask gpt --sync ping LAUNCH-only timeout: investigated as stale ChatGPT session pipeline killed. Workaround: --new-session restores AI response within timeout. Triage: not a code defect; pipeline triage script attached and skill updated."
+    },
+    {
+      "cmd": "wkappbot cdp open --tab gpt",
+      "expect": "OK with hwnd",
+      "prompt": "[BUG-AUTO] ask gpt --sync ping LAUNCH-only timeout: investigated as stale ChatGPT session pipeline killed. Workaround: --new-session restores AI response within timeout. Triage: not a code defect; pipeline triage script attached and skill updated."
+    }
+  ],
+  "primary_cmd": "wkappbot ask gpt --sync --timeout 20s ping",
+  "tags": [
+    "ask",
+    "gpt",
+    "chatgpt",
+    "cdp",
+    "editor-wait",
+    "selector",
+    "rescue"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.ChatGpt.cs",
+      "line": null,
+      "pattern": "EDITOR-RESCUE",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T12:21:56.1816944Z",
+  "updated": "2026-05-09T06:22:28.2908247Z",
+  "version": "1.13"
+}

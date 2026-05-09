@@ -5,18 +5,25 @@
   "title_ko": null,
   "desc": "Beginner-friendly guide to all wkappbot cdp commands: open, navigate, html, capture, eval, tabs. Explains port isolation, grap format, typical session flow, and common errors.",
   "steps": [
-    "WHAT IS CDP HERE: wkappbot cdp commands control Chrome via Chrome DevTools Protocol. Chrome is launched per-project with an isolated SHA256-derived port (9300-9995). Every cdp command talks to YOUR project\u0027s Chrome only.",
-    "FIRST STEP ALWAYS -- cdp open: wkappbot cdp open \u003Curl\u003E returns OK {proc:\u0027chrome\u0027,cdp:9300,hwnd:0x...,domain:\u0027...\u0027}. ONLY command that auto-detects/launches Chrome. SAVE the cdp:{port} from output.",
-    "cdp:{port} IN GRAP IS MANDATORY for all other commands: {proc:\u0027chrome\u0027,cdp:9300}. Omitting it = error. Bare URL as first arg = error. Copy port from cdp open output.",
-    "NAVIGATE: wkappbot cdp navigate \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 \u0027https://example.com\u0027 -- waits for load. Reuses existing tab or opens new one if host changed.",
-    "READ HTML: wkappbot cdp html \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 -- returns full outerHTML for scraping/inspection.",
-    "CAPTURE: wkappbot cdp capture \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 -- saves PNG screenshot, prints path.",
-    "URL\u002BTITLE: wkappbot cdp url / cdp title with grap -- current page URL or document title.",
-    "EVAL JS: wkappbot a11y read \u0027{proc:\u0022chrome\u0022,cdp:9300}\u0027 --eval-js \u0027document.title\u0027 -- a11y eval is removed, always use a11y read --eval-js.",
-    "TABS: wkappbot cdp tabs -- list all tabs. wkappbot cdp close \u003Cgrap\u003E -- close current tab.",
-    "PORT FORMULA: SHA256(project-git-root)[0:4] % 174 * 4 \u002B 9300, aligned to 0xFFFC. Same project = same port always. Wrong port = \u0027not in project CDP block\u0027 error.",
-    "TYPICAL FLOW: cdp open \u003Curl\u003E -\u003E save grap -\u003E cdp html \u003Cgrap\u003E -\u003E cdp navigate \u003Cgrap\u003E \u003Curl2\u003E -\u003E a11y read \u003Cgrap\u003E --eval-js \u0027...\u0027 -\u003E cdp capture \u003Cgrap\u003E.",
-    "ERRORS: \u0027grap required\u0027 = passed URL not grap. \u0027not in project CDP block\u0027 = wrong port. \u0027No node with given id\u0027 = DOM changed, re-read html. \u0027[CDP:DIALOG:BLOCKED]\u0027 = JS alert auto-dismissed, command retried."
+    "WHAT IS CDP HERE: wkappbot cdp commands control Chrome via Chrome DevTools Protocol. Chrome is launched per-project with an isolated SHA256-derived port (9300-9995). Every cdp command talks to YOUR project's Chrome only.",
+    "FIRST STEP ALWAYS -- cdp open: wkappbot cdp open <url> returns OK {proc:'chrome',cdp:9300,hwnd:0x...,domain:'...'}. ONLY command that auto-detects/launches Chrome. SAVE the cdp:{port} from output.",
+    "cdp:{port} IN GRAP IS MANDATORY for all other commands: {proc:'chrome',cdp:9300}. Omitting it = error. Bare URL as first arg = error. Copy port from cdp open output.",
+    "NAVIGATE: wkappbot cdp navigate '{proc:\"chrome\",cdp:9300}' 'https://example.com' -- waits for load. Reuses existing tab or opens new one if host changed.",
+    "READ HTML: wkappbot cdp html '{proc:\"chrome\",cdp:9300}' -- returns full outerHTML for scraping/inspection.",
+    "CAPTURE: wkappbot cdp capture '{proc:\"chrome\",cdp:9300}' -- saves PNG screenshot, prints path.",
+    "URL+TITLE: wkappbot cdp url / cdp title with grap -- current page URL or document title.",
+    "EVAL JS: wkappbot a11y read '{proc:\"chrome\",cdp:9300}' --eval-js 'document.title' -- a11y eval is removed, always use a11y read --eval-js.",
+    "TABS: wkappbot cdp tabs -- list all tabs. wkappbot cdp close <grap> -- close current tab.",
+    "PORT FORMULA: SHA256(project-git-root)[0:4] % 174 * 4 + 9300, aligned to 0xFFFC. Same project = same port always. Wrong port = 'not in project CDP block' error.",
+    "TYPICAL FLOW: cdp open <url> -> save grap -> cdp html <grap> -> cdp navigate <grap> <url2> -> a11y read <grap> --eval-js '...' -> cdp capture <grap>.",
+    "ERRORS: 'grap required' = passed URL not grap. 'not in project CDP block' = wrong port. 'No node with given id' = DOM changed, re-read html. '[CDP:DIALOG:BLOCKED]' = JS alert auto-dismissed, command retried.",
+    "LOCATION: D:\\GitHub\\WKAppBot\\bin\\cdp-mon.ps1 (also scripts/monitor-cdp.ps1 in wkappbot-sdk repo).\nUSAGE: cdp-mon.ps1 [-f] [-i N] [-tabs] [-nofix]\n  -f: follow/refresh mode  -tabs: per-tab detail + idle + alert  -nofix: skip IME auto-kill",
+    "cdp-mon ANOMALY REPORT: [CRIT] offscreen TGT-POS(x<-100) / LAT=DEAD / JS-alert / MEM>2GB. [WARN] sessions>5 / tabs>6 / drift>200px / lat>80ms / age>10h / MEM>1GB / dups>2. [INFO] CWD unknown.",
+    "cdp-mon LAUNCHED-BY (3-tier chain): (1) alive parent PID -- walk up process chain until wkappbot-core.exe found, parse cmdline for subcmd (cdp open/navigate/eval etc). (2) dead parent -- glob HQ/logs/wkappbot-core.exe.out-*.CMD.pid=PID.log; filename encodes command so no log read needed. (3) Chrome URL fallback -- extract hostname from active tab URL (gemini.google.com -> ask gemini, chatgpt.com -> ask gpt). PS5.1 gotcha: switch -Wildcard incompatible with scriptblock cases -- use if/elseif chain instead.",
+    "cdp-mon JS ALERT detection: Get-TabIdle connects WebSocket (200ms timeout); if connect OK but Runtime.evaluate times out (300ms) -> Alert=true. JS alerts block all CDP eval -- tab shows LAT=ALERT in report. Post-command alerts (fired after wkappbot exits) are NOT detected by cdp-mon; only stale alerts blocking at poll time are caught. Fix: wkappbot cdp eval '{cdp:PORT}' 'window.onbeforeunload=null' to clear blocking handlers.",
+    "cdp-mon IME DAEMON: Watch-ImeDaemon counts *ime-relay-daemon* processes; if 2+ found, auto-kills oldest by StartTime (unless -nofix). Root cause of duplicates: HasRealImeContext(WT hwnd) was returning true on CASCADIA_HOSTING_WINDOW_CLASS (ConPTY) because ImmGetContext returns non-null even though IME is non-functional. Fix (commit 139cf6fb): check UnicodeWindowClasses list BEFORE ImmGetContext -- if class matches WT/Chrome/WinRT, return false immediately.",
+    "cdp-mon PS5.1 GOTCHAS: (1) localhost resolves to IPv6 on Win11 but Chrome CDP binds 127.0.0.1 only -- always use http://127.0.0.1:PORT/json with 'Host: localhost' header. (2) switch -Wildcard incompatible with scriptblock cases in PS5.1 -- use if/elseif chain. (3) ?? null-coalescing not available in PS5.1 -- use if/else. (4) Nullable struct: .Value.L fails -- PS unwraps nullable automatically, use .L.",
+    "cdp-mon TAB ACCUMULATION BUG (gemini-whisper, fixed fe65cbf0): WhisperStudy was passing --target-tag {engine}-whisper to EnsureCdpConnection, causing sandbox-miss on wrong Chrome instance (HTS port 9712 instead of project port). Fix: removed --target-tag arg entirely -- EnsureCdpConnection URL-matches existing Gemini tab by host, no new tab creation. Symptom: cdp-tab-growth.jsonl shows repeated gemini-whisper sandbox-miss-create entries on unexpected port."
   ],
   "requirements": [
     {
@@ -52,6 +59,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:34:33.318371Z",
-  "updated": "2026-05-08T10:34:33.3183797Z",
-  "version": "1.0"
+  "updated": "2026-05-09T16:20:32.3883447Z",
+  "version": "1.14"
 }

@@ -1,0 +1,55 @@
+{
+  "id": "cdp-evalasync-retry-policy",
+  "app": "wkappbot-webbot",
+  "title": "CDP EvalAsync Retry and Inspected Target Reconnect",
+  "title_ko": null,
+  "desc": "CdpClient retry policy for timeout and Inspected target disconnect",
+  "steps": [
+    "Timeout or cancel under 2 attempts: delay then retry",
+    "Inspected target disconnect: EnsureConnectedAsync then replay",
+    "Attempt 2 or more: throw",
+    "Verified 2026-04-26: test-ask-gemini-cdp-reconnect.sh (resolve ts=2026-04-24T07:05:42.6452719Z)",
+    "2026-04-30: Chrome launcher 10s->20s wait (commit 28677a75) - resolves Chrome not ready timeouts",
+    "2026-04-30: Chrome launcher 10s->20s wait (commit 28677a75) - resolves Chrome not ready timeouts",
+    "2026-05-09: BUG-AUTO stale audit -- Chrome process exits before CDP ready (race condition) and Runtime.evaluate 10s timeout are intermittent and not consistently reproducible post-v7.2.x. Chrome 10->20s wait fix (28677a75) + CDP port guard (4f3606de) cover the known failure modes. BUG-AUTO ts=2026-05-05T01:41, 2026-05-05T01:38, 2026-05-04T23:11 closed as stale.",
+    "Verified 2026-05-09: ev-cdp-stale.sh (resolve ts=2026-05-04T23:11:54)",
+    "2026-05-09: WaitForEditorA11y sandbox-miss fix (commit 59abeed3) -- added document.readyState poll (1.5s timeout) before editor selector loop, and per-call EvalAsync timeoutMs=1500 instead of default 10s. Prevents 10s hang on ask-gemini/gpt/claude when tab was just created via sandbox-miss and page is still loading."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gemini hi",
+      "expect": "retries up to 2x on timeout before failing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask claude hi",
+      "expect": "reconnects automatically on Inspected target error",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gpt hi",
+      "expect": "WebSocket closed error triggers reconnect and single replay",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "retry",
+    "timeout",
+    "project"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
+      "line": 23,
+      "pattern": "ex is TimeoutException or TaskCanceledException",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-06T16:59:03.2605807Z",
+  "updated": "2026-05-09T06:13:47.6672581Z",
+  "version": "1.15"
+}

@@ -1,0 +1,39 @@
+{
+  "id": "wkappbot-taskkill-usage",
+  "app": "wkappbot",
+  "title": "wkappbot taskkill: classify and kill wkappbot processes",
+  "title_ko": null,
+  "desc": "taskkill CLASSIFY: shows full cmdline per process (2 lines). Zombie Eye cleanup after long uptime.",
+  "steps": [
+    "CLASSIFY (callout popup, no actual kill): wkappbot taskkill /IM wkappbot-core.exe\nEach match = 2 lines:\n  Line1: PID {id} {image} [{ctime}] reason PROTECTED/ZOMBIE/UNKNOWN\n  Line2:       > full command line (not truncated)\nForce-kill: wkappbot taskkill --force 1234,5678",
+    "Zombie Eye cleanup (100+ procs after 24h):\nHigh CPU = old Eye daemon. Kill all but newest:\n  Get-Process wkappbot-core ",
+    " Sort StartTime -Desc ",
+    " Select -Skip 1 ",
+    " Stop-Process -Force\nRoot cause: Eye restarts accumulate WH_KEYBOARD_LL hooks => garbled IME + Chrome flood."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot taskkill /IM wkappbot-core.exe",
+      "expect": "CLASSIFY output with 2 lines per process",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "Eye healthy after zombie cleanup with Stop-Process",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot taskkill --force 1234",
+      "expect": "KILLED block shows PID + full cmdline",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-09T03:24:58.1574359Z",
+  "updated": "2026-05-09T03:41:44.8104511Z",
+  "version": "1.1"
+}

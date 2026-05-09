@@ -3,9 +3,12 @@
   "app": "wkappbot",
   "title": "Hangul IME Relay architecture and sync pattern",
   "title_ko": null,
-  "desc": "HangulImeRelay WH_KEYBOARD_LL hook: architecture, bugs fixed 2026-05-08 (forced Korean on install), system-IME sync via ImmGetConversionStatus.",
+  "desc": "HangulImeRelay WH_KEYBOARD_LL hook: arch + bugs. KEY: daemon-only hook (Eye must NOT call Install), Global\\WkImeRelay mutex singleton.",
   "steps": [
-    "Architecture: WH_KEYBOARD_LL hook intercepts keystrokes when Korean mode ON. Composes via ImeProxy (system IME window) or HangulComposer FSM fallback. Toggle: Right Alt (VK_RMENU) or VK_HANGUL (0x15). Bypass: passes through when foreground window has working system IME (e.g. non-ConPTY windows).\nFiles: HangulImeRelay.cs (_koreanMode flag \u002B hook), .Composer.cs (syllable FSM), .ImeProxy.cs (proxy window), .Inject.cs (injection), ImeRelayDaemon.cs (lifecycle).\nBUG 2026-05-08: _koreanMode hardcoded true on install -- fixed to call IsSystemImeKoreanMode() instead.\nBUG 2026-05-08: CreateImeProxy() forced ImmSetOpenStatus(true)\u002BImmSetConversionStatus(1,0) -- fixed to sync from system state.\nIsSystemImeKoreanMode() reads ImmGetContext(GetForegroundWindow()) then ImmGetOpenStatus()\u002BImmGetConversionStatus(). IME_CMODE_NATIVE=1 means Hangul active. Returns false on any failure (safe English default).\nRight Alt handler flips _koreanMode AND passes key to OS to keep relay and system IME in sync."
+    "Architecture: WH_KEYBOARD_LL hook intercepts keystrokes when Korean mode ON. Composes via ImeProxy (system IME window) or HangulComposer FSM fallback. Toggle: Right Alt (VK_RMENU) or VK_HANGUL (0x15). Bypass: passes through when foreground window has working system IME (e.g. non-ConPTY windows).\nFiles: HangulImeRelay.cs (_koreanMode flag + hook), .Composer.cs (syllable FSM), .ImeProxy.cs (proxy window), .Inject.cs (injection), ImeRelayDaemon.cs (lifecycle), AppBotEyeGlobalMode.cs (spawn).\nBUG 2026-05-08: _koreanMode hardcoded true on install -- fixed to call IsSystemImeKoreanMode() instead.\nBUG 2026-05-08: CreateImeProxy() forced ImmSetOpenStatus -- fixed to sync from system state.\nIsSystemImeKoreanMode() reads ImmGetContext(GetForegroundWindow()) then ImmGetOpenStatus()+ImmGetConversionStatus(). IME_CMODE_NATIVE=1 means Hangul active.",
+    "BUG 2026-05-09: Path A (proxy) Backspace was flushing composition then passing BS to terminal. Fix: FeedKeyToProxy(VK_BACK) when composing.\nBUG 2026-05-09: Path B (FSM) jamo feed loop redundant erase+re-inject. Fix: track _prevPreviewChar, skip when !HasCommit && Preview==_prevPreviewChar.",
+    "ARCH FIX 2026-05-09: Multi-daemon hook conflict -- toggle broken (commit 67531f0b).\nROOT CAUSE: Eye called HangulImeRelay.Install() at startup AND ImeRelayDaemon.Spawn() spawned separate daemon that also installed WH_KEYBOARD_LL. Daemon singleton detection used log file scan but launcher never created log files -> every Spawn() call saw no daemon -> 3+ competing hooks.\nFIX 1: AppBotEyeGlobalMode.cs -- RelayWatchdog() no longer calls HangulImeRelay.Install(). Eye never installs hook. Daemon owns the hook exclusively.\nFIX 2: ImeRelayDaemon.cs -- Named Mutex Global\\WkImeRelay as primary singleton gate. Spawn() checks MutexHeld() first. Run() creates mutex initiallyOwned=true; exits immediately if live owner holds it. Log-file scan kept only for version comparison during binary update.\nFUTURE: Store caller CWD as Window Property (SetProp) on Chrome window at launch -- current eye_ticks.jsonl PromptHwnd approach works but HWNDs go stale after session end.",
+    "BUG 2026-05-09: HasRealImeContext returned true for Windows Terminal causing relay bypass. Fix commit 139cf6fb: check UnicodeWindowClasses before ImmGetContext."
   ],
   "requirements": [
     {
@@ -30,6 +33,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-07T16:23:46.03863Z",
-  "updated": "2026-05-07T16:23:46.0386394Z",
-  "version": "1.0"
+  "updated": "2026-05-09T06:36:50.9569998Z",
+  "version": "1.8"
 }
