@@ -13,6 +13,9 @@ param(
     [switch]$tabs
 )
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 $HQ = "D:\GitHub\WKAppBot\bin\wkappbot.hq"
 
 # ── Win32: actual window rect from PID ───────────────────────────────────────
@@ -135,7 +138,7 @@ function Build-CwdCallerMap {
     Get-ChildItem "$HQ\logs\eye.pid=*.log" -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending | ForEach-Object {
         try {
-            $tail = Get-Content $_.FullName -Tail 3000 -ErrorAction SilentlyContinue
+            $tail = Get-Content $_.FullName -Tail 3000 -Encoding UTF8 -ErrorAction SilentlyContinue
             for ($i = $tail.Count - 1; $i -ge 0; $i--) {
                 $m = $reCmd.Match($tail[$i])
                 if ($m.Success) {
