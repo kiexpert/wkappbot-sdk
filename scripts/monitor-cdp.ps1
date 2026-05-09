@@ -121,53 +121,33 @@ function Get-TabIdle([string]$wsUrl) {
     }
 }
 
-# ── CWD -> active session title via Eye log NOTIFY:PROMPT parsing ─────────────
-# Parses current Eye log for: [NOTIFY:PROMPT] TO: 0xHWND "title" cwd=slug
-# slug = folder name (e.g. wkappbot-sdk, WkAutoQuant). Falls back to eye_ticks.
+# ── CWD -> active session name via Eye log [CMD] lines ────────────────────────
+# Eye logs: [CMD] name=클롣[DG-wkappbot-sdk] cmd=... cwd=D:\GitHub\wkappbot-sdk
+#           [CMD-MCP] name=... cmd=... cwd=... hwnd=0x...
+# This is the ground truth: exact CWD + session name, logged per command.
+# Newest log wins per CWD. Works even after Eye has died (logs persist on disk).
 function Build-CwdCallerMap {
-    $map = @{}   # slug -> title (matched against Split-Path $cwd -Leaf)
+    $map   = @{}  # normalized-cwd -> session name
+    # name= captures up to first space; cwd= is last field (may follow many tokens)
+    $reCmd = [regex]'\[CMD(?:-MCP)?\] name=(\S+).*? cwd=(\S+)'
 
-    # Strategy 1: current Eye log NOTIFY:PROMPT TO lines (reliable, live titles)
-    $eyeLog = Get-ChildItem "$HQ\logs\eye.pid=*.log" -ErrorAction SilentlyContinue |
-              Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
-    if ($eyeLog) {
-        # Pattern: NOTIFY:PROMPT] TO: 0xHWND "title" cwd=slug
-        $re = [regex]'NOTIFY:PROMPT\] TO: (0x[0-9A-Fa-f]+) "([^"]+)" cwd=(\S+)'
-        Get-Content $eyeLog -Tail 3000 -ErrorAction SilentlyContinue | ForEach-Object {
-            $m = $re.Match($_)
-            if ($m.Success) {
-                $slug  = $m.Groups[3].Value
-                $title = $m.Groups[2].Value
-                $map[$slug] = $title   # keep last (most recent) per slug
+    # Scan all eye logs newest-first; stop once all CWDs covered
+    Get-ChildItem "$HQ\logs\eye.pid=*.log" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | ForEach-Object {
+        try {
+            $tail = Get-Content $_.FullName -Tail 3000 -ErrorAction SilentlyContinue
+            for ($i = $tail.Count - 1; $i -ge 0; $i--) {
+                $m = $reCmd.Match($tail[$i])
+                if ($m.Success) {
+                    $normCwd = $m.Groups[2].Value.Trim().ToLowerInvariant()
+                    if (-not $map.ContainsKey($normCwd)) {
+                        $map[$normCwd] = $m.Groups[1].Value
+                    }
+                }
             }
-        }
+        } catch {}
     }
-
-    # Strategy 2: eye_ticks.jsonl PromptHwnd fallback (for slugs not in log)
-    $tickFile = "$HQ\runtime\eye_ticks.jsonl"
-    if (Test-Path $tickFile) {
-        $hwndByCwd = @{}
-        Get-Content $tickFile -Tail 1000 -ErrorAction SilentlyContinue | ForEach-Object {
-            try {
-                $j = $_ | ConvertFrom-Json
-                if ($j.Cwd -and $j.PromptHwnd -and $j.PromptHwnd -ne '') {
-                    $hwndByCwd[$j.Cwd] = $j.PromptHwnd
-                }
-            } catch {}
-        }
-        foreach ($kv in $hwndByCwd.GetEnumerator()) {
-            $slug = Split-Path $kv.Key -Leaf
-            if ($map.ContainsKey($slug)) { continue }   # log already has it
-            try {
-                $hwnd = [IntPtr][Convert]::ToInt64(($kv.Value -replace '^0x',''), 16)
-                if ([WkWin32]::IsWindow($hwnd)) {
-                    $title = [WkWin32]::GetTitle($hwnd)
-                    if ($title) { $map[$slug] = $title }
-                }
-            } catch {}
-        }
-    }
-    return $map   # keyed by slug; caller: $map[(Split-Path $cwd -Leaf)]
+    return $map
 }
 
 # ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
@@ -289,7 +269,8 @@ function Get-WkCdpSessions {
 
         $cwd    = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
         $proj   = Split-Path $cwd -Leaf
-        $caller = if ($cwdCallerMap.ContainsKey($proj)) { $cwdCallerMap[$proj] } else { '' }
+        $normCwd = $cwd.ToLowerInvariant()
+        $caller  = if ($cwdCallerMap.ContainsKey($normCwd)) { $cwdCallerMap[$normCwd] } else { '' }
 
         [PSCustomObject]@{
             Port      = [int]$port
@@ -360,7 +341,7 @@ function Show-Once {
         $mid  = '{0,5}  {1,-13} {2,-13} {3,-10} {4,4}  ' -f `
                 $s.Age, $s.TgtPos, $s.ActPos, $s.Drift, $s.TabCount
         $lat  = '{0,-14} ' -f $latStr
-        $callerShort = if ($s.Caller) { $t = $s.Caller -replace '^\W+',''; "  [« $($t.Substring(0,[Math]::Min(45,$t.Length)))]" } else { '' }
+        $callerShort = if ($s.Caller) { $t = $s.Caller -replace '^\W+',''; "  [<< $($t.Substring(0,[Math]::Min(45,$t.Length)))]" } else { '' }
         $tail = "$($s.Proj)  ($($s.CWD))$callerShort"
 
         if ($rowColor -ne 'White') {
