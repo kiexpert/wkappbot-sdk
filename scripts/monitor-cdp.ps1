@@ -121,15 +121,33 @@ function Get-TabIdle([string]$wsUrl) {
     }
 }
 
-# ── CWD -> active session title (eye_ticks.jsonl PromptHwnd, most-recent) ────
+# ── CWD -> active session title via Eye log NOTIFY:PROMPT parsing ─────────────
+# Parses current Eye log for: [NOTIFY:PROMPT] TO: 0xHWND "title" cwd=slug
+# slug = folder name (e.g. wkappbot-sdk, WkAutoQuant). Falls back to eye_ticks.
 function Build-CwdCallerMap {
-    $map = @{}  # cwd -> window title
+    $map = @{}   # slug -> title (matched against Split-Path $cwd -Leaf)
+
+    # Strategy 1: current Eye log NOTIFY:PROMPT TO lines (reliable, live titles)
+    $eyeLog = Get-ChildItem "$HQ\logs\eye.pid=*.log" -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if ($eyeLog) {
+        # Pattern: NOTIFY:PROMPT] TO: 0xHWND "title" cwd=slug
+        $re = [regex]'NOTIFY:PROMPT\] TO: (0x[0-9A-Fa-f]+) "([^"]+)" cwd=(\S+)'
+        Get-Content $eyeLog -Tail 3000 -ErrorAction SilentlyContinue | ForEach-Object {
+            $m = $re.Match($_)
+            if ($m.Success) {
+                $slug  = $m.Groups[3].Value
+                $title = $m.Groups[2].Value
+                $map[$slug] = $title   # keep last (most recent) per slug
+            }
+        }
+    }
+
+    # Strategy 2: eye_ticks.jsonl PromptHwnd fallback (for slugs not in log)
     $tickFile = "$HQ\runtime\eye_ticks.jsonl"
-    if (-not (Test-Path $tickFile)) { return $map }
-    try {
-        # Read last 2000 lines (most recent), keep last valid PromptHwnd per CWD
+    if (Test-Path $tickFile) {
         $hwndByCwd = @{}
-        Get-Content $tickFile -Tail 2000 -ErrorAction SilentlyContinue | ForEach-Object {
+        Get-Content $tickFile -Tail 1000 -ErrorAction SilentlyContinue | ForEach-Object {
             try {
                 $j = $_ | ConvertFrom-Json
                 if ($j.Cwd -and $j.PromptHwnd -and $j.PromptHwnd -ne '') {
@@ -138,16 +156,18 @@ function Build-CwdCallerMap {
             } catch {}
         }
         foreach ($kv in $hwndByCwd.GetEnumerator()) {
+            $slug = Split-Path $kv.Key -Leaf
+            if ($map.ContainsKey($slug)) { continue }   # log already has it
             try {
-                $hwnd = [IntPtr][Convert]::ToInt64($kv.Value.TrimStart('0x'), 16)
+                $hwnd = [IntPtr][Convert]::ToInt64(($kv.Value -replace '^0x',''), 16)
                 if ([WkWin32]::IsWindow($hwnd)) {
                     $title = [WkWin32]::GetTitle($hwnd)
-                    if ($title) { $map[$kv.Key] = $title }
+                    if ($title) { $map[$slug] = $title }
                 }
             } catch {}
         }
-    } catch {}
-    return $map
+    }
+    return $map   # keyed by slug; caller: $map[(Split-Path $cwd -Leaf)]
 }
 
 # ── Port -> CWD map: MD5 (cdp_port files) + SHA256 DerivePort reverse ────────
@@ -269,7 +289,7 @@ function Get-WkCdpSessions {
 
         $cwd    = if ($portCwdMap.ContainsKey($port)) { $portCwdMap[$port] } else { '(unknown)' }
         $proj   = Split-Path $cwd -Leaf
-        $caller = if ($cwdCallerMap.ContainsKey($cwd)) { $cwdCallerMap[$cwd] } else { '' }
+        $caller = if ($cwdCallerMap.ContainsKey($proj)) { $cwdCallerMap[$proj] } else { '' }
 
         [PSCustomObject]@{
             Port      = [int]$port
