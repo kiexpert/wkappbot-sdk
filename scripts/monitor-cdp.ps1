@@ -10,7 +10,8 @@
 param(
     [switch]$f,
     [int]$i = 3,
-    [switch]$tabs
+    [switch]$tabs,
+    [switch]$nofix   # skip auto-kill of duplicate IME daemons
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -301,8 +302,37 @@ function Get-WkCdpSessions {
     }
 }
 
+# ── IME daemon health check + auto-kill duplicates ────────────────────────────
+function Watch-ImeDaemon {
+    $daemons = @(Get-CimInstance Win32_Process -Filter "Name='wkappbot-core.exe'" |
+                 Where-Object { $_.CommandLine -like '*ime-relay-daemon*' })
+    if ($daemons.Count -eq 0) {
+        Write-Host "[IME] WARNING: no relay daemon running -- Han/Yeong toggle will not work" -ForegroundColor Yellow
+        return
+    }
+    if ($daemons.Count -eq 1) {
+        Write-Host "[IME] relay daemon OK  PID=$($daemons[0].ProcessId)  age=$([int]((Get-Date)-$daemons[0].CreationDate).TotalMinutes)m" -ForegroundColor Green
+        return
+    }
+    # 2+ daemons: keep newest, kill the rest immediately
+    Write-Host "[IME] $($daemons.Count) relay daemons detected -- killing extras (Korean toggle conflict)" -ForegroundColor Red
+    $sorted = $daemons | Sort-Object CreationDate -Descending
+    $keep   = $sorted[0]
+    $kills  = $sorted[1..($sorted.Count-1)]
+    foreach ($d in $kills) {
+        try {
+            $age = [int]((Get-Date)-$d.CreationDate).TotalMinutes
+            Stop-Process -Id $d.ProcessId -Force -ErrorAction Stop
+            Write-Host "  [KILLED] PID=$($d.ProcessId) age=${age}m (stale duplicate)" -ForegroundColor Red
+        } catch { Write-Host "  [KILL FAIL] PID=$($d.ProcessId): $_" -ForegroundColor Yellow }
+    }
+    Write-Host "  [KEPT]   PID=$($keep.ProcessId) age=$([int]((Get-Date)-$keep.CreationDate).TotalMinutes)m (newest)" -ForegroundColor Green
+}
+
 # ── Display ───────────────────────────────────────────────────────────────────
 function Show-Once {
+    if (-not $nofix) { Watch-ImeDaemon }
+    Write-Host ''
     $sessions = @(Get-WkCdpSessions)
     if (-not $sessions -or $sessions.Count -eq 0) {
         Write-Host '  (no wkappbot Chrome sessions running)' -ForegroundColor DarkGray
