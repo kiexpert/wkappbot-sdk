@@ -257,7 +257,8 @@ Execute in order when user sends 'gg':
 | SDK user skill distribution | `setup.ps1` auto-install `wkappbot-workflow` skills on first run (suggest filed: 2026-05-08) |
 | Session recovery | `wkappbot session list --claude --cwd` after compaction |
 | Release prep | CHANGELOG + VERSIONING + CLAUDE.md header + gh issue comment on launch checklist |
-| **CDP monitor** | `scripts/monitor-cdp.ps1 [-f] [-tabs]` -- check session health, position drift, dup tabs, caller window, latency. Run when Chrome accumulates or position bugs suspected. |
+| **CDP monitor** | `scripts/monitor-cdp.ps1 [-f] [-tabs]` -- check session health, position drift, dup tabs, caller window, latency. Run when Chrome accumulates or position bugs suspected. Deployed to `D:\GitHub\WKAppBot\bin\cdp-mon.ps1`. |
+| **CDP anomaly response** | Red flags: off-screen TGT-POS (x<-100), LAT=DEAD, DUP tabs >3, MEM>2GB/session, >4 Chrome same CWD. Actions: file suggest with cdp-tab-growth.jsonl evidence, fix WaitForEditorA11y timeouts, check sandbox-miss patterns. |
 | **CDP suggest triage** | `wkappbot suggest list` -> resolve stale BUG-AUTO CDP/Chrome/ask-gpt suggests. Use `--class CdpClient --commit <hash> --skill cdp-evalasync-retry-policy`. ChromeLauncher.cs is 817 lines (over cap) -- use CdpClient or Win32 partial instead. |
 
 ## Skills
