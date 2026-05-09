@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "on-load",
   "app": "wkappbot-workflow",
   "title": "WKAppBot On-Load Checklist: session start and post-compaction",
@@ -13,7 +13,8 @@
     "COMPACTION RECOVERY (only after compaction -- not every session start): steps 2+3 above already reload rules and context. Additionally: (1) wkappbot session list --claude --cwd for session files. (2) wkappbot session list --codex for Codex sessions. (3) codex resume --last to continue Codex directly. (4) wkappbot skill read claude-md-guide + git log --oneline -10.",
     "HANDOFF COMMAND: if user says 'handoff' or 'continue from last session', run: wkappbot skill read claude-session-handoff -- find previous JSONL (index [1]) and extract context.",
     "PROJECT MAIN TASKS -- gg section authoring (only when step 5 cannot find a gg section): ask the user what the main recurring tasks are, then write '## gg Main Workflow' in the repo CLAUDE.md. Each step must be an executable command or Agent() call. TEMPLATE: 1. wkappbot skill read on-load 2. [project task] 3. Agent(model:opus, prompt:'triage: <list>') 4. wkappbot skill read repo-health-doctor",
-    "SKILL EDIT DISCIPLINE (read every session): NEVER directly edit .skill.json files. The pipe character is the step separator -- direct edits corrupt steps, miss version bump, disappear from skill search. ALWAYS use wkappbot skill edit <id> or wkappbot skill contribute. If you edited directly by mistake: (1) git checkout -- <path> to revert first. (2) wkappbot skill read <id> to verify it is clean. (3) redo via skill edit. Do NOT install a directly-edited file -- it registers the corrupted version. Correct install flow (exception case only): (A) BEFORE install -- python3 -c 'import json; json.load(open(\"path\"))' to validate JSON, then wkappbot skill read <id> dry-check. (B) install only if steps render cleanly with no broken splits. (C) AFTER install -- wkappbot skill read <id> again to confirm version bumped and all steps visible."
+    "SKILL EDIT DISCIPLINE (read every session): NEVER directly edit .skill.json files. The pipe character is the step separator -- direct edits corrupt steps, miss version bump, disappear from skill search. ALWAYS use wkappbot skill edit <id> or wkappbot skill contribute. If you edited directly by mistake: (1) git checkout -- <path> to revert first. (2) wkappbot skill read <id> to verify it is clean. (3) redo via skill edit. Do NOT install a directly-edited file -- it registers the corrupted version. Correct install flow (exception case only): (A) BEFORE install -- python3 -c 'import json; json.load(open(\"path\"))' to validate JSON, then wkappbot skill read <id> dry-check. (B) install only if steps render cleanly with no broken splits. (C) AFTER install -- wkappbot skill read <id> again to confirm version bumped and all steps visible.",
+    "WKEDIT RULE (MANDATORY): multi-file edits and any file containing multibyte characters (Korean, CJK, emoji) MUST use wkedit, never Edit/Write tool directly. Reason: Edit/Write silently re-encodes to CRLF or wrong encoding -- corrupts multibyte chars and skill steps. Pattern: wkedit file1.py file2.cs file3.md (opens all atomically). Single-file ASCII-only edits may use Edit tool."
   ],
   "requirements": [
     {
@@ -132,6 +133,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-05-08T14:40:52.2605605Z",
-  "version": "1.49"
+  "updated": "2026-05-09T17:54:20.2562156Z",
+  "version": "1.51"
 }
