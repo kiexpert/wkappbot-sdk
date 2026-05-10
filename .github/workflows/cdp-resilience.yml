@@ -107,9 +107,9 @@ jobs:
           $url = (& wkappbot a11y read $grap --eval-js 'window.location.href' 2>&1) -join " "
           if ($url.Length -lt 5) { throw "[정] No URL returned -- CDP eval dead" }
           Write-Host "  PASS [정]: URL=$($url.Trim().Substring(0,[Math]::Min(80,$url.Trim().Length)))"
-          # Store port for 반(反) step
-          echo "CDP_PORT=$port" >> $env:GITHUB_ENV
-          echo "CDP_GRAP=$grap" >> $env:GITHUB_ENV
+          # Store port for 반(反) step (Out-File required -- >> redirect unreliable in pwsh7)
+          "CDP_PORT=$port" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CDP_GRAP=$grap" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       # ── 반(反): 의도적 실패 주입 ───────────────────────────────────────────
       - name: "[반] Dead-tab eval + bad URL"
