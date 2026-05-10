@@ -109,6 +109,15 @@ jobs:
       - name: Add bin to PATH
         run: echo "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
+      - name: Verify binaries
+        shell: pwsh
+        run: |
+          if (!(Test-Path ./bin/wkappbot.exe))      { throw 'bin/wkappbot.exe missing' }
+          if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+          $v = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
+          if (!$v) { throw 'wkappbot --version produced no version line' }
+          Write-Host "Binary OK: $v"
+
       - name: Start Eye
         run: |
           Start-Process wkappbot.exe -ArgumentList "eye" -WindowStyle Hidden
