@@ -2,8 +2,12 @@ name: CDP Connectivity Smoke
 
 on:
   workflow_dispatch:
+    inputs:
+      site:
+        description: 'Target site (all / chatgpt / gemini / claude / perplexity)'
+        default: 'all'
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
+    - cron: '*/30 * * * *'   # every 30 min, all day
   push:
     paths:
       - 'scripts/test-cdp-connectivity.ps1'
@@ -15,20 +19,27 @@ permissions:
 jobs:
   cdp-smoke:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: chatgpt,    url: 'https://chatgpt.com',       expect: 'chatgpt\.com|openai\.com' }
+          - { name: gemini,     url: 'https://gemini.google.com', expect: 'gemini\.google\.com|google\.com' }
+          - { name: claude,     url: 'https://claude.ai',         expect: 'claude\.ai' }
+          - { name: perplexity, url: 'https://perplexity.ai',     expect: 'perplexity\.ai' }
+
+    name: CDP ${{ matrix.target.name }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # Chrome is pre-installed on windows-latest runners
-      - name: Verify Chrome available
+      - name: Verify Chrome
         run: |
-          $chrome = Get-Command chrome.exe -EA SilentlyContinue
-          if (-not $chrome) { $chrome = Get-Command "C:\Program Files\Google\Chrome\Application\chrome.exe" -EA SilentlyContinue }
-          if ($chrome) { Write-Host "Chrome: $($chrome.Source)" }
-          else { Write-Error "Chrome not found" }
+          $c = Get-Command "C:\Program Files\Google\Chrome\Application\chrome.exe" -EA SilentlyContinue
+          if ($c) { Write-Host "Chrome: $($c.Source)" } else { Write-Error "Chrome not found" }
 
-      # Download wkappbot binary from latest build artifact
       - name: Download wkappbot bin
         uses: dawidd6/action-download-artifact@v6
         with:
@@ -36,35 +47,72 @@ jobs:
           workflow: build.yml
           name: wkappbot-bin
           path: bin/
-        continue-on-error: true   # fallback to setup.ps1 if no artifact
+        continue-on-error: true
 
-      - name: Setup wkappbot (fallback)
+      - name: Setup (fallback)
         if: ${{ hashFiles('bin/wkappbot.exe') == '' }}
-        run: |
-          if (Test-Path scripts/setup.ps1) {
-            & scripts/setup.ps1 -Silent
-          } else {
-            Write-Warning "No bin artifact and no setup.ps1 -- skipping"
-          }
+        run: if (Test-Path scripts/setup.ps1) { & scripts/setup.ps1 -Silent }
 
       - name: Add bin to PATH
         run: echo "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Start wkappbot Eye (headless)
+      - name: Start Eye
         run: |
           Start-Process wkappbot.exe -ArgumentList "eye" -WindowStyle Hidden
           Start-Sleep -Seconds 3
           wkappbot eye tick
 
-      - name: Run CDP connectivity test
+      - name: CDP test -- ${{ matrix.target.name }}
+        id: cdp_test
         run: |
-          powershell -ExecutionPolicy Bypass -File scripts/test-cdp-connectivity.ps1
-        timeout-minutes: 5
+          $target = '${{ matrix.target.name }}'
+          $url    = '${{ matrix.target.url }}'
+          $expect = '${{ matrix.target.expect }}'
+          $pass   = $true
 
-      - name: Upload test log on failure
+          function ok ($m)   { Write-Host "  PASS [$target]: $m" -ForegroundColor Green }
+          function fail ($m) { Write-Host "  FAIL [$target]: $m" -ForegroundColor Red; $script:pass = $false }
+          function inf ($m)  { Write-Host "  INFO [$target]: $m" -ForegroundColor Cyan }
+
+          # 1. CDP open
+          $cdpOut = (& wkappbot cdp open $url 2>&1) -join " "
+          if ($cdpOut -match 'cdp:(\d+)') { $port = $Matches[1]; ok "Port $port assigned" }
+          else { fail "cdp open failed: $cdpOut"; exit 1 }
+
+          Start-Sleep -Seconds 6
+
+          # 2. URL reachable
+          $pageUrl = (& wkappbot a11y eval-js "window.location.href" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+          if ($pageUrl -match $expect) { ok "URL: $pageUrl" }
+          else { fail "Unexpected URL: $pageUrl" }
+
+          # 3. Page rendered
+          $state = (& wkappbot a11y eval-js "document.readyState" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+          if ($state -match 'complete|interactive') { ok "readyState: $state" }
+          else { fail "Not ready: $state" }
+
+          # 4. Cookie banner check
+          $bannerJs = "(function(){var s=['[id*=cookie]','[class*=cookie-banner]','[aria-label*=cookie i]','#onetrust-accept-btn-handler'];for(var x of s){var e=document.querySelector(x);if(e&&e.offsetParent!==null)return e.innerText.slice(0,60);}return 'none';})()"
+          $banner = (& wkappbot a11y eval-js $bannerJs --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+          if ($banner -match 'none|null') { ok "No blocking banner" }
+          else { inf "Banner present (auto-approval target): $banner" }
+
+          # 5. Page has content -- ANY response proves CDP alive
+          $body = (& wkappbot a11y eval-js "document.body.innerText.trim().slice(0,150)" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+          if ($body.Length -gt 20) {
+              ok "CDP alive -- page content received"
+              inf "Preview: $($body.Trim().Substring(0,[Math]::Min(100,$body.Trim().Length)))"
+          } else { fail "Empty page body" }
+
+          # Cleanup
+          & wkappbot cdp close --grap "{proc:'chrome',cdp:$port}" 2>&1 | Out-Null
+
+          if (-not $pass) { exit 1 }
+
+      - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: cdp-smoke-logs
+          name: cdp-fail-${{ matrix.target.name }}-${{ github.run_number }}
           path: bin/wkappbot.hq/logs/
-          retention-days: 3
+          retention-days: 1
