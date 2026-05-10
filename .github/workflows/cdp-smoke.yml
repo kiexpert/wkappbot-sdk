@@ -73,61 +73,11 @@ jobs:
 
       - name: CDP test -- ${{ matrix.target.name }}
         run: |
-          $name   = '${{ matrix.target.name }}'
-          $url    = '${{ matrix.target.url }}'
-          $expect = '${{ matrix.target.expect }}'
-          $pass   = $true
+          # Delegate to shared script (correct eval syntax + cdp-mon anomaly checks)
+          powershell -ExecutionPolicy Bypass -File scripts/test-cdp-connectivity.ps1 `
+            -Url '${{ matrix.target.url }}' -Expect '${{ matrix.target.expect }}'
+          exit $LASTEXITCODE
 
-          function ok  ($m) { Write-Host "  PASS [$name] $m" -ForegroundColor Green }
-          function fail($m) { Write-Host "  FAIL [$name] $m" -ForegroundColor Red; $script:pass = $false }
-          function inf ($m) { Write-Host "  INFO [$name] $m" -ForegroundColor Cyan }
-
-          # ── 1. CDP open ─────────────────────────────────────────────────
-          $cdpOut = (& wkappbot cdp open $url 2>&1) -join " "
-          if ($cdpOut -match 'cdp:(\d+)') { $port = $Matches[1]; ok "Port $port" }
-          else { fail "cdp open: $cdpOut"; exit 1 }
-          Start-Sleep -Seconds 6
-
-          # ── 2. URL reachable ────────────────────────────────────────────
-          $pageUrl = (& wkappbot a11y eval-js "window.location.href" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($pageUrl -match $expect) { ok "URL: $pageUrl" } else { fail "URL: $pageUrl" }
-
-          # ── 3. Page rendered ────────────────────────────────────────────
-          $state = (& wkappbot a11y eval-js "document.readyState" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($state -match 'complete|interactive') { ok "readyState: $state" } else { fail "Not ready: $state" }
-
-          # ── 4. Cookie/consent banner -- auto-approval target ────────────
-          $bannerJs = @'
-(function(){
-  var s=['[id*=cookie]','[class*=cookie-banner]','[aria-label*=cookie i]',
-         '[id*=consent]','[class*=consent-banner]','#onetrust-accept-btn-handler',
-         '[data-testid*=cookie i]','[class*=gdpr]'];
-  for(var x of s){var e=document.querySelector(x);
-    if(e&&e.offsetParent!==null)return 'BANNER:'+e.innerText.trim().slice(0,80);}
-  return 'none';
-})()
-'@
-          $banner = (& wkappbot a11y eval-js $bannerJs --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($banner -match 'BANNER:') {
-              inf "Cookie banner found (auto-approval should click): $($banner -replace '.*BANNER:','')"
-              # Attempt auto-dismiss: click first dismissible button
-              $dismissJs = "(function(){var btns=document.querySelectorAll('button');for(var b of btns){var t=b.innerText.toLowerCase();if(t.match(/reject|necessary|decline|close|dismiss/)){b.click();return 'DISMISSED:'+b.innerText;}};return 'no-dismiss-btn';})()"
-              $dismiss = (& wkappbot a11y eval-js $dismissJs --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-              if ($dismiss -match 'DISMISSED:') { ok "Auto-dismissed: $($dismiss -replace '.*DISMISSED:','')" }
-              else { inf "No dismiss button found (accept-only banner)" }
-          } else { ok "No blocking banner" }
-
-          # ── 5. Any content = CDP pipeline alive ─────────────────────────
-          $body = (& wkappbot a11y eval-js "document.body.innerText.trim().replace(/\s+/g,' ').slice(0,150)" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($body.Trim().Length -gt 15) {
-              ok "CDP alive -- any response counts (login page = still PASS)"
-              inf "$($body.Trim().Substring(0,[Math]::Min(100,$body.Trim().Length)))"
-          } else { fail "Empty page" }
-
-          # Cleanup
-          & wkappbot cdp close --grap "{proc:'chrome',cdp:$port}" 2>&1 | Out-Null
-
-          if (-not $pass) { exit 1 }
 
       - name: Upload logs on failure
         if: failure()
