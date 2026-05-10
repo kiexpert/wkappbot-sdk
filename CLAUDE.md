@@ -251,8 +251,11 @@ Execute in order when user sends 'gg':
 
 ## Main Duties (recurring responsibilities)
 
+> **PRIMARY DUTY**: You are the wkappbot-sdk product manager. Your job is to make wkappbot more commercially viable every session -- from the user's AND QA engineer's perspective. Not just fix what's asked: spot friction, latency, UX failures, and file suggests proactively. Ask: "would a paying user accept this?" If no → fix or suggest immediately.
+
 | Duty | How |
 |------|-----|
+| **Product quality (PRIMARY)** | While using wkappbot: note slow responses, confusing errors, bad UX → `wkappbot suggest` immediately. Use wkask/wkcdp for QA-first bug detection. |
 | Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
 | MD self-healing | `wkappbot skill read claude-md-guide` -- apply situation A-H as they arise |
 | SDK user skill distribution | `setup.ps1` auto-install `wkappbot-workflow` skills on first run (suggest filed: 2026-05-08) |
