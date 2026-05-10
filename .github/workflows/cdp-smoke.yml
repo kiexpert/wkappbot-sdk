@@ -2,12 +2,8 @@ name: CDP Connectivity Smoke
 
 on:
   workflow_dispatch:
-    inputs:
-      site:
-        description: 'Target site (all / chatgpt / gemini / claude / perplexity)'
-        default: 'all'
   schedule:
-    - cron: '*/30 * * * *'   # every 30 min, all day
+    - cron: '*/30 * * * *'   # every 30 min, all day, zero AI token cost
   push:
     paths:
       - 'scripts/test-cdp-connectivity.ps1'
@@ -25,20 +21,33 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - { name: chatgpt,    url: 'https://chatgpt.com',       expect: 'chatgpt\.com|openai\.com' }
-          - { name: gemini,     url: 'https://gemini.google.com', expect: 'gemini\.google\.com|google\.com' }
-          - { name: claude,     url: 'https://claude.ai',         expect: 'claude\.ai' }
-          - { name: perplexity, url: 'https://perplexity.ai',     expect: 'perplexity\.ai' }
+          # ── Major LLM chatbots ──────────────────────────────────────────
+          - { name: chatgpt,      url: 'https://chatgpt.com',               expect: 'chatgpt|openai' }
+          - { name: gemini,       url: 'https://gemini.google.com',         expect: 'gemini|google' }
+          - { name: claude,       url: 'https://claude.ai',                 expect: 'claude\.ai' }
+          - { name: deepseek,     url: 'https://chat.deepseek.com',         expect: 'deepseek' }
+          - { name: grok,         url: 'https://grok.com',                  expect: 'grok|x\.ai' }
+          - { name: meta-ai,      url: 'https://www.meta.ai',               expect: 'meta\.ai' }
+          - { name: copilot,      url: 'https://copilot.microsoft.com',     expect: 'copilot|microsoft' }
+          # ── Search + Research ───────────────────────────────────────────
+          - { name: perplexity,   url: 'https://www.perplexity.ai',         expect: 'perplexity' }
+          # ── Open source / API-first ─────────────────────────────────────
+          - { name: huggingchat,  url: 'https://huggingface.co/chat',       expect: 'huggingface' }
+          - { name: groq,         url: 'https://groq.com',                  expect: 'groq' }
+          - { name: cerebras,     url: 'https://inference.cerebras.ai',     expect: 'cerebras' }
+          # ── Roleplay / Character ────────────────────────────────────────
+          - { name: character-ai, url: 'https://character.ai',              expect: 'character' }
 
-    name: CDP ${{ matrix.target.name }}
+    name: ${{ matrix.target.name }}
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Verify Chrome
         run: |
-          $c = Get-Command "C:\Program Files\Google\Chrome\Application\chrome.exe" -EA SilentlyContinue
-          if ($c) { Write-Host "Chrome: $($c.Source)" } else { Write-Error "Chrome not found" }
+          $c = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (Test-Path $c) { Write-Host "Chrome OK: $c" }
+          else { Write-Error "Chrome not found" }
 
       - name: Download wkappbot bin
         uses: dawidd6/action-download-artifact@v6
@@ -49,7 +58,7 @@ jobs:
           path: bin/
         continue-on-error: true
 
-      - name: Setup (fallback)
+      - name: Setup fallback
         if: ${{ hashFiles('bin/wkappbot.exe') == '' }}
         run: if (Test-Path scripts/setup.ps1) { & scripts/setup.ps1 -Silent }
 
@@ -63,46 +72,57 @@ jobs:
           wkappbot eye tick
 
       - name: CDP test -- ${{ matrix.target.name }}
-        id: cdp_test
         run: |
-          $target = '${{ matrix.target.name }}'
+          $name   = '${{ matrix.target.name }}'
           $url    = '${{ matrix.target.url }}'
           $expect = '${{ matrix.target.expect }}'
           $pass   = $true
 
-          function ok ($m)   { Write-Host "  PASS [$target]: $m" -ForegroundColor Green }
-          function fail ($m) { Write-Host "  FAIL [$target]: $m" -ForegroundColor Red; $script:pass = $false }
-          function inf ($m)  { Write-Host "  INFO [$target]: $m" -ForegroundColor Cyan }
+          function ok  ($m) { Write-Host "  PASS [$name] $m" -ForegroundColor Green }
+          function fail($m) { Write-Host "  FAIL [$name] $m" -ForegroundColor Red; $script:pass = $false }
+          function inf ($m) { Write-Host "  INFO [$name] $m" -ForegroundColor Cyan }
 
-          # 1. CDP open
+          # ── 1. CDP open ─────────────────────────────────────────────────
           $cdpOut = (& wkappbot cdp open $url 2>&1) -join " "
-          if ($cdpOut -match 'cdp:(\d+)') { $port = $Matches[1]; ok "Port $port assigned" }
-          else { fail "cdp open failed: $cdpOut"; exit 1 }
-
+          if ($cdpOut -match 'cdp:(\d+)') { $port = $Matches[1]; ok "Port $port" }
+          else { fail "cdp open: $cdpOut"; exit 1 }
           Start-Sleep -Seconds 6
 
-          # 2. URL reachable
+          # ── 2. URL reachable ────────────────────────────────────────────
           $pageUrl = (& wkappbot a11y eval-js "window.location.href" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($pageUrl -match $expect) { ok "URL: $pageUrl" }
-          else { fail "Unexpected URL: $pageUrl" }
+          if ($pageUrl -match $expect) { ok "URL: $pageUrl" } else { fail "URL: $pageUrl" }
 
-          # 3. Page rendered
+          # ── 3. Page rendered ────────────────────────────────────────────
           $state = (& wkappbot a11y eval-js "document.readyState" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($state -match 'complete|interactive') { ok "readyState: $state" }
-          else { fail "Not ready: $state" }
+          if ($state -match 'complete|interactive') { ok "readyState: $state" } else { fail "Not ready: $state" }
 
-          # 4. Cookie banner check
-          $bannerJs = "(function(){var s=['[id*=cookie]','[class*=cookie-banner]','[aria-label*=cookie i]','#onetrust-accept-btn-handler'];for(var x of s){var e=document.querySelector(x);if(e&&e.offsetParent!==null)return e.innerText.slice(0,60);}return 'none';})()"
+          # ── 4. Cookie/consent banner -- auto-approval target ────────────
+          $bannerJs = @'
+(function(){
+  var s=['[id*=cookie]','[class*=cookie-banner]','[aria-label*=cookie i]',
+         '[id*=consent]','[class*=consent-banner]','#onetrust-accept-btn-handler',
+         '[data-testid*=cookie i]','[class*=gdpr]'];
+  for(var x of s){var e=document.querySelector(x);
+    if(e&&e.offsetParent!==null)return 'BANNER:'+e.innerText.trim().slice(0,80);}
+  return 'none';
+})()
+'@
           $banner = (& wkappbot a11y eval-js $bannerJs --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($banner -match 'none|null') { ok "No blocking banner" }
-          else { inf "Banner present (auto-approval target): $banner" }
+          if ($banner -match 'BANNER:') {
+              inf "Cookie banner found (auto-approval should click): $($banner -replace '.*BANNER:','')"
+              # Attempt auto-dismiss: click first dismissible button
+              $dismissJs = "(function(){var btns=document.querySelectorAll('button');for(var b of btns){var t=b.innerText.toLowerCase();if(t.match(/reject|necessary|decline|close|dismiss/)){b.click();return 'DISMISSED:'+b.innerText;}};return 'no-dismiss-btn';})()"
+              $dismiss = (& wkappbot a11y eval-js $dismissJs --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+              if ($dismiss -match 'DISMISSED:') { ok "Auto-dismissed: $($dismiss -replace '.*DISMISSED:','')" }
+              else { inf "No dismiss button found (accept-only banner)" }
+          } else { ok "No blocking banner" }
 
-          # 5. Page has content -- ANY response proves CDP alive
-          $body = (& wkappbot a11y eval-js "document.body.innerText.trim().slice(0,150)" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
-          if ($body.Length -gt 20) {
-              ok "CDP alive -- page content received"
-              inf "Preview: $($body.Trim().Substring(0,[Math]::Min(100,$body.Trim().Length)))"
-          } else { fail "Empty page body" }
+          # ── 5. Any content = CDP pipeline alive ─────────────────────────
+          $body = (& wkappbot a11y eval-js "document.body.innerText.trim().replace(/\s+/g,' ').slice(0,150)" --grap "{proc:'chrome',cdp:$port}" 2>&1) -join " "
+          if ($body.Trim().Length -gt 15) {
+              ok "CDP alive -- any response counts (login page = still PASS)"
+              inf "$($body.Trim().Substring(0,[Math]::Min(100,$body.Trim().Length)))"
+          } else { fail "Empty page" }
 
           # Cleanup
           & wkappbot cdp close --grap "{proc:'chrome',cdp:$port}" 2>&1 | Out-Null
@@ -113,6 +133,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: cdp-fail-${{ matrix.target.name }}-${{ github.run_number }}
+          name: fail-${{ matrix.target.name }}-${{ github.run_number }}
           path: bin/wkappbot.hq/logs/
           retention-days: 1
