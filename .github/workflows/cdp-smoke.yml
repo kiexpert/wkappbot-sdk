@@ -1,0 +1,70 @@
+name: CDP Connectivity Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6 hours
+  push:
+    paths:
+      - 'scripts/test-cdp-connectivity.ps1'
+      - '.github/workflows/cdp-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cdp-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Chrome is pre-installed on windows-latest runners
+      - name: Verify Chrome available
+        run: |
+          $chrome = Get-Command chrome.exe -EA SilentlyContinue
+          if (-not $chrome) { $chrome = Get-Command "C:\Program Files\Google\Chrome\Application\chrome.exe" -EA SilentlyContinue }
+          if ($chrome) { Write-Host "Chrome: $($chrome.Source)" }
+          else { Write-Error "Chrome not found" }
+
+      # Download wkappbot binary from latest build artifact
+      - name: Download wkappbot bin
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build.yml
+          name: wkappbot-bin
+          path: bin/
+        continue-on-error: true   # fallback to setup.ps1 if no artifact
+
+      - name: Setup wkappbot (fallback)
+        if: ${{ hashFiles('bin/wkappbot.exe') == '' }}
+        run: |
+          if (Test-Path scripts/setup.ps1) {
+            & scripts/setup.ps1 -Silent
+          } else {
+            Write-Warning "No bin artifact and no setup.ps1 -- skipping"
+          }
+
+      - name: Add bin to PATH
+        run: echo "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Start wkappbot Eye (headless)
+        run: |
+          Start-Process wkappbot.exe -ArgumentList "eye" -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          wkappbot eye tick
+
+      - name: Run CDP connectivity test
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/test-cdp-connectivity.ps1
+        timeout-minutes: 5
+
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdp-smoke-logs
+          path: bin/wkappbot.hq/logs/
+          retention-days: 3
