@@ -272,8 +272,7 @@ wkappbot skill read cdp-command-guide     # CDP command reference for Chrome aut
 wkappbot skill read a11y-command-cheatsheet  # a11y action cheatsheet
 
 # ★ MANDATORY -- wk-tool scripts (read before ANY ask/CDP work)
-wkappbot skill read wktool-pattern        # MANDATORY: use wkask/wkcdp instead of log polling -- saves tokens
-wkappbot skill read wktool-qa-pattern     # MANDATORY: QA script authoring -- state-check→eval-js→auto-suggest
+wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA script pattern (merged)
 
 ## Gotchas
 - `suggest list` crashes with JsonException if a delta-comment wrote raw JSON into a string field. Workaround: `python3 -c "import json; [print(l[:80]) for l in open('suggestions.jsonl') if json.loads(l)]"` to read valid lines.
