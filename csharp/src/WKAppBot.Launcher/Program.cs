@@ -1252,6 +1252,9 @@ partial class Program
 
             bool any = false;
 
+            const string skillSearchGlobal =
+                "wkappbot skill search session start suggest gg workflow handoff compaction language delegate notify terse rules mandatory";
+
             // Global CLAUDE.md: append session-start block if guidance missing
             var globalMd = Path.Combine(home, ".claude", "CLAUDE.md");
             if (File.Exists(globalMd))
@@ -1281,8 +1284,6 @@ partial class Program
             }
 
             // Project CLAUDE.md: create minimal stub if missing, or append skill search if absent
-            const string skillSearchGlobal =
-                "wkappbot skill search session start suggest gg workflow handoff compaction language delegate notify terse rules mandatory";
             const string skillSearchLine =
                 "wkappbot skill search cdp chrome windows a11y uia hangul ime whisper slack eye suggest gg workflow";
             var projMd = Path.Combine(Directory.GetCurrentDirectory(), "CLAUDE.md");
