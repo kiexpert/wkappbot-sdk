@@ -1,0 +1,72 @@
+{
+  "id": "free-ai-approval-nuisance-control",
+  "app": "wkappbot-workflow",
+  "title": "Free AI Site Approval \u002B Nuisance Control",
+  "title_ko": null,
+  "desc": "Classify every browser action by intended effect (5-Level: passive/nuisance/workflow/state-mutation/quota/legal) and enforce approval policy before execution.",
+  "steps": [
+    "Classify the intended effect using the 5-Level model: 0=passive, 1=cosmetic/nuisance, 2=workflow-continuation, 3=state-mutation, 4=economic/quota, 5=legal/identity. Classify by ACTION not UI element type.",
+    "Check docs/free-ai-sites-approval.md for site-specific gate rules and quota_sensitive flags before acting.",
+    "Level 0-2 actions: proceed automatically. Log the action with site, selector, text, classification, and decision.",
+    "Level 3-5 actions: stop and ask the user for explicit approval before proceeding. Never infer approval from prior context.",
+    "Cookie banners: auto-dismiss only Reject-all / Necessary-only / X-close paths (Level 1). Treat Accept-all / personalization / ad-targeting as Level 3 state mutation.",
+    "Rate limits: if continuation would consume scarce quota, paid entitlement, or irreversible allocation, treat as Level 4 and ask. Pure capacity limits (overload, truncation) are Level 0.",
+    "Never auto-dismiss: confirm, beforeunload, alert, sign-in, age/region gates, payment forms, OAuth, CAPTCHA, data export/delete (Level 3-5).",
+    "After auto-action, probe once to confirm the blocker is gone. If still blocked, escalate one level and re-evaluate.",
+    "Record site, gate level, action text, selector, decision, and outcome in the run log. On Level 3-5 decisions also record user response."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read free-ai-approval-nuisance-control",
+      "expect": "Free AI Site Approval \u002B Nuisance Control",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search free-ai-approval-nuisance-control",
+      "expect": "free-ai-approval-nuisance-control",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill verify free-ai-approval-nuisance-control",
+      "expect": "OK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "approval",
+    "consent",
+    "cookie",
+    "popup",
+    "ad",
+    "overlay",
+    "blocker",
+    "cdp",
+    "browser"
+  ],
+  "source_refs": [
+    {
+      "file": "../docs/free-ai-sites-approval.md",
+      "line": null,
+      "pattern": "Default Approval Policy",
+      "note": null
+    },
+    {
+      "file": "../docs/free-ai-sites-approval.md",
+      "line": null,
+      "pattern": "Site Matrix",
+      "note": null
+    },
+    {
+      "file": "../docs/free-ai-sites-approval.md",
+      "line": null,
+      "pattern": "CDP Monitor Rules",
+      "note": null
+    }
+  ],
+  "regression_script": "D:/GitHub/wkappbot-sdk/scripts/test-free-ai-approval-nuisance-control.ps1",
+  "author": "claude",
+  "created": "2026-05-10T05:30:21.8520743Z",
+  "updated": "2026-05-10T06:12:15.1219732Z",
+  "version": "1.2"
+}
