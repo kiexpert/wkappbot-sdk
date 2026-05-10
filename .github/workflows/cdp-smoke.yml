@@ -49,18 +49,62 @@ jobs:
           if (Test-Path $c) { Write-Host "Chrome OK: $c" }
           else { Write-Error "Chrome not found" }
 
-      - name: Download wkappbot bin
-        uses: dawidd6/action-download-artifact@v6
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          workflow: build.yml
-          name: wkappbot-bin
-          path: bin/
-        continue-on-error: true
+          dotnet-version: 8.0.x
 
-      - name: Setup fallback
-        if: ${{ hashFiles('bin/wkappbot.exe') == '' }}
-        run: if (Test-Path scripts/setup.ps1) { & scripts/setup.ps1 -Silent }
+      - name: Restore NuGet cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj', 'csharp/**/*.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore bin cache
+        id: bin_cache
+        uses: actions/cache/restore@v5
+        with:
+          path: bin
+          key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-sdk-build-run-
+            ${{ runner.os }}-sdk-build-
+
+      - name: Build launcher
+        if: ${{ steps.bin_cache.outputs.cache-hit != 'true' || hashFiles('bin/wkappbot.exe') == '' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+            --configuration Release -p:SkipDeployLauncher=true -o bin
+
+      - name: Fetch core binary (private release)
+        if: ${{ hashFiles('bin/wkappbot-core.exe') == '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+        run: |
+          if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+            throw 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT secrets required'
+          }
+          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+            | ConvertFrom-Json `
+            | Where-Object { $_.tagName -like 'core-*' } `
+            | Sort-Object createdAt -Descending `
+            | Select-Object -First 1 -ExpandProperty tagName
+          if (-not $tag) { throw "No core-* release found in $env:CORE_REPO." }
+          gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+          if (-not (Test-Path bin/wkappbot-core.exe)) { throw "wkappbot-core.exe not found" }
+          Write-Host "Core fetched: $tag"
+
+      - name: Seed bin/wkappbot.hq
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
+          if (Test-Path wkappbot.hq) { Copy-Item wkappbot.hq/* bin/wkappbot.hq -Recurse -Force }
+          if (Test-Path skills) { Copy-Item skills/* bin/wkappbot.hq/skills -Recurse -Force }
 
       - name: Add bin to PATH
         run: echo "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
