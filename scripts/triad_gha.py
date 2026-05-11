@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
-GHA Triad helper — called from .github/workflows/gha-triad.yml
+GHA Triad helper ??called from .github/workflows/gha-triad.yml
 Usage:
     python3 triad_gha.py thesis  <ai>   $QUESTION
     python3 triad_gha.py antithesis <ai> $QUESTION
@@ -54,7 +54,15 @@ def call_ai(ai, prompt, max_tokens=1024):
             print(f"[gemini failed: {e}]", file=sys.stderr)
             return call_groq_fallback_gemini(prompt)
     if ai == "groq":
-        return call_groq(prompt, max_tokens=max_tokens)
+        try:
+            return call_groq(prompt, max_tokens=max_tokens)
+        except Exception as e:
+            print(f"[groq failed: {e}]", file=sys.stderr)
+            try:
+                return call_gemini(prompt)
+            except Exception as e2:
+                print(f"[groq->gemini fallback failed: {e2}]", file=sys.stderr)
+                return call_groq_fallback_cerebras(prompt)
     if ai == "cerebras":
         try:
             return call_compat(prompt, "https://api.cerebras.ai/v1",
@@ -66,7 +74,7 @@ def call_ai(ai, prompt, max_tokens=1024):
     raise ValueError(f"unknown ai: {ai}")
 
 
-# ── Prompts ──────────────────────────────────────────────────────────────────
+# ?? Prompts ??????????????????????????????????????????????????????????????????
 
 THESIS_TMPL = """\
 Question / Task:
@@ -89,7 +97,7 @@ You are the synthesis judge in a three-way AI debate.
 ## Original Question
 {question}
 
-## Round 1 — Independent Answers (Thesis)
+## Round 1 ??Independent Answers (Thesis)
 ### Gemini
 {r1_gemini}
 
@@ -99,7 +107,7 @@ You are the synthesis judge in a three-way AI debate.
 ### Cerebras
 {r1_cerebras}
 
-## Round 2 — Counter-Arguments (Antithesis)
+## Round 2 ??Counter-Arguments (Antithesis)
 ### Gemini critiques the others
 {r2_gemini}
 
@@ -109,7 +117,7 @@ You are the synthesis judge in a three-way AI debate.
 ### Cerebras critiques the others
 {r2_cerebras}
 
-## Your Task — Final Synthesis
+## Your Task ??Final Synthesis
 1. Identify the strongest points from all 6 responses
 2. Note where the AIs agree vs. genuinely disagree
 3. Resolve disagreements with your own best judgment
@@ -118,14 +126,14 @@ You are the synthesis judge in a three-way AI debate.
 Structure:
 **Points of consensus:** ...
 **Key disagreements & resolution:** ...
-**Final answer:** (clear, complete, actionable)"""
-
+**Final answer:** (clear, complete, actionable)
+End the output with TRIAD_OK."""
 
 def read_file(path):
     return open(path).read() if os.path.exists(path) else "[not available]"
 
 
-# ── Commands ─────────────────────────────────────────────────────────────────
+# ?? Commands ?????????????????????????????????????????????????????????????????
 
 def cmd_thesis(ai, question):
     prompt = THESIS_TMPL.format(question=question)
@@ -178,10 +186,12 @@ def cmd_synthesis(question):
     print(synthesis)
 
     md = f"# Triad Synthesis\n\n**Question:** {question}\n\n**Synthesized by:** {synth_ai}\n\n---\n\n{synthesis}\n\n"
-    md += "<details><summary>Round 1 — Thesis</summary>\n\n"
+    if "TRIAD_OK" not in md:
+        md += "TRIAD_OK\n"
+    md += "<details><summary>Round 1 ??Thesis</summary>\n\n"
     for ai in ["gemini", "groq", "cerebras"]:
         md += f"**{ai.title()}:** {read_file(f'r1-{ai}.txt')}\n\n"
-    md += "</details>\n\n<details><summary>Round 2 — Antithesis</summary>\n\n"
+    md += "</details>\n\n<details><summary>Round 2 ??Antithesis</summary>\n\n"
     for ai in ["gemini", "groq", "cerebras"]:
         md += f"**{ai.title()} critique:** {read_file(f'r2-{ai}.txt')}\n\n"
     md += "</details>\n"

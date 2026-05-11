@@ -4,72 +4,67 @@ on:
   workflow_dispatch:
     inputs:
       question:
-        description: 'Question for the triad debate'
+        description: "Question for the triad debate"
         required: true
         type: string
       post_to_issue:
-        description: 'Post synthesis to GitHub issue (issue number)'
+        description: "Post synthesis to GitHub issue (issue number)"
         required: false
         type: string
 
 jobs:
-  # ── Round 1: Thesis ────────────────────────────────────────────────────
   thesis:
-    name: "R1 Thesis — ${{ matrix.ai }}"
+    name: "R1 Thesis - ${{ matrix.ai }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
         ai: [gemini, groq, cerebras]
       fail-fast: false
-
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-    - name: Call ${{ matrix.ai }} (thesis)
-      env:
-        QUESTION:         ${{ inputs.question }}
-        GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
-        GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
-        CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      run: python3 scripts/triad_gha.py thesis "${{ matrix.ai }}" "$QUESTION"
+      - name: Call ${{ matrix.ai }} (thesis)
+        env:
+          QUESTION: ${{ inputs.question }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: python3 scripts/triad_gha.py thesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
-      with:
-        name: r1-${{ matrix.ai }}
-        path: r1-${{ matrix.ai }}.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r1-${{ matrix.ai }}
+          path: r1-${{ matrix.ai }}.txt
 
-  # ── Round 2: Antithesis ────────────────────────────────────────────────
   antithesis:
-    name: "R2 Antithesis — ${{ matrix.ai }}"
+    name: "R2 Antithesis - ${{ matrix.ai }}"
     needs: thesis
     runs-on: ubuntu-latest
     strategy:
       matrix:
         ai: [gemini, groq, cerebras]
       fail-fast: false
-
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
-      with:
-        pattern: r1-*
-        merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: r1-*
+          merge-multiple: true
 
-    - name: Critique as ${{ matrix.ai }}
-      env:
-        QUESTION:         ${{ inputs.question }}
-        GEMINI_API_KEY:   ${{ secrets.GEMINI_API_KEY }}
-        GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
-        CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
-      run: python3 scripts/triad_gha.py antithesis "${{ matrix.ai }}" "$QUESTION"
+      - name: Critique as ${{ matrix.ai }}
+        env:
+          QUESTION: ${{ inputs.question }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: python3 scripts/triad_gha.py antithesis "${{ matrix.ai }}" "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
-      with:
-        name: r2-${{ matrix.ai }}
-        path: r2-${{ matrix.ai }}.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r2-${{ matrix.ai }}
+          path: r2-${{ matrix.ai }}.txt
 
-  # ── Round 3: Synthesis ─────────────────────────────────────────────────
   synthesis:
     name: "R3 Synthesis"
     needs: antithesis
@@ -77,43 +72,49 @@ jobs:
     permissions:
       contents: read
       issues: write
-
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
-      with:
-        pattern: 'r[12]-*'
-        merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: r[12]-*
+          merge-multiple: true
 
-    - name: Synthesize (Opus → Groq fallback)
-      env:
-        QUESTION:          ${{ inputs.question }}
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
-      run: python3 scripts/triad_gha.py synthesis "$QUESTION"
+      - name: Synthesize (Opus with Groq fallback)
+        env:
+          QUESTION: ${{ inputs.question }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: python3 scripts/triad_gha.py synthesis "$QUESTION"
 
-    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
-      with:
-        name: triad-synthesis
-        path: synthesis.md
+      - name: Verify synthesis markers
+        run: |
+          test -f synthesis.md
+          grep -q 'Points of consensus:' synthesis.md
+          grep -q 'Key disagreements & resolution:' synthesis.md
+          grep -q 'Final answer:' synthesis.md
+          grep -q 'TRIAD_OK' synthesis.md
 
-    - name: Post to GitHub issue
-      if: ${{ inputs.post_to_issue != '' }}
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ISSUE_NUMBER: ${{ inputs.post_to_issue }}
-        REPO: ${{ github.repository }}
-      run: |
-        # Validate issue number is numeric only (prevent shell injection)
-        if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
-          echo "ERROR: post_to_issue must be a numeric issue number."
-          exit 1
-        fi
-        gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file synthesis.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: triad-synthesis
+          path: synthesis.md
 
-    - name: Write job summary
-      run: |
-        echo "## Triad Synthesis Complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        cat synthesis.md >> $GITHUB_STEP_SUMMARY
+      - name: Post to GitHub issue
+        if: ${{ inputs.post_to_issue != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.post_to_issue }}
+          REPO: ${{ github.repository }}
+        run: |
+          if ! [[ "$ISSUE_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: post_to_issue must be a numeric issue number."
+            exit 1
+          fi
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file synthesis.md
+
+      - name: Write job summary
+        run: |
+          echo "## Triad Synthesis Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat synthesis.md >> "$GITHUB_STEP_SUMMARY"
