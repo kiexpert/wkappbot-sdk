@@ -1,6 +1,9 @@
 name: Daily Market Triad Teaser
 
 on:
+  push:
+    branches:
+      - triad-market-teaser
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
