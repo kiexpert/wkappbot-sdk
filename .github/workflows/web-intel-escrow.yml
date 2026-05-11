@@ -1,0 +1,43 @@
+name: Web Intelligence Escrow Evidence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run web intelligence escrow demo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPBOT_PRIVATE_REPO: ${{ secrets.APPBOT_PRIVATE_REPO }}
+          APPBOT_PRIVATE_REPO_TOKEN: ${{ secrets.APPBOT_PRIVATE_REPO_TOKEN }}
+          APPBOT_WEB_INTEL_MODE: public-evidence-demo
+        run: |
+          python examples/web-intel-escrow/web_intel_escrow_demo.py
+
+      - name: Upload public artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wkappbot-web-intel-evidence
+          path: |
+            examples/web-intel-escrow/out/public-summary.md
+            examples/web-intel-escrow/out/public-redacted.json
+          retention-days: 14
