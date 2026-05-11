@@ -41,9 +41,14 @@ def call_groq_fallback_gemini(prompt):
     return call_groq(prompt, "qwen/qwen3-32b")
 
 
-def call_groq_fallback_cerebras(prompt):
-    print("[cerebras fallback] -> groq/llama-4-scout", file=sys.stderr)
-    return call_groq(prompt, "meta-llama/llama-4-scout-17b-16e-instruct")
+def call_cerebras(prompt, model="qwen-3-235b-a22b-instruct-2507", max_tokens=1024):
+    return call_compat(prompt, "https://api.cerebras.ai/v1",
+                       os.environ["CEREBRAS_API_KEY"], model, max_tokens)
+
+
+def call_groq_fallback_cerebras(prompt, max_tokens=1024):
+    print("[groq fallback] -> cerebras/qwen-3-235b-a22b-instruct-2507", file=sys.stderr)
+    return call_cerebras(prompt, max_tokens=max_tokens)
 
 
 def call_ai(ai, prompt, max_tokens=1024):
@@ -65,12 +70,14 @@ def call_ai(ai, prompt, max_tokens=1024):
                 return call_groq_fallback_cerebras(prompt)
     if ai == "cerebras":
         try:
-            return call_compat(prompt, "https://api.cerebras.ai/v1",
-                               os.environ["CEREBRAS_API_KEY"],
-                               "qwen-3-235b-a22b-instruct-2507", max_tokens)
+            return call_cerebras(prompt, max_tokens=max_tokens)
         except Exception as e:
             print(f"[cerebras failed: {e}]", file=sys.stderr)
-            return call_groq_fallback_cerebras(prompt)
+            try:
+                return call_gemini(prompt)
+            except Exception as e2:
+                print(f"[cerebras->gemini fallback failed: {e2}]", file=sys.stderr)
+                return call_groq(prompt, max_tokens=max_tokens)
     raise ValueError(f"unknown ai: {ai}")
 
 
@@ -180,7 +187,7 @@ def cmd_synthesis(question):
             synthesis = json.load(r)["content"][0]["text"].strip()
     except Exception as e:
         print(f"[Opus failed: {e}] -> Groq fallback", file=sys.stderr)
-        synthesis = call_groq(prompt, max_tokens=2048)
+        synthesis = call_ai("groq", prompt, max_tokens=2048)
         synth_ai = "groq"
 
     print(synthesis)
