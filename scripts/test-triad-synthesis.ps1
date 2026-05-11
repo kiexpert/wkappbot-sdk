@@ -83,7 +83,13 @@ function Invoke-Wk([string[]]$CommandArgs) {
 }
 
 function Get-TriadPrompt {
-    return "Check triad synthesis. Use exactly these sections: Points of consensus, Key disagreements & resolution, Final answer. Keep them concise. End with TRIAD_OK."
+    return @"
+Check triad synthesis.
+If the topic is time-sensitive, incorporate current public news, market, or price context when available, and clearly note what is fresh vs. stable.
+Use exactly these sections: Points of consensus, Key disagreements & resolution, Final answer.
+Keep them concise.
+End with TRIAD_OK.
+"@
 }
 
 function Get-LogPathFromOutput([string[]]$lines) {
