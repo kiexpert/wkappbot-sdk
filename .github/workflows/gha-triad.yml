@@ -1,4 +1,4 @@
-name: GHA Triad Debate
+﻿name: GHA Triad Debate
 
 on:
   workflow_dispatch:
@@ -13,9 +13,9 @@ on:
         type: string
 
 jobs:
-  # ── Round 1: Thesis ────────────────────────────────────────────────────
+  # ?? Round 1: Thesis ????????????????????????????????????????????????????
   thesis:
-    name: "R1 Thesis — ${{ matrix.ai }}"
+    name: "R1 Thesis ??${{ matrix.ai }}"
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -38,9 +38,9 @@ jobs:
         name: r1-${{ matrix.ai }}
         path: r1-${{ matrix.ai }}.txt
 
-  # ── Round 2: Antithesis ────────────────────────────────────────────────
+  # ?? Round 2: Antithesis ????????????????????????????????????????????????
   antithesis:
-    name: "R2 Antithesis — ${{ matrix.ai }}"
+    name: "R2 Antithesis ??${{ matrix.ai }}"
     needs: thesis
     runs-on: ubuntu-latest
     strategy:
@@ -69,7 +69,7 @@ jobs:
         name: r2-${{ matrix.ai }}
         path: r2-${{ matrix.ai }}.txt
 
-  # ── Round 3: Synthesis ─────────────────────────────────────────────────
+  # ?? Round 3: Synthesis ?????????????????????????????????????????????????
   synthesis:
     name: "R3 Synthesis"
     needs: antithesis
@@ -86,12 +86,20 @@ jobs:
         pattern: 'r[12]-*'
         merge-multiple: true
 
-    - name: Synthesize (Opus → Groq fallback)
+    - name: Synthesize (Opus ??Groq fallback)
       env:
         QUESTION:          ${{ inputs.question }}
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
       run: python3 scripts/triad_gha.py synthesis "$QUESTION"
+
+    - name: Verify synthesis markers
+      run: |
+        test -f synthesis.md
+        grep -q 'Points of consensus:' synthesis.md
+        grep -q 'Key disagreements & resolution:' synthesis.md
+        grep -q 'Final answer:' synthesis.md
+        grep -q 'TRIAD_OK' synthesis.md
 
     - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
       with:
