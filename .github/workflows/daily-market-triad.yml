@@ -96,6 +96,8 @@ jobs:
           ISSUE_NUMBER: ${{ inputs.public_issue }}
           TEASER: ${{ steps.teaser.outputs.teaser }}
         run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          $kstStamp = $kstNow.ToString('yyyy-MM-dd HH:mm') + ' KST'
           $question = "${{ inputs.question }}"
           if ([string]::IsNullOrWhiteSpace($question)) {
             $question = "Analyze today's promising sectors and leading stocks using current public news and price context. Keep ranks 1 and 2 private and reveal only the 3rd-place teaser."
@@ -103,6 +105,8 @@ jobs:
 
           $body = @(
             'Daily market triad teaser.',
+            '',
+            "KST: $kstStamp",
             '',
             'Question:',
             $question,
@@ -119,7 +123,7 @@ jobs:
             }
             gh issue comment "$env:ISSUE_NUMBER" --repo "$env:REPO" --body "$body"
           } else {
-            $title = "Daily market triad teaser $(Get-Date -Format yyyy-MM-dd)"
+            $title = "Daily market triad teaser $($kstNow.ToString('yyyy-MM-dd')) KST"
             gh issue create --repo "$env:REPO" --title "$title" --body "$body"
           }
 
@@ -147,6 +151,9 @@ jobs:
         env:
           TEASER: ${{ steps.teaser.outputs.teaser }}
         run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '## Daily Market Triad Teaser'
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("**KST:** {0}" -f $kstNow.ToString('yyyy-MM-dd HH:mm'))
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("**Public teaser:** {0}" -f $env:TEASER)
