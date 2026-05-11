@@ -117,6 +117,7 @@ jobs:
             'The full ranking is kept private in the core repo.'
           ) -join [Environment]::NewLine
 
+          $issueNumber = $env:ISSUE_NUMBER
           if (-not [string]::IsNullOrWhiteSpace($env:ISSUE_NUMBER)) {
             if ($env:ISSUE_NUMBER -notmatch '^\d+$') {
               throw 'public_issue must be a numeric issue number.'
@@ -124,7 +125,19 @@ jobs:
             gh issue comment "$env:ISSUE_NUMBER" --repo "$env:REPO" --body "$body"
           } else {
             $title = "Daily market triad teaser $($kstNow.ToString('yyyy-MM-dd')) KST"
-            gh issue create --repo "$env:REPO" --title "$title" --body "$body"
+            $found = gh issue list --repo "$env:REPO" --state all --search "$title in:title" --json number,title --limit 20 | ConvertFrom-Json
+            $match = $found | Where-Object { $_.title -eq $title } | Select-Object -First 1
+            if ($match) {
+              $issueNumber = [string]$match.number
+              Write-Host "Reusing daily issue #$issueNumber : $title"
+              gh issue comment "$issueNumber" --repo "$env:REPO" --body "$body"
+            } else {
+              $issueNumber = gh api --method POST "repos/$env:REPO/issues" -f title="$title" -f body="$body" --jq '.number'
+              if ([string]::IsNullOrWhiteSpace($issueNumber)) {
+                throw 'failed to create the daily issue'
+              }
+              Write-Host "Created daily issue #$issueNumber : $title"
+            }
           }
 
       - name: Promote full synthesis to core repo
