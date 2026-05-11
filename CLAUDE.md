@@ -14,6 +14,7 @@
   - `AGENTS.md`
   - `CLAUDE.md`
 - Shared AI policy must not drift between these files.
+- Claude-facing project guidance should stay in this `CLAUDE.md`; use skills for execution rules and Codex-specific guardrails, not for replacing the project notes that Claude must also read.
 
 ### Language / Communication
 - **Final responses to user: Korean, polite 해요체 (-요 form). NEVER informal speech.**
@@ -37,6 +38,7 @@
 ```
 - **Hot-Swap**: publish triggers auto-detect + swap by Eye. **NEVER kill Eye!**
 - Auto-publish after any `.cs` edit without waiting for instructions
+- If you touch the launcher or core runtime path, you must finish the full release loop immediately: build, deploy, hot-swap, and smoke test. Do not stop at source edits, do not wait for extra confirmation, and do not leave the repo in a half-updated state.
 
 ### Minor Version Bump
 -> See [VERSIONING.md](../VERSIONING.md) -- commit 3 files together
@@ -256,15 +258,19 @@ Execute in order when user sends 'gg':
 | Duty | How |
 |------|-----|
 | **Product quality (PRIMARY)** | While using wkappbot: note slow responses, confusing errors, bad UX → `wkappbot suggest` immediately. Use wkask/wkcdp for QA-first bug detection. |
+| **Ask QA** | For SDK ask/latency debugging, `wkask` is the default live-monitoring tool. If the rule is not already written in CLAUDE.md, use `wkask` first, then add the rule here in the same session. |
+| **User-perspective QA** | For public SDK regressions, start from `sdk-user-perspective-test-playbook` and the matching `wkask`/`wkcdp` smoke first; the user path is the truth source. |
+| **CDP isolation** | Project Chrome/CDP is strictly project-scoped. Reuse only the current project's registered Chrome and tabs; ignore foreign-project Chrome/CDP ports and never attach across project boundaries. |
+| **Release loop** | Every project keeps its recurring `Main Duties` block in repo `CLAUDE.md`. The release loop is always `build -> deploy -> hot-swap -> smoke test`. |
+| **Core promotion** | Public workflows that use private-core downloads may promote only sanitized durable summaries back to `WKAPPBOT_CORE_REPO`; never copy secrets or raw private logs. |
 | Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
 | MD self-healing | `wkappbot skill read claude-md-guide` -- apply situation A-H as they arise |
 | SDK user skill distribution | `setup.ps1` auto-install `wkappbot-workflow` skills on first run (suggest filed: 2026-05-08) |
 | Session recovery | `wkappbot session list --claude --cwd` after compaction |
 | Release prep | CHANGELOG + VERSIONING + CLAUDE.md header + gh issue comment on launch checklist |
-| **CDP monitor** | `scripts/monitor-cdp.ps1 [-f] [-tabs]` -- check session health, position drift, dup tabs, caller window, latency. Run when Chrome accumulates or position bugs suspected. Deployed to `D:\GitHub\WKAppBot\bin\cdp-mon.ps1`. |
-| **CDP anomaly response** | Red flags: off-screen TGT-POS (x<-100), LAT=DEAD, DUP tabs >3, MEM>2GB/session, >4 Chrome same CWD. Actions: file suggest with cdp-tab-growth.jsonl evidence, fix WaitForEditorA11y timeouts, check sandbox-miss patterns. |
+| **CDP anomaly response** | Red flags: off-screen TGT-POS (x<-100), LAT=DEAD, DUP tabs >3, MEM>2GB/session, >4 Chrome same CWD. **DIRECT FIX via wktool -- NO suggest filing for Chrome position/cookie bugs.** Fix: wkcdp auto-moves off-screen Chrome, wkask aborts if caller off-screen. |
 | **CDP suggest triage** | `wkappbot suggest list` -> resolve stale BUG-AUTO CDP/Chrome/ask-gpt suggests. Use `--class CdpClient --commit <hash> --skill cdp-evalasync-retry-policy`. ChromeLauncher.cs is 817 lines (over cap) -- use CdpClient or Win32 partial instead. |
-| **CDP bug fixes (primary owner)** | CDP/Chrome bugs are YOUR primary responsibility. Pattern: cdp-mon anomaly detected -> read suggest detail -> spawn Opus agent to fix in WKAppBot C# -> build -> hot-swap. Key areas: tab accumulation (sandbox-miss), window position drift (SetWindowBoundsWaitStableAsync), hotswap off-screen (LoadParentWindowGeo on-screen guard), WaitForEditorA11y timeout, CDP eval timeout. Always use partial class (CdpClient.*.cs, ChromeLauncher.*.cs) not the 817-line monolith. |
+| **CDP bug fixes (primary owner) -- NO SUGGESTS, DIRECT FIX** | CDP/Chrome bugs are YOUR primary responsibility. Pattern: cdp-mon anomaly detected -> read suggest detail -> spawn Opus agent to fix in WKAppBot C# -> build -> hot-swap. Key areas: tab accumulation (sandbox-miss), window position drift (SetWindowBoundsWaitStableAsync), hotswap off-screen (LoadParentWindowGeo on-screen guard), WaitForEditorA11y timeout, CDP eval timeout. Always use partial class (CdpClient.*.cs, ChromeLauncher.*.cs) not the 817-line monolith. |
 | **Doc version audit** | Before release and on ㄱㄱ: grep all root `*.md` for old version strings (v5.x, v6.x). Check SECURITY.md supported-versions table, README What's New section, CHANGELOG header. Fix and push any stale references. |
 | **Doc version sync** | Keep README/AGENTS/CLAUDE/SECURITY/VERSIONING/CHANGELOG consistent with current version. When version bumps: update SECURITY supported-versions, README What's New, VERSIONING current-version line, CHANGELOG header -- all in one commit. Never let version strings drift between files. |
 
@@ -288,3 +294,8 @@ wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA sc
 - `AGENTS.md`
 - **MEMORY.md** / **memory/**: build commands, architecture decisions, gotchas detail
 - .NET 8.0 `net8.0-windows10.0.22621.0`, Korean UI support
+
+## 리밋 메시지 윌김이 추가~ 스킬화후 이 섹션 삭제 요망~
+■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit
+https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 4:30 PM.
+■ First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.

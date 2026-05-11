@@ -11,13 +11,11 @@
 | `codeql` | Weekly + PR to `csharp/**` | Static security analysis |
 | `lint` | PR to `csharp/**` | `dotnet format --verify-no-changes` |
 
-## Required secrets
+## Secret handling
 
-| Secret | Purpose |
-|--------|---------|
-| `WKAPPBOT_CORE_PAT` | PAT with `read` access to private dev repo — downloads `wkappbot-core.exe` |
-| `WKAPPBOT_CORE_REPO` | Private dev repo slug (e.g. `kiexpert/WKAppBot`) |
-| `GITHUB_TOKEN` | Auto-provided by GitHub Actions — used for release creation and smoke license auth |
+Private-core promotion is wired only in workflows and uses repository secrets there.
+The secret names are intentionally omitted from this document.
+Workflows must promote only sanitized summaries back to the private core repo and must not copy secrets or raw private logs.
 
 ## Artifacts
 

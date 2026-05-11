@@ -333,4 +333,36 @@ jobs:
           Write-Host "Push attempt $i failed, retrying..."
           Start-Sleep -Seconds (2 * $i)
         }
-        if (-not $ok) { Write-Host 'All push attempts failed (branch protection) — skipping'; exit 0 }
+        if (-not $ok) { Write-Host 'All push attempts failed (branch protection) - skipping'; exit 0 }
+
+    - name: Promote build summary to core repo
+      if: ${{ always() && github.event_name == 'push' }}
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+      run: |
+        if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+          Write-Host '::warning::Core promotion skipped -- WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT not set.'
+          exit 0
+        }
+
+        $summary = [ordered]@{
+          source_repo  = '${{ github.repository }}'
+          workflow     = '${{ github.workflow }}'
+          run_id       = '${{ github.run_id }}'
+          run_number   = '${{ github.run_number }}'
+          sha          = '${{ github.sha }}'
+          ref          = '${{ github.ref }}'
+          status       = '${{ job.status }}'
+          built_at_utc = (Get-Date -AsUTC -Format o)
+        } | ConvertTo-Json -Compress
+
+        $content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($summary))
+        $runId   = '${{ github.run_id }}'
+        $path    = "wkappbot.hq/promotions/public-sdk/build/$runId.json"
+
+        gh api --method PUT "repos/$env:CORE_REPO/contents/$path" `
+          -f message="ci: promote build summary from public sdk [skip ci]" `
+          -f content="$content" `
+          -f branch="main"

@@ -3,6 +3,18 @@
 This file is the shared reference for AI agents working in this repository.
 Read this first before changing code, scripts, workflows, or shared documentation.
 
+## Document role split
+- Read `CLAUDE.md` first, then use this file for Codex and other non-Claude agents.
+- Keep `AGENTS.md` focused on shared operating rules, workflow discipline, and runtime guardrails.
+- Keep Claude-specific reminders and project-facing guidance in `CLAUDE.md`.
+- If the launcher or core runtime is edited, finish the loop immediately: build, deploy, hot-swap, and smoke test before pausing. Do not stop after the code edit or ask the user to continue the release step later.
+
+## Codex / other-agent flow
+- Use this file for Codex and other non-Claude agents; keep Claude-facing notes out of it.
+- Keep shared rules here short and durable: official binaries, HQ layout, skill discipline, CDP isolation, first-limit handoff, and release loop guardrails.
+- If a rule must be visible to Claude too, keep the short shared reminder here and mirror the Claude-facing note in `CLAUDE.md`.
+- If `bin\wkappbot.exe` is locked during publish, do not leave the repo in a half-deployed state. Finish by restoring a runnable launcher to `bin\wkappbot.exe` from a clean publish output, and keep the previous launcher only as `wkappbot.old-*.exe` backup.
+
 ## Cross-reference rule
 - Read all top-level Markdown files in the repository root before making non-trivial changes.
 - At minimum, check these files when they exist:
@@ -48,7 +60,8 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 
 ## 5. Skill-first principle
 - AI tools should learn from skill commands first.
-- `skill`, `knowhow`, and `schedule` are important baseline commands and should always remain testable.
+- `skill` and `knowhow` are important baseline commands and should always remain testable.
+- `schedule` is not part of the public SDK smoke surface unless the current binary explicitly exposes it.
 - For load/compact handoff, start with:
   ```bash
   wkappbot skill read claude-session-handoff
@@ -58,9 +71,10 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - Smoke tests should include at least:
   - `skill --help`
   - `knowhow --help`
-  - `schedule --help`
   - `skill list`
-  - `schedule list`
+- For SDK ask QA or latency debugging, use `wkask` as the default live-monitoring tool before patching ask behavior or documenting the rule.
+- For public SDK regressions, start from `sdk-user-perspective-test-playbook` and the matching `wkask`/`wkcdp` smoke first; the user path is the truth source.
+- CDP is project-scoped only. Reuse the current project's Chrome/tab state; ignore foreign-project Chrome/CDP ports and never attach across project boundaries.
 
 ## 6. File tool baseline
 - File tools should support basic non-interactive verification.
@@ -73,6 +87,7 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - Runtime experience may accumulate in HQ and later be promoted into the repository.
 - Promote only durable and reusable knowledge.
 - Avoid committing volatile or sensitive runtime artifacts.
+- When public workflows derive durable CI evidence from private-core downloads, promote a sanitized summary back to `WKAPPBOT_CORE_REPO`; never copy secrets or raw private logs.
 - Good candidates for commit:
   - validated knowhow
   - stable handlers
@@ -96,6 +111,8 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 - PATH injection preferred.
 - No-arg scripts should be healthy.
 - Skill commands are core AI learning surface.
+- First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.
+- Every project keeps its recurring `Main Duties` block in repo `CLAUDE.md`, and the release loop is always `build -> deploy -> hot-swap -> smoke test`.
 
 ## 10.1 Korean response style
 - Do not imitate the user's speech style or dialect.

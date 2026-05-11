@@ -183,6 +183,41 @@ jobs:
           Write-Host ""
           Write-Host "RESULT: 정반합 ALL PASS [${{ matrix.target.name }}]" -ForegroundColor Green
 
+      - name: Promote resilience summary to core repo
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+        run: |
+          if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+            Write-Host '::warning::Core promotion skipped -- WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT not set.'
+            exit 0
+          }
+
+          $summary = [ordered]@{
+            source_repo  = "${{ github.repository }}"
+            workflow     = "${{ github.workflow }}"
+            run_id       = "${{ github.run_id }}"
+            run_number   = "${{ github.run_number }}"
+            sha          = "${{ github.sha }}"
+            target       = "${{ matrix.target.name }}"
+            url          = "${{ matrix.target.url }}"
+            expect       = "${{ matrix.target.expect }}"
+            status       = "${{ job.status }}"
+            built_at_utc = (Get-Date -AsUTC -Format o)
+          } | ConvertTo-Json -Compress
+
+          $content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($summary))
+          $runId   = "${{ github.run_id }}"
+          $target  = "${{ matrix.target.name }}"
+          $path    = "wkappbot.hq/promotions/public-sdk/cdp-resilience/$runId-$target.json"
+
+          gh api --method PUT "repos/$env:CORE_REPO/contents/$path" `
+            -f message="ci: promote cdp resilience summary from public sdk [skip ci]" `
+            -f content="$content" `
+            -f branch="main"
+
       - name: Upload logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
