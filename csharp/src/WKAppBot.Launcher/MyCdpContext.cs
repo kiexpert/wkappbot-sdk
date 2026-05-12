@@ -176,8 +176,9 @@ partial class Program
                 "caller_foreign_process"  => "caller foreground belongs to an unrelated process (not a terminal/IDE/wkappbot)",
                 _                         => "caller HWND is off-screen or invalid",
             };
-            error = $"[LAUNCHER] {cmd}: {reason} (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)}). "
-                  + $"Run {cmd} from a terminal/IDE owned by your project so Chrome can be placed correctly.";
+            error = $"[LAUNCHER] {cmd}: {reason} (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)})."
+                  + (string.IsNullOrEmpty(callerValidation.Diagnostic) ? "" : $" caller {callerValidation.Diagnostic}.")
+                  + $" Run {cmd} from a terminal/IDE owned by your project so Chrome can be placed correctly.";
             return new MyCdpContext(
                 DateTimeOffset.UtcNow,
                 cmd,
@@ -199,7 +200,9 @@ partial class Program
         // these to their "no caller" values on rejected paths above so a stale anchor from
         // a previous invocation isn't reused.
         LastValidatedCallerHwnd = callerHwnd;
-        LastValidatedCallerRect = GetWindowRect(callerHwnd, out var cRect) ? cRect : System.Drawing.Rectangle.Empty;
+        LastValidatedCallerRect = TryGetWindowRectLTRB(callerHwnd, out var cRect)
+            ? System.Drawing.Rectangle.FromLTRB(cRect.Left, cRect.Top, cRect.Right, cRect.Bottom)
+            : System.Drawing.Rectangle.Empty;
 
         return new MyCdpContext(
             DateTimeOffset.UtcNow,
@@ -302,7 +305,18 @@ partial class Program
         return int.TryParse(grap[start..end], out var port) ? port : null;
     }
 
-    record CallerValidation(bool IsOffScreen, string Status);
+    record CallerValidation(bool IsOffScreen, string Status, string? Diagnostic = null);
+
+    static string DescribeCallerRect(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return "(no hwnd)";
+        if (!IsWindow(hwnd)) return "(not a window)";
+        var cloaked = IsWindowCloaked(hwnd);
+        var visible = IsWindowVisible(hwnd);
+        if (!TryGetWindowRectLTRB(hwnd, out var r))
+            return $"(rect unavailable; visible={visible} cloaked={cloaked})";
+        return $"rect=(L={r.Left},T={r.Top},R={r.Right},B={r.Bottom}) size=({r.Width}x{r.Height}) visible={visible} cloaked={cloaked}";
+    }
 
     static CallerValidation ValidateCallerHwnd(IntPtr callerHwnd, IntPtr consoleHwnd, IntPtr hostHwnd)
     {
@@ -321,7 +335,7 @@ partial class Program
             return new(true, "invalid_window_type");
 
         if (IsWindowOffScreen(callerHwnd))
-            return new(true, "caller_offscreen");
+            return new(true, "caller_offscreen", DescribeCallerRect(callerHwnd));
 
         // Determine caller type for logging
         var callerType = callerHwnd == consoleHwnd ? "console"
@@ -410,32 +424,184 @@ partial class Program
         }
     }
 
+    // Win32 RECT (left, top, right, bottom). MUST NOT be marshalled as
+    // System.Drawing.Rectangle: Rectangle's fields are (X, Y, Width, Height), so
+    // the same 4 LONGs from Win32 get reinterpreted as (left, top, width=right,
+    // height=bottom), and accessing .Right/.Bottom adds them again -- yielding
+    // garbage like Right = left+right_coord. This was the long-standing reason
+    // CASCADIA_HOSTING_WINDOW_CLASS (Windows Terminal) on a left/secondary
+    // monitor (negative coords like -2414..-1285) was falsely flagged as
+    // off-screen and rejected the caller.
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    internal struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+        public int Width => Right - Left;
+        public int Height => Bottom - Top;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool IsWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+    delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+    const int DWMWA_CLOAKED = 14;
+    const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    /// <summary>
+    /// Returns the window's bounding rect as (Left, Top, Right, Bottom). Prefers
+    /// DWM extended frame bounds (more accurate, excludes drop-shadow padding),
+    /// falls back to GetWindowRect. Returns false only if both APIs fail.
+    /// </summary>
+    static bool TryGetWindowRectLTRB(IntPtr hwnd, out RECT rect)
+    {
+        rect = default;
+        if (hwnd == IntPtr.Zero) return false;
+        try
+        {
+            // DWM extended frame bounds is the "real" visible rect (excludes
+            // the 8px invisible resize border on Win10+ Aero windows).
+            if (DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT dwmRect, 16) == 0
+                && (dwmRect.Right > dwmRect.Left) && (dwmRect.Bottom > dwmRect.Top))
+            {
+                rect = dwmRect;
+                return true;
+            }
+        }
+        catch { /* fall through to GetWindowRect */ }
+        return GetWindowRect(hwnd, out rect);
+    }
+
+    /// <summary>
+    /// True iff window is DWM-cloaked (UWP suspended app, Win+Tab thumbnail,
+    /// virtual-desktop hidden). Cloaked windows are not visible to the user even
+    /// though GetWindowRect returns valid coords.
+    /// </summary>
+    static bool IsWindowCloaked(IntPtr hwnd)
+    {
+        try
+        {
+            if (DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out int cloaked, 4) == 0)
+                return cloaked != 0;
+        }
+        catch { }
+        return false;
+    }
+
+    // AOT-friendly: collect monitor rects into a static field via a non-capturing
+    // delegate. We cannot use closures here (NativeAOT cannot synthesize the
+    // marshal stub for a capturing lambda). The collection is guarded by a
+    // monitor lock so concurrent validations don't clobber the shared list.
+    static readonly object s_monitorRectsLock = new();
+    static List<RECT>? s_monitorRectsScratch;
+    static readonly MonitorEnumProc s_collectMonitorRects = CollectMonitorRect;
+
+    static bool CollectMonitorRect(IntPtr hMon, IntPtr hdc, ref RECT mr, IntPtr _)
+    {
+        try { s_monitorRectsScratch?.Add(mr); } catch { }
+        return true;
+    }
+
+    /// <summary>
+    /// True iff the given rect does not intersect ANY monitor's bounds. Walks
+    /// the full multi-monitor virtual screen via EnumDisplayMonitors so windows
+    /// living entirely on a left/secondary monitor with negative coords are
+    /// correctly classified as on-screen.
+    /// </summary>
+    static bool IsRectOutsideAllMonitors(RECT r)
+    {
+        List<RECT> rects;
+        lock (s_monitorRectsLock)
+        {
+            s_monitorRectsScratch = new List<RECT>(4);
+            try
+            {
+                if (!EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, s_collectMonitorRects, IntPtr.Zero))
+                    return false; // fail open
+                rects = s_monitorRectsScratch;
+            }
+            catch
+            {
+                return false; // fail open
+            }
+            finally
+            {
+                s_monitorRectsScratch = null;
+            }
+        }
+
+        foreach (var mr in rects)
+        {
+            if (r.Left   < mr.Right
+             && r.Right  > mr.Left
+             && r.Top    < mr.Bottom
+             && r.Bottom > mr.Top)
+            {
+                return false; // intersects this monitor → on-screen
+            }
+        }
+        return true; // no monitor intersected → off-screen
+    }
+
     static bool IsWindowOffScreen(IntPtr hwnd)
     {
         try
         {
-            if (!GetWindowRect(hwnd, out var rect))
-                return true;
+            if (!IsWindow(hwnd)) { LogValidation(hwnd, default, false, false, false, "not_a_window"); return true; }
+            bool visible = IsWindowVisible(hwnd);
+            bool cloaked = IsWindowCloaked(hwnd);
+            bool gotRect = TryGetWindowRectLTRB(hwnd, out var rect);
 
-            // Window is off-screen if both left and top are past reasonable negative bounds (-500px)
-            // or if rect is invalid (right < left or bottom < top)
-            const int OffScreenThreshold = -500;
-            if (rect.Right < rect.Left || rect.Bottom < rect.Top)
-                return true;
+            if (!gotRect)               { LogValidation(hwnd, default, true, visible, cloaked, "get_rect_failed"); return true; }
+            if (cloaked)                { LogValidation(hwnd, rect,    true, visible, cloaked, "cloaked");        return true; }
+            if (!visible)               { LogValidation(hwnd, rect,    true, visible, cloaked, "not_visible");    return true; }
+            if (rect.Right <= rect.Left || rect.Bottom <= rect.Top)
+                                        { LogValidation(hwnd, rect,    true, visible, cloaked, "degenerate_rect"); return true; }
+            if (IsRectOutsideAllMonitors(rect))
+                                        { LogValidation(hwnd, rect,    true, visible, cloaked, "outside_all_monitors"); return true; }
 
-            if (rect.Right < OffScreenThreshold && rect.Bottom < OffScreenThreshold)
-                return true;
-
+            LogValidation(hwnd, rect, true, visible, cloaked, "on_screen");
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            try { Console.Error.WriteLine($"[VALIDATION] hwnd=0x{hwnd.ToInt64():X} exception={ex.GetType().Name}: {ex.Message}"); } catch { }
             return true;
         }
     }
 
-    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
-    static extern bool GetWindowRect(IntPtr hWnd, out System.Drawing.Rectangle lpRect);
+    static void LogValidation(IntPtr hwnd, RECT r, bool isWindow, bool isVisible, bool cloaked, string verdict)
+    {
+        try
+        {
+            var cls = new System.Text.StringBuilder(64);
+            GetClassNameW(hwnd, cls, cls.Capacity);
+            Console.Error.WriteLine(
+                $"[VALIDATION] hwnd=0x{hwnd.ToInt64():X} class={cls} "
+                + $"rect=(L={r.Left},T={r.Top},R={r.Right},B={r.Bottom}) "
+                + $"size=({r.Width}x{r.Height}) "
+                + $"IsWindow={isWindow} IsVisible={isVisible} cloaked={cloaked} verdict={verdict}");
+        }
+        catch { }
+    }
 
     static string? GetWindowSnapshot(IntPtr hwnd)
     {
