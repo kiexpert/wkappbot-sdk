@@ -557,6 +557,24 @@ partial class Program
         prof($"cmd={cmd}");
         var relayArgs = forwardArgs;
         var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
+
+        // chat command: auto-convert model name argument to --model flag
+        // Usage: wkappbot chat haiku "prompt" -> claude --model haiku "prompt"
+        if (isChatCmd && forwardArgs.Length > 1)
+        {
+            var secondArg = forwardArgs[1].ToLowerInvariant();
+            var validModels = new[] { "haiku", "sonnet", "opus", "claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7" };
+            if (validModels.Contains(secondArg))
+            {
+                // Transform: chat <model> "prompt" -> claude --model <model> "prompt"
+                var modelArgs = new List<string> { "claude", "--model", secondArg };
+                modelArgs.AddRange(forwardArgs.Skip(2));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat model conversion: {secondArg} -> {string.Join(" ", relayArgs)}");
+            }
+        }
+
         var inheritedChatSession = Environment.GetEnvironmentVariable("WKAPPBOT_CHAT_SESSION") == "1";
         var isChatSession = isChatCmd || inheritedChatSession;
         if (isChatSession)
