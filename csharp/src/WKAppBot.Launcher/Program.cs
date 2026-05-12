@@ -111,7 +111,7 @@ partial class Program
             var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
             var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\\"{argsJoined}\\\"{exSuffix}";
             var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}\n";
-            WKAppBot.Shared.ToolOutputStore.AppendRotatingLine(jsonlPath, line);
+            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(jsonlPath, line);
         }
         catch { /* best-effort -- if we cannot even write the suggest, stay silent */ }
     }
@@ -871,9 +871,23 @@ partial class Program
         }
 
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
+
+        // Post-launch placement: after Core launches Chrome (cdp/web/ask family),
+        // proactively nudge the new Chrome window into caller proximity. Core
+        // already does its own placement via ComputePlacementNearCaller using
+        // WKAPPBOT_CALLER_HWND, but a second SDK-side pass catches the cases
+        // where Core attached to a pre-existing Chrome at a stale position OR
+        // Chrome's session-restore race repositioned the window after Core
+        // released it. Best-effort: failures are swallowed.
+        if (finalCode == 0 && IsCdpFamilyCommand(cmd))
+            TryMoveWebBotNearCaller(cmd);
+
         AppBotExit(finalCode);
         return finalCode; // unreachable
     }
+
+    static bool IsCdpFamilyCommand(string cmd)
+        => cmd is "cdp" or "web" or "a11y" or "ask";
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
     static volatile string _lDiagStep = "";

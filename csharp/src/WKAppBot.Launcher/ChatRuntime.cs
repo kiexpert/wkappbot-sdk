@@ -415,6 +415,54 @@ partial class Program
             _ => null
         };
 
+    /// <summary>
+    /// Locate the on-disk entrypoint for a chat provider CLI by probing the user's
+    /// PATH for the well-known executable name. Returns the absolute path when found,
+    /// or null when the CLI is not installed. Stub-grade implementation -- callers
+    /// already handle null/missing-file with a user-facing error.
+    /// </summary>
+    static string? ResolveProviderCliTarget(string provider)
+    {
+        var linkName = GetProviderCliLinkName(provider);
+        if (string.IsNullOrWhiteSpace(linkName)) return null;
+        try
+        {
+            // 1. Adjacent to wkappbot.exe (typical when a wrapper .cmd ships with us).
+            var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? Environment.CurrentDirectory);
+            if (!string.IsNullOrWhiteSpace(exeDir))
+            {
+                var adjacent = Path.Combine(exeDir, linkName);
+                if (File.Exists(adjacent)) return adjacent;
+            }
+            // 2. PATH lookup -- match the link name verbatim (codex.exe / claude.cmd / gemini.cmd).
+            var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (var seg in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+            {
+                try
+                {
+                    var candidate = Path.Combine(seg.Trim('"'), linkName);
+                    if (File.Exists(candidate)) return candidate;
+                }
+                catch { }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// Ensure a CLI alias for the chat provider is reachable. Stub: no-op when the
+    /// resolver already finds the provider on disk; callers tolerate the no-alias
+    /// case (they fall back to the resolved entrypoint).
+    /// </summary>
+    static void EnsureProviderCliAlias(string provider)
+    {
+        // Real implementation would create a launcher-side .cmd shim that forwards
+        // to ResolveProviderCliTarget so `provider` works as a bare command.
+        // For now we rely on the user's existing PATH alias (codex / claude / gemini).
+        _ = provider;
+    }
+
     static int RunChatProviderOneShot(string providerName, string[] providerArgs)
     {
         try

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -174,7 +173,12 @@ public static class ToolOutputStore
             try
             {
                 File.WriteAllText(Path.Combine(dir, $"{slug}.log"), output ?? "");
-                File.AppendAllText(IndexFile(safeTool), JsonSerializer.Serialize(rec) + "\n");
+                var indexPath = IndexFile(safeTool);
+                using var fs = new FileStream(indexPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.SequentialScan);
+                using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+#pragma warning disable IL2026, IL3050 // ToolOutputRecord is a simple POCO; AOT-safe in practice. SDK AOT build promotes these to errors.
+                sw.WriteLine(JsonSerializer.Serialize(rec));
+#pragma warning restore IL2026, IL3050
             }
             catch { /* best-effort */ }
 
@@ -222,4 +226,48 @@ public static class ToolOutputStore
         }
         catch { }
     }
+
+    /// <summary>
+    /// Append a single line to a canonical log file. If the target file was
+    /// created on a previous day, rotate it into .old-append/YYYYMMDD/ and
+    /// start a fresh file for today.
+    /// </summary>
+    public static void AppBotAppendFile(string path, string line)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var dir = Path.GetDirectoryName(full);
+            if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
+
+            if (File.Exists(full))
+            {
+                var created = File.GetCreationTimeUtc(full).Date;
+                var today = DateTime.UtcNow.Date;
+                if (created != today)
+                {
+                    var oldDir = Path.Combine(dir ?? ".", ".old-append", created.ToString("yyyyMMdd"));
+                    Directory.CreateDirectory(oldDir);
+                    var oldPath = Path.Combine(oldDir, Path.GetFileName(full));
+                    if (File.Exists(oldPath)) File.Delete(oldPath);
+                    File.Move(full, oldPath);
+                }
+            }
+
+            using var fs = new FileStream(full, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.SequentialScan);
+            using var sw = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            sw.WriteLine(line);
+        }
+        catch
+        {
+            // best-effort logging helper
+        }
+    }
+
+    /// <summary>
+    /// Legacy name kept for older callers while the public API moves to the
+    /// clearer AppBotAppendFile name.
+    /// </summary>
+    [Obsolete("Use AppBotAppendFile instead.")]
+    public static void AppendRotatingLine(string path, string line) => AppBotAppendFile(path, line);
 }

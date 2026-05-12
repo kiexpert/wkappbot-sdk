@@ -133,6 +133,16 @@ partial class Program
             if (relayFilePath != null)
                 proc.StartInfo.EnvironmentVariables["WKAPPBOT_RELAY_FILE"] = relayFilePath;
 
+            // Forward the validated caller HWND so Core's ChromeLauncher.ComputePlacementNearCaller
+            // anchors Chrome on the right terminal during launch + every new-tab path.
+            // MyCdpContext.BuildMyCdpContext rejects foreign / off-screen / pseudo-console callers
+            // before this point, so the env var is only set when a real terminal owns this run.
+            var validatedCallerHwnd = LastValidatedCallerHwnd;
+            if (validatedCallerHwnd != IntPtr.Zero)
+                proc.StartInfo.EnvironmentVariables["WKAPPBOT_CALLER_HWND"] = $"0x{validatedCallerHwnd.ToInt64():X}";
+            else
+                proc.StartInfo.EnvironmentVariables.Remove("WKAPPBOT_CALLER_HWND");
+
             // Strip MSYS2/Cygwin PTY env vars for ALL Core spawns (not just fast-exit).
             // .NET 8 single-file AppHost deadlocks when TERM/MSYSTEM/MSYS/etc. are set,
             // regardless of CreateNoWindow mode. These vars tell the AppHost to reconcile

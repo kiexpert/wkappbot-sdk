@@ -23,6 +23,21 @@ internal sealed record MyCdpContext(
 
 partial class Program
 {
+    /// <summary>
+    /// The most recently validated caller HWND from <see cref="BuildMyCdpContext"/>.
+    /// CoreRunner reads this to forward the anchor to Core via WKAPPBOT_CALLER_HWND,
+    /// so Chrome placement (ComputePlacementNearCaller) targets the right terminal
+    /// even when the Eye pipe is unavailable. IntPtr.Zero when no validated caller
+    /// is available (uninitialised or last validation was rejected).
+    /// </summary>
+    internal static IntPtr LastValidatedCallerHwnd { get; private set; } = IntPtr.Zero;
+
+    /// <summary>
+    /// Window rect of the validated caller. Used by post-launch WebBot placement
+    /// to move Chrome to the caller's screen area. RECT.Empty when unavailable.
+    /// </summary>
+    internal static System.Drawing.Rectangle LastValidatedCallerRect { get; private set; } = System.Drawing.Rectangle.Empty;
+
     static bool TryTrackMyCdpAccess(string cmd, string[] forwardArgs, out string? error)
     {
         error = null;
@@ -46,6 +61,11 @@ partial class Program
     static MyCdpContext BuildMyCdpContext(string cmd, string[] forwardArgs, bool hasEvalJs, out string? error)
     {
         error = null;
+
+        // Clear any stale anchor from a previous invocation -- only the
+        // "ok_*_caller" success path below republishes a usable HWND/rect.
+        LastValidatedCallerHwnd = IntPtr.Zero;
+        LastValidatedCallerRect = System.Drawing.Rectangle.Empty;
 
         var subcommand = forwardArgs.Length > 1 ? forwardArgs[1] : null;
         var target = FindMyCdpTarget(cmd, forwardArgs, hasEvalJs);
@@ -173,6 +193,13 @@ partial class Program
                 "rejected_" + callerValidation.Status,
                 forwardArgs);
         }
+
+        // Publish the validated caller HWND + rect so CoreRunner (via WKAPPBOT_CALLER_HWND env)
+        // and any post-launch WebBot mover can anchor Chrome on the right terminal. Reset
+        // these to their "no caller" values on rejected paths above so a stale anchor from
+        // a previous invocation isn't reused.
+        LastValidatedCallerHwnd = callerHwnd;
+        LastValidatedCallerRect = GetWindowRect(callerHwnd, out var cRect) ? cRect : System.Drawing.Rectangle.Empty;
 
         return new MyCdpContext(
             DateTimeOffset.UtcNow,
@@ -457,13 +484,104 @@ partial class Program
             var jsonlPath = Path.Combine(runtimeDir, "cdp-state.jsonl");
 
             var line = WriteMyCdpJsonLine(ctx);
-            WKAppBot.Shared.ToolOutputStore.AppendRotatingLine(jsonlPath, line);
+            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(jsonlPath, line);
         }
         catch
         {
             // best-effort telemetry only
         }
     }
+
+    /// <summary>
+    /// Post-launch Chrome placement: locate the newly launched project Chrome
+    /// (windows of class "Chrome_WidgetWin_1" owned by chrome.exe) and SetWindowPos
+    /// it next to the validated caller window. Uses SWP_NOZORDER | SWP_NOACTIVATE
+    /// so focus is never stolen from the terminal that invoked this command.
+    ///
+    /// Best-effort: returns silently on any failure (no caller anchor, no Chrome
+    /// window found, off-screen rect, etc.). Logged to wkappbot.hq/runtime/cdp-state.jsonl
+    /// via the existing telemetry path.
+    /// </summary>
+    internal static void TryMoveWebBotNearCaller(string cmd)
+    {
+        try
+        {
+            var caller = LastValidatedCallerHwnd;
+            var callerRect = LastValidatedCallerRect;
+            if (caller == IntPtr.Zero || callerRect == System.Drawing.Rectangle.Empty)
+                return;
+
+            // Width/height: prefer the caller's actual size, but clamp to reasonable
+            // bounds. RECT here is (left, top, right, bottom) -- not (x, y, w, h).
+            int callerLeft = callerRect.Left;
+            int callerTop = callerRect.Top;
+            int callerW = Math.Max(400, callerRect.Right - callerRect.Left);
+            int callerH = Math.Max(300, callerRect.Bottom - callerRect.Top);
+
+            // Compute target rect: offset the new Chrome window -30/-30 from the
+            // caller's upper-left (the same offset Core uses in CallerPlacementOffset).
+            // This places Chrome just behind and slightly above the terminal.
+            int targetX = callerLeft - 30;
+            int targetY = callerTop - 30;
+            // Default WebBot rect ~ 1200x800 unless caller is smaller.
+            int targetW = Math.Min(1400, Math.Max(callerW, 1000));
+            int targetH = Math.Min(900,  Math.Max(callerH, 700));
+
+            // Find chrome.exe windows that are top-level + visible + not owned by
+            // the caller process. The newest by creation time wins (typically the
+            // window Core just launched).
+            var candidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+            EnumWindowsLocal((hwnd, _) =>
+            {
+                if (!IsWindowVisibleLocal(hwnd)) return true;
+                var cls = new System.Text.StringBuilder(64);
+                GetClassNameW(hwnd, cls, cls.Capacity);
+                if (cls.ToString() != "Chrome_WidgetWin_1") return true;
+                GetWindowThreadProcessIdLocal(hwnd, out int wpid);
+                if (wpid <= 0) return true;
+                try
+                {
+                    using var p = System.Diagnostics.Process.GetProcessById(wpid);
+                    if (!string.Equals(p.ProcessName, "chrome", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    candidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
+                }
+                catch { }
+                return true;
+            }, IntPtr.Zero);
+
+            if (candidates.Count == 0)
+                return;
+
+            // Pick the most recently started chrome.exe top-level window -- that's
+            // the Chrome instance Core just launched (or attached to).
+            candidates.Sort((a, b) => b.startedAt.CompareTo(a.startedAt));
+            var target = candidates[0].hwnd;
+
+            // SWP_NOZORDER (0x0004) | SWP_NOACTIVATE (0x0010) -- move without
+            // disturbing focus or Z-order.
+            const uint SWP_NOZORDER   = 0x0004;
+            const uint SWP_NOACTIVATE = 0x0010;
+            SetWindowPos(target, IntPtr.Zero, targetX, targetY, targetW, targetH, SWP_NOZORDER | SWP_NOACTIVATE);
+            Console.Error.WriteLine($"[LAUNCHER] post-launch placed Chrome 0x{target.ToInt64():X} at ({targetX},{targetY},{targetW},{targetH}) near caller 0x{caller.ToInt64():X} (cmd={cmd})");
+        }
+        catch
+        {
+            // best-effort -- never crash the launcher exit path
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "IsWindowVisible")]
+    static extern bool IsWindowVisibleLocal(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "EnumWindows")]
+    static extern bool EnumWindowsLocal(EnumWindowsProcLocal lpEnumFunc, IntPtr lParam);
+
+    delegate bool EnumWindowsProcLocal(IntPtr hWnd, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
 
     static string WriteMyCdpJsonLine(MyCdpContext ctx)
     {
