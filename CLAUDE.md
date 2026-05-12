@@ -31,6 +31,7 @@
 - **Handoff**: `wkappbot newchat "prompt"` -- passes context summary to new chat
 - **Cro card forbidden!**: OpenClaw(Cro) is a separate service -- do not modify. Only Claude cards OK.
 - **CWD shorthand**: `D:\GitHub\WKAppBot` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `ㄱㄱ`
+- **Skill discovery**: use `wkappbot skill search <topic>` first; if the user says `ㄱㄱ` or `ㄱㄱㄱ`, also search `wkappbot skill search ㄱㄱ` or `wkappbot skill search ㄱㄱㄱ`.
 
 ### Build & Deploy
 ```bash
@@ -158,6 +159,7 @@ wkappbot a11y <action> <grap>[#scope] [options]   # ★ unified standard (24 act
   --eval-js "js"  --all  --nth N  --force  --timeout N  --speak
 wkappbot a11y kill <pattern>[/<ancestor>]
 wkappbot windows [grap] [--deep] [--process <name>] [--cmd <substr>]
+wkappbot chat ["prompt"] [-p] [--no-fallback]     # Claude Code REPL passthrough (alias: wkchat.exe)
 wkappbot slack send "msg" [file.png]  /  reply "msg" --msg TS
 wkappbot eye / eye tick
 wkappbot newchat "prompt" [--file f.txt]
@@ -184,6 +186,17 @@ wkappbot <cmd> --help / --regression
 -> Full grap syntax: `wkappbot skill read grap`
 -> `a11y find <grap>` stdout first line `# TARGET "hwnd:0x..."` -- copy-paste ready
 -> **Accumulated knowhow**: `wkappbot skill list` -- search skills first when stuck, then ask triad
+
+### Chat Command Usage
+```bash
+wkappbot chat                                      # Interactive REPL (default model: Haiku)
+wkappbot chat "your question"                      # Run prompt, show full conversation
+wkappbot chat -p "quick check"                     # Print mode: result only, exit immediately
+wkappbot chat --model sonnet "complex task"        # Use Sonnet instead of Haiku
+wkappbot chat --model opus "architecture decision" # Use Opus for critical decisions
+wkappbot chat -p --max-budget-usd 0.50 "task"     # Cost-controlled batch mode
+```
+Alias: `wkchat.exe` opens interactive chat session. Models: haiku (default, cheap), sonnet (mid), opus (expensive).
 
 ---
 
@@ -245,7 +258,7 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 ## gg Main Workflow
 
-Execute in order when user sends 'gg':
+Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 1. wkappbot skill read on-load
 2. wkappbot suggest list
 3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
@@ -261,6 +274,7 @@ Execute in order when user sends 'gg':
 | **Ask QA** | For SDK ask/latency debugging, `wkask` is the default live-monitoring tool. If the rule is not already written in CLAUDE.md, use `wkask` first, then add the rule here in the same session. |
 | **User-perspective QA** | For public SDK regressions, start from `sdk-user-perspective-test-playbook` and the matching `wkask`/`wkcdp` smoke first; the user path is the truth source. |
 | **CDP isolation** | Project Chrome/CDP is strictly project-scoped. Reuse only the current project's registered Chrome and tabs; ignore foreign-project Chrome/CDP ports and never attach across project boundaries. |
+| **Caller validation** | Before any Chrome placement, normalize the caller HWND. Reject zero, PseudoConsoleWindow, desktop, and off-screen callers; never let Chrome inherit a guessed foreground window. |
 | **Release loop** | Every project keeps its recurring `Main Duties` block in repo `CLAUDE.md`. The release loop is always `build -> deploy -> hot-swap -> smoke test`. |
 | **Core promotion** | Public workflows that use private-core downloads may promote only sanitized durable summaries back to `WKAPPBOT_CORE_REPO`; never copy secrets or raw private logs. |
 | Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
