@@ -111,7 +111,7 @@ partial class Program
             var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
             var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\\"{argsJoined}\\\"{exSuffix}";
             var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}\n";
-            File.AppendAllText(jsonlPath, line, new System.Text.UTF8Encoding(false));
+            WKAppBot.Shared.ToolOutputStore.AppendRotatingLine(jsonlPath, line);
         }
         catch { /* best-effort -- if we cannot even write the suggest, stay silent */ }
     }
@@ -596,6 +596,16 @@ partial class Program
         // hack-* workers are long-running -> bypass Eye pipe (would timeout)
         var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
             && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
+
+        if (TryTrackMyCdpAccess(cmd, forwardArgs, out var cdpAccessError))
+        {
+            if (cdpAccessError != null)
+            {
+                Console.Error.WriteLine(cdpAccessError);
+                return 1;
+            }
+        }
+
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
@@ -779,8 +789,25 @@ partial class Program
         // the Core spawns would inherit PIPES instead of the user's console. Result:
         // cmd.exe starts, prints nothing visible, and the user's keystrokes go to a
         // dead handle. Fix: spawn Core with fully inherited stdio, no redirection.
+        var isChatProbe = isChatCmd
+            && relayArgs.Any(a => a.Equals("--probe-routing", StringComparison.OrdinalIgnoreCase));
+        var isChatSlashProbe = isChatCmd
+            && relayArgs.Any(a => a.Equals("--probe-switch", StringComparison.OrdinalIgnoreCase));
         if (isChatCmd)
         {
+            if (isChatProbe)
+            {
+                int probeCode = DumpChatRoutingProbe();
+                AppBotExit(probeCode);
+                return probeCode; // unreachable
+            }
+            if (isChatSlashProbe)
+            {
+                int probeCode = DumpChatSlashSwitchProbe();
+                AppBotExit(probeCode);
+                return probeCode; // unreachable
+            }
+
             // Nested chat (parent process chain already has a chat session):
             // switch to one-shot mode so interactive stdio doesn't corrupt the parent session.
             if (inheritedChatSession)
@@ -789,7 +816,7 @@ partial class Program
                 AppBotExit(nestedCode);
                 return nestedCode; // unreachable
             }
-            int chatCode = RunCoreInheritedStdio(relayArgs);
+            int chatCode = RunChatInteractiveSession(relayArgs);
             AppBotExit(chatCode);
             return chatCode; // unreachable
         }
@@ -797,77 +824,6 @@ partial class Program
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
         AppBotExit(finalCode);
         return finalCode; // unreachable
-    }
-
-    /// <summary>
-    /// Spawn Core with full stdio inheritance -- no pipe redirection, no ConPTY
-    /// decoupling. Used exclusively by interactive commands like `chat` where the
-    /// child process must see the user's actual terminal so its own subprocess
-    /// (claude CLI, cmd.exe, bash, ...) can read keystrokes and render output live.
-    ///
-    /// MCP-style hot-swap loop: if Core exits with code 99 (hot-swap signal), the
-    /// Launcher re-resolves the core binary path (Core was just swapped on disk)
-    /// and respawns without the user noticing -- same terminal, same session, new
-    /// binary. Lets `chat` sessions survive Core updates instead of dying whenever
-    /// the user publishes a new build mid-conversation.
-    ///
-    /// Accepts the LPC/MSYS2 deadlock risk because the command is BY DEFINITION
-    /// running inside an interactive console session; the conditions that trigger
-    /// the deadlock (non-interactive ConPTY + single-file AppHost) don't apply.
-    /// </summary>
-    static int RunCoreInheritedStdio(string[] args)
-    {
-        try
-        {
-            var core = ResolveCoreExe();
-            if (!System.IO.File.Exists(core))
-            {
-                Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}");
-                return 1;
-            }
-
-            while (true)
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = core,
-                    UseShellExecute = false,
-                    // NOT redirected -- child gets the real console stdio.
-                    RedirectStandardOutput = false,
-                    RedirectStandardError  = false,
-                    RedirectStandardInput  = false,
-                    CreateNoWindow = false,
-                };
-                foreach (var a in args) psi.ArgumentList.Add(a);
-
-                int code;
-                using (var proc = System.Diagnostics.Process.Start(psi))
-                {
-                    if (proc == null) { Console.Error.WriteLine("[LAUNCHER] chat: failed to start Core"); return 1; }
-                    proc.WaitForExit();
-                    code = proc.ExitCode;
-                }
-
-                if (code != 99) return code;
-
-                // Exit 99 = hot-swap restart. Re-resolve Core (binary was just swapped)
-                // and respawn in the SAME Launcher process -- same terminal, same console,
-                // no new window. Session continuity is preserved from the user's POV.
-                Prof("chat: exit code 99 -- hot-swap restart, re-spawning Core");
-                Console.Error.WriteLine("[LAUNCHER] chat: Core hot-swapped, restarting session with new binary...");
-                core = ResolveCoreExe();
-                if (!System.IO.File.Exists(core))
-                {
-                    Console.Error.WriteLine("[LAUNCHER] chat: new Core not found after hot-swap, aborting");
-                    return 1;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[LAUNCHER] chat inherited-stdio spawn error: {ex.Message}");
-            return 1;
-        }
     }
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().

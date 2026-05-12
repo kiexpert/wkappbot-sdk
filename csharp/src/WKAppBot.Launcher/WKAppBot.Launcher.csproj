@@ -24,6 +24,8 @@
     <Compile Include="..\Shared\ProjectRoot.cs" Link="Shared\ProjectRoot.cs" />
     <Compile Include="..\Shared\NonBlockingLineReader.cs" Link="Shared\NonBlockingLineReader.cs" />
     <Compile Include="..\Shared\InterruptChannel.cs" Link="Shared\InterruptChannel.cs" />
+    <Compile Include="..\Shared\ToolOutputStore.cs" Link="Shared\ToolOutputStore.cs" />
+    <Compile Include="..\Shared\PseudoConsoleRunner.cs" Link="Shared\PseudoConsoleRunner.cs" />
   </ItemGroup>
 
   <!-- Repo-relative bin dir: <repo>/bin (resolved from csproj: csharp/src/WKAppBot.Launcher/) -->
