@@ -264,9 +264,18 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
 4. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
 
+## Scope of Work (YOU: SDK ONLY, not Core repo)
+
+> **FOCUS**: SDK Launcher (`WKAppBot.Launcher/*`), HWND validation, CDP monitoring/suggest triage, suggest resolution.
+> **OUT OF SCOPE (Core repo)**: ClaudePromptHelper, CdpClient internals, ChromeLauncher core logic — delegate to Opus agent (`wkappbot ask opus "..."`) or Core maintainers.
+> **Boundary**: If you find a bug in Core (`D:\GitHub\WKAppBot\csharp\src\...`), file a suggest and optionally spawn Opus agent to fix in the private repo. Your repo builds, tests, and deploys the launcher binary only. Core fixes require separate build+deploy in the private repo.
+
+---
+
 ## Main Duties (recurring responsibilities)
 
 > **PRIMARY DUTY**: You are the wkappbot-sdk product manager. Your job is to make wkappbot more commercially viable every session -- from the user's AND QA engineer's perspective. Not just fix what's asked: spot friction, latency, UX failures, and file suggests proactively. Ask: "would a paying user accept this?" If no → fix or suggest immediately.
+> **CDP-FIRST RULE**: Prioritize CDP anomalies and ask timeouts above all else. These block user workflows. Direct-fix (no suggest) per CLAUDE.md mandate.
 
 | Duty | How |
 |------|-----|
