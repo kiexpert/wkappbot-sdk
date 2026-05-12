@@ -135,11 +135,17 @@ partial class Program
         var fgHwnd = GetForegroundWindow();
         var consoleHwnd = GetConsoleWindow();
         var hostHwnd = GetHostWindowSnapshot();
-        var callerValidation = ValidateCallerHwnd(fgHwnd, consoleHwnd);
+
+        // Caller priority: (1) console window (2) host/parent window (3) foreground as fallback
+        var callerHwnd = consoleHwnd != IntPtr.Zero ? consoleHwnd
+                       : hostHwnd != IntPtr.Zero ? hostHwnd
+                       : fgHwnd;
+
+        var callerValidation = ValidateCallerHwnd(callerHwnd, consoleHwnd, hostHwnd);
 
         if (callerValidation.IsOffScreen)
         {
-            error = $"[LAUNCHER] {cmd}: caller HWND is off-screen or invalid (fg: {GetWindowSnapshot(fgHwnd)}, console: {GetWindowSnapshot(consoleHwnd)})";
+            error = $"[LAUNCHER] {cmd}: caller HWND is off-screen or invalid (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)})";
             return new MyCdpContext(
                 DateTimeOffset.UtcNow,
                 cmd,
@@ -258,34 +264,28 @@ partial class Program
 
     record CallerValidation(bool IsOffScreen, string Status);
 
-    static CallerValidation ValidateCallerHwnd(IntPtr fgHwnd, IntPtr consoleHwnd)
+    static CallerValidation ValidateCallerHwnd(IntPtr callerHwnd, IntPtr consoleHwnd, IntPtr hostHwnd)
     {
-        // ForegroundWindow = current focused window (may be any app)
-        // ConsoleWindow = this process's console (if running in console)
-        // Valid CDP caller must be either:
-        // 1. The console window itself (wkappbot launched from console)
-        // 2. Valid GUI window (not desktop, not PseudoConsoleWindow, not off-screen)
+        // Caller priority: (1) console window (this process's console, if available)
+        //                 (2) host/parent process window (VSCode, IDE, etc. that spawned wkappbot)
+        //                 (3) foreground window (fallback, may be unrelated)
+        // Valid callers: must be on-screen, not desktop/PseudoConsoleWindow
 
-        if (fgHwnd == IntPtr.Zero && consoleHwnd == IntPtr.Zero)
+        if (callerHwnd == IntPtr.Zero)
             return new(true, "no_caller_window");
 
-        var validConsole = consoleHwnd != IntPtr.Zero
-            && fgHwnd != IntPtr.Zero
-            && fgHwnd == consoleHwnd;
-
-        if (validConsole)
-            return new(false, "ok_console_caller");
-
-        if (fgHwnd == IntPtr.Zero)
-            return new(true, "caller_hidden");
-
-        if (IsDesktopWindow(fgHwnd) || IsPseudoConsoleWindow(fgHwnd))
+        if (IsDesktopWindow(callerHwnd) || IsPseudoConsoleWindow(callerHwnd))
             return new(true, "invalid_window_type");
 
-        if (IsWindowOffScreen(fgHwnd))
+        if (IsWindowOffScreen(callerHwnd))
             return new(true, "caller_offscreen");
 
-        return new(false, "ok_foreground_window");
+        // Determine caller type for logging
+        var callerType = callerHwnd == consoleHwnd ? "console"
+                       : callerHwnd == hostHwnd ? "host_process"
+                       : "foreground";
+
+        return new(false, $"ok_{callerType}_caller");
     }
 
     static bool IsDesktopWindow(IntPtr hwnd)
