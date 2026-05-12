@@ -28,7 +28,10 @@ partial class Program
         error = null;
 
         var hasEvalJs = forwardArgs.Any(a => a.Equals("--eval-js", StringComparison.OrdinalIgnoreCase));
-        var isCdpFamily = cmd is "a11y" or "web" or "ask";
+        // "cdp" is the renamed surface of "web"; both spawn Chrome and need caller-HWND
+        // validation so a foreign foreground window (YouTube, unrelated browser, etc.)
+        // cannot become the placement anchor and bind Chrome to the wrong project.
+        var isCdpFamily = cmd is "a11y" or "web" or "cdp" or "ask";
         if (!isCdpFamily && !hasEvalJs)
             return false;
 
@@ -145,7 +148,16 @@ partial class Program
 
         if (callerValidation.IsOffScreen)
         {
-            error = $"[LAUNCHER] {cmd}: caller HWND is off-screen or invalid (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)})";
+            var reason = callerValidation.Status switch
+            {
+                "no_caller_window"        => "no caller window available",
+                "invalid_window_type"     => "caller is desktop or PseudoConsoleWindow",
+                "caller_offscreen"        => "caller window is off-screen",
+                "caller_foreign_process"  => "caller foreground belongs to an unrelated process (not a terminal/IDE/wkappbot)",
+                _                         => "caller HWND is off-screen or invalid",
+            };
+            error = $"[LAUNCHER] {cmd}: {reason} (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)}). "
+                  + $"Run {cmd} from a terminal/IDE owned by your project so Chrome can be placed correctly.";
             return new MyCdpContext(
                 DateTimeOffset.UtcNow,
                 cmd,
@@ -158,7 +170,7 @@ partial class Program
                 GetWindowSnapshot(fgHwnd),
                 GetWindowSnapshot(consoleHwnd),
                 GetWindowSnapshot(hostHwnd),
-                "rejected_caller_offscreen",
+                "rejected_" + callerValidation.Status,
                 forwardArgs);
         }
 
@@ -185,7 +197,8 @@ partial class Program
         if (cmd.Equals("a11y", StringComparison.OrdinalIgnoreCase))
             return FindA11yTarget(forwardArgs, hasEvalJs);
 
-        if (cmd.Equals("web", StringComparison.OrdinalIgnoreCase))
+        if (cmd.Equals("web", StringComparison.OrdinalIgnoreCase)
+            || cmd.Equals("cdp", StringComparison.OrdinalIgnoreCase))
             return FindFirstPositionalArgBeforeEvalJs(forwardArgs, startIndex: 1);
 
         if (cmd.Equals("ask", StringComparison.OrdinalIgnoreCase))
@@ -269,7 +282,10 @@ partial class Program
         // Caller priority: (1) console window (this process's console, if available)
         //                 (2) host/parent process window (VSCode, IDE, etc. that spawned wkappbot)
         //                 (3) foreground window (fallback, may be unrelated)
-        // Valid callers: must be on-screen, not desktop/PseudoConsoleWindow
+        // Valid callers: must be on-screen, not desktop/PseudoConsoleWindow,
+        // and (when falling back to foreground) MUST belong to a known shell/IDE
+        // process — never a media player, browser, or other foreign app that
+        // happens to hold focus when the user runs `cdp open`.
 
         if (callerHwnd == IntPtr.Zero)
             return new(true, "no_caller_window");
@@ -285,8 +301,58 @@ partial class Program
                        : callerHwnd == hostHwnd ? "host_process"
                        : "foreground";
 
+        // FOREIGN-PROCESS GUARD: when the only available anchor is the foreground
+        // window (no console, no parent process window), the user may have run
+        // `cdp open` from a detached context with YouTube / Chrome / VLC / etc.
+        // currently in front. Latching Chrome onto an unrelated app's window
+        // contaminates the project's CDP placement and may cross project
+        // boundaries. Reject unless the foreground belongs to a known host
+        // (terminal, shell, IDE, or wkappbot itself).
+        if (callerType == "foreground" && !IsKnownHostProcess(callerHwnd))
+            return new(true, "caller_foreign_process");
+
         return new(false, $"ok_{callerType}_caller");
     }
+
+    static readonly string[] KnownHostProcessNames = new[]
+    {
+        // Terminals / shells
+        "windowsterminal", "conhost", "openconsole", "cmd", "powershell", "pwsh", "wt",
+        "bash", "sh", "zsh", "fish", "mintty", "alacritty", "wezterm",
+        // IDEs / editors that commonly host CLI runs
+        "code", "code-insiders", "cursor", "windsurf",
+        "devenv", "rider", "rider64", "idea", "idea64", "pycharm", "pycharm64",
+        "webstorm", "webstorm64", "clion", "clion64", "goland", "goland64",
+        "sublime_text", "notepad++", "atom",
+        // wkappbot self
+        "wkappbot", "wkappbot-core", "wkchat", "wka11y", "a11y",
+        // Claude Code / Codex CLI host shells
+        "claude", "codex",
+    };
+
+    static bool IsKnownHostProcess(IntPtr hwnd)
+    {
+        try
+        {
+            GetWindowThreadProcessIdLocal(hwnd, out int pid);
+            if (pid <= 0) return false;
+            using var p = System.Diagnostics.Process.GetProcessById(pid);
+            var name = (p.ProcessName ?? "").ToLowerInvariant();
+            if (string.IsNullOrEmpty(name)) return false;
+            foreach (var allowed in KnownHostProcessNames)
+                if (name == allowed) return true;
+            return false;
+        }
+        catch
+        {
+            // If we cannot determine the process, fail closed — better to reject
+            // a legitimate caller than to bind Chrome to a foreign window.
+            return false;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId")]
+    static extern int GetWindowThreadProcessIdLocal(IntPtr hWnd, out int lpdwProcessId);
 
     static bool IsDesktopWindow(IntPtr hwnd)
     {
