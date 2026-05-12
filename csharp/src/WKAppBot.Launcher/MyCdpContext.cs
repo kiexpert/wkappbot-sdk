@@ -19,7 +19,8 @@ internal sealed record MyCdpContext(
     string? ConsoleWindow,
     string? HostWindow,
     string Status,
-    string[] Args);
+    string[] Args,
+    string? CallerDiagnostic = null);
 
 partial class Program
 {
@@ -51,10 +52,14 @@ partial class Program
             return false;
 
         var ctx = BuildMyCdpContext(cmd, forwardArgs, hasEvalJs, out error);
+        // Persist BOTH accepted and rejected contexts -- the rejection records
+        // (status starts with "rejected") are the primary debug signal for
+        // HWND/caller-validation regressions, so they MUST land in the same
+        // jsonl as successes so operators have a single audit trail.
+        TryAppendMyCdpState(ctx);
         if (error != null)
             return true;
 
-        TryAppendMyCdpState(ctx);
         return true;
     }
 
@@ -192,7 +197,8 @@ partial class Program
                 GetWindowSnapshot(consoleHwnd),
                 GetWindowSnapshot(hostHwnd),
                 "rejected_" + callerValidation.Status,
-                forwardArgs);
+                forwardArgs,
+                callerValidation.Diagnostic);
         }
 
         // Publish the validated caller HWND + rect so CoreRunner (via WKAPPBOT_CALLER_HWND env)
@@ -780,6 +786,7 @@ partial class Program
             if (!string.IsNullOrWhiteSpace(ctx.ForegroundWindow)) writer.WriteString("foreground_window", ctx.ForegroundWindow);
             if (!string.IsNullOrWhiteSpace(ctx.ConsoleWindow)) writer.WriteString("console_window", ctx.ConsoleWindow);
             if (!string.IsNullOrWhiteSpace(ctx.HostWindow)) writer.WriteString("host_window", ctx.HostWindow);
+            if (!string.IsNullOrWhiteSpace(ctx.CallerDiagnostic)) writer.WriteString("caller_diagnostic", ctx.CallerDiagnostic);
             writer.WriteString("status", ctx.Status);
             writer.WritePropertyName("args");
             writer.WriteStartArray();
