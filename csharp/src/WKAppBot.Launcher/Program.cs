@@ -696,6 +696,14 @@ partial class Program
             if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
+                // Post-launch placement: Eye runs Core in its own process; Core sees
+                // WKAPPBOT_CALLER_HWND only when EyeCmdPipeClient forwards it. As a
+                // belt-and-braces safety net, the Launcher (which still has the
+                // validated caller anchor in static fields) re-runs the move pass
+                // after Eye returns. Same behaviour as the RunCoreDetachedNormal
+                // path below: best-effort, swallows failures.
+                if (code == 0 && IsCdpFamilyCommand(cmd))
+                    TryMoveWebBotNearCaller(cmd);
                 // TerminateSelf: all output already flushed by TryDelegate; hard-kill Launcher immediately.
                 Console.Out.Flush();
                 Console.Error.Flush();

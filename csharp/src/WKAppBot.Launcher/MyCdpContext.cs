@@ -508,8 +508,12 @@ partial class Program
         {
             var caller = LastValidatedCallerHwnd;
             var callerRect = LastValidatedCallerRect;
+            Console.Error.WriteLine($"[PLACEMENT:STEP1] cmd={cmd} caller=0x{caller.ToInt64():X} rect=({callerRect.Left},{callerRect.Top},{callerRect.Right},{callerRect.Bottom})");
             if (caller == IntPtr.Zero || callerRect == System.Drawing.Rectangle.Empty)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STEP1] no validated caller anchor -- skip move (cmd={cmd})");
                 return;
+            }
 
             // Width/height: prefer the caller's actual size, but clamp to reasonable
             // bounds. RECT here is (left, top, right, bottom) -- not (x, y, w, h).
@@ -550,13 +554,22 @@ partial class Program
                 return true;
             }, IntPtr.Zero);
 
+            Console.Error.WriteLine($"[PLACEMENT:STEP2] found {candidates.Count} Chrome candidate(s)");
             if (candidates.Count == 0)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STEP2] no Chrome_WidgetWin_1 windows found -- skip move (cmd={cmd})");
                 return;
+            }
 
             // Pick the most recently started chrome.exe top-level window -- that's
-            // the Chrome instance Core just launched (or attached to).
+            // the Chrome instance Core just launched (or attached to / reused).
+            // Note: on tab-reuse, the start time will be the original Chrome's
+            // start time, but among multiple chrome.exe processes the recycled
+            // one is typically also the most-recently-used (Chrome reuses the
+            // newest in its session-restore queue).
             candidates.Sort((a, b) => b.startedAt.CompareTo(a.startedAt));
             var target = candidates[0].hwnd;
+            Console.Error.WriteLine($"[PLACEMENT:STEP3] target=0x{target.ToInt64():X} pid={candidates[0].pid} startedAt={candidates[0].startedAt:HH:mm:ss}");
 
             // SWP_NOZORDER (0x0004) | SWP_NOACTIVATE (0x0010) -- move without
             // disturbing focus or Z-order.
@@ -582,6 +595,7 @@ partial class Program
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int X, int Y, int cx, int cy, uint uFlags);
+
 
     static string WriteMyCdpJsonLine(MyCdpContext ctx)
     {

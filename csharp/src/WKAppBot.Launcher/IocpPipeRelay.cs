@@ -45,15 +45,34 @@ partial class Program
             "TERM", "MSYSTEM", "MSYS", "MSYS2_ARG_CONV_EXCL", "ConEmuANSI",
             "CYGWIN", "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX", "MSYS2_PATH_TYPE",
         };
+        // Reserved keys we'll always write ourselves below -- skip from generic env copy.
+        var reserved = new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase)
+        {
+            "WKAPPBOT_EXIT_FILE",
+            "WKAPPBOT_CALLER_HWND",
+        };
         var envSb = new StringBuilder();
         foreach (System.Collections.DictionaryEntry kv in Environment.GetEnvironmentVariables())
         {
             var k = kv.Key?.ToString() ?? "";
-            if (strip.Contains(k) || k == "WKAPPBOT_EXIT_FILE") continue;
+            if (strip.Contains(k) || reserved.Contains(k)) continue;
             envSb.Append(k).Append('=').Append(kv.Value?.ToString() ?? "").Append('\0');
         }
         // Pass exact exit-file path -- avoids PID mismatch (.NET 8 single-file inner process PID ≠ host PID)
         envSb.Append("WKAPPBOT_EXIT_FILE=").Append(exitFilePath).Append('\0');
+        // Forward the validated caller HWND so Core's
+        // ChromeLauncher.ComputePlacementNearCaller anchors Chrome on the
+        // right terminal at launch and on every new-tab path. Only set when a
+        // real terminal owns this run (MyCdpContext rejects foreign / off-screen
+        // / pseudo-console callers before this point).
+        var validatedCallerHwnd = LastValidatedCallerHwnd;
+        if (validatedCallerHwnd != IntPtr.Zero)
+        {
+            envSb.Append("WKAPPBOT_CALLER_HWND=0x")
+                 .Append(validatedCallerHwnd.ToInt64().ToString("X"))
+                 .Append('\0');
+            Prof($"IOCP: env WKAPPBOT_CALLER_HWND=0x{validatedCallerHwnd.ToInt64():X}");
+        }
         envSb.Append('\0');
         Prof($"IOCP: env WKAPPBOT_EXIT_FILE={exitFilePath}");
         var envBytes = Encoding.Unicode.GetBytes(envSb.ToString());
