@@ -99,7 +99,7 @@ Windows a11y-based app UI automation. UIA->Win32->SendInput 3-tier fallback, foc
 ### 5-Tier Element Search
 UIA -> Vision Cache -> Simple OCR -> Vision API(Claude) -> Coordinate-based
 
-### AppBotPipe / File Tools (v5.8)
+### AppBotPipe / File Tools (v7.2)
 All process creation goes through `Spawn()` / `StartTracked()` -- ensures CreateProcessW hook
 - `Spawn(showNoActivate:true)`: for WPF overlays (WhisperRing/ScreenSaver) -- shows window without focus steal
 - `Spawn(default)`: `SW_HIDE` -- background processes
