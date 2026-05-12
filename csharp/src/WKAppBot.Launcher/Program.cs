@@ -560,7 +560,8 @@ partial class Program
 
         // chat command: auto-convert model name argument to --model flag
         // Usage: wkappbot chat haiku "prompt" -> claude --model haiku "prompt"
-        //        wkappbot chat claude "prompt" -> claude (default model, no --model flag)
+        //        wkappbot chat "prompt" -> claude --model haiku "prompt" (default: haiku)
+        //        wkappbot chat claude "prompt" -> claude "prompt" (explicit default)
         if (isChatCmd && forwardArgs.Length > 1)
         {
             var secondArg = forwardArgs[1].ToLowerInvariant();
@@ -584,6 +585,24 @@ partial class Program
                 relayArgs = modelArgs.ToArray();
                 cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
                 prof($"chat model conversion: {secondArg} -> {string.Join(" ", relayArgs)}");
+            }
+            else if (!secondArg.StartsWith("-"))
+            {
+                // Transform: chat "prompt" -> claude --model haiku "prompt" (default: haiku)
+                var modelArgs = new List<string> { "claude", "--model", "haiku" };
+                modelArgs.AddRange(forwardArgs.Skip(1));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat default model (haiku): {string.Join(" ", relayArgs)}");
+            }
+            else
+            {
+                // Transform: chat -p "prompt" -> claude --model haiku -p "prompt" (flags without model)
+                var modelArgs = new List<string> { "claude", "--model", "haiku" };
+                modelArgs.AddRange(forwardArgs.Skip(1));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat flags with default model (haiku): {string.Join(" ", relayArgs)}");
             }
         }
 
