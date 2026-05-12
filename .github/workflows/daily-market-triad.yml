@@ -124,6 +124,81 @@ jobs:
           "issue_number=$issueNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "issue_title=$title" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      - name: Refresh daily issue body sections
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.daily_issue.outputs.issue_number }}
+          TEASER: ${{ steps.teaser.outputs.teaser }}
+        run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          $kstStamp = $kstNow.ToString('yyyy-MM-dd HH:mm') + ' KST'
+          $question = "${{ inputs.question }}"
+          if ([string]::IsNullOrWhiteSpace($question)) {
+            $question = "Analyze today's promising sectors and leading stocks using current public news and price context. Keep ranks 1 and 2 private and reveal only the 3rd-place teaser."
+          }
+
+          function Update-Section([string]$body, [string]$tag, [string]$content) {
+            $start = "<!-- ${tag}_START -->"
+            $end = "<!-- ${tag}_END -->"
+            $s = $body.IndexOf($start)
+            $e = $body.IndexOf($end)
+            if ($s -lt 0 -or $e -lt 0 -or $e -lt $s) {
+              return $body
+            }
+            $head = $body.Substring(0, $s + $start.Length)
+            $tail = $body.Substring($e)
+            return @($head, $content, $tail) -join [Environment]::NewLine
+          }
+
+          $template = @(
+            '# Daily Market Triad Teaser',
+            '',
+            '<!-- TEASER_START -->',
+            '_Waiting for the next run._',
+            '<!-- TEASER_END -->',
+            '',
+            '<!-- STATUS_START -->',
+            '_Waiting for the next run._',
+            '<!-- STATUS_END -->',
+            '',
+            '<!-- PROMOTION_START -->',
+            '_Waiting for the next run._',
+            '<!-- PROMOTION_END -->'
+          ) -join [Environment]::NewLine
+
+          $issueNumber = $env:ISSUE_NUMBER
+          $bodyJson = gh issue view "$issueNumber" --repo "$env:REPO" --json body | ConvertFrom-Json
+          $currentBody = $bodyJson.body
+          if ([string]::IsNullOrWhiteSpace($currentBody) -or $currentBody -notmatch '<!-- TEASER_START -->') {
+            $currentBody = $template
+          }
+
+          $teaserBody = @(
+            "Public teaser: $env:TEASER",
+            '',
+            "KST: $kstStamp"
+          ) -join [Environment]::NewLine
+          $statusBody = @(
+            "KST: $kstStamp",
+            "Question: $question",
+            "Run: ${{ github.run_id }}"
+          ) -join [Environment]::NewLine
+          $promotionBody = @(
+            "Full synthesis promoted to core repo.",
+            "Question: $question",
+            "KST: $kstStamp"
+          ) -join [Environment]::NewLine
+
+          $updatedBody = Update-Section $currentBody 'TEASER' $teaserBody
+          $updatedBody = Update-Section $updatedBody 'STATUS' $statusBody
+          $updatedBody = Update-Section $updatedBody 'PROMOTION' $promotionBody
+
+          $tmp = Join-Path $env:RUNNER_TEMP 'daily-market-triad-body.txt'
+          Set-Content -Path $tmp -Value $updatedBody -Encoding utf8
+          gh issue edit "$issueNumber" --repo "$env:REPO" --body-file "$tmp"
+
       - name: Publish teaser publicly
         shell: pwsh
         env:
