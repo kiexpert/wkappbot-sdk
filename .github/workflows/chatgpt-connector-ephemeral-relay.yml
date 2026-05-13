@@ -7,6 +7,10 @@ on:
         description: "How long to keep the relay alive"
         required: false
         default: "25"
+      query:
+        description: "Initial query or launch note"
+        required: false
+        default: ""
 
 jobs:
   relay:
@@ -23,6 +27,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Save launch query
+        run: |
+          cat > launch-query.txt <<'EOF'
+          ${{ github.event.inputs.query }}
+          EOF
 
       - name: Start relay
         run: |
@@ -68,6 +78,7 @@ jobs:
           esac
           if [ "$MINS" -gt 29 ]; then MINS=29; fi
           echo "WKAppBot temporary relay is online: $PUBLIC_URL"
+          echo "Launch query: ${{ github.event.inputs.query }}"
           echo "Keeping alive for $MINS minute(s)."
           sleep "$((MINS * 60))"
 
@@ -78,5 +89,6 @@ jobs:
           name: wkappbot-ephemeral-relay
           path: |
             connectors/chatgpt-wkappbot/public-url.txt
+            connectors/chatgpt-wkappbot/launch-query.txt
             connectors/chatgpt-wkappbot/.wk-relay.log
             connectors/chatgpt-wkappbot/.wk-tunnel.log
