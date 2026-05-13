@@ -235,20 +235,28 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
 
 ### wkfind - Unified Code + Session Search
 **Location**: `D:\GitHub\WKAppBot\bin\wkfind.ps1` (core repo)
-**Usage**: `wkfind <keyword1> <keyword2> ...`
+**Usage**: `wkfind [--day|--week|--month|--year|--unlimited] <keyword1> <keyword2> ...`
 
 Unified multi-keyword search across code + Claude sessions:
 - **GlobCoverageScore ranking**: tokenize keywords, score by token_length / field_length
 - **PHRASE/AND/OR tiers**: PHRASE ×2.5, AND ×1.5, OR ×1.0
 - **Code search**: git diff (auto-detected) + time-range fallback (--day → --unlimited)
-- **Session search**: live Claude session titles + dates, same GlobCoverageScore ranking
+- **Session search**: live Claude session titles + dates (same time-range filter as code)
+- **Time-range sync**: both code and sessions filtered by --day/--week/--month/--year/--unlimited
 - **Triad analysis**: GPT+Gemini+Claude synthesis runs in background (configurable timeout)
+
+Time ranges:
+- `--day` (default fallback): 24 hours
+- `--week`: 7 days
+- `--month`: 30 days
+- `--year`: 365 days
+- `--unlimited`: all time
 
 Examples:
 ```
-wkfind "caller window" HWND          # Find code + sessions
-wkfind --day "CDP position"          # Recent 24h code + all sessions
-wkfind "05-13"                       # Sessions from date + code mentions
+wkfind "caller window" HWND          # Find code + sessions (all time)
+wkfind --day "CDP position"          # Recent 24h code + 24h sessions
+wkfind --week "05-13"                # Week-old sessions + code
 ```
 
 No additional options; search-only tool. `.gitignore` auto-exclusion via ripgrep.
