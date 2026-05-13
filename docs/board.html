@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>WKAppBot Board</title>
+  <title>WKAppBot Daily Board</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root { color-scheme: light dark; }
@@ -20,23 +20,21 @@
     .avatar { width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-right: 8px; }
     .comment { border-left: 4px solid rgba(128,128,128,.35); padding-left: 14px; margin: 18px 0; }
     .pending { opacity: .75; border-left-color: #f5a623; }
-    .body { white-space: normal; }
     .body pre { overflow: auto; padding: 12px; border-radius: 12px; background: rgba(128,128,128,.15); }
     .body code { padding: 2px 5px; border-radius: 6px; background: rgba(128,128,128,.15); }
     .body pre code { padding: 0; background: transparent; }
     .body blockquote { border-left: 4px solid rgba(128,128,128,.35); margin-left: 0; padding-left: 12px; opacity: .9; }
-    #status { margin-top: 4px; }
   </style>
 </head>
 <body>
   <header>
     <div>
-      <h1>WKAppBot Daily Board</h1>
-      <div id="status" class="muted">초기 화면 준비 중...</div>
+      <h1 id="pageTitle">WKAppBot Daily Board</h1>
+      <div id="status" class="muted">오늘 이슈 찾는 중...</div>
     </div>
     <div class="row">
       <button id="reload">새로고침</button>
-      <a id="openIssue" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">GitHub에서 보기</a>
+      <a id="openIssue" class="button" href="#" target="_blank">GitHub에서 보기</a>
     </div>
   </header>
 
@@ -44,14 +42,14 @@
 
   <section class="card">
     <h2>댓글 쓰기</h2>
-    <p class="muted">마크다운을 사용할 수 있습니다. <code>?user=githubid</code>로 들어오면 이름이 자동 고정됩니다.</p>
+    <p class="muted">오늘 Daily issue에 댓글을 남깁니다. <code>?user=githubid</code>로 들어오면 이름이 고정됩니다.</p>
     <input id="workerUrl" placeholder="Cloudflare Worker URL, 예: https://xxx.workers.dev">
     <input id="guestName" placeholder="이름, 예: Guest">
     <input id="website" style="display:none" tabindex="-1" autocomplete="off">
     <textarea id="commentText" placeholder="댓글을 입력하세요. **굵게**, `코드`, ```코드블록``` 지원"></textarea>
     <div class="row">
       <button id="submitComment">댓글 등록</button>
-      <a id="openIssue2" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">GitHub에서 댓글 쓰기</a>
+      <a id="openIssue2" class="button" href="#" target="_blank">GitHub에서 댓글 쓰기</a>
     </div>
   </section>
 
@@ -61,16 +59,16 @@
   </section>
 
   <script>
-    const repo = 'kiexpert/wkappbot-sdk';
-    const issueNumber = 21;
-    const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
-    const apiBase = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
-    const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
+    const repo = params.get('repo') || 'kiexpert/wkappbot-sdk';
+    const label = params.get('label') || 'daily';
+    const titlePrefix = params.get('title') || 'Daily board';
+    const $ = id => document.getElementById(id);
+    let issueNumber = Number(params.get('issue') || 21);
+    let issueUrl = '';
+    let apiBase = '';
     let currentComments = [];
 
-    $('openIssue').href = issueUrl;
-    $('openIssue2').href = issueUrl;
     $('workerUrl').value = localStorage.getItem('wkBoardWorkerUrl') || '';
     $('guestName').value = localStorage.getItem('wkBoardGuestName') || '';
     if (params.get('user')) {
@@ -79,79 +77,62 @@
       localStorage.setItem('wkBoardGuestName', params.get('user'));
     }
 
-    function esc(s) {
-      return String(s || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    function todayIso() { return new Date().toISOString().slice(0, 10); }
+    function todayTitle() { return `${titlePrefix} - ${todayIso()}`; }
+    function setIssue(num) {
+      issueNumber = Number(num || issueNumber);
+      issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
+      apiBase = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
+      $('openIssue').href = issueUrl;
+      $('openIssue2').href = issueUrl;
     }
 
+    async function findTodayIssue() {
+      if (params.get('issue')) return Number(params.get('issue'));
+      const q = encodeURIComponent(`repo:${repo} is:issue label:${label} in:title "${todayTitle()}"`);
+      const res = await fetch(`https://api.github.com/search/issues?q=${q}`);
+      if (!res.ok) return issueNumber;
+      const data = await res.json();
+      return data.items && data.items[0] ? data.items[0].number : issueNumber;
+    }
+
+    function esc(s) { return String(s || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
     function md(text) {
       text = esc(text || '');
       const blocks = [];
-      text = text.replace(/```([\s\S]*?)```/g, (_, code) => {
-        const key = `@@BLOCK${blocks.length}@@`;
-        blocks.push(`<pre><code>${code}</code></pre>`);
-        return key;
-      });
-      text = text.replace(/^### (.*)$/gm, '<h3>$1</h3>')
-        .replace(/^## (.*)$/gm, '<h2>$1</h2>')
-        .replace(/^# (.*)$/gm, '<h1>$1</h1>')
-        .replace(/^&gt; (.*)$/gm, '<blockquote>$1</blockquote>')
-        .replace(/^[-*] (.*)$/gm, '<li>$1</li>')
-        .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-        .replace(/\n{2,}/g, '</p><p>')
-        .replace(/\n/g, '<br>');
+      text = text.replace(/```([\s\S]*?)```/g, (_, code) => { const key = `@@BLOCK${blocks.length}@@`; blocks.push(`<pre><code>${code}</code></pre>`); return key; });
+      text = text.replace(/^### (.*)$/gm, '<h3>$1</h3>').replace(/^## (.*)$/gm, '<h2>$1</h2>').replace(/^# (.*)$/gm, '<h1>$1</h1>').replace(/^&gt; (.*)$/gm, '<blockquote>$1</blockquote>').replace(/^[-*] (.*)$/gm, '<li>$1</li>').replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>');
       text = `<p>${text}</p>`;
       blocks.forEach((html, i) => { text = text.replace(`@@BLOCK${i}@@`, html); });
       return text.replace(/<p><\/p>/g, '');
     }
-
     function fmtTime(s) { try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; } }
 
     function renderComments(comments) {
       currentComments = comments || [];
-      if (!currentComments.length) {
-        $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>';
-        return;
-      }
-      $('comments').innerHTML = currentComments.map(c => `
-        <article class="comment ${c.pending ? 'pending' : ''}">
-          <div class="row">
-            ${c.avatar ? `<img class="avatar" src="${esc(c.avatar)}" alt="">` : ''}
-            <strong>${esc(c.user || 'user')}</strong>
-            <span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>
-            ${c.pending ? '<span class="muted">등록 중...</span>' : ''}
-          </div>
-          <div class="body">${md(c.body)}</div>
-        </article>
-      `).join('');
+      if (!currentComments.length) { $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>'; return; }
+      $('comments').innerHTML = currentComments.map(c => `<article class="comment ${c.pending ? 'pending' : ''}"><div class="row">${c.avatar ? `<img class="avatar" src="${esc(c.avatar)}" alt="">` : ''}<strong>${esc(c.user || 'user')}</strong><span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>${c.pending ? '<span class="muted">등록 중...</span>' : ''}</div><div class="body">${md(c.body)}</div></article>`).join('');
     }
 
     function render(issue, comments, sourceLabel) {
       comments = comments || [];
-      $('issueCard').innerHTML = `
-        <div class="row">
-          ${issue.avatar ? `<img class="avatar" src="${esc(issue.avatar)}" alt="">` : ''}
-          <strong>${esc(issue.user || 'WKAppBot')}</strong>
-          <span class="muted">${fmtTime(issue.created_at || issue.updatedAt)}</span>
-          <span class="muted">#${esc(issue.number || issue.issue || issueNumber)}</span>
-        </div>
-        <h2>${esc(issue.title)}</h2>
-        <div class="body">${md(issue.body)}</div>
-      `;
+      $('pageTitle').textContent = `${titlePrefix} · ${todayIso()}`;
+      $('issueCard').innerHTML = `<div class="row">${issue.avatar ? `<img class="avatar" src="${esc(issue.avatar)}" alt="">` : ''}<strong>${esc(issue.user || 'WKAppBot')}</strong><span class="muted">${fmtTime(issue.created_at || issue.updatedAt)}</span><span class="muted">#${esc(issue.number || issue.issue || issueNumber)}</span></div><h2>${esc(issue.title)}</h2><div class="body">${md(issue.body)}</div>`;
       renderComments(comments);
-      $('status').textContent = `${sourceLabel} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
+      $('status').textContent = `${sourceLabel} · 오늘 이슈 #${issueNumber} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
     }
 
     async function loadSnapshot() {
       const res = await fetch('board-data.json', { cache: 'no-cache' });
       if (!res.ok) return;
       const data = await res.json();
+      if (data.issue) setIssue(data.issue);
       render({ title: data.title, body: data.body, issue: data.issue, updatedAt: data.updatedAt, user: 'snapshot' }, data.comments || [], '저장된 빠른 화면');
     }
 
     async function loadLive() {
+      $('status').textContent = '오늘 Daily issue 확인 중...';
+      setIssue(await findTodayIssue());
       $('status').textContent = '최신 GitHub 데이터 불러오는 중...';
       const issueRes = await fetch(apiBase, { headers: { 'accept': 'application/vnd.github+json' } });
       if (!issueRes.ok) throw new Error('issue load failed: ' + issueRes.status);
@@ -162,40 +143,25 @@
       render({ title: issue.title, body: issue.body, number: issue.number, created_at: issue.created_at, user: issue.user && issue.user.login, avatar: issue.user && issue.user.avatar_url }, comments.map(c => ({ user: c.user && c.user.login, avatar: c.user && c.user.avatar_url, created_at: c.created_at, body: c.body })), '최신 데이터');
     }
 
-    async function refresh() {
-      await loadSnapshot().catch(() => {});
-      await loadLive().catch(err => $('status').textContent = '최신 데이터 실패, 저장된 화면 표시 중: ' + err.message);
-    }
+    async function refresh() { await loadSnapshot().catch(() => {}); await loadLive().catch(err => $('status').textContent = '최신 데이터 실패, 저장된 화면 표시 중: ' + err.message); }
 
     async function submitComment() {
-      const text = $('commentText').value.trim();
-      const worker = $('workerUrl').value.trim();
-      const guestName = $('guestName').value.trim() || 'Guest';
+      const text = $('commentText').value.trim(); const worker = $('workerUrl').value.trim(); const guestName = $('guestName').value.trim() || 'Guest';
       if (!text) return;
       if (!worker) { window.open(issueUrl, '_blank'); return; }
-      localStorage.setItem('wkBoardWorkerUrl', worker);
-      localStorage.setItem('wkBoardGuestName', guestName);
+      localStorage.setItem('wkBoardWorkerUrl', worker); localStorage.setItem('wkBoardGuestName', guestName);
       const optimistic = { user: guestName, body: text, created_at: new Date().toISOString(), pending: true };
-      renderComments([optimistic, ...currentComments]);
-      $('commentText').value = '';
-      $('status').textContent = '댓글 등록 중... 화면에는 먼저 표시했습니다.';
+      renderComments([optimistic, ...currentComments]); $('commentText').value = ''; $('status').textContent = '댓글 등록 중... 화면에는 먼저 표시했습니다.';
       try {
-        const res = await fetch(worker, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ issue: issueNumber, guestName, body: text, website: $('website').value })
-        });
+        const res = await fetch(worker, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ issue: issueNumber, guestName, body: text, website: $('website').value }) });
         if (!res.ok) throw new Error('worker failed: ' + res.status);
-        $('status').textContent = '댓글 등록 요청 완료. 최신 데이터로 다시 확인합니다.';
-        setTimeout(loadLive, 1500);
+        $('status').textContent = '댓글 등록 요청 완료. 최신 데이터로 다시 확인합니다.'; setTimeout(loadLive, 1500);
       } catch (err) {
-        optimistic.pending = false;
-        optimistic.body = text + '\n\n[등록 실패: ' + err.message + ']';
-        renderComments([optimistic, ...currentComments.filter(c => c !== optimistic)]);
-        $('status').textContent = '댓글 등록 실패: ' + err.message;
+        optimistic.pending = false; optimistic.body = text + '\n\n[등록 실패: ' + err.message + ']'; renderComments([optimistic, ...currentComments.filter(c => c !== optimistic)]); $('status').textContent = '댓글 등록 실패: ' + err.message;
       }
     }
 
+    setIssue(issueNumber);
     $('reload').onclick = refresh;
     $('submitComment').onclick = submitComment;
     refresh();
