@@ -694,18 +694,6 @@ partial class Program
                 return;
             }
 
-            // Guard: reject off-screen caller quickly. If caller window center is not on any
-            // monitor, skip placement immediately to avoid 90+ second Stage 2 timeout.
-            int callerCx = callerRect.Left + Math.Max(1, callerRect.Width) / 2;
-            int callerCy = callerRect.Top + Math.Max(1, callerRect.Height) / 2;
-
-            var callerPt = new POINT { X = callerCx, Y = callerCy };
-            IntPtr callerMonitor = MonitorFromPoint(callerPt, MONITOR_DEFAULTTONULL);
-            if (callerMonitor == IntPtr.Zero)
-            {
-                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller center ({callerCx},{callerCy}) not on any monitor -- skip placement (fail fast)");
-                return;
-            }
 
             // Coordinate space: by the time this runs the launcher has called
             // TrySetPerMonitorV2DpiAwareness() in Main(), so callerRect is in
