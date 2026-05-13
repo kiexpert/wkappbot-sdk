@@ -1,5 +1,20 @@
 <!doctype html>
-<meta charset="utf-8">
-<meta http-equiv="refresh" content="0; url=../board.html">
-<title>WKAppBot Board</title>
-<p>Redirecting to <a href="../board.html">WKAppBot Board</a>...</p>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>WKAppBot Daily Board</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    const target = new URL('../board.html', location.href);
+    for (const [k, v] of new URLSearchParams(location.search)) target.searchParams.set(k, v);
+    if (!target.searchParams.has('v')) target.searchParams.set('v', Date.now());
+    location.replace(target.toString());
+  </script>
+</head>
+<body>
+  <h1>WKAppBot Daily Board</h1>
+  <p>보드 앱을 여는 중입니다.</p>
+  <p><a id="fallback" href="../board.html">보드 열기</a></p>
+  <script>document.getElementById('fallback').href = target.toString();</script>
+</body>
+</html>
