@@ -55,6 +55,7 @@
       <input id="title" value="Daily board" placeholder="title prefix">
       <input id="label" value="daily" placeholder="issue label">
       <button id="openBoard">오늘 보드 열기</button>
+      <button id="saveFavorite">즐겨찾기 추가</button>
     </div>
 
     <div class="card">
@@ -63,6 +64,16 @@
       <a class="pill" id="quantBoard" href="board/">퀀트 보드</a>
       <a class="pill" href="chatgpt-wkappbot-dashboard.html">릴레이 대시보드</a>
       <a class="pill" id="freshBoard" href="board/">캐시 우회 보드</a>
+    </div>
+
+    <div class="card">
+      <h2>즐겨찾기</h2>
+      <div id="favorites" class="muted">아직 없습니다.</div>
+    </div>
+
+    <div class="card">
+      <h2>최근 보드</h2>
+      <div id="recent" class="muted">아직 없습니다.</div>
     </div>
 
     <div class="card">
@@ -88,6 +99,11 @@
       if (opt) $('repo').value = lastRepo;
     }
 
+    function loadJson(key, fallback) {
+      try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (_) { return fallback; }
+    }
+    function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+
     function boardUrl(repo, title = 'Daily board', label = 'daily') {
       const p = new URLSearchParams();
       p.set('repo', repo);
@@ -102,17 +118,45 @@
       return $('repo').value === 'custom' ? $('customRepo').value.trim() : $('repo').value;
     }
 
+    function selectedConfig() {
+      return { repo: selectedRepo(), title: $('title').value || 'Daily board', label: $('label').value || 'daily' };
+    }
+
+    function rememberRecent(cfg) {
+      const items = loadJson('wkPortalRecent', []);
+      const next = [cfg, ...items.filter(x => x.repo !== cfg.repo)].slice(0, 6);
+      saveJson('wkPortalRecent', next);
+    }
+
     function openBoard() {
-      const repo = selectedRepo();
-      if (!repo) { $('customRepo').focus(); return; }
-      localStorage.setItem('wkPortalRepo', repo);
-      location.href = boardUrl(repo, $('title').value || 'Daily board', $('label').value || 'daily');
+      const cfg = selectedConfig();
+      if (!cfg.repo) { $('customRepo').focus(); return; }
+      localStorage.setItem('wkPortalRepo', cfg.repo);
+      rememberRecent(cfg);
+      location.href = boardUrl(cfg.repo, cfg.title, cfg.label);
+    }
+
+    function renderList(id, key) {
+      const items = loadJson(key, []);
+      if (!items.length) { $(id).textContent = '아직 없습니다.'; return; }
+      $(id).innerHTML = items.map(x => `<a class="pill" href="${boardUrl(x.repo, x.title, x.label)}">${x.repo}</a>`).join('');
+    }
+
+    function saveFavorite() {
+      const cfg = selectedConfig();
+      if (!cfg.repo) return;
+      const items = loadJson('wkPortalFavorites', []);
+      const next = [cfg, ...items.filter(x => x.repo !== cfg.repo)].slice(0, 12);
+      saveJson('wkPortalFavorites', next);
+      renderList('favorites', 'wkPortalFavorites');
     }
 
     $('saveUser').onclick = () => {
       localStorage.setItem('wkPortalUser', $('user').value.trim());
       $('saved').textContent = '저장됨';
       setTimeout(() => $('saved').textContent = '', 1200);
+      renderList('favorites', 'wkPortalFavorites');
+      renderList('recent', 'wkPortalRecent');
     };
     $('repo').onchange = () => {
       const custom = $('repo').value === 'custom';
@@ -121,9 +165,12 @@
     };
     $('customRepo').onkeydown = e => { if (e.key === 'Enter') openBoard(); };
     $('openBoard').onclick = openBoard;
+    $('saveFavorite').onclick = saveFavorite;
     $('appbotBoard').href = boardUrl('kiexpert/wkappbot-sdk', 'Daily board', 'daily');
     $('quantBoard').href = boardUrl('kiexpert/WkFeedQuant', 'Quant Daily', 'daily');
     $('freshBoard').href = 'board/?v=' + Date.now();
+    renderList('favorites', 'wkPortalFavorites');
+    renderList('recent', 'wkPortalRecent');
   </script>
 </body>
 </html>
