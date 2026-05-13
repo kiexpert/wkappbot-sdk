@@ -276,11 +276,11 @@ partial class Program
             $"[PLACEMENT:STAGE2] trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms ok={placementOk} attempts={attempts} "
             + $"final=(L={final.Left},T={final.Top},R={final.Right},B={final.Bottom})");
 
-        // Auto-suggest on Stage 2 failure (timeout, selector not found, CDP error)
-        if (trigger.Contains("timeout") || trigger.Contains("cdp_error") || trigger.Contains("no_ws_url"))
+        // Auto-suggest on Stage 2 failure (timeout, selector not found, CDP error, ws errors)
+        if (trigger.Contains("timeout") || trigger.Contains("cdp") || trigger.Contains("ws") || trigger.Contains("no_ws_url"))
         {
-            var suggestMsg = $"BUG: Stage 2 ask timeout (cmd={cmd}). trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms. " +
-                            $"Chrome may be off-screen, selector unavailable, or CDP unresponsive. " +
+            var suggestMsg = $"BUG: Stage 2 ask anomaly (cmd={cmd}). trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms. " +
+                            $"Chrome placement or CDP communication failed. " +
                             $"Repro: wkappbot ask gpt 'test'";
             try
             {
@@ -457,8 +457,9 @@ partial class Program
             {
                 await ws.ConnectAsync(new Uri(wsUrl), ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
+                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP ws connect failed: {ex.GetType().Name}: {ex.Message}");
                 return "ws_open_failed";
             }
 
@@ -466,7 +467,15 @@ partial class Program
             // versions don't deliver events without explicit enable.
             var enableMsg = "{\"id\":1,\"method\":\"Page.enable\"}";
             var enableBytes = Encoding.UTF8.GetBytes(enableMsg);
-            await ws.SendAsync(enableBytes, WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+            try
+            {
+                await ws.SendAsync(enableBytes, WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP Page.enable send failed: {ex.GetType().Name}: {ex.Message}");
+                return "cdp_enable_failed";
+            }
 
             // Read frames until Page.loadEventFired, ws close, or cancel.
             var buf = new byte[8192];
@@ -476,12 +485,23 @@ partial class Program
             {
                 sb.Clear();
                 WebSocketReceiveResult res;
-                do
+                try
                 {
                     res = await ws.ReceiveAsync(buf, ct).ConfigureAwait(false);
-                    if (res.MessageType == WebSocketMessageType.Close) return "ws_closed";
-                    sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
-                } while (!res.EndOfMessage);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP frame receive failed: {ex.GetType().Name}: {ex.Message}");
+                    return "ws_receive_error";
+                }
+
+                if (res.MessageType == WebSocketMessageType.Close)
+                {
+                    Console.Error.WriteLine("[PLACEMENT:STAGE2] CDP ws closed by server");
+                    return "ws_closed";
+                }
+                sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
+                if (!res.EndOfMessage) continue;
 
                 var msg = sb.ToString();
                 frameCount++;
@@ -505,7 +525,10 @@ partial class Program
         {
             return "timeout";
         }
-        catch { /* fall through */ }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP ws error: {ex.GetType().Name}: {ex.Message}");
+        }
         finally
         {
             try { ws?.Dispose(); } catch { }
