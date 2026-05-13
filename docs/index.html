@@ -1,24 +1,42 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="utf-8">
   <title>WKAppBot SDK</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; max-width: 840px; margin: 40px auto; padding: 16px; }
+    body { font-family: system-ui, sans-serif; max-width: 840px; margin: 40px auto; padding: 16px; line-height: 1.55; }
     a { display: block; margin: 12px 0; }
+    .card { border: 1px solid rgba(128,128,128,.35); border-radius: 16px; padding: 16px; margin: 16px 0; }
+    button { padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(128,128,128,.35); background: transparent; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>WKAppBot SDK</h1>
   <p>Tools and dashboards for WKAppBot connector experiments.</p>
 
-  <h2>Dashboards</h2>
-  <a href="chatgpt-wkappbot-dashboard.html">ChatGPT WKAppBot Dashboard</a>
-  <a href="board.html">GitHub Issues Board</a>
+  <div class="card">
+    <h2>Dashboards</h2>
+    <a href="chatgpt-wkappbot-dashboard.html">ChatGPT WKAppBot Dashboard</a>
+    <a href="board.html">GitHub Issues Board</a>
+    <a href="board/">GitHub Issues Board fallback path</a>
+    <a id="freshBoard" href="board.html">GitHub Issues Board fresh link</a>
+    <button id="openFresh">Open board with cache buster</button>
+  </div>
 
-  <h2>Docs</h2>
-  <a href="wkappbot-dashboard.md">Dashboard notes</a>
-  <a href="GITHUB-BOARD.md">GitHub board pattern</a>
+  <div class="card">
+    <h2>Docs</h2>
+    <a href="wkappbot-dashboard.md">Dashboard notes</a>
+    <a href="GITHUB-BOARD.md">GitHub board pattern</a>
+    <a href="GITHUB-PAGES.md">GitHub Pages setup</a>
+  </div>
+
+  <p id="hint">GitHub Pages can take 1-3 minutes to refresh after commits.</p>
+
+  <script>
+    const fresh = 'board.html?v=' + Date.now();
+    document.getElementById('freshBoard').href = fresh;
+    document.getElementById('openFresh').onclick = () => location.href = fresh;
+  </script>
 </body>
 </html>
