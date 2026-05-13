@@ -9,6 +9,8 @@
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 920px; margin: 0 auto; padding: 24px; line-height: 1.55; }
     header { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 24px; }
     h1 { margin: 0; font-size: 28px; }
+    textarea, input { width: 100%; box-sizing: border-box; border: 1px solid rgba(128,128,128,.35); border-radius: 12px; padding: 12px; margin: 8px 0; font: inherit; }
+    textarea { min-height: 96px; }
     .muted { opacity: .7; }
     .card { border: 1px solid rgba(128,128,128,.35); border-radius: 16px; padding: 18px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -16,6 +18,7 @@
     button:hover, a.button:hover { background: rgba(128,128,128,.12); }
     .avatar { width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-right: 8px; }
     .comment { border-left: 4px solid rgba(128,128,128,.35); padding-left: 14px; margin: 18px 0; }
+    .pending { opacity: .75; border-left-color: #f5a623; }
     .body { white-space: pre-wrap; }
     #status { margin-top: 4px; }
   </style>
@@ -28,11 +31,23 @@
     </div>
     <div class="row">
       <button id="reload">새로고침</button>
-      <a id="openIssue" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">댓글 쓰기</a>
+      <a id="openIssue" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">GitHub에서 보기</a>
     </div>
   </header>
 
   <section id="issueCard" class="card"></section>
+
+  <section class="card">
+    <h2>댓글 쓰기</h2>
+    <p class="muted">Worker 주소를 넣으면 이 화면에서 바로 등록됩니다. 없으면 GitHub 댓글 페이지로 이동합니다.</p>
+    <input id="workerUrl" placeholder="Cloudflare Worker URL, 예: https://xxx.workers.dev">
+    <textarea id="commentText" placeholder="댓글을 입력하세요"></textarea>
+    <div class="row">
+      <button id="submitComment">댓글 등록</button>
+      <a id="openIssue2" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">GitHub에서 댓글 쓰기</a>
+    </div>
+  </section>
+
   <section class="card">
     <h2>댓글</h2>
     <div id="comments"></div>
@@ -44,8 +59,11 @@
     const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
     const apiBase = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
     const $ = id => document.getElementById(id);
+    let currentComments = [];
 
     $('openIssue').href = issueUrl;
+    $('openIssue2').href = issueUrl;
+    $('workerUrl').value = localStorage.getItem('wkBoardWorkerUrl') || '';
 
     function esc(s) {
       return String(s || '').replace(/[&<>"']/g, ch => ({
@@ -55,6 +73,25 @@
 
     function fmtTime(s) {
       try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; }
+    }
+
+    function renderComments(comments) {
+      currentComments = comments || [];
+      if (!currentComments.length) {
+        $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>';
+        return;
+      }
+      $('comments').innerHTML = currentComments.map(c => `
+        <article class="comment ${c.pending ? 'pending' : ''}">
+          <div class="row">
+            ${c.avatar ? `<img class="avatar" src="${esc(c.avatar)}" alt="">` : ''}
+            <strong>${esc(c.user || 'user')}</strong>
+            <span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>
+            ${c.pending ? '<span class="muted">등록 중...</span>' : ''}
+          </div>
+          <div class="body">${esc(c.body)}</div>
+        </article>
+      `).join('');
     }
 
     function render(issue, comments, sourceLabel) {
@@ -69,22 +106,7 @@
         <h2>${esc(issue.title)}</h2>
         <div class="body">${esc(issue.body)}</div>
       `;
-
-      if (!comments.length) {
-        $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. GitHub에서 첫 댓글을 남겨보세요.</p>';
-      } else {
-        $('comments').innerHTML = comments.map(c => `
-          <article class="comment">
-            <div class="row">
-              ${c.avatar ? `<img class="avatar" src="${esc(c.avatar)}" alt="">` : ''}
-              <strong>${esc(c.user || 'user')}</strong>
-              <span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>
-            </div>
-            <div class="body">${esc(c.body)}</div>
-          </article>
-        `).join('');
-      }
-
+      renderComments(comments);
       $('status').textContent = `${sourceLabel} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
     }
 
@@ -92,39 +114,18 @@
       const res = await fetch('board-data.json', { cache: 'no-cache' });
       if (!res.ok) return;
       const data = await res.json();
-      render({
-        title: data.title,
-        body: data.body,
-        issue: data.issue,
-        updatedAt: data.updatedAt,
-        user: 'snapshot'
-      }, data.comments || [], '저장된 빠른 화면');
+      render({ title: data.title, body: data.body, issue: data.issue, updatedAt: data.updatedAt, user: 'snapshot' }, data.comments || [], '저장된 빠른 화면');
     }
 
     async function loadLive() {
       $('status').textContent = '최신 GitHub 데이터 불러오는 중...';
-
       const issueRes = await fetch(apiBase, { headers: { 'accept': 'application/vnd.github+json' } });
       if (!issueRes.ok) throw new Error('issue load failed: ' + issueRes.status);
       const issue = await issueRes.json();
-
       const commentsRes = await fetch(apiBase + '/comments', { headers: { 'accept': 'application/vnd.github+json' } });
       if (!commentsRes.ok) throw new Error('comments load failed: ' + commentsRes.status);
       const comments = await commentsRes.json();
-
-      render({
-        title: issue.title,
-        body: issue.body,
-        number: issue.number,
-        created_at: issue.created_at,
-        user: issue.user && issue.user.login,
-        avatar: issue.user && issue.user.avatar_url
-      }, comments.map(c => ({
-        user: c.user && c.user.login,
-        avatar: c.user && c.user.avatar_url,
-        created_at: c.created_at,
-        body: c.body
-      })), '최신 데이터');
+      render({ title: issue.title, body: issue.body, number: issue.number, created_at: issue.created_at, user: issue.user && issue.user.login, avatar: issue.user && issue.user.avatar_url }, comments.map(c => ({ user: c.user && c.user.login, avatar: c.user && c.user.avatar_url, created_at: c.created_at, body: c.body })), '최신 데이터');
     }
 
     async function refresh() {
@@ -132,7 +133,40 @@
       await loadLive().catch(err => $('status').textContent = '최신 데이터 실패, 저장된 화면 표시 중: ' + err.message);
     }
 
+    async function submitComment() {
+      const text = $('commentText').value.trim();
+      const worker = $('workerUrl').value.trim();
+      if (!text) return;
+      if (!worker) {
+        window.open(issueUrl, '_blank');
+        return;
+      }
+
+      localStorage.setItem('wkBoardWorkerUrl', worker);
+      const optimistic = { user: 'you', body: text, created_at: new Date().toISOString(), pending: true };
+      renderComments([optimistic, ...currentComments]);
+      $('commentText').value = '';
+      $('status').textContent = '댓글 등록 중... 화면에는 먼저 표시했습니다.';
+
+      try {
+        const res = await fetch(worker, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ issue: issueNumber, body: text })
+        });
+        if (!res.ok) throw new Error('worker failed: ' + res.status);
+        $('status').textContent = '댓글 등록 요청 완료. 최신 데이터로 다시 확인합니다.';
+        setTimeout(loadLive, 1500);
+      } catch (err) {
+        optimistic.pending = false;
+        optimistic.body = text + '\n\n[등록 실패: ' + err.message + ']';
+        renderComments([optimistic, ...currentComments.filter(c => c !== optimistic)]);
+        $('status').textContent = '댓글 등록 실패: ' + err.message;
+      }
+    }
+
     $('reload').onclick = refresh;
+    $('submitComment').onclick = submitComment;
     refresh();
   </script>
 </body>
