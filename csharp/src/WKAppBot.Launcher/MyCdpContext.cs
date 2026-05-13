@@ -169,6 +169,9 @@ partial class Program
                        : hostHwnd != IntPtr.Zero ? hostHwnd
                        : fgHwnd;
 
+        // Auto-resolve off-screen caller to valid alternative
+        callerHwnd = ResolveValidCallerWindow(callerHwnd);
+
         var callerValidation = ValidateCallerHwnd(callerHwnd, consoleHwnd, hostHwnd);
 
         if (callerValidation.IsOffScreen)
@@ -672,6 +675,87 @@ partial class Program
     }
 
     /// <summary>
+    /// Resolve a valid on-screen caller window. If the given caller is off-screen,
+    /// try alternatives: foreground window, host window, or largest visible window.
+    /// Returns IntPtr.Zero if no valid on-screen window is found.
+    /// </summary>
+    static IntPtr ResolveValidCallerWindow(IntPtr preferredCaller)
+    {
+        if (preferredCaller != IntPtr.Zero && IsWindowVisibleLocal(preferredCaller))
+        {
+            if (GetWindowRect(preferredCaller, out RECT rect))
+            {
+                var centerPt = new POINT
+                {
+                    X = rect.Left + (rect.Right - rect.Left) / 2,
+                    Y = rect.Top + (rect.Bottom - rect.Top) / 2
+                };
+                IntPtr monitor = MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL);
+                if (monitor != IntPtr.Zero)
+                {
+                    Console.Error.WriteLine($"[CALLER:RESOLVE] preferred 0x{preferredCaller.ToInt64():X} valid");
+                    return preferredCaller;
+                }
+            }
+        }
+
+        Console.Error.WriteLine($"[CALLER:RESOLVE] preferred off-screen/invalid, trying alternatives...");
+
+        // Try foreground window
+        IntPtr foreground = GetForegroundWindow();
+        if (foreground != IntPtr.Zero && foreground != preferredCaller && IsWindowVisibleLocal(foreground))
+        {
+            if (GetWindowRect(foreground, out RECT rect))
+            {
+                var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
+                if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
+                {
+                    Console.Error.WriteLine($"[CALLER:RESOLVE] using foreground 0x{foreground.ToInt64():X}");
+                    return foreground;
+                }
+            }
+        }
+
+        // Try host window (parent process)
+        IntPtr host = GetHostWindowSnapshot();
+        if (host != IntPtr.Zero && host != preferredCaller && host != foreground && IsWindowVisibleLocal(host))
+        {
+            if (GetWindowRect(host, out RECT rect))
+            {
+                var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
+                if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
+                {
+                    Console.Error.WriteLine($"[CALLER:RESOLVE] using host 0x{host.ToInt64():X}");
+                    return host;
+                }
+            }
+        }
+
+        // Fallback: find largest on-screen window
+        var largestWindow = IntPtr.Zero;
+        int largestArea = 0;
+        EnumWindowsLocal((hwnd, _) =>
+        {
+            if (!IsWindowVisibleLocal(hwnd)) return true;
+            if (!GetWindowRect(hwnd, out RECT rect)) return true;
+            var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
+            if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) == IntPtr.Zero) return true;
+            int area = rect.Width * rect.Height;
+            if (area > largestArea) { largestArea = area; largestWindow = hwnd; }
+            return true;
+        }, IntPtr.Zero);
+
+        if (largestWindow != IntPtr.Zero)
+        {
+            Console.Error.WriteLine($"[CALLER:RESOLVE] using largest window 0x{largestWindow.ToInt64():X}");
+            return largestWindow;
+        }
+
+        Console.Error.WriteLine($"[CALLER:RESOLVE] FAIL no valid on-screen window found");
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
     /// Post-launch Chrome placement: locate the newly launched project Chrome
     /// (windows of class "Chrome_WidgetWin_1" owned by chrome.exe) and SetWindowPos
     /// it next to the validated caller window. Uses SWP_NOZORDER | SWP_NOACTIVATE
@@ -690,7 +774,7 @@ partial class Program
             Console.Error.WriteLine($"[PLACEMENT:STEP1] cmd={cmd} caller=0x{caller.ToInt64():X} rect=({callerRect.Left},{callerRect.Top},{callerRect.Right},{callerRect.Bottom})");
             if (caller == IntPtr.Zero || callerRect == System.Drawing.Rectangle.Empty)
             {
-                Console.Error.WriteLine($"[PLACEMENT:STEP1] no validated caller anchor -- skip move (cmd={cmd})");
+                Console.Error.WriteLine($"[PLACEMENT:STEP1] no caller anchor -- skip move (cmd={cmd})");
                 return;
             }
 
@@ -722,17 +806,12 @@ partial class Program
             int baseX = callerLeft;
             int baseY = callerTop;
 
+            // Caller is already resolved to on-screen via ResolveValidCallerWindow above
             var callerCenterPt = new POINT
             {
                 X = callerLeft + Math.Max(1, callerRect.Width) / 2,
                 Y = callerTop + Math.Max(1, callerRect.Height) / 2
             };
-            IntPtr callerMonitor = MonitorFromPoint(callerCenterPt, MONITOR_DEFAULTTONULL);
-            if (callerMonitor == IntPtr.Zero)
-            {
-                Console.Error.WriteLine($"[PLACEMENT:STEP1:FAIL] caller window center is off-screen at ({callerCenterPt.X},{callerCenterPt.Y}) — the selected caller window is not on any display. Verify the ask command origin window selection.");
-                return;
-            }
 
             int targetX = baseX + 30;
             int targetY = baseY + 30;
