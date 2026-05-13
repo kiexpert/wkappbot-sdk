@@ -17,4 +17,20 @@ function appendEvent(type, payload) {
   }
 }
 
-module.exports = { appendEvent };
+function readEvents() {
+  try {
+    if (!fs.existsSync(logPath)) return [];
+
+    return fs.readFileSync(logPath, 'utf8')
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map(line => {
+        try { return JSON.parse(line); } catch (_) { return null; }
+      })
+      .filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
+module.exports = { appendEvent, readEvents };
