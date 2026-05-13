@@ -694,14 +694,16 @@ partial class Program
                 return;
             }
 
-            // Guard: reject off-screen caller to prevent Chrome from inheriting off-screen placement.
-            // Off-screen caller (e.g., left monitor at -2189,-9 outside all monitors) would place Chrome
-            // off-screen too, causing Stage 2 selector detection to fail and block for 90+ seconds.
-            // Skip placement when caller is genuinely off-screen (not just negative coordinates).
-            if (IsRectOutsideAllMonitors(new RECT
-                { Left = callerRect.Left, Top = callerRect.Top, Right = callerRect.Right, Bottom = callerRect.Bottom }))
+            // Guard: reject off-screen caller quickly. If caller window center is not on any
+            // monitor, skip placement immediately to avoid 90+ second Stage 2 timeout.
+            int callerCx = callerRect.Left + Math.Max(1, callerRect.Width) / 2;
+            int callerCy = callerRect.Top + Math.Max(1, callerRect.Height) / 2;
+
+            var callerPt = new POINT { X = callerCx, Y = callerCy };
+            IntPtr callerMonitor = MonitorFromPoint(callerPt, MONITOR_DEFAULTTONULL);
+            if (callerMonitor == IntPtr.Zero)
             {
-                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller off-screen outside all monitors rect=({callerRect.Left},{callerRect.Top},{callerRect.Right},{callerRect.Bottom}) -- skip placement");
+                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller center ({callerCx},{callerCy}) not on any monitor -- skip placement (fail fast)");
                 return;
             }
 
@@ -1138,6 +1140,7 @@ partial class Program
         public uint dwFlags;
     }
 
+    const uint MONITOR_DEFAULTTONULL    = 0x00000000;
     const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
