@@ -231,6 +231,28 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
   ```
 - **MEMORY.md**: 200-line limit. Overflow -> split into `memory/` topic files
 
+## Internal Tools
+
+### wkfind - Unified Code + Session Search
+**Location**: `D:\GitHub\WKAppBot\bin\wkfind.ps1` (core repo)
+**Usage**: `wkfind <keyword1> <keyword2> ...`
+
+Unified multi-keyword search across code + Claude sessions:
+- **GlobCoverageScore ranking**: tokenize keywords, score by token_length / field_length
+- **PHRASE/AND/OR tiers**: PHRASE ×2.5, AND ×1.5, OR ×1.0
+- **Code search**: git diff (auto-detected) + time-range fallback (--day → --unlimited)
+- **Session search**: live Claude session titles + dates, same GlobCoverageScore ranking
+- **Triad analysis**: GPT+Gemini+Claude synthesis runs in background (configurable timeout)
+
+Examples:
+```
+wkfind "caller window" HWND          # Find code + sessions
+wkfind --day "CDP position"          # Recent 24h code + all sessions
+wkfind "05-13"                       # Sessions from date + code mentions
+```
+
+No additional options; search-only tool. `.gitignore` auto-exclusion via ripgrep.
+
 ## Encoding Policy
 - Treat repository text files as UTF-8 by default.
 - When importing a source file in CP949 or any non-UTF-8 encoding, preserve the original file and also create a UTF-8 copy for safe reading and editing.
