@@ -1,6 +1,7 @@
 const jobs = new Map();
 const agents = new Map();
 const { appendEvent } = require('./log');
+const { publish } = require('./stream');
 
 function now() {
   return new Date().toISOString();
@@ -18,7 +19,9 @@ function createJob(input) {
   };
 
   jobs.set(id, job);
+
   appendEvent('job_created', job);
+  publish('job_created', job);
 
   return job;
 }
@@ -30,10 +33,13 @@ function nextJob(agentId) {
       job.agentId = agentId || null;
       job.updatedAt = now();
 
-      appendEvent('job_started', {
+      const payload = {
         id: job.id,
         agentId: job.agentId
-      });
+      };
+
+      appendEvent('job_started', payload);
+      publish('job_started', payload);
 
       return job;
     }
@@ -50,10 +56,13 @@ function completeJob(id, result) {
   job.result = result;
   job.updatedAt = now();
 
-  appendEvent('job_completed', {
+  const payload = {
     id,
     ok: result && result.ok
-  });
+  };
+
+  appendEvent('job_completed', payload);
+  publish('job_completed', payload);
 
   return job;
 }
@@ -76,7 +85,9 @@ function heartbeat(agentId, meta) {
   };
 
   agents.set(id, agent);
+
   appendEvent('agent_heartbeat', agent);
+  publish('agent_heartbeat', agent);
 
   return agent;
 }
