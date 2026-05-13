@@ -6,6 +6,7 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: connectors/chatgpt-wkappbot
@@ -17,6 +18,6 @@ jobs:
         with:
           node-version: 20
 
-      - run: node src/server.js &
+      - run: bash scripts/start-relay-ci.sh
 
       - run: bash smoke-test.sh
