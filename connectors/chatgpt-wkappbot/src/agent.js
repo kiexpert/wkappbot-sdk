@@ -1,19 +1,26 @@
 const http = require('http');
-const { execFile } = require('child_process');
 const { isAllowedArgs } = require('./allowlist');
+const { getConfig } = require('./config');
+const { runFile } = require('./run');
 
-const relay = process.env.WK_RELAY || 'http://127.0.0.1:8787';
-const bin = process.env.WKAPPBOT_BIN || 'wkappbot';
+const config = getConfig();
+const token = process.env.WKAPPBOT_TOKEN || '';
 
 function post(path, body) {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body || {});
-    const req = http.request(relay + path, {
+    const headers = {
+      'content-type': 'application/json',
+      'content-length': Buffer.byteLength(data)
+    };
+
+    if (token) {
+      headers.authorization = `Bearer ${token}`;
+    }
+
+    const req = http.request(config.relayUrl + path, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'content-length': Buffer.byteLength(data)
-      }
+      headers
     }, res => {
       let raw = '';
       res.on('data', chunk => raw += chunk);
@@ -32,21 +39,15 @@ function post(path, body) {
   });
 }
 
-function run(command, args) {
-  return new Promise((resolve) => {
-    execFile(command, args, { windowsHide: true }, (error, stdout, stderr) => {
-      resolve({
-        ok: !error,
-        code: error ? (error.code || 1) : 0,
-        stdout,
-        stderr
-      });
-    });
-  });
-}
-
 async function loop() {
-  const polled = await post('/poll');
+  await post('/heartbeat', {
+    agentId: config.agentId,
+    meta: { bin: config.bin }
+  });
+
+  const polled = await post('/poll', {
+    agentId: config.agentId
+  });
 
   if (!polled.job) {
     return setTimeout(loop, 1000);
@@ -68,7 +69,7 @@ async function loop() {
     return setTimeout(loop, 10);
   }
 
-  const result = await run(bin, args);
+  const result = await runFile(config.bin, args, config.timeoutMs);
 
   await post('/complete', {
     id: polled.job.id,
