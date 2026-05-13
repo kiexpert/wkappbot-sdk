@@ -730,9 +730,8 @@ partial class Program
             IntPtr callerMonitor = MonitorFromPoint(callerCenterPt, MONITOR_DEFAULTTONULL);
             if (callerMonitor == IntPtr.Zero)
             {
-                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller center not on monitor, fallback to (100,100)");
-                baseX = 100;
-                baseY = 100;
+                Console.Error.WriteLine($"[PLACEMENT:STEP1:FAIL] caller window center is off-screen at ({callerCenterPt.X},{callerCenterPt.Y}) — the selected caller window is not on any display. Verify the ask command origin window selection.");
+                return;
             }
 
             int targetX = baseX + 30;
