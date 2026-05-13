@@ -24,7 +24,7 @@
   <header>
     <div>
       <h1>WKAppBot Daily Board</h1>
-      <div id="status" class="muted">불러오는 중...</div>
+      <div id="status" class="muted">초기 화면 준비 중...</div>
     </div>
     <div class="row">
       <button id="reload">새로고침</button>
@@ -57,28 +57,18 @@
       try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; }
     }
 
-    async function loadBoard() {
-      $('status').textContent = '불러오는 중...';
-      $('comments').innerHTML = '';
-
-      const issueRes = await fetch(apiBase, { headers: { 'accept': 'application/vnd.github+json' } });
-      if (!issueRes.ok) throw new Error('issue load failed: ' + issueRes.status);
-      const issue = await issueRes.json();
-
+    function render(issue, comments, sourceLabel) {
+      comments = comments || [];
       $('issueCard').innerHTML = `
         <div class="row">
-          <img class="avatar" src="${esc(issue.user && issue.user.avatar_url)}" alt="">
-          <strong>${esc(issue.user && issue.user.login)}</strong>
-          <span class="muted">${fmtTime(issue.created_at)}</span>
-          <span class="muted">#${issue.number}</span>
+          ${issue.avatar ? `<img class="avatar" src="${esc(issue.avatar)}" alt="">` : ''}
+          <strong>${esc(issue.user || 'WKAppBot')}</strong>
+          <span class="muted">${fmtTime(issue.created_at || issue.updatedAt)}</span>
+          <span class="muted">#${esc(issue.number || issue.issue || issueNumber)}</span>
         </div>
         <h2>${esc(issue.title)}</h2>
         <div class="body">${esc(issue.body)}</div>
       `;
-
-      const commentsRes = await fetch(apiBase + '/comments', { headers: { 'accept': 'application/vnd.github+json' } });
-      if (!commentsRes.ok) throw new Error('comments load failed: ' + commentsRes.status);
-      const comments = await commentsRes.json();
 
       if (!comments.length) {
         $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. GitHub에서 첫 댓글을 남겨보세요.</p>';
@@ -86,20 +76,64 @@
         $('comments').innerHTML = comments.map(c => `
           <article class="comment">
             <div class="row">
-              <img class="avatar" src="${esc(c.user && c.user.avatar_url)}" alt="">
-              <strong>${esc(c.user && c.user.login)}</strong>
-              <span class="muted">${fmtTime(c.created_at)}</span>
+              ${c.avatar ? `<img class="avatar" src="${esc(c.avatar)}" alt="">` : ''}
+              <strong>${esc(c.user || 'user')}</strong>
+              <span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>
             </div>
             <div class="body">${esc(c.body)}</div>
           </article>
         `).join('');
       }
 
-      $('status').textContent = `업데이트됨: ${new Date().toLocaleString()} · 댓글 ${comments.length}개`;
+      $('status').textContent = `${sourceLabel} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
     }
 
-    $('reload').onclick = () => loadBoard().catch(err => $('status').textContent = err.message);
-    loadBoard().catch(err => $('status').textContent = err.message);
+    async function loadSnapshot() {
+      const res = await fetch('board-data.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const data = await res.json();
+      render({
+        title: data.title,
+        body: data.body,
+        issue: data.issue,
+        updatedAt: data.updatedAt,
+        user: 'snapshot'
+      }, data.comments || [], '저장된 빠른 화면');
+    }
+
+    async function loadLive() {
+      $('status').textContent = '최신 GitHub 데이터 불러오는 중...';
+
+      const issueRes = await fetch(apiBase, { headers: { 'accept': 'application/vnd.github+json' } });
+      if (!issueRes.ok) throw new Error('issue load failed: ' + issueRes.status);
+      const issue = await issueRes.json();
+
+      const commentsRes = await fetch(apiBase + '/comments', { headers: { 'accept': 'application/vnd.github+json' } });
+      if (!commentsRes.ok) throw new Error('comments load failed: ' + commentsRes.status);
+      const comments = await commentsRes.json();
+
+      render({
+        title: issue.title,
+        body: issue.body,
+        number: issue.number,
+        created_at: issue.created_at,
+        user: issue.user && issue.user.login,
+        avatar: issue.user && issue.user.avatar_url
+      }, comments.map(c => ({
+        user: c.user && c.user.login,
+        avatar: c.user && c.user.avatar_url,
+        created_at: c.created_at,
+        body: c.body
+      })), '최신 데이터');
+    }
+
+    async function refresh() {
+      await loadSnapshot().catch(() => {});
+      await loadLive().catch(err => $('status').textContent = '최신 데이터 실패, 저장된 화면 표시 중: ' + err.message);
+    }
+
+    $('reload').onclick = refresh;
+    refresh();
   </script>
 </body>
 </html>
