@@ -19,7 +19,11 @@
     .avatar { width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-right: 8px; }
     .comment { border-left: 4px solid rgba(128,128,128,.35); padding-left: 14px; margin: 18px 0; }
     .pending { opacity: .75; border-left-color: #f5a623; }
-    .body { white-space: pre-wrap; }
+    .body { white-space: normal; }
+    .body pre { overflow: auto; padding: 12px; border-radius: 12px; background: rgba(128,128,128,.15); }
+    .body code { padding: 2px 5px; border-radius: 6px; background: rgba(128,128,128,.15); }
+    .body pre code { padding: 0; background: transparent; }
+    .body blockquote { border-left: 4px solid rgba(128,128,128,.35); margin-left: 0; padding-left: 12px; opacity: .9; }
     #status { margin-top: 4px; }
   </style>
 </head>
@@ -39,9 +43,11 @@
 
   <section class="card">
     <h2>댓글 쓰기</h2>
-    <p class="muted">Worker 주소를 넣으면 이 화면에서 바로 등록됩니다. 없으면 GitHub 댓글 페이지로 이동합니다.</p>
+    <p class="muted">마크다운을 사용할 수 있습니다. Worker 주소가 없으면 GitHub 댓글 페이지로 이동합니다.</p>
     <input id="workerUrl" placeholder="Cloudflare Worker URL, 예: https://xxx.workers.dev">
-    <textarea id="commentText" placeholder="댓글을 입력하세요"></textarea>
+    <input id="guestName" placeholder="이름, 예: Guest">
+    <input id="website" style="display:none" tabindex="-1" autocomplete="off">
+    <textarea id="commentText" placeholder="댓글을 입력하세요. **굵게**, `코드`, ```코드블록``` 지원"></textarea>
     <div class="row">
       <button id="submitComment">댓글 등록</button>
       <a id="openIssue2" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">GitHub에서 댓글 쓰기</a>
@@ -64,16 +70,37 @@
     $('openIssue').href = issueUrl;
     $('openIssue2').href = issueUrl;
     $('workerUrl').value = localStorage.getItem('wkBoardWorkerUrl') || '';
+    $('guestName').value = localStorage.getItem('wkBoardGuestName') || '';
 
     function esc(s) {
-      return String(s || '').replace(/[&<>"']/g, ch => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[ch]));
+      return String(s || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
-    function fmtTime(s) {
-      try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; }
+    function md(text) {
+      text = esc(text || '');
+      const blocks = [];
+      text = text.replace(/```([\s\S]*?)```/g, (_, code) => {
+        const key = `@@BLOCK${blocks.length}@@`;
+        blocks.push(`<pre><code>${code}</code></pre>`);
+        return key;
+      });
+      text = text.replace(/^### (.*)$/gm, '<h3>$1</h3>')
+        .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+        .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+        .replace(/^&gt; (.*)$/gm, '<blockquote>$1</blockquote>')
+        .replace(/^[-*] (.*)$/gm, '<li>$1</li>')
+        .replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+        .replace(/\n{2,}/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+      text = `<p>${text}</p>`;
+      blocks.forEach((html, i) => { text = text.replace(`@@BLOCK${i}@@`, html); });
+      return text.replace(/<p><\/p>/g, '');
     }
+
+    function fmtTime(s) { try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; } }
 
     function renderComments(comments) {
       currentComments = comments || [];
@@ -89,7 +116,7 @@
             <span class="muted">${fmtTime(c.created_at || c.updatedAt)}</span>
             ${c.pending ? '<span class="muted">등록 중...</span>' : ''}
           </div>
-          <div class="body">${esc(c.body)}</div>
+          <div class="body">${md(c.body)}</div>
         </article>
       `).join('');
     }
@@ -104,7 +131,7 @@
           <span class="muted">#${esc(issue.number || issue.issue || issueNumber)}</span>
         </div>
         <h2>${esc(issue.title)}</h2>
-        <div class="body">${esc(issue.body)}</div>
+        <div class="body">${md(issue.body)}</div>
       `;
       renderComments(comments);
       $('status').textContent = `${sourceLabel} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
@@ -136,23 +163,20 @@
     async function submitComment() {
       const text = $('commentText').value.trim();
       const worker = $('workerUrl').value.trim();
+      const guestName = $('guestName').value.trim() || 'Guest';
       if (!text) return;
-      if (!worker) {
-        window.open(issueUrl, '_blank');
-        return;
-      }
-
+      if (!worker) { window.open(issueUrl, '_blank'); return; }
       localStorage.setItem('wkBoardWorkerUrl', worker);
-      const optimistic = { user: 'you', body: text, created_at: new Date().toISOString(), pending: true };
+      localStorage.setItem('wkBoardGuestName', guestName);
+      const optimistic = { user: guestName, body: text, created_at: new Date().toISOString(), pending: true };
       renderComments([optimistic, ...currentComments]);
       $('commentText').value = '';
       $('status').textContent = '댓글 등록 중... 화면에는 먼저 표시했습니다.';
-
       try {
         const res = await fetch(worker, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ issue: issueNumber, body: text })
+          body: JSON.stringify({ issue: issueNumber, guestName, body: text, website: $('website').value })
         });
         if (!res.ok) throw new Error('worker failed: ' + res.status);
         $('status').textContent = '댓글 등록 요청 완료. 최신 데이터로 다시 확인합니다.';
