@@ -717,17 +717,26 @@ partial class Program
             int targetH = DefaultChromeH + CompensationH;
 
             // Compute target position: offset slightly down-right of the caller's
-            // upper-left so the terminal stays visible behind/beside Chrome. We
-            // INTENTIONALLY use a POSITIVE offset (+30, +30) — the previous
-            // negative offset (-30, -30) could push Chrome into the top-left of
-            // the caller's monitor or even cross monitor boundaries on multi-mon
-            // setups, especially when combined with the legacy DPI bug.
-            //
-            // NOTE: Negative coordinates are VALID (left/secondary monitors).
-            // Do NOT reject or fall back on negative coords. The caller rect
-            // was validated by IsWindowOffScreen which uses IsRectOutsideAllMonitors.
-            int targetX = callerLeft + 30;
-            int targetY = callerTop + 30;
+            // upper-left so the terminal stays visible behind/beside Chrome.
+            // If caller center is not on any monitor, fall back to primary (100,100).
+            int baseX = callerLeft;
+            int baseY = callerTop;
+
+            var callerCenterPt = new POINT
+            {
+                X = callerLeft + Math.Max(1, callerRect.Width) / 2,
+                Y = callerTop + Math.Max(1, callerRect.Height) / 2
+            };
+            IntPtr callerMonitor = MonitorFromPoint(callerCenterPt, MONITOR_DEFAULTTONULL);
+            if (callerMonitor == IntPtr.Zero)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller center not on monitor, fallback to (100,100)");
+                baseX = 100;
+                baseY = 100;
+            }
+
+            int targetX = baseX + 30;
+            int targetY = baseY + 30;
 
             // Clamp target rect to the caller's monitor work area so Chrome
             // never spills onto another display. Uses MonitorFromPoint at the
