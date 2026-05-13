@@ -19,6 +19,11 @@ const {
 const { isAllowed } = require('./auth');
 const { addClient, removeClient } = require('./stream');
 const { snapshot } = require('./metrics');
+const {
+  validateExecute,
+  validateComplete,
+  validateHeartbeat
+} = require('./validate');
 
 const port = Number(process.env.PORT || 8787);
 const maxBodyBytes = Number(process.env.WK_MAX_BODY_BYTES || 1024 * 1024);
@@ -114,6 +119,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/heartbeat') {
     return readJson(req, (err, parsed) => {
       if (err) return send(res, 400, { error: err.message === 'body_too_large' ? 'body_too_large' : 'bad_json' });
+      const validation = validateHeartbeat(parsed);
+      if (validation) return send(res, 400, { error: validation });
       const item = heartbeat(parsed.agentId, parsed.meta);
       send(res, 200, item);
     });
@@ -122,6 +129,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/execute') {
     return readJson(req, (err, parsed) => {
       if (err) return send(res, 400, { error: err.message === 'body_too_large' ? 'body_too_large' : 'bad_json' });
+      const validation = validateExecute(parsed);
+      if (validation) return send(res, 400, { error: validation });
       const job = createJob(parsed);
       send(res, 200, job);
     });
@@ -137,6 +146,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/complete') {
     return readJson(req, (err, parsed) => {
       if (err) return send(res, 400, { error: err.message === 'body_too_large' ? 'body_too_large' : 'bad_json' });
+      const validation = validateComplete(parsed);
+      if (validation) return send(res, 400, { error: validation });
       const job = completeJob(parsed.id, parsed.result || null);
       if (!job) return send(res, 404, { error: 'job_not_found' });
       send(res, 200, job);
