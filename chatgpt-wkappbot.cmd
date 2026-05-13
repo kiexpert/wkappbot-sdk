@@ -7,10 +7,14 @@ set "LOGDIR=%CONN%\.wk-data"
 set "RELAY_LOG=%LOGDIR%\relay.log"
 set "AGENT_LOG=%LOGDIR%\agent.log"
 set "TUNNEL_LOG=%LOGDIR%\tunnel.log"
+set "URL_FILE=%LOGDIR%\public-url.txt"
+set "STATUS_FILE=%LOGDIR%\status.txt"
 
 if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>nul
 if exist "%ROOT%bin\wkappbot.exe" set "PATH=%ROOT%bin;%PATH%"
 call :refresh_path
+call :write_status "starting"
+call :battery_hint
 
 call :ensure_powershell || exit /b 1
 call :ensure_winget
@@ -38,11 +42,13 @@ for /l %%i in (1,1,20) do (
 )
 
 echo [ERROR] Relay did not become healthy. See: %RELAY_LOG%
+call :write_status "relay_failed"
 call :open_log "%RELAY_LOG%"
 exit /b 1
 
 :relay_ready
 echo [2/4] Relay is healthy.
+call :write_status "relay_ready"
 
 echo [3/4] Starting local WKAppBot agent ...
 start "WKAppBot ChatGPT Agent" /min cmd /c "cd /d "%CONN%" && set WK_RELAY=http://127.0.0.1:8787&& set WKAPPBOT_TOKEN=%WKAPPBOT_TOKEN%&& node src\agent.js >> "%AGENT_LOG%" 2>&1"
@@ -52,11 +58,13 @@ if errorlevel 1 (
   echo [WARN] cloudflared is still not available. Opening download page.
   call :open_browser "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
   echo Relay URL for local test: http://127.0.0.1:8787
+  call :write_status "local_only_no_cloudflared"
   exit /b 0
 )
 
 echo [4/4] Starting free Cloudflare Tunnel. Waiting for public HTTPS URL ...
 if exist "%TUNNEL_LOG%" del "%TUNNEL_LOG%" >nul 2>nul
+if exist "%URL_FILE%" del "%URL_FILE%" >nul 2>nul
 start "WKAppBot Cloudflare Tunnel" /min cmd /c "cloudflared tunnel --url http://127.0.0.1:8787 > "%TUNNEL_LOG%" 2>&1"
 
 for /l %%i in (1,1,45) do (
@@ -68,20 +76,36 @@ for /l %%i in (1,1,45) do (
 echo [WARN] Tunnel started but public URL was not detected yet.
 echo Check log: %TUNNEL_LOG%
 echo Relay URL: http://127.0.0.1:8787
+call :write_status "tunnel_url_not_detected"
 call :open_log "%TUNNEL_LOG%"
 exit /b 0
 
 :tunnel_ready
+echo !PUBLIC_URL!> "%URL_FILE%"
+call :write_status "online !PUBLIC_URL!"
 echo.
 echo ============================================================
 echo WKAppBot ChatGPT connector is ready.
 echo Public HTTPS URL: !PUBLIC_URL!
 echo Health: !PUBLIC_URL!/health
 echo Bearer token: %WKAPPBOT_TOKEN%
+echo Saved URL: %URL_FILE%
+echo If this laptop sleeps, shuts down, or loses internet, this URL stops working.
+echo Restart this cmd to get a new temporary URL.
 echo ============================================================
 echo.
+call :open_browser "!PUBLIC_URL!/"
 call :open_browser "https://chatgpt.com/gpts/editor"
 pause
+exit /b 0
+
+:write_status
+echo %date% %time% %~1> "%STATUS_FILE%"
+exit /b 0
+
+:battery_hint
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$b=Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue; if($b){ if($b.BatteryStatus -ne 2 -and $b.EstimatedChargeRemaining -lt 35){ Write-Host '[WARN] Battery is below 35%% and not charging. Tunnel will die if laptop powers off.' } }" 2>nul
+echo [TIP] For stable sharing, keep laptop awake and plugged in while the temporary URL is in use.
 exit /b 0
 
 :ensure_powershell
