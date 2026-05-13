@@ -1,4 +1,9 @@
 const jobs = new Map();
+const agents = new Map();
+
+function now() {
+  return new Date().toISOString();
+}
 
 function createJob(input) {
   const id = String(Date.now()) + '-' + Math.random().toString(16).slice(2);
@@ -6,19 +11,20 @@ function createJob(input) {
     id,
     state: 'queued',
     input,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now(),
+    updatedAt: now(),
     result: null
   };
   jobs.set(id, job);
   return job;
 }
 
-function nextJob() {
+function nextJob(agentId) {
   for (const job of jobs.values()) {
     if (job.state === 'queued') {
       job.state = 'running';
-      job.updatedAt = new Date().toISOString();
+      job.agentId = agentId || null;
+      job.updatedAt = now();
       return job;
     }
   }
@@ -30,7 +36,7 @@ function completeJob(id, result) {
   if (!job) return null;
   job.state = 'done';
   job.result = result;
-  job.updatedAt = new Date().toISOString();
+  job.updatedAt = now();
   return job;
 }
 
@@ -42,10 +48,27 @@ function listJobs() {
   return [...jobs.values()];
 }
 
+function heartbeat(agentId, meta) {
+  const id = agentId || 'default';
+  const agent = {
+    id,
+    meta: meta || {},
+    updatedAt: now()
+  };
+  agents.set(id, agent);
+  return agent;
+}
+
+function listAgents() {
+  return [...agents.values()];
+}
+
 module.exports = {
   createJob,
   nextJob,
   completeJob,
   getJob,
-  listJobs
+  listJobs,
+  heartbeat,
+  listAgents
 };
