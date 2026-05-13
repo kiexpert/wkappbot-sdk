@@ -1,0 +1,65 @@
+{
+  "id": "md-heal",
+  "app": "wkappbot-workflow",
+  "title": "md-heal: detect and fix stale or drifted CLAUDE.md files",
+  "title_ko": "엠디힐: CLAUDE.md 드리프트·스테일 탐지·수정",
+  "desc": "Actionable checklist to heal project CLAUDE.md: scan for stale commands, check drift against README/AGENTS, validate gg section, sync with global CLAUDE.md, commit all fixes together.",
+  "steps": [
+    "WHEN TO RUN: (A) user says 'md-heal', '엠디힐', 'heal claude.md', or 'fix markdown'. (B) after a significant session where commands or architecture changed. (C) before a PR or release. (D) when a command in CLAUDE.md fails unexpectedly. Run proactively -- stale CLAUDE.md wastes tokens on every future session.",
+    "STEP 1 -- SCAN REPO ROOT MD FILES: list all *.md at repo root. Read CLAUDE.md. Also read README.md and AGENTS.md if they exist. Look for: (a) build commands that changed, (b) removed features still mentioned, (c) new tools not yet documented, (d) wrong file paths, (e) stale version numbers, (f) gg section that no longer works end-to-end.",
+    "STEP 2 -- DRIFT CHECK (shared subjects must agree): for every subject that appears in both CLAUDE.md and README.md (or AGENTS.md), verify the descriptions agree. Common drift points: build command, main entry point, architecture summary, key env vars, deployment steps. Fix any discrepancy in both files in the same commit.",
+    "STEP 3 -- GG SECTION VALIDATION: find '## gg Main Workflow' in project CLAUDE.md. Dry-run each step mentally: (1) does the skill id still exist? wkappbot skill read <id>. (2) does the shell command still work? (3) is the Agent() prompt still accurate? If any step is broken or stale, fix it now.",
+    "STEP 4 -- GLOBAL CLAUDE.MD SYNC: open ~/.claude/CLAUDE.md (symlink at D:/GitHub/CLAUDE.md). Check if project CLAUDE.md overrides or contradicts any global rule. If global rule was updated, ensure project CLAUDE.md reflects the change or explicitly overrides it. The project file WINS -- but it should acknowledge the global baseline.",
+    "STEP 5 -- FIX AND COMMIT: apply all fixes with Edit tool (project CLAUDE.md is a tracked file -- edit directly). If multiple *.md files changed, commit them together: git add *.md && git commit. Commit message: 'docs(claude): heal CLAUDE.md -- <1-line summary of what changed>'. Do NOT split md fixes across multiple commits.",
+    "CHECKLIST (copy-paste and tick off): [ ] build command verified working. [ ] architecture description accurate. [ ] gg section tested end-to-end. [ ] README/AGENTS drift fixed. [ ] stale commands/features removed. [ ] new patterns added. [ ] committed with all *.md in same commit.",
+    "ROLE MAP: project CLAUDE.md is Claude-facing project guidance; AGENTS.md is for Codex and other non-Claude agents; README.md is user-facing documentation. Keep each file in its lane and sync only overlapping subjects.",
+    "TOKEN OPTIMIZATION CHECK: if a workflow or command chain repeats across CLAUDE.md/README.md/AGENTS.md, keep only a short pointer in the MD and move the executable details into a skill. Prefer one canonical home per recurring flow to avoid drift and repeated session load."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "WHEN TO RUN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search md-heal",
+      "expect": "md-heal",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search 엠디힐",
+      "expect": "md-heal",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "md-heal",
+    "heal",
+    "fix",
+    "update",
+    "sync",
+    "drift",
+    "stale",
+    "markdown",
+    "claude",
+    "readme",
+    "agents",
+    "gg",
+    "checklist",
+    "project",
+    "self-healing",
+    "maintain",
+    "repair",
+    "엠디힐",
+    "클로드엠디",
+    "힐링",
+    "정비"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T12:35:51.9998565Z",
+  "updated": "2026-05-11T11:54:46.7160682Z",
+  "version": "1.4"
+}

@@ -1,0 +1,56 @@
+{
+  "id": "skill-sync-warning-triage",
+  "app": "wkappbot-workflow",
+  "title": "Skill Sync Warning Triage",
+  "title_ko": null,
+  "desc": "Inspect wkappbot skill sync split-brain warnings, extract the conflicting ids, and decide the minimal resolve list before cleanup.",
+  "steps": [
+    "Run wkappbot skill sync and capture split-brain warnings",
+    "Extract id, repo, version, and whether HQ or peer should win",
+    "Pass the final ids to wkappbot skill sync --resolve <id>",
+    "Re-run plain wkappbot skill sync to confirm the warning set is stable"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill sync",
+      "expect": "[SKILL:SYNC] WARN split-brain .* Run wkappbot skill sync --resolve <id> to choose.",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill sync",
+      "expect": "CONFLICTS=.*",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill sync --resolve <id>",
+      "expect": "[SKILL:SYNC] resolved split-brain .* (accepted peer copy)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sync",
+    "triage",
+    "split-brain",
+    "warning"
+  ],
+  "source_refs": [
+    {
+      "file": "skills/wkappbot-workflow/skill-sync-warning-triage.skill.json",
+      "line": 1,
+      "pattern": "split-brain",
+      "note": null
+    },
+    {
+      "file": "skills/wkappbot-workflow/skill-sync-split-brain-cleanup.skill.json",
+      "line": 1,
+      "pattern": "split-brain",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T04:27:57.6022157Z",
+  "updated": "2026-05-11T04:27:57.6022247Z",
+  "version": "1.0"
+}

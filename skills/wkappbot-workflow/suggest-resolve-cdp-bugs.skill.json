@@ -1,0 +1,38 @@
+{
+  "id": "suggest-resolve-cdp-bugs",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Resolve: CDP Bug Fixes",
+  "title_ko": null,
+  "desc": "Resolve CDP bug suggests with evidence script validation",
+  "steps": [
+    "suggest resolve <ts> note --i-completed-script test-fix-cdp.sh --class CdpClient --skill suggest-resolve-cdp-bugs --commit 7375b93b",
+    "Class coupling OK: CdpClient / ChromeLauncher / ClaudePromptHelper matches affected classes in commit diff",
+    "Run evidence script: bash test-fix-cdp.sh -- must exit 0 to confirm CDP session is healthy",
+    "Use wkappbot windows to inspect current window positions and verify Chrome is placed correctly relative to caller HWND"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "session|end:0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "긴급",
+      "prompt": null
+    },
+    {
+      "cmd": "test-fix-cdp.sh",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-13T05:41:50.2196247Z",
+  "updated": "2026-05-13T05:52:45.3490081Z",
+  "version": "1.6"
+}

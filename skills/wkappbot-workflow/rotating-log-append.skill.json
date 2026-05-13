@@ -1,0 +1,51 @@
+{
+  "id": "rotating-log-append",
+  "app": "wkappbot-workflow",
+  "title": "Rotating Log Append Helper",
+  "title_ko": null,
+  "desc": "Shared append helper for runtime logs and JSONL files. If the target file was created on a previous day, rotate it into .old-append/YYYYMMDD/ before appending new content.",
+  "steps": [
+    "WHEN TO RUN: use this when adding or modifying any shared append helper for logs, JSONL, telemetry, or runtime traces.",
+    "ROTATION RULE: if the target file exists and its creation date is not today, move it under the same parent folder's .old-append/YYYYMMDD/ directory before appending.",
+    "NAME RULE: preserve the original filename inside .old-append/YYYYMMDD/. If that name already exists, add a -2, -3, ... suffix before the extension.",
+    "APPEND RULE: after rotation, append the new line to the fresh target file using UTF-8 without BOM.",
+    "FAILURE RULE: rotation is best-effort; if move fails, keep appending to the live file rather than losing the write.",
+    "INTEGRATION RULE: use one canonical helper for all recurring append sites. Do not duplicate rotation logic at each call site.",
+    "VERIFY: create a stale file dated yesterday, append one line, confirm the old file is in .old-append/YYYYMMDD/ and the live file contains the new line."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read rotating-log-append",
+      "expect": "ROTATION RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search rotating-log-append",
+      "expect": "rotating-log-append",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "TOKEN OPTIMIZATION CHECK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "append",
+    "rotate",
+    "log",
+    "jsonl",
+    "runtime",
+    "telemetry",
+    "old-append",
+    "helper",
+    "shared"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T14:47:49.0289526Z",
+  "updated": "2026-05-11T14:47:49.0289612Z",
+  "version": "1.0"
+}

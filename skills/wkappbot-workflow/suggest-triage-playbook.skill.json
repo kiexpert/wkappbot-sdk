@@ -1,11 +1,10 @@
-﻿{
+{
   "id": "suggest-triage-playbook",
   "app": "wkappbot-workflow",
   "title": "Suggest Triage Playbook",
-  "title_ko": null,
   "desc": "Operator playbook for reviewing wkappbot suggestions: classify duplicates, prioritize by impact, keep evidence requirements explicit, and convert repeated insights into skills.",
   "steps": [
-    "Run suggest list first and treat it as the source of truth for open work.",
+    "PRIORITY ZERO: Check resolve before triage. Every suggest fix must end with \u0027suggest resolve \u003Cts\u003E ... --commit \u003Chash\u003E\u0027. Do NOT skip resolve, defer it, or move to next batch. Resolve completion (HALF state or full RESOLVED) is the gate for closure. Only after resolve is done may you move to next suggest.",
     "Classify each item by audience and responsibility: operator, developer, project, or user.",
     "Merge obvious duplicates conceptually before attempting a fix so one root cause does not create multiple partially solved items.",
     "Prioritize by quick win, frequency, and risk; handle the highest signal items first. For large backlogs: use ask-suggest-priority-batching skill -- one GPT batch rank pass then per-item asks concurrently before acting.",
@@ -16,24 +15,6 @@
     "Verified 2026-04-26: test-suggest-merge-all-matching.sh (resolve ts=2026-04-26T06:11:13.6770863Z)",
     "Suggester confirm flow (2026-05-01): (1) maintainer does 1st-party resolve -\u003E HALF state \u002B Slack notice sent to suggester. (2) Suggester runs \u0027suggest check \u003Cts\u003E\u0027 to see regression result. (3) If regression PASS -\u003E \u0027suggest check \u003Cts\u003E\u0027 (author shortcut, preferred) OR \u0027suggest resolve \u003Cts\u003E note --confirm --skill X\u0027 (manual). Running resolve WITHOUT --confirm while HALF exists -\u003E ERROR with copy-pasteable check \u002B confirm commands."
   ],
-  "requirements": [
-    {
-      "cmd": "wkappbot suggest list",
-      "expect": "shows suggests with ts values",
-      "prompt": "--all-matching re-enabled \u002B --dry-run \uCD94\uAC00 --skill suggest-triage-playbook --commit 259b4f8aeda4fc112d9907740c7bbbe7663ded69 --class skill-only"
-    },
-    {
-      "cmd": "wkappbot suggest merge --all-matching blocker --title merged",
-      "expect": "merges all matching",
-      "prompt": "--all-matching re-enabled \u002B --dry-run \uCD94\uAC00 --skill suggest-triage-playbook --commit 259b4f8aeda4fc112d9907740c7bbbe7663ded69 --class skill-only"
-    },
-    {
-      "cmd": "wkappbot suggest merge --all-matching blocker --title merged --dry-run",
-      "expect": "shows what would merge",
-      "prompt": "--all-matching re-enabled \u002B --dry-run \uCD94\uAC00 --skill suggest-triage-playbook --commit 259b4f8aeda4fc112d9907740c7bbbe7663ded69 --class skill-only"
-    }
-  ],
-  "primary_cmd": "wkappbot suggest list",
   "tags": [
     "workflow",
     "suggest",
@@ -47,6 +28,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-08T16:54:57.9220465Z",
-  "updated": "2026-05-08T04:46:19.3242952Z",
-  "version": "1.10"
+  "updated": "2026-05-13T05:29:05.5231896Z",
+  "version": "1.12"
 }

@@ -1,0 +1,62 @@
+{
+  "id": "ask-health-check",
+  "app": "wkappbot-workflow",
+  "title": "Ask Health Check (wkask)",
+  "title_ko": null,
+  "desc": "End-to-end CDP ask pipeline health check via wkask.ps1. Run after hot-swap, Chrome accumulation, or before triad sessions.",
+  "steps": [
+    "Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt 'say: PONG' -Timeout 60. Pass = PONG received in colour stream. Fail = timeout or Chrome stuck.",
+    "Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini 'say: PONG' -Timeout 90. Common failure: off-screen Chrome -- check cdp-mon.ps1 for CRIT position drift.",
+    "Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 triad 'say: PONG' -Timeout 120. GPT+Gemini+Claude all must respond.",
+    "On failure: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1 -- look for CRIT flags (off-screen TGT-POS, LAT=DEAD, >5 sessions). Kill stale Chrome PIDs then retry.",
+    "Stale session cleanup: Stop-Process -Id PID -Force for each stale PID shown by cdp-mon. Retry wkask after cleanup.",
+    "Chrome restart loop (Runtime.enable timeout in log): wkappbot --sudo eye restart to force hot-swap and fresh Chrome session.",
+    "Success baseline: gpt<60s, gemini<90s, triad<120s. Consistent timeouts = Chrome or network issue, not wkappbot code.",
+    "When to run: after hot-swap deploy, after Chrome accumulation (cdp-mon shows >5), after network change, before triad sessions.",
+    "USER-FACING SMOKE: when the issue is user-visible, run the repo's user-perspective or smoke scripts before deeper triage so the failure is anchored to the user journey.",
+    "Run: powershell -ExecutionPolicy Bypass -File D:/GitHub/wkappbot-sdk/scripts/test-triad-synthesis.ps1 -Full. Pass = triad log contains gpt/claude/gemini, Points of consensus, Key disagreements & resolution, Final answer, and TRIAD_OK."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "session",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-health-check",
+      "expect": "ask health check",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ask health",
+      "expect": "ask-health-check",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-user-perspective-test-playbook",
+      "expect": "user-facing QA playbook",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "health",
+    "cdp",
+    "gpt",
+    "gemini",
+    "triad",
+    "wkask",
+    "monitor",
+    "test",
+    "check",
+    "ping",
+    "pong"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T16:10:21.6199698Z",
+  "updated": "2026-05-11T19:39:04.3894938Z",
+  "version": "1.5"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "sdk-user-perspective-test-playbook",
+  "app": "wkappbot-sdk",
+  "title": "SDK User-Perspective Test Playbook",
+  "title_ko": null,
+  "desc": "Systematic QA playbook for the public SDK launcher from a first-time user perspective. Each step: run command, check exit code and output, file suggest on deviation.",
+  "steps": [
+    "KNOWN SDK-LAUNCHER BEHAVIOR: launcher connects to whichever wkappbot Eye is running on the machine. In dev env with private Eye active, commands route to private core. For isolated testing use wkappbot-core.exe directly.",
+    "SDK QA FLOW: for user-visible launcher/CDP bugs, start from this playbook, then run the matching wkask/wkcdp smoke and compare exit code plus output against the first-time-user baseline before diagnosing internals.",
+    "EVIDENCE RULE: on any failure, keep the exact command, exit code, and smoke output together so the same user path can be replayed without re-deriving context."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "wkappbot v",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot license status",
+      "expect": "Free",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "test",
+    "qa",
+    "user",
+    "launcher",
+    "playbook"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T04:08:16.8430032Z",
+  "updated": "2026-05-11T16:11:09.0143091Z",
+  "version": "1.5"
+}
