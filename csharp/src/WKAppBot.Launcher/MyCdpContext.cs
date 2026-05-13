@@ -694,6 +694,17 @@ partial class Program
                 return;
             }
 
+            // Guard: reject off-screen caller to prevent Chrome from inheriting off-screen placement.
+            // Off-screen caller (e.g., left monitor at -2189,-9 outside all monitors) would place Chrome
+            // off-screen too, causing Stage 2 selector detection to fail and block for 90+ seconds.
+            // Skip placement when caller is genuinely off-screen (not just negative coordinates).
+            if (IsRectOutsideAllMonitors(new RECT
+                { Left = callerRect.Left, Top = callerRect.Top, Right = callerRect.Right, Bottom = callerRect.Bottom }))
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STEP1] caller off-screen outside all monitors rect=({callerRect.Left},{callerRect.Top},{callerRect.Right},{callerRect.Bottom}) -- skip placement");
+                return;
+            }
+
             // Coordinate space: by the time this runs the launcher has called
             // TrySetPerMonitorV2DpiAwareness() in Main(), so callerRect is in
             // physical pixels — the same coordinate space Chrome (PerMonitorV2)
