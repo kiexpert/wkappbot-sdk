@@ -222,7 +222,10 @@ partial class Program
 
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            // Stage 2 timeout: 3s max. If Page.loadEventFired hasn't arrived by then,
+            // assume selector is unavailable or page won't load. Better to fail fast
+            // than to wait 10s and waste user time.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
 
             // Step A: resolve the active page's webSocketDebuggerUrl via the
             // standard CDP discovery endpoint. Chrome listens on 127.0.0.1
@@ -272,6 +275,29 @@ partial class Program
         Console.Error.WriteLine(
             $"[PLACEMENT:STAGE2] trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms ok={placementOk} attempts={attempts} "
             + $"final=(L={final.Left},T={final.Top},R={final.Right},B={final.Bottom})");
+
+        // Auto-suggest on Stage 2 failure (timeout, selector not found, CDP error)
+        if (trigger.Contains("timeout") || trigger.Contains("cdp_error") || trigger.Contains("no_ws_url"))
+        {
+            var suggestMsg = $"BUG: Stage 2 ask timeout (cmd={cmd}). trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms. " +
+                            $"Chrome may be off-screen, selector unavailable, or CDP unresponsive. " +
+                            $"Repro: wkappbot ask gpt 'test'";
+            try
+            {
+                System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "wkappbot",
+                        Arguments = $"suggest \"{suggestMsg}\" --requirement \"wkappbot ask gpt 'test' => within 20s\" " +
+                                   "--requirement \"wkappbot ask gemini 'test' => within 20s\" " +
+                                   "--requirement \"wkappbot eye tick => healthy\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                Console.Error.WriteLine($"[PLACEMENT:STAGE2] auto-suggest submitted for {trigger}");
+            }
+            catch { /* best-effort */ }
+        }
     }
 
     /// <summary>
