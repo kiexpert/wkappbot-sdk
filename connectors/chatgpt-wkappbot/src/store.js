@@ -2,9 +2,18 @@ const jobs = new Map();
 const agents = new Map();
 const { appendEvent } = require('./log');
 const { publish } = require('./stream');
+const { loadBootstrapState } = require('./bootstrap');
 
 function now() {
   return new Date().toISOString();
+}
+
+for (const job of loadBootstrapState().jobs || []) {
+  jobs.set(job.id, job);
+}
+
+for (const agent of loadBootstrapState().agents || []) {
+  agents.set(agent.id, agent);
 }
 
 function createJob(input) {
