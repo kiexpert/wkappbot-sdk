@@ -11,6 +11,7 @@
     button, select, input { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; margin: 6px 0; }
     select, input { width: 100%; box-sizing: border-box; }
     button { cursor: pointer; border-radius: 999px; }
+    .muted { opacity: .7; }
   </style>
 </head>
 <body>
@@ -19,7 +20,7 @@
 
   <div class="card">
     <h2>Portable Daily Board</h2>
-    <p>레포를 고르면 오늘 Daily issue를 찾아서 보드를 엽니다.</p>
+    <p>레포를 고르면 바로 오늘 Daily board로 이동합니다.</p>
     <label>Repository</label>
     <select id="repo">
       <option value="kiexpert/wkappbot-sdk">wkappbot-sdk</option>
@@ -33,6 +34,7 @@
     <input id="user" placeholder="GitHub user, 예: kiexpert">
     <input id="title" value="Daily board" placeholder="title prefix">
     <input id="label" value="daily" placeholder="issue label">
+    <p class="muted">오늘 issue가 없으면 보드에서 fallback issue가 보일 수 있습니다. 이 경우 Daily workflow를 실행해 오늘 issue를 만들면 됩니다.</p>
     <button id="openBoard">오늘 보드 열기</button>
     <button id="openFresh">현재 보드 캐시 우회 열기</button>
   </div>
@@ -40,8 +42,7 @@
   <div class="card">
     <h2>Dashboards</h2>
     <a href="chatgpt-wkappbot-dashboard.html">ChatGPT WKAppBot Dashboard</a>
-    <a href="board.html">GitHub Issues Board</a>
-    <a href="board/">GitHub Issues Board fallback path</a>
+    <a href="board/">GitHub Issues Board</a>
     <a id="freshBoard" href="board.html">GitHub Issues Board fresh link</a>
   </div>
 
@@ -58,7 +59,7 @@
     const $ = id => document.getElementById(id);
     const fresh = 'board.html?v=' + Date.now();
     $('freshBoard').href = fresh;
-    $('repo').onchange = () => $('customRepo').style.display = $('repo').value === 'custom' ? 'block' : 'none';
+
     function boardUrl() {
       const repo = $('repo').value === 'custom' ? $('customRepo').value.trim() : $('repo').value;
       const p = new URLSearchParams();
@@ -67,9 +68,24 @@
       if ($('title').value.trim()) p.set('title', $('title').value.trim());
       if ($('user').value.trim()) p.set('user', $('user').value.trim());
       p.set('v', Date.now());
-      return 'board.html?' + p.toString();
+      return 'board/?' + p.toString();
     }
-    $('openBoard').onclick = () => location.href = boardUrl();
+
+    function openBoard() {
+      if ($('repo').value === 'custom' && !$('customRepo').value.trim()) {
+        $('customRepo').focus();
+        return;
+      }
+      location.href = boardUrl();
+    }
+
+    $('repo').onchange = () => {
+      const custom = $('repo').value === 'custom';
+      $('customRepo').style.display = custom ? 'block' : 'none';
+      if (!custom) openBoard();
+    };
+    $('customRepo').onkeydown = e => { if (e.key === 'Enter') openBoard(); };
+    $('openBoard').onclick = openBoard;
     $('openFresh').onclick = () => location.href = fresh;
   </script>
 </body>
