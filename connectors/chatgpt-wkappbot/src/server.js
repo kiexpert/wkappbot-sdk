@@ -1,5 +1,13 @@
 const http = require('http');
-const { createJob, getJob, nextJob, completeJob } = require('./store');
+const {
+  createJob,
+  getJob,
+  nextJob,
+  completeJob,
+  listJobs,
+  heartbeat,
+  listAgents
+} = require('./store');
 const { isAllowed } = require('./auth');
 
 const port = Number(process.env.PORT || 8787);
@@ -30,6 +38,22 @@ const server = http.createServer((req, res) => {
     return send(res, 200, { ok: true, service: 'wkappbot-chatgpt-relay' });
   }
 
+  if (req.method === 'GET' && req.url === '/jobs') {
+    return send(res, 200, { jobs: listJobs() });
+  }
+
+  if (req.method === 'GET' && req.url === '/agents') {
+    return send(res, 200, { agents: listAgents() });
+  }
+
+  if (req.method === 'POST' && req.url === '/heartbeat') {
+    return readJson(req, (err, parsed) => {
+      if (err) return send(res, 400, { error: 'bad_json' });
+      const item = heartbeat(parsed.agentId, parsed.meta);
+      send(res, 200, item);
+    });
+  }
+
   if (req.method === 'POST' && req.url === '/execute') {
     return readJson(req, (err, parsed) => {
       if (err) return send(res, 400, { error: 'bad_json' });
@@ -39,8 +63,10 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'POST' && req.url === '/poll') {
-    const job = nextJob();
-    return send(res, 200, { job });
+    return readJson(req, (err, parsed) => {
+      const job = nextJob(parsed && parsed.agentId);
+      send(res, 200, { job });
+    });
   }
 
   if (req.method === 'POST' && req.url === '/complete') {
