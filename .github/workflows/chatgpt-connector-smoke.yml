@@ -6,6 +6,17 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: connectors/chatgpt-wkappbot
+
     steps:
       - uses: actions/checkout@v4
-      - run: echo smoke
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: node src/server.js &
+
+      - run: bash smoke-test.sh
