@@ -262,6 +262,27 @@ wkfind --week "05-13"                # Week-old sessions + code
 Output: Top 3 sessions + top 10 code matches per tier, ranked by score.
 No options; search-only. `.gitignore` auto-exclusion via ripgrep.
 
+### wkask - Real-time Ask (Stage 3) Pipeline Health Monitor
+**Location**: `D:\GitHub\WKAppBot\bin\wkask.ps1` (core repo)
+**Usage**: `powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 <provider> '<prompt>' -Timeout <seconds>`
+
+Real-time monitoring of ask CDP pipeline health. Fires a question, streams live response color-coded by AI (GPT/Gemini/Claude), detects Stage 2/3 placement corrections, and reports timing.
+
+Providers: `gpt` (60s), `gemini` (90s), `triad` (120s parallel)
+
+Examples:
+```
+powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt "say: hello" -Timeout 60
+powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 triad "say: test" -Timeout 120
+```
+
+When to use:
+- After hot-swap deploy to verify Chrome is on-screen and responsive
+- Before triad sessions to confirm all three pipelines (GPT + Gemini + Claude) are healthy
+- During Stage 23 testing to watch placement corrections and DPI checks in real-time
+
+On failure: check `cdp-mon.ps1` for position drift (CRIT flags), kill stale Chrome processes, retry.
+
 ## Encoding Policy
 - Treat repository text files as UTF-8 by default.
 - When importing a source file in CP949 or any non-UTF-8 encoding, preserve the original file and also create a UTF-8 copy for safe reading and editing.
