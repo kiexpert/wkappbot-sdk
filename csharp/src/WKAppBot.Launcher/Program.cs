@@ -231,29 +231,31 @@ partial class Program
             var cwd = Environment.CurrentDirectory;
             var exePath = Environment.ProcessPath ?? "";
             var sid = System.Diagnostics.Process.GetCurrentProcess().SessionId;
-            // Host window: parent process's main window (VS Code, Terminal, etc.)
-            var hostHwnd = IntPtr.Zero;
-            var hostTitle = "";
-            try
+            // Caller window: parent process's main window (VS Code, Terminal, etc.)
+            // Launcher's own window: walk process chain to find first valid MainWindowHandle
+            var fgHwnd = IntPtr.Zero;
+            var fgTitle = "";
+            var walkPid = myPid;
+            for (int ci = 0; ci < 10; ci++)
             {
-                if (parentPid > 0)
+                var ppid = GetParentProcessId(walkPid);
+                if (ppid <= 0 || ppid == walkPid) break;
+                try
                 {
-                    var pp = System.Diagnostics.Process.GetProcessById(parentPid);
-                    hostHwnd = pp.MainWindowHandle;
-                    if (hostHwnd != IntPtr.Zero)
+                    var p = System.Diagnostics.Process.GetProcessById(ppid);
+                    if (p.MainWindowHandle != IntPtr.Zero)
                     {
+                        fgHwnd = p.MainWindowHandle;
                         var tb = new System.Text.StringBuilder(256);
-                        GetWindowTextW(hostHwnd, tb, 256);
-                        hostTitle = tb.ToString();
-                        if (hostTitle.Length > 60) hostTitle = hostTitle[..57] + "...";
+                        GetWindowTextW(fgHwnd, tb, 256);
+                        fgTitle = tb.ToString();
+                        if (fgTitle.Length > 60) { fgTitle = fgTitle[..57] + "..."; }
+                        break;  // Found it!
                     }
                 }
+                catch { }
+                walkPid = ppid;
             }
-            catch { }
-            // Foreground window at launch time
-            var fgHwnd = GetForegroundWindow();
-            var fgTitle = "";
-            try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
@@ -261,8 +263,8 @@ partial class Program
             var err = Console.Error;
             void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
             F($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
-            if (consoleHwnd != IntPtr.Zero) F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
-            if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
+            if (consoleHwnd != IntPtr.Zero) { F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\""); }
+            if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) { F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); } }
             F($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
             // Parent chain
             F(",\"chain\":[");
