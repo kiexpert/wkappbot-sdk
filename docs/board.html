@@ -11,6 +11,7 @@
     h1 { margin: 0; font-size: 28px; }
     textarea, input { width: 100%; box-sizing: border-box; border: 1px solid rgba(128,128,128,.35); border-radius: 12px; padding: 12px; margin: 8px 0; font: inherit; }
     textarea { min-height: 96px; }
+    input[readonly] { opacity: .75; }
     .muted { opacity: .7; }
     .card { border: 1px solid rgba(128,128,128,.35); border-radius: 16px; padding: 18px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
     .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -43,7 +44,7 @@
 
   <section class="card">
     <h2>댓글 쓰기</h2>
-    <p class="muted">마크다운을 사용할 수 있습니다. Worker 주소가 없으면 GitHub 댓글 페이지로 이동합니다.</p>
+    <p class="muted">마크다운을 사용할 수 있습니다. <code>?user=githubid</code>로 들어오면 이름이 자동 고정됩니다.</p>
     <input id="workerUrl" placeholder="Cloudflare Worker URL, 예: https://xxx.workers.dev">
     <input id="guestName" placeholder="이름, 예: Guest">
     <input id="website" style="display:none" tabindex="-1" autocomplete="off">
@@ -65,12 +66,18 @@
     const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
     const apiBase = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
     const $ = id => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
     let currentComments = [];
 
     $('openIssue').href = issueUrl;
     $('openIssue2').href = issueUrl;
     $('workerUrl').value = localStorage.getItem('wkBoardWorkerUrl') || '';
     $('guestName').value = localStorage.getItem('wkBoardGuestName') || '';
+    if (params.get('user')) {
+      $('guestName').value = params.get('user');
+      $('guestName').readOnly = true;
+      localStorage.setItem('wkBoardGuestName', params.get('user'));
+    }
 
     function esc(s) {
       return String(s || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
