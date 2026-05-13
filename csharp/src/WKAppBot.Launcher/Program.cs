@@ -122,12 +122,44 @@ partial class Program
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
 
+        // DPI awareness MUST be set before ANY GetWindowRect / SetWindowPos / monitor
+        // enumeration call, or the launcher will silently operate in virtualized
+        // coordinates while Chrome (PerMonitorV2) reports/expects physical pixels.
+        //
+        // Bug history: without this call, on a 150% scaled monitor:
+        //   - GetWindowRect(callerHwnd) returned logical coords (e.g. width=1707)
+        //   - SetWindowPos(chromeHwnd, ...) applied those as if physical
+        //   - net effect: Chrome ended up at the wrong monitor and oversized
+        //     (caller's logical 1707x960 → Chrome physical 2560x1440)
+        //
+        // PER_MONITOR_AWARE_V2 = -4 ensures every Win32 window API in this process
+        // operates in physical pixels on the current monitor, matching Chrome's
+        // own DPI context. Failure to set (e.g. older Windows 10 without
+        // SetProcessDpiAwarenessContext) silently falls back to legacy behaviour.
+        TrySetPerMonitorV2DpiAwareness();
+
         // --heal-link <linkPath> <targetPath>: internal self-dispatch used by
         // the live-swap exit path. Polls the stale alias (up to ~1s) until the
         // previous Launcher releases its exe lock, then deletes + re-links to
         // wkappbot.exe. Runs early so we skip all the normal startup noise.
         if (args.Length >= 3 && args[0] == "--heal-link")
             return HealLinkSelfDispatch(args[1], args[2]);
+
+        // __bg-place-chrome: internal self-dispatch from TryMoveWebBotNearCaller.
+        // The parent launcher fires this child after Stage 1 placement so the
+        // user's terminal prompt returns immediately while Stage 2 (page-load
+        // wait) and Stage 3 (DPI-aware match) run in the background.
+        //
+        // argv: __bg-place-chrome <0xHWND> <port> <L> <T> <R> <B> <cmd>
+        //
+        // Runs early so we skip the rest of Main()'s normal startup (JSON
+        // banner, encoding setup, Eye pipe handshake, etc.) -- the watcher
+        // only needs the DPI awareness already set above and the telemetry
+        // helpers in MyCdpContext.Stage23.cs.
+        if (args.Length > 0 && args[0] == BgPlaceChromeArg)
+        {
+            return RunBackgroundPlacementWatcher(args);
+        }
 
         // Dim all Launcher stderr via ANSI codes -- MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
         Console.SetError(new DimStderrWriter(Console.Error));
@@ -952,6 +984,50 @@ partial class Program
     static extern uint GetConsoleOutputCP();
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern uint GetConsoleCP();
+
+    // DPI awareness context values (winuser.h DPI_AWARENESS_CONTEXT_*).
+    // PER_MONITOR_AWARE_V2 = -4 gives the launcher the same coordinate space
+    // Chrome uses, so GetWindowRect / SetWindowPos exchange physical pixels.
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    = new IntPtr(-3);
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         = new IntPtr(-2);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll", SetLastError = true)]
+    static extern int SetProcessDpiAwareness(int awareness);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetProcessDPIAware();
+
+    /// <summary>
+    /// Make the launcher process PerMonitorV2 DPI-aware so every Win32 window
+    /// API operates in physical pixels (the same coordinate space Chrome uses).
+    /// Falls back gracefully on older OSes that lack the v2 API.
+    /// </summary>
+    static void TrySetPerMonitorV2DpiAwareness()
+    {
+        try
+        {
+            if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                return;
+        }
+        catch { /* SetProcessDpiAwarenessContext missing on older Win10 → try shcore */ }
+        try
+        {
+            // PROCESS_PER_MONITOR_DPI_AWARE = 2 (Win 8.1+)
+            if (SetProcessDpiAwareness(2) == 0) return;
+        }
+        catch { /* shcore missing → try user32 fallback */ }
+        try
+        {
+            // System DPI aware -- last resort. Better than DPI-Unaware
+            // (virtualized coords), worse than per-monitor on multi-DPI setups.
+            SetProcessDPIAware();
+        }
+        catch { /* fail open -- legacy DPI-Unaware behaviour */ }
+    }
 
     // CreateProcessW with DETACHED_PROCESS: spawns Core outside bash's ConPTY session.
     // Structs + guard: AppBotPipe.cs (shared between Launcher and Core)

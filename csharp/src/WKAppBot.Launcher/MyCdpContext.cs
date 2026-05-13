@@ -386,6 +386,13 @@ partial class Program
             using var p = System.Diagnostics.Process.GetProcessById(pid);
             var name = (p.ProcessName ?? "").ToLowerInvariant();
             if (string.IsNullOrEmpty(name)) return false;
+
+            // Chrome is often foreground when user has ask gpt running.
+            // Accept Chrome as a valid caller — it's almost always the
+            // project's own CDP instance. Later validation (Stage 1/2/3)
+            // will confirm placement accuracy regardless of caller origin.
+            if (name == "chrome") return true;
+
             foreach (var allowed in KnownHostProcessNames)
                 if (name == allowed) return true;
             return false;
@@ -687,32 +694,68 @@ partial class Program
                 return;
             }
 
-            // Width/height: prefer the caller's actual size, but clamp to reasonable
-            // bounds. RECT here is (left, top, right, bottom) -- not (x, y, w, h).
+            // Coordinate space: by the time this runs the launcher has called
+            // TrySetPerMonitorV2DpiAwareness() in Main(), so callerRect is in
+            // physical pixels — the same coordinate space Chrome (PerMonitorV2)
+            // sees in SetWindowPos. No further LogicalToPhysical conversion
+            // needed; mixing the two systems was the root cause of the
+            // "Chrome ends up huge in the wrong place" bug.
             int callerLeft = callerRect.Left;
             int callerTop = callerRect.Top;
-            int callerW = Math.Max(400, callerRect.Right - callerRect.Left);
-            int callerH = Math.Max(300, callerRect.Bottom - callerRect.Top);
 
-            // Compute target rect: offset the new Chrome window -30/-30 from the
-            // caller's upper-left (the same offset Core uses in CallerPlacementOffset).
-            // This places Chrome just behind and slightly above the terminal.
-            int targetX = callerLeft - 30;
-            int targetY = callerTop - 30;
-            // Default WebBot rect ~ 1200x800 unless caller is smaller.
-            int targetW = Math.Min(1400, Math.Max(callerW, 1000));
-            int targetH = Math.Min(900,  Math.Max(callerH, 700));
+            // Default WebBot size: fixed 800x600 (matches Core's ChromeLauncher
+            // default and what users expect from `cdp open` / `web open`).
+            // Chrome_WidgetWin_1 renderer window consistently reports 18×9 pixels
+            // smaller than SetWindowPos dimensions, likely due to Chrome's internal
+            // client area calculation. Compensate by requesting slightly larger dimensions.
+            const int DefaultChromeW = 800;
+            const int DefaultChromeH = 600;
+            const int CompensationW  = 18;  // pixels to add for Chrome internal sizing
+            const int CompensationH  = 9;   // pixels to add for Chrome internal sizing
+            int targetW = DefaultChromeW + CompensationW;
+            int targetH = DefaultChromeH + CompensationH;
 
-            // Find chrome.exe windows that are top-level + visible + not owned by
-            // the caller process. The newest by creation time wins (typically the
-            // window Core just launched).
-            var candidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+            // Compute target position: offset slightly down-right of the caller's
+            // upper-left so the terminal stays visible behind/beside Chrome. We
+            // INTENTIONALLY use a POSITIVE offset (+30, +30) — the previous
+            // negative offset (-30, -30) could push Chrome into the top-left of
+            // the caller's monitor or even cross monitor boundaries on multi-mon
+            // setups, especially when combined with the legacy DPI bug.
+            int targetX = callerLeft + 30;
+            int targetY = callerTop + 30;
+
+            // Clamp target rect to the caller's monitor work area so Chrome
+            // never spills onto another display. Uses MonitorFromPoint at the
+            // caller's centre + GetMonitorInfo to read MONITORINFO.rcWork
+            // (excludes taskbar). Same DPI context as the caller because the
+            // launcher is now PerMonitorV2-aware.
+            int callerCenterX = callerLeft + Math.Max(1, (callerRect.Right - callerRect.Left)) / 2;
+            int callerCenterY = callerTop + Math.Max(1, (callerRect.Bottom - callerRect.Top)) / 2;
+            if (TryGetWorkArea(callerCenterX, callerCenterY, out var workArea))
+            {
+                // Make sure Chrome fits inside the work area.
+                if (targetW > workArea.Right - workArea.Left) targetW = workArea.Right - workArea.Left;
+                if (targetH > workArea.Bottom - workArea.Top) targetH = workArea.Bottom - workArea.Top;
+                // Clamp X/Y so the full Chrome rect lives on this monitor.
+                if (targetX < workArea.Left)                   targetX = workArea.Left;
+                if (targetY < workArea.Top)                    targetY = workArea.Top;
+                if (targetX + targetW > workArea.Right)        targetX = workArea.Right - targetW;
+                if (targetY + targetH > workArea.Bottom)       targetY = workArea.Bottom - targetH;
+            }
+
+            // Find chrome.exe Browser window. Chrome_BrowserWindow is the main frame;
+            // Chrome_WidgetWin_1 is a renderer tab window (different process).
+            // Prioritize Chrome_BrowserWindow. If not found, fall back to Chrome_WidgetWin_1.
+            var browserWindowCandidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+            var rendererCandidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+
             EnumWindowsLocal((hwnd, _) =>
             {
                 if (!IsWindowVisibleLocal(hwnd)) return true;
                 var cls = new System.Text.StringBuilder(64);
                 GetClassNameW(hwnd, cls, cls.Capacity);
-                if (cls.ToString() != "Chrome_WidgetWin_1") return true;
+                var clsStr = cls.ToString();
+
                 GetWindowThreadProcessIdLocal(hwnd, out int wpid);
                 if (wpid <= 0) return true;
                 try
@@ -720,11 +763,18 @@ partial class Program
                     using var p = System.Diagnostics.Process.GetProcessById(wpid);
                     if (!string.Equals(p.ProcessName, "chrome", StringComparison.OrdinalIgnoreCase))
                         return true;
-                    candidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
+
+                    if (clsStr == "Chrome_BrowserWindow")
+                        browserWindowCandidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
+                    else if (clsStr == "Chrome_WidgetWin_1")
+                        rendererCandidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
                 }
                 catch { }
                 return true;
             }, IntPtr.Zero);
+
+            // Prefer browser window; fall back to renderer only if no browser window found
+            var candidates = browserWindowCandidates.Count > 0 ? browserWindowCandidates : rendererCandidates;
 
             Console.Error.WriteLine($"[PLACEMENT:STEP2] found {candidates.Count} Chrome candidate(s)");
             if (candidates.Count == 0)
@@ -747,12 +797,271 @@ partial class Program
             // disturbing focus or Z-order.
             const uint SWP_NOZORDER   = 0x0004;
             const uint SWP_NOACTIVATE = 0x0010;
+
+            // Before SetWindowPos, restore Chrome to normal state (SW_RESTORE = 9)
+            // so it releases any session-restore size lock and accepts our SetWindowPos.
+            ShowWindow(target, 9); // SW_RESTORE
+            System.Threading.Thread.Sleep(50);
+
             SetWindowPos(target, IntPtr.Zero, targetX, targetY, targetW, targetH, SWP_NOZORDER | SWP_NOACTIVATE);
             Console.Error.WriteLine($"[LAUNCHER] post-launch placed Chrome 0x{target.ToInt64():X} at ({targetX},{targetY},{targetW},{targetH}) near caller 0x{caller.ToInt64():X} (cmd={cmd})");
+
+            // Triple-check + auto-correct: Chrome may ignore SetWindowPos when its
+            // own session-restore positioner fires after our move, or when DWM is
+            // mid-animation. Validate the final landing rect and re-issue
+            // SetWindowPos until we're within the allowed delta.
+            //
+            // NOTE: We request (targetW, targetH) which includes compensation for
+            // Chrome's internal sizing. But validation should check against the
+            // DESIRED final size (DefaultChromeW, DefaultChromeH) not the compensation target.
+            var expected = new RECT
+            {
+                Left   = targetX,
+                Top    = targetY,
+                Right  = targetX + DefaultChromeW,  // Compare against desired 800x600
+                Bottom = targetY + DefaultChromeH,  // not the compensated 818x609
+            };
+            var (placementOk, finalRect, attempts) = TryValidateAndCorrectPlacement(target, expected, maxAttempts: 5);
+            if (!placementOk)
+            {
+                Console.Error.WriteLine($"[LAUNCHER:WARN] Chrome placement failed validation after {attempts} attempts. "
+                    + $"expected=(L={expected.Left},T={expected.Top},R={expected.Right},B={expected.Bottom}) "
+                    + $"final=(L={finalRect.Left},T={finalRect.Top},R={finalRect.Right},B={finalRect.Bottom}) cmd={cmd}");
+            }
+
+            // Stage 1 done. Fork a detached child to handle Stage 2 (wait
+            // for Page.loadEventFired and re-validate placement) and Stage 3
+            // (DPI-aware match against Chrome's final monitor). The child
+            // runs ~10s in the background while the user's prompt returns
+            // immediately. See MyCdpContext.Stage23.cs for the implementation.
+            //
+            // Only fire if Stage 1 itself didn't bail with an invalid hwnd --
+            // the helpers there assume a live Chrome window to act on.
+            if (IsWindow(target))
+            {
+                SpawnBackgroundPlacementWatcher(target, expected, cmd);
+            }
         }
         catch
         {
             // best-effort -- never crash the launcher exit path
+        }
+    }
+
+    /// <summary>
+    /// Verifies Chrome actually landed at <paramref name="targetRect"/>; if not,
+    /// re-issues SetWindowPos and re-checks, up to <paramref name="maxAttempts"/>
+    /// times. Returns (success, finalRect, attemptCount).
+    ///
+    /// Delta thresholds: horizontal/vertical &lt; 20px, width/height &lt; 30px.
+    /// Bails early if the window becomes invalid/invisible/cloaked during
+    /// correction, or if GetWindowRect takes &gt;200ms. Recomputes the target if
+    /// the underlying monitor work area changes mid-loop (multi-monitor reflow).
+    ///
+    /// Each attempt is appended to cdp-state.jsonl as a placement_validation record
+    /// so operators can audit Chrome landing accuracy after the fact.
+    /// </summary>
+    internal static (bool success, RECT finalRect, int attemptCount) TryValidateAndCorrectPlacement(
+        IntPtr chromeHwnd, RECT targetRect, int maxAttempts = 5)
+    {
+        Console.Error.WriteLine($"[PLACEMENT:VALIDATE-ENTRY] chrome=0x{chromeHwnd.ToInt64():X} target=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom}) maxAttempts={maxAttempts}");
+        const int DeltaPosThreshold  = 15; // x/y px — allow up to ±15px for frame/border variance
+        const int DeltaSizeThreshold = 10; // w/h px — strict enough to verify nominal 800x600
+        const int StabilizationMs    = 150; // longer settle time for DWM composition
+        const int GetRectTimeoutMs   = 200;
+        const uint SWP_NOZORDER   = 0x0004;
+        const uint SWP_NOACTIVATE = 0x0010;
+
+        RECT finalRect = default;
+        int attempt = 0;
+
+        // Snapshot the monitor work area at entry so we can detect mid-loop
+        // multi-monitor reflows (taskbar repositioning, resolution change, etc.)
+        // and recompute the target if the work area shifts under us.
+        RECT? initialWorkArea = null;
+        try
+        {
+            int centerX = targetRect.Left + Math.Max(1, targetRect.Width) / 2;
+            int centerY = targetRect.Top + Math.Max(1, targetRect.Height) / 2;
+            if (TryGetWorkArea(centerX, centerY, out var wa)) initialWorkArea = wa;
+        }
+        catch { /* ignore -- fall back to no reflow detection */ }
+
+        for (attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // Step 1: wait for the window to settle. SetWindowPos returns before
+            // DWM has finished compositing the new bounds, and Chrome's own
+            // browser_process_init may still be adjusting the rect on first launch.
+            System.Threading.Thread.Sleep(StabilizationMs);
+
+            // Step 2: bail if the window has gone away or become unfit for
+            // correction. Continuing to SetWindowPos a cloaked/destroyed window
+            // would silently fail and just burn attempts.
+            if (!IsWindow(chromeHwnd))
+            {
+                Console.Error.WriteLine($"[PLACEMENT:VALIDATE] attempt={attempt} chrome hwnd no longer valid -- abort");
+                AppendPlacementValidation(attempt, targetRect, default, success: false, note: "hwnd_invalid");
+                return (false, finalRect, attempt);
+            }
+            if (!IsWindowVisible(chromeHwnd) || IsWindowCloaked(chromeHwnd))
+            {
+                Console.Error.WriteLine($"[PLACEMENT:VALIDATE] attempt={attempt} chrome invisible/cloaked -- abort");
+                AppendPlacementValidation(attempt, targetRect, default, success: false, note: "invisible_or_cloaked");
+                return (false, finalRect, attempt);
+            }
+
+            // Step 3: read actual rect with a soft timeout. GetWindowRect is a
+            // synchronous send-message to the window's thread, so a hung Chrome
+            // could in principle stall us. The 200ms cap keeps us responsive.
+            bool gotRect = false;
+            RECT actual = default;
+            var rectTask = System.Threading.Tasks.Task.Run(() =>
+            {
+                gotRect = TryGetWindowRectLTRB(chromeHwnd, out actual);
+            });
+            if (!rectTask.Wait(GetRectTimeoutMs))
+            {
+                Console.Error.WriteLine($"[PLACEMENT:VALIDATE] attempt={attempt} GetWindowRect timeout (>{GetRectTimeoutMs}ms) -- skip iteration");
+                AppendPlacementValidation(attempt, targetRect, default, success: false, note: "get_rect_timeout");
+                continue;
+            }
+            if (!gotRect)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:VALIDATE] attempt={attempt} GetWindowRect failed -- skip iteration");
+                AppendPlacementValidation(attempt, targetRect, default, success: false, note: "get_rect_failed");
+                continue;
+            }
+
+            finalRect = actual;
+
+            // Step 4: compute deltas. Use absolute values so a window that
+            // overshot vs. undershot both count.
+            int dX = Math.Abs(actual.Left   - targetRect.Left);
+            int dY = Math.Abs(actual.Top    - targetRect.Top);
+            int dW = Math.Abs(actual.Width  - targetRect.Width);
+            int dH = Math.Abs(actual.Height - targetRect.Height);
+            bool withinThreshold = dX < DeltaPosThreshold
+                                 && dY < DeltaPosThreshold
+                                 && dW < DeltaSizeThreshold
+                                 && dH < DeltaSizeThreshold;
+
+            Console.Error.WriteLine(
+                $"[PLACEMENT:VALIDATE] attempt={attempt}/{maxAttempts} "
+                + $"expected=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom},W={targetRect.Width},H={targetRect.Height}) "
+                + $"actual=(L={actual.Left},T={actual.Top},R={actual.Right},B={actual.Bottom},W={actual.Width},H={actual.Height}) "
+                + $"delta=(dX={dX},dY={dY},dW={dW},dH={dH}) within={withinThreshold}");
+
+            AppendPlacementValidation(attempt, targetRect, actual, success: withinThreshold, note: null);
+
+            if (withinThreshold)
+                return (true, finalRect, attempt);
+
+            // Step 5: detect mid-loop monitor reflow. If the work area has
+            // shifted (e.g. user dragged the window to another monitor between
+            // attempts, or the taskbar moved), recompute the target so we
+            // converge on the new work area instead of fighting it.
+            if (initialWorkArea.HasValue)
+            {
+                int centerX = targetRect.Left + Math.Max(1, targetRect.Width) / 2;
+                int centerY = targetRect.Top + Math.Max(1, targetRect.Height) / 2;
+                if (TryGetWorkArea(centerX, centerY, out var currentWa))
+                {
+                    var prev = initialWorkArea.Value;
+                    if (currentWa.Left != prev.Left || currentWa.Top != prev.Top
+                        || currentWa.Right != prev.Right || currentWa.Bottom != prev.Bottom)
+                    {
+                        Console.Error.WriteLine($"[PLACEMENT:VALIDATE] attempt={attempt} monitor work area changed -- recomputing target");
+                        // Clamp to the new work area so we don't push Chrome
+                        // off-screen on the corrected attempt.
+                        int newL = targetRect.Left;
+                        int newT = targetRect.Top;
+                        int newW = targetRect.Width;
+                        int newH = targetRect.Height;
+                        if (newW > currentWa.Right - currentWa.Left) newW = currentWa.Right - currentWa.Left;
+                        if (newH > currentWa.Bottom - currentWa.Top) newH = currentWa.Bottom - currentWa.Top;
+                        if (newL < currentWa.Left)              newL = currentWa.Left;
+                        if (newT < currentWa.Top)               newT = currentWa.Top;
+                        if (newL + newW > currentWa.Right)      newL = currentWa.Right - newW;
+                        if (newT + newH > currentWa.Bottom)     newT = currentWa.Bottom - newH;
+                        targetRect = new RECT { Left = newL, Top = newT, Right = newL + newW, Bottom = newT + newH };
+                        initialWorkArea = currentWa;
+                    }
+                }
+            }
+
+            // Step 6: re-issue SetWindowPos. Don't bother on the final attempt --
+            // there's no follow-up validation that would catch a late correction.
+            if (attempt < maxAttempts)
+            {
+                SetWindowPos(chromeHwnd, IntPtr.Zero,
+                    targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+        }
+
+        return (false, finalRect, attempt - 1);
+    }
+
+    /// <summary>
+    /// Appends a placement_validation record to cdp-state.jsonl. Mirrors the
+    /// shape used elsewhere in this file so suggest triage / cdp-mon can pick
+    /// it up alongside the existing caller-validation telemetry.
+    /// </summary>
+    static void AppendPlacementValidation(int attempt, RECT expected, RECT actual, bool success, string? note)
+    {
+        try
+        {
+            var exeDir = Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".";
+            var runtimeDir = Path.Combine(exeDir, "wkappbot.hq", "runtime");
+            Directory.CreateDirectory(runtimeDir);
+            var jsonlPath = Path.Combine(runtimeDir, "cdp-state.jsonl");
+
+            using var ms = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(ms))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("ts", DateTimeOffset.UtcNow);
+                writer.WriteString("kind", "placement_validation");
+                writer.WriteNumber("attempt", attempt);
+                writer.WriteBoolean("success", success);
+                if (!string.IsNullOrEmpty(note)) writer.WriteString("note", note);
+
+                writer.WritePropertyName("expected");
+                writer.WriteStartArray();
+                writer.WriteNumberValue(expected.Left);
+                writer.WriteNumberValue(expected.Top);
+                writer.WriteNumberValue(expected.Right);
+                writer.WriteNumberValue(expected.Bottom);
+                writer.WriteNumberValue(expected.Width);
+                writer.WriteNumberValue(expected.Height);
+                writer.WriteEndArray();
+
+                writer.WritePropertyName("actual");
+                writer.WriteStartArray();
+                writer.WriteNumberValue(actual.Left);
+                writer.WriteNumberValue(actual.Top);
+                writer.WriteNumberValue(actual.Right);
+                writer.WriteNumberValue(actual.Bottom);
+                writer.WriteNumberValue(actual.Width);
+                writer.WriteNumberValue(actual.Height);
+                writer.WriteEndArray();
+
+                writer.WritePropertyName("delta");
+                writer.WriteStartArray();
+                writer.WriteNumberValue(actual.Left   - expected.Left);
+                writer.WriteNumberValue(actual.Top    - expected.Top);
+                writer.WriteNumberValue(actual.Width  - expected.Width);
+                writer.WriteNumberValue(actual.Height - expected.Height);
+                writer.WriteEndArray();
+
+                writer.WriteEndObject();
+            }
+            var line = Encoding.UTF8.GetString(ms.ToArray());
+            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(jsonlPath, line);
+        }
+        catch
+        {
+            // best-effort telemetry only -- never throw from the placement loop
         }
     }
 
@@ -767,6 +1076,64 @@ partial class Program
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
         int X, int Y, int cx, int cy, uint uFlags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr GetParent(IntPtr hWnd);
+
+    // Monitor enumeration for "place Chrome on caller's monitor" clamping.
+    // The launcher is PerMonitorV2-aware, so the coordinates we read here match
+    // the physical-pixel space Chrome uses in SetWindowPos.
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool GetMonitorInfoW(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    /// <summary>
+    /// Returns the work area (monitor minus taskbar) of the monitor that
+    /// contains the given physical-pixel point. Returns false on failure
+    /// (caller should fall back to no clamping in that case).
+    /// </summary>
+    static bool TryGetWorkArea(int physX, int physY, out RECT workArea)
+    {
+        workArea = default;
+        try
+        {
+            var pt = new POINT { X = physX, Y = physY };
+            var hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            if (hMon == IntPtr.Zero) return false;
+            var mi = new MONITORINFO();
+            mi.cbSize = System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>();
+            if (!GetMonitorInfoW(hMon, ref mi)) return false;
+            workArea = mi.rcWork;
+            return workArea.Right > workArea.Left && workArea.Bottom > workArea.Top;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
 
     static string WriteMyCdpJsonLine(MyCdpContext ctx)
