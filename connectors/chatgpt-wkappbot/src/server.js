@@ -1,5 +1,6 @@
 const http = require('http');
 const { createJob, getJob, nextJob, completeJob } = require('./store');
+const { isAllowed } = require('./auth');
 
 const port = Number(process.env.PORT || 8787);
 
@@ -21,6 +22,10 @@ function readJson(req, done) {
 }
 
 const server = http.createServer((req, res) => {
+  if (!isAllowed(req)) {
+    return send(res, 401, { error: 'unauthorized' });
+  }
+
   if (req.method === 'GET' && req.url === '/health') {
     return send(res, 200, { ok: true, service: 'wkappbot-chatgpt-relay' });
   }
