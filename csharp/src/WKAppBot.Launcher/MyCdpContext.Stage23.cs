@@ -422,7 +422,11 @@ partial class Program
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
             var url = $"http://127.0.0.1:{cdpPort}/json/list";
             var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list returned {(int)resp.StatusCode}");
+                return null;
+            }
             var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             using var doc = JsonDocument.Parse(body);
             foreach (var el in doc.RootElement.EnumerateArray())
@@ -434,8 +438,16 @@ partial class Program
                     return wsProp.GetString();
                 }
             }
+            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list returned no page tab");
         }
-        catch { /* fall through to null */ }
+        catch (OperationCanceledException)
+        {
+            Console.Error.WriteLine("[PLACEMENT:STAGE2] CDP /json/list timeout");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list error: {ex.GetType().Name}: {ex.Message}");
+        }
         return null;
     }
 
