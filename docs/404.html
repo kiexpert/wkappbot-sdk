@@ -2,30 +2,37 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>WKAppBot SDK - Loading</title>
+  <title>WKAppBot SDK - Safe Fallback</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 20px; line-height: 1.55; }
     .card { border: 1px solid rgba(128,128,128,.35); border-radius: 16px; padding: 20px; }
     a, button { display: inline-block; margin: 8px 8px 8px 0; padding: 10px 14px; border-radius: 999px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; text-decoration: none; cursor: pointer; }
     .muted { opacity: .7; }
+    .primary { font-weight: 700; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>WKAppBot SDK</h1>
     <p>페이지가 아직 배포 중이거나 GitHub Pages 캐시가 갱신 중입니다.</p>
-    <p class="muted">잠시 후 홈으로 이동합니다. 홈은 항상 안전한 진입점입니다.</p>
-    <a id="home" href="./">홈으로 이동</a>
-    <a id="board" href="board.html">보드 열기</a>
-    <button id="fresh">캐시 우회해서 홈 열기</button>
+    <p class="muted">아래 링크로 안전하게 이동할 수 있습니다.</p>
+
+    <h2>바로가기</h2>
+    <a id="home" href="./">홈</a>
+    <a id="boardFolder" class="primary" href="board/">보드 /board/</a>
+    <a id="boardHtml" href="board.html">보드 board.html</a>
+    <a id="boardFresh" href="board.html">보드 캐시 우회</a>
+    <button id="freshHome">홈 캐시 우회</button>
   </div>
   <script>
     const qs = location.search || '';
-    document.getElementById('home').href = './?v=' + Date.now();
-    document.getElementById('board').href = 'board.html' + (qs || ('?v=' + Date.now()));
-    document.getElementById('fresh').onclick = () => location.href = './?v=' + Date.now();
-    setTimeout(() => { location.href = './?v=' + Date.now(); }, 1800);
+    const stamp = Date.now();
+    document.getElementById('home').href = './?v=' + stamp;
+    document.getElementById('boardFolder').href = 'board/' + (qs || ('?v=' + stamp));
+    document.getElementById('boardHtml').href = 'board.html' + (qs || ('?v=' + stamp));
+    document.getElementById('boardFresh').href = 'board.html?v=' + stamp;
+    document.getElementById('freshHome').onclick = () => location.href = './?v=' + Date.now();
   </script>
 </body>
 </html>
