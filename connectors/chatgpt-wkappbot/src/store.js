@@ -38,4 +38,14 @@ function getJob(id) {
   return jobs.get(id) || null;
 }
 
-module.exports = { createJob, nextJob, completeJob, getJob };
+function listJobs() {
+  return [...jobs.values()];
+}
+
+module.exports = {
+  createJob,
+  nextJob,
+  completeJob,
+  getJob,
+  listJobs
+};
