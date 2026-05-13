@@ -8,6 +8,12 @@ const {
   heartbeat,
   listAgents
 } = require('./store');
+const {
+  createSession,
+  appendSession,
+  getSession,
+  listSessions
+} = require('./session');
 const { isAllowed } = require('./auth');
 const { addClient, removeClient } = require('./stream');
 
@@ -53,6 +59,27 @@ const server = http.createServer((req, res) => {
     return send(res, 200, { agents: listAgents() });
   }
 
+  if (req.method === 'GET' && req.url === '/sessions') {
+    return send(res, 200, { sessions: listSessions() });
+  }
+
+  if (req.method === 'POST' && req.url === '/sessions') {
+    return readJson(req, (err, parsed) => {
+      if (err) return send(res, 400, { error: 'bad_json' });
+      const item = createSession(parsed);
+      send(res, 200, item);
+    });
+  }
+
+  if (req.method === 'POST' && req.url.startsWith('/sessions/')) {
+    return readJson(req, (err, parsed) => {
+      const id = req.url.split('/').pop();
+      const item = appendSession(id, parsed || {});
+      if (!item) return send(res, 404, { error: 'session_not_found' });
+      send(res, 200, item);
+    });
+  }
+
   if (req.method === 'POST' && req.url === '/heartbeat') {
     return readJson(req, (err, parsed) => {
       if (err) return send(res, 400, { error: 'bad_json' });
@@ -90,6 +117,13 @@ const server = http.createServer((req, res) => {
     const job = getJob(id);
     if (!job) return send(res, 404, { error: 'job_not_found' });
     return send(res, 200, job);
+  }
+
+  if (req.method === 'GET' && req.url.startsWith('/session/')) {
+    const id = req.url.split('/').pop();
+    const item = getSession(id);
+    if (!item) return send(res, 404, { error: 'session_not_found' });
+    return send(res, 200, item);
   }
 
   send(res, 404, { error: 'not_found' });
