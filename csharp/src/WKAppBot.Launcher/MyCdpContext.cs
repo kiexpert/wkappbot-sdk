@@ -341,7 +341,7 @@ partial class Program
             return new(true, "invalid_window_type");
 
         if (IsWindowOffScreen(callerHwnd))
-            return new(true, "caller_offscreen", DescribeCallerRect(callerHwnd));
+            return new(true, "caller_offscreen_reject", DescribeCallerRect(callerHwnd));
 
         // Determine caller type for logging
         var callerType = callerHwnd == consoleHwnd ? "console"
@@ -721,17 +721,44 @@ partial class Program
             // negative offset (-30, -30) could push Chrome into the top-left of
             // the caller's monitor or even cross monitor boundaries on multi-mon
             // setups, especially when combined with the legacy DPI bug.
-            int targetX = callerLeft + 30;
-            int targetY = callerTop + 30;
+            //
+            // GUARD: If caller is off-screen (e.g., a minimized window in negative
+            // coordinates), start from primary monitor top-left instead.
+            int targetX, targetY;
+            if (callerLeft < -1000 || callerTop < -1000)
+            {
+                // Caller appears off-screen: use primary monitor fallback
+                targetX = 100;
+                targetY = 100;
+                Console.Error.WriteLine($"[PLACEMENT:GUARD] caller off-screen detected ({callerLeft},{callerTop}) -> fallback to primary (100,100)");
+            }
+            else
+            {
+                targetX = callerLeft + 30;
+                targetY = callerTop + 30;
+            }
 
             // Clamp target rect to the caller's monitor work area so Chrome
             // never spills onto another display. Uses MonitorFromPoint at the
             // caller's centre + GetMonitorInfo to read MONITORINFO.rcWork
             // (excludes taskbar). Same DPI context as the caller because the
             // launcher is now PerMonitorV2-aware.
+            //
+            // GUARD: If caller is off-screen, fall back to primary monitor (0,0).
+            // This prevents Chrome from inheriting off-screen placement.
             int callerCenterX = callerLeft + Math.Max(1, (callerRect.Right - callerRect.Left)) / 2;
             int callerCenterY = callerTop + Math.Max(1, (callerRect.Bottom - callerRect.Top)) / 2;
-            if (TryGetWorkArea(callerCenterX, callerCenterY, out var workArea))
+
+            // Try caller's monitor first; fall back to primary (0,0) if caller is off-screen
+            RECT workArea = default;
+            bool hasWorkArea = TryGetWorkArea(callerCenterX, callerCenterY, out workArea);
+            if (!hasWorkArea)
+            {
+                // Caller off-screen or off-monitor: query primary monitor at (0,0)
+                hasWorkArea = TryGetWorkArea(0, 0, out workArea);
+            }
+
+            if (hasWorkArea)
             {
                 // Make sure Chrome fits inside the work area.
                 if (targetW > workArea.Right - workArea.Left) targetW = workArea.Right - workArea.Left;
