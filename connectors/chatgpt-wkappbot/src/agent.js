@@ -1,5 +1,6 @@
 const http = require('http');
 const { execFile } = require('child_process');
+const { isAllowedArgs } = require('./allowlist');
 
 const relay = process.env.WK_RELAY || 'http://127.0.0.1:8787';
 const bin = process.env.WKAPPBOT_BIN || 'wkappbot';
@@ -53,6 +54,19 @@ async function loop() {
 
   const input = polled.job.input || {};
   const args = Array.isArray(input.args) ? input.args : ['--version'];
+
+  if (!isAllowedArgs(args)) {
+    await post('/complete', {
+      id: polled.job.id,
+      result: {
+        ok: false,
+        code: 403,
+        stderr: 'command_not_allowed'
+      }
+    });
+
+    return setTimeout(loop, 10);
+  }
 
   const result = await run(bin, args);
 
