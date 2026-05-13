@@ -759,6 +759,14 @@ partial class Program
                 if (targetX + targetW > workArea.Right)        targetX = workArea.Right - targetW;
                 if (targetY + targetH > workArea.Bottom)       targetY = workArea.Bottom - targetH;
             }
+            else
+            {
+                // workArea query failed (caller off-screen, no primary monitor found, etc.)
+                // Force fallback to safe default: (100, 100) on primary display
+                Console.Error.WriteLine($"[PLACEMENT:FALLBACK] workArea query failed for caller ({callerCenterX},{callerCenterY}) and primary (0,0) -> force (100,100)");
+                targetX = 100;
+                targetY = 100;
+            }
 
             // Find chrome.exe Browser window. Chrome_BrowserWindow is the main frame;
             // Chrome_WidgetWin_1 is a renderer tab window (different process).

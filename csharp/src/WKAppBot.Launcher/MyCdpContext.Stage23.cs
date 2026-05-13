@@ -445,6 +445,7 @@ partial class Program
             // Read frames until Page.loadEventFired, ws close, or cancel.
             var buf = new byte[8192];
             var sb = new StringBuilder();
+            var frameCount = 0;
             while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
             {
                 sb.Clear();
@@ -457,6 +458,16 @@ partial class Program
                 } while (!res.EndOfMessage);
 
                 var msg = sb.ToString();
+                frameCount++;
+
+                // EARLY FAIL: if we receive error messages about missing selectors
+                // or DOM query failures, bail immediately instead of waiting for timeout
+                if (msg.Contains("\"errorDetails\"") || msg.Contains("\"error\":{"))
+                {
+                    Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP error frame detected at frame {frameCount}: {msg.Substring(0, Math.Min(100, msg.Length))}");
+                    return "cdp_error_frame";
+                }
+
                 // Cheap substring probe -- CDP frames are JSON and the method
                 // string is uniquely identifiable. Avoids parsing every frame
                 // (Chrome can be chatty with Page.frameNavigated, etc.).
