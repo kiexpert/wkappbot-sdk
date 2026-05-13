@@ -1,55 +1,49 @@
 {
   "id": "wkfind",
   "app": "wkappbot-workflow",
-  "title": "wkfind: Comprehensive Problem-Solving Framework",
-  "desc": "Multi-angle code discovery and problem-solving tool combining git history, grep, web search, and intelligent code analysis",
+  "title": "wkfind: Multi-keyword code search with GlobCoverageScore ranking",
+  "title_ko": null,
+  "desc": "Smart keyword extraction (skill-search compatible) with PHRASE/AND/OR tier ranking, git diff auto-detection, time-range fallback, and parallel triad analysis",
   "steps": [
-    "Problem Definition Phase: Clarify what you're looking for vs what you're mistakenly doing. Use: Recent commits, git log search, initial grep",
-    "Multi-Angle Search Phase: Search from 5+ angles simultaneously: (1) git history/blame (2) code pattern matching (3) reference implementations (4) environment/process state (5) web search",
-    "Hypothesis & Validation: Form assumption about root cause, then validate using actual code and testing. Don't assume—verify.",
-    "Integration & Persistence Tracing: Trace data flow end-to-end: source detection → forwarding → consumption → persistence/logs. Verify each step.",
-    "Build, Deploy & Smoke Test: Compile changes, deploy to both bin directories, test with actual commands, check for regressions",
-    "Document Discovery: Update skills with methodology for reuse on similar problems. Capture what worked and what didn't."
+    "GlobCoverageScore ranking: tokenize keywords by Unicode non-letter/non-digit delimiters. Score each match as token_length/field_length. Results grouped into tiers: PHRASE (keywords consecutive, ×2.5 multiplier) ",
+    " AND (keywords any order, ×1.5 multiplier) ",
+    " OR (either keyword, ×1.0 multiplier). Within each tier, results sorted by descending score. ",
+    " Time-range fallback (auto-expand on <3 results): --day → --week → --month → --year → --unlimited. Threshold 3 is hardcoded. ",
+    " Git diff support: auto-detects C:\\Users\\kiexp\\AppData\\Local\\Temp\\wkfind-git.diff. If present, searches diff instead of source files; source label switches. ",
+    " Current directory context: works from any project folder. Searches from current dir and all subdirs only. Does NOT cross project boundaries. ",
+    " .gitignore auto-exclusion via ripgrep (native feature). ",
+    " Usage: wkfind keyword1 [keyword2] [--day",
+    "--week",
+    "--month",
+    "--year] [--output file.json] ",
+    " Parallel triad (GPT+Gemini+Claude) background analysis runs in parallel. Timeout: \\ (default 60s)."
   ],
-  "tools": [
-    "CLI Tool: scripts/wkfind.ps1 (primary)",
-    "File search: wkappbot file grep [pattern]",
-    "Git history: git log --grep, git show, git blame",
-    "Web search: WebSearch 'Windows [problem] C#'",
-    "Agent exploration: wkappbot agent 'problem description' --subagent Explore",
-    "Skill discovery: wkappbot skill search [keyword]",
-    "Process analysis: Get-Process, [System.Diagnostics.Process]::GetProcessById",
-    "Environment inspection: $env:VARIABLE_NAME or Get-ChildItem env:",
-    "File monitoring: wkappbot monitor 'tail -f file.log'"
+  "requirements": [
+    {
+      "cmd": "wkfind --help",
+      "expect": "wkfind",
+      "prompt": null
+    },
+    {
+      "cmd": "wkfind caller window",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkfind",
+      "expect": "wkfind",
+      "prompt": null
+    }
   ],
-  "search_strategies": [
-    "Shallow (5min): git log + grep + 1-2 file reads",
-    "Medium (30min): git history + multi-angle grep + Agent Explore + 3-5 files",
-    "Deep (60min): full codebase search + triad consultation + web research"
+  "primary_cmd": null,
+  "tags": [
+    "search",
+    "code-discovery"
   ],
-  "examples": [
-    "wkfind 'Chrome window position mismatch' --depth medium --include-web",
-    "wkfind 'caller HWND detection' --depth deep --auto",
-    "wkfind 'off-screen validation' --include-web"
-  ],
-  "case_study": "caller window detection (commit dd10359f → e10bc11e)",
-  "case_study_phases": [
-    "Phase 1: Recognized GetForegroundWindow() returns current active window, not launcher's caller",
-    "Phase 2: Found Process.GetParentProcessId() reference in git blame, parallel grep searches",
-    "Phase 3: Validated hypothesis with MyCdpContext.ValidateCallerHwnd reference implementation",
-    "Phase 4: Traced forwarding: Program.cs → EyeCmdPipeClient.cs → CoreRunner.cs → Core usage",
-    "Phase 5: Built, deployed, verified cdp-state.jsonl persistence and Chrome placement"
-  ],
-  "key_insights": [
-    "Problem definition first: don't code until you understand what you're solving",
-    "Multi-angle search: use all available tools in parallel, not serially",
-    "Validation always: hypothesis-driven testing prevents dead-ends",
-    "End-to-end tracing: source → forwarding → consumption → persistence",
-    "Regression safety: build + test + smoke before declaring victory"
-  ],
-  "mdfile": "skills/wkappbot-workflow/wkfind-comprehensive-problem-solving.md",
+  "source_refs": null,
+  "regression_script": null,
   "author": "claude",
-  "created": "2026-05-13T14:00:00Z",
-  "updated": "2026-05-13T14:00:00Z",
-  "version": "1.0"
+  "created": "2026-05-13T09:29:13.2225459Z",
+  "updated": "2026-05-13T10:29:42.2370989Z",
+  "version": "1.4"
 }

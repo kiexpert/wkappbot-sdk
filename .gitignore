@@ -103,3 +103,8 @@ scripts/slack_merge_threads.py
 approval-policy.json
 wkappbot*.zip
 *.zip
+
+# Probe/debug artifacts (large binaries)
+_probe_*/
+_provider_probe_*/
+bin/_append_test*/
