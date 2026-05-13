@@ -1,65 +1,105 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
 <head>
   <meta charset="utf-8">
   <title>WKAppBot Board</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: sans-serif; max-width: 860px; margin: 32px auto; padding: 16px; }
-    input, button { padding: 10px; margin: 6px 0; }
-    input { width: 100%; box-sizing: border-box; }
-    pre { background: #f4f4f4; padding: 12px; overflow: auto; white-space: pre-wrap; }
-    a { display: inline-block; margin: 8px 0; }
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; max-width: 920px; margin: 0 auto; padding: 24px; line-height: 1.55; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 28px; }
+    .muted { opacity: .7; }
+    .card { border: 1px solid rgba(128,128,128,.35); border-radius: 16px; padding: 18px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button, a.button { border: 1px solid rgba(128,128,128,.35); border-radius: 999px; padding: 10px 14px; text-decoration: none; color: inherit; background: transparent; cursor: pointer; }
+    button:hover, a.button:hover { background: rgba(128,128,128,.12); }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; vertical-align: middle; margin-right: 8px; }
+    .comment { border-left: 4px solid rgba(128,128,128,.35); padding-left: 14px; margin: 18px 0; }
+    .body { white-space: pre-wrap; }
+    #status { margin-top: 4px; }
   </style>
 </head>
 <body>
-  <h1>WKAppBot Daily Board</h1>
-  <p>GitHub Issues are used as posts. Issue comments are used as replies.</p>
+  <header>
+    <div>
+      <h1>WKAppBot Daily Board</h1>
+      <div id="status" class="muted">불러오는 중...</div>
+    </div>
+    <div class="row">
+      <button id="reload">새로고침</button>
+      <a id="openIssue" class="button" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">댓글 쓰기</a>
+    </div>
+  </header>
 
-  <label>Repository</label>
-  <input id="repo" value="kiexpert/wkappbot-sdk">
-
-  <label>Issue number</label>
-  <input id="issue" value="21">
-
-  <button id="load">Load issue and comments</button>
-  <a id="openIssue" href="https://github.com/kiexpert/wkappbot-sdk/issues/21" target="_blank">Open on GitHub to comment</a>
-
-  <h2>Issue</h2>
-  <pre id="issueOut"></pre>
-
-  <h2>Comments</h2>
-  <pre id="commentsOut"></pre>
+  <section id="issueCard" class="card"></section>
+  <section class="card">
+    <h2>댓글</h2>
+    <div id="comments"></div>
+  </section>
 
   <script>
+    const repo = 'kiexpert/wkappbot-sdk';
+    const issueNumber = 21;
+    const issueUrl = `https://github.com/${repo}/issues/${issueNumber}`;
+    const apiBase = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
     const $ = id => document.getElementById(id);
 
-    async function loadBoard() {
-      const repo = $('repo').value.trim();
-      const num = $('issue').value.trim();
-      $('openIssue').href = `https://github.com/${repo}/issues/${num}`;
+    $('openIssue').href = issueUrl;
 
-      const issueRes = await fetch(`https://api.github.com/repos/${repo}/issues/${num}`);
-      const issue = await issueRes.json();
-      $('issueOut').textContent = JSON.stringify({
-        title: issue.title,
-        user: issue.user && issue.user.login,
-        state: issue.state,
-        created_at: issue.created_at,
-        body: issue.body
-      }, null, 2);
-
-      const commentsRes = await fetch(`https://api.github.com/repos/${repo}/issues/${num}/comments`);
-      const comments = await commentsRes.json();
-      $('commentsOut').textContent = JSON.stringify(comments.map(c => ({
-        user: c.user && c.user.login,
-        created_at: c.created_at,
-        body: c.body
-      })), null, 2);
+    function esc(s) {
+      return String(s || '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
     }
 
-    $('load').onclick = loadBoard;
-    loadBoard().catch(err => $('commentsOut').textContent = String(err));
+    function fmtTime(s) {
+      try { return new Date(s).toLocaleString(); } catch (_) { return s || ''; }
+    }
+
+    async function loadBoard() {
+      $('status').textContent = '불러오는 중...';
+      $('comments').innerHTML = '';
+
+      const issueRes = await fetch(apiBase, { headers: { 'accept': 'application/vnd.github+json' } });
+      if (!issueRes.ok) throw new Error('issue load failed: ' + issueRes.status);
+      const issue = await issueRes.json();
+
+      $('issueCard').innerHTML = `
+        <div class="row">
+          <img class="avatar" src="${esc(issue.user && issue.user.avatar_url)}" alt="">
+          <strong>${esc(issue.user && issue.user.login)}</strong>
+          <span class="muted">${fmtTime(issue.created_at)}</span>
+          <span class="muted">#${issue.number}</span>
+        </div>
+        <h2>${esc(issue.title)}</h2>
+        <div class="body">${esc(issue.body)}</div>
+      `;
+
+      const commentsRes = await fetch(apiBase + '/comments', { headers: { 'accept': 'application/vnd.github+json' } });
+      if (!commentsRes.ok) throw new Error('comments load failed: ' + commentsRes.status);
+      const comments = await commentsRes.json();
+
+      if (!comments.length) {
+        $('comments').innerHTML = '<p class="muted">아직 댓글이 없습니다. GitHub에서 첫 댓글을 남겨보세요.</p>';
+      } else {
+        $('comments').innerHTML = comments.map(c => `
+          <article class="comment">
+            <div class="row">
+              <img class="avatar" src="${esc(c.user && c.user.avatar_url)}" alt="">
+              <strong>${esc(c.user && c.user.login)}</strong>
+              <span class="muted">${fmtTime(c.created_at)}</span>
+            </div>
+            <div class="body">${esc(c.body)}</div>
+          </article>
+        `).join('');
+      }
+
+      $('status').textContent = `업데이트됨: ${new Date().toLocaleString()} · 댓글 ${comments.length}개`;
+    }
+
+    $('reload').onclick = () => loadBoard().catch(err => $('status').textContent = err.message);
+    loadBoard().catch(err => $('status').textContent = err.message);
   </script>
 </body>
 </html>
