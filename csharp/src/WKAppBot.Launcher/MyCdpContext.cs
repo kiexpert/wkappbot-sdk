@@ -722,21 +722,11 @@ partial class Program
             // the caller's monitor or even cross monitor boundaries on multi-mon
             // setups, especially when combined with the legacy DPI bug.
             //
-            // GUARD: If caller is off-screen (e.g., a minimized window in negative
-            // coordinates), start from primary monitor top-left instead.
-            int targetX, targetY;
-            if (callerLeft < -1000 || callerTop < -1000)
-            {
-                // Caller appears off-screen: use primary monitor fallback
-                targetX = 100;
-                targetY = 100;
-                Console.Error.WriteLine($"[PLACEMENT:GUARD] caller off-screen detected ({callerLeft},{callerTop}) -> fallback to primary (100,100)");
-            }
-            else
-            {
-                targetX = callerLeft + 30;
-                targetY = callerTop + 30;
-            }
+            // NOTE: Negative coordinates are VALID (left/secondary monitors).
+            // Do NOT reject or fall back on negative coords. The caller rect
+            // was validated by IsWindowOffScreen which uses IsRectOutsideAllMonitors.
+            int targetX = callerLeft + 30;
+            int targetY = callerTop + 30;
 
             // Clamp target rect to the caller's monitor work area so Chrome
             // never spills onto another display. Uses MonitorFromPoint at the
