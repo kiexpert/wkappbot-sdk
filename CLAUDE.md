@@ -259,7 +259,8 @@ wkfind --day "CDP position"          # Recent 24h code + 24h sessions
 wkfind --week "05-13"                # Week-old sessions + code
 ```
 
-No additional options; search-only tool. `.gitignore` auto-exclusion via ripgrep.
+Output: Top 3 sessions + top 10 code matches per tier, ranked by score.
+No options; search-only. `.gitignore` auto-exclusion via ripgrep.
 
 ## Encoding Policy
 - Treat repository text files as UTF-8 by default.
