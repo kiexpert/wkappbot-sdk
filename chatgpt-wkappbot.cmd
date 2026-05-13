@@ -8,18 +8,13 @@ set "RELAY_LOG=%LOGDIR%\relay.log"
 set "TUNNEL_LOG=%LOGDIR%\tunnel.log"
 
 if not exist "%LOGDIR%" mkdir "%LOGDIR%" >nul 2>nul
+if exist "%ROOT%bin\wkappbot.exe" set "PATH=%ROOT%bin;%PATH%"
 
-where node >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Node.js 20+ is required.
-  echo Install from https://nodejs.org/ then run this file again.
-  exit /b 1
-)
+call :ensure_node || exit /b 1
+call :ensure_cloudflared
 
 where wkappbot >nul 2>nul
-if errorlevel 1 (
-  echo [WARN] wkappbot is not on PATH. The relay can start, but the local agent will fail until wkappbot is available.
-)
+if errorlevel 1 echo [WARN] wkappbot is not on PATH. Add repo bin to PATH if agent fails.
 
 cd /d "%CONN%" || exit /b 1
 
@@ -28,7 +23,7 @@ if "%WKAPPBOT_TOKEN%"=="" (
   echo [WARN] WKAPPBOT_TOKEN was empty. Using dev-local-token for this process.
 )
 
-echo [1/4] Starting WKAppBot ChatGPT relay on http://127.0.0.1:8787 ...
+echo [1/4] Starting relay on http://127.0.0.1:8787 ...
 start "WKAppBot ChatGPT Relay" /min cmd /c "cd /d "%CONN%" && set WKAPPBOT_TOKEN=%WKAPPBOT_TOKEN%&& node src\server.js > "%RELAY_LOG%" 2>&1"
 
 for /l %%i in (1,1,20) do (
@@ -48,8 +43,9 @@ start "WKAppBot ChatGPT Agent" /min cmd /c "cd /d "%CONN%" && set WK_RELAY=http:
 
 where cloudflared >nul 2>nul
 if errorlevel 1 (
-  echo [WARN] cloudflared was not found on PATH.
-  echo Install it, or use ngrok manually: ngrok http 8787
+  echo [WARN] cloudflared is still not available.
+  echo Opening Cloudflare download page.
+  call :open_browser "https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
   echo Relay URL for local test: http://127.0.0.1:8787
   exit /b 0
 )
@@ -73,18 +69,60 @@ exit /b 0
 echo.
 echo ============================================================
 echo WKAppBot ChatGPT connector is ready.
-echo.
-echo Public HTTPS URL:
-echo !PUBLIC_URL!
-echo.
-echo ChatGPT Action server URL:
-echo !PUBLIC_URL!
-echo.
-echo Health:
-echo !PUBLIC_URL!/health
-echo.
-echo Use bearer token:
-echo %WKAPPBOT_TOKEN%
+echo Public HTTPS URL: !PUBLIC_URL!
+echo Health: !PUBLIC_URL!/health
+echo Bearer token: %WKAPPBOT_TOKEN%
 echo ============================================================
 echo.
 pause
+exit /b 0
+
+:ensure_node
+where node >nul 2>nul
+if not errorlevel 1 exit /b 0
+
+echo [SETUP] Node.js was not found. Trying winget install...
+where winget >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] winget not found. Opening Node.js download page.
+  call :ensure_chrome
+  call :open_browser "https://nodejs.org/"
+  exit /b 1
+)
+
+winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
+where node >nul 2>nul
+if not errorlevel 1 exit /b 0
+
+echo [ERROR] Node installed, but current terminal PATH was not refreshed.
+echo Close this window and run chatgpt-wkappbot.cmd again.
+exit /b 1
+
+:ensure_cloudflared
+where cloudflared >nul 2>nul
+if not errorlevel 1 exit /b 0
+
+echo [SETUP] cloudflared was not found. Trying winget install...
+where winget >nul 2>nul
+if errorlevel 1 exit /b 0
+winget install --id Cloudflare.cloudflared -e --accept-source-agreements --accept-package-agreements
+exit /b 0
+
+:ensure_chrome
+where chrome >nul 2>nul
+if not errorlevel 1 exit /b 0
+where winget >nul 2>nul
+if errorlevel 1 exit /b 0
+echo [SETUP] Chrome was not found. Trying winget install...
+winget install --id Google.Chrome -e --accept-source-agreements --accept-package-agreements
+exit /b 0
+
+:open_browser
+set "URL=%~1"
+where chrome >nul 2>nul
+if not errorlevel 1 (
+  start "" chrome "%URL%"
+) else (
+  start "" "%URL%"
+)
+exit /b 0
