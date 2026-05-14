@@ -363,6 +363,7 @@ wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA sc
 - `wkappbot suggest` silently drops submit when PENDING CO-RESOLVE banner shows. Use `wkappbot-core.exe suggest "..."` to bypass.
 - `skill audit` shows FILE MISSING for `csharp/src/WKAppBot.*` paths — expected in SDK repo (files live in the WKAppBot core repo). Not broken.
 - Chrome translate infobar (auto-shown on Korean pages) blocks CDP injection — it steals focus and intercepts clicks. Dismiss or suppress before automation.
+- `cdp-mon.ps1` off-screen check was `'^-\d{3,}'` regex (x < -100 = off-screen) — **false positive on multi-monitor setups** where left monitor has large negative x. Fixed to use `MonitorFromPoint` Win32 API. Rule: never use raw coordinate sign for off-screen detection; always use `MonitorFromPoint` (same as `IsWindowOnScreen` in EyeCmdPipeClient.cs).
 
 ## References
 - `README.md`
