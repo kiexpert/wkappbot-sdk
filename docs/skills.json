@@ -1,0 +1,33 @@
+[
+  {
+    "id": "relay-smoke",
+    "title": "Relay Smoke Test",
+    "desc": "Relay connector smoke test and board reporting.",
+    "tags": ["relay", "smoke", "test"],
+    "repo": "kiexpert/wkappbot-sdk",
+    "command": "wkappbot relay smoke",
+    "board": "board/?repo=kiexpert/wkappbot-sdk&title=Daily%20board&label=daily",
+    "status": "public"
+  },
+  {
+    "id": "quant-daily",
+    "title": "Quant Daily",
+    "desc": "Quant feed daily automation and board.",
+    "tags": ["quant", "daily", "feed"],
+    "repo": "kiexpert/WkFeedQuant",
+    "command": "wkappbot quant daily",
+    "board": "board/?repo=kiexpert/WkFeedQuant&title=Quant%20Daily&label=daily",
+    "status": "public"
+  },
+  {
+    "id": "business-plan-draft",
+    "title": "Business Plan Draft",
+    "desc": "Draft business plan skill from HQ/core repo.",
+    "tags": ["document", "draft", "planning"],
+    "repo": "kiexpert/WKAppBot",
+    "command": "wkappbot skill run business-plan-draft",
+    "source": "https://github.com/kiexpert/WKAppBot/blob/main/skills/wkappbot/wkappbot-business-plan-draft.skill.json",
+    "board": "board/?repo=kiexpert/WKAppBot&title=Business%20Daily&label=daily",
+    "status": "core"
+  }
+]
