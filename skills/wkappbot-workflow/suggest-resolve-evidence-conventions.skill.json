@@ -1,0 +1,36 @@
+{
+  "id": "suggest-resolve-evidence-conventions",
+  "app": "wkappbot-workflow",
+  "title": "Suggest resolve evidence script conventions",
+  "title_ko": null,
+  "desc": "How to write evidence scripts for suggest resolve. The script must demonstrate regression check passing before 2nd-party confirm.",
+  "steps": [
+    "Evidence script must exit 0 on pass, non-zero on fail. ALWAYS run wkappbot skill read suggest-resolve-pre-flight-checklist before first resolve attempt -- it covers all guards (commit keyword, class size, filename convention, full path, final command) that block resolve if missed.",
+    "Script path is stored inline in the suggest JSONL as i-completed-script. Eye runs it hourly for auto-confirm.",
+    "Convention: script filename prefix matches suggest timestamp. Uses wkappbot commands only -- no external dependencies.",
+    "2026-05-06 SKILL HEALING WHILE RESOLVING: Evidence is not only a test script; when resolve work reveals stale or missing skill instructions, update the related skill and include skill read/search checks in the evidence script when practical.",
+    "On Windows repos, PowerShell evidence scripts are acceptable; keep the script repo-local, run wkappbot commands, and exit 0 on pass.",
+    "On Windows repos, PowerShell evidence scripts are acceptable; keep the script repo-local, run wkappbot commands, and exit 0 on pass.",
+    "Verified 2026-05-12: test-prompt-send-symmetric-matcher.sh (resolve ts=2026-05-12T11:10:42)",
+    "Verified 2026-05-12: test-web-open-parent-process-fallback.sh (resolve ts=2026-05-11T15:17:37)",
+    "Verified 2026-05-12: scripts/test-suggest-list-malformed-artifact.sh (resolve ts=2026-05-12T14:37)",
+    "HIDDEN WINDOW EXECUTION: evidence scripts run in WindowStyle=Hidden cmd.exe. Key limits: (1) ALWAYS pass FULL ABSOLUTE PATH to script, e.g. --i-completed-...script 'D:\\repo\\test-eye-tick-fix.cmd' -- relative filename alone is NOT found. (2) 'wkappbot ask gpt' WILL TIMEOUT (60s+) -- never use in evidence. (3) 'wkappbot eye tick' works fine in hidden mode. (4) 'wkappbot windows' works. Fastest reliable evidence command: wkappbot eye tick.",
+    "FILENAME CMD-SUBCMD GUARD: filename test-{cmd}-{subcmd}-desc.cmd requires the script to contain literal '{cmd} {subcmd}' as a substring. Examples: test-eye-tick-fix.cmd must use 'wkappbot eye tick'; test-windows-guard.cmd must use 'wkappbot windows'; test-ask-groq-fix.cmd must use 'wkappbot ask groq'. Mismatch = 'Script doesnt contain X -- filename says test-X but command not used!' Fix: align filename prefix to the command actually invoked."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "suggest",
+    "resolve",
+    "evidence",
+    "testing",
+    "workflow",
+    "guard-bypass"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T11:09:06.6204622Z",
+  "updated": "2026-05-14T06:41:27.6496191Z",
+  "version": "1.16"
+}

@@ -1,0 +1,50 @@
+{
+  "id": "suggest-resolve-pre-flight-checklist",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Resolve Pre-flight Checklist",
+  "title_ko": null,
+  "desc": "5-step preflight to pass all resolve guards first try. Covers commit keyword, class size, evidence filename, hidden-window path, final command.",
+  "steps": [
+    "STEP 1 COMMIT KEYWORD GUARD: git log --oneline --grep=KEYWORD to find a commit whose message contains suggest title keywords. Merge or chore commits often have the full title. Terse fix-commits fail the keyword guard. Use the merge commit that recorded the suggest close.",
+    "STEP 2 CLASS SIZE GUARD: check target class is under 400 lines. Command: wc -l src/ClassName.cs. If 400 or more: split into partial classes with C# partial keyword, rebuild, push to remote, then resolve. Guard checks resolver repo. Skipping blocks every attempt.",
+    "STEP 3 EVIDENCE FILENAME GUARD: name script test-{cmd}-{subcmd}-description.cmd. The {cmd}-{subcmd} part must appear as a literal substring in the script commands. test-eye-tick-fix.cmd must call: wkappbot eye tick. test-windows-guard.cmd must call: wkappbot windows. NEVER use ask gpt -- it times out in hidden window mode. Best fast commands: wkappbot eye tick, wkappbot windows.",
+    "STEP 4 EVIDENCE SCRIPT PATH: always pass full absolute path. Hidden window cannot find relative filenames. Use: D:\\full\\path\\test-eye-tick-fix.cmd. Wrong: just the filename alone.",
+    "STEP 5 FINAL RESOLVE COMMAND: wkappbot suggest resolve TS NOTE --i-completed-...-script ABSOLUTE_PATH --skill SKILL-ID --commit COMMIT-HASH --class ClassName. All 5 flags required. After: wkappbot suggest check TS to verify HALF or RESOLVED.",
+    "RELATED SKILLS: wkappbot skill read suggest-workflow (step 5 resolve command), wkappbot skill read suggest-resolve-evidence-conventions (step 1 hidden-window limits, step 11 filename guard), wkappbot skill read suggest-resolve-cdp-bugs (CDP-specific resolve), wkappbot skill read ask-suggest-priority-batching (triage to resolve pipeline)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest check TS",
+      "expect": "Status: HALF or RESOLVED",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-resolve-preflight-checklist",
+      "expect": "STEP 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve TS NOTE --i-completed-...-script PATH --skill ID --commit HASH --class Name",
+      "expect": "RESOLVE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "suggest",
+    "resolve",
+    "preflight",
+    "checklist",
+    "guard",
+    "evidence",
+    "commit",
+    "class",
+    "source-size"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-14T06:38:19.3089414Z",
+  "updated": "2026-05-14T06:44:20.7420754Z",
+  "version": "1.16"
+}
