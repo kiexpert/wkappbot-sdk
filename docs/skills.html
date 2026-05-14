@@ -27,56 +27,27 @@
     <a class="button" href="board/">Board</a>
   </div>
 
-  <div id="stats" class="muted"></div>
+  <div id="stats" class="muted">loading skills...</div>
   <div id="skills" class="grid"></div>
 
   <script>
-    const registry = [
-      {
-        id:'relay-smoke',
-        title:'Relay Smoke Test',
-        desc:'Relay connector smoke test and board reporting.',
-        tags:['relay','smoke','test'],
-        repo:'kiexpert/wkappbot-sdk',
-        command:'wkappbot relay smoke',
-        board:'board/?repo=kiexpert/wkappbot-sdk&title=Daily%20board&label=daily'
-      },
-      {
-        id:'quant-daily',
-        title:'Quant Daily',
-        desc:'Quant feed daily automation and board.',
-        tags:['quant','daily','feed'],
-        repo:'kiexpert/WkFeedQuant',
-        command:'wkappbot quant daily',
-        board:'board/?repo=kiexpert/WkFeedQuant&title=Quant%20Daily&label=daily'
-      },
-      {
-        id:'business-plan-draft',
-        title:'Business Plan Draft',
-        desc:'Draft business plan skill from HQ/core repo.',
-        tags:['document','draft','planning'],
-        repo:'kiexpert/WKAppBot',
-        command:'wkappbot skill run business-plan-draft',
-        source:'https://github.com/kiexpert/WKAppBot/blob/main/skills/wkappbot/wkappbot-business-plan-draft.skill.json',
-        board:'board/?repo=kiexpert/WKAppBot&title=Business%20Daily&label=daily'
-      }
-    ];
-
     const skills = document.getElementById('skills');
     const q = document.getElementById('q');
     const stats = document.getElementById('stats');
+    let registry = [];
 
     function render(items) {
-      stats.textContent = `${items.length} skills`;
+      stats.textContent = `${items.length} skills loaded`;
       skills.innerHTML = items.map(s => `
         <div class="card">
           <h2>${s.title}</h2>
           <div class="muted">${s.id}</div>
-          <p>${s.desc}</p>
-          <div>${s.tags.map(t=>`<span class="pill">${t}</span>`).join('')}</div>
-          <p><strong>Repo:</strong> ${s.repo}</p>
-          <pre>${s.command}</pre>
-          <a class="button" href="${s.board}">오늘 보드</a>
+          <p>${s.desc || ''}</p>
+          <div>${(s.tags||[]).map(t=>`<span class="pill">${t}</span>`).join('')}</div>
+          <p><strong>Repo:</strong> ${s.repo || '-'}</p>
+          <p><strong>Status:</strong> ${s.status || 'public'}</p>
+          <pre>${s.command || ''}</pre>
+          ${s.board ? `<a class="button" href="${s.board}">오늘 보드</a>` : ''}
           ${s.source ? `<a class="button" href="${s.source}" target="_blank">Skill Source</a>` : ''}
         </div>
       `).join('');
@@ -86,16 +57,26 @@
       const v = q.value.trim().toLowerCase();
       if (!v) return render(registry);
       render(registry.filter(s =>
-        s.id.toLowerCase().includes(v) ||
-        s.title.toLowerCase().includes(v) ||
-        s.desc.toLowerCase().includes(v) ||
-        s.tags.join(' ').toLowerCase().includes(v) ||
-        s.command.toLowerCase().includes(v)
+        (s.id||'').toLowerCase().includes(v) ||
+        (s.title||'').toLowerCase().includes(v) ||
+        (s.desc||'').toLowerCase().includes(v) ||
+        (s.tags||[]).join(' ').toLowerCase().includes(v) ||
+        (s.command||'').toLowerCase().includes(v)
       ));
     }
 
+    async function loadSkills() {
+      try {
+        const res = await fetch('skills.json?v=' + Date.now(), { cache:'no-cache' });
+        registry = await res.json();
+        render(registry);
+      } catch (e) {
+        stats.textContent = 'failed to load skills.json: ' + e.message;
+      }
+    }
+
     q.oninput = filter;
-    render(registry);
+    loadSkills();
   </script>
 </body>
 </html>
