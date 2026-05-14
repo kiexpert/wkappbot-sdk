@@ -1,0 +1,35 @@
+name: build-skills-registry
+
+on:
+  push:
+    paths:
+      - 'skills/**'
+      - 'bin/wkappbot.hq/skills/**'
+      - 'scripts/build-skills-registry.mjs'
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build skills registry
+        run: node scripts/build-skills-registry.mjs
+
+      - name: Commit generated registry
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add docs/skills.json
+          git diff --cached --quiet || git commit -m "chore: update generated skills registry"
+          git push
