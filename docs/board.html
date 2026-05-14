@@ -87,13 +87,33 @@
       $('openIssue2').href = issueUrl;
     }
 
+    async function searchIssue(q) {
+      const res = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(q)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.items && data.items[0] ? data.items[0] : null;
+    }
+
     async function findTodayIssue() {
       if (params.get('issue')) return Number(params.get('issue'));
-      const q = encodeURIComponent(`repo:${repo} is:issue label:${label} in:title "${todayTitle()}"`);
-      const res = await fetch(`https://api.github.com/search/issues?q=${q}`);
-      if (!res.ok) return issueNumber;
-      const data = await res.json();
-      return data.items && data.items[0] ? data.items[0].number : issueNumber;
+
+      const queries = [
+        `repo:${repo} is:issue label:${label} in:title "${todayTitle()}"`,
+        `repo:${repo} is:issue label:${label} ${todayIso()}`,
+        `repo:${repo} is:issue ${todayIso()}`,
+        `repo:${repo} is:issue sort:created-desc`
+      ];
+
+      for (const q of queries) {
+        const item = await searchIssue(q).catch(() => null);
+        if (item && item.number) {
+          $('status').textContent = `오늘 issue 발견 #${item.number}`;
+          return item.number;
+        }
+      }
+
+      $('status').textContent = '오늘 issue를 찾지 못해 fallback issue 사용 중';
+      return issueNumber;
     }
 
     function esc(s) { return String(s || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
@@ -119,7 +139,7 @@
       $('pageTitle').textContent = `${titlePrefix} · ${todayIso()}`;
       $('issueCard').innerHTML = `<div class="row">${issue.avatar ? `<img class="avatar" src="${esc(issue.avatar)}" alt="">` : ''}<strong>${esc(issue.user || 'WKAppBot')}</strong><span class="muted">${fmtTime(issue.created_at || issue.updatedAt)}</span><span class="muted">#${esc(issue.number || issue.issue || issueNumber)}</span></div><h2>${esc(issue.title)}</h2><div class="body">${md(issue.body)}</div>`;
       renderComments(comments);
-      $('status').textContent = `${sourceLabel} · 오늘 이슈 #${issueNumber} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
+      $('status').textContent = `${sourceLabel} · issue #${issueNumber} · 댓글 ${comments.length}개 · ${new Date().toLocaleString()}`;
     }
 
     async function loadSnapshot() {
