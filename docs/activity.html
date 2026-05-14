@@ -13,11 +13,22 @@ input { width:100%; padding:12px; border-radius:12px; border:1px solid rgba(128,
 .pill { display:inline-block; padding:5px 10px; border-radius:999px; border:1px solid rgba(128,128,128,.35); margin:4px; }
 a.button { display:inline-block; margin-top:10px; margin-right:8px; padding:10px 14px; border-radius:999px; border:1px solid rgba(128,128,128,.35); text-decoration:none; color:inherit; }
 .muted { opacity:.7; }
+.topnav { margin-bottom:16px; }
 </style>
 </head>
 <body>
 <h1>WKAppBot Activity Portal</h1>
 <p class="muted">최신 업데이트 레포 · 최근 이슈 · Board 연결</p>
+
+<div class="topnav">
+  <a class="button" href="./">Portal</a>
+  <a class="button" href="skills.html">Skill Browser</a>
+  <a class="button" href="board/">Daily Board</a>
+  <a class="button" href="chatgpt-wkappbot-dashboard.html">AppBot Dashboard</a>
+  <a class="button" href="https://chat.openai.com/gpts" target="_blank">GPTs</a>
+  <a class="button" href="https://github.com/settings/installations" target="_blank">GitHub App 연결</a>
+</div>
+
 <input id="owner" value="kiexpert" placeholder="GitHub owner">
 <div id="status" class="muted">loading...</div>
 <div id="repos" class="grid"></div>
