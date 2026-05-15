@@ -169,10 +169,13 @@ internal static class EyeCmdPipeClient
 
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder cls, int max);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetWindowTextLengthW(IntPtr hWnd);
 
     delegate bool EnumWindowsProcDelegate(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")]
@@ -194,26 +197,29 @@ internal static class EyeCmdPipeClient
     };
 
     /// <summary>
-    /// Resolve the hwnd of the terminal where the user typed this command.
-    ///   1. If foreground window is a known terminal class -> use it (covers normal CLI use).
-    ///   2. Otherwise walk OUR ancestor process chain (Launcher -> shell -> Windows Terminal)
-    ///      and find a CASCADIA window whose pid is in that chain. This handles the case
-    ///      where the user runs commands inside an IDE's integrated terminal: the IDE window
-    ///      has focus, but the actual ConPTY host (WindowsTerminal.exe) is our great-ancestor.
-    ///   3. Fallback to foreground (preserves legacy behavior if neither hit).
+    /// Resolve the hwnd of the caller window where the user invoked wkappbot.
+    ///   P1. If foreground window is a known terminal class -> use it (covers normal CLI use:
+    ///       cmd.exe, Windows Terminal tab, etc. where the foreground IS the terminal).
+    ///   P2. Otherwise walk OUR ancestor process chain (Launcher -> shell -> host) and return
+    ///       the NEAREST ancestor that owns ANY visible, on-screen, titled window. This handles
+    ///       launches from VS Code, Claude Code, any IDE, any host -- no class whitelist needed.
+    ///       Spec: "앱봇 부모프로세스 중 가장 근접한 창을 가진 프로세스를 찾으면 그게 AppBot 호출창"
+    ///   P3. Fallback to foreground (preserves legacy behavior if neither hit).
     /// </summary>
     static IntPtr ResolveCallerTerminalHwnd()
     {
-        // Windows Terminal: each tab has its own CASCADIA_HOSTING_WINDOW_CLASS top-level
+        // P1: Windows Terminal: each tab has its own CASCADIA_HOSTING_WINDOW_CLASS top-level
         // window. When user types a command in a WT tab, that specific tab's CASCADIA
         // window IS the foreground -- so GetForegroundWindow() gives the exact tab hwnd.
         var fg = GetForegroundWindow();
         if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg)))
             return fg; // WT tab or other terminal directly in foreground
 
-        // Foreground is not a terminal (IDE, browser, etc.) -- walk Launcher's parent
-        // process chain to find the hosting window (VS Code integrated terminal, etc.)
-        var ancestorPids = new HashSet<uint>();
+        // P2: Walk Launcher's parent process chain in order (immediate parent first).
+        // Return the FIRST window from the CLOSEST ancestor that has any visible, on-screen,
+        // titled top-level window. No class restriction -- VS Code, Claude Code, any IDE,
+        // any shell host that launched wkappbot is accepted.
+        var ancestorPids = new List<uint>();
         try
         {
             int pid = Environment.ProcessId;
@@ -227,22 +233,26 @@ internal static class EyeCmdPipeClient
         }
         catch { }
 
-        if (ancestorPids.Count > 0)
+        // Walk ancestor PIDs in order; for each, EnumWindows looking for a usable window.
+        // First hit on the closest ancestor wins.
+        foreach (var targetPid in ancestorPids)
         {
             IntPtr match = IntPtr.Zero;
             EnumWindows((hWnd, _) =>
             {
-                if (!IsWindowVisible(hWnd)) return true;
-                if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
                 GetWindowThreadProcessId(hWnd, out uint wpid);
-                if (!ancestorPids.Contains(wpid)) return true;
+                if (wpid != targetPid) return true; // not this ancestor
+                if (!IsWindowVisible(hWnd)) return true;
+                if (IsIconic(hWnd)) return true; // minimized
+                if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true; // owned popup
+                if (GetWindowTextLengthW(hWnd) <= 0) return true; // no title -> likely tool window
                 match = hWnd;
                 return false;
             }, IntPtr.Zero);
             if (match != IntPtr.Zero) return match;
         }
 
-        return fg; // last resort
+        return fg; // P3: last resort
     }
 
     static bool IsTerminalClass(string cls)
