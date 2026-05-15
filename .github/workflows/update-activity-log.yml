@@ -1,0 +1,46 @@
+name: update-activity-log
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update activity log
+        run: |
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          ACTOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          SHA="${{ github.sha }}"
+
+          cat > docs/activity-log.json <<EOF
+          {
+            "generatedAt": "$NOW",
+            "lastActor": "$ACTOR",
+            "repo": "$REPO",
+            "sha": "$SHA",
+            "recent": [
+              {
+                "actor": "$ACTOR",
+                "repo": "$REPO",
+                "sha": "$SHA",
+                "time": "$NOW"
+              }
+            ]
+          }
+          EOF
+
+      - name: Commit activity log
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add docs/activity-log.json
+          git diff --cached --quiet || git commit -m "chore: update activity log"
+          git push
