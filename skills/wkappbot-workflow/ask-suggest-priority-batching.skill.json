@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "ask-suggest-priority-batching",
   "app": "wkappbot-workflow",
   "title": "Ask Suggest Priority Batching",
@@ -17,7 +17,8 @@
     "If ask reveals reusable pattern: wkappbot skill edit <id> to update the related skill before moving on.",
     "After fix commit: wkappbot suggest check <ts> to verify regression PASS. Then close via ONE of two paths -- (A) 1st-party resolve: wkappbot suggest resolve <ts> NOTE [see suggest-workflow step 5 for the exact --i-completed-... flag; use that verbatim] --skill <id> --commit <hash> (creates HALF state with evidence script; Eye auto-confirms hourly when binary newer). (B) 2nd-party confirm (only if suggest is already HALF from another resolver): wkappbot suggest resolve <ts> NOTE --confirm --skill <id>. See suggest-workflow skill for the long --i-completed flag and DGWCS limitations.",
     "Recurrence: if bug recurs AFTER fix commit, do NOT resolve old suggest -- file new suggest with post-fix repro date and uncovered code path.",
-    "Next page: reuse same batching prompt. Track page number to avoid re-reading already-ranked items. Repeat from step 2."
+    "Next page: reuse same batching prompt. Track page number to avoid re-reading already-ranked items. Repeat from step 2.",
+    "RIQUA [resolve pre-flight]: when ready to resolve a suggest, always read suggest-resolve-pre-flight-checklist first. It gates 5 guards: commit keyword match, class file under 400 lines, evidence filename convention, full absolute path, all required flags. Missing any one = repeated failure."
   ],
   "requirements": [
     {
@@ -80,6 +81,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-06T07:15:28.141417Z",
-  "updated": "2026-05-09T17:48:54.1689078Z",
-  "version": "1.46"
+  "updated": "2026-05-14T06:42:05.934371Z",
+  "version": "1.48"
 }
