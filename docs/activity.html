@@ -29,6 +29,11 @@ a.button { display:inline-block; margin-top:10px; margin-right:8px; padding:10px
   <a class="button" href="https://github.com/settings/installations" target="_blank">GitHub App 연결</a>
 </div>
 
+<div id="actorCard" class="card">
+  <h2>Connected Activity</h2>
+  <div id="actorInfo" class="muted">loading activity log...</div>
+</div>
+
 <input id="owner" value="kiexpert" placeholder="GitHub owner">
 <div id="status" class="muted">loading...</div>
 <div id="repos" class="grid"></div>
@@ -36,8 +41,25 @@ a.button { display:inline-block; margin-top:10px; margin-right:8px; padding:10px
 const ownerInput = document.getElementById('owner');
 const reposEl = document.getElementById('repos');
 const statusEl = document.getElementById('status');
+const actorInfo = document.getElementById('actorInfo');
 
 function esc(v){ return String(v||'').replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s])); }
+
+async function loadActivityLog(){
+  try {
+    const r = await fetch('activity-log.json?v=' + Date.now(), { cache:'no-cache' });
+    if(!r.ok) throw new Error('failed');
+    const j = await r.json();
+
+    actorInfo.innerHTML = `
+      <div class="pill">Connected Actor: ${esc(j.lastActor || 'unknown')}</div>
+      <div class="pill">Repo: ${esc(j.repo || '-')}</div>
+      <div class="pill">Updated: ${esc(j.generatedAt || '-')}</div>
+    `;
+  } catch(err){
+    actorInfo.textContent = 'activity log unavailable';
+  }
+}
 
 async function fetchLatestIssue(full){
   try {
@@ -90,6 +112,7 @@ async function load(){
 }
 
 ownerInput.onchange = load;
+loadActivityLog();
 load();
 </script>
 </body>
