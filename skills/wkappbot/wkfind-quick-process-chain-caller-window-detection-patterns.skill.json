@@ -1,0 +1,52 @@
+{
+  "id": "wkfind-quick-process-chain-caller-window-detection-patterns",
+  "app": "wkappbot",
+  "title": "wkfind quick: Process-chain caller window detection patterns",
+  "title_ko": null,
+  "desc": "Quick reference for finding and fixing caller HWND issues. When you suspect wrong window detection, use this checklist.",
+  "steps": [
+    "1. Spot the symptom: Chrome window placement wrong, HWND validation rejects unexpectedly, JSON output shows wrong fg/fgT, or caller position is off-screen.\n",
+    "2. Check detection source: Launcher/Program.cs Main(), lines 234-258. Look for GetParentProcessId loop that walks parent chain.\n",
+    "3. Check forwarding path: Launcher line 1030 (BuildDetachedEnvBlock) adds WKAPPBOT_CALLER_HWND to env. Verify it's not stripped by forwardArgs.Where().\n",
+    "4. Check usage in Core: Search Core repo for 'WKAPPBOT_CALLER_HWND' and 'ComputePlacementNearCaller'. That's where the value is used.\n",
+    "5. Verify persistence: After running a cdp command, check wkappbot.hq/cdp-state.jsonl for 'caller_hwnd' and rejection reasons.\n",
+    "6. Test the fix: Build Launcher, hot-swap, run wkappbot a11y find '*' from different terminals/apps, capture LAUNCH JSON, verify fg matches caller not foreground app."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n 'var fgHwnd' d:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/Program.cs",
+      "expect": "236:",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n 'WKAPPBOT_CALLER_HWND' d:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/Program.cs",
+      "expect": "1030:",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -q 'TryMoveWebBotNearCaller' d:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/Program.cs",
+      "expect": "success",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "quick-ref",
+    "caller",
+    "HWND",
+    "process-chain",
+    "window-detection",
+    "launcher"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-13T07:00:37.492668Z",
+  "updated": "2026-05-15T15:52:49.8048963Z",
+  "version": "1.1"
+}

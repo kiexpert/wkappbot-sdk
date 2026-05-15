@@ -1,0 +1,36 @@
+{
+  "id": "wkfind-caller-hwnd-validation-3tier-pattern",
+  "app": "wkappbot",
+  "title": "wkfind: Caller HWND validation - 3-tier priority cascade pattern",
+  "title_ko": null,
+  "desc": "Complete pattern for Windows process->window mapping. Solves GetForegroundWindow() gotcha with 3-tier priority (console>host>foreground) and 8-point edge case validation. Covers multi-monitor, DWM cloak, PseudoConsoleWindow rejection, foreign-process guard, RECT marshalling bug fix, WT multi-tab support.",
+  "steps": [
+    "Recognize the GetForegroundWindow() Gotcha: GetForegroundWindow() returns whoever is CURRENTLY IN FOREGROUND (browser, IDE, another app), NOT the launcher's actual caller. Chrome gets placed on wrong window or wrong project. Correct model: 'Caller HWND' is contextual to Launcher's process ancestry -- who spawned us?",
+    "3-Tier Priority Cascade (MyCdpContext.cs:163-170): var fgHwnd = GetForegroundWindow(); var consoleHwnd = GetConsoleWindow(); var hostHwnd = GetHostWindowSnapshot(); var callerHwnd = consoleHwnd != IntPtr.Zero ? consoleHwnd : hostHwnd != IntPtr.Zero ? hostHwnd : fgHwnd; Rationale: Console (GetConsoleWindow) when run from ConPTY/cmd/pwsh. If not, walk parent chain (Program.cs:234-258) for first process with MainWindowHandle (Terminal, IDE, wkappbot). Fallback to GetForegroundWindow only if both fail.",
+    "Edge Case Validation Checklist (MyCdpContext.cs:340-399):\n(1) Desktop Window Rejection: SHELLDLL_DefView, Progman, WorkerW are shell background, not valid callers.\n(2) PseudoConsoleWindow Rejection: ConPTY spawns hidden child (class=PseudoConsoleWindow) -- NOT visual terminal.\n(3) Off-Screen Detection: IsRectOutsideAllMonitors(rect) checks intersection with ANY monitor. Handles multi-monitor negative coords on left/secondary monitors.\n(4) DWM Cloak: DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED) detects hidden (UWP suspended, Win+Tab, virtual-desktop).\n(5) Foreign-Process Guard: Reject foreground unless it's known host (terminal, IDE, wkappbot). 40+ allow-listed: cmd, powershell, pwsh, bash, wt, code, devenv, rider, etc.\n(6) RECT Marshalling: Win32 RECT=(L,T,R,B). DO NOT use System.Drawing.Rectangle (X,Y,W,H) -- coords get mangled on negative secondary-monitor positions.\n(7) Visibility: IsWindowVisible(hwnd) && IsWindow(hwnd) && GetWindowRect succeeds.\n(8) Degenerate: Reject if Width<=0 or Height<=0.",
+    "Parent Process Chain Walk (Program.cs:234-258 + MyCdpContext.cs:634-647): GetParentProcessId(pid) via NtQueryInformationProcess, max 10 iterations. Path: cmd.exe (MainWindowHandle=terminal hwnd) <- powershell.exe <- wkappbot.exe (our launcher). Code: static IntPtr GetHostWindowSnapshot() { var parentPid = GetParentProcessId(Environment.ProcessId); if (parentPid <= 0) return IntPtr.Zero; using var parent = System.Diagnostics.Process.GetProcessById(parentPid); return parent.MainWindowHandle; }",
+    "Environment Variable Forwarding (CoreRunner.cs + EyeCmdPipeClient.cs): After validation, persist caller HWND for downstream: (1) Launcher: static LastValidatedCallerHwnd = callerHwnd; compute LastValidatedCallerRect (System.Drawing.Rectangle.FromLTRB). (2) CoreRunner: Append WKAPPBOT_CALLER_HWND=0x... to CreateProcessW env block so Core subprocess accesses it. (3) ChromeLauncher: Post-launch TryMoveWebBotNearCaller() SetWindowPos Chrome next to caller. Use SWP_NOZORDER|SWP_NOACTIVATE so focus never stolen from terminal.",
+    "Windows Terminal Multi-Tab Edge Case (EyeCmdPipeClient.cs:207-212): Each WT tab has OWN CASCADIA_HOSTING_WINDOW_CLASS top-level hwnd (not shared; all tabs same WT pid but unique hwnd per tab). When user types in WT tab, that tab's CASCADIA window IS the foreground. Therefore GetForegroundWindow() directly returns correct tab hwnd. Parent walk unnecessary for WT (console window check catches it). Gotcha: Older logic assumed all WT tabs share one hwnd -- WRONG.",
+    "Logging & Telemetry (cdp-state.jsonl): Every validation logged to wkappbot.hq/runtime/cdp-state.jsonl: [VALIDATION] hwnd=0x48152E class=ConsoleWindowClass rect=(L=33,T=26,R=1012,B=538) size=(979x512) IsWindow=True IsVisible=False verdict=not_visible. [LAUNCHER] ask: caller window is off-screen (console:0x... host:0x... fg:0x...). Run from a terminal/IDE owned by your project. Use telemetry to diagnose off-screen or invalid caller rejections in production.",
+    "Key Code Locations:\n(1) MyCdpContext.cs:163-227 -- priority cascade + validation orchestration\n(2) MyCdpContext.cs:340-399 -- validation logic (8-point checklist)\n(3) Program.cs:234-258 -- GetParentProcessId loop\n(4) EyeCmdPipeClient.cs:207-212 -- WT tab detection\n(5) CoreRunner.cs:140-144 -- WKAPPBOT_CALLER_HWND env forwarding\n\nKey commits:\n(1) e10bc11e -- persist HWND validation rejections\n(2) ca987a3f -- fix off-screen check + multi-monitor + DWM cloak (RECT fix)\n(3) 655e9d7c -- forward WKAPPBOT_CALLER_HWND through env block\n(4) dd10359f -- place WebBot next to validated caller\n(5) e4737593 -- add foreign-process guard (allow-list)",
+    "SEE ALSO: wkappbot skill read standard-appbot-window -- complete definitive reference for Standard AppBot Window detection, IPC, ConPTY, multi-tab, iconified, placement, all gaps fixed."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "caller-window",
+    "hwnd-validation",
+    "process-chain",
+    "multi-monitor",
+    "windows-terminal",
+    "chrome-placement",
+    "wkfind",
+    "edge-cases"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": null,
+  "created": "2026-05-15T15:53:00.714243Z",
+  "updated": "2026-05-15T15:53:01.297966Z",
+  "version": "1.2"
+}

@@ -108,3 +108,5 @@ wkappbot*.zip
 _probe_*/
 _provider_probe_*/
 bin/_append_test*/
+resolve-24-output.txt
+resolve-output.txt

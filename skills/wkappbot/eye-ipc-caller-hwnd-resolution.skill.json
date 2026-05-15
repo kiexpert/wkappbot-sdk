@@ -1,0 +1,53 @@
+{
+  "id": "eye-ipc-caller-hwnd-resolution",
+  "app": "wkappbot",
+  "title": "Eye IPC caller HWND: ResolveCallerTerminalHwnd + __hwnd prefix",
+  "title_ko": null,
+  "desc": "Find the real launcher caller window when running through Eye IPC pipe. Covers ResolveCallerTerminalHwnd priority cascade, wire protocol, downstream consumers, and known gaps.",
+  "steps": [
+    "PROBLEM: GetForegroundWindow() in Eye IPC context returns Eye process window NOT the caller terminal. Chrome gets placed on wrong project window.",
+    "BEFORE PIPE SEND (EyeCmdPipeClient.cs TryDelegate lines 56-61): call ResolveCallerTerminalHwnd(), prepend __hwnd:0xHHHHHHHH to JSON args array. Only prepended when hwnd != Zero.",
+    "ResolveCallerTerminalHwnd() cascade (lines 205-246): P1 = foreground IS terminal class (CASCADIA_HOSTING_WINDOW_CLASS or ConsoleWindowClass) -- use directly. P2 = walk ancestor PID chain up to 8 levels -- find first visible top-level window owned by ancestor PID. P3 = raw GetForegroundWindow() fallback.",
+    "Wire protocol: payload = [__cwd:D:\\path, __hwnd:0x0012AB34, actual-cmd, arg1...]. EyeCmdPipeServer.HandleClientAsync lines 244-260 strips both prefixes, decodes hex via long.TryParse(hexStr, HexNumber).",
+    "Downstream after Eye receives __hwnd: ChromeLauncher.CallerHwndForPlacement = hwnd (static). EyeCmdPipeServer.CallerHwnd.Value = hwnd (AsyncLocal, propagates to all async continuations). WKAPPBOT_CALLER_HWND env var forwarded to Core via CreateProcessW env block.",
+    "GAPS TO FILL: (A) Zero hwnd -- no __hwnd sent -- Eye inherits stale CallerHwndForPlacement from prior command. Eye should reset to Zero when prefix absent. (B) Static CallerHwndForPlacement survives hot-swap -- stale hwnd risk. (C) Integrated terminal -- ConPTY host is IDE -- ancestor walk finds IDE HWND not terminal panel.",
+    "MULTI-MONITOR: negative x/y coords ARE valid on left monitor. Never reject by coordinate sign. Use MonitorFromPoint() Win32 API. cdp-mon.ps1 [OFF-SCREEN] label uses old sign-based check -- 99.9% false positive on multi-monitor setups. Debug via wkappbot.hq/runtime/cdp-state.jsonl caller_hwnd field.",
+    "STANDARD APPBOT WINDOW definition: The window of the nearest ancestor process in the wkappbot process chain that owns a visible non-minimized window with a non-empty title. RULES: (1) Foreground/focus window is IRRELEVANT -- it is someone else's window, never use it as caller. (2) GetForegroundWindow() is always WRONG for this purpose -- remove all P1 and P3 foreground fallbacks. (3) ONLY correct method: parent process chain walk (P2) -- walk GetParentProcessId chain, EnumWindows per ancestor PID, return first visible non-minimized non-empty-title window from closest ancestor. (4) If no ancestor has a window -- callerHwnd = Zero. Do NOT fall back to foreground. (5) Applies to all Eye IPC paths: normal pipe, admin pipe, MCP worker. Mnemonic: AppBot was launched FROM somewhere -- find that place via process ancestry, ignore what the user is currently looking at.",
+    "MULTI-TAB TERMINAL EDGE CASE: When a terminal app (Windows Terminal, VS Code integrated terminal) has multiple tabs and wkappbot ran in Tab B while Tab A is active -- the ancestor walk finds the TERMINAL HOST PROCESS (e.g., WindowsTerminal.exe) via PID chain: shell -> conhost/ConPTY server -> WindowsTerminal.exe. This host process owns ONE main HWND that covers ALL tabs. We return that HWND regardless of which tab is active. This is CORRECT for Chrome placement (Chrome appears near the terminal window). Implementation note: ConPTY server processes (conhost.exe, OpenConsole.exe) have NO visible top-level window -- the ancestor walk skips them naturally (no EnumWindows match for their PID) and continues up to WindowsTerminal.exe which DOES have a visible HWND with non-empty title. Do NOT try to identify the specific active tab -- the terminal window HWND is the correct placement anchor regardless of tab focus.",
+    "ICONIFIED (MINIMIZED) CALLER WINDOW: If the AppBot caller terminal is minimized, IsIconic(hwnd) returns true -- the ancestor walk skips it and returns Zero. TryMoveChromeToCaller receives Zero and does NOT move Chrome (no-op). Chrome stays at its last valid position. This is the CORRECT behavior: minimized terminal = user is not watching it (background/batch run), moving Chrome would be disruptive. DO NOT fall back to foreground in this case. DO NOT move Chrome to a default center position. Legacy/last position is the safest choice. Optional future enhancement: use WINDOWPLACEMENT.rcNormalPosition to place Chrome near the would-be restored position, but adds complexity for minimal gain.",
+    "DUAL HWND RESOLUTION -- placement vs input injection: Two distinct HWNDs are needed. (1) PLACEMENT HWND: nearest visible non-iconic titled ancestor window (current P2 result) -- used for TryMoveChromeToCaller to position Chrome near the terminal. (2) INPUT HWND (ConPTY HWND): the PseudoConsoleWindow class HWND in the ancestor chain -- needed when injecting keystrokes or input INTO the specific terminal tab that ran wkappbot. ConPTY windows have class 'PseudoConsoleWindow', are NOT visible (IsWindowVisible=false, no title), so the standard P2 walk skips them. To find ConPTY HWND: (a) GetConsoleWindow() returns it directly if called from a console process, (b) walk ancestor PIDs and EnumWindows WITHOUT the IsWindowVisible/title filter, checking GetClassName == 'PseudoConsoleWindow'. The LAUNCH JSON already tracks this as the 'con' field (hex HWND). Both HWNDs should be forwarded via IPC: __hwnd for placement, __conhwnd for input injection. Skipping ConPTY in P2 is CORRECT for placement. For input injection, use the 'con' field directly.",
+    "REVISED SINGLE HWND POLICY: One __hwnd: prefix only. P2 ancestor walk finds the NEAREST ancestor with ANY window (visible OR hidden). Hidden ConPTY (PseudoConsoleWindow) has valid GetWindowRect coordinates -- use those for Chrome placement. Same hwnd for input injection. No __conhwnd: prefix needed. P2 filter: IsWindow + non-zero GetWindowRect (remove IsWindowVisible requirement). Prefer ConPTY (nearest) over WindowsTerminal host (further). Supersedes step 7 dual-HWND approach.",
+    "COORDINATE RESOLUTION FOR HIDDEN WINDOWS: When the forwarded __hwnd is a hidden window (IsWindowVisible=false, e.g. ConPTY PseudoConsoleWindow), do NOT use GetWindowRect on that hwnd directly for Chrome placement -- the rect may be zero or unreliable. Instead: walk UP via GetParent(hwnd) or GetAncestor(hwnd, GA_ROOTOWNER) until a visible window with a non-zero rect is found. Use THAT parent/ancestor rect for Chrome placement coordinates. The original hidden hwnd is still kept as the identity and input-injection target. Pattern in TryMoveChromeToCaller: hWndForRect = IsWindowVisible(callerHwnd) ? callerHwnd : FindVisibleParent(callerHwnd). FindVisibleParent walks GetParent() chain until IsWindowVisible + non-zero GetWindowRect.",
+    "GetAncestor GA_ROOT for hidden caller rect: hidden __hwnd (ConPTY) -> GetAncestor(hwnd, GA_ROOT) gets root visible ancestor in one API call. Use root rect for Chrome placement. Original hidden hwnd kept as identity for input injection. Code: hWndForRect = IsWindowVisible(callerHwnd) ? callerHwnd : GetAncestor(callerHwnd, GA_ROOT)"
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n ResolveCallerTerminalHwnd D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs",
+      "expect": "205",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n __hwnd D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs",
+      "expect": "__hwnd:",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n CallerHwndForPlacement D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/EyeCmdPipeServer.cs",
+      "expect": "CallerHwndForPlacement",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T13:39:06.1020986Z",
+  "updated": "2026-05-15T15:52:46.5525252Z",
+  "version": "1.15"
+}

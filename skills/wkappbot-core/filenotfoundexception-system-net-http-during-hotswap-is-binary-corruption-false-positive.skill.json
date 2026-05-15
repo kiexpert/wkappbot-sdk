@@ -10,7 +10,8 @@
     "3. Match exception timestamp to git log entries within +/- 30 minutes (git log --since/--until). High commit density right before the crash = active rebuild guardrail swap window.",
     "4. If all three signals match (PublishTrimmed=false + tiny broken binary + active hotswap timing), resolve as false positive: the next clean build replaces the truncated copy and the exception cannot reproduce.",
     "5. Reference: suggest 2026-05-15T03:17:17 resolved as binary corruption false positive 2026-05-15.",
-    "Verified 2026-05-15: 2026-05-15T03-17-17-system-net-http-binary-corruption-false-positive.ps1 (resolve ts=2026-05-15T03:17:17)"
+    "Verified 2026-05-15: 2026-05-15T03-17-17-system-net-http-binary-corruption-false-positive.ps1 (resolve ts=2026-05-15T03:17:17)",
+    "Verified 2026-05-15: test-system-io-filesystem-watcher-binary-corruption-false-positive.cmd (resolve ts=2026-05-11T03:21:49.1690687Z)"
   ],
   "requirements": [
     {
@@ -35,6 +36,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T07:21:12.581682Z",
-  "updated": "2026-05-15T09:55:10.5762421Z",
-  "version": "1.3"
+  "updated": "2026-05-15T09:57:32.6323665Z",
+  "version": "1.4"
 }

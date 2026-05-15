@@ -27,6 +27,11 @@
       "cmd": "wkappbot skill search wkask wkcdp token",
       "expect": "wktool-pattern",
       "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
     }
   ],
   "primary_cmd": null,
@@ -48,6 +53,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-10T13:32:49.8983722Z",
-  "updated": "2026-05-14T07:22:02.9913476Z",
-  "version": "1.11"
+  "updated": "2026-05-15T15:53:13.11515Z",
+  "version": "1.12"
 }
