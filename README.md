@@ -62,13 +62,13 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ---
 
-## 🚀 What's New in v7.2
+## 🚀 What's New in v7.3
 
-- **CDP port isolation** — each project CWD gets a dedicated 4-port block (SHA256-derived, range 9300–9995). Parallel sessions never share a Chrome instance.
-- **Korean IME relay daemon** — `ime-relay-daemon` runs as a separate process with a named-mutex singleton (`Global\WkImeRelay`). Han/Yeong toggle works in ConPTY (Windows Terminal) without focus steal.
-- **Taskkill classify + force** — `wkappbot taskkill /IM wkappbot-core.exe` classifies PROTECTED/ZOMBIE/UNKNOWN before killing. `--force <pids>` is the only kill path.
-- **Triad parallel ask** — `wkappbot ask triad "question"` dispatches GPT + Gemini + Claude simultaneously and returns all three answers.
-- **CDP monitor** — `cdp-mon.ps1` shows per-session: CWD, port, memory, position drift, latency (3-ping), duplicate tabs, IME daemon health.
+- **Caller HWND ancestor walk** — Launcher resolves the AppBot caller window strictly via the process-ancestor chain (no foreground fallbacks). ConPTY hidden terminals are included via `GetWindowRect`, and visible windows apply the `GA_ROOT` filter. Off-screen callers are rejected fail-fast.
+- **Chrome session restore guard** — Two-layer fix for Chrome session-restore position override: `ChromeLauncher.SessionRestore` clears the cached geometry and `CdpClient.WindowStabilize` re-asserts the target rect post-restore.
+- **IME Relay jamo-sync** — Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus`.
+- **Publish defense** — `IncludeAllContentForSelfExtract=true` to suppress `System.IO.FileSystem.Watcher` shim-assembly false positives during hot-swap.
+- **wkfind / wkask tools** — Unified code+session search (`wkfind`) with GlobCoverageScore ranking, plus live ask-pipeline monitor (`wkask`) for QA-first regression checks.
 
 → Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 

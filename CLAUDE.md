@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.2.0 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
