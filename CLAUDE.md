@@ -315,6 +315,7 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 2. wkappbot suggest list
 3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
 4. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
+5. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
 
 ## Scope of Work (YOU: SDK ONLY, not Core repo)
 
@@ -339,13 +340,14 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 | **Release loop** | Every project keeps its recurring `Main Duties` block in repo `CLAUDE.md`. The release loop is always `build -> deploy -> hot-swap -> smoke test`. |
 | **Core promotion** | Public workflows that use private-core downloads may promote only sanitized durable summaries back to `WKAPPBOT_CORE_REPO`; never copy secrets or raw private logs. |
 | Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
+| **Public skill curation** | Before each release: select non-confidential skills from all apps → register under `wkappbot-sdk` with `audience:user` or `audience:developer` via `wkappbot skill contribute`. Criteria: useful to global SDK users, no business secrets, no internal-ops content. Maintain `sdk-public-skill-index` as the canonical list. |
 | MD self-healing | `wkappbot skill read claude-md-guide` -- apply situation A-H as they arise |
 | SDK user skill distribution | `setup.ps1` auto-install `wkappbot-workflow` skills on first run (suggest filed: 2026-05-08) |
 | Session recovery | `wkappbot session list --claude --cwd` after compaction |
 | Release prep | CHANGELOG + VERSIONING + CLAUDE.md header + gh issue comment on launch checklist |
 | **CDP anomaly response** | Red flags: off-screen TGT-POS (x<-100), LAT=DEAD, DUP tabs >3, MEM>2GB/session, >4 Chrome same CWD. **DIRECT FIX via wktool -- NO suggest filing for Chrome position/cookie bugs.** Fix: wkcdp auto-moves off-screen Chrome, wkask aborts if caller off-screen. |
-| **CDP suggest triage** | `wkappbot suggest list` -> resolve stale BUG-AUTO CDP/Chrome/ask-gpt suggests. Use `--class CdpClient --commit <hash> --skill cdp-evalasync-retry-policy`. ChromeLauncher.cs is 817 lines (over cap) -- use CdpClient or Win32 partial instead. |
-| **CDP bug fixes (primary owner) -- NO SUGGESTS, DIRECT FIX** | CDP/Chrome bugs are YOUR primary responsibility. Pattern: cdp-mon anomaly detected -> read suggest detail -> spawn Opus agent to fix in WKAppBot C# -> build -> hot-swap. Key areas: tab accumulation (sandbox-miss), window position drift (SetWindowBoundsWaitStableAsync), hotswap off-screen (LoadParentWindowGeo on-screen guard), WaitForEditorA11y timeout, CDP eval timeout. Always use partial class (CdpClient.*.cs, ChromeLauncher.*.cs) not the 817-line monolith. |
+| **CDP suggest triage** | `wkappbot suggest list` -> resolve stale BUG-AUTO CDP/Chrome/ask-gpt suggests. Use `--class CdpClient --commit <hash> --skill cdp-evalasync-retry-policy`. ChromeLauncher.cs is 817 lines (over cap) -- use partial classes (ChromeLauncher.SessionRestore.cs, ChromeLauncher.*.cs) or CdpClient.*.cs instead. |
+| **CDP bug fixes (primary owner) -- NO SUGGESTS, DIRECT FIX** | CDP/Chrome bugs are YOUR primary responsibility. Pattern: cdp-mon anomaly detected -> read suggest detail -> spawn Opus agent to fix in WKAppBot C# -> build -> hot-swap. Key areas: tab accumulation (sandbox-miss), window position drift (SetWindowBoundsWaitStableAsync -- see CdpClient.WindowStabilize.cs), session restore override (ChromeLauncher.SessionRestore.cs), hotswap off-screen (LoadParentWindowGeo on-screen guard), WaitForEditorA11y timeout, CDP eval timeout. Always use partial class (CdpClient.*.cs, ChromeLauncher.*.cs). |
 | **Doc version audit** | Before release and on ㄱㄱ: grep all root `*.md` for old version strings (v5.x, v6.x). Check SECURITY.md supported-versions table, README What's New section, CHANGELOG header. Fix and push any stale references. |
 | **Doc version sync** | Keep README/AGENTS/CLAUDE/SECURITY/VERSIONING/CHANGELOG consistent with current version. When version bumps: update SECURITY supported-versions, README What's New, VERSIONING current-version line, CHANGELOG header -- all in one commit. Never let version strings drift between files. |
 
@@ -357,6 +359,10 @@ wkappbot skill read a11y-command-cheatsheet  # a11y action cheatsheet
 
 # ★ MANDATORY -- wk-tool scripts (read before ANY ask/CDP work)
 wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA script pattern (merged)
+
+# SDK public skills index (global user distribution)
+wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills for SDK users
+# NOTE: chrome-session-restore-position-fix skill is in Core repo -- register to HQ via skill contribute before adding here
 
 ## Gotchas
 - `suggest list` crashes with JsonException if a delta-comment wrote raw JSON into a string field. Workaround: `python3 -c "import json; [print(l[:80]) for l in open('suggestions.jsonl') if json.loads(l)]"` to read valid lines.
