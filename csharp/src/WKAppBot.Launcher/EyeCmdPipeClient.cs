@@ -55,9 +55,20 @@ internal static class EyeCmdPipeClient
             // is the AppBot caller, not whichever window happens to have focus.
             var fgHwnd = ResolveCallerTerminalHwnd();
             var hwndPrefix = fgHwnd != IntPtr.Zero ? $"__hwnd:0x{fgHwnd.ToInt64():X8}" : null;
-            var prefixes = new[] { $"__cwd:{Environment.CurrentDirectory}" }
-                .Concat(hwndPrefix != null ? new[] { hwndPrefix } : Array.Empty<string>());
-            var payload = prefixes.Concat(args).ToArray();
+
+            // Also resolve the ConPTY (PseudoConsoleWindow) HWND of THIS terminal tab.
+            // Distinct from __hwnd: the placement HWND is the visible IDE window; the ConPTY
+            // HWND is the hidden console window of the specific tab that ran wkappbot, needed
+            // for future input injection into that exact tab.
+            IntPtr conHwnd = GetConsoleWindow();
+            if (conHwnd == IntPtr.Zero)
+                conHwnd = FindAncestorPseudoConsoleWindow();
+            var conHwndPrefix = conHwnd != IntPtr.Zero ? $"__conhwnd:0x{conHwnd.ToInt64():X8}" : null;
+
+            var prefixList = new List<string> { $"__cwd:{Environment.CurrentDirectory}" };
+            if (hwndPrefix != null) prefixList.Add(hwndPrefix);
+            if (conHwndPrefix != null) prefixList.Add(conHwndPrefix);
+            var payload = prefixList.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
             // First-output timeout: both LAUNCH JSON and [CMD] must arrive within N ms.
@@ -167,12 +178,17 @@ internal static class EyeCmdPipeClient
         }
     }
 
-    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
-    [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern int GetWindowTextLengthW(IntPtr hWnd);
+    static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+    [DllImport("kernel32.dll")] static extern IntPtr GetConsoleWindow();
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int Left, Top, Right, Bottom; }
 
     delegate bool EnumWindowsProcDelegate(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")]
@@ -222,10 +238,13 @@ internal static class EyeCmdPipeClient
             {
                 GetWindowThreadProcessId(hWnd, out uint wpid);
                 if (wpid != targetPid) return true; // not this ancestor
-                if (!IsWindowVisible(hWnd)) return true;
-                if (IsIconic(hWnd)) return true; // minimized
+                if (!IsWindow(hWnd)) return true;
                 if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true; // owned popup
-                if (GetWindowTextLengthW(hWnd) <= 0) return true; // no title -> likely tool window
+                // Include hidden ConPTY windows: they have IsWindowVisible=false and no title,
+                // but GetWindowRect returns valid tab-area coords -- sufficient for both Chrome
+                // placement AND input injection (one hwnd serves both purposes).
+                if (!GetWindowRect(hWnd, out RECT rect)) return true;
+                if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true; // zero rect
                 match = hWnd;
                 return false;
             }, IntPtr.Zero);
@@ -234,6 +253,47 @@ internal static class EyeCmdPipeClient
 
         // No ancestor owns a usable window. Do NOT fall back to foreground --
         // foreground is someone else's window and would be wrong every time.
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Walk ancestor PIDs looking for a window whose class name is "PseudoConsoleWindow".
+    /// Used when GetConsoleWindow() returns 0 (e.g. launcher running detached or under a host
+    /// that owns the ConPTY rather than wkappbot itself). No visibility/title filter --
+    /// ConPTY windows are intentionally hidden and have no title.
+    /// Returns IntPtr.Zero if no ancestor owns a ConPTY window.
+    /// </summary>
+    static IntPtr FindAncestorPseudoConsoleWindow()
+    {
+        var ancestorPids = new List<uint>();
+        try
+        {
+            int pid = Environment.ProcessId;
+            for (int depth = 0; depth < 8 && pid > 0; depth++)
+            {
+                var parent = GetParentPid(pid);
+                if (parent <= 0 || parent == pid) break;
+                ancestorPids.Add((uint)parent);
+                pid = parent;
+            }
+        }
+        catch { }
+
+        foreach (var targetPid in ancestorPids)
+        {
+            IntPtr match = IntPtr.Zero;
+            EnumWindows((hWnd, _) =>
+            {
+                GetWindowThreadProcessId(hWnd, out uint wpid);
+                if (wpid != targetPid) return true; // not this ancestor
+                var cls = new System.Text.StringBuilder(256);
+                GetClassNameW(hWnd, cls, 256);
+                if (cls.ToString() != "PseudoConsoleWindow") return true;
+                match = hWnd;
+                return false;
+            }, IntPtr.Zero);
+            if (match != IntPtr.Zero) return match;
+        }
         return IntPtr.Zero;
     }
 
