@@ -179,6 +179,7 @@ internal static class EyeCmdPipeClient
     }
 
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
     [DllImport("user32.dll", SetLastError = true)]
@@ -239,10 +240,11 @@ internal static class EyeCmdPipeClient
                 GetWindowThreadProcessId(hWnd, out uint wpid);
                 if (wpid != targetPid) return true; // not this ancestor
                 if (!IsWindow(hWnd)) return true;
-                if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true; // owned popup
-                // Include hidden ConPTY windows: they have IsWindowVisible=false and no title,
-                // but GetWindowRect returns valid tab-area coords -- sufficient for both Chrome
-                // placement AND input injection (one hwnd serves both purposes).
+                // Visible windows must be root (filters owned popups / tool windows).
+                // Hidden windows (e.g. ConPTY PseudoConsoleWindow) skip the root check --
+                // they are not root windows but ARE valid as caller identity + GA_ROOT
+                // gives their visible ancestor for placement coords.
+                if (IsWindowVisible(hWnd) && GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
                 if (!GetWindowRect(hWnd, out RECT rect)) return true;
                 if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true; // zero rect
                 match = hWnd;
