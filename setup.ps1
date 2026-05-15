@@ -177,7 +177,7 @@ Write-Step "checking gh auth (required for paid tier)"
 $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $ghCmd) {
     Write-Skip "gh CLI not installed -- Free tier only. Install: winget install GitHub.cli"
-    Write-Host "        Paid tiers (CDP 100k/mo, Sudo 500k/mo) require gh auth login + GitHub invite acceptance."
+    Write-Host "        Paid tiers (CDP 30-day, Sudo 108-day) require gh auth login + GitHub invite acceptance."
 } else {
     try {
         $ghStatus = & gh auth status 2>&1

@@ -22,7 +22,7 @@ export default defineConfig({
       { text: '고급', link: '/advanced/architecture' },
       { text: '요금', link: '/pricing' },
       {
-        text: 'v6.0.0',
+        text: 'v7.3.0',
         items: [
           { text: 'Changelog', link: 'https://github.com/kiexpert/wkappbot-sdk/releases' },
           { text: 'GitHub', link: 'https://github.com/kiexpert/wkappbot-sdk' },

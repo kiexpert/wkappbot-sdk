@@ -45,3 +45,19 @@ If you have scripts that reference the old pipe name `wkappbot_eye_ipc`, update 
 
 v6.5 uses ECDSA file-based licenses (offline) combined with GitHub collaborator auth.
 Free tier works without any login. Paid tiers require `gh auth login` once.
+
+## v7.1 → v7.2
+
+- No breaking changes
+- New: Chrome session geometry persistence (window position saved per project)
+- New: wkfind multi-keyword code+session search tool
+- New: wkask real-time ask pipeline health monitor
+
+## v7.2 → v7.3
+
+- No breaking changes
+- Fixed: Chrome window position mismatch (session restore override) — two-layer fix
+- Fixed: IME Relay jamo-sync (kana/hangul input relay)
+- Fixed: Eye startup FileNotFoundException false positive (single-file publish defense)
+- New: Launcher HWND ancestor-walk caller resolution (P2 ConPTY support)
+- New: standard-appbot-window / standard-chrome-window skills

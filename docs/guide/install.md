@@ -51,7 +51,7 @@ WKAppBot은 사용 기록을 학습해 `bin\wkappbot.hq\`에 UI Experience DB를
 
 ```bash
 wkappbot --version
-# WKAppBot v7.1.0 (core: 6.0.0)
+# WKAppBot v7.3.0 (core: 7.3.0)
 
 wkappbot skill list
 # 설치된 스킬 목록 출력
