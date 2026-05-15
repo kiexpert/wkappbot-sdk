@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>WKAppBot Relay</title>
+</head>
+<body>
+<h1>WKAppBot Relay Dashboard</h1>
+<pre id="log"></pre>
+<script>
+const log = document.getElementById('log');
+const es = new EventSource('/events');
+es.onmessage = (e) => {
+  log.textContent += e.data + '\n';
+};
+es.addEventListener('job_created', e => {
+  log.textContent += '[job_created] ' + e.data + '\n';
+});
+es.addEventListener('job_completed', e => {
+  log.textContent += '[job_completed] ' + e.data + '\n';
+});
+</script>
+</body>
+</html>

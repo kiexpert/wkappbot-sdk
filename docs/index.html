@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>WKAppBot Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 1040px; margin: 32px auto; padding: 16px; line-height: 1.55; }
+    header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    h1 { margin-bottom: 4px; }
+    a { color: inherit; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card { border: 1px solid rgba(128,128,128,.35); border-radius: 18px; padding: 18px; margin: 16px 0; box-shadow: 0 8px 24px rgba(0,0,0,.05); }
+    button, select, input { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit; margin: 6px 0; }
+    select, input { width: 100%; box-sizing: border-box; }
+    button { cursor: pointer; border-radius: 999px; }
+    .muted { opacity: .7; }
+    .pill { display: inline-block; padding: 6px 10px; border: 1px solid rgba(128,128,128,.35); border-radius: 999px; margin: 4px 4px 4px 0; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header><div><h1>WKAppBot Portal</h1><div class="muted" id="today"></div></div><div><a class="pill" href="board/">Board</a><a class="pill" href="chatgpt-wkappbot-dashboard.html">Dashboard</a><a class="pill" href="404.html">Safe 404</a></div></header>
+  <section class="card"><h2>내 설정</h2><input id="user" placeholder="GitHub user, 예: kiexpert"><button id="saveUser">저장</button><span id="saved" class="muted"></span></section>
+  <section class="grid">
+    <div class="card"><h2>오늘 Daily Board</h2><p class="muted">레포를 고르면 바로 오늘 보드로 이동합니다.</p><select id="repo"><option value="kiexpert/wkappbot-sdk">wkappbot-sdk</option><option value="kiexpert/WkFeedQuant">WkFeedQuant</option><option value="kiexpert/bitwise-sets">bitwise-sets</option><option value="kiexpert/WkWhisperKey">WkWhisperKey</option><option value="kiexpert/WkDevContainer">WkDevContainer</option><option value="custom">직접 입력</option></select><input id="customRepo" placeholder="owner/repo" style="display:none"><input id="title" value="Daily board" placeholder="title prefix"><input id="label" value="daily" placeholder="issue label"><button id="openBoard">오늘 보드 열기</button><button id="saveFavorite">즐겨찾기 추가</button><div id="dailyStatus" class="muted">온로드 점검 대기 중...</div></div>
+    <div class="card"><h2>빠른 실행</h2><a class="pill" id="appbotBoard" href="board/">앱봇 보드</a><a class="pill" id="quantBoard" href="board/">퀀트 보드</a><a class="pill" href="chatgpt-wkappbot-dashboard.html">릴레이 대시보드</a><a class="pill" id="freshBoard" href="board/">캐시 우회 보드</a></div>
+    <div class="card"><h2>즐겨찾기</h2><div id="favorites" class="muted">아직 없습니다.</div></div>
+    <div class="card"><h2>최근 보드</h2><div id="recent" class="muted">아직 없습니다.</div></div>
+    <div class="card"><h2>온로드 점검</h2><div id="onloadChecks" class="muted">점검 중...</div></div>
+    <div class="card"><h2>문서</h2><a class="pill" href="wkappbot-dashboard.md">Dashboard notes</a><a class="pill" href="GITHUB-BOARD.md">GitHub board pattern</a><a class="pill" href="GITHUB-PAGES.md">GitHub Pages setup</a></div>
+  </section>
+  <section class="card"><h2>상태</h2><p class="muted">GitHub Pages는 커밋 뒤 1~3분 늦게 반영될 수 있습니다. 보드 링크는 자동으로 cache-buster를 붙입니다.</p></section>
+  <script>
+    const $ = id => document.getElementById(id);
+    $('today').textContent = new Date().toLocaleString();
+    $('user').value = localStorage.getItem('wkPortalUser') || '';
+    const lastRepo = localStorage.getItem('wkPortalRepo');
+    if (lastRepo) { const opt = [...$('repo').options].find(o => o.value === lastRepo); if (opt) $('repo').value = lastRepo; }
+    function loadJson(key, fallback) { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch (_) { return fallback; } }
+    function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+    function day() { return new Date().toISOString().slice(0, 10); }
+    function boardUrl(repo, title = 'Daily board', label = 'daily') { const p = new URLSearchParams(); p.set('repo', repo); p.set('title', title); p.set('label', label); if ($('user').value.trim()) p.set('user', $('user').value.trim()); p.set('v', Date.now()); return 'board/?' + p.toString(); }
+    function selectedRepo() { return $('repo').value === 'custom' ? $('customRepo').value.trim() : $('repo').value; }
+    function selectedConfig() { return { repo: selectedRepo(), title: $('title').value || 'Daily board', label: $('label').value || 'daily' }; }
+    function rememberRecent(cfg) { const items = loadJson('wkPortalRecent', []); const next = [cfg, ...items.filter(x => x.repo !== cfg.repo)].slice(0, 6); saveJson('wkPortalRecent', next); }
+    function openBoard() { const cfg = selectedConfig(); if (!cfg.repo) { $('customRepo').focus(); return; } localStorage.setItem('wkPortalRepo', cfg.repo); rememberRecent(cfg); location.href = boardUrl(cfg.repo, cfg.title, cfg.label); }
+    function renderList(id, key) { const items = loadJson(key, []); if (!items.length) { $(id).textContent = '아직 없습니다.'; return; } $(id).innerHTML = items.map(x => `<a class="pill" href="${boardUrl(x.repo, x.title, x.label)}">${x.repo}</a>`).join(''); }
+    function saveFavorite() { const cfg = selectedConfig(); if (!cfg.repo) return; const items = loadJson('wkPortalFavorites', []); const next = [cfg, ...items.filter(x => x.repo !== cfg.repo)].slice(0, 12); saveJson('wkPortalFavorites', next); renderList('favorites', 'wkPortalFavorites'); checkBoards(); }
+    async function findDaily(cfg) { const q = encodeURIComponent(`repo:${cfg.repo} is:issue label:${cfg.label || 'daily'} in:title "${cfg.title || 'Daily board'} - ${day()}"`); const r = await fetch(`https://api.github.com/search/issues?q=${q}`); if (!r.ok) return { ok:false, repo: cfg.repo, status:r.status }; const j = await r.json(); return { ok:true, repo: cfg.repo, issue: j.items && j.items[0] }; }
+    async function checkBoards() { const configs = [selectedConfig(), ...loadJson('wkPortalFavorites', []), ...loadJson('wkPortalRecent', [])].filter(x => x.repo).filter((x,i,a)=>a.findIndex(y=>y.repo===x.repo)===i).slice(0,5); $('onloadChecks').textContent = '오늘 이슈 점검 중...'; const rows=[]; for (const cfg of configs) { const r = await findDaily(cfg).catch(e => ({ok:false, repo:cfg.repo, error:e.message})); if (r.issue) rows.push(`<a class="pill" href="${boardUrl(cfg.repo,cfg.title,cfg.label)}">✅ ${cfg.repo} #${r.issue.number}</a>`); else rows.push(`<span class="pill">⚠️ ${cfg.repo} 오늘 이슈 없음</span>`); } $('onloadChecks').innerHTML = rows.join('') || '점검할 보드가 없습니다.'; $('dailyStatus').innerHTML = rows[0] || '오늘 이슈 상태 없음'; }
+    $('saveUser').onclick = () => { localStorage.setItem('wkPortalUser', $('user').value.trim()); $('saved').textContent = '저장됨'; setTimeout(() => $('saved').textContent = '', 1200); renderList('favorites', 'wkPortalFavorites'); renderList('recent', 'wkPortalRecent'); checkBoards(); };
+    $('repo').onchange = () => { const custom = $('repo').value === 'custom'; $('customRepo').style.display = custom ? 'block' : 'none'; if (!custom) openBoard(); };
+    $('customRepo').onkeydown = e => { if (e.key === 'Enter') openBoard(); };
+    $('openBoard').onclick = openBoard; $('saveFavorite').onclick = saveFavorite;
+    $('appbotBoard').href = boardUrl('kiexpert/wkappbot-sdk', 'Daily board', 'daily'); $('quantBoard').href = boardUrl('kiexpert/WkFeedQuant', 'Quant Daily', 'daily'); $('freshBoard').href = 'board/?v=' + Date.now();
+    renderList('favorites', 'wkPortalFavorites'); renderList('recent', 'wkPortalRecent'); checkBoards();
+  </script>
+</body>
+</html>

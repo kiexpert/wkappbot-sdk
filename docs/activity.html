@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>WKAppBot Activity Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui,sans-serif; max-width: 1200px; margin: 32px auto; padding: 16px; }
+.grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(340px,1fr)); gap:16px; }
+.card { border:1px solid rgba(128,128,128,.35); border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.05); }
+input { width:100%; padding:12px; border-radius:12px; border:1px solid rgba(128,128,128,.35); background:transparent; color:inherit; box-sizing:border-box; }
+.pill { display:inline-block; padding:5px 10px; border-radius:999px; border:1px solid rgba(128,128,128,.35); margin:4px; }
+a.button { display:inline-block; margin-top:10px; margin-right:8px; padding:10px 14px; border-radius:999px; border:1px solid rgba(128,128,128,.35); text-decoration:none; color:inherit; }
+.muted { opacity:.7; }
+.topnav { margin-bottom:16px; }
+</style>
+</head>
+<body>
+<h1>WKAppBot Activity Portal</h1>
+<p class="muted">최신 업데이트 레포 · 최근 이슈 · Board 연결</p>
+
+<div class="topnav">
+  <a class="button" href="./">Portal</a>
+  <a class="button" href="skills.html">Skill Browser</a>
+  <a class="button" href="board/">Daily Board</a>
+  <a class="button" href="chatgpt-wkappbot-dashboard.html">AppBot Dashboard</a>
+  <a class="button" href="https://chat.openai.com/gpts" target="_blank">GPTs</a>
+  <a class="button" href="https://github.com/settings/installations" target="_blank">GitHub App 연결</a>
+</div>
+
+<div id="actorCard" class="card">
+  <h2>Connected Activity</h2>
+  <div id="actorInfo" class="muted">loading activity log...</div>
+</div>
+
+<input id="owner" value="kiexpert" placeholder="GitHub owner">
+<div id="status" class="muted">loading...</div>
+<div id="repos" class="grid"></div>
+<script>
+const ownerInput = document.getElementById('owner');
+const reposEl = document.getElementById('repos');
+const statusEl = document.getElementById('status');
+const actorInfo = document.getElementById('actorInfo');
+
+function esc(v){ return String(v||'').replace(/[&<>]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[s])); }
+
+async function loadActivityLog(){
+  try {
+    const r = await fetch('activity-log.json?v=' + Date.now(), { cache:'no-cache' });
+    if(!r.ok) throw new Error('failed');
+    const j = await r.json();
+
+    actorInfo.innerHTML = `
+      <div class="pill">Connected Actor: ${esc(j.lastActor || 'unknown')}</div>
+      <div class="pill">Repo: ${esc(j.repo || '-')}</div>
+      <div class="pill">Updated: ${esc(j.generatedAt || '-')}</div>
+    `;
+  } catch(err){
+    actorInfo.textContent = 'activity log unavailable';
+  }
+}
+
+async function fetchLatestIssue(full){
+  try {
+    const r = await fetch(`https://api.github.com/repos/${full}/issues?state=open&sort=updated&direction=desc&per_page=1`);
+    if(!r.ok) return null;
+    const j = await r.json();
+    return j && j[0];
+  } catch { return null; }
+}
+
+async function load(){
+  const owner = ownerInput.value.trim() || 'kiexpert';
+  statusEl.textContent = 'loading repositories...';
+  reposEl.innerHTML = '';
+
+  const res = await fetch(`https://api.github.com/users/${owner}/repos?sort=updated&per_page=30`);
+  if(!res.ok){
+    statusEl.textContent = 'failed to load repos';
+    return;
+  }
+
+  const repos = await res.json();
+  repos.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+  statusEl.textContent = `${repos.length} repos`;
+
+  for(const repo of repos){
+    const issue = await fetchLatestIssue(repo.full_name);
+    const card = document.createElement('div');
+    card.className='card';
+
+    const issueHtml = issue ? `
+      <div class="pill">#${issue.number}</div>
+      <strong>${esc(issue.title)}</strong>
+      <p class="muted">${new Date(issue.updated_at).toLocaleString()}</p>
+    ` : '<p class="muted">최근 issue 없음</p>';
+
+    card.innerHTML = `
+      <h2>${esc(repo.name)}</h2>
+      <p>${esc(repo.description || '')}</p>
+      <div class="pill">updated ${new Date(repo.updated_at).toLocaleString()}</div>
+      <div class="pill">⭐ ${repo.stargazers_count}</div>
+      <div style="margin-top:12px">${issueHtml}</div>
+      <a class="button" href="board/?repo=${encodeURIComponent(repo.full_name)}">Board</a>
+      <a class="button" href="https://github.com/${repo.full_name}" target="_blank">Repo</a>
+      ${issue ? `<a class="button" href="https://github.com/${repo.full_name}/issues/${issue.number}" target="_blank">Latest Issue</a>` : ''}
+    `;
+
+    reposEl.appendChild(card);
+  }
+}
+
+ownerInput.onchange = load;
+loadActivityLog();
+load();
+</script>
+</body>
+</html>

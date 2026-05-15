@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WKAppBot Ephemeral Relay Launcher</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 16px; }
+    input, textarea, button { width: 100%; padding: 12px; margin-top: 10px; box-sizing: border-box; }
+    textarea { min-height: 120px; }
+    code { background: #eee; padding: 2px 6px; }
+  </style>
+</head>
+<body>
+  <h1>WKAppBot Temporary Relay</h1>
+
+  <p>
+    This page is intended to trigger the GitHub Actions ephemeral relay workflow.
+  </p>
+
+  <label>Minutes (max 29)</label>
+  <input id="minutes" type="number" min="1" max="29" value="25">
+
+  <label>Initial query</label>
+  <textarea id="query" placeholder="hello wkappbot"></textarea>
+
+  <button id="launch">Prepare Launch Payload</button>
+
+  <h2>Payload</h2>
+  <pre id="payload"></pre>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>Use a server-side trigger to keep GitHub tokens private.</li>
+    <li>Recommended: Cloudflare Workers free tier.</li>
+    <li>Workflow file: <code>chatgpt-connector-ephemeral-relay.yml</code></li>
+  </ul>
+
+  <script>
+    document.getElementById('launch').onclick = () => {
+      const payload = {
+        ref: 'main',
+        inputs: {
+          minutes: String(document.getElementById('minutes').value || '25'),
+          query: document.getElementById('query').value || ''
+        }
+      };
+
+      document.getElementById('payload').textContent = JSON.stringify(payload, null, 2);
+    };
+  </script>
+</body>
+</html>

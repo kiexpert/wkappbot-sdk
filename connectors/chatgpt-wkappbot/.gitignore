@@ -1,0 +1,4 @@
+.wk-data/
+relay.pid
+node_modules/
+*.log

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WKAppBot Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; max-width: 920px; margin: 32px auto; padding: 16px; }
+    input, textarea, button { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; }
+    textarea { min-height: 90px; }
+    pre { background: #f4f4f4; padding: 12px; overflow: auto; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  </style>
+</head>
+<body>
+  <h1>WKAppBot Dashboard</h1>
+
+  <p>This static page can prepare a GitHub Actions ephemeral relay launch payload and connect to a running relay URL.</p>
+
+  <h2>Launch Payload</h2>
+  <div class="row">
+    <div>
+      <label>Minutes</label>
+      <input id="minutes" type="number" min="1" max="29" value="25">
+    </div>
+    <div>
+      <label>Relay URL</label>
+      <input id="relay" placeholder="https://xxxx.trycloudflare.com">
+    </div>
+  </div>
+
+  <label>Initial query</label>
+  <textarea id="query" placeholder="hello wkappbot"></textarea>
+  <button id="payloadBtn">Build workflow_dispatch payload</button>
+  <pre id="payload"></pre>
+
+  <h2>Connect to Running Relay</h2>
+  <button id="healthBtn">Check /health</button>
+  <button id="metricsBtn">Check /metrics</button>
+  <button id="eventsBtn">Watch /events</button>
+  <pre id="output"></pre>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    const out = msg => $('output').textContent += msg + '\n';
+
+    $('payloadBtn').onclick = () => {
+      const payload = {
+        ref: 'main',
+        inputs: {
+          minutes: String($('minutes').value || '25'),
+          query: $('query').value || ''
+        }
+      };
+      $('payload').textContent = JSON.stringify(payload, null, 2);
+    };
+
+    async function getJson(path) {
+      const base = $('relay').value.replace(/\/$/, '');
+      if (!base) return out('relay url required');
+      const res = await fetch(base + path);
+      out(path + ' -> ' + res.status);
+      out(await res.text());
+    }
+
+    $('healthBtn').onclick = () => getJson('/health');
+    $('metricsBtn').onclick = () => getJson('/metrics');
+    $('eventsBtn').onclick = () => {
+      const base = $('relay').value.replace(/\/$/, '');
+      if (!base) return out('relay url required');
+      const es = new EventSource(base + '/events');
+      es.onmessage = e => out('[message] ' + e.data);
+      es.addEventListener('job_created', e => out('[job_created] ' + e.data));
+      es.addEventListener('job_completed', e => out('[job_completed] ' + e.data));
+      es.onerror = () => out('[events] disconnected or blocked');
+    };
+  </script>
+</body>
+</html>

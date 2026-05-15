@@ -1,0 +1,23 @@
+name: chatgpt-connector-smoke
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: connectors/chatgpt-wkappbot
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: bash scripts/start-relay-ci.sh
+
+      - run: bash smoke-test.sh

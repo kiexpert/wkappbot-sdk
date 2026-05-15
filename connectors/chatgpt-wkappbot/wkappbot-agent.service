@@ -1,0 +1,10 @@
+[Unit]
+Description=WKAppBot Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/wkappbot-agent/src/agent.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

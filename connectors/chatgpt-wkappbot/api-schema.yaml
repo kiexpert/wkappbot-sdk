@@ -1,0 +1,52 @@
+openapi: 3.1.0
+info:
+  title: WKAppBot Relay API
+  version: 0.1.0
+servers:
+  - url: https://example.com
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      responses:
+        '200':
+          description: Relay health
+
+  /execute:
+    post:
+      operationId: executeWkappbot
+      summary: Queue a WKAppBot command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                args:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Queued job
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job state
+
+  /sessions:
+    get:
+      operationId: listSessions
+      responses:
+        '200':
+          description: Session list

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wkappbot-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wkappbot-relay
+  template:
+    metadata:
+      labels:
+        app: wkappbot-relay
+    spec:
+      containers:
+        - name: relay
+          image: wkappbot-relay:latest
+          ports:
+            - containerPort: 8787

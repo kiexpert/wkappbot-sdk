@@ -1,0 +1,118 @@
+name: wkappbot-daily-board
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Compute date
+        id: date
+        run: |
+          DAY=$(date -u +%F)
+          echo "day=$DAY" >> "$GITHUB_OUTPUT"
+
+      - name: Create daily issue
+        id: issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const day = '${{ steps.date.outputs.day }}';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const title = `Daily board - ${day}`;
+            const found = await github.rest.search.issuesAndPullRequests({
+              q: `repo:${owner}/${repo} is:issue in:title "${title}"`
+            });
+            if (found.data.items.length) {
+              core.setOutput('number', String(found.data.items[0].number));
+              return;
+            }
+            const issue = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              labels: ['board', 'daily'],
+              body: `# Daily WKAppBot Board - ${day}\n\n## Smoke Test\n\nWaiting for automated smoke result...\n\n## Notes\n\nUse comments as replies.`
+            });
+            core.setOutput('number', String(issue.data.number));
+
+      - name: Run connector smoke
+        id: smoke
+        working-directory: connectors/chatgpt-wkappbot
+        run: |
+          set +e
+          node src/server.js > .wk-relay.log 2>&1 &
+          PID=$!
+          sleep 2
+          bash smoke-test.sh > .wk-smoke.log 2>&1
+          CODE=$?
+          kill $PID >/dev/null 2>&1 || true
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          cat .wk-smoke.log
+          exit 0
+
+      - name: Comment smoke result
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = Number('${{ steps.issue.outputs.number }}');
+            const code = '${{ steps.smoke.outputs.code }}';
+            const log = fs.readFileSync('connectors/chatgpt-wkappbot/.wk-smoke.log', 'utf8').slice(-6000);
+            const ok = code === '0';
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: `## WKAppBot smoke test\n\nStatus: ${ok ? 'PASS' : 'FAIL'}\n\n\`\`\`text\n${log}\n\`\`\``
+            });
+
+      - name: Update board-data snapshot
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = Number('${{ steps.issue.outputs.number }}');
+            const issue = await github.rest.issues.get({ owner, repo, issue_number });
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 });
+            const data = {
+              repo: `${owner}/${repo}`,
+              issue: issue_number,
+              title: issue.data.title,
+              body: issue.data.body,
+              comments: comments.map(c => ({
+                user: c.user && c.user.login,
+                avatar: c.user && c.user.avatar_url,
+                created_at: c.created_at,
+                body: c.body
+              })),
+              updatedAt: new Date().toISOString()
+            };
+            fs.writeFileSync('docs/board-data.json', JSON.stringify(data, null, 2) + '\n');
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/board-data.json
+          git commit -m "docs: update daily board snapshot" || exit 0
+          git push

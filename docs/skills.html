@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>WKAppBot Skill Browser</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui,sans-serif; max-width: 1100px; margin: 32px auto; padding: 16px; }
+    .top { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    input { flex:1; min-width:240px; padding:12px; border-radius:12px; border:1px solid rgba(128,128,128,.35); background:transparent; color:inherit; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-top:20px; }
+    .card { border:1px solid rgba(128,128,128,.35); border-radius:18px; padding:18px; box-shadow:0 8px 24px rgba(0,0,0,.05); }
+    .pill { display:inline-block; padding:5px 10px; border:1px solid rgba(128,128,128,.35); border-radius:999px; margin:3px; font-size:12px; }
+    a.button { display:inline-block; margin-top:8px; margin-right:8px; padding:10px 14px; border-radius:999px; border:1px solid rgba(128,128,128,.35); text-decoration:none; color:inherit; }
+    pre { overflow:auto; padding:12px; border-radius:12px; background:rgba(128,128,128,.12); }
+    .muted { opacity:.7; }
+  </style>
+</head>
+<body>
+  <h1>WKAppBot Skill Browser</h1>
+  <p class="muted">공개 SDK 스킬 브라우저 · 검색 · Daily Board 연결</p>
+
+  <div class="top">
+    <input id="q" placeholder="검색: quant, relay, smoke ...">
+    <a class="button" href="./">Portal</a>
+    <a class="button" href="board/">Board</a>
+  </div>
+
+  <div id="stats" class="muted">loading skills...</div>
+  <div id="skills" class="grid"></div>
+
+  <script>
+    const skills = document.getElementById('skills');
+    const q = document.getElementById('q');
+    const stats = document.getElementById('stats');
+    let registry = [];
+
+    function render(items) {
+      stats.textContent = `${items.length} skills loaded`;
+      skills.innerHTML = items.map(s => `
+        <div class="card">
+          <h2>${s.title}</h2>
+          <div class="muted">${s.id}</div>
+          <p>${s.desc || ''}</p>
+          <div>${(s.tags||[]).map(t=>`<span class="pill">${t}</span>`).join('')}</div>
+          <p><strong>Repo:</strong> ${s.repo || '-'}</p>
+          <p><strong>Status:</strong> ${s.status || 'public'}</p>
+          <pre>${s.command || ''}</pre>
+          ${s.board ? `<a class="button" href="${s.board}">오늘 보드</a>` : ''}
+          ${s.source ? `<a class="button" href="${s.source}" target="_blank">Skill Source</a>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function filter() {
+      const v = q.value.trim().toLowerCase();
+      if (!v) return render(registry);
+      render(registry.filter(s =>
+        (s.id||'').toLowerCase().includes(v) ||
+        (s.title||'').toLowerCase().includes(v) ||
+        (s.desc||'').toLowerCase().includes(v) ||
+        (s.tags||[]).join(' ').toLowerCase().includes(v) ||
+        (s.command||'').toLowerCase().includes(v)
+      ));
+    }
+
+    async function loadSkills() {
+      try {
+        const res = await fetch('skills.json?v=' + Date.now(), { cache:'no-cache' });
+        registry = await res.json();
+        render(registry);
+      } catch (e) {
+        stats.textContent = 'failed to load skills.json: ' + e.message;
+      }
+    }
+
+    q.oninput = filter;
+    loadSkills();
+  </script>
+</body>
+</html>
