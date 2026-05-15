@@ -3,6 +3,13 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.3.1-sdk] - 2026-05-16
+
+### Fixed (CRITICAL)
+- **CDP popup auto-dismiss**: `CdpClient.PopupDismiss.cs` runs before prompt injection on all ask flows (GPT/Gemini/Claude). Stage 1: ChatGPT login prompt — clicks "Stay logged out"/"Use as guest" to maintain anonymous session. Stage 2: generic modal/dialog overlay — finds and clicks X/close button. Exception: AI service cookie consent banners on chatgpt.com, gemini.google.com, claude.ai, copilot.microsoft.com are intentionally skipped.
+- **Chrome content size stabilization**: 800×600 viewport enforced on all CDP-managed Chrome windows (outer 804×710 accounting for browser frame). Prevents layout reflow from triggering session restore geometry.
+- **SetWindowBounds drift retry**: `SetWindowBoundsAggressiveAsync` wraps SetWindowBoundsAsync with 3-attempt poll-and-correct loop (500ms delay). Corrects position drift >50px after initial placement. New Chrome launches: DRIFT=OK confirmed.
+
 ## [7.3.0-sdk] - 2026-05-16
 
 ### Added
