@@ -1,0 +1,61 @@
+{
+  "id": "codex-session-guardrails",
+  "app": "wkappbot-workflow",
+  "title": "Codex Session Guardrails",
+  "title_ko": null,
+  "desc": "Codex-specific recovery, approval, handoff, and skill-edit guardrails for WKAppBot workspaces. Use when starting or resuming Codex work, recovering from compaction, switching from Claude to Codex, or applying reusable rules learned from other workspaces.",
+  "steps": [
+    "Read codex-global-approval, codex-auto-approval, codex-cli-wkappbot-usage, and post-compaction-recovery before acting.",
+    "Recover continuity from the right source: use the current workspace's latest Claude session JSONL for Claude handoff, and use C:\\Users\\kiexp\\.codex\\session_index.jsonl plus C:\\Users\\kiexp\\.codex\\sessions with codex resume --last for Codex continuity.",
+    "Keep workspace boundaries strict: treat personal-docs, WkAutoQuant, and wkappbot-sdk as separate domains; reuse only durable rules across them.",
+    "Use AppBot skill commands for skill work: wkappbot skill read, search, edit, contribute, install, and sync. Never edit .skill.json directly. After any change, install or sync and re-read the skill.",
+    "If Codex hits a limit, handled failure, or sandbox friction, finish the current atomic task, write a short handoff note with unfinished items and the next step, then switch or stop according to the router policy.",
+    "Rate-limit handling: when Claude or any primary provider prints a monthly usage limit / quota exhaustion message, mark handoff_pending instead of retrying immediately. Do not give the same CLI another chance after the first limit signal. Let the current atomic task finish if one is already running. If the same limit appears again while pending, stop the current session and switch to the next available AI provider with the buffered prompt and state.",
+    "When staging a new core for hot-swap, use build.cmd --stage-only so wkappbot-core.new.exe is created explicitly. Do not invent a parallel staging path.",
+    "For provider-specific one-shot routing, use the official installed entrypoint only. Keep provider flags provider-specific: Gemini may need --skip-trust, while Claude must not receive that flag.",
+    "For one-shot chat smoke tests, always publish to a fresh temporary output directory or stage a clean launcher-plus-core pair first. Do not rely on dotnet build alone to refresh the native wkappbot.exe.",
+    "AGENT DOCUMENT FLOW: read repo AGENTS.md for Codex and other non-Claude agents. Keep Claude-facing project notes in repo CLAUDE.md; do not move them into this skill.",
+    "BUILD/DEPLOY RECOVERY: if publish stalls because bin\\wkappbot.exe is locked, do not stop with only a renamed backup. Restore a runnable launcher into bin\\wkappbot.exe from a clean publish output, keep the prior file as wkappbot.old-*.exe if needed, verify the launcher still responds, and run a smoke test before ending the session.",
+    "11. LAUNCHER/CORE RELEASE LOOP: if you edit the launcher or core runtime path, finish build, deploy, hot-swap, and smoke test before pausing. Do not leave a half-updated bin or hand the user a later release task.",
+    "PUSH EARLY BEFORE LONG SMOKE: after a meaningful source change, push or otherwise stage the modified source before starting long smoke loops or crash-prone validation. Do not leave important runtime fixes only in the local worktree."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-global-approval",
+      "expect": "approval_policy",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage",
+      "expect": "codex exec",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read post-compaction-recovery",
+      "expect": "Codex handoff",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "skill editing discipline",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "session",
+    "guardrails",
+    "handoff",
+    "compaction",
+    "approval",
+    "skills",
+    "workflow"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T05:21:37.5966788Z",
+  "updated": "2026-05-12T09:00:55.2496805Z",
+  "version": "1.15"
+}

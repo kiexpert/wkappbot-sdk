@@ -170,3 +170,16 @@ Read this first before changing code, scripts, workflows, or shared documentatio
 ## See also
 - `README.md`
 - `CLAUDE.md`
+
+## Commit Gate (encoding enforcement)
+
+After completing any file changes, always run `git add -A && git commit -m "..."`
+The pre-commit hook (cp949_save_guard.ps1) checks all staged files for CP949-incompatible characters.
+If commit fails: fix the flagged file, re-stage, retry. Repeat until green.
+This is the encoding enforcement gate -- never skip it.
+
+## Skill Reference Requirement
+
+Before any delegation or agent task, include 3+ `wkappbot skill read <id>` references in the prompt.
+Use `wkappbot skill search <keyword1> <keyword2>` to find relevant IDs first.
+Agents start with zero context -- skill reads are their only briefing.

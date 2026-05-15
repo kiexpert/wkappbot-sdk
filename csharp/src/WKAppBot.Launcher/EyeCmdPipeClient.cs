@@ -50,14 +50,25 @@ internal static class EyeCmdPipeClient
             var r = new StreamReader(pipe, leaveOpen: true);
 
             // Prepend CWD + caller-terminal HWND hint so Eye can resolve caller window directly.
-            // ResolveCallerTerminalHwnd() prefers the actual Windows Terminal hosting our shell
-            // (process-tree match) over GetForegroundWindow() -- the IDE/editor window often has
-            // focus when the user runs commands from an integrated terminal.
+            // ResolveCallerTerminalHwnd() walks the ancestor process chain and returns the nearest
+            // ancestor with a visible non-minimized window. Foreground/focus is ignored -- the IDE
+            // is the AppBot caller, not whichever window happens to have focus.
             var fgHwnd = ResolveCallerTerminalHwnd();
             var hwndPrefix = fgHwnd != IntPtr.Zero ? $"__hwnd:0x{fgHwnd.ToInt64():X8}" : null;
-            var prefixes = new[] { $"__cwd:{Environment.CurrentDirectory}" }
-                .Concat(hwndPrefix != null ? new[] { hwndPrefix } : Array.Empty<string>());
-            var payload = prefixes.Concat(args).ToArray();
+
+            // Also resolve the ConPTY (PseudoConsoleWindow) HWND of THIS terminal tab.
+            // Distinct from __hwnd: the placement HWND is the visible IDE window; the ConPTY
+            // HWND is the hidden console window of the specific tab that ran wkappbot, needed
+            // for future input injection into that exact tab.
+            IntPtr conHwnd = GetConsoleWindow();
+            if (conHwnd == IntPtr.Zero)
+                conHwnd = FindAncestorPseudoConsoleWindow();
+            var conHwndPrefix = conHwnd != IntPtr.Zero ? $"__conhwnd:0x{conHwnd.ToInt64():X8}" : null;
+
+            var prefixList = new List<string> { $"__cwd:{Environment.CurrentDirectory}" };
+            if (hwndPrefix != null) prefixList.Add(hwndPrefix);
+            if (conHwndPrefix != null) prefixList.Add(conHwndPrefix);
+            var payload = prefixList.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
             // First-output timeout: both LAUNCH JSON and [CMD] must arrive within N ms.
@@ -167,12 +178,18 @@ internal static class EyeCmdPipeClient
         }
     }
 
-    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll")] static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder cls, int max);
+    static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+    [DllImport("kernel32.dll")] static extern IntPtr GetConsoleWindow();
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct RECT { public int Left, Top, Right, Bottom; }
 
     delegate bool EnumWindowsProcDelegate(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")]
@@ -181,39 +198,25 @@ internal static class EyeCmdPipeClient
     [DllImport("ntdll.dll")]
     static extern int NtQueryInformationProcess(IntPtr handle, int infoClass, byte[] info, int infoLen, ref int retLen);
 
-    // Terminal-host window classes (matches PromptCommand.TerminalInject.cs).
-    // Only CASCADIA + classic console are addressable via PostMessage; PseudoConsoleWindow
-    // and VirtualConsoleClass are listed for completeness even though we won't pick them
-    // here unless the foreground happens to be one.
-    static readonly string[] TerminalClasses =
-    {
-        "CASCADIA_HOSTING_WINDOW_CLASS",
-        "PseudoConsoleWindow",
-        "VirtualConsoleClass",
-        "ConsoleWindowClass",
-    };
-
     /// <summary>
-    /// Resolve the hwnd of the terminal where the user typed this command.
-    ///   1. If foreground window is a known terminal class -> use it (covers normal CLI use).
-    ///   2. Otherwise walk OUR ancestor process chain (Launcher -> shell -> Windows Terminal)
-    ///      and find a CASCADIA window whose pid is in that chain. This handles the case
-    ///      where the user runs commands inside an IDE's integrated terminal: the IDE window
-    ///      has focus, but the actual ConPTY host (WindowsTerminal.exe) is our great-ancestor.
-    ///   3. Fallback to foreground (preserves legacy behavior if neither hit).
+    /// Resolve the hwnd of the caller window where the user invoked wkappbot.
+    ///
+    /// STANDARD APPBOT WINDOW = the window of the NEAREST ANCESTOR PROCESS in the wkappbot
+    /// process chain that owns a visible, non-minimized window. Foreground/focus window is
+    /// COMPLETELY IRRELEVANT. GetForegroundWindow() is ALWAYS wrong for this purpose.
+    ///
+    /// Algorithm: Walk OUR ancestor process chain (Launcher -> shell -> host) up to 8 levels.
+    /// For each ancestor PID, EnumWindows and return the FIRST visible, non-minimized,
+    /// titled top-level window. First hit on the CLOSEST ancestor wins. No class restriction --
+    /// VS Code, Claude Code, any IDE, any shell host that launched wkappbot is accepted.
+    /// Spec: "앱봇 부모프로세스 중 가장 근접한 창을 가진 프로세스를 찾으면 그게 AppBot 호출창"
+    ///
+    /// Returns IntPtr.Zero if no ancestor owns a usable window. NO foreground fallback.
     /// </summary>
     static IntPtr ResolveCallerTerminalHwnd()
     {
-        // Windows Terminal: each tab has its own CASCADIA_HOSTING_WINDOW_CLASS top-level
-        // window. When user types a command in a WT tab, that specific tab's CASCADIA
-        // window IS the foreground -- so GetForegroundWindow() gives the exact tab hwnd.
-        var fg = GetForegroundWindow();
-        if (fg != IntPtr.Zero && IsTerminalClass(GetClass(fg)))
-            return fg; // WT tab or other terminal directly in foreground
-
-        // Foreground is not a terminal (IDE, browser, etc.) -- walk Launcher's parent
-        // process chain to find the hosting window (VS Code integrated terminal, etc.)
-        var ancestorPids = new HashSet<uint>();
+        // Walk Launcher's parent process chain in order (immediate parent first).
+        var ancestorPids = new List<uint>();
         try
         {
             int pid = Environment.ProcessId;
@@ -227,36 +230,73 @@ internal static class EyeCmdPipeClient
         }
         catch { }
 
-        if (ancestorPids.Count > 0)
+        // Walk ancestor PIDs in order; for each, EnumWindows looking for a usable window.
+        // First hit on the closest ancestor wins.
+        foreach (var targetPid in ancestorPids)
         {
             IntPtr match = IntPtr.Zero;
             EnumWindows((hWnd, _) =>
             {
-                if (!IsWindowVisible(hWnd)) return true;
-                if (GetAncestor(hWnd, 2 /* GA_ROOTOWNER */) != hWnd) return true;
                 GetWindowThreadProcessId(hWnd, out uint wpid);
-                if (!ancestorPids.Contains(wpid)) return true;
+                if (wpid != targetPid) return true; // not this ancestor
+                if (!IsWindow(hWnd)) return true;
+                // Visible windows must be root (filters owned popups / tool windows).
+                // Hidden windows (e.g. ConPTY PseudoConsoleWindow) skip the root check --
+                // they are not root windows but ARE valid as caller identity + GA_ROOT
+                // gives their visible ancestor for placement coords.
+                if (IsWindowVisible(hWnd) && GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
+                if (!GetWindowRect(hWnd, out RECT rect)) return true;
+                if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true; // zero rect
                 match = hWnd;
                 return false;
             }, IntPtr.Zero);
             if (match != IntPtr.Zero) return match;
         }
 
-        return fg; // last resort
+        // No ancestor owns a usable window. Do NOT fall back to foreground --
+        // foreground is someone else's window and would be wrong every time.
+        return IntPtr.Zero;
     }
 
-    static bool IsTerminalClass(string cls)
+    /// <summary>
+    /// Walk ancestor PIDs looking for a window whose class name is "PseudoConsoleWindow".
+    /// Used when GetConsoleWindow() returns 0 (e.g. launcher running detached or under a host
+    /// that owns the ConPTY rather than wkappbot itself). No visibility/title filter --
+    /// ConPTY windows are intentionally hidden and have no title.
+    /// Returns IntPtr.Zero if no ancestor owns a ConPTY window.
+    /// </summary>
+    static IntPtr FindAncestorPseudoConsoleWindow()
     {
-        foreach (var t in TerminalClasses)
-            if (string.Equals(cls, t, StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
-    }
+        var ancestorPids = new List<uint>();
+        try
+        {
+            int pid = Environment.ProcessId;
+            for (int depth = 0; depth < 8 && pid > 0; depth++)
+            {
+                var parent = GetParentPid(pid);
+                if (parent <= 0 || parent == pid) break;
+                ancestorPids.Add((uint)parent);
+                pid = parent;
+            }
+        }
+        catch { }
 
-    static string GetClass(IntPtr hWnd)
-    {
-        var sb = new System.Text.StringBuilder(256);
-        GetClassNameW(hWnd, sb, sb.Capacity);
-        return sb.ToString();
+        foreach (var targetPid in ancestorPids)
+        {
+            IntPtr match = IntPtr.Zero;
+            EnumWindows((hWnd, _) =>
+            {
+                GetWindowThreadProcessId(hWnd, out uint wpid);
+                if (wpid != targetPid) return true; // not this ancestor
+                var cls = new System.Text.StringBuilder(256);
+                GetClassNameW(hWnd, cls, 256);
+                if (cls.ToString() != "PseudoConsoleWindow") return true;
+                match = hWnd;
+                return false;
+            }, IntPtr.Zero);
+            if (match != IntPtr.Zero) return match;
+        }
+        return IntPtr.Zero;
     }
 
     static int GetParentPid(int pid)

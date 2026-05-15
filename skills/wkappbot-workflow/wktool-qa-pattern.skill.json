@@ -1,0 +1,56 @@
+{
+  "id": "wktool-qa-pattern",
+  "app": "wkappbot-workflow",
+  "title": "wktool QA pattern: token-efficient bug detection scripts",
+  "title_ko": null,
+  "desc": "How to write wkask/wkcdp-style QA scripts that find bugs cheaply. Key principle: state-check first (fast), eval-js second (medium), DOM check last (slow). Auto-file suggest on confirmed bugs.",
+  "steps": [
+    "PRINCIPLE: wk-tool scripts replace Claude polling logs. Claude reads ONE clean result. Scripts do the work. Token cost = near zero per check.",
+    "STATE-CHECK FIRST (cheapest): before any CDP eval, check observable state -- TGT-POS from cdp-mon, file sizes, log tail. If off-screen (x<-100 or y<-100) = geometry bug = skip eval, auto-file suggest. No need to invoke Chrome at all.",
+    "MINIMIZED RECOVERY (before eval): if Chrome window is minimized/iconified, restore it first via 'wkappbot a11y restore GRAP' then wait 2s. Minimized Chrome doesn't render pages -- DOM checks return false negatives.",
+    "EVAL-JS (medium cost): use 'wkappbot a11y eval-js JS --grap {proc:chrome,cdp:PORT}' for DOM state. Keep JS under 200 chars. Return null for not-found so you can check with -notmatch 'null'. Example: document.cookie.split(';').length",
+    "CROSS-VALIDATE heuristics: if you have a fast heuristic (SQLite file size, log keyword) AND a slower truth (eval-js), run both and compare. Mismatch = update the heuristic threshold. Log the mismatch as a warning.",
+    "AUTO-SUGGEST on confirmed bugs: if off-screen/DEAD/mismatch is confirmed (not transient), call wkappbot-core.exe suggest with: exact port, observed value, expected value, and reproduction command. Use --requirement with wkappbot commands only.",
+    "TIMING: cookie/DOM checks at session CLOSE (post-ask done) not during -- avoids noise during active processing. State checks (off-screen) can run any time via wkcdp.",
+    "NAMING: wk<domain>.ps1 in D:/GitHub/WKAppBot/bin/. Subcommands via switch($Command). Default='status'. Add new checks as subcommands (cookies, cookies-test, etc.) not new scripts.",
+    "TEST SUBCOMMAND: every wk-tool should have a '<tool> test' or '<tool>-test' subcommand that validates its own detection logic by cross-checking fast heuristic vs eval-js truth and reporting AGREE/MISMATCH.",
+    "USER-PERSPECTIVE BASELINE: for public SDK regressions, cross-check against sdk-user-perspective-test-playbook before diagnosing internals; the user flow is the source of truth.",
+    "TOKEN-SAVING WAITING: while a smoke test is running, do not busy-poll logs. Use the wait window to fix the next bug or tighten the next QA case, then read one clean result at the end.",
+    "FASTEST VALID SMOKE FIRST: always look for the shortest trustworthy path (probe, one-shot, state check, or narrow harness) before long interactive smoke. Prefer the minimum command that proves the bug or fix."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wktool-qa-pattern",
+      "expect": "wktool QA pattern",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wktool qa cookie detect",
+      "expect": "wktool-qa-pattern",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkcdp",
+    "wkask",
+    "qa",
+    "cookie",
+    "detect",
+    "pattern",
+    "script",
+    "eval-js",
+    "suggest",
+    "auto",
+    "off-screen",
+    "minimize",
+    "restore",
+    "heuristic"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T16:10:38.6202888Z",
+  "updated": "2026-05-12T09:00:55.2912882Z",
+  "version": "1.4"
+}

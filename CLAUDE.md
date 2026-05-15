@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.2.0 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -31,6 +31,7 @@
 - **Handoff**: `wkappbot newchat "prompt"` -- passes context summary to new chat
 - **Cro card forbidden!**: OpenClaw(Cro) is a separate service -- do not modify. Only Claude cards OK.
 - **CWD shorthand**: `D:\GitHub\WKAppBot` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `ㄱㄱ`
+- **Skill discovery**: use `wkappbot skill search <topic>` first; if the user says `ㄱㄱ` or `ㄱㄱㄱ`, also search `wkappbot skill search ㄱㄱ` or `wkappbot skill search ㄱㄱㄱ`.
 
 ### Build & Deploy
 ```bash
@@ -98,7 +99,7 @@ Windows a11y-based app UI automation. UIA->Win32->SendInput 3-tier fallback, foc
 ### 5-Tier Element Search
 UIA -> Vision Cache -> Simple OCR -> Vision API(Claude) -> Coordinate-based
 
-### AppBotPipe / File Tools (v5.8)
+### AppBotPipe / File Tools (v7.2)
 All process creation goes through `Spawn()` / `StartTracked()` -- ensures CreateProcessW hook
 - `Spawn(showNoActivate:true)`: for WPF overlays (WhisperRing/ScreenSaver) -- shows window without focus steal
 - `Spawn(default)`: `SW_HIDE` -- background processes
@@ -158,6 +159,7 @@ wkappbot a11y <action> <grap>[#scope] [options]   # ★ unified standard (24 act
   --eval-js "js"  --all  --nth N  --force  --timeout N  --speak
 wkappbot a11y kill <pattern>[/<ancestor>]
 wkappbot windows [grap] [--deep] [--process <name>] [--cmd <substr>]
+wkappbot chat ["prompt"] [-p] [--no-fallback]     # Claude Code REPL passthrough (alias: wkchat.exe)
 wkappbot slack send "msg" [file.png]  /  reply "msg" --msg TS
 wkappbot eye / eye tick
 wkappbot newchat "prompt" [--file f.txt]
@@ -184,6 +186,17 @@ wkappbot <cmd> --help / --regression
 -> Full grap syntax: `wkappbot skill read grap`
 -> `a11y find <grap>` stdout first line `# TARGET "hwnd:0x..."` -- copy-paste ready
 -> **Accumulated knowhow**: `wkappbot skill list` -- search skills first when stuck, then ask triad
+
+### Chat Command Usage
+```bash
+wkappbot chat                                      # Interactive REPL (default model: Haiku)
+wkappbot chat "your question"                      # Run prompt, show full conversation
+wkappbot chat -p "quick check"                     # Print mode: result only, exit immediately
+wkappbot chat --model sonnet "complex task"        # Use Sonnet instead of Haiku
+wkappbot chat --model opus "architecture decision" # Use Opus for critical decisions
+wkappbot chat -p --max-budget-usd 0.50 "task"     # Cost-controlled batch mode
+```
+Alias: `wkchat.exe` opens interactive chat session. Models: haiku (default, cheap), sonnet (mid), opus (expensive).
 
 ---
 
@@ -218,6 +231,58 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
   ```
 - **MEMORY.md**: 200-line limit. Overflow -> split into `memory/` topic files
 
+## Internal Tools
+
+### wkfind - Unified Code + Session Search
+**Location**: `D:\GitHub\WKAppBot\bin\wkfind.ps1` (core repo)
+**Usage**: `wkfind [--day|--week|--month|--year|--unlimited] <keyword1> <keyword2> ...`
+
+Unified multi-keyword search across code + Claude sessions:
+- **GlobCoverageScore ranking**: tokenize keywords, score by token_length / field_length
+- **PHRASE/AND/OR tiers**: PHRASE ×2.5, AND ×1.5, OR ×1.0
+- **Code search**: git diff (auto-detected) + time-range fallback (--day → --unlimited)
+- **Session search**: live Claude session titles + dates (same time-range filter as code)
+- **Time-range sync**: both code and sessions filtered by --day/--week/--month/--year/--unlimited
+- **Triad analysis**: GPT+Gemini+Claude synthesis runs in background (configurable timeout)
+
+Time ranges:
+- `--day` (default fallback): 24 hours
+- `--week`: 7 days
+- `--month`: 30 days
+- `--year`: 365 days
+- `--unlimited`: all time
+
+Examples:
+```
+wkfind "caller window" HWND          # Find code + sessions (all time)
+wkfind --day "CDP position"          # Recent 24h code + 24h sessions
+wkfind --week "05-13"                # Week-old sessions + code
+```
+
+Output: Top 3 sessions + top 10 code matches per tier, ranked by score.
+No options; search-only. `.gitignore` auto-exclusion via ripgrep.
+
+### wkask - Real-time Ask (Stage 3) Pipeline Health Monitor
+**Location**: `D:\GitHub\WKAppBot\bin\wkask.ps1` (core repo)
+**Usage**: `powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 <provider> '<prompt>' -Timeout <seconds>`
+
+Real-time monitoring of ask CDP pipeline health. Fires a question, streams live response color-coded by AI (GPT/Gemini/Claude), detects Stage 2/3 placement corrections, and reports timing.
+
+Providers: `gpt` (60s), `gemini` (90s), `triad` (120s parallel)
+
+Examples:
+```
+powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt "say: hello" -Timeout 60
+powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 triad "say: test" -Timeout 120
+```
+
+When to use:
+- After hot-swap deploy to verify Chrome is on-screen and responsive
+- Before triad sessions to confirm all three pipelines (GPT + Gemini + Claude) are healthy
+- During Stage 23 testing to watch placement corrections and DPI checks in real-time
+
+On failure: check `cdp-mon.ps1` for position drift (CRIT flags), kill stale Chrome processes, retry.
+
 ## Encoding Policy
 - Treat repository text files as UTF-8 by default.
 - When importing a source file in CP949 or any non-UTF-8 encoding, preserve the original file and also create a UTF-8 copy for safe reading and editing.
@@ -245,15 +310,24 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 ## gg Main Workflow
 
-Execute in order when user sends 'gg':
+Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 1. wkappbot skill read on-load
 2. wkappbot suggest list
 3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
 4. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
 
+## Scope of Work (YOU: SDK ONLY, not Core repo)
+
+> **FOCUS**: SDK Launcher (`WKAppBot.Launcher/*`), HWND validation, CDP monitoring/suggest triage, suggest resolution.
+> **OUT OF SCOPE (Core repo)**: ClaudePromptHelper, CdpClient internals, ChromeLauncher core logic — delegate to Opus agent (`wkappbot ask opus "..."`) or Core maintainers.
+> **Boundary**: If you find a bug in Core (`D:\GitHub\WKAppBot\csharp\src\...`), file a suggest and optionally spawn Opus agent to fix in the private repo. Your repo builds, tests, and deploys the launcher binary only. Core fixes require separate build+deploy in the private repo.
+
+---
+
 ## Main Duties (recurring responsibilities)
 
 > **PRIMARY DUTY**: You are the wkappbot-sdk product manager. Your job is to make wkappbot more commercially viable every session -- from the user's AND QA engineer's perspective. Not just fix what's asked: spot friction, latency, UX failures, and file suggests proactively. Ask: "would a paying user accept this?" If no → fix or suggest immediately.
+> **CDP-FIRST RULE**: Prioritize CDP anomalies and ask timeouts above all else. These block user workflows. Direct-fix (no suggest) per CLAUDE.md mandate.
 
 | Duty | How |
 |------|-----|
@@ -261,6 +335,7 @@ Execute in order when user sends 'gg':
 | **Ask QA** | For SDK ask/latency debugging, `wkask` is the default live-monitoring tool. If the rule is not already written in CLAUDE.md, use `wkask` first, then add the rule here in the same session. |
 | **User-perspective QA** | For public SDK regressions, start from `sdk-user-perspective-test-playbook` and the matching `wkask`/`wkcdp` smoke first; the user path is the truth source. |
 | **CDP isolation** | Project Chrome/CDP is strictly project-scoped. Reuse only the current project's registered Chrome and tabs; ignore foreign-project Chrome/CDP ports and never attach across project boundaries. |
+| **Caller validation** | Before any Chrome placement, normalize the caller HWND. Reject zero, PseudoConsoleWindow, desktop, and off-screen callers; never let Chrome inherit a guessed foreground window. |
 | **Release loop** | Every project keeps its recurring `Main Duties` block in repo `CLAUDE.md`. The release loop is always `build -> deploy -> hot-swap -> smoke test`. |
 | **Core promotion** | Public workflows that use private-core downloads may promote only sanitized durable summaries back to `WKAPPBOT_CORE_REPO`; never copy secrets or raw private logs. |
 | Skill health | `wkappbot skill read repo-health-doctor` -- [LITE] steps each session, [FULL] before release |
@@ -288,6 +363,7 @@ wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA sc
 - `wkappbot suggest` silently drops submit when PENDING CO-RESOLVE banner shows. Use `wkappbot-core.exe suggest "..."` to bypass.
 - `skill audit` shows FILE MISSING for `csharp/src/WKAppBot.*` paths — expected in SDK repo (files live in the WKAppBot core repo). Not broken.
 - Chrome translate infobar (auto-shown on Korean pages) blocks CDP injection — it steals focus and intercepts clicks. Dismiss or suppress before automation.
+- `cdp-mon.ps1` off-screen check was `'^-\d{3,}'` regex (x < -100 = off-screen) — **false positive on multi-monitor setups** where left monitor has large negative x. Fixed to use `MonitorFromPoint` Win32 API. Rule: never use raw coordinate sign for off-screen detection; always use `MonitorFromPoint` (same as `IsWindowOnScreen` in EyeCmdPipeClient.cs).
 
 ## References
 - `README.md`

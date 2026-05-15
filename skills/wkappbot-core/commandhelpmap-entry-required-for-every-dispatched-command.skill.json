@@ -1,0 +1,70 @@
+{
+  "id": "commandhelpmap-entry-required-for-every-dispatched-command",
+  "app": "wkappbot-core",
+  "title": "CommandHelpMap entry required for every dispatched command",
+  "title_ko": null,
+  "desc": "Every command in WKAppBot.CLI requires a CommandHelpMap entry in csharp/src/WKAppBot.CLI/Commands/CommandHelp.cs. When a command is removed (e.g. d1eaaf2a removed schedule), keep help text for discoverability but scrub dispatch refs in AppBotProgramInfra/EyeCmdPipeServer/AppBotEyeTick/SuggestCommand.knownSubcmds/UsageCommand.",
+  "steps": [
+    "Search CommandHelpMap.cs for the key",
+    "If missing: add entry",
+    "If removed: keep help + scrub dispatch case-blocks",
+    "Build + publish wkappbot-core.exe",
+    "Verify: wkappbot <cmd> --help shows non-empty text",
+    "Top-level aliases such as close, kill, and window must also have CommandHelpMap entries when they are user-facing dispatch targets, even if they mirror a11y or taskkill help text.",
+    "Top-level aliases such as close, kill, and window must also have CommandHelpMap entries when they are user-facing dispatch targets, even if they mirror a11y or taskkill help text.",
+    "session command added to CommandHelpMap in commit 72706c8cc; --version added in e6fd11a6b -- both unblock suggest resolve guards",
+    "Verified 2026-05-15: test-help-session-commandhelpmap-fix.cmd (resolve ts=2026-05-13T10:39:15.1535284Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot screenshot --help",
+      "expect": "Screenshot a window or screen region",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule --help",
+      "expect": "schedule",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule",
+      "expect": "Unknown command",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot session list --claude",
+      "expect": "[claude]",
+      "prompt": "session added to CommandHelpMap"
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx:",
+      "prompt": "session added to CommandHelpMap"
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "resolve",
+      "prompt": "session added to CommandHelpMap"
+    }
+  ],
+  "primary_cmd": "wkappbot session list --claude",
+  "tags": [
+    "help",
+    "CommandHelpMap",
+    "bug-auto",
+    "dispatch"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/CommandHelp.cs",
+      "line": 235,
+      "pattern": "CommandHelpMap = new",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-02T20:04:20.1830819Z",
+  "updated": "2026-05-15T09:52:51.03033Z",
+  "version": "1.6"
+}

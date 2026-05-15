@@ -1,0 +1,41 @@
+{
+  "id": "filenotfoundexception-system-net-http-during-hotswap-is-binary-corruption-false-positive",
+  "app": "wkappbot-core",
+  "title": "FileNotFoundException System.Net.Http during hotswap is binary corruption false positive",
+  "title_ko": null,
+  "desc": "When CLR-shim assemblies (System.Net.Http, System.IO.FileSystem.Watcher, etc.) fail to load with FileNotFoundException during a hot-swap window, it indicates the self-contained single-file binary was truncated mid-rebuild. Not a code bug, not a trimming bug. Same root cause for any reference assembly loaded post-startup.",
+  "steps": [
+    "1. Verify csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj sets PublishTrimmed=false. If true, trimming is NOT enabled so a missing System.Net.Http at runtime cannot be caused by linker trim.",
+    "2. Look in bin/ for unusually small wkappbot-core.broken-*.exe artifacts (~7MB instead of ~245MB) timestamped near the exception. Their presence confirms a partial publish/copy during hotswap.",
+    "3. Match exception timestamp to git log entries within +/- 30 minutes (git log --since/--until). High commit density right before the crash = active rebuild guardrail swap window.",
+    "4. If all three signals match (PublishTrimmed=false + tiny broken binary + active hotswap timing), resolve as false positive: the next clean build replaces the truncated copy and the exception cannot reproduce.",
+    "5. Reference: suggest 2026-05-15T03:17:17 resolved as binary corruption false positive 2026-05-15.",
+    "Verified 2026-05-15: 2026-05-15T03-17-17-system-net-http-binary-corruption-false-positive.ps1 (resolve ts=2026-05-15T03:17:17)",
+    "Verified 2026-05-15: test-system-io-filesystem-watcher-binary-corruption-false-positive.cmd (resolve ts=2026-05-11T03:21:49.1690687Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep PublishTrimmed --path csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj",
+      "expect": "false",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot help",
+      "expect": "commands",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "suggest",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T07:21:12.581682Z",
+  "updated": "2026-05-15T09:57:32.6323665Z",
+  "version": "1.4"
+}

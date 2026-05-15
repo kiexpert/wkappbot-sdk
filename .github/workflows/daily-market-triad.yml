@@ -1,0 +1,287 @@
+name: Daily Market Triad Teaser
+
+on:
+  push:
+    branches:
+      - triad-market-teaser
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      question:
+        description: "Question for the triad debate"
+        required: false
+        type: string
+      public_issue:
+        description: "Existing issue number to comment on (blank = create new issue)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  triad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+
+      - name: Run triad debate
+        shell: pwsh
+        env:
+          TRIAD_QUIET: 1
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          $question = "${{ inputs.question }}"
+          if ([string]::IsNullOrWhiteSpace($question)) {
+            $question = "Analyze today's promising sectors and leading stocks using current public news and price context. Keep ranks 1 and 2 private and reveal only the 3rd-place teaser."
+          }
+
+          Write-Host "Question: $question"
+          python3 scripts/triad_gha.py thesis gemini "$question"
+          python3 scripts/triad_gha.py thesis groq "$question"
+          python3 scripts/triad_gha.py thesis cerebras "$question"
+          python3 scripts/triad_gha.py antithesis gemini "$question"
+          python3 scripts/triad_gha.py antithesis groq "$question"
+          python3 scripts/triad_gha.py antithesis cerebras "$question"
+          python3 scripts/triad_gha.py synthesis "$question"
+
+      - name: Verify synthesis markers
+        shell: pwsh
+        run: |
+          if (!(Test-Path synthesis.md)) { throw 'synthesis.md missing' }
+          $raw = Get-Content -Raw synthesis.md
+          foreach ($needle in @(
+            'Points of consensus:',
+            'Key disagreements & resolution:',
+            'Public teaser:',
+            'Final answer:',
+            'TRIAD_OK'
+          )) {
+            if ($raw -notmatch [regex]::Escape($needle)) {
+              throw "Missing marker: $needle"
+            }
+          }
+
+      - name: Extract public teaser
+        id: teaser
+        shell: pwsh
+        run: |
+          $raw = Get-Content -Raw synthesis.md
+          $match = [regex]::Match($raw, '(?m)^\*\*Public teaser:\*\*\s*(.+)$')
+          $teaser = if ($match.Success) { $match.Groups[1].Value.Trim() } else { 'The public teaser is unavailable.' }
+          if ([string]::IsNullOrWhiteSpace($teaser)) {
+            $teaser = 'The public teaser is unavailable.'
+          }
+          "teaser=$teaser" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Public teaser: $teaser"
+
+      - name: Resolve daily issue
+        id: daily_issue
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ inputs.public_issue }}
+        run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          $kstDate = $kstNow.ToString('yyyy-MM-dd')
+          $title = "Daily market triad teaser $kstDate KST"
+          $issueNumber = $env:ISSUE_NUMBER
+          $template = @(
+            '# Daily Market Triad Teaser',
+            '',
+            '<!-- TEASER_START -->',
+            '_Waiting for the next run._',
+            '<!-- TEASER_END -->',
+            '',
+            '<!-- STATUS_START -->',
+            '_Waiting for the next run._',
+            '<!-- STATUS_END -->',
+            '',
+            '<!-- PROMOTION_START -->',
+            '_Waiting for the next run._',
+            '<!-- PROMOTION_END -->'
+          ) -join [Environment]::NewLine
+
+          if (-not [string]::IsNullOrWhiteSpace($env:ISSUE_NUMBER)) {
+            if ($env:ISSUE_NUMBER -notmatch '^\d+$') {
+              throw 'public_issue must be a numeric issue number.'
+            }
+            Write-Host "Using explicit issue #$issueNumber"
+          } else {
+            $found = gh issue list --repo "$env:REPO" --state open --search '"Daily market triad teaser" in:title' --json number,title,createdAt,updatedAt --limit 20 | ConvertFrom-Json
+            $match = $found |
+              Where-Object { $_.title -like 'Daily market triad teaser *' } |
+              Sort-Object updatedAt -Descending |
+              Select-Object -First 1
+            if ($match) {
+              $issueNumber = [string]$match.number
+              if ($match.title -ne $title) {
+                gh issue edit "$issueNumber" --repo "$env:REPO" --title "$title" | Out-Null
+              }
+              Write-Host "Reusing daily issue #$issueNumber : $title"
+            } else {
+              $issueNumber = gh api --method POST "repos/$env:REPO/issues" -f title="$title" -f body="$template" --jq '.number'
+              if ([string]::IsNullOrWhiteSpace($issueNumber)) {
+                throw 'failed to create the daily issue'
+              }
+              Write-Host "Created daily issue #$issueNumber : $title"
+            }
+          }
+
+          "issue_number=$issueNumber" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "issue_title=$title" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Refresh daily issue body sections
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.daily_issue.outputs.issue_number }}
+          TEASER: ${{ steps.teaser.outputs.teaser }}
+        run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          $kstStamp = $kstNow.ToString('yyyy-MM-dd HH:mm') + ' KST'
+          $question = "${{ inputs.question }}"
+          if ([string]::IsNullOrWhiteSpace($question)) {
+            $question = "Analyze today's promising sectors and leading stocks using current public news and price context. Keep ranks 1 and 2 private and reveal only the 3rd-place teaser."
+          }
+
+          function Update-Section([string]$body, [string]$tag, [string]$content) {
+            $start = "<!-- ${tag}_START -->"
+            $end = "<!-- ${tag}_END -->"
+            $s = $body.IndexOf($start)
+            $e = $body.IndexOf($end)
+            if ($s -lt 0 -or $e -lt 0 -or $e -lt $s) {
+              return $body
+            }
+            $head = $body.Substring(0, $s + $start.Length)
+            $tail = $body.Substring($e)
+            return @($head, $content, $tail) -join [Environment]::NewLine
+          }
+
+          $template = @(
+            '# Daily Market Triad Teaser',
+            '',
+            '<!-- TEASER_START -->',
+            '_Waiting for the next run._',
+            '<!-- TEASER_END -->',
+            '',
+            '<!-- STATUS_START -->',
+            '_Waiting for the next run._',
+            '<!-- STATUS_END -->',
+            '',
+            '<!-- PROMOTION_START -->',
+            '_Waiting for the next run._',
+            '<!-- PROMOTION_END -->'
+          ) -join [Environment]::NewLine
+
+          $issueNumber = $env:ISSUE_NUMBER
+          $bodyJson = gh issue view "$issueNumber" --repo "$env:REPO" --json body | ConvertFrom-Json
+          $currentBody = $bodyJson.body
+          if ([string]::IsNullOrWhiteSpace($currentBody) -or $currentBody -notmatch '<!-- TEASER_START -->') {
+            $currentBody = $template
+          }
+
+          $teaserBody = @(
+            "Public teaser: $env:TEASER",
+            '',
+            "KST: $kstStamp"
+          ) -join [Environment]::NewLine
+          $statusBody = @(
+            "KST: $kstStamp",
+            "Question: $question",
+            "Run: ${{ github.run_id }}"
+          ) -join [Environment]::NewLine
+          $promotionBody = @(
+            "Full synthesis promoted to core repo.",
+            "Question: $question",
+            "KST: $kstStamp"
+          ) -join [Environment]::NewLine
+
+          $updatedBody = Update-Section $currentBody 'TEASER' $teaserBody
+          $updatedBody = Update-Section $updatedBody 'STATUS' $statusBody
+          $updatedBody = Update-Section $updatedBody 'PROMOTION' $promotionBody
+
+          $tmp = Join-Path $env:RUNNER_TEMP 'daily-market-triad-body.txt'
+          Set-Content -Path $tmp -Value $updatedBody -Encoding utf8
+          gh issue edit "$issueNumber" --repo "$env:REPO" --body-file "$tmp"
+
+      - name: Publish teaser publicly
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.daily_issue.outputs.issue_number }}
+          TEASER: ${{ steps.teaser.outputs.teaser }}
+        run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          $kstStamp = $kstNow.ToString('yyyy-MM-dd HH:mm') + ' KST'
+          $question = "${{ inputs.question }}"
+          if ([string]::IsNullOrWhiteSpace($question)) {
+            $question = "Analyze today's promising sectors and leading stocks using current public news and price context. Keep ranks 1 and 2 private and reveal only the 3rd-place teaser."
+          }
+
+          $body = @(
+            'Daily market triad teaser.',
+            '',
+            "KST: $kstStamp",
+            '',
+            'Question:',
+            $question,
+            '',
+            'Public teaser:',
+            $env:TEASER,
+            '',
+            'The full ranking is kept private in the core repo.'
+          ) -join [Environment]::NewLine
+
+          $issueNumber = $env:ISSUE_NUMBER
+          if ([string]::IsNullOrWhiteSpace($issueNumber)) {
+            throw 'failed to resolve daily issue'
+          }
+          gh issue comment "$issueNumber" --repo "$env:REPO" --body "$body"
+
+      - name: Promote full synthesis to core repo
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+        run: |
+          if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+            throw 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT secrets are required.'
+          }
+
+          $content = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes((Get-Content -Raw synthesis.md)))
+          $runId = '${{ github.run_id }}'
+          $path = "wkappbot.hq/promotions/public-sdk/market-triad/$runId.md"
+
+          gh api --method PUT "repos/$env:CORE_REPO/contents/$path" `
+            -f message="ci: promote market triad synthesis from public sdk [skip ci]" `
+            -f content="$content" `
+            -f branch="main"
+
+      - name: Write job summary
+        shell: pwsh
+        env:
+          TEASER: ${{ steps.teaser.outputs.teaser }}
+        run: |
+          $kstNow = [DateTime]::UtcNow.AddHours(9)
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '## Daily Market Triad Teaser'
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("**KST:** {0}" -f $kstNow.ToString('yyyy-MM-dd HH:mm'))
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ''
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value ("**Public teaser:** {0}" -f $env:TEASER)

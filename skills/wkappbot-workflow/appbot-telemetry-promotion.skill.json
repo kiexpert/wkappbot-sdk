@@ -1,0 +1,53 @@
+{
+  "id": "appbot-telemetry-promotion",
+  "app": "wkappbot-workflow",
+  "title": "AppBot Telemetry and Skill Promotion",
+  "title_ko": null,
+  "desc": "Automatically capture user prompts, tool calls, outcome scores, and durable patterns, then route reusable knowledge to the right home: CLAUDE.md, AGENTS.md, or a skill.",
+  "steps": [
+    "Start from the user prompt, workspace, and active repo; capture the exact prompt before any tool work begins.",
+    "Record every tool call and its result in structured telemetry: tool name, args summary, elapsed time, success, failure reason, and follow-up.",
+    "Score the run after completion; use correctness, tool efficiency, retry count, and handoff quality as the default axes.",
+    "Promote only durable results. Keep raw traces in HQ; move Claude-facing notes to CLAUDE.md, Codex and other shared rules to AGENTS.md, and executable flow to skills.",
+    "If a repeated pattern crosses sessions, write one canonical rule and point the other documents to it instead of duplicating the full flow.",
+    "Verify the promoted rule with the narrowest useful replay or smoke test. If verification fails, keep the record in HQ only.",
+    "For user-facing prose cleanup, draft or polish the wording with ask first, so Claude tokens are spent on judgment instead of wording. Keep the polished text in the right document or skill after verification."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "ROLE MAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "PROJECT CLAUDE.MD PURPOSE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "skill editing discipline",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "telemetry",
+    "promotion",
+    "score",
+    "log",
+    "prompt",
+    "tool",
+    "record",
+    "skill",
+    "hq",
+    "md",
+    "automation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T12:02:18.6602434Z",
+  "updated": "2026-05-11T12:35:13.8530793Z",
+  "version": "1.2"
+}

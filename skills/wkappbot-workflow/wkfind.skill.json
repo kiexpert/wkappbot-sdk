@@ -1,0 +1,52 @@
+{
+  "id": "wkfind",
+  "app": "wkappbot-workflow",
+  "title": "wkfind: Multi-keyword code search with GlobCoverageScore ranking",
+  "title_ko": null,
+  "desc": "Smart keyword extraction (skill-search compatible) with PHRASE/AND/OR tier ranking, git diff auto-detection, time-range fallback, and parallel triad analysis",
+  "steps": [
+    "Tokenization: split each user arg by Unicode regex [^\\p{L}\\p{N}]+ (non-letter/non-digit). Result has two lists: keywords (tokenized sub-strings) and rawPhrases (original args, lowercased).",
+    "Token-length filter: include sub-tokens only when length > 1 AND sub-token != original lowercase arg. Original lowercase arg is always added to keywords first.",
+    "phraseNorm vs phraseRaw: phraseNorm = keywords joined by space (used when arg count > 1); phraseRaw = rawPhrases joined by space. Both substrings are checked for in-order containment.",
+    "baseScore (GlobCoverageScore): for each keyword present in fieldLower, score = token.Length / field.Length. Final baseScore = average of all matched-token scores. No matches => 0.",
+    "Tier multipliers (skill-search compatible): PHRASE (phraseNorm or phraseRaw substring present in field) => baseScore x 2.5. AND (every keyword present, any order) => baseScore x 1.5. OR (any single keyword present) => baseScore x 1.0.",
+    "Tier classification at display: score >= 2.4 => PHRASE; 1.4 <= score < 2.4 => AND; 0 < score < 1.4 => OR. OR tier capped at 10 displayed rows.",
+    "Time-range fallback: --day -> --week -> --month -> --year -> --unlimited. Threshold = 3 matches (hardcoded minResultsThreshold). Each broader range is a superset, so total replaces (not accumulates).",
+    "Git diff auto-detection: if $env:TEMP\\wkfind-git.diff exists, set searchPath to that file and skip the time-range fallback chain. Source label switches to 'git diff + TRIAD'.",
+    "suggestions.jsonl noise filter: skip grep result lines that match BOTH (suggestions.jsonl|\\\"ts\\\":|\\\"from\\\":|\\\"text\\\":\\\") AND (BUG-AUTO|DG-wkappbot) to avoid suggest-history flooding the results.",
+    "Search backend: wkappbot file grep <firstToken> --path <searchPath> -i (ripgrep underneath, .gitignore-aware). First keyword only is used for grep; all keywords are used for scoring against each matching line.",
+    "Session search: wkappbot session list --claude --cwd, parse [claude] lines, extract MM-DD date + HH:MM time + title. Filter by the same time-range cutoff used for code. Score titles via Measure-SkillSearchScore. Top 3 are shown.",
+    "Year inference for sessions: parsed MM-DD is compared to current date; if greater than now, assume previous year so the date stays in the past.",
+    "Triad parallelism: wkappbot ask triad is launched via Start-Process before search begins; output streams to a temp file. Default timeout 60s, override via $env:WKFIND_TRIAD_TIMEOUT. Process is intentionally NOT killed on timeout to preserve the in-flight response.",
+    "Output: --output <file> writes JSON {timestamp, search_terms, time_range, total_matches}. Triad insights are always streamed to stdout after the code+session report.",
+    "Usage: wkfind [--day|--week|--month|--year|--unlimited] [--output file.json] <kw1> [kw2] [kwN]. Range flags accept --, -, /, or suffix forms (e.g., --day, -day, /day, day)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkfind --help",
+      "expect": "wkfind",
+      "prompt": null
+    },
+    {
+      "cmd": "wkfind caller window",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkfind",
+      "expect": "wkfind",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "search",
+    "code-discovery"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-13T09:29:13.2225459Z",
+  "updated": "2026-05-13T11:00:00.0000000Z",
+  "version": "1.5"
+}

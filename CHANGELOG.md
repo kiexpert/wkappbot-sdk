@@ -3,6 +3,41 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.3.0-sdk] - 2026-05-16
+
+### Added
+- **`wkfind`**: unified code + Claude-session search tool with multi-keyword GlobCoverageScore ranking — PHRASE/AND/OR tiered scoring, git-diff + time-range fallback (`--day`/`--week`/`--month`/`--year`/`--unlimited`), top 3 sessions + top 10 code matches per tier
+- **`wkask`**: real-time ask (Stage 3) pipeline health monitor — fires question, streams live response color-coded by AI (GPT/Gemini/Claude), detects Stage 2/3 placement corrections, reports timing
+- **HWND validation persistence**: launcher writes off-screen / PseudoConsole / desktop / process-mismatch rejections to `cdp-state.jsonl` for postmortem audit
+- **Daily market triad teaser workflow**: CI workflow dispatches daily market triad (GPT + Gemini + Claude) on branch push, reuses latest KST daily issue, centralizes issue resolution
+- **Standard window skills**: `standard-appbot-window` + `standard-chrome-window` reference skills documenting IPC and DPI conventions
+
+### Fixed (CRITICAL)
+- **Chrome session restore position override**: two-layer fix — `ChromeLauncher.SessionRestore` clears cached geometry on restart, `CdpClient.WindowStabilize` re-asserts target rect post-restore. Eliminates Chrome jumping to last-session position on hot-swap
+- **Launcher caller HWND resolution**: `ResolveCallerTerminalHwnd` now walks the process ancestor chain only — no P1/P3 foreground fallbacks. P2 finds nearest ancestor with any window (not just terminal-class); visible windows apply `GA_ROOT` filter; hidden ConPTY windows are included via `GetWindowRect` (one HWND for placement and input)
+- **Off-screen caller rejection**: launcher rejects zero / `PseudoConsoleWindow` / desktop / off-screen callers fail-fast with explicit error; auto-resolves to valid alternative window or falls back to primary monitor anchor
+- **On-screen Chrome placement guard**: prevents window position mismatch (RIQUA-SAFE) by anchoring Chrome to on-screen rect even when caller geometry is partly off-screen
+- **Caller HWND via process chain**: replaces foreground-based detection with parent-process window lookup (`NtQueryInformationProcess`); forwards `WKAPPBOT_CALLER_HWND` through IOCP env block + Eye-pipe path
+- **IME Relay jamo-sync**: Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus` (Core v7.3)
+- **Stage 2 fail-fast**: log all CDP / WebSocket / `/json/list` errors to stderr immediately; reduce selector-unavailable timeout 10s → 3s; fail fast on CDP error frames instead of timeout
+- **`cdp-mon` multi-monitor off-screen false positive**: regex `'^-\d{3,}'` replaced with `MonitorFromPoint` Win32 API — matches `IsWindowOnScreen` behavior, no longer flags negative-x monitor as off-screen
+- **Chat command default model**: defaults to Haiku; `claude` keyword + model-name argument supported
+- **Publish self-extract defense**: `IncludeAllContentForSelfExtract=true` suppresses `System.IO.FileSystem.Watcher` shim-assembly `FileNotFoundException` false positive during hot-swap
+
+### Changed
+- **Launcher partial split**: `MyCdpContext.cs` split from 1281 lines into 6 partials (each ≤ 291 lines) — under the 400-line soft cap
+- **Chrome placement**: 18×9 compensation factor + validation threshold adjustment for high-DPI multi-monitor setups
+- **Caller-HWND validation**: extended to `cdp` command path with foreign-process guard
+
+### Docs
+- `wkfind` GlobCoverageScore algorithm, time-range synchronization, multi-keyword discovery flow
+- `wkask` real-time monitoring usage in CLAUDE.md internal tools
+- Scope of Work section in CLAUDE.md (SDK launcher ownership boundary vs Core repo)
+- `cdp-mon` off-screen false-positive gotcha for multi-monitor setups
+- BUG-AUTO false-positive notes for CLR shim assemblies (`System.IO.FileSystem.Watcher`, `PublicKeyToken`, `Culture=neutral`)
+- Suggest evidence scripts: Chrome window position mismatch, session CommandHelpMap fix, hidden-mode MCP hang, FSW false positive
+- Stale version reference cleanup (`v5.8` → `v7.2.0`)
+
 ## [7.2.0-sdk] - 2026-05-08
 
 ### Added

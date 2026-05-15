@@ -1,0 +1,67 @@
+{
+  "id": "suggest-resolve-cdp-bugs",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Resolve: CDP Bug Fixes",
+  "title_ko": null,
+  "desc": "Resolve CDP bug suggests with evidence script validation",
+  "steps": [
+    "suggest resolve <ts> note --i-completed-script test-fix-cdp.sh --class CdpClient --skill suggest-resolve-cdp-bugs --commit 7375b93b",
+    "Class coupling OK: CdpClient / ChromeLauncher / ClaudePromptHelper matches affected classes in commit diff",
+    "Run evidence script: bash test-fix-cdp.sh -- must exit 0 to confirm CDP session is healthy",
+    "Use wkappbot windows to inspect current window positions and verify Chrome is placed correctly relative to caller HWND",
+    "RIQUA [resolve guards]: before every resolve attempt, run wkappbot skill read suggest-resolve-pre-flight-checklist. Covers 5 guards that block resolve: commit keyword, class size under 400 lines, evidence filename cmd-subcmd match, full absolute path, and final command flags.",
+    "Use wkappbot eye tick to verify Eye is running and the hot-swap binary is active before and after CDP bug fix resolve",
+    "Verified 2026-05-15: test-eye-tick-chrome-off-screen-caller-guard.cmd (resolve ts=2026-05-14T18:21:15.9885652Z)",
+    "Verified 2026-05-15: test-eye-tick-cdp-taskcancel-retry-fix.cmd (resolve ts=2026-05-10T14:04:32.0621418Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "session|end:0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "긴급",
+      "prompt": null
+    },
+    {
+      "cmd": "test-fix-cdp.sh",
+      "expect": "exit 0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest check 2026-05-14T18:21:15",
+      "expect": "Chrome",
+      "prompt": "off-screen caller guard: ResolveValidCallerWindow rejects negative coords, anchors Chrome to on-screen position"
+    },
+    {
+      "cmd": "wkappbot skill read suggest-resolve-cdp-bugs",
+      "expect": "Resolve",
+      "prompt": "off-screen caller guard: ResolveValidCallerWindow rejects negative coords, anchors Chrome to on-screen position"
+    },
+    {
+      "cmd": "wkappbot session list --claude --cwd",
+      "expect": "session",
+      "prompt": "CDP WebSocket reconnect on Runtime.enable stall - avoids 10-25s TaskCanceledException burst"
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window",
+      "expect": "CHROME TAB",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot eye tick",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-13T05:41:50.2196247Z",
+  "updated": "2026-05-15T16:03:15.2109788Z",
+  "version": "1.16"
+}

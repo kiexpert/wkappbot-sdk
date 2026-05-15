@@ -1,0 +1,51 @@
+{
+  "id": "standard-appbot-window",
+  "app": "wkappbot",
+  "title": "Standard AppBot Window: definition, detection, IPC forwarding, placement",
+  "title_ko": null,
+  "desc": "Complete reference for the Standard AppBot Window concept. Covers what it is, how to detect it via ancestor walk only, IPC forwarding, hidden ConPTY handling, multi-tab terminals, iconified callers, Chrome placement, and all downstream consumers. Read this before touching any callerHwnd code.",
+  "steps": [
+    "DEFINITION -- Standard AppBot Window: The window owned by the NEAREST ancestor process in the wkappbot process chain that owns ANY window with a valid non-zero GetWindowRect. This is the window FROM WHICH wkappbot was launched. It is the correct target for Chrome placement and input injection.",
+    "FOREGROUND IS IRRELEVANT: The focused/foreground window has nothing to do with the AppBot caller. GetForegroundWindow() is always wrong for this purpose. The user may be looking at YouTube, a PDF, anything -- that is someone else's window. Never use P1 (foreground terminal-class check) or P3 (GetForegroundWindow fallback). Foreground fallbacks removed in commit 08b0b423.",
+    "DETECTION -- ancestor walk only (P2): Walk GetParentProcessId chain up to 8 levels from wkappbot.exe. For each ancestor PID call EnumWindows and find windows where GetWindowThreadProcessId == ancestor PID. Filter: IsWindow + GetWindowRect returns non-zero area. NO class restriction. NO IsWindowVisible requirement. Return the FIRST match from the CLOSEST ancestor. If no ancestor has a usable window: return Zero -- do NOT fall back to foreground.",
+    "HIDDEN WINDOWS (ConPTY PseudoConsoleWindow): ConPTY is the nearest ancestor when wkappbot runs in a terminal tab. Class=PseudoConsoleWindow, IsWindowVisible=false, no title -- but IsWindow=true and GetWindowRect returns valid non-zero rect. P2 finds it (no visibility filter). For Chrome PLACEMENT coordinates: use GetAncestor(hwnd, GA_ROOT) to get the root visible ancestor (e.g. WindowsTerminal.exe main HWND) and use THAT rect. Pattern: hForRect = IsWindowVisible(hwnd) ? hwnd : GetAncestor(hwnd, GA_ROOT). Original hidden hwnd kept as identity for input injection. See AskCommands.CallerPlacement.cs FindRectProviderHwnd.",
+    "MULTI-TAB TERMINAL: Ancestor chain goes shell -> ConPTY server (for the specific AppBot tab) -> WindowsTerminal.exe. ConPTY for the AppBot tab is the nearest ancestor window. GA_ROOT gives WindowsTerminal main HWND for placement -- correct regardless of which tab is active. No need to identify the active tab.",
+    "ICONIFIED CALLER: If the AppBot terminal is minimized -- TryMoveChromeToCaller skips placement. Chrome stays at its last valid position. Minimized terminal = background/batch run = moving Chrome would be disruptive. Do NOT fall back to foreground. Do NOT move Chrome to screen center.",
+    "IPC FORWARDING via __hwnd: EyeCmdPipeClient.TryDelegate calls ResolveCallerTerminalHwnd() before sending to Eye pipe. If hwnd != Zero, prepends __hwnd:0xHHHHHHHH to JSON args. EyeCmdPipeServer.HandleClientAsync strips prefix, validates IsWindow, sets CallerHwnd AsyncLocal + ChromeLauncher.CallerHwndForPlacement static (reset to Zero when __hwnd absent). ONE __hwnd only -- no __conhwnd needed. Use the single hwnd for both placement (via GA_ROOT rect) and input injection.",
+    "DOWNSTREAM CONSUMERS: (1) TryMoveChromeToCallerAsync -- Chrome placement on every ask/cdp command (AskCommands.CallerPlacement.cs). (2) ChromeLauncher.CallerHwndForPlacement -- static anchor for next cdp open. (3) MCP worker via _meta.callerHwnd JSON (EyeMcpClient). (4) Admin Eye via ElevatedEyeServer.Execute.cs (fixed d557c6486). (5) WKAPPBOT_CALLER_HWND env var to Core subprocess via CreateProcessW env block.",
+    "BUGS FIXED (do not regress): Gap A stale CallerHwndForPlacement reset (7c19f50cb). Gap B EyeMcpClient static leak (d7bc05191). Gap G IsWindow validation on pipe parse (d7bc05191). Gap I MCP _meta validation (d7bc05191). Gap D/J Admin Eye --sudo (d557c6486). P1/P3 foreground removed (08b0b423). P2 hidden-window support (e450655a). GA_ROOT simplification (6d656296d). WithAutoReconnectAsync on CDP DOM calls (26dd30c8). Chrome placement on every ask command (2ca0500a7).",
+    "WHAT NOT TO DO: Never use GetForegroundWindow() for caller detection. Never require IsWindowVisible in P2. Never use two IPC fields (__hwnd + __conhwnd) -- one hwnd handles all use cases. Never fall back to foreground when Zero returned -- skip and keep Chrome in place. Never reject ConPTY by class name in P2. Never use negative x coordinate as off-screen signal -- use MonitorFromPoint.",
+    "DPI-AWARE COORDINATE PIPELINE: AppBot window rect (GetWindowRect) returns PHYSICAL pixel coordinates when process is PerMonitorV2 DPI-aware (set via TrySetPerMonitorV2DpiAwareness at Launcher startup). Three DPI values matter: (1) callerDpi = GetDpiForWindow(callerHwnd) -- DPI of the monitor hosting the caller window. (2) chromeDpi = GetDpiForWindow(chromeHwnd via Win32) -- DPI of the monitor hosting Chrome. (3) System DPI = GetDpiForSystem() -- baseline 96dpi reference. All placement calculations must stay in PHYSICAL pixels end-to-end. Do not mix logical and physical coordinates. MonitorFromPoint + GetMonitorInfo.rcWork always returns physical coords when process is PerMonitorV2 aware. ClampBoundsToVisible operates in physical coords. If caller and Chrome are on different DPI monitors, the raw rect coords are already correct in physical space -- no scaling needed between monitors when using physical coords throughout.",
+    "DPI verified 2026-05-16: wkappbot-core.exe now sets PerMonitorV2 awareness in Program.Dispatch.Run() via NativeMethods.TrySetPerMonitorV2DpiAwarenessOnce(). Caller GetWindowRect + CDP Browser.setWindowBounds + Win32 SetWindowPos all exchange PHYSICAL pixels end-to-end. No LogicalToPhysical conversion needed in TryMoveChromeToCallerAsync."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n ResolveCallerTerminalHwnd D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs",
+      "expect": "ancestor",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n FindRectProviderHwnd D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AskCommands.CallerPlacement.cs",
+      "expect": "GA_ROOT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window",
+      "expect": "CHROME TAB",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T15:41:54.5684714Z",
+  "updated": "2026-05-15T16:17:46.3306732Z",
+  "version": "1.5"
+}

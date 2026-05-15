@@ -1,0 +1,52 @@
+{
+  "id": "session-pattern-mining-skill-promotion",
+  "app": "wkappbot-workflow",
+  "title": "Session Pattern Mining and Skill Promotion",
+  "title_ko": null,
+  "desc": "Scan recent session logs for repeated successful patterns, score them for durability, and promote only stable knowledge into the right home: CLAUDE.md, AGENTS.md, or a reusable skill.",
+  "steps": [
+    "Find the most recent relevant session logs in HQ or the workspace, starting with the latest successful runs.",
+    "Extract prompt, tools used, outcome, retry count, elapsed time, and failure reason for each candidate pattern.",
+    "Group repeated patterns and score them by repeatability, success rate, and cross-session durability. Ignore one-off successes unless they recur.",
+    "Promote only stable knowledge. Put Claude-facing project notes in CLAUDE.md, Codex and other shared rules in AGENTS.md, and executable workflows in a skill.",
+    "Verify each promoted candidate with the narrowest useful replay or smoke test. If verification is unstable, keep the candidate in HQ only.",
+    "Do not auto-promote raw traces. Keep raw logs in HQ and promote only durable summaries, rules, or workflows."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read appbot-telemetry-promotion",
+      "expect": "structured telemetry",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "ROLE MAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "skill editing discipline",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "session",
+    "pattern",
+    "telemetry",
+    "promotion",
+    "log",
+    "score",
+    "mining",
+    "skill",
+    "hq",
+    "claude",
+    "agents"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-11T12:05:13.550169Z",
+  "updated": "2026-05-11T12:05:13.550178Z",
+  "version": "1.0"
+}

@@ -111,7 +111,7 @@ partial class Program
             var ts = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
             var text = $"[BUG-AUTO] Launcher HANDSHAKE-MISS on --sudo: pipe wkappbot_elevated reachable but no response within {budgetMs}ms (elapsed {elapsedMs}ms). args=\\\"{argsJoined}\\\"{exSuffix}";
             var line = $"{{\"ts\":\"{ts}\",\"from\":\"bug-auto\",\"cwd\":\"{cwdEsc}\",\"text\":\"{text}\",\"files\":[],\"status\":\"pending\",\"tag\":\"bug-auto\"}}\n";
-            File.AppendAllText(jsonlPath, line, new System.Text.UTF8Encoding(false));
+            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(jsonlPath, line);
         }
         catch { /* best-effort -- if we cannot even write the suggest, stay silent */ }
     }
@@ -122,12 +122,44 @@ partial class Program
         // backward-compat local alias so existing prof("...") calls in Main still work
         Action<string> prof = Prof;
 
+        // DPI awareness MUST be set before ANY GetWindowRect / SetWindowPos / monitor
+        // enumeration call, or the launcher will silently operate in virtualized
+        // coordinates while Chrome (PerMonitorV2) reports/expects physical pixels.
+        //
+        // Bug history: without this call, on a 150% scaled monitor:
+        //   - GetWindowRect(callerHwnd) returned logical coords (e.g. width=1707)
+        //   - SetWindowPos(chromeHwnd, ...) applied those as if physical
+        //   - net effect: Chrome ended up at the wrong monitor and oversized
+        //     (caller's logical 1707x960 → Chrome physical 2560x1440)
+        //
+        // PER_MONITOR_AWARE_V2 = -4 ensures every Win32 window API in this process
+        // operates in physical pixels on the current monitor, matching Chrome's
+        // own DPI context. Failure to set (e.g. older Windows 10 without
+        // SetProcessDpiAwarenessContext) silently falls back to legacy behaviour.
+        TrySetPerMonitorV2DpiAwareness();
+
         // --heal-link <linkPath> <targetPath>: internal self-dispatch used by
         // the live-swap exit path. Polls the stale alias (up to ~1s) until the
         // previous Launcher releases its exe lock, then deletes + re-links to
         // wkappbot.exe. Runs early so we skip all the normal startup noise.
         if (args.Length >= 3 && args[0] == "--heal-link")
             return HealLinkSelfDispatch(args[1], args[2]);
+
+        // __bg-place-chrome: internal self-dispatch from TryMoveWebBotNearCaller.
+        // The parent launcher fires this child after Stage 1 placement so the
+        // user's terminal prompt returns immediately while Stage 2 (page-load
+        // wait) and Stage 3 (DPI-aware match) run in the background.
+        //
+        // argv: __bg-place-chrome <0xHWND> <port> <L> <T> <R> <B> <cmd>
+        //
+        // Runs early so we skip the rest of Main()'s normal startup (JSON
+        // banner, encoding setup, Eye pipe handshake, etc.) -- the watcher
+        // only needs the DPI awareness already set above and the telemetry
+        // helpers in MyCdpContext.Stage23.cs.
+        if (args.Length > 0 && args[0] == BgPlaceChromeArg)
+        {
+            return RunBackgroundPlacementWatcher(args);
+        }
 
         // Dim all Launcher stderr via ANSI codes -- MCP relay now writes raw UTF-8 bytes (preserves ANSI + encoding)
         Console.SetError(new DimStderrWriter(Console.Error));
@@ -231,29 +263,31 @@ partial class Program
             var cwd = Environment.CurrentDirectory;
             var exePath = Environment.ProcessPath ?? "";
             var sid = System.Diagnostics.Process.GetCurrentProcess().SessionId;
-            // Host window: parent process's main window (VS Code, Terminal, etc.)
-            var hostHwnd = IntPtr.Zero;
-            var hostTitle = "";
-            try
+            // Caller window: parent process's main window (VS Code, Terminal, etc.)
+            // Launcher's own window: walk process chain to find first valid MainWindowHandle
+            var fgHwnd = IntPtr.Zero;
+            var fgTitle = "";
+            var walkPid = myPid;
+            for (int ci = 0; ci < 10; ci++)
             {
-                if (parentPid > 0)
+                var ppid = GetParentProcessId(walkPid);
+                if (ppid <= 0 || ppid == walkPid) break;
+                try
                 {
-                    var pp = System.Diagnostics.Process.GetProcessById(parentPid);
-                    hostHwnd = pp.MainWindowHandle;
-                    if (hostHwnd != IntPtr.Zero)
+                    var p = System.Diagnostics.Process.GetProcessById(ppid);
+                    if (p.MainWindowHandle != IntPtr.Zero)
                     {
+                        fgHwnd = p.MainWindowHandle;
                         var tb = new System.Text.StringBuilder(256);
-                        GetWindowTextW(hostHwnd, tb, 256);
-                        hostTitle = tb.ToString();
-                        if (hostTitle.Length > 60) hostTitle = hostTitle[..57] + "...";
+                        GetWindowTextW(fgHwnd, tb, 256);
+                        fgTitle = tb.ToString();
+                        if (fgTitle.Length > 60) { fgTitle = fgTitle[..57] + "..."; }
+                        break;  // Found it!
                     }
                 }
+                catch { }
+                walkPid = ppid;
             }
-            catch { }
-            // Foreground window at launch time
-            var fgHwnd = GetForegroundWindow();
-            var fgTitle = "";
-            try { var fb = new System.Text.StringBuilder(256); GetWindowTextW(fgHwnd, fb, 256); fgTitle = fb.ToString(); if (fgTitle.Length > 60) fgTitle = fgTitle[..57] + "..."; } catch { }
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
@@ -261,8 +295,8 @@ partial class Program
             var err = Console.Error;
             void F(string s) { err.Write(s); err.Write('\r'); } // field + reset cursor
             F($"{{\"_\":\"LAUNCH\",\"pid\":{myPid},\"sid\":{sid}");
-            if (consoleHwnd != IntPtr.Zero) F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\"");
-            if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); }
+            if (consoleHwnd != IntPtr.Zero) { F($",\"con\":\"0x{consoleHwnd:X}\",\"cls\":\"{consoleName}\""); }
+            if (fgHwnd != IntPtr.Zero) { F($",\"fg\":\"0x{fgHwnd:X}\""); if (fgTitle.Length > 0) { F($",\"fgT\":\"{fgTitle.Replace("\"","'")}\""); } }
             F($",\"cwd\":\"{cwd.Replace("\\","\\\\")}\"");
             // Parent chain
             F(",\"chain\":[");
@@ -557,6 +591,55 @@ partial class Program
         prof($"cmd={cmd}");
         var relayArgs = forwardArgs;
         var isChatCmd = string.Equals(cmd, "chat", StringComparison.OrdinalIgnoreCase);
+
+        // chat command: auto-convert model name argument to --model flag
+        // Usage: wkappbot chat haiku "prompt" -> claude --model haiku "prompt"
+        //        wkappbot chat "prompt" -> claude --model haiku "prompt" (default: haiku)
+        //        wkappbot chat claude "prompt" -> claude "prompt" (explicit default)
+        if (isChatCmd && forwardArgs.Length > 1)
+        {
+            var secondArg = forwardArgs[1].ToLowerInvariant();
+            var validModels = new[] { "haiku", "sonnet", "opus", "claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-opus-4-7" };
+
+            // "claude" keyword: skip it, pass remaining args to claude CLI
+            if (secondArg == "claude")
+            {
+                // Transform: chat claude "prompt" -> claude "prompt"
+                var modelArgs = new List<string> { "claude" };
+                modelArgs.AddRange(forwardArgs.Skip(2));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat claude: skip alias, pass to claude: {string.Join(" ", relayArgs)}");
+            }
+            else if (validModels.Contains(secondArg))
+            {
+                // Transform: chat <model> "prompt" -> claude --model <model> "prompt"
+                var modelArgs = new List<string> { "claude", "--model", secondArg };
+                modelArgs.AddRange(forwardArgs.Skip(2));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat model conversion: {secondArg} -> {string.Join(" ", relayArgs)}");
+            }
+            else if (!secondArg.StartsWith("-"))
+            {
+                // Transform: chat "prompt" -> claude --model haiku "prompt" (default: haiku)
+                var modelArgs = new List<string> { "claude", "--model", "haiku" };
+                modelArgs.AddRange(forwardArgs.Skip(1));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat default model (haiku): {string.Join(" ", relayArgs)}");
+            }
+            else
+            {
+                // Transform: chat -p "prompt" -> claude --model haiku -p "prompt" (flags without model)
+                var modelArgs = new List<string> { "claude", "--model", "haiku" };
+                modelArgs.AddRange(forwardArgs.Skip(1));
+                relayArgs = modelArgs.ToArray();
+                cmd = "chat"; // Keep as chat for routing, but relayArgs points to claude
+                prof($"chat flags with default model (haiku): {string.Join(" ", relayArgs)}");
+            }
+        }
+
         var inheritedChatSession = Environment.GetEnvironmentVariable("WKAPPBOT_CHAT_SESSION") == "1";
         var isChatSession = isChatCmd || inheritedChatSession;
         if (isChatSession)
@@ -596,6 +679,16 @@ partial class Program
         // hack-* workers are long-running -> bypass Eye pipe (would timeout)
         var isHackWorker = cmd == "a11y" && forwardArgs.Length > 1
             && forwardArgs[1].StartsWith("hack-", StringComparison.OrdinalIgnoreCase);
+
+        if (TryTrackMyCdpAccess(cmd, forwardArgs, out var cdpAccessError))
+        {
+            if (cdpAccessError != null)
+            {
+                Console.Error.WriteLine(cdpAccessError);
+                return 1;
+            }
+        }
+
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
@@ -637,6 +730,14 @@ partial class Program
             if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
+                // Post-launch placement: Eye runs Core in its own process; Core sees
+                // WKAPPBOT_CALLER_HWND only when EyeCmdPipeClient forwards it. As a
+                // belt-and-braces safety net, the Launcher (which still has the
+                // validated caller anchor in static fields) re-runs the move pass
+                // after Eye returns. Same behaviour as the RunCoreDetachedNormal
+                // path below: best-effort, swallows failures.
+                if (code == 0 && IsCdpFamilyCommand(cmd))
+                    TryMoveWebBotNearCaller(cmd);
                 // TerminateSelf: all output already flushed by TryDelegate; hard-kill Launcher immediately.
                 Console.Out.Flush();
                 Console.Error.Flush();
@@ -779,8 +880,25 @@ partial class Program
         // the Core spawns would inherit PIPES instead of the user's console. Result:
         // cmd.exe starts, prints nothing visible, and the user's keystrokes go to a
         // dead handle. Fix: spawn Core with fully inherited stdio, no redirection.
+        var isChatProbe = isChatCmd
+            && relayArgs.Any(a => a.Equals("--probe-routing", StringComparison.OrdinalIgnoreCase));
+        var isChatSlashProbe = isChatCmd
+            && relayArgs.Any(a => a.Equals("--probe-switch", StringComparison.OrdinalIgnoreCase));
         if (isChatCmd)
         {
+            if (isChatProbe)
+            {
+                int probeCode = DumpChatRoutingProbe();
+                AppBotExit(probeCode);
+                return probeCode; // unreachable
+            }
+            if (isChatSlashProbe)
+            {
+                int probeCode = DumpChatSlashSwitchProbe();
+                AppBotExit(probeCode);
+                return probeCode; // unreachable
+            }
+
             // Nested chat (parent process chain already has a chat session):
             // switch to one-shot mode so interactive stdio doesn't corrupt the parent session.
             if (inheritedChatSession)
@@ -789,86 +907,29 @@ partial class Program
                 AppBotExit(nestedCode);
                 return nestedCode; // unreachable
             }
-            int chatCode = RunCoreInheritedStdio(relayArgs);
+            int chatCode = RunChatInteractiveSession(relayArgs);
             AppBotExit(chatCode);
             return chatCode; // unreachable
         }
 
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
+
+        // Post-launch placement: after Core launches Chrome (cdp/web/ask family),
+        // proactively nudge the new Chrome window into caller proximity. Core
+        // already does its own placement via ComputePlacementNearCaller using
+        // WKAPPBOT_CALLER_HWND, but a second SDK-side pass catches the cases
+        // where Core attached to a pre-existing Chrome at a stale position OR
+        // Chrome's session-restore race repositioned the window after Core
+        // released it. Best-effort: failures are swallowed.
+        if (finalCode == 0 && IsCdpFamilyCommand(cmd))
+            TryMoveWebBotNearCaller(cmd);
+
         AppBotExit(finalCode);
         return finalCode; // unreachable
     }
 
-    /// <summary>
-    /// Spawn Core with full stdio inheritance -- no pipe redirection, no ConPTY
-    /// decoupling. Used exclusively by interactive commands like `chat` where the
-    /// child process must see the user's actual terminal so its own subprocess
-    /// (claude CLI, cmd.exe, bash, ...) can read keystrokes and render output live.
-    ///
-    /// MCP-style hot-swap loop: if Core exits with code 99 (hot-swap signal), the
-    /// Launcher re-resolves the core binary path (Core was just swapped on disk)
-    /// and respawns without the user noticing -- same terminal, same session, new
-    /// binary. Lets `chat` sessions survive Core updates instead of dying whenever
-    /// the user publishes a new build mid-conversation.
-    ///
-    /// Accepts the LPC/MSYS2 deadlock risk because the command is BY DEFINITION
-    /// running inside an interactive console session; the conditions that trigger
-    /// the deadlock (non-interactive ConPTY + single-file AppHost) don't apply.
-    /// </summary>
-    static int RunCoreInheritedStdio(string[] args)
-    {
-        try
-        {
-            var core = ResolveCoreExe();
-            if (!System.IO.File.Exists(core))
-            {
-                Console.Error.WriteLine($"[LAUNCHER] wkappbot-core.exe not found at: {core}");
-                return 1;
-            }
-
-            while (true)
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = core,
-                    UseShellExecute = false,
-                    // NOT redirected -- child gets the real console stdio.
-                    RedirectStandardOutput = false,
-                    RedirectStandardError  = false,
-                    RedirectStandardInput  = false,
-                    CreateNoWindow = false,
-                };
-                foreach (var a in args) psi.ArgumentList.Add(a);
-
-                int code;
-                using (var proc = System.Diagnostics.Process.Start(psi))
-                {
-                    if (proc == null) { Console.Error.WriteLine("[LAUNCHER] chat: failed to start Core"); return 1; }
-                    proc.WaitForExit();
-                    code = proc.ExitCode;
-                }
-
-                if (code != 99) return code;
-
-                // Exit 99 = hot-swap restart. Re-resolve Core (binary was just swapped)
-                // and respawn in the SAME Launcher process -- same terminal, same console,
-                // no new window. Session continuity is preserved from the user's POV.
-                Prof("chat: exit code 99 -- hot-swap restart, re-spawning Core");
-                Console.Error.WriteLine("[LAUNCHER] chat: Core hot-swapped, restarting session with new binary...");
-                core = ResolveCoreExe();
-                if (!System.IO.File.Exists(core))
-                {
-                    Console.Error.WriteLine("[LAUNCHER] chat: new Core not found after hot-swap, aborting");
-                    return 1;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[LAUNCHER] chat inherited-stdio spawn error: {ex.Message}");
-            return 1;
-        }
-    }
+    static bool IsCdpFamilyCommand(string cmd)
+        => cmd is "cdp" or "web" or "a11y" or "ask";
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
     static volatile string _lDiagStep = "";
@@ -923,6 +984,50 @@ partial class Program
     static extern uint GetConsoleOutputCP();
     [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = false)]
     static extern uint GetConsoleCP();
+
+    // DPI awareness context values (winuser.h DPI_AWARENESS_CONTEXT_*).
+    // PER_MONITOR_AWARE_V2 = -4 gives the launcher the same coordinate space
+    // Chrome uses, so GetWindowRect / SetWindowPos exchange physical pixels.
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = new IntPtr(-4);
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    = new IntPtr(-3);
+    static readonly IntPtr DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         = new IntPtr(-2);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll", SetLastError = true)]
+    static extern int SetProcessDpiAwareness(int awareness);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool SetProcessDPIAware();
+
+    /// <summary>
+    /// Make the launcher process PerMonitorV2 DPI-aware so every Win32 window
+    /// API operates in physical pixels (the same coordinate space Chrome uses).
+    /// Falls back gracefully on older OSes that lack the v2 API.
+    /// </summary>
+    static void TrySetPerMonitorV2DpiAwareness()
+    {
+        try
+        {
+            if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                return;
+        }
+        catch { /* SetProcessDpiAwarenessContext missing on older Win10 → try shcore */ }
+        try
+        {
+            // PROCESS_PER_MONITOR_DPI_AWARE = 2 (Win 8.1+)
+            if (SetProcessDpiAwareness(2) == 0) return;
+        }
+        catch { /* shcore missing → try user32 fallback */ }
+        try
+        {
+            // System DPI aware -- last resort. Better than DPI-Unaware
+            // (virtualized coords), worse than per-monitor on multi-DPI setups.
+            SetProcessDPIAware();
+        }
+        catch { /* fail open -- legacy DPI-Unaware behaviour */ }
+    }
 
     // CreateProcessW with DETACHED_PROCESS: spawns Core outside bash's ConPTY session.
     // Structs + guard: AppBotPipe.cs (shared between Launcher and Core)

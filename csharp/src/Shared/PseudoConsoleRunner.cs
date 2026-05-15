@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace WKAppBot.Shared;
 
@@ -73,6 +74,8 @@ public static class PseudoConsoleRunner
         string? cwd = null,
         Action<byte[], int>? onOutput = null,
         Func<string, Action?>? onLineReady = null,
+        Action<IntPtr>? onProcessStarted = null,
+        Action<string>? onOutputText = null,
         bool mirrorToTerminal = true)
     {
         if (!IsSupported)
@@ -134,9 +137,11 @@ public static class PseudoConsoleRunner
                     ref si, out pi))
                 throw new InvalidOperationException($"CreateProcessW: {Marshal.GetLastWin32Error()}");
 
+            try { onProcessStarted?.Invoke(pi.hProcess); } catch { }
+
             // Parent no longer needs its copies of child-end handles (already closed above).
             // Start reader + stdin translator threads.
-            readerThread = new Thread(() => RelayOutput(outputRead, onOutput, mirrorToTerminal, cts.Token))
+            readerThread = new Thread(() => RelayOutput(outputRead, onOutput, onOutputText, mirrorToTerminal, cts.Token))
                 { IsBackground = true, Name = "conpty-reader" };
             readerThread.Start();
 
@@ -176,7 +181,12 @@ public static class PseudoConsoleRunner
 
     // --- Output relay ----------------------------------------------------------
 
-    private static void RelayOutput(IntPtr outputRead, Action<byte[], int>? cb, bool mirror, CancellationToken ct)
+    private static void RelayOutput(
+        IntPtr outputRead,
+        Action<byte[], int>? cb,
+        Action<string>? textCb,
+        bool mirror,
+        CancellationToken ct)
     {
         var buf = new byte[4096];
         Stream? stdout = mirror ? Console.OpenStandardOutput() : null;
@@ -187,6 +197,15 @@ public static class PseudoConsoleRunner
                 if (!ReadFile(outputRead, buf, (uint)buf.Length, out uint read, IntPtr.Zero) || read == 0)
                     break;
                 try { cb?.Invoke(buf, (int)read); } catch { }
+                if (textCb != null)
+                {
+                    try
+                    {
+                        var chunk = Encoding.UTF8.GetString(buf, 0, (int)read);
+                        textCb(chunk);
+                    }
+                    catch { }
+                }
                 try
                 {
                     stdout?.Write(buf, 0, (int)read);
@@ -428,6 +447,7 @@ public static class PseudoConsoleRunner
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GetStdHandle(int nStdHandle);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CloseHandle(IntPtr h);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CreatePipe(out IntPtr hRead, out IntPtr hWrite, ref SECURITY_ATTRIBUTES sa, int nSize);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool ReadFile(IntPtr h, byte[] buf, uint toRead, out uint read, IntPtr overlapped);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool WriteFile(IntPtr h, byte[] buf, uint toWrite, out uint written, IntPtr overlapped);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetConsoleScreenBufferInfo(IntPtr h, out CONSOLE_SCREEN_BUFFER_INFO info);
@@ -444,4 +464,11 @@ public static class PseudoConsoleRunner
         ref STARTUPINFOEX si, out PROCESS_INFORMATION pi);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(IntPtr h, uint ms);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetExitCodeProcess(IntPtr h, out uint code);
+
+    public static bool TryTerminateProcess(IntPtr hProcess, uint exitCode = 1)
+    {
+        if (hProcess == IntPtr.Zero) return false;
+        try { return TerminateProcess(hProcess, exitCode); }
+        catch { return false; }
+    }
 }

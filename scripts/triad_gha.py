@@ -11,6 +11,10 @@ import os, sys, json, urllib.request
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
 
+def is_quiet():
+    return os.environ.get("TRIAD_QUIET", "").strip().lower() not in ("", "0", "false", "no")
+
+
 def call_gemini(prompt):
     key = os.environ["GEMINI_API_KEY"]
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + key
@@ -87,6 +91,7 @@ THESIS_TMPL = """\
 Question / Task:
 {question}
 
+If the topic is time-sensitive, incorporate current public news, market, or price context when available, and clearly state what is fresh vs. stable.
 Give your best, complete answer. Be concise but thorough. Max 300 words."""
 
 ANTITHESIS_TMPL = """\
@@ -96,6 +101,7 @@ Two other AIs answered this question:
 {others}
 
 Your task: Write a critical counter-argument or improvement.
+If the topic is time-sensitive, challenge or refine any stale assumptions with current public context when available.
 Identify weaknesses, missing points, or alternative perspectives. Max 200 words."""
 
 SYNTHESIS_TMPL = """\
@@ -128,11 +134,14 @@ You are the synthesis judge in a three-way AI debate.
 1. Identify the strongest points from all 6 responses
 2. Note where the AIs agree vs. genuinely disagree
 3. Resolve disagreements with your own best judgment
-4. Output a definitive synthesized answer
+4. If the topic is time-sensitive, preserve fresh public context and clearly separate it from stable background facts.
+5. Add a one-line public teaser that names only the third-ranked sector/stock idea, but do not reveal the full private ranking in that teaser.
+6. Output a definitive synthesized answer
 
 Structure:
 **Points of consensus:** ...
 **Key disagreements & resolution:** ...
+**Public teaser:** The third-ranked teaser is ...
 **Final answer:** (clear, complete, actionable)
 End the output with TRIAD_OK."""
 
@@ -163,6 +172,7 @@ def fallback_synthesis(question):
     return (
         "**Points of consensus:** Live providers were unavailable or rate-limited in CI, so the workflow fell back to a deterministic synthesis.\n\n"
         "**Key disagreements & resolution:** Provider availability is not a reliable CI success condition. The workflow should preserve output shape and complete successfully even when live providers are throttled.\n\n"
+        "**Public teaser:** The third-ranked teaser stays private in the full ranking, but the public hook still points to a plausible rotation name.\n\n"
         "**Final answer:** The triad workflow completed successfully in CI with fallback synthesis, verified markers, and a durable artifact path.\n"
         "TRIAD_OK"
     )
@@ -186,7 +196,8 @@ def cmd_thesis(ai, question):
             print(f"[{label} failed: {e}]", file=sys.stderr)
     if answer is None:
         answer = fallback_thesis(ai, question)
-    print(answer)
+    if not is_quiet():
+        print(answer)
     with open(f"r1-{ai}.txt", "w") as f:
         f.write(answer)
 
@@ -211,7 +222,8 @@ def cmd_antithesis(ai, question):
             print(f"[{label} failed: {e}]", file=sys.stderr)
     if answer is None:
         answer = fallback_antithesis(ai, question, others_text)
-    print(answer)
+    if not is_quiet():
+        print(answer)
     with open(f"r2-{ai}.txt", "w") as f:
         f.write(answer)
 
@@ -257,7 +269,8 @@ def cmd_synthesis(question):
             synthesis = fallback_synthesis(question)
             synth_ai = "fallback"
 
-    print(synthesis)
+    if not is_quiet():
+        print(synthesis)
 
     md = f"# Triad Synthesis\n\n**Question:** {question}\n\n**Synthesized by:** {synth_ai}\n\n---\n\n{synthesis}\n\n"
     if "TRIAD_OK" not in md:
