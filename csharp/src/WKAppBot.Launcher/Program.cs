@@ -928,8 +928,15 @@ partial class Program
         return finalCode; // unreachable
     }
 
+    // Chrome placement (TryMoveWebBotNearCaller) should ONLY fire for commands
+    // that actually launch/attach a project Chrome window for AI prompt delivery
+    // -- that is, `ask` (triad/gpt/gemini/claude prompt injection) and `cdp`
+    // (explicit `cdp open` user request). Other commands (`a11y`, `windows`,
+    // `inspect`, `web` browsing, `file`, `gc`, `skill`, `suggest`, `eye`,
+    // `slack`, ...) MUST NOT move Chrome -- doing so causes Chrome to jump
+    // to whichever terminal happened to invoke the unrelated command.
     static bool IsCdpFamilyCommand(string cmd)
-        => cmd is "cdp" or "web" or "a11y" or "ask";
+        => cmd is "cdp" or "ask";
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
     static volatile string _lDiagStep = "";
