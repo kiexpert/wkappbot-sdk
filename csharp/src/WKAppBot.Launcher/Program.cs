@@ -277,27 +277,25 @@ partial class Program
                     var p = System.Diagnostics.Process.GetProcessById(ppid);
                     if (p.MainWindowHandle != IntPtr.Zero)
                     {
-                        // Skip browser processes -- they are user's apps, not our terminal.
-                        var pn = (p.ProcessName ?? "").ToLowerInvariant();
-                        if (pn is "chrome" or "msedge" or "firefox" or "opera" or "brave" or "vivaldi") { walkPid = ppid; continue; }
+                        // Diagnostic only -- do NOT use for placement.
+                        // Parent PIDs can be recycled: the "parent" PID may now belong to a
+                        // completely unrelated process (e.g. msedge.exe) that inherited the
+                        // old PID. This value appears in LAUNCH JSON fg= field only.
                         fgHwnd = p.MainWindowHandle;
                         var tb = new System.Text.StringBuilder(256);
                         GetWindowTextW(fgHwnd, tb, 256);
                         fgTitle = tb.ToString();
                         if (fgTitle.Length > 60) { fgTitle = fgTitle[..57] + "..."; }
-                        break;  // Found it!
+                        break;
                     }
                 }
                 catch { }
                 walkPid = ppid;
             }
-            // Pin caller HWND before Chrome can steal focus -- MyCdpContext reads this env var
-            // as highest-priority anchor so placement survives the post-launch focus change.
-            if (fgHwnd != IntPtr.Zero
-                && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_HWND")))
-            {
-                Environment.SetEnvironmentVariable("WKAPPBOT_CALLER_HWND", fgHwnd.ToInt64().ToString());
-            }
+            // NOTE: fgHwnd (parent walk result) is intentionally NOT written to WKAPPBOT_CALLER_HWND.
+            // The parent walk can return unrelated processes (e.g. browser windows) whose PID
+            // happens to appear in the process ancestry. Caller HWND for placement is resolved
+            // by MyCdpContext via console/ancestor/host chain, and by Eye IPC via __hwnd: prefix.
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
