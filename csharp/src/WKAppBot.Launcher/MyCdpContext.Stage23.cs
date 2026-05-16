@@ -20,13 +20,16 @@
 //   - If DPI mismatch detected, recompute target rect at Chrome's current
 //     DPI and issue a corrective SetWindowPos
 //
+// File layout (2026-05-16 split, ~400-line cap)
+//   MyCdpContext.Stage23.cs           -- this file: watcher spawn/entry, Stage 2 flow
+//   MyCdpContext.Stage3.cs            -- TryStage3DpiAwareMatch + DPI helpers
+//   MyCdpContext.Stage23Ws.cs         -- CDP WebSocket helpers used by Stage 2
+//   MyCdpContext.Stage23Telemetry.cs  -- AppendStage2Record / AppendStage3Record
+//
 // Telemetry: every stage outcome is appended to wkappbot.hq/runtime/cdp-state.jsonl
 // with "stage": 2 | 3 records so cdp-mon can audit timing and accuracy.
 
-using System.Net.Http;
-using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -123,7 +126,7 @@ partial class Program
     /// <summary>
     /// Entry point for the detached child process started by
     /// <see cref="SpawnBackgroundPlacementWatcher"/>. Runs Stage 2 and Stage 3,
-    /// then exits. Never crashes the parent — all exceptions are swallowed.
+    /// then exits. Never crashes the parent -- all exceptions are swallowed.
     ///
     /// argv layout (passed via Main()):
     ///   [0] __bg-place-chrome  (already stripped by caller)
@@ -244,7 +247,7 @@ partial class Program
             {
                 // Step B: open WebSocket, enable Page domain, listen for
                 // Page.loadEventFired. If page already loaded, Chrome will
-                // not re-fire — fall back to the 10s timer and re-validate
+                // not re-fire -- fall back to the 10s timer and re-validate
                 // anyway (still useful for catching post-Stage-1 drift).
                 trigger = await WaitForPageLoadEventFired(wsUrl!, cts.Token).ConfigureAwait(false);
             }
@@ -346,309 +349,10 @@ partial class Program
         }
     }
 
-    /// <summary>
-    /// Stage 3: re-check Chrome's DPI context post-load and correct any rect
-    /// mismatch caused by an intervening WM_DPICHANGED. If the caller-DPI
-    /// captured at watcher entry differs from Chrome's current DPI by more
-    /// than the threshold (e.g. caller=96, Chrome=144), the target rect is
-    /// recomputed in the new DPI context and SetWindowPos re-issued.
-    ///
-    /// Logical-to-physical / physical-to-logical: since the launcher process
-    /// is PerMonitorV2-aware, both rects are already in physical pixels for
-    /// their respective monitors. The "rescale" therefore means scaling the
-    /// stage1 width/height by (currentDpi / callerDpi) so the visible size
-    /// stays consistent across the migration.
-    /// </summary>
-    internal static void TryStage3DpiAwareMatch(IntPtr chromeHwnd, RECT stage1Target, uint callerDpi, string cmd)
-    {
-        const int DeltaThreshold = 8;             // px — minimum drift to bother correcting
-        const uint MinDpi = 72, MaxDpi = 480;     // sanity bounds, anything outside means a bad read
-        const uint SWP_NOZORDER = 0x0004;
-        const uint SWP_NOACTIVATE = 0x0010;
-
-        try
-        {
-            if (!IsWindow(chromeHwnd))
-            {
-                AppendStage3Record(0, 0, false, false, false, stage1Target, default, "hwnd_invalid", cmd);
-                Console.Error.WriteLine("[PLACEMENT:STAGE3] hwnd no longer valid -- skip");
-                return;
-            }
-
-            uint currentDpi = TryGetWindowDpiSafe(chromeHwnd);
-            if (currentDpi < MinDpi || currentDpi > MaxDpi) currentDpi = 96;
-            if (callerDpi  < MinDpi || callerDpi  > MaxDpi) callerDpi  = 96;
-
-            double currentScale = currentDpi / 96.0;
-            double callerScale  = callerDpi  / 96.0;
-            bool dpiMatch = currentDpi == callerDpi;
-
-            // Read Chrome's actual rect now (after Stage 2 stabilized things).
-            RECT actual = default;
-            if (!TryGetWindowRectLTRB(chromeHwnd, out actual))
-            {
-                AppendStage3Record(callerDpi, currentDpi, dpiMatch, false, false, stage1Target, default, "rect_unavailable", cmd);
-                Console.Error.WriteLine("[PLACEMENT:STAGE3] could not read rect -- skip");
-                return;
-            }
-
-            // If DPIs match and the rect is close to target, nothing to do.
-            int dX = Math.Abs(actual.Left - stage1Target.Left);
-            int dY = Math.Abs(actual.Top  - stage1Target.Top);
-            int dW = Math.Abs(actual.Width  - stage1Target.Width);
-            int dH = Math.Abs(actual.Height - stage1Target.Height);
-
-            if (dpiMatch && dX < DeltaThreshold && dY < DeltaThreshold && dW < DeltaThreshold && dH < DeltaThreshold)
-            {
-                AppendStage3Record(callerDpi, currentDpi, true, false, true, stage1Target, actual, "match_confirmed", cmd);
-                Console.Error.WriteLine(
-                    $"[PLACEMENT:STAGE3] DPI match confirmed (caller={callerDpi}/{callerScale * 100:F0}% chrome={currentDpi}/{currentScale * 100:F0}%), no correction needed");
-                return;
-            }
-
-            // Recompute target in the current DPI context. The visible size
-            // we want is whatever Stage 1 targeted at the caller's DPI; if
-            // Chrome ended up on a higher-DPI monitor, scale up accordingly
-            // so the user sees the same physical size on the new display.
-            int newW = stage1Target.Width;
-            int newH = stage1Target.Height;
-            int newL = stage1Target.Left;
-            int newT = stage1Target.Top;
-
-            if (!dpiMatch && callerDpi > 0)
-            {
-                double r = (double)currentDpi / (double)callerDpi;
-                newW = (int)Math.Round(stage1Target.Width  * r);
-                newH = (int)Math.Round(stage1Target.Height * r);
-            }
-
-            // Clamp the recomputed rect to the work area of the monitor the
-            // caller actually wants Chrome on (i.e. stage1Target's monitor),
-            // NOT Chrome's current (drifted) monitor. Bug history: Chrome's
-            // session-restore can snap the window back to its remembered
-            // monitor between Stage 1 and Stage 3. If we anchored the work
-            // area on Chrome's drifted center we would clamp newL/newT to
-            // the DRIFTED monitor's edge -- effectively yanking Chrome onto
-            // the wrong display permanently and overriding the Launcher's
-            // stage 1 placement (e.g. caller at -1732,-1093 left monitor
-            // becomes 1740,20 right monitor). Use stage1Target as the
-            // authoritative anchor; fall back to actual only if stage1's
-            // monitor cannot be resolved (extreme edge case).
-            int cX = stage1Target.Left + Math.Max(1, stage1Target.Width) / 2;
-            int cY = stage1Target.Top  + Math.Max(1, stage1Target.Height) / 2;
-            if (!TryGetWorkArea(cX, cY, out var workArea))
-            {
-                cX = actual.Left + Math.Max(1, actual.Width) / 2;
-                cY = actual.Top  + Math.Max(1, actual.Height) / 2;
-                Console.Error.WriteLine(
-                    $"[PLACEMENT:STAGE3] stage1Target center ({stage1Target.Left + stage1Target.Width / 2},{stage1Target.Top + stage1Target.Height / 2}) off-monitor -- falling back to actual center for work-area probe");
-                TryGetWorkArea(cX, cY, out workArea);
-            }
-            // workArea may be default(RECT) if both probes failed; in that
-            // case skip the clamp entirely (rather than clamp to (0,0)) so
-            // stage1Target's intended position survives untouched. Default
-            // RECT has Right=Bottom=0 so the `newW > workArea.Right - Left`
-            // check would otherwise corrupt the recomputed width.
-            if (workArea.Right > workArea.Left && workArea.Bottom > workArea.Top)
-            {
-                if (newW > workArea.Right - workArea.Left) newW = workArea.Right - workArea.Left;
-                if (newH > workArea.Bottom - workArea.Top) newH = workArea.Bottom - workArea.Top;
-                if (newL < workArea.Left)              newL = workArea.Left;
-                if (newT < workArea.Top)               newT = workArea.Top;
-                if (newL + newW > workArea.Right)      newL = workArea.Right - newW;
-                if (newT + newH > workArea.Bottom)     newT = workArea.Bottom - newH;
-            }
-
-            var corrected = new RECT { Left = newL, Top = newT, Right = newL + newW, Bottom = newT + newH };
-            int correctedDx = corrected.Left - actual.Left;
-            int correctedDy = corrected.Top  - actual.Top;
-
-            SetWindowPos(chromeHwnd, IntPtr.Zero, newL, newT, newW, newH, SWP_NOZORDER | SWP_NOACTIVATE);
-            Console.Error.WriteLine(
-                $"[PLACEMENT:STAGE3] DPI mismatch detected at caller={callerScale * 100:F0}% chrome={currentScale * 100:F0}%, "
-                + $"correcting by [dX={correctedDx},dY={correctedDy}] new=(L={newL},T={newT},W={newW},H={newH})");
-
-            AppendStage3Record(callerDpi, currentDpi, dpiMatch, true, true, corrected, actual, "corrected", cmd);
-        }
-        catch (Exception ex)
-        {
-            try { Console.Error.WriteLine($"[PLACEMENT:STAGE3] fatal: {ex.GetType().Name}: {ex.Message}"); } catch { }
-        }
-    }
-
-    // ---- CDP WebSocket helpers (stage 2) -------------------------------------------------------
-
-    /// <summary>
-    /// HTTP GET http://127.0.0.1:&lt;port&gt;/json/list and return the
-    /// webSocketDebuggerUrl of the first page (type=="page") tab. Returns
-    /// null on any error so the caller can fall back to the timeout path.
-    /// </summary>
-    static async Task<string?> ResolveActivePageWsUrl(int cdpPort, CancellationToken ct)
-    {
-        try
-        {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            var url = $"http://127.0.0.1:{cdpPort}/json/list";
-            var resp = await http.GetAsync(url, ct).ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode)
-            {
-                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list returned {(int)resp.StatusCode}");
-                return null;
-            }
-            var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            using var doc = JsonDocument.Parse(body);
-            foreach (var el in doc.RootElement.EnumerateArray())
-            {
-                if (el.TryGetProperty("type", out var typeProp)
-                    && typeProp.GetString() == "page"
-                    && el.TryGetProperty("webSocketDebuggerUrl", out var wsProp))
-                {
-                    return wsProp.GetString();
-                }
-            }
-            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list returned no page tab");
-        }
-        catch (OperationCanceledException)
-        {
-            Console.Error.WriteLine("[PLACEMENT:STAGE2] CDP /json/list timeout");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP /json/list error: {ex.GetType().Name}: {ex.Message}");
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// Open the given CDP WebSocket, enable Page domain, then wait for the
-    /// next Page.loadEventFired event. Returns a short trigger code:
-    ///   "page_load_event" -- the event fired
-    ///   "ws_closed"       -- socket closed before any event
-    ///   "timeout"         -- ct fired first (caller-imposed budget)
-    ///   "ws_open_failed"  -- could not connect
-    /// </summary>
-    static async Task<string> WaitForPageLoadEventFired(string wsUrl, CancellationToken ct)
-    {
-        ClientWebSocket? ws = null;
-        try
-        {
-            ws = new ClientWebSocket();
-            try
-            {
-                await ws.ConnectAsync(new Uri(wsUrl), ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP ws connect failed: {ex.GetType().Name}: {ex.Message}");
-                return "ws_open_failed";
-            }
-
-            // Enable Page domain so Page.* events get delivered. Some Chrome
-            // versions don't deliver events without explicit enable.
-            var enableMsg = "{\"id\":1,\"method\":\"Page.enable\"}";
-            var enableBytes = Encoding.UTF8.GetBytes(enableMsg);
-            try
-            {
-                await ws.SendAsync(enableBytes, WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP Page.enable send failed: {ex.GetType().Name}: {ex.Message}");
-                return "cdp_enable_failed";
-            }
-
-            // Read frames until Page.loadEventFired, ws close, or cancel.
-            var buf = new byte[8192];
-            var sb = new StringBuilder();
-            var frameCount = 0;
-            while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
-            {
-                sb.Clear();
-                WebSocketReceiveResult res;
-                try
-                {
-                    res = await ws.ReceiveAsync(buf, ct).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // Cancellation token fired (Stage 2 budget exhausted) -- this is the
-                    // expected benign termination, NOT a real WebSocket failure. Report
-                    // as timeout so silent-yield gate suppresses BUG-AUTO and downstream
-                    // log readers see the correct cause.
-                    return "timeout";
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP frame receive failed: {ex.GetType().Name}: {ex.Message}");
-                    return "ws_receive_error";
-                }
-
-                if (res.MessageType == WebSocketMessageType.Close)
-                {
-                    Console.Error.WriteLine("[PLACEMENT:STAGE2] CDP ws closed by server");
-                    return "ws_closed";
-                }
-                sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
-                if (!res.EndOfMessage) continue;
-
-                var msg = sb.ToString();
-                frameCount++;
-
-                // EARLY FAIL: if we receive error messages about missing selectors
-                // or DOM query failures, bail immediately instead of waiting for timeout
-                if (msg.Contains("\"errorDetails\"") || msg.Contains("\"error\":{"))
-                {
-                    Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP error frame detected at frame {frameCount}: {msg.Substring(0, Math.Min(100, msg.Length))}");
-                    return "cdp_error_frame";
-                }
-
-                // Cheap substring probe -- CDP frames are JSON and the method
-                // string is uniquely identifiable. Avoids parsing every frame
-                // (Chrome can be chatty with Page.frameNavigated, etc.).
-                if (msg.Contains("\"Page.loadEventFired\""))
-                    return "page_load_event";
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            return "timeout";
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"[PLACEMENT:STAGE2] CDP ws error: {ex.GetType().Name}: {ex.Message}");
-        }
-        finally
-        {
-            try { ws?.Dispose(); } catch { }
-        }
-        return ct.IsCancellationRequested ? "timeout" : "ws_closed";
-    }
-
-    // ---- DPI helpers (stage 3) -----------------------------------------------------------------
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    static extern uint GetDpiForWindow(IntPtr hwnd);
-
-    /// <summary>
-    /// GetDpiForWindow wrapped against older Win10 builds that may not export
-    /// it. Falls back to 96 (100% scale) on any failure so Stage 3 still has
-    /// a non-zero baseline to reason about.
-    /// </summary>
-    static uint TryGetWindowDpiSafe(IntPtr hwnd)
-    {
-        try
-        {
-            if (hwnd == IntPtr.Zero) return 96;
-            uint dpi = GetDpiForWindow(hwnd);
-            return dpi == 0 ? 96 : dpi;
-        }
-        catch
-        {
-            return 96;
-        }
-    }
-
-    // Telemetry helpers (AppendStage2Record / AppendStage3Record / RECT array
-    // writer) live in MyCdpContext.Stage23Telemetry.cs to keep this file
-    // focused on the actual stage 2/3 flow.
+    // CDP WebSocket helpers (ResolveActivePageWsUrl, WaitForPageLoadEventFired)
+    // live in MyCdpContext.Stage23Ws.cs. Stage 3 / DPI helpers
+    // (TryStage3DpiAwareMatch, TryGetWindowDpiSafe, GetDpiForWindow P/Invoke)
+    // live in MyCdpContext.Stage3.cs. Telemetry helpers
+    // (AppendStage2Record / AppendStage3Record / RECT array writer) live in
+    // MyCdpContext.Stage23Telemetry.cs.
 }
