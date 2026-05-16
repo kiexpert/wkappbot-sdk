@@ -277,6 +277,9 @@ partial class Program
                     var p = System.Diagnostics.Process.GetProcessById(ppid);
                     if (p.MainWindowHandle != IntPtr.Zero)
                     {
+                        // Skip browser processes -- they are user's apps, not our terminal.
+                        var pn = (p.ProcessName ?? "").ToLowerInvariant();
+                        if (pn is "chrome" or "msedge" or "firefox" or "opera" or "brave" or "vivaldi") { walkPid = ppid; continue; }
                         fgHwnd = p.MainWindowHandle;
                         var tb = new System.Text.StringBuilder(256);
                         GetWindowTextW(fgHwnd, tb, 256);
