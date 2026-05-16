@@ -65,9 +65,23 @@ internal static class EyeCmdPipeClient
                 conHwnd = FindAncestorPseudoConsoleWindow();
             var conHwndPrefix = conHwnd != IntPtr.Zero ? $"__conhwnd:0x{conHwnd.ToInt64():X8}" : null;
 
+            // Pass the Launcher-validated Chrome placement target (set by
+            // MyCdpContext.Placement.TryMoveWebBotNearCaller) through to Eye
+            // so Core's ComputePlacementNearCaller honours the same target
+            // the Launcher already used for its SetWindowPos. Without this,
+            // Eye-delegated commands re-derive the target inside Core from
+            // the caller HWND, which can diverge from the Launcher's value
+            // (e.g. when ResolveCallerHwnd in Core re-walks the process tree
+            // and picks a different ancestor with off-screen coordinates).
+            var chromeTargetEnv = Environment.GetEnvironmentVariable("WKAPPBOT_CHROME_TARGET");
+            var targetPrefix = !string.IsNullOrWhiteSpace(chromeTargetEnv)
+                ? $"__target:{chromeTargetEnv}"
+                : null;
+
             var prefixList = new List<string> { $"__cwd:{Environment.CurrentDirectory}" };
             if (hwndPrefix != null) prefixList.Add(hwndPrefix);
             if (conHwndPrefix != null) prefixList.Add(conHwndPrefix);
+            if (targetPrefix != null) prefixList.Add(targetPrefix);
             var payload = prefixList.Concat(args).ToArray();
             w.WriteLine(JsonSerializer.Serialize(payload, LauncherJsonContext.Default.StringArray));
 
