@@ -41,10 +41,12 @@ partial class Program
         error = null;
 
         var hasEvalJs = forwardArgs.Any(a => a.Equals("--eval-js", StringComparison.OrdinalIgnoreCase));
-        // "cdp" is the renamed surface of "web"; both spawn Chrome and need caller-HWND
-        // validation so a foreign foreground window (YouTube, unrelated browser, etc.)
-        // cannot become the placement anchor and bind Chrome to the wrong project.
-        var isCdpFamily = cmd is "a11y" or "web" or "cdp" or "ask";
+        // Placement is only triggered for commands that actually open/use a CDP connection
+        // for AI prompt delivery: `ask` (triad/gpt/gemini/claude) and `cdp` (explicit cdp open).
+        // Commands like `a11y`, `web`, `windows`, `file`, `gc`, `skill`, `suggest`, `eye`,
+        // `slack` MUST NOT trigger caller validation or placement -- they don't move Chrome,
+        // and running GetForegroundWindow / ancestor walk on every a11y call is unnecessary overhead.
+        var isCdpFamily = cmd is "cdp" or "ask";
         if (!isCdpFamily && !hasEvalJs)
             return false;
 
@@ -157,12 +159,29 @@ partial class Program
             }
         }
 
-        var fgHwnd = GetForegroundWindow();
+        // Prefer WKAPPBOT_CALLER_HWND if set by an outer launcher invocation (nested call).
+        // This avoids GetForegroundWindow() snapshotting the wrong window when the user
+        // runs a nested cdp/ask command from inside a wkappbot session.
+        var envCallerHwnd = IntPtr.Zero;
+        {
+            var envVal = Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_HWND");
+            if (!string.IsNullOrEmpty(envVal))
+            {
+                var raw = envVal.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                    ? envVal[2..] : envVal;
+                if (long.TryParse(raw, System.Globalization.NumberStyles.HexNumber, null, out var hwndVal))
+                    envCallerHwnd = new IntPtr(hwndVal);
+            }
+        }
+
+        var fgHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd : GetForegroundWindow();
         var consoleHwnd = GetConsoleWindow();
         var hostHwnd = GetHostWindowSnapshot();
 
-        // Caller priority: (1) console window (2) host/parent window (3) foreground as fallback
-        var callerHwnd = consoleHwnd != IntPtr.Zero ? consoleHwnd
+        // Caller priority: (1) env WKAPPBOT_CALLER_HWND (nested call anchor)
+        //                  (2) console window (3) host/parent window (4) foreground as fallback
+        var callerHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd
+                       : consoleHwnd != IntPtr.Zero ? consoleHwnd
                        : hostHwnd != IntPtr.Zero ? hostHwnd
                        : fgHwnd;
 
