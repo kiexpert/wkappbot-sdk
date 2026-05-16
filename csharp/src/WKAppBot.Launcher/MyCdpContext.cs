@@ -205,7 +205,8 @@ partial class Program
         var callerHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd
                        : consoleHwnd != IntPtr.Zero ? consoleHwnd
                        : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
-                       : hostHwnd;
+                       : hostHwnd != IntPtr.Zero ? hostHwnd
+                       : fgHwnd; // last resort: foreground window (non-TTY envs like Claude Code shell)
 
         // Auto-resolve off-screen caller to valid alternative
         callerHwnd = ResolveValidCallerWindow(callerHwnd);
