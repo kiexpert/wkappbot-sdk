@@ -222,10 +222,14 @@ partial class Program
 
         try
         {
-            // Stage 2 timeout: 3s max. If Page.loadEventFired hasn't arrived by then,
-            // assume selector is unavailable or page won't load. Better to fail fast
-            // than to wait 10s and waste user time.
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            // Stage 2 timeout: 10s max (was 3s -- premature ws_receive_error spam when
+            // ChatGPT/Gemini/Copilot pages took longer than 3s to fire Page.loadEventFired
+            // on cold first launch or DPI heavy monitors). 10s matches the original
+            // docstring intent at the top of this file and gives the foreground ASK
+            // pipelines CDP socket enough headroom to finish injection before our
+            // secondary watcher races it. Since the watcher is a fire and forget child
+            // process, a 10s budget has no impact on user visible CLI latency.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
             // Step A: resolve the active page's webSocketDebuggerUrl via the
             // standard CDP discovery endpoint. Chrome listens on 127.0.0.1
@@ -564,6 +568,14 @@ partial class Program
                 try
                 {
                     res = await ws.ReceiveAsync(buf, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Cancellation token fired (Stage 2 budget exhausted) -- this is the
+                    // expected benign termination, NOT a real WebSocket failure. Report
+                    // as timeout so silent-yield gate suppresses BUG-AUTO and downstream
+                    // log readers see the correct cause.
+                    return "timeout";
                 }
                 catch (Exception ex)
                 {
