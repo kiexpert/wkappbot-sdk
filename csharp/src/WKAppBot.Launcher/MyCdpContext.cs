@@ -216,32 +216,41 @@ partial class Program
 
         if (callerValidation.IsOffScreen)
         {
+            // Placement skipped -- but the ask/cdp command still runs normally.
+            // No caller = Chrome won't be repositioned, but the command executes.
+            // Only hard-block for off-screen callers (chrome would land off-screen).
             var reason = callerValidation.Status switch
             {
-                "no_caller_window"        => "no caller window available",
-                "invalid_window_type"     => "caller is desktop or PseudoConsoleWindow",
+                "no_caller_window"        => "no caller window -- placement skipped",
+                "invalid_window_type"     => "caller is desktop or PseudoConsoleWindow -- placement skipped",
                 "caller_offscreen"        => "caller window is off-screen",
-                "caller_foreign_process"  => "caller foreground belongs to an unrelated process (not a terminal/IDE/wkappbot)",
-                _                         => "caller HWND is off-screen or invalid",
+                "caller_foreign_process"  => "caller foreground belongs to an unrelated process -- placement skipped",
+                _                         => "caller HWND invalid -- placement skipped",
             };
-            error = $"[LAUNCHER] {cmd}: {reason} (console: {GetWindowSnapshot(consoleHwnd)}, host: {GetWindowSnapshot(hostHwnd)}, fg: {GetWindowSnapshot(fgHwnd)})."
-                  + (string.IsNullOrEmpty(callerValidation.Diagnostic) ? "" : $" caller {callerValidation.Diagnostic}.")
-                  + $" Run {cmd} from a terminal/IDE owned by your project so Chrome can be placed correctly.";
-            return new MyCdpContext(
-                DateTimeOffset.UtcNow,
-                cmd,
-                subcommand,
-                target,
-                hasEvalJs,
-                isGraphStyle,
-                Environment.CurrentDirectory,
-                Environment.ProcessPath ?? "",
-                GetWindowSnapshot(fgHwnd),
-                GetWindowSnapshot(consoleHwnd),
-                GetWindowSnapshot(hostHwnd),
-                "rejected_" + callerValidation.Status,
-                forwardArgs,
-                callerValidation.Diagnostic);
+            Console.Error.WriteLine($"[LAUNCHER] {cmd}: {reason} (fg: {GetWindowSnapshot(fgHwnd)})");
+            // Only hard-block when caller is genuinely off-screen (would misplace Chrome).
+            // For no_caller / invalid_type / foreign_process: skip placement, allow command.
+            if (callerValidation.Status == "caller_offscreen")
+            {
+                error = $"[LAUNCHER] {cmd}: caller window is off-screen -- cannot place Chrome correctly.";
+                return new MyCdpContext(
+                    DateTimeOffset.UtcNow,
+                    cmd,
+                    subcommand,
+                    target,
+                    hasEvalJs,
+                    isGraphStyle,
+                    Environment.CurrentDirectory,
+                    Environment.ProcessPath ?? "",
+                    GetWindowSnapshot(fgHwnd),
+                    GetWindowSnapshot(consoleHwnd),
+                    GetWindowSnapshot(hostHwnd),
+                    "rejected_offscreen",
+                    forwardArgs,
+                    callerValidation.Diagnostic);
+            }
+            // No valid caller but not off-screen: proceed without placement.
+            // LastValidatedCallerHwnd stays Zero so TryMoveWebBotNearCaller is skipped.
         }
 
         // Publish the validated caller HWND + rect so CoreRunner (via WKAPPBOT_CALLER_HWND env)
