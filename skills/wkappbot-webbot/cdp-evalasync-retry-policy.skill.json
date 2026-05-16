@@ -14,7 +14,8 @@
     "2026-05-09: BUG-AUTO stale audit -- Chrome process exits before CDP ready (race condition) and Runtime.evaluate 10s timeout are intermittent and not consistently reproducible post-v7.2.x. Chrome 10->20s wait fix (28677a75) + CDP port guard (4f3606de) cover the known failure modes. BUG-AUTO ts=2026-05-05T01:41, 2026-05-05T01:38, 2026-05-04T23:11 closed as stale.",
     "Verified 2026-05-09: ev-cdp-stale.sh (resolve ts=2026-05-04T23:11:54)",
     "2026-05-09: WaitForEditorA11y sandbox-miss fix (commit 59abeed3) -- added document.readyState poll (1.5s timeout) before editor selector loop, and per-call EvalAsync timeoutMs=1500 instead of default 10s. Prevents 10s hang on ask-gemini/gpt/claude when tab was just created via sandbox-miss and page is still loading.",
-    "Verified 2026-05-13: test-fix-cdp.ps1 (resolve ts=2026-05-12T12:16:43)"
+    "Verified 2026-05-13: test-fix-cdp.ps1 (resolve ts=2026-05-12T12:16:43)",
+    "WaitForEditorA11y INTENTIONAL SHORT TIMEOUT (v7.3): Per-call EvalAsync timeoutMs=1500 (reduced from 10s default) to prevent hangs on fresh sandbox tabs where page is still loading. Sequence: (1) document.readyState poll 1.5s, (2) selector chain #prompt-textarea -> [data-testid=send-button] -> data-wkappbot-editor-rescue rescue tag. Do NOT increase this timeout -- short timeout + rescue fallback is the correct pattern. If ask gpt appears slow, diagnose via wkask, not by increasing eval timeout."
   ],
   "requirements": [
     {
@@ -51,6 +52,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-06T16:59:03.2605807Z",
-  "updated": "2026-05-13T05:18:53.2639914Z",
-  "version": "1.16"
+  "updated": "2026-05-15T18:48:21.9013693Z",
+  "version": "1.18"
 }

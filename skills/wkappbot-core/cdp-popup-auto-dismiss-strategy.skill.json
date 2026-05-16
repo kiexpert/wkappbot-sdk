@@ -1,0 +1,60 @@
+{
+  "id": "cdp-popup-auto-dismiss-strategy",
+  "app": "wkappbot-core",
+  "title": "CDP popup auto-dismiss strategy: blocking overlay removal before prompt injection",
+  "title_ko": null,
+  "desc": "How wkappbot automatically clears blocking popups (login prompts, ad modals, cookie banners on non-AI domains) before CDP prompt injection. Covers ChatGPT stay-logged-out handler, generic X-button dismiss, and AI-service exclusion rules.",
+  "steps": [
+    "POPUP AUTO-DISMISS runs automatically before prompt injection in all ask flows (ask gpt, ask gemini, ask claude). Implemented in CdpClient.PopupDismiss.cs via DismissBlockingPopupsAsync(). Non-fatal -- errors are logged but never block the ask flow.",
+    "STAGE 1 -- ChatGPT only (chatgpt.com): finds button/a elements matching /stay logged out",
+    "continue without",
+    "use as guest",
+    "skip",
+    "not now/i and clicks. Maintains anonymous session to avoid per-account quota tracking (see cookie-consent-ai-strategy skill).",
+    "STAGE 2 -- All domains: walks visible [role=dialog],[role=alertdialog],.modal,[data-testid*=modal] elements. Clicks first matching close button: [aria-label*=close i],[aria-label*=dismiss i],[data-testid*=close i],button[class*=close]. Visibility filter: display!=none, visibility!=hidden, opacity!=0, size>10x10px.",
+    "EXCLUSION (CRITICAL): overlays matching /accept.*cookie",
+    "cookie.*consent",
+    "privacy.*policy/i on AI quota hosts (chatgpt.com, gemini.google.com, claude.ai, copilot.microsoft.com, bing.com) are NEVER auto-dismissed. This is intentional per business strategy -- see cookie-consent-ai-strategy skill.",
+    "INTEGRATION POINTS: hooked into WaitForEditorAsync (covers GPT + Gemini via WaitForChatGptEditorA11y and AskSession.FindEditorAsync) and WaitForClaudeEditorA11y. Runs once per ask call, 3s timeout, errors non-fatal.",
+    "QA CHECK: wkappbot ask gpt 'say: hello' should complete without [POPUP:BLOCK] in logs. If popup persists blocking editor, check z-order -- banner may be behind editor (benign) vs covering it (bug). File suggest if blocking persists post-dismiss attempt."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt 'say: popup test'",
+      "expect": "response within 30s no POPUP:BLOCK in log",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cookie-consent-ai-strategy",
+      "expect": "AI domains excluded from auto-dismiss",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-prompt-pump-focusless-enter",
+      "expect": "editor injection chain context",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "popup",
+    "dismiss",
+    "modal",
+    "cookie",
+    "chatgpt",
+    "login",
+    "overlay",
+    "cdp",
+    "ask",
+    "injection",
+    "auto",
+    "strategy",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T18:48:32.5143684Z",
+  "updated": "2026-05-15T18:48:32.5143787Z",
+  "version": "1.0"
+}
