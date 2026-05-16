@@ -418,12 +418,34 @@ partial class Program
                 newH = (int)Math.Round(stage1Target.Height * r);
             }
 
-            // Clamp the recomputed rect to Chrome's current monitor work
-            // area so we don't push the window off-screen on the corrected
-            // attempt.
-            int cX = actual.Left + Math.Max(1, actual.Width) / 2;
-            int cY = actual.Top  + Math.Max(1, actual.Height) / 2;
-            if (TryGetWorkArea(cX, cY, out var workArea))
+            // Clamp the recomputed rect to the work area of the monitor the
+            // caller actually wants Chrome on (i.e. stage1Target's monitor),
+            // NOT Chrome's current (drifted) monitor. Bug history: Chrome's
+            // session-restore can snap the window back to its remembered
+            // monitor between Stage 1 and Stage 3. If we anchored the work
+            // area on Chrome's drifted center we would clamp newL/newT to
+            // the DRIFTED monitor's edge -- effectively yanking Chrome onto
+            // the wrong display permanently and overriding the Launcher's
+            // stage 1 placement (e.g. caller at -1732,-1093 left monitor
+            // becomes 1740,20 right monitor). Use stage1Target as the
+            // authoritative anchor; fall back to actual only if stage1's
+            // monitor cannot be resolved (extreme edge case).
+            int cX = stage1Target.Left + Math.Max(1, stage1Target.Width) / 2;
+            int cY = stage1Target.Top  + Math.Max(1, stage1Target.Height) / 2;
+            if (!TryGetWorkArea(cX, cY, out var workArea))
+            {
+                cX = actual.Left + Math.Max(1, actual.Width) / 2;
+                cY = actual.Top  + Math.Max(1, actual.Height) / 2;
+                Console.Error.WriteLine(
+                    $"[PLACEMENT:STAGE3] stage1Target center ({stage1Target.Left + stage1Target.Width / 2},{stage1Target.Top + stage1Target.Height / 2}) off-monitor -- falling back to actual center for work-area probe");
+                TryGetWorkArea(cX, cY, out workArea);
+            }
+            // workArea may be default(RECT) if both probes failed; in that
+            // case skip the clamp entirely (rather than clamp to (0,0)) so
+            // stage1Target's intended position survives untouched. Default
+            // RECT has Right=Bottom=0 so the `newW > workArea.Right - Left`
+            // check would otherwise corrupt the recomputed width.
+            if (workArea.Right > workArea.Left && workArea.Bottom > workArea.Top)
             {
                 if (newW > workArea.Right - workArea.Left) newW = workArea.Right - workArea.Left;
                 if (newH > workArea.Bottom - workArea.Top) newH = workArea.Bottom - workArea.Top;
