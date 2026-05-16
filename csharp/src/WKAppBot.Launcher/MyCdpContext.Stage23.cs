@@ -276,8 +276,50 @@ partial class Program
             $"[PLACEMENT:STAGE2] trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms ok={placementOk} attempts={attempts} "
             + $"final=(L={final.Left},T={final.Top},R={final.Right},B={final.Bottom})");
 
-        // Auto-suggest on Stage 2 failure (timeout, selector not found, CDP error, ws errors)
-        if (trigger.Contains("timeout") || trigger.Contains("cdp") || trigger.Contains("ws") || trigger.Contains("no_ws_url"))
+        // Auto-suggest GATE (silent-yield pattern, 2026-05-16):
+        // ws_receive_error / ws_closed / no_ws_url / timeout are BENIGN when the
+        // foreground ASK pipeline is the legitimate owner of this CDP port and
+        // is actively pumping commands -- our secondary watcher socket races
+        // against the foreground WS and intermittently fails on frame receive,
+        // even though Stage 1 placement is correct. The previous behavior
+        // spam-fired BUG-AUTO suggest on every transient race, flooding 30+
+        // identical items per day across all projects (personal-docs,
+        // wkappbot-sdk, WKAppBot). New rule:
+        //
+        //   1. If placementOk == true, the actual user-visible outcome is
+        //      correct -- suppress the suggest regardless of trigger code.
+        //      Stage 2 is purely a re-validation pass; placement OK means
+        //      Stage 1 already landed Chrome where the user wanted it and
+        //      the WS frame failure had no functional impact.
+        //   2. If placementOk == false BUT the trigger is a benign CDP race
+        //      (ws_receive_error / ws_closed / no_ws_url / ws_open_failed /
+        //      cdp_enable_failed / timeout), still suppress -- we can't tell
+        //      from a failed WS frame whether placement actually drifted,
+        //      and the next Stage 1 placement pass on the user's next ask
+        //      will fix it without spam.
+        //   3. Only fire BUG-AUTO when placementOk == false AND we have a
+        //      structural CDP error (cdp_error_frame) that suggests a real
+        //      Chrome/CDP problem, not a transient socket race.
+        //
+        // See also: a11y-focus-steal-user-active-silent-yield skill -- same
+        // pattern (silently yield when the foreground actor is legitimately
+        // racing us; only escalate on true involuntary failures).
+        bool isBenignRace =
+            trigger == "ws_receive_error" || trigger == "ws_closed" ||
+            trigger == "ws_open_failed"  || trigger == "no_ws_url" ||
+            trigger == "cdp_enable_failed" || trigger == "timeout";
+
+        bool shouldFireSuggest = !placementOk
+            && !isBenignRace
+            && (trigger.Contains("cdp_error_frame") || trigger.StartsWith("error:"));
+
+        if (!shouldFireSuggest && (trigger.Contains("timeout") || trigger.Contains("cdp") || trigger.Contains("ws") || trigger.Contains("no_ws_url")))
+        {
+            Console.Error.WriteLine(
+                $"[PLACEMENT:STAGE2] suppress BUG-AUTO (silent-yield): trigger={trigger} placementOk={placementOk} -- benign CDP race or placement still correct");
+        }
+
+        if (shouldFireSuggest)
         {
             var suggestMsg = $"BUG: Stage 2 ask anomaly (cmd={cmd}). trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms. " +
                             $"Chrome placement or CDP communication failed. " +

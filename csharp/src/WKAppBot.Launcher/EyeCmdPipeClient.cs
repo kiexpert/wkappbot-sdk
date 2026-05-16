@@ -213,7 +213,7 @@ internal static class EyeCmdPipeClient
     ///
     /// Returns IntPtr.Zero if no ancestor owns a usable window. NO foreground fallback.
     /// </summary>
-    static IntPtr ResolveCallerTerminalHwnd()
+    internal static IntPtr ResolveCallerTerminalHwnd()
     {
         // Walk Launcher's parent process chain in order (immediate parent first).
         var ancestorPids = new List<uint>();

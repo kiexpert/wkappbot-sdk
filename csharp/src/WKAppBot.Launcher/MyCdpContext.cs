@@ -59,6 +59,16 @@ partial class Program
         if (error != null)
             return true;
 
+        // Init-time placement: move Chrome to the caller's vicinity as soon as the
+        // caller context is validated -- before Core even starts. If Chrome is already
+        // running (reuse case), this gives instant visual feedback. If Chrome isn't
+        // open yet, TryMoveWebBotNearCaller finds no window and returns silently.
+        // Stage 2/3 (MyCdpContext.Stage23.cs) handles the post-launch re-validate pass.
+        // Fires once per validated CDP command, not once per Core exit -- eliminates
+        // the "Chrome jumps on every ask" regression from per-command post-exit calls.
+        if (isCdpFamily && LastValidatedCallerHwnd != IntPtr.Zero)
+            TryMoveWebBotNearCaller(cmd);
+
         return true;
     }
 
@@ -174,16 +184,28 @@ partial class Program
             }
         }
 
-        var fgHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd : GetForegroundWindow();
+        // Ancestor walk: nearest parent process that owns a visible window.
+        // NEVER use GetForegroundWindow() -- it returns whoever has focus (YouTube, other apps).
+        var ancestorHwnd = EyeCmdPipeClient.ResolveCallerTerminalHwnd();
+
         var consoleHwnd = GetConsoleWindow();
         var hostHwnd = GetHostWindowSnapshot();
 
-        // Caller priority: (1) env WKAPPBOT_CALLER_HWND (nested call anchor)
-        //                  (2) console window (3) host/parent window (4) foreground as fallback
+        // fgHwnd: kept for diagnostic logging only -- NOT used as a placement anchor.
+        var fgHwnd = GetForegroundWindow();
+
+        // Caller priority:
+        //   (1) WKAPPBOT_CALLER_HWND env (set by parent wkappbot process -- nested call anchor)
+        //   (2) console window (this process's console, if available)
+        //   (3) ancestor walk (nearest parent process owning a visible window)
+        //   (4) host/parent MainWindowHandle (immediate parent's MainWindowHandle)
+        // GetForegroundWindow() is retained for diagnostic logging only -- it is intentionally
+        // excluded from the caller resolution chain because it returns whichever window holds
+        // focus (e.g. YouTube, Chrome, any app) rather than the terminal that invoked wkappbot.
         var callerHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd
                        : consoleHwnd != IntPtr.Zero ? consoleHwnd
-                       : hostHwnd != IntPtr.Zero ? hostHwnd
-                       : fgHwnd;
+                       : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
+                       : hostHwnd;
 
         // Auto-resolve off-screen caller to valid alternative
         callerHwnd = ResolveValidCallerWindow(callerHwnd);

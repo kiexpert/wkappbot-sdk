@@ -155,24 +155,25 @@ partial class Program
 
         Console.Error.WriteLine($"[CALLER:RESOLVE] preferred off-screen/invalid, trying alternatives...");
 
-        // Try foreground window
-        IntPtr foreground = GetForegroundWindow();
-        if (foreground != IntPtr.Zero && foreground != preferredCaller && IsWindowVisibleLocal(foreground))
+        // Try ancestor walk -- nearest parent process owning a visible on-screen window.
+        // NEVER use GetForegroundWindow() -- it returns whoever holds focus (YouTube, any app).
+        IntPtr ancestor = EyeCmdPipeClient.ResolveCallerTerminalHwnd();
+        if (ancestor != IntPtr.Zero && ancestor != preferredCaller && IsWindowVisibleLocal(ancestor))
         {
-            if (GetWindowRect(foreground, out RECT rect))
+            if (GetWindowRect(ancestor, out RECT rect))
             {
                 var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
                 if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
                 {
-                    Console.Error.WriteLine($"[CALLER:RESOLVE] using foreground 0x{foreground.ToInt64():X}");
-                    return foreground;
+                    Console.Error.WriteLine($"[CALLER:RESOLVE] using ancestor 0x{ancestor.ToInt64():X}");
+                    return ancestor;
                 }
             }
         }
 
         // Try host window (parent process)
         IntPtr host = GetHostWindowSnapshot();
-        if (host != IntPtr.Zero && host != preferredCaller && host != foreground && IsWindowVisibleLocal(host))
+        if (host != IntPtr.Zero && host != preferredCaller && host != ancestor && IsWindowVisibleLocal(host))
         {
             if (GetWindowRect(host, out RECT rect))
             {
