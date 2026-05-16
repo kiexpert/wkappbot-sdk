@@ -1,0 +1,146 @@
+name: board-connector-operation-test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/board-connector-operation-test.yml'
+      - '.github/workflows/wkappbot-daily-board.yml'
+      - 'docs/board.html'
+      - 'docs/board-data.json'
+      - 'connectors/chatgpt-wkappbot/**'
+  push:
+    branches:
+      - main
+      - triad-market-teaser
+    paths:
+      - '.github/workflows/board-connector-operation-test.yml'
+      - '.github/workflows/wkappbot-daily-board.yml'
+      - 'docs/board.html'
+      - 'docs/board-data.json'
+      - 'connectors/chatgpt-wkappbot/**'
+
+permissions:
+  contents: read
+
+jobs:
+  operation:
+    name: Board and ChatGPT connector operation test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate board page script
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('docs/board.html', 'utf8');
+          const match = html.match(/<script>([\s\S]*)<\/script>/);
+          if (!match) throw new Error('docs/board.html has no inline script');
+          new Function(match[1]);
+          const snapshot = JSON.parse(fs.readFileSync('docs/board-data.json', 'utf8'));
+          if (!snapshot.repo || !snapshot.issue || !snapshot.title) {
+            throw new Error('docs/board-data.json is missing repo, issue, or title');
+          }
+          console.log('board page script and snapshot are valid');
+          NODE
+
+      - name: Validate Cloudflare Worker modules
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const files = [
+            'connectors/chatgpt-wkappbot/cloudflare-worker-board.js',
+            'connectors/chatgpt-wkappbot/cloudflare-worker-daily-issue.js',
+            'connectors/chatgpt-wkappbot/cloudflare-worker-github-oauth.js',
+            'connectors/chatgpt-wkappbot/cloudflare-worker-trigger.js'
+          ];
+
+          (async () => {
+            for (const file of files) {
+              const source = fs.readFileSync(file, 'utf8');
+              await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+              console.log(`${file} imports cleanly`);
+            }
+          })().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Run relay smoke test
+        working-directory: connectors/chatgpt-wkappbot
+        run: |
+          set -euo pipefail
+          export PORT=8787
+          node src/server.js > .wk-relay-open.log 2>&1 &
+          relay_pid=$!
+          trap 'kill "$relay_pid" >/dev/null 2>&1 || true' EXIT
+
+          for _ in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8787/health >/dev/null && break
+            sleep 1
+          done
+
+          curl -fsS http://127.0.0.1:8787/health
+          curl -fsS http://127.0.0.1:8787/dashboard >/dev/null
+          curl -fsS http://127.0.0.1:8787/metrics
+          curl -fsS -X POST http://127.0.0.1:8787/execute \
+            -H 'content-type: application/json' \
+            -d '{"args":["--version"]}' | tee .wk-job-created.json
+          curl -fsS -X POST http://127.0.0.1:8787/poll \
+            -H 'content-type: application/json' \
+            -d '{"agentId":"ci-agent"}' | tee .wk-job-polled.json
+
+          job_id="$(node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('.wk-job-polled.json','utf8')); if(!j.job||!j.job.id) process.exit(1); console.log(j.job.id)")"
+          curl -fsS -X POST http://127.0.0.1:8787/complete \
+            -H 'content-type: application/json' \
+            -d "{\"id\":\"$job_id\",\"result\":{\"ok\":true,\"code\":0,\"stdout\":\"ci\",\"stderr\":\"\"}}"
+          curl -fsS "http://127.0.0.1:8787/jobs/$job_id" | node -e "let s=''; process.stdin.on('data',c=>s+=c); process.stdin.on('end',()=>{const j=JSON.parse(s); if(j.state!=='done'||!j.result||!j.result.ok) process.exit(1); console.log('job completed');})"
+
+      - name: Verify bearer-token mode
+        working-directory: connectors/chatgpt-wkappbot
+        run: |
+          set -euo pipefail
+          export PORT=8788
+          export WKAPPBOT_TOKEN=ci-secret
+          node src/server.js > .wk-relay-auth.log 2>&1 &
+          relay_pid=$!
+          trap 'kill "$relay_pid" >/dev/null 2>&1 || true' EXIT
+
+          for _ in $(seq 1 20); do
+            if curl -sS -o /tmp/wk-health.json -w '%{http_code}' http://127.0.0.1:8788/health | grep -q '^401$'; then
+              break
+            fi
+            sleep 1
+          done
+
+          unauth_code="$(curl -sS -o /tmp/wk-unauth.json -w '%{http_code}' http://127.0.0.1:8788/health)"
+          test "$unauth_code" = "401"
+
+          curl -fsS -H 'authorization: Bearer ci-secret' http://127.0.0.1:8788/health
+          curl -fsS -H 'authorization: Bearer ci-secret' \
+            -X POST http://127.0.0.1:8788/execute \
+            -H 'content-type: application/json' \
+            -d '{"args":["--version"]}'
+
+      - name: Upload relay logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: board-connector-operation-logs
+          path: |
+            connectors/chatgpt-wkappbot/.wk-relay-open.log
+            connectors/chatgpt-wkappbot/.wk-relay-auth.log
+            connectors/chatgpt-wkappbot/.wk-job-created.json
+            connectors/chatgpt-wkappbot/.wk-job-polled.json
