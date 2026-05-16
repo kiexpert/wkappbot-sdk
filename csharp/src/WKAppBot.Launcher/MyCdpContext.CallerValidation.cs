@@ -72,6 +72,14 @@ partial class Program
     {
         try
         {
+            // Reject wkappbot-owned WPF windows (ScreenSaver, overlays).
+            // HwndWrapper[wkappbot-core;...] windows can be 3840x2160 and win
+            // the "largest visible window" fallback -- they must never be callers.
+            var cls256b = new System.Text.StringBuilder(256);
+            GetClassNameW(hwnd, cls256b, 256);
+            if (cls256b.ToString().StartsWith("HwndWrapper[wkappbot", StringComparison.OrdinalIgnoreCase))
+                return false;
+
             GetWindowThreadProcessIdLocal(hwnd, out int pid);
             if (pid <= 0) return false;
             using var p = System.Diagnostics.Process.GetProcessById(pid);

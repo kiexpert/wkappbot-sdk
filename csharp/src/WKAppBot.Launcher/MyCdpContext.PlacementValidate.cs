@@ -153,6 +153,15 @@ partial class Program
                 SetWindowPos(chromeHwnd, IntPtr.Zero,
                     targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
                     SWP_NOZORDER | SWP_NOACTIVATE);
+                // Trace every SetWindowPos to diagnose Chrome drift
+                {
+                    var swpLog = System.IO.Path.Combine(
+                        System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".",
+                        "wkappbot.hq", "logs", "setwindowpos-trace.jsonl");
+                    System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(swpLog)!);
+                    WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(swpLog,
+                        $"{{\"ts\":\"{DateTimeOffset.UtcNow:O}\",\"action\":\"SetWindowPos\",\"hwnd\":\"0x{chromeHwnd.ToInt64():X}\",\"x\":{targetRect.Left},\"y\":{targetRect.Top},\"w\":{targetRect.Width},\"h\":{targetRect.Height},\"attempt\":{attempt}}}");
+                }
             }
         }
 
