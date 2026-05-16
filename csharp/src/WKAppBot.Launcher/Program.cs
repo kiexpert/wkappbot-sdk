@@ -288,6 +288,13 @@ partial class Program
                 catch { }
                 walkPid = ppid;
             }
+            // Pin caller HWND before Chrome can steal focus -- MyCdpContext reads this env var
+            // as highest-priority anchor so placement survives the post-launch focus change.
+            if (fgHwnd != IntPtr.Zero
+                && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WKAPPBOT_CALLER_HWND")))
+            {
+                Environment.SetEnvironmentVariable("WKAPPBOT_CALLER_HWND", fgHwnd.ToInt64().ToString());
+            }
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
             if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
