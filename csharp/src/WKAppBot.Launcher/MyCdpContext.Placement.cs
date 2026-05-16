@@ -125,6 +125,28 @@ partial class Program
             }
             Console.Error.WriteLine($"[PLACEMENT:VALIDATE] caller=({callerLeft},{callerTop}) target=({targetX},{targetY}) offset=({targetX - callerLeft},{targetY - callerTop})");
 
+            // Publish the validated target to Core via env var. Core's
+            // ChromeLauncher.ComputePlacementNearCaller + CdpClient
+            // SetWindowBoundsWaitStableAsync read WKAPPBOT_CHROME_TARGET first
+            // so the --window-position flag, the post-launch stability loop,
+            // and any per-command reposition use the SAME coordinates the
+            // Launcher just computed. Without this Core falls back to
+            // ExpectedBounds (rightmost monitor, ~1740,20) and "corrects"
+            // Chrome back to that anchor every time, fighting the Launcher's
+            // SetWindowPos and producing the well-known "Chrome ends up on
+            // the wrong monitor" regression. Width/height passed are the
+            // DESIRED final outer size (DefaultChromeW x DefaultChromeH),
+            // matching Core's CdpClient.OuterWidthPx/OuterHeightPx constants.
+            try
+            {
+                Environment.SetEnvironmentVariable(
+                    "WKAPPBOT_CHROME_TARGET",
+                    $"{targetX},{targetY},{DefaultChromeW},{DefaultChromeH}");
+                Console.Error.WriteLine(
+                    $"[PLACEMENT:ENV] WKAPPBOT_CHROME_TARGET={targetX},{targetY},{DefaultChromeW},{DefaultChromeH}");
+            }
+            catch { /* env set failure is non-fatal -- Core falls back to ExpectedBounds */ }
+
             // Find chrome.exe Browser window. Chrome_BrowserWindow is the main frame;
             // Chrome_WidgetWin_1 is a renderer tab window (different process).
             // Prioritize Chrome_BrowserWindow. If not found, fall back to Chrome_WidgetWin_1.
