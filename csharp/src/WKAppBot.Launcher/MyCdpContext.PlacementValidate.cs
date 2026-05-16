@@ -153,14 +153,20 @@ partial class Program
                 SetWindowPos(chromeHwnd, IntPtr.Zero,
                     targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
                     SWP_NOZORDER | SWP_NOACTIVATE);
-                // Trace every SetWindowPos to diagnose Chrome drift
+                // Trace every SetWindowPos to diagnose Chrome drift.
+                // coord_system=win32_physical because SetWindowPos accepts PHYSICAL
+                // pixels on a PerMonitorV2-aware process. logical_x/logical_y let
+                // operators compare against any CDP cdp_logical entry instantly.
                 {
                     var swpLog = System.IO.Path.Combine(
                         System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".",
                         "wkappbot.hq", "logs", "setwindowpos-trace.jsonl");
                     System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(swpLog)!);
+                    var _swpDpi = TryGetWindowDpiSafe(chromeHwnd);
+                    var _swpScale = _swpDpi > 0 ? _swpDpi / 96.0 : 1.0;
+                    var _swpScaleStr = _swpScale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
                     WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(swpLog,
-                        $"{{\"ts\":\"{DateTimeOffset.UtcNow:O}\",\"action\":\"SetWindowPos\",\"hwnd\":\"0x{chromeHwnd.ToInt64():X}\",\"x\":{targetRect.Left},\"y\":{targetRect.Top},\"w\":{targetRect.Width},\"h\":{targetRect.Height},\"attempt\":{attempt}}}");
+                        $"{{\"ts\":\"{DateTimeOffset.UtcNow:O}\",\"action\":\"SetWindowPos\",\"coord_system\":\"win32_physical\",\"hwnd\":\"0x{chromeHwnd.ToInt64():X}\",\"x\":{targetRect.Left},\"y\":{targetRect.Top},\"w\":{targetRect.Width},\"h\":{targetRect.Height},\"dpi_scale\":{_swpScaleStr},\"logical_x\":{(int)(targetRect.Left/_swpScale)},\"logical_y\":{(int)(targetRect.Top/_swpScale)},\"attempt\":{attempt}}}");
                 }
             }
         }
