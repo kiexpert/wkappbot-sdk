@@ -186,12 +186,16 @@ partial class Program
             }
         }
 
-        // Fallback: find largest on-screen window
+        // Fallback: find largest on-screen TERMINAL/IDE window owned by a known host process.
+        // MUST use IsKnownHostProcess guard -- without it, EnumWindows picks the globally
+        // largest visible window (another project's terminal, Chrome, YouTube, etc.) and
+        // Chrome ends up placed on a completely unrelated app's window ("남의 창" contamination).
         var largestWindow = IntPtr.Zero;
         int largestArea = 0;
         EnumWindowsLocal((hwnd, _) =>
         {
             if (!IsWindowVisibleLocal(hwnd)) return true;
+            if (!IsKnownHostProcess(hwnd)) return true;  // project boundary guard
             if (!GetWindowRect(hwnd, out RECT rect)) return true;
             var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
             if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) == IntPtr.Zero) return true;
@@ -202,7 +206,7 @@ partial class Program
 
         if (largestWindow != IntPtr.Zero)
         {
-            Console.Error.WriteLine($"[CALLER:RESOLVE] using largest window 0x{largestWindow.ToInt64():X}");
+            Console.Error.WriteLine($"[CALLER:RESOLVE] using largest terminal window 0x{largestWindow.ToInt64():X}");
             return largestWindow;
         }
 
