@@ -202,11 +202,12 @@ partial class Program
         // GetForegroundWindow() is retained for diagnostic logging only -- it is intentionally
         // excluded from the caller resolution chain because it returns whichever window holds
         // focus (e.g. YouTube, Chrome, any app) rather than the terminal that invoked wkappbot.
+        // fgHwnd is intentionally excluded -- foreground is always "someone else's window"
+        // (YouTube, another project's terminal, Chrome itself, etc.). Never use it for placement.
         var callerHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd
                        : consoleHwnd != IntPtr.Zero ? consoleHwnd
                        : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
-                       : hostHwnd != IntPtr.Zero ? hostHwnd
-                       : fgHwnd; // last resort: foreground window (non-TTY envs like Claude Code shell)
+                       : hostHwnd;
 
         // Auto-resolve off-screen caller to valid alternative
         callerHwnd = ResolveValidCallerWindow(callerHwnd);
