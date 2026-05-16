@@ -12,7 +12,8 @@
     "RIQUA [resolve guards]: before every resolve attempt, run wkappbot skill read suggest-resolve-pre-flight-checklist. Covers 5 guards that block resolve: commit keyword, class size under 400 lines, evidence filename cmd-subcmd match, full absolute path, and final command flags.",
     "Use wkappbot eye tick to verify Eye is running and the hot-swap binary is active before and after CDP bug fix resolve",
     "Verified 2026-05-15: test-eye-tick-chrome-off-screen-caller-guard.cmd (resolve ts=2026-05-14T18:21:15.9885652Z)",
-    "Verified 2026-05-15: test-eye-tick-cdp-taskcancel-retry-fix.cmd (resolve ts=2026-05-10T14:04:32.0621418Z)"
+    "Verified 2026-05-15: test-eye-tick-cdp-taskcancel-retry-fix.cmd (resolve ts=2026-05-10T14:04:32.0621418Z)",
+    "NEW CDP BUG PATTERNS (v7.3) -- know before triaging suggests:\n1. Off-screen caller HWND: launcher now rejects explicitly (fail-fast). If suggest filed, verify caller GetWindowRect() returns valid on-screen rect. Use wkappbot skill read standard-appbot-window.\n2. Chrome position mismatch after hot-swap: two-layer fix in place (session-restore Preferences patch + post-bounds re-assert via CdpClient.WindowStabilize). If still drifting post-deploy, check cdp-mon for residual BOUNDS:TIMEOUT. Confirm Core v7.3+ running.\n3. Caller HWND via process chain: launcher walks ancestors only, NO foreground fallback. If suggest mentions foreground/desktop/console as caller, investigate ResolveCallerTerminalHwnd in MyCdpContext.Placement.cs."
   ],
   "requirements": [
     {
@@ -62,6 +63,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-13T05:41:50.2196247Z",
-  "updated": "2026-05-15T16:03:15.2109788Z",
-  "version": "1.16"
+  "updated": "2026-05-15T18:48:13.7683505Z",
+  "version": "1.18"
 }

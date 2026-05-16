@@ -1,0 +1,50 @@
+{
+  "id": "sdk-public-skill-index",
+  "app": "wkappbot-sdk",
+  "title": "WKAppBot SDK Public Skill Index -- reference, patterns, and best practices for global users",
+  "title_ko": null,
+  "desc": "Curated index of all public skills available to wkappbot SDK users worldwide. Covers reference cheatsheets (commands), best-practice principles (focusless-first, inspect-before-automate), architecture patterns (caller HWND validation, CDP port isolation, Chrome profile sync), and SDK-specific guides (launcher, QA, mystery-window). Run any listed skill via wkappbot skill read.",
+  "steps": [
+    "STEP 1 -- REFERENCE CHEATSHEETS (commands and tools): wkappbot skill read grap (UI element address system), wkappbot skill read cdp-command-guide (Chrome DevTools Protocol commands), wkappbot skill read a11y-command-cheatsheet (24 a11y actions), wkappbot skill read ask-command-cheatsheet (AI dispatch: claude/gpt/gemini/triad), wkappbot skill read web-command-cheatsheet (web/CDP cheatsheet), wkappbot skill read file-command-cheatsheet (file tools: read/write/edit/grep/glob), wkappbot skill read slack-command-cheatsheet (Slack send/reply), wkappbot skill read logcat-command-cheatsheet (log viewer with regex), wkappbot skill read diagnostic-commands-cheatsheet (whisper/validate/claude-usage/eye-tick), wkappbot skill read wkedit (bulk transaction edit, encoding-safe).",
+    "STEP 2 -- BEST PRACTICES (automation patterns to follow): wkappbot skill read focusless-first-principle (always try focusless UIA before SendInput), wkappbot skill read inspect-before-automate (inspect UIA tree before writing automation code).",
+    "STEP 3 -- ARCHITECTURE AND PATTERNS (how wkappbot internals work): wkappbot skill read standard-appbot-window (Standard AppBot Window detection and placement), wkappbot skill read standard-chrome-window (Chrome CDP tab vs window placement), wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern (caller HWND 3-tier cascade), wkappbot skill read cdp-open-reuse-existing-chrome-tab (CDP open reuses existing Chrome), wkappbot skill read cdp-port-isolation-sha256-4-port-block-per-project-cwd (SHA256 port isolation per CWD), wkappbot skill read chrome-profile-auth-sync-architecture (Chrome auth sync master to project), wkappbot skill read cdp-prompt-pump-focusless-enter (focusless CDP prompt pump), wkappbot skill read cdp-evalasync-retry-policy (CDP eval retry policy), wkappbot skill read ask-gpt-editor-wait-tag-and-rescue-fallback (editor-wait fallback for ChatGPT), wkappbot skill read ask-health-check (end-to-end ask pipeline health check via wkask).",
+    "STEP 4 -- SDK-SPECIFIC (launcher, QA, maintenance for SDK users): wkappbot skill read sdk-user-perspective-test-playbook (QA playbook from first-time user perspective), wkappbot skill read sdk-launcher-maintenance (launcher build/test/maintenance guide), wkappbot skill read mystery-window-diagnosis (diagnose unexpected windows or consoles), wkappbot skill read rotating-log-append (rotating log/JSONL helper), wkappbot skill read skill-contribute-edit (skill authoring rules: English only, no direct .skill.json edits).",
+    "STEP 5 -- SKILL TEMPLATES (when authoring new skills): wkappbot skill read user-skill-template (end-user product actions), wkappbot skill read developer-skill-template (developer code changes, refactors, tests), wkappbot skill read project-skill-template (repo-specific rules and conventions), wkappbot skill read operator-skill-template (inspect, verify, audit, dry-run safely).",
+    "STEP 6 -- HOW TO USE THIS INDEX: each step above lists one category. Pick the category that matches your task, then run wkappbot skill read on the entries you need. All listed skills are non-confidential and safe for global SDK users. For confidential or internal skills (release playbook, business plan, suggest workflow), see private wkappbot-core repo."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read grap",
+      "expect": "GRAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-command-guide",
+      "expect": "CDP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-user-perspective-test-playbook",
+      "expect": "SDK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "index",
+    "public",
+    "sdk",
+    "reference",
+    "global",
+    "user",
+    "developer",
+    "cheatsheet",
+    "patterns"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T18:17:07.5902399Z",
+  "updated": "2026-05-15T18:17:07.5902528Z",
+  "version": "1.0"
+}

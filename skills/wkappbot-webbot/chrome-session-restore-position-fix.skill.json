@@ -1,0 +1,58 @@
+{
+  "id": "chrome-session-restore-position-fix",
+  "app": "wkappbot-webbot",
+  "title": "Chrome window position mismatch: session restore override fix",
+  "title_ko": null,
+  "desc": "Two-layer fix for Chrome ignoring --window-position launch flag due to session restore override (Default/Preferences browser.window_placement rehydration). Pre-launch Preferences patch + post-timeout final reapply.",
+  "steps": [
+    "Root cause: Chrome session restore (--restore-last-session / Default/Preferences browser.window_placement) overrides --window-position launch arg. Drift pattern: requested=(-2449,-362) vs actual=(-1169,357) drift 1280x719px.",
+    "Fix layer 1 (ChromeLauncher.SessionRestore.cs): Before launching Chrome, call SuppressSessionRestoreInPreferences(userDataDir) to patch Default/Preferences: set profile.exit_type=Normal, profile.exited_cleanly=true, delete browser.window_placement. This kills session restore at the source.",
+    "Fix layer 2 (CdpClient.WindowStabilize.cs): In SetWindowBoundsWaitStableAsync, on BOUNDS:TIMEOUT, send one final Browser.setWindowBounds with requested coords + short stability poll before surfacing BUG-AUTO suggest.",
+    "Verify: after fix, wkappbot ask gpt say hello completes in under 5s with no [CDP:BOUNDS:TIMEOUT] or AutoSuggestPositionMismatch in logs.",
+    "OWNERSHIP NOTE: Both fix layers live in the PRIVATE Core repo only -- SDK launcher has no direct control. ChromeLauncher.SessionRestore.cs and CdpClient.WindowStabilize.cs are in D:\\GitHub\\WKAppBot\\csharp\\src\\WKAppBot.WebBot\\. SDK side: invoke via standard cdp commands; fixes apply automatically at runtime. If position mismatch persists after v7.3 hot-swap, check cdp-mon for BOUNDS:TIMEOUT and verify Core is running v7.3+."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt --timeout 30s say: hello",
+      "expect": "response under 5s no BOUNDS:TIMEOUT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read chrome-session-restore-position-fix",
+      "expect": "shows 4 steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot logcat --past 5m CDP:BOUNDS:TAIL-DRIFT",
+      "expect": "0 matches after fix deployed",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "chrome",
+    "window-position",
+    "session-restore",
+    "bug-auto"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.SessionRestore.cs",
+      "line": null,
+      "pattern": "SuppressSessionRestoreInPreferences",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.WindowStabilize.cs",
+      "line": null,
+      "pattern": "SetWindowBoundsWaitStableAsync",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T17:34:23.8352695Z",
+  "updated": "2026-05-15T18:48:02.5979043Z",
+  "version": "1.2"
+}
