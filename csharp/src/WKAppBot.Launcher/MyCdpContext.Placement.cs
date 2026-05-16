@@ -60,14 +60,28 @@ partial class Program
                 Y = callerTop + Math.Max(1, callerRect.Height) / 2
             };
 
-            int targetX = baseX + 30;
-            int targetY = baseY + 30;
+            // Offset Chrome to the UPPER-LEFT of the terminal so the caller
+            // terminal stays visible to the lower-right of Chrome (the user's
+            // mental model: "Chrome pops up next to my terminal, not on top of
+            // it"). This was previously +30 (down-right INSIDE the terminal),
+            // which buried the terminal under Chrome. Mirrors the Core fix in
+            // ChromeLauncher; soft monitor clamp below keeps the rect on
+            // screen when the caller sits near the monitor's top-left edge.
+            int targetX = baseX - 30;
+            int targetY = baseY - 30;
 
-            // Clamp target rect to the caller's monitor work area so Chrome
-            // never spills onto another display. Uses MonitorFromPoint at the
-            // caller's centre + GetMonitorInfo to read MONITORINFO.rcWork
-            // (excludes taskbar). Same DPI context as the caller because the
-            // launcher is now PerMonitorV2-aware.
+            // Soft monitor clamp: with the upper-left offset (-30, -30) the
+            // target rect can legitimately land slightly to the left/above
+            // rcWork when the caller terminal sits near the top-left of the
+            // monitor. Hard-clamping to rcWork.Left / rcWork.Top would snap
+            // Chrome back onto the terminal, defeating Fix 1. So:
+            //   LEFT/TOP: clamp to rcMonitor.Left/Top - 100 (allow 100px
+            //             tolerance off the monitor edge -- still visible
+            //             enough for the user to grab and move).
+            //   RIGHT/BOTTOM: clamp inside rcMonitor minus a 200px guard so
+            //                 Chrome's title bar / close button never run
+            //                 off the right or bottom edge of the display.
+            // Mirrors the Core ChromeLauncher fix.
             //
             // GUARD: If caller is off-screen, fall back to primary monitor (0,0).
             // This prevents Chrome from inheriting off-screen placement.
@@ -75,33 +89,41 @@ partial class Program
             int callerCenterY = callerTop + Math.Max(1, (callerRect.Bottom - callerRect.Top)) / 2;
 
             // Try caller's monitor first; fall back to primary (0,0) if caller is off-screen
-            RECT workArea = default;
-            bool hasWorkArea = TryGetWorkArea(callerCenterX, callerCenterY, out workArea);
-            if (!hasWorkArea)
+            RECT rcMonitor = default;
+            RECT rcWork = default;
+            bool hasMonitor = TryGetMonitorRects(callerCenterX, callerCenterY, out rcMonitor, out rcWork);
+            if (!hasMonitor)
             {
                 // Caller off-screen or off-monitor: query primary monitor at (0,0)
-                hasWorkArea = TryGetWorkArea(0, 0, out workArea);
+                hasMonitor = TryGetMonitorRects(0, 0, out rcMonitor, out rcWork);
             }
 
-            if (hasWorkArea)
+            if (hasMonitor)
             {
-                // Make sure Chrome fits inside the work area.
-                if (targetW > workArea.Right - workArea.Left) targetW = workArea.Right - workArea.Left;
-                if (targetH > workArea.Bottom - workArea.Top) targetH = workArea.Bottom - workArea.Top;
-                // Clamp X/Y so the full Chrome rect lives on this monitor.
-                if (targetX < workArea.Left)                   targetX = workArea.Left;
-                if (targetY < workArea.Top)                    targetY = workArea.Top;
-                if (targetX + targetW > workArea.Right)        targetX = workArea.Right - targetW;
-                if (targetY + targetH > workArea.Bottom)       targetY = workArea.Bottom - targetH;
+                // Make sure Chrome fits inside the monitor bounds.
+                if (targetW > rcMonitor.Right - rcMonitor.Left) targetW = rcMonitor.Right - rcMonitor.Left;
+                if (targetH > rcMonitor.Bottom - rcMonitor.Top) targetH = rcMonitor.Bottom - rcMonitor.Top;
+                // Soft clamp LEFT/TOP: allow up to 100px outside the monitor edge.
+                int minX = rcMonitor.Left - 100;
+                int minY = rcMonitor.Top  - 100;
+                if (targetX < minX) targetX = minX;
+                if (targetY < minY) targetY = minY;
+                // Hard clamp RIGHT/BOTTOM: leave 200px so the title bar / close
+                // button remain on-screen and reachable.
+                int maxX = rcMonitor.Right  - 200;
+                int maxY = rcMonitor.Bottom - 200;
+                if (targetX + targetW > rcMonitor.Right)  targetX = Math.Min(rcMonitor.Right  - targetW, maxX);
+                if (targetY + targetH > rcMonitor.Bottom) targetY = Math.Min(rcMonitor.Bottom - targetH, maxY);
             }
             else
             {
-                // workArea query failed (caller off-screen, no primary monitor found, etc.)
+                // Monitor query failed (caller off-screen, no primary monitor found, etc.)
                 // Force fallback to safe default: (100, 100) on primary display
-                Console.Error.WriteLine($"[PLACEMENT:FALLBACK] workArea query failed for caller ({callerCenterX},{callerCenterY}) and primary (0,0) -> force (100,100)");
+                Console.Error.WriteLine($"[PLACEMENT:FALLBACK] monitor query failed for caller ({callerCenterX},{callerCenterY}) and primary (0,0) -> force (100,100)");
                 targetX = 100;
                 targetY = 100;
             }
+            Console.Error.WriteLine($"[PLACEMENT:VALIDATE] caller=({callerLeft},{callerTop}) target=({targetX},{targetY}) offset=({targetX - callerLeft},{targetY - callerTop})");
 
             // Find chrome.exe Browser window. Chrome_BrowserWindow is the main frame;
             // Chrome_WidgetWin_1 is a renderer tab window (different process).

@@ -288,4 +288,34 @@ partial class Program
             return false;
         }
     }
+
+    /// <summary>
+    /// Like TryGetWorkArea but returns both rcMonitor (full display bounds)
+    /// AND rcWork (display minus taskbar). Used by the soft placement clamp:
+    /// LEFT/TOP use rcMonitor with a -100px tolerance so Chrome can sit
+    /// slightly off-edge when the caller terminal is hugging a corner;
+    /// RIGHT/BOTTOM clamp inside rcMonitor with a 200px guard so the title
+    /// bar and close button stay reachable.
+    /// </summary>
+    static bool TryGetMonitorRects(int physX, int physY, out RECT rcMonitor, out RECT rcWork)
+    {
+        rcMonitor = default;
+        rcWork = default;
+        try
+        {
+            var pt = new POINT { X = physX, Y = physY };
+            var hMon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            if (hMon == IntPtr.Zero) return false;
+            var mi = new MONITORINFO();
+            mi.cbSize = System.Runtime.InteropServices.Marshal.SizeOf<MONITORINFO>();
+            if (!GetMonitorInfoW(hMon, ref mi)) return false;
+            rcMonitor = mi.rcMonitor;
+            rcWork    = mi.rcWork;
+            return rcMonitor.Right > rcMonitor.Left && rcMonitor.Bottom > rcMonitor.Top;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
