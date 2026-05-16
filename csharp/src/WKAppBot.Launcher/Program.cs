@@ -730,14 +730,9 @@ partial class Program
             if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
                 prof("Eye pipe: delegated");
-                // Post-launch placement: Eye runs Core in its own process; Core sees
-                // WKAPPBOT_CALLER_HWND only when EyeCmdPipeClient forwards it. As a
-                // belt-and-braces safety net, the Launcher (which still has the
-                // validated caller anchor in static fields) re-runs the move pass
-                // after Eye returns. Same behaviour as the RunCoreDetachedNormal
-                // path below: best-effort, swallows failures.
-                if (code == 0 && IsCdpFamilyCommand(cmd))
-                    TryMoveWebBotNearCaller(cmd);
+                // Placement was already triggered at init time (TryTrackMyCdpAccess → TryMoveWebBotNearCaller).
+                // Stage 2/3 watcher (MyCdpContext.Stage23.cs) handles post-CDP-connect re-validation.
+                // No redundant post-Eye-exit placement call here.
                 // TerminateSelf: all output already flushed by TryDelegate; hard-kill Launcher immediately.
                 Console.Out.Flush();
                 Console.Error.Flush();
@@ -914,29 +909,14 @@ partial class Program
 
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
 
-        // Post-launch placement: after Core launches Chrome (cdp/web/ask family),
-        // proactively nudge the new Chrome window into caller proximity. Core
-        // already does its own placement via ComputePlacementNearCaller using
-        // WKAPPBOT_CALLER_HWND, but a second SDK-side pass catches the cases
-        // where Core attached to a pre-existing Chrome at a stale position OR
-        // Chrome's session-restore race repositioned the window after Core
-        // released it. Best-effort: failures are swallowed.
-        if (finalCode == 0 && IsCdpFamilyCommand(cmd))
-            TryMoveWebBotNearCaller(cmd);
+        // Placement was already triggered at init time (TryTrackMyCdpAccess → TryMoveWebBotNearCaller).
+        // Stage 2/3 watcher (MyCdpContext.Stage23.cs) handles post-CDP-connect re-validation
+        // for the fresh-Chrome-launch case (page.loadEventFired + DPI-aware match).
+        // No redundant post-Core-exit placement call here.
 
         AppBotExit(finalCode);
         return finalCode; // unreachable
     }
-
-    // Chrome placement (TryMoveWebBotNearCaller) should ONLY fire for commands
-    // that actually launch/attach a project Chrome window for AI prompt delivery
-    // -- that is, `ask` (triad/gpt/gemini/claude prompt injection) and `cdp`
-    // (explicit `cdp open` user request). Other commands (`a11y`, `windows`,
-    // `inspect`, `web` browsing, `file`, `gc`, `skill`, `suggest`, `eye`,
-    // `slack`, ...) MUST NOT move Chrome -- doing so causes Chrome to jump
-    // to whichever terminal happened to invoke the unrelated command.
-    static bool IsCdpFamilyCommand(string cmd)
-        => cmd is "cdp" or "ask";
 
     // Shared step name for fast-exit watchdog -- updated in both Main() and RunCore().
     static volatile string _lDiagStep = "";
