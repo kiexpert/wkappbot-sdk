@@ -1,6 +1,24 @@
 $ErrorActionPreference = "Continue"
 $CI = $env:GITHUB_ACTIONS -eq 'true'
 
+# 2026-05-18: commit-limit pre-check. When Windows is near its paging-file
+# commit limit (>= 95%), CreateProcessW returns err=1455 (ERROR_COMMITMENT_LIMIT)
+# and every `wkappbot cdp open` silently times out. We were burning the entire
+# test budget on hung subprocesses, producing 5/5 SKIPs that look like real
+# failures. Fail loudly instead so the operator knows to bump page file.
+try {
+    $commit  = (Get-Counter '\Memory\Committed Bytes' -ErrorAction Stop).CounterSamples[0].CookedValue
+    $climit  = (Get-Counter '\Memory\Commit Limit'    -ErrorAction Stop).CounterSamples[0].CookedValue
+    if ($climit -gt 0) {
+        $pct = [math]::Round(100.0 * $commit / $climit, 1)
+        Write-Host "Memory commit: $([math]::Round($commit/1GB,1))GB / $([math]::Round($climit/1GB,1))GB ($pct%)"
+        if ($pct -ge 95) {
+            Write-Host "ABORT: commit-limit at $pct% -- CreateProcessW will fail (err=1455). Bump Windows paging file or restart heavy apps."
+            exit 2
+        }
+    }
+} catch { Write-Host "WARN: commit-limit check skipped: $_" }
+
 # Start Eye at the top, before any CDP operations
 Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
@@ -20,7 +38,11 @@ if ($cdpStatus) {
 Write-Host 'Pre-test cleanup done.'
 Start-Sleep -Milliseconds 500
 
-$SiteTimeout = if ($CI) { 40 } else { 25 }
+# 2026-05-18: bumped local 25s->60s. Eye-routed `cdp open` reuses an existing
+# Chrome via Target.createTarget which can hit a 5s session-restore stabilize loop
+# plus 500ms tail-verify (CdpClient.WindowStabilize), pushing total well past 25s.
+# CI keeps the higher 60s budget too -- launcher cold-start adds another second.
+$SiteTimeout = if ($CI) { 60 } else { 60 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
@@ -204,8 +226,11 @@ function Open-Site {
         Save-TextLog $Site "cdp-open" $open.Output | Out-Null
 
         # First check for success (normal path)
+        # NOTE: 2026-05-18 fix -- core emits OK {hwnd:0x..., ..., cdp:N} (hwnd FIRST, cdp LAST).
+        # Previous regex required cdp before hwnd, which never matched and silently fell through
+        # to skip. Use a regex that matches both fields independently regardless of order.
         if ($open.Ok -and $open.Output -match "OK\s+\{") {
-            $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
+            $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{" -and $_ -match "cdp:[0-9]+" -and $_ -match "hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
             if (-not $okLine) { $okLine = $open.Output }
 
             if ($okLine -match "cdp:([0-9]+)") { $CDPPORT = $Matches[1] }
@@ -214,7 +239,7 @@ function Open-Site {
         # Check if output contains OK but exit code is non-zero (may still be usable)
         elseif ($open.OkByOutput -and -not ($open.ExitCode -eq 0)) {
             Write-Host "NOTE: cdp open exited non-zero but OK found in output -- using output result"
-            $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
+            $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{" -and $_ -match "cdp:[0-9]+" -and $_ -match "hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
             if (-not $okLine) { $okLine = $open.Output }
 
             if ($okLine -match "cdp:([0-9]+)") { $CDPPORT = $Matches[1] }
