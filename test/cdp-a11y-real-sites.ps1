@@ -120,31 +120,13 @@ function Save-BrokerShot {
     $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
     $shotPath = "$expDir/$($Site.ToLowerInvariant())/$ts.png"
 
-    # Try node-level screenshot first (targets blocking element specifically)
-    $brokerGraps = @(
-        "$CDPGRAP#*cookie*",
-        "$CDPGRAP#*consent*",
-        "$CDPGRAP#*Accept*",
-        "$CDPGRAP#*Cookie*",
-        "$CDPGRAP#*GDPR*"
-    )
-    $shotOk = $false
-    foreach ($bg in $brokerGraps) {
-        $r = Invoke-WK -WkArgs @('a11y','screenshot',$bg,'--path',$shotPath) -TimeoutSec 8
-        if ($r.Ok -and (Test-Path $shotPath)) { $shotOk = $true; break }
-    }
-    # Fallback: full Chrome screenshot
-    if (-not $shotOk) {
-        $r = Invoke-WK -WkArgs @('a11y','screenshot',$CDPGRAP,'--path',$shotPath) -TimeoutSec 8
-        if ($r.Ok -and (Test-Path $shotPath)) { $shotOk = $true }
-    }
-
-    if ($shotOk) {
-        Write-Host "  [BROKER:SHOT] path=$shotPath desc=$BrokerDesc"
-        # Save metadata JSON alongside screenshot
-        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP; shot=$shotPath } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
+    # Use cdp capture for Chrome web content (most reliable for web pages)
+    $r = Invoke-WK -WkArgs @('cdp','capture',$CDPGRAP,'--path',$shotPath) -TimeoutSec 10
+    if ($r.Ok -or (Test-Path $shotPath)) {
+        Write-Host "  [BROKER:SHOT] path=$(Resolve-Path $shotPath) desc=$BrokerDesc"
+        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
     } else {
-        Write-Host "  [BROKER:SHOT] screenshot failed for $Site"
+        Write-Host "  [BROKER:SHOT] failed for $Site -- output: $($r.Output.Substring(0,[Math]::Min(100,$r.Output.Length)))"
     }
 }
 
