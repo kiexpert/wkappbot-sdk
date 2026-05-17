@@ -209,6 +209,21 @@ partial class Program
                        : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
                        : hostHwnd;
 
+        // Last resort for bash/ConPTY contexts: when the process chain has no
+        // visible window (ancestor walk returns Zero, ConPTY has no console
+        // window, parent has no MainWindowHandle), fall back to the foreground
+        // window IF it passes the known-host-process gate AND is on-screen.
+        // In bash/ConPTY scenarios the foreground IS the user's terminal
+        // (Windows Terminal / conhost) which is a legitimate caller anchor.
+        // Strict gating prevents foreign-app foregrounds (YouTube, other-project
+        // Chrome) from sneaking in as the placement anchor.
+        if (callerHwnd == IntPtr.Zero && fgHwnd != IntPtr.Zero
+            && IsKnownHostProcess(fgHwnd) && !IsWindowOffScreen(fgHwnd))
+        {
+            Console.Error.WriteLine($"[LAUNCHER:FALLBACK] using foreground as last-resort caller hwnd=0x{fgHwnd.ToInt64():X}");
+            callerHwnd = fgHwnd;
+        }
+
         // Auto-resolve off-screen caller to valid alternative
         callerHwnd = ResolveValidCallerWindow(callerHwnd);
 
