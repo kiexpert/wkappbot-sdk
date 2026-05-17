@@ -117,7 +117,8 @@ function Open-Site {
         Start-Sleep -Milliseconds 500
     }
 
-    $open = Invoke-WK -WkArgs @("cdp","open",$Url) -TimeoutSec $SiteTimeout
+    $navTimeout = if ($CI) { 60000 } else { 20000 }
+    $open = Invoke-WK -WkArgs @("cdp","open",$Url,"--timeout",$navTimeout) -TimeoutSec $SiteTimeout
     Save-TextLog $Site "cdp-open" $open.Output | Out-Null
     if (-not $open.Ok -or $open.Output -notmatch "OK\s+\{") {
         Add-Skip $Site "cdp open failed"
