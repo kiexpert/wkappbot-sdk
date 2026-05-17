@@ -4,6 +4,18 @@ $SiteTimeout = if ($CI) { 90 } else { 30 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
+Write-Host "Warming up Chrome..."
+$warmup = Invoke-WK -WkArgs @("cdp","open","about:blank") -TimeoutSec 90
+if (-not $warmup.Ok) {
+    Write-Host "WARN: Chrome warmup failed -- $($warmup.Output.Substring(0,[Math]::Min(200,$warmup.Output.Length)))"
+} else {
+    if ($warmup.Output -match "cdp:([0-9]+)") {
+        $script:WarmCdpPort = $Matches[1]
+        Write-Host "Chrome warm at port $($script:WarmCdpPort)"
+    }
+}
+Start-Sleep -Milliseconds 500
+
 $script:LastWKOutput = ""
 $script:Results = @{}
 $script:TotalPass = 0
@@ -159,15 +171,69 @@ function Open-Site {
                 return $null
             }
         } else {
-            Add-Skip $Site "cdp open failed and Chrome not reachable at extracted port"
-            Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
-            return $null
+            # Last resort: try warm-up port if available
+            if ($script:WarmCdpPort) {
+                Write-Host "FALLBACK: extracted port failed, trying warm-up port $($script:WarmCdpPort)"
+                $verifyGrap = "{proc:'chrome',cdp:$($script:WarmCdpPort)}"
+                $liveCheck = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+                if ($liveCheck.Ok -and $liveCheck.Output -match "https?://") {
+                    $CDPPORT = $script:WarmCdpPort
+                    Write-Host "FALLBACK: Chrome is alive at warm-up port, proceeding with manual navigation"
+                    $navCmd = "window.location.assign('$Url'); 'navigating'"
+                    $navResult = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js",$navCmd) -TimeoutSec 15
+                    Start-Sleep -Seconds 5
+                    $checkUrl = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+                    if ($checkUrl.Ok -and $checkUrl.Output -match [regex]::Escape($Url.Split('/')[2])) {
+                        Write-Host "FALLBACK: Navigation successful to $Url via warm-up port"
+                        $HW = ""
+                    } else {
+                        Add-Skip $Site "fallback warm-up navigation failed"
+                        Write-Host "  >> navigation check output: $($checkUrl.Output.Substring(0,[Math]::Min(200,$checkUrl.Output.Length)))"
+                        return $null
+                    }
+                } else {
+                    Add-Skip $Site "cdp open failed and Chrome not reachable at warm-up port either"
+                    Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
+                    return $null
+                }
+            } else {
+                Add-Skip $Site "cdp open failed and Chrome not reachable at extracted port"
+                Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
+                return $null
+            }
         }
     }
     else {
-        Add-Skip $Site "cdp open failed"
-        Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
-        return $null
+        # If cdp open completely failed, try warm-up port before giving up
+        if ($script:WarmCdpPort) {
+            Write-Host "FALLBACK: cdp open failed, trying warm-up port $($script:WarmCdpPort)"
+            $verifyGrap = "{proc:'chrome',cdp:$($script:WarmCdpPort)}"
+            $liveCheck = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+            if ($liveCheck.Ok -and $liveCheck.Output -match "https?://") {
+                $CDPPORT = $script:WarmCdpPort
+                Write-Host "FALLBACK: Chrome is alive at warm-up port, proceeding with manual navigation"
+                $navCmd = "window.location.assign('$Url'); 'navigating'"
+                $navResult = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js",$navCmd) -TimeoutSec 15
+                Start-Sleep -Seconds 5
+                $checkUrl = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+                if ($checkUrl.Ok -and $checkUrl.Output -match [regex]::Escape($Url.Split('/')[2])) {
+                    Write-Host "FALLBACK: Navigation successful to $Url via warm-up port"
+                    $HW = ""
+                } else {
+                    Add-Skip $Site "fallback warm-up navigation failed"
+                    Write-Host "  >> navigation check output: $($checkUrl.Output.Substring(0,[Math]::Min(200,$checkUrl.Output.Length)))"
+                    return $null
+                }
+            } else {
+                Add-Skip $Site "cdp open failed and Chrome not reachable at warm-up port"
+                Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
+                return $null
+            }
+        } else {
+            Add-Skip $Site "cdp open failed and no warm-up port available"
+            Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
+            return $null
+        }
     }
 
     # Validate extraction
