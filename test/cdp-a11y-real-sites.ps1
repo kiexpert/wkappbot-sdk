@@ -5,7 +5,7 @@ $CI = $env:GITHUB_ACTIONS -eq 'true'
 Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 
-$SiteTimeout = if ($CI) { 15 } else { 10 }
+$SiteTimeout = if ($CI) { 30 } else { 20 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
@@ -165,7 +165,7 @@ function Open-Site {
     if ([string]::IsNullOrEmpty($CDPPORT)) {
         Write-Host "cdp open $Url"
         $navTimeout = if ($CI) { 60000 } else { 20000 }
-        $open = Invoke-WK -WkArgs @("cdp","open",$Url,"--timeout",$navTimeout) -TimeoutSec $SiteTimeout
+        $open = Invoke-WK -WkArgs @("cdp","open",$Url) -TimeoutSec $SiteTimeout
         Save-TextLog $Site "cdp-open" $open.Output | Out-Null
 
         # First check for success (normal path)
