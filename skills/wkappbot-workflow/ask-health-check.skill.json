@@ -14,7 +14,8 @@
     "Success baseline: gpt<60s, gemini<90s, triad<120s. Consistent timeouts = Chrome or network issue, not wkappbot code.",
     "When to run: after hot-swap deploy, after Chrome accumulation (cdp-mon shows >5), after network change, before triad sessions.",
     "USER-FACING SMOKE: when the issue is user-visible, run the repo's user-perspective or smoke scripts before deeper triage so the failure is anchored to the user journey.",
-    "Run: powershell -ExecutionPolicy Bypass -File D:/GitHub/wkappbot-sdk/scripts/test-triad-synthesis.ps1 -Full. Pass = triad log contains gpt/claude/gemini, Points of consensus, Key disagreements & resolution, Final answer, and TRIAD_OK."
+    "Run: powershell -ExecutionPolicy Bypass -File D:/GitHub/wkappbot-sdk/scripts/test-triad-synthesis.ps1 -Full. Pass = triad log contains gpt/claude/gemini, Points of consensus, Key disagreements & resolution, Final answer, and TRIAD_OK.",
+    "RENAMED: cdp-mon.ps1 is now wkcdp-mon.ps1. Use: powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1"
   ],
   "requirements": [
     {
@@ -57,6 +58,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-11T16:10:21.6199698Z",
-  "updated": "2026-05-11T19:39:04.3894938Z",
-  "version": "1.5"
+  "updated": "2026-05-17T05:39:51.4009264Z",
+  "version": "1.7"
 }

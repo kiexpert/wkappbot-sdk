@@ -11,7 +11,9 @@
     "4. If all three signals match (PublishTrimmed=false + tiny broken binary + active hotswap timing), resolve as false positive: the next clean build replaces the truncated copy and the exception cannot reproduce.",
     "5. Reference: suggest 2026-05-15T03:17:17 resolved as binary corruption false positive 2026-05-15.",
     "Verified 2026-05-15: 2026-05-15T03-17-17-system-net-http-binary-corruption-false-positive.ps1 (resolve ts=2026-05-15T03:17:17)",
-    "Verified 2026-05-15: test-system-io-filesystem-watcher-binary-corruption-false-positive.cmd (resolve ts=2026-05-11T03:21:49.1690687Z)"
+    "Verified 2026-05-15: test-system-io-filesystem-watcher-binary-corruption-false-positive.cmd (resolve ts=2026-05-11T03:21:49.1690687Z)",
+    "Verified 2026-05-16: test-eye-tick-hwnd-onscreen-guard.cmd (resolve ts=2026-05-15T13:19:08)",
+    "Verified 2026-05-16: test-eye-tick-chrome-session-restore-position-fix.cmd (resolve ts=2026-05-15T13:19:08.4101866Z)"
   ],
   "requirements": [
     {
@@ -36,6 +38,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T07:21:12.581682Z",
-  "updated": "2026-05-15T09:57:32.6323665Z",
-  "version": "1.4"
+  "updated": "2026-05-16T08:44:01.2846513Z",
+  "version": "1.6"
 }

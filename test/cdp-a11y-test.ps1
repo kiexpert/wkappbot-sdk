@@ -83,6 +83,24 @@ function Test-UiaDomPair {
         $resultId = $DomPattern -replace '[=:^\[\]\.*+?(){}|]','' | ForEach-Object { $_ -replace ' .*','' }
         $actualText = (& wkappbot a11y read $CDPGRAP --eval-js "document.querySelector('[id*=result],[id*=output],[id*=value]') && document.querySelector('[id*=result],[id*=output],[id*=value]').textContent" 2>$null) -join ''
         Write-Host "  >> Actual DOM text (eval-js): $actualText"
+        # CDP fallback: try stronger Input.dispatchMouseEvent via eval-js
+        Write-Host "  >> [FALLBACK] Trying CDP direct event dispatch..."
+        $fallbackJs = "(function(){$env:CDP_FALLBACK_JS})()".Replace('$env:CDP_FALLBACK_JS','')
+        # Generic fallback: find the element and dispatch real click event
+        $elementSelector = ($FindArgs | Where-Object { $_ -notmatch 'a11y|find' } | Select-Object -First 1) -replace '#.*',''
+        $fallbackResult = Run-WK @("a11y","read",$CDPGRAP,"--eval-js",
+            "var el=document.querySelector('[automation-id*=$elementSelector],[id*=$elementSelector]');" +
+            "if(el){el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));}" +
+            "el?'dispatched':'not-found'") "dispatched" "$Label [cdp-fallback]" 10
+        Start-Sleep -Milliseconds 300
+        $fallbackHtml = (& wkappbot cdp html $CDPGRAP 2>$null) -join ' '
+        if ($fallbackHtml -match $DomPattern) {
+            Write-Host "  >> [FALLBACK PASS] CDP event dispatch worked -- UIA->JS bridge is the bug"
+            Write-Host "  >> Root cause: UIA InvokePattern does not trigger JS event handlers in CI Chrome"
+        } else {
+            Write-Host "  >> [FALLBACK FAIL] Neither UIA nor CDP event dispatch updated DOM"
+            Write-Host "  >> Root cause: Chrome renderer not processing events (headless/focus/GPU issue)"
+        }
         return $false
     } elseif (-not $uiaOk -and $domChanged) {
         Write-Host "NOTE: $Label -- UIA node mismatch but DOM updated anyway (wrong-node hit?)"
