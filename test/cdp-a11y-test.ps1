@@ -133,6 +133,36 @@ Write-Host "SETUP OK hwnd=$HW"
 Start-Sleep -Milliseconds 500
 
 Write-Host ""
+Write-Host "--- CDP Baseline (no UIA) ---"
+
+# eval-js direct click -> DOM update
+Write-Host "[CDP-B1] eval-js click btn-primary..."
+$evalClick = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('btn-primary').click(); document.getElementById('click-result').textContent") "clicked:" "cdp-b1 eval-js click" 15
+Add-Result $evalClick
+if (-not $evalClick) {
+    Write-Host "  >> CDP BASELINE FAIL: Chrome JS execution or DOM not interactive -- all UIA->DOM tests will be invalid"
+    Write-Host "  >> This indicates headless/GPU-disabled Chrome or renderer bridge issue"
+}
+
+# eval-js direct value set -> DOM read back
+Write-Host "[CDP-B2] eval-js set input value..."
+$evalSet = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('input-text').value='cdp-direct'; document.getElementById('input-text').value") "cdp-direct" "cdp-b2 eval-js set" 15
+Add-Result $evalSet
+
+# eval-js toggle checkbox -> state read back
+Write-Host "[CDP-B3] eval-js toggle checkbox..."
+$evalToggle = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('chk-a').checked=true; document.getElementById('chk-a').checked.toString()") "true" "cdp-b3 eval-js checkbox" 15
+Add-Result $evalToggle
+
+$cdpBaselineOk = $evalClick -and $evalSet -and $evalToggle
+if (-not $cdpBaselineOk) {
+    Write-Host "  >> [DIAGNOSIS] CDP direct JS fails -> root cause is Chrome renderer, NOT UIA bridge"
+} else {
+    Write-Host "  >> [DIAGNOSIS] CDP direct JS works -> if UIA actions fail later, root cause is UIA->JS event bridge"
+}
+$TOTAL += 3
+
+Write-Host ""
 Write-Host "--- Discovery ---"
 
 Write-Host "[T01] a11y find..."
