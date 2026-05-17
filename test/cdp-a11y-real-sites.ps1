@@ -120,21 +120,59 @@ function Open-Site {
     $navTimeout = if ($CI) { 60000 } else { 20000 }
     $open = Invoke-WK -WkArgs @("cdp","open",$Url,"--timeout",$navTimeout) -TimeoutSec $SiteTimeout
     Save-TextLog $Site "cdp-open" $open.Output | Out-Null
-    if (-not $open.Ok -or $open.Output -notmatch "OK\s+\{") {
+
+    $CDPPORT = ""
+    $HW = ""
+
+    # First check for success (normal path)
+    if ($open.Ok -and $open.Output -match "OK\s+\{") {
+        $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
+        if (-not $okLine) { $okLine = $open.Output }
+
+        if ($okLine -match "cdp:([0-9]+)") { $CDPPORT = $Matches[1] }
+        if ($okLine -match "hwnd:(0x[0-9A-Fa-f]+)") { $HW = $Matches[1] }
+    }
+    # Fallback: if cdp open failed but output contains port, try to reuse Chrome
+    elseif ($open.Output -match "port\s+([0-9]+)") {
+        $CDPPORT = $Matches[1]
+        Write-Host "FALLBACK: extracted port $CDPPORT from cdp open output, attempting Chrome reuse"
+
+        # Verify Chrome is alive with eval-js
+        $verifyGrap = "{proc:'chrome',cdp:$CDPPORT}"
+        $liveCheck = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+        if ($liveCheck.Ok -and $liveCheck.Output -match "https?://") {
+            Write-Host "FALLBACK: Chrome is alive at $verifyGrap, proceeding with manual navigation"
+
+            # Try to navigate using eval-js
+            $navCmd = "window.location.assign('$Url'); 'navigating'"
+            $navResult = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js",$navCmd) -TimeoutSec 15
+            Start-Sleep -Seconds 5
+
+            # Verify navigation succeeded
+            $checkUrl = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+            if ($checkUrl.Ok -and $checkUrl.Output -match [regex]::Escape($Url.Split('/')[2])) {
+                Write-Host "FALLBACK: Navigation successful to $Url"
+                $HW = ""
+            } else {
+                Add-Skip $Site "fallback navigation failed"
+                Write-Host "  >> navigation check output: $($checkUrl.Output.Substring(0,[Math]::Min(200,$checkUrl.Output.Length)))"
+                return $null
+            }
+        } else {
+            Add-Skip $Site "cdp open failed and Chrome not reachable at extracted port"
+            Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
+            return $null
+        }
+    }
+    else {
         Add-Skip $Site "cdp open failed"
         Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
         return $null
     }
 
-    $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
-    if (-not $okLine) { $okLine = $open.Output }
-
-    $CDPPORT = ""
-    $HW = ""
-    if ($okLine -match "cdp:([0-9]+)") { $CDPPORT = $Matches[1] }
-    if ($okLine -match "hwnd:(0x[0-9A-Fa-f]+)") { $HW = $Matches[1] }
-    if ([string]::IsNullOrEmpty($CDPPORT) -or [string]::IsNullOrEmpty($HW)) {
-        Add-Skip $Site "could not extract cdp port or hwnd"
+    # Validate extraction
+    if ([string]::IsNullOrEmpty($CDPPORT)) {
+        Add-Skip $Site "could not extract cdp port"
         return $null
     }
 
