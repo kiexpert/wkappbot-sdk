@@ -133,21 +133,17 @@ function Save-BrokerShot {
     $siteDir = 'bin/wkappbot.hq/experience/brokers/' + $Site.ToLowerInvariant()
     New-Item -Force -ItemType Directory -Path $siteDir | Out-Null
     $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $shotPath = "$siteDir/$ts.png"
+    $destPath = "$siteDir/$ts.png"
 
-    # a11y screenshot supports -o path and outputs SAVED:path
-    $r = Invoke-WK -WkArgs @('a11y','screenshot',$CDPGRAP,'-o',$shotPath) -TimeoutSec 10
-    # Check if file was saved (either Ok=true or file exists)
-    if (Test-Path $shotPath) {
-        Write-Host "  [BROKER:SHOT] path=$(Resolve-Path $shotPath) desc=$BrokerDesc"
-        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
+    # cdp capture saves to runtime/clipboard_screenshot.png
+    $clipPath = 'bin/wkappbot.hq/runtime/clipboard_screenshot.png'
+    $r = Invoke-WK -WkArgs @('cdp','capture',$CDPGRAP) -TimeoutSec 10
+    if (Test-Path $clipPath) {
+        Copy-Item $clipPath $destPath -Force
+        Write-Host "  [BROKER:SHOT] path=$(Resolve-Path $destPath) desc=$BrokerDesc"
+        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP } | ConvertTo-Json | Set-Content "$destPath.meta.json" -Encoding utf8
     } else {
-        $savedPath = $r.Output | Select-String 'SAVED:(.+)' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
-        if ($savedPath -and (Test-Path $savedPath)) {
-            Write-Host "  [BROKER:SHOT] path=$savedPath desc=$BrokerDesc"
-        } else {
-            Write-Host "  [BROKER:SHOT] failed -- $($r.Output.Substring(0,[Math]::Min(100,$r.Output.Length)))"
-        }
+        Write-Host "  [BROKER:SHOT] failed -- cdp capture output: $($r.Output.Substring(0,[Math]::Min(100,$r.Output.Length)))"
     }
 }
 
