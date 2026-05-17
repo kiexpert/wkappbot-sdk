@@ -27,7 +27,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Caller HWND via process chain**: replaces foreground-based detection with parent-process window lookup (`NtQueryInformationProcess`); forwards `WKAPPBOT_CALLER_HWND` through IOCP env block + Eye-pipe path
 - **IME Relay jamo-sync**: Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus` (Core v7.3)
 - **Stage 2 fail-fast**: log all CDP / WebSocket / `/json/list` errors to stderr immediately; reduce selector-unavailable timeout 10s → 3s; fail fast on CDP error frames instead of timeout
-- **`cdp-mon` multi-monitor off-screen false positive**: regex `'^-\d{3,}'` replaced with `MonitorFromPoint` Win32 API — matches `IsWindowOnScreen` behavior, no longer flags negative-x monitor as off-screen
+- **`wkcdp-mon` multi-monitor off-screen false positive**: regex `'^-\d{3,}'` replaced with `MonitorFromPoint` Win32 API — matches `IsWindowOnScreen` behavior, no longer flags negative-x monitor as off-screen
 - **Chat command default model**: defaults to Haiku; `claude` keyword + model-name argument supported
 - **Publish self-extract defense**: `IncludeAllContentForSelfExtract=true` suppresses `System.IO.FileSystem.Watcher` shim-assembly `FileNotFoundException` false positive during hot-swap
 
@@ -40,7 +40,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `wkfind` GlobCoverageScore algorithm, time-range synchronization, multi-keyword discovery flow
 - `wkask` real-time monitoring usage in CLAUDE.md internal tools
 - Scope of Work section in CLAUDE.md (SDK launcher ownership boundary vs Core repo)
-- `cdp-mon` off-screen false-positive gotcha for multi-monitor setups
+- `wkcdp-mon` off-screen false-positive gotcha for multi-monitor setups
 - BUG-AUTO false-positive notes for CLR shim assemblies (`System.IO.FileSystem.Watcher`, `PublicKeyToken`, `Culture=neutral`)
 - Suggest evidence scripts: Chrome window position mismatch, session CommandHelpMap fix, hidden-mode MCP hang, FSW false positive
 - Stale version reference cleanup (`v5.8` → `v7.2.0`)
