@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Continue"
+$CI = $env:GITHUB_ACTIONS -eq 'true'
 
 function Run-WK {
     param([string[]]$WkArgs, [string]$ExpectPattern, [string]$TestName, [int]$TimeoutSec = 15)
@@ -13,7 +14,11 @@ function Run-WK {
     Write-Host "FAIL: $TestName [expected: $ExpectPattern]"; return $false
 }
 
-$PAGE = "file:///D:/GitHub/wkappbot-sdk/docs/test/index.html"
+if ($CI) {
+    $PAGE = "https://kiexpert.github.io/wkappbot-sdk/test/"
+} else {
+    $PAGE = "file:///D:/GitHub/wkappbot-sdk/docs/test/index.html"
+}
 if ($args -contains "--pages") {
     $PAGE = "https://kiexpert.github.io/wkappbot-sdk/test/"
 }
@@ -41,9 +46,11 @@ function Auto-Suggest-And-Exit {
     Write-Host "================================================"
 
     if ($FAIL -gt 0) {
-        Push-Location D:/GitHub/WKAppBot
-        & wkappbot-core.exe suggest "a11y/cdp integration test: $FAIL of $TOTAL tests failed. Comprehensive action coverage test. Run test/cdp-a11y-test.ps1 to reproduce." --requirement "wkappbot eye tick => ctx=" --requirement "wkappbot windows *chrome* => Match" --requirement "wkappbot a11y inspect {cdp:9741} => btn-primary"
-        Pop-Location
+        if (-not $CI -and (Test-Path D:/GitHub/WKAppBot)) {
+            Push-Location D:/GitHub/WKAppBot
+            & wkappbot-core.exe suggest "a11y/cdp integration test: $FAIL of $TOTAL tests failed. Comprehensive action coverage test. Run test/cdp-a11y-test.ps1 to reproduce." --requirement "wkappbot eye tick => ctx=" --requirement "wkappbot windows *chrome* => Match" --requirement "wkappbot a11y inspect {cdp:9741} => btn-primary"
+            Pop-Location
+        }
         exit 1
     }
 
@@ -57,7 +64,8 @@ Write-Host "================================================"
 
 Write-Host ""
 Write-Host "[SETUP] cdp open..."
-$setupOk = Run-WK @("cdp","open",$PAGE) "hwnd:0x[0-9A-Fa-f]+" "cdp open" 30
+$cdpOpenTimeout = if ($CI) { 90 } else { 30 }
+$setupOk = Run-WK @("cdp","open",$PAGE) "hwnd:0x[0-9A-Fa-f]+" "cdp open" $cdpOpenTimeout
 if (-not $setupOk) {
     $FAIL = $TOTAL
     Auto-Suggest-And-Exit
