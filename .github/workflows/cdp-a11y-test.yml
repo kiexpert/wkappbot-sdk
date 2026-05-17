@@ -122,6 +122,14 @@ jobs:
           "rc=$rc" >> $env:GITHUB_OUTPUT
           exit $rc
 
+      - name: Restart Eye for real-site tests
+        if: always()
+        shell: pwsh
+        run: |
+          Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden
+          Start-Sleep -Seconds 3
+          wkappbot eye tick
+
       - name: Run real-site a11y tests
         if: always()
         id: real_sites
