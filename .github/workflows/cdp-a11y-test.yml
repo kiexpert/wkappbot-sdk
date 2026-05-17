@@ -127,15 +127,29 @@ jobs:
             const found = await github.rest.search.issuesAndPullRequests({
               q: 'repo:' + owner + '/' + repo + ' is:issue in:title "' + title + '"'
             });
-            if (!found.data.items.length) { console.log('No daily issue found for ' + day); return; }
-            const issue_number = found.data.items[0].number;
+            if (!found.data.items.length) { console.log('No daily issue for ' + day); return; }
+            const issueNumber = found.data.items[0].number;
             const rc = '${{ steps.a11y_test.outputs.rc }}';
             const ok = rc === '0';
             const runUrl = context.serverUrl + '/' + owner + '/' + repo + '/actions/runs/' + context.runId;
-            await github.rest.issues.createComment({
-              owner, repo, issue_number,
-              body: '## CDP/A11y Integration Test\n\nStatus: ' + (ok ? '✅ PASS' : '❌ FAIL') + '\n\nRun: ' + runUrl + '\n\n> Logs attached as artifact on the run page.',
-            });
+            const now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
+            const statusEmoji = ok ? '✅ PASS' : '❌ FAIL';
+
+            // 1. Edit issue body marker section
+            const issue = await github.rest.issues.get({ owner, repo, issue_number: issueNumber });
+            let body = issue.data.body || '';
+            const sectionContent = statusEmoji + '  ' + now + ' KST\n\n[Run #${{ github.run_number }}](' + runUrl + ')';
+            const updated = body.replace(
+              /(<!-- CDP_A11Y_START -->)[\s\S]*?(<!-- CDP_A11Y_END -->)/,
+              '$1\n' + sectionContent + '\n$2'
+            );
+            if (updated !== body) {
+              await github.rest.issues.update({ owner, repo, issue_number: issueNumber, body: updated });
+            }
+
+            // 2. Delta comment
+            const comment = '## CDP/A11y 통합 테스트\n\n상태: ' + statusEmoji + '\n\n실행: ' + runUrl + '\n\n> 실패 시 로그는 Run 아티팩트에서 확인';
+            await github.rest.issues.createComment({ owner, repo, issue_number: issueNumber, body: comment });
 
       - name: Upload logs on failure
         if: failure()

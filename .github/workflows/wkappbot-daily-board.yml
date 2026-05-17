@@ -47,7 +47,7 @@ jobs:
               repo,
               title,
               labels: ['board', 'daily'],
-              body: `# Daily WKAppBot Board - ${day}\n\n## Smoke Test\n\nWaiting for automated smoke result...\n\n## Notes\n\nUse comments as replies.`
+              body: `# Daily WKAppBot Board - ${day}\n\n## Smoke Test\n\nWaiting for automated smoke result...\n\n## CDP/A11y Test\n<!-- CDP_A11Y_START -->\n_대기 중..._\n<!-- CDP_A11Y_END -->\n\n## Notes\n\nUse comments as replies.`
             });
             core.setOutput('number', String(issue.data.number));
 
