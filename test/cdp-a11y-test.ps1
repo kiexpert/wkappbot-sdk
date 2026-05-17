@@ -39,6 +39,53 @@ function Check-Dom {
     return Run-WK @("cdp","html",$HW) $ExpectString $TestName
 }
 
+function Test-UiaDomPair {
+    param(
+        [string]$Label,
+        [string[]]$FindArgs,
+        [string]$UiaPattern,
+        [string[]]$ActionArgs,
+        [string]$DomPattern,
+        [string]$ActionLabel = ''
+    )
+    if (-not $ActionLabel) { $ActionLabel = $Label }
+
+    # Step 1: verify UIA node (mismatch = wrong node targeted)
+    $uiaOk = Run-WK ($FindArgs) $UiaPattern "$Label [UIA-find]" 15
+    if (-not $uiaOk) {
+        Write-Host "  >> MISMATCH: UIA node not found or wrong node (expected: $UiaPattern)"
+        Write-Host "  >> UIA output: $($script:LastWKOutput | Select-Object -First 3 | Out-String)"
+    }
+
+    # Step 2: capture DOM before
+    $beforeHtml = (& wkappbot cdp html $HW 2>$null) -join ' '
+
+    # Step 3: execute action
+    [void](Run-WK $ActionArgs $null "$ActionLabel [exec]" 15)
+    if ($CI) { Start-Sleep -Seconds 2 } else { Start-Sleep -Seconds 1 }
+
+    # Step 4: capture DOM after + check
+    $afterHtml = (& wkappbot cdp html $HW 2>$null) -join ' '
+    $domChanged = $afterHtml -match $DomPattern
+
+    if ($uiaOk -and $domChanged) {
+        Write-Host "PASS: $Label [UIA->DOM path OK]"
+        return $true
+    } elseif ($uiaOk -and -not $domChanged) {
+        Write-Host "MISMATCH: $Label -- UIA action fired ($UiaPattern found) but DOM didn't update (expected: $DomPattern)"
+        $excerptStart = [Math]::Max(0, $beforeHtml.IndexOf('click-result') - 20)
+        $excerptLength = [Math]::Min(200, $beforeHtml.Length - $excerptStart)
+        Write-Host "  >> DOM before excerpt: $($beforeHtml.Substring($excerptStart, $excerptLength))"
+        return $false
+    } elseif (-not $uiaOk -and $domChanged) {
+        Write-Host "NOTE: $Label -- UIA node mismatch but DOM updated anyway (wrong-node hit?)"
+        return $false
+    } else {
+        Write-Host "FAIL: $Label -- both UIA node missing AND DOM unchanged"
+        return $false
+    }
+}
+
 function Auto-Suggest-And-Exit {
     Write-Host ""
     Write-Host "================================================"
@@ -127,47 +174,31 @@ Write-Host ""
 Write-Host "--- Web Interaction ---"
 
 Write-Host "[T08] a11y invoke btn-primary..."
-[void](Run-WK @("a11y","invoke","btn-primary#$HW") $null "invoke command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "clicked:" "invoke -> DOM updated")
+Add-Result (Test-UiaDomPair "invoke" @("a11y","find","btn-primary#$HW") "btn-primary" @("a11y","invoke","btn-primary#$HW") "clicked:")
 
 Write-Host "[T09] a11y type..."
-[void](Run-WK @("a11y","type","input-text#$HW","hello wkappbot") $null "type command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "hello wkappbot" "type -> input value")
+Add-Result (Test-UiaDomPair "type" @("a11y","find","input-text#$HW") "input" @("a11y","type","input-text#$HW","hello wkappbot") "hello wkappbot")
 
 Write-Host "[T10] a11y toggle checkbox-a..."
-[void](Run-WK @("a11y","toggle","chk-a#$HW") $null "toggle command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "A=on" "toggle -> checkbox checked")
+Add-Result (Test-UiaDomPair "toggle" @("a11y","find","chk-a#$HW") "chk-a|CheckBox" @("a11y","toggle","chk-a#$HW") "A=on")
 
 Write-Host "[T11] a11y select Beta..."
-[void](Run-WK @("a11y","select","dropdown#$HW","Beta") $null "select command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "selected: beta" "select -> dropdown value")
+Add-Result (Test-UiaDomPair "select" @("a11y","find","dropdown#$HW") "dropdown|ComboBox|ListBox" @("a11y","select","dropdown#$HW","Beta") "selected: beta")
 
 Write-Host "[T12] a11y scroll..."
-[void](Run-WK @("a11y","scroll","scroll-box#$HW","--direction","down") $null "scroll command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "scrollTop=" "scroll -> indicator")
+Add-Result (Test-UiaDomPair "scroll" @("a11y","find","scroll-box#$HW") "scroll" @("a11y","scroll","scroll-box#$HW","--direction","down") "scrollTop=[^0]")
 
 Write-Host "[T13] a11y read read-target..."
 Add-Result (Run-WK @("a11y","read","read-target#$HW") "fox" "read")
 
 Write-Host "[T14] a11y set-range slider..."
-[void](Run-WK @("a11y","set-range","range-input#$HW","75") $null "set-range command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "value=75" "set-range -> slider value")
+Add-Result (Test-UiaDomPair "set-range" @("a11y","find","range-input#$HW") "range|slider" @("a11y","set-range","range-input#$HW","75") "value=75")
 
 Write-Host "[T15] a11y expand details..."
-[void](Run-WK @("a11y","expand","details-main#$HW") $null "expand command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "expanded" "expand -> details open")
+Add-Result (Test-UiaDomPair "expand" @("a11y","find","details-main#$HW") "details|group" @("a11y","expand","details-main#$HW") "expanded")
 
 Write-Host "[T16] a11y collapse details..."
-[void](Run-WK @("a11y","collapse","details-main#$HW") $null "collapse command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "collapsed" "collapse -> details closed")
+Add-Result (Test-UiaDomPair "collapse" @("a11y","find","details-main#$HW") "details|group" @("a11y","collapse","details-main#$HW") "collapsed")
 
 Write-Host "[T17] a11y wait --condition..."
 [void](Run-WK @("a11y","invoke","btn-spawn#$HW") $null "spawn command")
@@ -184,9 +215,7 @@ Write-Host "[T19] a11y type --hotkey Tab..."
 Add-Result (Run-WK @("a11y","type","input-text#$HW","{TAB}","--hotkey") $null "type --hotkey")
 
 Write-Host "[T20] a11y set-value contenteditable..."
-[void](Run-WK @("a11y","set-value","setval-target#$HW","new value via set-value") $null "set-value command")
-Start-Sleep -Seconds 1
-Add-Result (Check-Dom "new value via set-value" "set-value -> content updated")
+Add-Result (Test-UiaDomPair "set-value" @("a11y","find","setval-target#$HW") "setval|edit|content" @("a11y","set-value","setval-target#$HW","new value via set-value") "new value via set-value")
 
 Write-Host "[T21] a11y move + resize..."
 $moveOk = Run-WK @("a11y","move",$HW,"100","100") $null "move command"
