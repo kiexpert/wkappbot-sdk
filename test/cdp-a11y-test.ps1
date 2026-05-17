@@ -73,9 +73,16 @@ function Test-UiaDomPair {
         return $true
     } elseif ($uiaOk -and -not $domChanged) {
         Write-Host "MISMATCH: $Label -- UIA action fired ($UiaPattern found) but DOM didn't update (expected: $DomPattern)"
-        $excerptStart = [Math]::Max(0, $beforeHtml.IndexOf('click-result') - 20)
-        $excerptLength = [Math]::Min(200, $beforeHtml.Length - $excerptStart)
-        Write-Host "  >> DOM before excerpt: $($beforeHtml.Substring($excerptStart, $excerptLength))"
+        # Secondary verification: screenshot the node + read actual DOM text via eval-js
+        $shotDir = "bin/wkappbot.hq/logs"
+        New-Item -Force -ItemType Directory -Path $shotDir | Out-Null
+        $shotPath = "$shotDir/mismatch-$Label-$(Get-Date -Format 'HHmmss').png"
+        Run-WK @("a11y","screenshot",$CDPGRAP,"--path",$shotPath) $null "$Label [node-screenshot]" 10 | Out-Null
+        if (Test-Path $shotPath) { Write-Host "  >> Screenshot: $shotPath" }
+        # Read actual current value of the result element via eval-js
+        $resultId = $DomPattern -replace '[=:^\[\]\.*+?(){}|]','' | ForEach-Object { $_ -replace ' .*','' }
+        $actualText = (& wkappbot a11y read $CDPGRAP --eval-js "document.querySelector('[id*=result],[id*=output],[id*=value]') && document.querySelector('[id*=result],[id*=output],[id*=value]').textContent" 2>$null) -join ''
+        Write-Host "  >> Actual DOM text (eval-js): $actualText"
         return $false
     } elseif (-not $uiaOk -and $domChanged) {
         Write-Host "NOTE: $Label -- UIA node mismatch but DOM updated anyway (wrong-node hit?)"
