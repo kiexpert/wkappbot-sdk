@@ -4,15 +4,13 @@ $SiteTimeout = if ($CI) { 90 } else { 30 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
-Write-Host "Warming up Chrome..."
-$warmup = Invoke-WK -WkArgs @("cdp","open","about:blank") -TimeoutSec 90
-if (-not $warmup.Ok) {
-    Write-Host "WARN: Chrome warmup failed -- $($warmup.Output.Substring(0,[Math]::Min(200,$warmup.Output.Length)))"
+# Read Chrome port saved by local test
+$savedPort = ''
+if (Test-Path 'bin/wkappbot.hq/logs/cdp-port.txt') {
+    $savedPort = (Get-Content 'bin/wkappbot.hq/logs/cdp-port.txt' -Raw).Trim()
+    Write-Host "Chrome port from local test: $savedPort"
 } else {
-    if ($warmup.Output -match "cdp:([0-9]+)") {
-        $script:WarmCdpPort = $Matches[1]
-        Write-Host "Chrome warm at port $($script:WarmCdpPort)"
-    }
+    Write-Host 'WARN: No saved Chrome port -- will attempt cdp open per site'
 }
 Start-Sleep -Milliseconds 500
 
@@ -204,9 +202,35 @@ function Open-Site {
         }
     }
     else {
-        # If cdp open completely failed, try warm-up port before giving up
-        if ($script:WarmCdpPort) {
-            Write-Host "FALLBACK: cdp open failed, trying warm-up port $($script:WarmCdpPort)"
+        # If cdp open completely failed, try saved port first, then warm-up port
+        if (-not [string]::IsNullOrEmpty($savedPort)) {
+            Write-Host "FALLBACK: cdp open failed, trying saved port $savedPort"
+            $verifyGrap = "{proc:'chrome',cdp:$savedPort}"
+            $liveCheck = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+            if ($liveCheck.Ok -and $liveCheck.Output -match "https?://") {
+                $CDPPORT = $savedPort
+                Write-Host "FALLBACK: Chrome is alive at saved port, proceeding with manual navigation"
+                $navCmd = "window.location.assign('$Url'); 'navigating'"
+                $navResult = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js",$navCmd) -TimeoutSec 15
+                Start-Sleep -Seconds 5
+                $checkUrl = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
+                if ($checkUrl.Ok -and $checkUrl.Output -match [regex]::Escape($Url.Split('/')[2])) {
+                    Write-Host "FALLBACK: Navigation successful to $Url via saved port"
+                    $HW = ""
+                } else {
+                    Write-Host "FALLBACK: saved port navigation failed, trying warm-up port"
+                    # Fall through to warm-up port attempt below
+                    $CDPPORT = ""
+                }
+            } else {
+                Write-Host "FALLBACK: Chrome not reachable at saved port, trying warm-up port"
+                # Fall through to warm-up port attempt below
+            }
+        }
+
+        # If saved port didn't work (or wasn't available), try warm-up port
+        if ([string]::IsNullOrEmpty($CDPPORT) -and $script:WarmCdpPort) {
+            Write-Host "FALLBACK: trying warm-up port $($script:WarmCdpPort)"
             $verifyGrap = "{proc:'chrome',cdp:$($script:WarmCdpPort)}"
             $liveCheck = Invoke-WK -WkArgs @("a11y","read",$verifyGrap,"--eval-js","document.location.href") -TimeoutSec 15
             if ($liveCheck.Ok -and $liveCheck.Output -match "https?://") {
@@ -229,8 +253,8 @@ function Open-Site {
                 Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
                 return $null
             }
-        } else {
-            Add-Skip $Site "cdp open failed and no warm-up port available"
+        } elseif ([string]::IsNullOrEmpty($CDPPORT)) {
+            Add-Skip $Site "cdp open failed and no saved or warm-up port available"
             Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
             return $null
         }

@@ -282,4 +282,11 @@ Add-Result ($moveOk -and $resizeOk)
 Write-Host "[T22] a11y maximize..."
 Add-Result (Run-WK @("a11y","maximize",$HW) $null "maximize")
 
+# Save Chrome port for real-site tests
+if (-not [string]::IsNullOrEmpty($CDPPORT)) {
+    New-Item -Force -ItemType Directory -Path 'bin/wkappbot.hq/logs' | Out-Null
+    Set-Content -Path 'bin/wkappbot.hq/logs/cdp-port.txt' -Value $CDPPORT
+    Write-Host "[INFO] Saved Chrome port $CDPPORT for real-site tests"
+}
+
 Auto-Suggest-And-Exit
