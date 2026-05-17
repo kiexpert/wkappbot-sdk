@@ -130,31 +130,24 @@ function Save-TextLog {
 
 function Save-BrokerShot {
     param([string]$Site, [string]$CDPGRAP, [string]$HW, [string]$BrokerDesc)
-    $expDir = Resolve-Path 'bin/wkappbot.hq/experience/brokers' -ErrorAction SilentlyContinue
-    if (-not $expDir) {
-        New-Item -Force -ItemType Directory -Path 'bin/wkappbot.hq/experience/brokers' | Out-Null
-        $expDir = Resolve-Path 'bin/wkappbot.hq/experience/brokers'
-    }
-    $siteDir = Join-Path $expDir $Site.ToLowerInvariant()
+    $siteDir = 'bin/wkappbot.hq/experience/brokers/' + $Site.ToLowerInvariant()
     New-Item -Force -ItemType Directory -Path $siteDir | Out-Null
+    $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $shotPath = "$siteDir/$ts.png"
 
-    # cdp capture saves to its own path and prints it -- parse from output
-    $r = Invoke-WK -WkArgs @('cdp','capture',$CDPGRAP) -TimeoutSec 10
-    $capturedPath = ''
-    if ($r.Output -match 'Saved .*?to[: ]+([^\n\r]+\.png)') {
-        $capturedPath = $Matches[1].Trim()
-    } elseif ($r.Output -match '([A-Za-z]:[\/][^\n\r]+\.png)') {
-        $capturedPath = $Matches[1].Trim()
-    }
-
-    if ($capturedPath -and (Test-Path $capturedPath)) {
-        $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
-        $destPath = Join-Path $siteDir "$ts.png"
-        Copy-Item $capturedPath $destPath
-        Write-Host "  [BROKER:SHOT] path=$destPath desc=$BrokerDesc"
-        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP; source=$capturedPath } | ConvertTo-Json | Set-Content "$destPath.meta.json" -Encoding utf8
+    # a11y screenshot supports -o path and outputs SAVED:path
+    $r = Invoke-WK -WkArgs @('a11y','screenshot',$CDPGRAP,'-o',$shotPath) -TimeoutSec 10
+    # Check if file was saved (either Ok=true or file exists)
+    if (Test-Path $shotPath) {
+        Write-Host "  [BROKER:SHOT] path=$(Resolve-Path $shotPath) desc=$BrokerDesc"
+        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
     } else {
-        Write-Host "  [BROKER:SHOT] capture OK but path parse failed -- raw: $($r.Output.Substring(0,[Math]::Min(150,$r.Output.Length)))"
+        $savedPath = $r.Output | Select-String 'SAVED:(.+)' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
+        if ($savedPath -and (Test-Path $savedPath)) {
+            Write-Host "  [BROKER:SHOT] path=$savedPath desc=$BrokerDesc"
+        } else {
+            Write-Host "  [BROKER:SHOT] failed -- $($r.Output.Substring(0,[Math]::Min(100,$r.Output.Length)))"
+        }
     }
 }
 
