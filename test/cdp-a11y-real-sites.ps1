@@ -1,6 +1,11 @@
 $ErrorActionPreference = "Continue"
 $CI = $env:GITHUB_ACTIONS -eq 'true'
-$SiteTimeout = 5
+
+# Start Eye at the top, before any CDP operations
+Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+$SiteTimeout = if ($CI) { 15 } else { 10 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
@@ -118,14 +123,6 @@ function Open-Site {
     Write-Host "================================================"
     Write-Host "[$Site] Opening $Url"
     Write-Host "================================================"
-
-    # Ensure Eye is running before attempting CDP operations
-    $eyeCheck = Invoke-WK @("eye","tick") 10
-    if (-not $eyeCheck.Ok) {
-        Write-Host "WARN: eye tick failed, attempting Eye startup"
-        try { & wkappbot eye } catch { Write-Host "WARN: failed to start Eye" }
-        Start-Sleep -Milliseconds 500
-    }
 
     $CDPPORT = ""
     $HW = ""
