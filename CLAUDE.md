@@ -281,7 +281,30 @@ When to use:
 - Before triad sessions to confirm all three pipelines (GPT + Gemini + Claude) are healthy
 - During Stage 23 testing to watch placement corrections and DPI checks in real-time
 
-On failure: check `wkcdp-mon.ps1` for position drift (CRIT flags), kill stale Chrome processes, retry.
+On failure: run `powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1` -- look for CRIT flags (position drift, LAT=DEAD, >5 sessions), kill stale Chrome PIDs, retry.
+
+### wkcdp-mon - CDP Session Monitor
+**Location**: `D:\GitHub\WKAppBotin\wkcdp-mon.ps1` (core repo)
+**Usage**: `powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1`
+
+Shows all active Chrome CDP sessions: port, PID, position (TGT vs ACT), drift, tab count, latency, project CWD. Uses `MonitorFromPoint` for off-screen detection -- large negative X on left monitors is NOT flagged as off-screen.
+
+Output columns: PORT / PID / P/R procs / MEM / AGE / TGT-POS / ACT-POS / DRIFT / TABS / LAT / LAUNCHED-BY / PROJECT
+
+Anomaly flags:
+- `[CRIT]` -- window is off all monitors (genuinely off-screen), LAT=DEAD, JS alert blocking, MEM>2GB
+- `[WARN]` -- sessions>5, tabs>6, lat>80ms, age>10h, MEM>1GB, DUP tabs>2
+
+Examples:
+```
+powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1
+```
+
+When to use:
+- After any Chrome placement to verify ACT-POS matches TGT-POS
+- When Chrome shows white screen or wrong position
+- Before triad sessions to confirm no zombie Chrome sessions
+- After hot-swap to verify session count is clean
 
 ## Encoding Policy
 - Treat repository text files as UTF-8 by default.
