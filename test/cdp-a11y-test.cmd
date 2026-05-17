@@ -117,7 +117,9 @@ REM -- Auto-suggest on failure -------------------
 if !FAIL! gtr 0 (
     echo.
     echo [AUTO] Submitting bug suggest for !FAIL! failed test(s)...
-    wkappbot-core.exe suggest "a11y/cdp integration test failure: !FAIL! of !TOTAL! tests failed. Failed tests logged above. Run: test\cdp-a11y-test.cmd to reproduce." --requirement "test\cdp-a11y-test.cmd => 0 FAIL" --requirement "wkappbot cdp open file:///D:/GitHub/wkappbot-sdk/docs/test/index.html => OK" --requirement "wkappbot a11y inspect {cdp:9741} => btn-primary" 2>/dev/null
+    pushd D:\GitHub\WKAppBot
+    wkappbot-core.exe suggest "a11y/cdp integration test failure: !FAIL! of !TOTAL! tests failed. Run: test\cdp-a11y-test.cmd to reproduce." --requirement "test\cdp-a11y-test.cmd => 0 FAIL" --requirement "wkappbot cdp open file:///D:/GitHub/wkappbot-sdk/docs/test/index.html => OK" --requirement "wkappbot a11y inspect {cdp:9741} => btn-primary" 2>nul
+    popd
     if not errorlevel 1 ( echo [AUTO] Suggest filed successfully. ) else ( echo [AUTO] Suggest filing failed -- check wkappbot. )
 )
 if !FAIL! gtr 0 ( exit /b 1 ) else ( exit /b 0 )
