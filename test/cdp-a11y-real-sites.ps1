@@ -130,18 +130,31 @@ function Save-TextLog {
 
 function Save-BrokerShot {
     param([string]$Site, [string]$CDPGRAP, [string]$HW, [string]$BrokerDesc)
-    $expDir = 'bin/wkappbot.hq/experience/brokers'
-    New-Item -Force -ItemType Directory -Path "$expDir/$($Site.ToLowerInvariant())" | Out-Null
-    $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $shotPath = "$expDir/$($Site.ToLowerInvariant())/$ts.png"
+    $expDir = Resolve-Path 'bin/wkappbot.hq/experience/brokers' -ErrorAction SilentlyContinue
+    if (-not $expDir) {
+        New-Item -Force -ItemType Directory -Path 'bin/wkappbot.hq/experience/brokers' | Out-Null
+        $expDir = Resolve-Path 'bin/wkappbot.hq/experience/brokers'
+    }
+    $siteDir = Join-Path $expDir $Site.ToLowerInvariant()
+    New-Item -Force -ItemType Directory -Path $siteDir | Out-Null
 
-    # Use cdp capture for Chrome web content (most reliable for web pages)
-    $r = Invoke-WK -WkArgs @('cdp','capture',$CDPGRAP,'--path',$shotPath) -TimeoutSec 10
-    if ($r.Ok -or (Test-Path $shotPath)) {
-        Write-Host "  [BROKER:SHOT] path=$(Resolve-Path $shotPath) desc=$BrokerDesc"
-        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
+    # cdp capture saves to its own path and prints it -- parse from output
+    $r = Invoke-WK -WkArgs @('cdp','capture',$CDPGRAP) -TimeoutSec 10
+    $capturedPath = ''
+    if ($r.Output -match 'Saved .*?to[: ]+([^\n\r]+\.png)') {
+        $capturedPath = $Matches[1].Trim()
+    } elseif ($r.Output -match '([A-Za-z]:[\/][^\n\r]+\.png)') {
+        $capturedPath = $Matches[1].Trim()
+    }
+
+    if ($capturedPath -and (Test-Path $capturedPath)) {
+        $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $destPath = Join-Path $siteDir "$ts.png"
+        Copy-Item $capturedPath $destPath
+        Write-Host "  [BROKER:SHOT] path=$destPath desc=$BrokerDesc"
+        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP; source=$capturedPath } | ConvertTo-Json | Set-Content "$destPath.meta.json" -Encoding utf8
     } else {
-        Write-Host "  [BROKER:SHOT] failed for $Site -- output: $($r.Output.Substring(0,[Math]::Min(100,$r.Output.Length)))"
+        Write-Host "  [BROKER:SHOT] capture OK but path parse failed -- raw: $($r.Output.Substring(0,[Math]::Min(150,$r.Output.Length)))"
     }
 }
 
