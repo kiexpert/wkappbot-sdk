@@ -8,13 +8,14 @@ set WK=wkappbot
 set PAGE=file:///D:/GitHub/wkappbot-sdk/docs/test/index.html
 set PASS=0
 set FAIL=0
+set TOTAL=6
 set CHROME_HW=
 
 echo =============================================
 echo  WKAppBot CDP/A11y Integration Test v2
 echo =============================================
 
-REM ── T1: Open page ─────────────────────────
+REM -- T1: Open page -------------------------
 echo.
 echo [T1] cdp open test page (local)...
 for /f "tokens=*" %%L in ('%WK% cdp open "%PAGE%" 2^>^&1') do (
@@ -30,7 +31,7 @@ for /f "tokens=2 delims=:" %%H in ("!LINE!") do (
 )
 echo Detected hwnd: !CHROME_HW!
 
-REM ── T2: cdp html - page loaded ────────────
+REM -- T2: cdp html - page loaded ------------
 echo.
 echo [T2] cdp html - verify test page loaded...
 for /f "tokens=*" %%L in ('%WK% cdp html "!CHROME_HW!" 2^>^&1') do (
@@ -43,7 +44,7 @@ goto :t3
 echo PASS: WKAppBot CDP/A11y Test Page loaded
 set /a PASS+=1
 
-REM ── T3: a11y inspect - find button ────────
+REM -- T3: a11y inspect - find button --------
 :t3
 echo.
 echo [T3] a11y inspect - find btn-primary...
@@ -57,7 +58,7 @@ goto :t4
 echo PASS: btn-primary found with Invoke pattern
 set /a PASS+=1
 
-REM ── T4: a11y restore + invoke ─────────────
+REM -- T4: a11y restore + invoke -------------
 :t4
 echo.
 echo [T4] a11y restore + invoke btn-primary...
@@ -77,7 +78,7 @@ goto :t5
 echo PASS: button click confirmed in DOM
 set /a PASS+=1
 
-REM ── T5: a11y type ─────────────────────────
+REM -- T5: a11y type -------------------------
 :t5
 echo.
 echo [T5] a11y type into input-text...
@@ -93,7 +94,7 @@ goto :t6
 echo PASS: typed text confirmed in DOM
 set /a PASS+=1
 
-REM ── T6: a11y read ─────────────────────────
+REM -- T6: a11y read -------------------------
 :t6
 echo.
 echo [T6] a11y read #read-target...
@@ -112,4 +113,11 @@ echo.
 echo =============================================
 echo  Results: !PASS! PASS  /  !FAIL! FAIL
 echo =============================================
+REM -- Auto-suggest on failure -------------------
+if !FAIL! gtr 0 (
+    echo.
+    echo [AUTO] Submitting bug suggest for !FAIL! failed test(s)...
+    wkappbot-core.exe suggest "a11y/cdp integration test failure: !FAIL! of !TOTAL! tests failed. Failed tests logged above. Run: test\cdp-a11y-test.cmd to reproduce." --requirement "test\cdp-a11y-test.cmd => 0 FAIL" --requirement "wkappbot cdp open file:///D:/GitHub/wkappbot-sdk/docs/test/index.html => OK" --requirement "wkappbot a11y inspect {cdp:9741} => btn-primary" 2>/dev/null
+    if not errorlevel 1 ( echo [AUTO] Suggest filed successfully. ) else ( echo [AUTO] Suggest filing failed -- check wkappbot. )
+)
 if !FAIL! gtr 0 ( exit /b 1 ) else ( exit /b 0 )
