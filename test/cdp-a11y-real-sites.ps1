@@ -122,10 +122,11 @@ function Save-BrokerShot {
 
     # Try node-level screenshot first (targets blocking element specifically)
     $brokerGraps = @(
-        "*cookie*;$HW",
-        "*consent*;$HW",
-        "*Accept*;$HW",
-        "*overlay*;$HW"
+        "$CDPGRAP#*cookie*",
+        "$CDPGRAP#*consent*",
+        "$CDPGRAP#*Accept*",
+        "$CDPGRAP#*Cookie*",
+        "$CDPGRAP#*GDPR*"
     )
     $shotOk = $false
     foreach ($bg in $brokerGraps) {
