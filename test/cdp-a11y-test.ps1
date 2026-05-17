@@ -62,7 +62,7 @@ function Test-UiaDomPair {
 
     # Step 3: execute action
     [void](Run-WK $ActionArgs $null "$ActionLabel [exec]" 15)
-    if ($CI) { Start-Sleep -Seconds 2 } else { Start-Sleep -Seconds 1 }
+    if ($CI) { Start-Sleep -Milliseconds 500 } else { Start-Sleep -Milliseconds 300 }
 
     # Step 4: capture DOM after + check
     $afterHtml = (& wkappbot cdp html $HW 2>$null) -join ' '
@@ -130,7 +130,7 @@ if ([string]::IsNullOrEmpty($HW)) {
 }
 
 Write-Host "SETUP OK hwnd=$HW"
-Start-Sleep -Seconds 2
+Start-Sleep -Milliseconds 500
 
 Write-Host ""
 Write-Host "--- Discovery ---"
@@ -161,11 +161,11 @@ Write-Host "--- Window Control ---"
 
 Write-Host "[T05] a11y minimize..."
 Add-Result (Run-WK @("a11y","minimize",$HW) $null "minimize")
-Start-Sleep -Seconds 1
+Start-Sleep -Milliseconds 300
 
 Write-Host "[T06] a11y restore..."
 Add-Result (Run-WK @("a11y","restore",$HW) $null "restore")
-Start-Sleep -Seconds 1
+Start-Sleep -Milliseconds 300
 
 Write-Host "[T07] a11y focus..."
 Add-Result (Run-WK @("a11y","focus",$HW) $null "focus")
@@ -203,12 +203,12 @@ Add-Result (Test-UiaDomPair "collapse" @("a11y","find","details-main#$HW") "deta
 Write-Host "[T17] a11y wait --condition..."
 [void](Run-WK @("a11y","invoke","btn-spawn#$HW") $null "spawn command")
 [void](Run-WK @("a11y","wait","btn-delayed#$HW","--condition","visible","--timeout","5000") $null "wait command" 8)
-Start-Sleep -Seconds 1
+Start-Sleep -Milliseconds 300
 Add-Result (Check-Dom "appeared" "wait --condition")
 
 Write-Host "[T18] clipboard-write/read..."
 [void](Run-WK @("a11y","clipboard-write","wkappbot-test-clip") $null "clipboard-write command")
-Start-Sleep -Seconds 1
+Start-Sleep -Milliseconds 300
 Add-Result (Run-WK @("a11y","clipboard-read") "wkappbot-test-clip" "clipboard-write/read")
 
 Write-Host "[T19] a11y type --hotkey Tab..."
