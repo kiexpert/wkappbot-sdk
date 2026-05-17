@@ -109,7 +109,15 @@ function Open-Site {
     Write-Host "[$Site] cdp open $Url"
     Write-Host "================================================"
 
-    $open = Invoke-WK @("cdp","open",$Url) $SiteTimeout
+    # Ensure Eye is running before attempting CDP operations
+    $eyeCheck = Invoke-WK @("eye","tick") 10
+    if (-not $eyeCheck.Ok) {
+        Write-Host "WARN: eye tick failed, attempting Eye startup"
+        try { & wkappbot eye } catch { Write-Host "WARN: failed to start Eye" }
+        Start-Sleep -Milliseconds 500
+    }
+
+    $open = Invoke-WK -WkArgs @("cdp","open",$Url) -TimeoutSec $SiteTimeout
     Save-TextLog $Site "cdp-open" $open.Output | Out-Null
     if (-not $open.Ok -or $open.Output -notmatch "OK\s+\{") {
         Add-Skip $Site "cdp open failed"
@@ -132,7 +140,7 @@ function Open-Site {
     Write-Host "SETUP: [$Site] hwnd=$HW cdp=$CDPPORT grap=$CDPGRAP"
     Start-Sleep -Milliseconds 700
 
-    $html = Invoke-WK @("cdp","html",$CDPGRAP) 20
+    $html = Invoke-WK -WkArgs @("cdp","html",$CDPGRAP) -TimeoutSec 20
     Save-TextLog $Site "broker-html-precheck" $html.Output | Out-Null
     if (-not $html.Ok -or [string]::IsNullOrWhiteSpace($html.Output)) {
         Add-Skip $Site "cdp html broker pre-check failed"
