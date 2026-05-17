@@ -44,7 +44,8 @@ function Invoke-WK {
     $script:LastWKOutput = $out
     $exitCode = $proc.ExitCode
     Remove-Item "$logBase.out","$logBase.err" -ErrorAction SilentlyContinue
-    return [pscustomobject]@{ Ok = ($exitCode -eq 0); ExitCode = $exitCode; Output = $out }
+    $okByOutput = $out -match 'OK \{hwnd:'
+    return [pscustomobject]@{ Ok = ($exitCode -eq 0 -or $okByOutput); ExitCode = $exitCode; Output = $out; OkByOutput = $okByOutput }
 }
 
 function Run-WK {
@@ -170,6 +171,15 @@ function Open-Site {
 
         # First check for success (normal path)
         if ($open.Ok -and $open.Output -match "OK\s+\{") {
+            $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
+            if (-not $okLine) { $okLine = $open.Output }
+
+            if ($okLine -match "cdp:([0-9]+)") { $CDPPORT = $Matches[1] }
+            if ($okLine -match "hwnd:(0x[0-9A-Fa-f]+)") { $HW = $Matches[1] }
+        }
+        # Check if output contains OK but exit code is non-zero (may still be usable)
+        elseif ($open.OkByOutput -and -not ($open.ExitCode -eq 0)) {
+            Write-Host "NOTE: cdp open exited non-zero but OK found in output -- using output result"
             $okLine = ($open.Output -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*cdp:[0-9]+.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
             if (-not $okLine) { $okLine = $open.Output }
 
