@@ -51,3 +51,30 @@ jobs:
             git commit -m "chore(ai-news): prefetch ${COUNT} filtered items [skip ci]"
             git push
           fi
+
+  queue-suggests:
+    needs: prefetch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone WKAppBot core
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git clone --depth=1 https://x-access-token:${GH_PAT}@github.com/kiexpert/WKAppBot.git /tmp/wkcore
+      - name: Append suggest records
+        run: python3 scripts/append-pending-suggests.py
+      - name: Push to WKAppBot core
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          cd /tmp/wkcore
+          git config user.email "github-actions@github.com"
+          git config user.name "AI News Bot"
+          git add .wkappbot/pending_suggests.jsonl
+          git diff --cached --quiet && echo "Nothing to commit" && exit 0
+          git commit -m "chore(ai-news): queue AI-NEWS suggests [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push https://x-access-token:${GH_PAT}@github.com/kiexpert/WKAppBot.git main && break
+            sleep $((i*5))
+          done
