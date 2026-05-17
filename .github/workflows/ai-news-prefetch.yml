@@ -6,46 +6,48 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   prefetch:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout WKAppBot
+      - name: Checkout wkappbot-sdk
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with:
-          repository: kiexpert/WKAppBot
           token: ${{ secrets.WKAPPBOT_PAT }}
-          path: wkappbot
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.12'
 
-      - name: Collect raw HN + YouTube (no Claude)
+      - name: Collect AI news (HN + YouTube, optional LLM filter)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # CI=true skips the Claude filter step in the script
-          # Only raw data collection: HN Algolia + YouTube RSS
-          cd wkappbot
-          sed 's/python\.exe/python3/g' \
-            bin/wkappbot.hq/scripts/ai-news-prefetch.sh \
-            > bin/wkappbot.hq/scripts/prefetch-ci.sh
-          chmod +x bin/wkappbot.hq/scripts/prefetch-ci.sh
-          CI=true bash bin/wkappbot.hq/scripts/prefetch-ci.sh
+          mkdir -p data
+          # Self-contained collector (no wkappbot CLI, no python.exe).
+          # When LLM key is set, outputs filtered (score>=2) items to data/ai-news-latest.jsonl.
+          # When no LLM key, collector exits without writing -- the briefing script's
+          # local prefetch path covers full pipeline with the LLM filter.
+          python3 scripts/ai-news-collect.py 26 data/ai-news-latest.jsonl || true
+          # Mirror latest -> raw so the local briefing fast-path can consume either name.
+          if [ -f data/ai-news-latest.jsonl ]; then
+            cp data/ai-news-latest.jsonl data/ai-news-raw.jsonl
+          fi
 
-      - name: Commit raw results
+      - name: Commit results
         run: |
-          cd wkappbot
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f bin/wkappbot.hq/data/ai-news-raw.jsonl
+          git add -f data/ai-news-latest.jsonl data/ai-news-raw.jsonl 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No new items"
           else
-            COUNT=$(grep -c '{' bin/wkappbot.hq/data/ai-news-raw.jsonl 2>/dev/null || echo 0)
-            git commit -m "chore(ai-news): raw prefetch ${COUNT} items [skip ci]"
+            COUNT=$(wc -l < data/ai-news-latest.jsonl 2>/dev/null || echo 0)
+            git commit -m "chore(ai-news): prefetch ${COUNT} filtered items [skip ci]"
             git push
           fi
