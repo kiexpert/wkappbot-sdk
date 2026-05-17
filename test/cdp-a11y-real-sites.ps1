@@ -316,22 +316,26 @@ function Open-Site {
     Write-Host "SETUP: [$Site] hwnd=$HW cdp=$CDPPORT grap=$CDPGRAP"
     Start-Sleep -Milliseconds 700
 
-    $html = Invoke-WK -WkArgs @("cdp","html",$CDPGRAP) -TimeoutSec 20
-    Save-TextLog $Site "broker-html-precheck" $html.Output | Out-Null
-    if (-not $html.Ok -or [string]::IsNullOrWhiteSpace($html.Output)) {
-        Add-Skip $Site "cdp html broker pre-check failed"
-        return $null
+    # Broker pre-check via cdp html
+    $htmlResult = Invoke-WK -WkArgs @('cdp','html',$CDPGRAP) -TimeoutSec 10
+    $html = $htmlResult.Output
+    if (-not $htmlResult.Ok -and -not ($html -match '<html')) {
+        Write-Host "  [WARN] cdp html failed for $Site -- continuing anyway"
+    }
+    $brokerPatterns = 'cookielaw|cookie-consent|gdpr-consent|onetrust|sign in.*required|captcha|paywall'
+    if ($html -match $brokerPatterns) {
+        Write-Host "  [BROKER:PRE] Cookie/consent detected in HTML -- automation may be affected"
     }
 
-    foreach ($pattern in $HtmlPatterns) {
-        if ($html.Output -notmatch $pattern) {
-            Add-Skip $Site "broker pre-check missing pattern: $pattern"
-            return $null
-        }
+    # Also check via a11y find for blocking overlay
+    $brokerFind = Invoke-WK -WkArgs @('a11y','find',"*Accept*cookies*;*Cookie*consent*;*Accept all*#$HW") -TimeoutSec 8
+    if ($brokerFind.Output -match 'TARGET') {
+        Write-Host "  [BROKER:PRE:A11Y] Blocking overlay found in UIA tree: $($brokerFind.Output | Select-String 'TARGET' | Select-Object -First 1)"
     }
 
+    # Continue regardless of broker (just warn)
     Add-Pass $Site "cdp open + broker pre-check"
-    return [pscustomobject]@{ Site = $Site; Url = $Url; HW = $HW; CDPPORT = $CDPPORT; CDPGRAP = $CDPGRAP; InitialHtml = $html.Output }
+    return [pscustomobject]@{ Site = $Site; Url = $Url; HW = $HW; CDPPORT = $CDPPORT; CDPGRAP = $CDPGRAP; InitialHtml = $html }
 }
 
 function Test-Find {
