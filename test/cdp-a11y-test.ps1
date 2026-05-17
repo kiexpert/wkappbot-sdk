@@ -36,7 +36,7 @@ function Add-Result {
 
 function Check-Dom {
     param([string]$ExpectString, [string]$TestName)
-    return Run-WK @("cdp","html",$HW) $ExpectString $TestName
+    return Run-WK @("cdp","html",$CDPGRAP) $ExpectString $TestName
 }
 
 function Test-UiaDomPair {
@@ -58,14 +58,14 @@ function Test-UiaDomPair {
     }
 
     # Step 2: capture DOM before
-    $beforeHtml = (& wkappbot cdp html $HW 2>$null) -join ' '
+    $beforeHtml = (& wkappbot cdp html $CDPGRAP 2>$null) -join ' '
 
     # Step 3: execute action
     [void](Run-WK $ActionArgs $null "$ActionLabel [exec]" 15)
     if ($CI) { Start-Sleep -Milliseconds 500 } else { Start-Sleep -Milliseconds 300 }
 
     # Step 4: capture DOM after + check
-    $afterHtml = (& wkappbot cdp html $HW 2>$null) -join ' '
+    $afterHtml = (& wkappbot cdp html $CDPGRAP 2>$null) -join ' '
     $domChanged = $afterHtml -match $DomPattern
 
     if ($uiaOk -and $domChanged) {
@@ -119,17 +119,19 @@ if (-not $setupOk) {
 }
 
 $okLine = ($script:LastWKOutput -split "`r?`n" | Where-Object { $_ -match "OK\s+\{.*hwnd:0x[0-9A-Fa-f]+" } | Select-Object -First 1)
+if ($okLine -match 'cdp:([0-9]+)') { $CDPPORT = $Matches[1] }
 if ($okLine -match "hwnd:(0x[0-9A-Fa-f]+)") {
     $HW = $Matches[1]
 }
 
-if ([string]::IsNullOrEmpty($HW)) {
-    Write-Host "FAIL: hwnd not extracted"
+$CDPGRAP = "{proc:'chrome',cdp:$CDPPORT}"
+if ([string]::IsNullOrEmpty($HW) -or [string]::IsNullOrEmpty($CDPPORT)) {
+    Write-Host "FAIL: hwnd or cdp port not extracted (HW=$HW CDPPORT=$CDPPORT)"
     $FAIL = $TOTAL
     Auto-Suggest-And-Exit
 }
 
-Write-Host "SETUP OK hwnd=$HW"
+Write-Host "SETUP OK hwnd=$HW cdp=$CDPPORT"
 Start-Sleep -Milliseconds 500
 
 Write-Host ""
@@ -137,7 +139,7 @@ Write-Host "--- CDP Baseline (no UIA) ---"
 
 # eval-js direct click -> DOM update
 Write-Host "[CDP-B1] eval-js click btn-primary..."
-$evalClick = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('btn-primary').click(); document.getElementById('click-result').textContent") "clicked:" "cdp-b1 eval-js click" 15
+$evalClick = Run-WK @("a11y","read",$CDPGRAP,"--eval-js","document.getElementById('btn-primary').click(); document.getElementById('click-result').textContent") "clicked:" "cdp-b1 eval-js click" 15
 Add-Result $evalClick
 if (-not $evalClick) {
     Write-Host "  >> CDP BASELINE FAIL: Chrome JS execution or DOM not interactive -- all UIA->DOM tests will be invalid"
@@ -146,12 +148,12 @@ if (-not $evalClick) {
 
 # eval-js direct value set -> DOM read back
 Write-Host "[CDP-B2] eval-js set input value..."
-$evalSet = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('input-text').value='cdp-direct'; document.getElementById('input-text').value") "cdp-direct" "cdp-b2 eval-js set" 15
+$evalSet = Run-WK @("a11y","read",$CDPGRAP,"--eval-js","document.getElementById('input-text').value='cdp-direct'; document.getElementById('input-text').value") "cdp-direct" "cdp-b2 eval-js set" 15
 Add-Result $evalSet
 
 # eval-js toggle checkbox -> state read back
 Write-Host "[CDP-B3] eval-js toggle checkbox..."
-$evalToggle = Run-WK @("a11y","read",$HW,"--eval-js","document.getElementById('chk-a').checked=true; document.getElementById('chk-a').checked.toString()") "true" "cdp-b3 eval-js checkbox" 15
+$evalToggle = Run-WK @("a11y","read",$CDPGRAP,"--eval-js","document.getElementById('chk-a').checked=true; document.getElementById('chk-a').checked.toString()") "true" "cdp-b3 eval-js checkbox" 15
 Add-Result $evalToggle
 
 $cdpBaselineOk = $evalClick -and $evalSet -and $evalToggle
