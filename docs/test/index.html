@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WKAppBot CDP/A11y Test Page</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:monospace;max-width:820px;margin:2rem auto;padding:1rem;background:#0d1117;color:#c9d1d9}
+h1{color:#58a6ff;margin-bottom:.25rem}
+p.sub{color:#8b949e;margin:.25rem 0 1.5rem}
+.sec{border:1px solid #30363d;border-radius:6px;padding:1rem;margin:.75rem 0}
+.sec h2{color:#79c0ff;margin:0 0 .6rem;font-size:.95rem}
+.res{color:#3fb950;font-weight:bold;min-height:1.3rem;margin-top:.4rem;font-size:.9rem}
+button{background:#238636;color:#fff;border:none;padding:.35rem .75rem;border-radius:4px;cursor:pointer;margin-right:.4rem}
+button:hover{background:#2ea043}
+button.sec-btn{background:#21262d}
+button.sec-btn:hover{background:#30363d}
+input[type=text]{background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:.3rem .5rem;width:280px}
+textarea{background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:.4rem;width:300px;height:70px}
+select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:.3rem .5rem}
+.scroll-box{height:110px;overflow-y:auto;background:#161b22;border:1px solid #30363d;border-radius:4px;padding:.4rem;font-size:.85rem}
+#test-log{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:.5rem;height:140px;overflow-y:auto;font-size:.82rem;color:#8b949e;white-space:pre-wrap}
+.badge{display:inline-block;padding:.1rem .4rem;border-radius:3px;font-size:.8rem;background:#1f6feb;color:#fff;margin-left:.4rem}
+</style>
+</head>
+<body>
+<h1>&#129302; WKAppBot CDP/A11y Test Page</h1>
+<p class="sub">Automation test target &mdash; <code>wkappbot a11y</code> + <code>wkappbot cdp eval</code> integration</p>
+
+<div class="sec" id="sec-click">
+  <h2>1. Button Click <span class="badge" id="click-badge">count=0</span></h2>
+  <button id="btn-primary">Click Me</button>
+  <button class="sec-btn" id="btn-reset">Reset</button>
+  <div class="res" id="click-result">not clicked</div>
+</div>
+
+<div class="sec" id="sec-type">
+  <h2>2. Text Input</h2>
+  <input id="input-text" type="text" placeholder="type something" autocomplete="off">
+  <div class="res" id="type-result">empty</div>
+</div>
+
+<div class="sec" id="sec-textarea">
+  <h2>3. Textarea</h2>
+  <textarea id="textarea-main" placeholder="multiline input"></textarea>
+  <div class="res" id="textarea-result">empty</div>
+</div>
+
+<div class="sec" id="sec-check">
+  <h2>4. Checkbox Toggle</h2>
+  <label><input id="chk-a" type="checkbox"> Feature A</label> &nbsp;
+  <label><input id="chk-b" type="checkbox" checked> Feature B (on)</label>
+  <div class="res" id="check-result">A=off B=on</div>
+</div>
+
+<div class="sec" id="sec-select">
+  <h2>5. Select / Dropdown</h2>
+  <select id="dropdown">
+    <option value="alpha">Alpha</option>
+    <option value="beta">Beta</option>
+    <option value="gamma">Gamma</option>
+    <option value="delta">Delta</option>
+  </select>
+  <div class="res" id="select-result">selected: alpha</div>
+</div>
+
+<div class="sec" id="sec-read">
+  <h2>6. Text Read Target</h2>
+  <div id="read-target" role="article" style="color:#e6edf3;line-height:1.5">
+    The quick brown fox jumps over the lazy dog.<br>
+    WKAppBot automation target text. <strong id="read-strong">Bold content here.</strong>
+  </div>
+</div>
+
+<div class="sec" id="sec-scroll">
+  <h2>7. Scroll Area</h2>
+  <div class="scroll-box" id="scroll-box"></div>
+  <div class="res" id="scroll-result">scrollTop=0</div>
+</div>
+
+<div class="sec" id="sec-eval">
+  <h2>8. CDP Eval Counter</h2>
+  <div style="margin-bottom:.3rem">Eval hits: <strong id="eval-count">0</strong></div>
+  <div class="res" id="eval-result">no eval yet</div>
+</div>
+
+<div class="sec">
+  <h2>Test Log</h2>
+  <div id="test-log">ready\n</div>
+</div>
+
+<script>
+var _log = document.getElementById('test-log');
+function log(m){_log.textContent+='['+new Date().toISOString().substr(11,12)+'] '+m+'\n';_log.scrollTop=9999;}
+
+// 1. button
+var _clicks=0;
+document.getElementById('btn-primary').onclick=function(){
+  _clicks++;
+  this.dataset.clicks=_clicks;
+  document.getElementById('click-badge').textContent='count='+_clicks;
+  document.getElementById('click-result').textContent='clicked:'+_clicks+' ts='+Date.now();
+  log('btn-primary clicked, count='+_clicks);
+};
+document.getElementById('btn-reset').onclick=function(){
+  _clicks=0;
+  document.getElementById('btn-primary').dataset.clicks=0;
+  document.getElementById('click-badge').textContent='count=0';
+  document.getElementById('click-result').textContent='reset';
+  log('reset');
+};
+
+// 2. input
+document.getElementById('input-text').addEventListener('input',function(){
+  document.getElementById('type-result').textContent='value="'+this.value+'" len='+this.value.length;
+});
+
+// 3. textarea
+document.getElementById('textarea-main').addEventListener('input',function(){
+  document.getElementById('textarea-result').textContent='lines='+this.value.split('\n').length+' chars='+this.value.length;
+});
+
+// 4. checkbox
+function _chkUpdate(){
+  var a=document.getElementById('chk-a').checked, b=document.getElementById('chk-b').checked;
+  document.getElementById('check-result').textContent='A='+(a?'on':'off')+' B='+(b?'on':'off');
+  log('checkbox A='+a+' B='+b);
+}
+document.getElementById('chk-a').addEventListener('change',_chkUpdate);
+document.getElementById('chk-b').addEventListener('change',_chkUpdate);
+
+// 5. select
+document.getElementById('dropdown').addEventListener('change',function(){
+  document.getElementById('select-result').textContent='selected: '+this.value;
+  log('dropdown='+this.value);
+});
+
+// 7. scroll
+var sb=document.getElementById('scroll-box');
+for(var i=1;i<=30;i++){var d=document.createElement('div');d.textContent='Line '+i+': scroll test row content';sb.appendChild(d);}
+sb.addEventListener('scroll',function(){
+  document.getElementById('scroll-result').textContent='scrollTop='+Math.round(this.scrollTop)+'px';
+});
+
+// test API (for cdp eval)
+window.__wkTest={
+  ping:function(){return 'pong';},
+  getClickCount:function(){return _clicks;},
+  getInputValue:function(){return document.getElementById('input-text').value;},
+  getTextareaValue:function(){return document.getElementById('textarea-main').value;},
+  getCheckState:function(){return {a:document.getElementById('chk-a').checked,b:document.getElementById('chk-b').checked};},
+  getSelected:function(){return document.getElementById('dropdown').value;},
+  getScrollTop:function(){return document.getElementById('scroll-box').scrollTop;},
+  evalHit:function(note){
+    var n=parseInt(document.getElementById('eval-count').textContent||'0')+1;
+    document.getElementById('eval-count').textContent=n;
+    document.getElementById('eval-result').textContent='#'+n+': '+note;
+    log('eval_hit #'+n+' note='+note);
+    return n;
+  }
+};
+log('page ready -- __wkTest API active');
+</script>
+</body>
+</html>
