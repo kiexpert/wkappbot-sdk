@@ -120,25 +120,11 @@ jobs:
           }
           $rc = $LASTEXITCODE
           "rc=$rc" >> $env:GITHUB_OUTPUT
-          exit $rc
-
-      - name: Restart Eye for real-site tests
-        if: always()
-        shell: pwsh
-        run: |
-          Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden
-          Start-Sleep -Seconds 3
-          wkappbot eye tick
-
-      - name: Run real-site a11y tests
-        if: always()
-        id: real_sites
-        shell: pwsh
-        continue-on-error: true
-        run: |
+          Write-Host 'Running real-site tests with same Chrome session...'
           if (Test-Path test/cdp-a11y-real-sites.ps1) {
             powershell -ExecutionPolicy Bypass -File test/cdp-a11y-real-sites.ps1 2>&1 | Tee-Object -FilePath bin/wkappbot.hq/logs/real-sites-ci.log
           }
+          exit $rc
 
       - name: Post result to daily board
         if: always() && github.event_name == 'schedule'
