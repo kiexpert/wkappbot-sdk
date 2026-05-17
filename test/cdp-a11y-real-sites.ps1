@@ -5,6 +5,21 @@ $CI = $env:GITHUB_ACTIONS -eq 'true'
 Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 
+# Pre-test Chrome cleanup: kill any Chrome with >10 tabs to prevent tab explosion
+Write-Host 'Pre-test: checking Chrome tab counts...'
+$cdpStatus = & powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1 2>$null
+if ($cdpStatus) {
+    $ports = $cdpStatus | Select-String 'Port (\d+).*(\d+) tabs' | ForEach-Object {
+        if ($_.Matches[0].Groups[2].Value -as [int] -gt 10) {
+            $port = $_.Matches[0].Groups[1].Value
+            Write-Host "  Pre-test kill: port $port (tab overload)"
+            & powershell -File D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1 kill $port 2>$null
+        }
+    }
+}
+Write-Host 'Pre-test cleanup done.'
+Start-Sleep -Milliseconds 500
+
 $SiteTimeout = if ($CI) { 40 } else { 25 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
