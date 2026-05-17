@@ -121,6 +121,7 @@ function Open-Site {
     Save-TextLog $Site "cdp-open" $open.Output | Out-Null
     if (-not $open.Ok -or $open.Output -notmatch "OK\s+\{") {
         Add-Skip $Site "cdp open failed"
+        Write-Host "  >> cdp open output: $($open.Output.Substring(0,[Math]::Min(500,$open.Output.Length)))"
         return $null
     }
 
