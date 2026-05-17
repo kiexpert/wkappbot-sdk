@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Continue"
 $CI = $env:GITHUB_ACTIONS -eq 'true'
-$SiteTimeout = if ($CI) { 90 } else { 30 }
+$SiteTimeout = if ($CI) { 10 } else { 15 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
