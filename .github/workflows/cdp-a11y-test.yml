@@ -3,12 +3,19 @@
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 1 * * *'   # 10:00 KST daily
   push:
     paths:
       - 'test/**'
       - 'docs/test/**'
       - '.github/workflows/cdp-a11y-test.yml'
+      - 'csharp/src/WKAppBot.Launcher/**'   # launcher source changed
+  release:
+    types: [published]   # new core binary released
+  workflow_run:
+    workflows: ['Build']
+    types: [completed]
+    branches: [main, triad-market-teaser]
 
 permissions:
   contents: read
