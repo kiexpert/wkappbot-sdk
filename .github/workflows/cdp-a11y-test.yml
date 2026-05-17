@@ -99,17 +99,43 @@ jobs:
           wkappbot eye tick
 
       - name: Run CDP/A11y integration tests
+        id: a11y_test
         shell: pwsh
         run: |
+          $log = 'bin/wkappbot.hq/logs/cdp-a11y-ci.log'
+          New-Item -Force -ItemType Directory -Path (Split-Path $log) | Out-Null
           if (Test-Path test/cdp-a11y-test.ps1) {
-            powershell -ExecutionPolicy Bypass -File test/cdp-a11y-test.ps1
-            exit $LASTEXITCODE
+            powershell -ExecutionPolicy Bypass -File test/cdp-a11y-test.ps1 2>&1 | Tee-Object -FilePath $log
           } elseif (Test-Path test/cdp-a11y-test.cmd) {
-            cmd /c test\cdp-a11y-test.cmd
-            exit $LASTEXITCODE
+            cmd /c test\cdp-a11y-test.cmd 2>&1 | Tee-Object -FilePath $log
           } else {
             throw 'No test runner found: test/cdp-a11y-test.ps1 or test/cdp-a11y-test.cmd'
           }
+          $rc = $LASTEXITCODE
+          "rc=$rc" >> $env:GITHUB_OUTPUT
+          exit $rc
+
+      - name: Post result to daily board
+        if: always() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const day = new Date().toISOString().slice(0, 10);
+            const title = 'Daily board - ' + day;
+            const found = await github.rest.search.issuesAndPullRequests({
+              q: 'repo:' + owner + '/' + repo + ' is:issue in:title "' + title + '"'
+            });
+            if (!found.data.items.length) { console.log('No daily issue found for ' + day); return; }
+            const issue_number = found.data.items[0].number;
+            const rc = '${{ steps.a11y_test.outputs.rc }}';
+            const ok = rc === '0';
+            const runUrl = context.serverUrl + '/' + owner + '/' + repo + '/actions/runs/' + context.runId;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: '## CDP/A11y Integration Test\n\nStatus: ' + (ok ? '✅ PASS' : '❌ FAIL') + '\n\nRun: ' + runUrl + '\n\n> Logs attached as artifact on the run page.',
+            });
 
       - name: Upload logs on failure
         if: failure()
