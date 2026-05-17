@@ -84,6 +84,38 @@ select{background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:4
   <div class="res" id="eval-result">no eval yet</div>
 </div>
 
+<!-- Section 8: Range slider (for set-range) -->
+<div class="sec" id="sec-range">
+  <h2>8. Range / Slider</h2>
+  <input id="range-input" type="range" min="0" max="100" value="50" style="width:250px">
+  <div class="res" id="range-result">value=50</div>
+</div>
+
+<!-- Section 9: Expand/Collapse (details element) -->
+<div class="sec" id="sec-expand">
+  <h2>9. Expand / Collapse</h2>
+  <details id="details-main">
+    <summary id="details-summary">Click to expand</summary>
+    <div id="details-content" style="padding:.5rem;color:#8b949e">Hidden content revealed!</div>
+  </details>
+  <div class="res" id="expand-result">collapsed</div>
+</div>
+
+<!-- Section 10: Set-value (contenteditable) -->
+<div class="sec" id="sec-setval">
+  <h2>10. Set Value</h2>
+  <div id="setval-target" contenteditable="true" style="background:#161b22;border:1px solid #30363d;border-radius:4px;padding:.4rem;min-height:2rem;min-width:200px">editable content</div>
+  <div class="res" id="setval-result">original</div>
+</div>
+
+<!-- Section 11: Wait condition (button that appears after 2s) -->
+<div class="sec" id="sec-wait">
+  <h2>11. Wait Condition</h2>
+  <button id="btn-spawn" onclick="setTimeout(function(){document.getElementById('btn-delayed').style.display='inline';document.getElementById('wait-result').textContent='appeared';log('delayed button appeared');},2000)">Spawn delayed button (2s)</button>
+  <button id="btn-delayed" style="display:none;background:#6e40c9;margin-left:.5rem">Delayed Button</button>
+  <div class="res" id="wait-result">not appeared</div>
+</div>
+
 <div class="sec">
   <h2>Test Log</h2>
   <div id="test-log">ready\n</div>
@@ -151,6 +183,10 @@ window.__wkTest={
   getCheckState:function(){return {a:document.getElementById('chk-a').checked,b:document.getElementById('chk-b').checked};},
   getSelected:function(){return document.getElementById('dropdown').value;},
   getScrollTop:function(){return document.getElementById('scroll-box').scrollTop;},
+  getRangeValue:function(){ return document.getElementById('range-input').value; },
+  isExpanded:function(){ return document.getElementById('details-main').open; },
+  getSetVal:function(){ return document.getElementById('setval-target').textContent.trim(); },
+  delayedVisible:function(){ return document.getElementById('btn-delayed').style.display !== 'none'; },
   evalHit:function(note){
     var n=parseInt(document.getElementById('eval-count').textContent||'0')+1;
     document.getElementById('eval-count').textContent=n;
@@ -159,6 +195,23 @@ window.__wkTest={
     return n;
   }
 };
+
+// range
+document.getElementById('range-input').addEventListener('input', function() {
+  document.getElementById('range-result').textContent = 'value='+this.value;
+  log('range='+this.value);
+});
+// details
+document.getElementById('details-main').addEventListener('toggle', function() {
+  document.getElementById('expand-result').textContent = this.open ? 'expanded' : 'collapsed';
+  log('details '+( this.open ? 'expanded' : 'collapsed'));
+});
+// setval
+var setvalObs = new MutationObserver(function(){
+  document.getElementById('setval-result').textContent = 'changed: '+document.getElementById('setval-target').textContent.trim().substr(0,30);
+});
+setvalObs.observe(document.getElementById('setval-target'), {childList:true, characterData:true, subtree:true});
+
 log('page ready -- __wkTest API active');
 </script>
 </body>
