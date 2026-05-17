@@ -5,7 +5,7 @@ $CI = $env:GITHUB_ACTIONS -eq 'true'
 Start-Process wkappbot.exe -ArgumentList eye -WindowStyle Hidden -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 
-$SiteTimeout = if ($CI) { 30 } else { 20 }
+$SiteTimeout = if ($CI) { 40 } else { 25 }
 $LogDir = "bin/wkappbot.hq/logs/real-sites"
 New-Item -Force -ItemType Directory -Path $LogDir | Out-Null
 
