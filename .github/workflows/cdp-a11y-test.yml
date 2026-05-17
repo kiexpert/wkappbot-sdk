@@ -122,6 +122,15 @@ jobs:
           "rc=$rc" >> $env:GITHUB_OUTPUT
           exit $rc
 
+      - name: Run real-site a11y tests
+        id: real_sites
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          if (Test-Path test/cdp-a11y-real-sites.ps1) {
+            powershell -ExecutionPolicy Bypass -File test/cdp-a11y-real-sites.ps1 2>&1 | Tee-Object -FilePath bin/wkappbot.hq/logs/real-sites-ci.log
+          }
+
       - name: Post result to daily board
         if: always() && github.event_name == 'schedule'
         uses: actions/github-script@v7
