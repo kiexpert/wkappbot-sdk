@@ -123,6 +123,7 @@ jobs:
           exit $rc
 
       - name: Run real-site a11y tests
+        if: always()
         id: real_sites
         shell: pwsh
         continue-on-error: true
