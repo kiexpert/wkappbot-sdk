@@ -113,6 +113,40 @@ function Save-TextLog {
     return $path
 }
 
+function Save-BrokerShot {
+    param([string]$Site, [string]$CDPGRAP, [string]$HW, [string]$BrokerDesc)
+    $expDir = 'bin/wkappbot.hq/experience/brokers'
+    New-Item -Force -ItemType Directory -Path "$expDir/$($Site.ToLowerInvariant())" | Out-Null
+    $ts = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $shotPath = "$expDir/$($Site.ToLowerInvariant())/$ts.png"
+
+    # Try node-level screenshot first (targets blocking element specifically)
+    $brokerGraps = @(
+        "*cookie*;$HW",
+        "*consent*;$HW",
+        "*Accept*;$HW",
+        "*overlay*;$HW"
+    )
+    $shotOk = $false
+    foreach ($bg in $brokerGraps) {
+        $r = Invoke-WK -WkArgs @('a11y','screenshot',$bg,'--path',$shotPath) -TimeoutSec 8
+        if ($r.Ok -and (Test-Path $shotPath)) { $shotOk = $true; break }
+    }
+    # Fallback: full Chrome screenshot
+    if (-not $shotOk) {
+        $r = Invoke-WK -WkArgs @('a11y','screenshot',$CDPGRAP,'--path',$shotPath) -TimeoutSec 8
+        if ($r.Ok -and (Test-Path $shotPath)) { $shotOk = $true }
+    }
+
+    if ($shotOk) {
+        Write-Host "  [BROKER:SHOT] path=$shotPath desc=$BrokerDesc"
+        # Save metadata JSON alongside screenshot
+        @{ site=$Site; ts=$ts; desc=$BrokerDesc; grap=$CDPGRAP; shot=$shotPath } | ConvertTo-Json | Set-Content "$shotPath.meta.json" -Encoding utf8
+    } else {
+        Write-Host "  [BROKER:SHOT] screenshot failed for $Site"
+    }
+}
+
 function Open-Site {
     param(
         [string]$Site,
@@ -325,12 +359,14 @@ function Open-Site {
     $brokerPatterns = 'cookielaw|cookie-consent|gdpr-consent|onetrust|sign in.*required|captcha|paywall'
     if ($html -match $brokerPatterns) {
         Write-Host "  [BROKER:PRE] Cookie/consent detected in HTML -- automation may be affected"
+        Save-BrokerShot $Site $CDPGRAP $HW 'cookie-consent-pre-action'
     }
 
     # Also check via a11y find for blocking overlay
     $brokerFind = Invoke-WK -WkArgs @('a11y','find',"*Accept*cookies*;*Cookie*consent*;*Accept all*#$HW") -TimeoutSec 8
     if ($brokerFind.Output -match 'TARGET') {
         Write-Host "  [BROKER:PRE:A11Y] Blocking overlay found in UIA tree: $($brokerFind.Output | Select-String 'TARGET' | Select-Object -First 1)"
+        Save-BrokerShot $Site $CDPGRAP $HW 'blocking-overlay-pre-action'
     }
 
     # Continue regardless of broker (just warn)
