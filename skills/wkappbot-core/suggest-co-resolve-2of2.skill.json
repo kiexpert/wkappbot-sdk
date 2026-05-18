@@ -1,0 +1,68 @@
+{
+  "id": "suggest-co-resolve-2of2",
+  "app": "wkappbot-core",
+  "title": "Suggest 2-of-2 Co-Resolve: Cross-Author Confirmation",
+  "title_ko": null,
+  "desc": "When wkappbot suggest resolve is called by a different channel than the suggest author, requires 2-of-2 confirmation before marking resolved. Prevents maintainer fake bulk-resolves.",
+  "steps": [
+    "resolver_channel = AbbreviateCwd(CWD) compared case-insensitively to suggest.from",
+    "Cross-author 1st resolve: writes half_resolved_by/note/at/skill + half_resolved_evidence (script content inline) + half_resolved_evidence_ext to suggest entry, posts Slack thread asking author to confirm.",
+    "Cross-author second resolve (other party): completes 2/2, moves to history with both notes",
+    "Same-author self-resolve (full flow): requires --confirm --skill X --commit <hash> --class <ClassName|skill-only>. Commit message MUST contain keywords from suggest title (guard checks word-by-word). If no fix commit exists, use git commit --allow-empty -m '...' with title keywords embedded. --class skill-only for doc/skill-only changes.",
+    "--force reason: bypasses gate, posts override notice to Slack thread",
+    "--confirm flag: 2nd-party confirmation path. Skips ALL evidence file checks (goto SkipEvidenceChecks). Only requires --skill. Moves to BOTH resolver history (wkappbot.hq/) AND suggester history ({suggest.cwd}/.wkappbot/).",
+    "Verified 2026-04-26: test-suggest-resolve-coresolve.sh (resolve ts=2026-04-26T10:44:21.4731572Z)",
+    "AUTO-CONFIRM (Eye-side, runs at startup + hourly): suggest auto-confirm [--dry-run]. Pre-check binary built after half_resolved_at → run stored evidence script in this context → pass: --confirm → history. fail: stays HALF.",
+    "SUGGESTER CHECK (author-side, ID only): wkappbot suggest check <ts>. Shows: fixed-by + note + runs regression script → PASSED/FAILED. Offers 'suggest check <ts> --confirm' or add-requirement. No evidence flags needed for original author.",
+    "DUAL HISTORY: on full resolve, appends to (1) {wkappbot.hq}/suggestions_history.jsonl (resolver/WKAppBot) AND (2) {suggest.cwd}/.wkappbot/suggestions_history.jsonl (suggester project). Each project owns its audit trail.",
+    "SUGGESTER GUARD (2026-05-01): when suggester (same channel as suggest.from) runs resolve WITHOUT --confirm: (A) if 1/2 already exists → ERROR + copy-pasteable 'suggest check <ts> --confirm', return 1. (B) if no half yet → INFO reminder that resolve is maintainer's command + 'suggest check <ts>', proceeds anyway (same-author still allowed).",
+    "REQUIREMENT DESIGN RULES (learned 2026-05-09): (1) Never hardcode hwnd — session-specific, always stale next run. (2) Never test transient state (popup visible, specific dialog open) — will fail when popup gone. (3) Test behavior that is reproducible any time. (4) If bug is 'cmd X fails', requirement should test 'workaround Y works' not 'X now succeeds' — X won't succeed until fix ships.",
+    "LEGACY MERGE 0-REQUIREMENTS FIX (2026-05-18): CollectEffectiveRequirements in SuggestCommand.Resolve.Helpers.cs extended to search suggestions.bak.*.jsonl (pre-merge snapshots) + active suggestions.jsonl (--keep-originals path) in addition to suggestions_history.jsonl. Recovers requirements from legacy merge entries where mergedTs children were deleted at merge time and never resolved to history. Search order: history -> active -> backups (newest first). 875 of 890 merge records were affected before fix.",
+    "FIX BUILD STEP: rebuild WKAppBot.CLI after Helpers.cs edit via dotnet publish Release; verify by inspecting build output for zero errors"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest resolve <cross-author-ts> note --skill X --evidence Y",
+      "expect": "[RESOLVE:HALF] 1/2 by DG-WKAppBot -- waiting for DG-WkAutoQuant to confirm",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve <ts> note --confirm --skill X --evidence Y",
+      "expect": "[RESOLVE:DONE] 2/2 complete",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve <same-author-ts> note --skill X --evidence Y",
+      "expect": "resolves immediately (no 2-of-2 needed)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest resolve ts note --skill X --evidence Y",
+      "expect": "cross-author triggers 1/2 half-resolve",
+      "prompt": "2-of-2 co-resolve implemented. Commit 0141cf80."
+    },
+    {
+      "cmd": "wkappbot suggest resolve ts note --confirm --skill X --evidence Y",
+      "expect": "second party completes 2/2",
+      "prompt": "2-of-2 co-resolve implemented. Commit 0141cf80."
+    },
+    {
+      "cmd": "wkappbot suggest resolve ts note --force reason --skill X",
+      "expect": "override with Slack notice",
+      "prompt": "2-of-2 co-resolve implemented. Commit 0141cf80."
+    },
+    {
+      "cmd": "wkappbot suggest check <ts>",
+      "expect": "fixed-by",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot suggest resolve ts note --skill X --evidence Y",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T10:51:38.888765Z",
+  "updated": "2026-05-18T08:19:19.8161817Z",
+  "version": "1.24"
+}

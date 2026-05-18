@@ -1,0 +1,63 @@
+{
+  "id": "a11y-find",
+  "app": "wkappbot",
+  "title": "a11y find - output format and process resolution",
+  "title_ko": null,
+  "desc": "How wkappbot a11y find resolves windows and process trees, and how to keep its output aligned with the current # FOCUS / # TARGET / # INFO contract. Useful when Claude or Codex is changing find behavior or debugging target ambiguity: proc is the identity, hwnd is the disambiguator, and root hwnd is only a search entry point. Include short operator flags only when they help verification or debugging.",
+  "steps": [
+    "Keep the emitted output aligned with the current contract: one shared # FOCUS line, one # TARGET block per match, and optional indented # INFO lines.",
+    "Treat the grap as what was actually matched: proc/domain/cmd/title/cls/file are matchable fields; hwnd is for disambiguation, not identity.",
+    "Separate root hwnd from process-owned hwnd; when a process has no own window, resolve its effective host window through the parent chain.",
+    "Keep output shell-safe and markdown-friendly: quote the full grap expression, avoid extra noise, and preserve paste-ready tokens.",
+    "Prefer short operator flags like verify, review, and dry-run when they make the workflow safer or easier to audit.",
+    "Verify by rerunning a11y find on the emitted hwnd:0x... token and checking [OK].",
+    "Prefer process-first search logic for matching, but preserve focus context whenever interaction side effects could matter.",
+    "[v6.2+ SCORE OUTPUT] find [OK] includes score={field:score,...} for ALL fields. GlobCoverageScore formula: Σ(segment_len × occurrence_count) / field_len. Regex forms: re:pat (grap), /pat/ or ~pat~ (skill search, bash-safe). Regex score = literal-char-count / field_len (symbols penalized; exact match → 1.00). OR-array: best-match / n. Multi-hit boost: *chrome* in 'Google Chrome - Chrome' (2x) → 0.55 vs 0.27. All forms normalized through same GlobCoverageScore function.",
+    "[v6.2+ MDI FALLBACK] Simple 'a11y find *pattern*' now auto-scans MDI child windows when no top-level matches found. Covers HTS/MDI apps (Heroes4, nkrunlite) previously requiring explicit {proc:'nkrunlite',title:'*foo*'} JSON5. Simple-pattern path FindWindows now includes MDI child enumeration fallback. Explicit JSON5 still faster when host proc is known.",
+    "[v6.2+ CMD FALLBACK NOISE FIX] IsSearcherProcess filter excludes bash/sh/cmd/powershell/pwsh/wkappbot* from cmd: fallback matching. Prevents generic wildcard patterns from returning VS Code as a result via bash process cmdline containing the pattern substring. cmd: secondary scan is now also skipped when top-level results already found.",
+    "[v6.2+ EXAMPLES] Concrete verified behaviors:\n  1) 'wkappbot a11y find *panel-title-wildcard*' -> finds MDI child window directly, [OK] with score={}, no proc:/JSON5 needed.\n  2) 'wkappbot a11y find {proc:chrome,domain:chatgpt.com}' -> [OK] Nms score={domain:1.00,proc:1.00,cls:1.00,title:...}, multi-field exact.\n  3) 'wkappbot a11y find *Code*' (VS Code) -> completes <3s (was 50s), score shows proc:1.00; cmd: fallback does NOT return bash/wkappbot children.\n  4) 'wkappbot a11y find *nkrunlite*' -> <5s (was ~50s), MFC UIA discovery skipped.\nWhen updating a11y find code, these four cases are the regression baseline.",
+    "[v6.3+ AMB OUTPUT] Multiple matches: [OK] replaced with [AMB:N] where N = total match count. Single unique match stays [OK]. [AMB:N] signals grap needs tightening -- use score={} output to pick a higher-scoring field to add for precision. Example: [AMB:3] score={domain:1.00,proc:1.00,cls:0.54,title:0.22} -> add domain: or tighten title wildcard.",
+    "Verified 2026-04-24: test-a11y-find-grap-verify-miss.ps1 (resolve ts=2026-04-23T02:56:33)",
+    "[v6.3+ CLS PATH] cls ancestor path: simple pattern matches own class AND descendants. Path pattern cls:'A/B' matches window class A whose parent contains B. cls:'**/_NKHero*' finds any depth. Each segment is substring-matched. Score context: cls:'Afx:00DB0000/_NKH':0.85 shows matched segment. Coverage score applies per path segment.",
+    "PARENT CHAIN FIELDS (2026-05-18): ppid:N (direct parent PID), ppids:N or ppids:[N1,N2,...] (any ancestor, scalar=same as [N]), ppids:'' (output ancestor chain). Example: wkappbot windows {proc:'bash',ppids:[MY_CLAUDE_PID]} finds only bash shells from your session. ancestor:N field removed (replaced by ppids:N). (commits c92dc4621 -> d3688cf7c)",
+    "USAGE NOTE (2026-05-18): ppids filter works correctly for processes found by PROC-mode scan. Console processes (bash shells) with no top-level HWND ARE found when proc: is specified (windowless scan), but console bash children of claude.exe with no visible window are NOT enumerated unless explicitly targeted by pid:. Use ppids:'' to reveal ancestor chain of matched processes. Example confirmed: {proc:'bash',ppids:[PARENT_PID]} correctly includes/excludes by parent chain; {proc:'bash',ppids:''} shows ancestors: chain in output.",
+    "2026-05-18: CDP DOM fallback added for Chrome wildcard finds. When UIA wildcard returns 0 results on Chrome target, fallback tries CDP querySelector with aria-label/placeholder/type=search patterns. Fix: A11yCommand.cs Core commit a55d44577."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read grap",
+      "expect": "GRAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find --help",
+      "expect": "find",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows --help",
+      "expect": "windows",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "find",
+    "grap",
+    "architecture",
+    "codex",
+    "verify",
+    "shell-safe",
+    "review",
+    "dry-run",
+    "operator",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T13:48:27.1734429Z",
+  "updated": "2026-05-18T07:06:53.0391755Z",
+  "version": "1.29"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "file-as-scheduler-pending-prompts-pattern",
+  "app": "wkappbot-core",
+  "title": "File-as-scheduler: pending_prompts/ filename-encoded schedule pattern",
+  "title_ko": "파일명이 곧 스케줄 -- pending_prompts 패턴",
+  "desc": "Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.",
+  "steps": [
+    "INSIGHT: Store deferred prompts as files in {cwd}/.wkappbot/pending_prompts/. Filename encodes everything -- no JSON parse needed for scheduling decisions.",
+    "FILENAME SCHEMA: prompt_{triggerUtc|NOW}_{guid8}[,rep=Nh|Nm|Ns][,cnt=N][,tod=HHMM-HHMM][,days=weekdays|weekends|mon-fri|1-5|mon,wed,fri].json",
+    "TOD/DAYS GATE: tod=HHMM-HHMM (local time) + days=weekdays|weekends|mon-fri|mon,wed,fri skips DELIVERY but still reschedules (rep= rename). Prompt fires only inside window; outside window: silent skip + next trigger queued. Eye holds zero window state.",
+    "TIME GATE: string.Compare(trigger, nowTag) <= 0 -- no JSON parse, no DateTime.Parse. NOW always passes. Sorted files give chronological delivery order. triggerUtc=yyyyMMddHHmmss (lexicographic sort = chronological).",
+    "MANAGEMENT: wkappbot schedule pending list [--cwd <path>] -- shows all file-schedules with parsed params. wkappbot schedule pending delete <pattern|--all> [--cwd <path>] -- deletes by name substring or * glob. Only way to cancel infinite rep= (no cnt=) schedules.",
+    "EXAMPLES: prompt_NOW_abc12345.json (session-miss, deliver asap), prompt_20260429090000_def,rep=24h.json (daily forever), prompt_20260429090000_ghi,rep=20m,tod=0900-1530,days=weekdays.json (weekday market-hours every 20min), prompt_20260429090000_xyz,rep=24h,cnt=5.json (daily 5x then done).",
+    "TIME GATE: string.Compare(trigger, nowTag) <= 0 -- no JSON parse, no DateTime.Parse. NOW always passes. Sorted files give chronological delivery order.",
+    "LIFECYCLE: rename on delivery → update trigger to next time, decrement cnt. cnt=0 → delete. rep without cnt → rename forever. File born → evolves → dies. Eye holds ZERO state in memory.",
+    "ATOMIC CLAIM (race-free): File.Move(f, f+'.processing', overwrite:false). Only one thread wins. Loser skips. Error → rename back to .json for next drain retry.",
+    "DRAIN TRIGGERS: (1) OnCommandArrived: any wkappbot cmd from that CWD fires immediately. (2) Eye startup AuditOnStartup. (3) Successful prompt delivery auto-drains siblings. (4) deliver_after: skip until time.",
+    "SESSION-MISS: no target session → re-append with exponential backoff (30s→300s, infinite retries). No Slack escalation. No retry limit. File waits silently.",
+    "DURABILITY: wkappbot uninstalled → files survive. Reinstall → AuditOnStartup finds files → delivers. The OS is the persistence layer.",
+    "BEAUTY: cnt=5 recurring = 5 files created once, each self-destructs after delivery. OR one file with cnt=5 that renames itself 5 times then deletes. Same result, different philosophy.",
+    "2026-05-02: BUG-AUTO auto-queue -- SuggestCommand.QueueBugAutoPromptIfNeeded creates prompt_YYYYMMDDHHMMSS_{guid8},tag=bugauto.json on BUG-AUTO submit. 1s DeliverAfter, 60s dedup window (checks recent tag=bugauto files). WkChannel.Prompt, Priority=3.",
+    "2026-05-02: BUG-AUTO auto-queue -- SuggestCommand.QueueBugAutoPromptIfNeeded creates prompt_YYYYMMDDHHMMSS_{guid8},tag=bugauto.json on BUG-AUTO submit. 1s DeliverAfter, 60s dedup window (checks recent tag=bugauto files). WkChannel.Prompt, Priority=3.",
+    "2026-05-18 BUG OBSERVED: Multiple prompt_NOW_*.json.processing files stuck in personal-docs/.wkappbot/pending_prompts/ -- evidence of concurrent workers racing on NOW delivery (suggest ts=2026-05-14T07:15:42). Fix needed: SemaphoreSlim(1,1) guard on NOW dispatch + async Task.Run delivery + CPU-load abort check. Stuck .processing files can be manually deleted to recover.",
+    "2026-05-18 BUG: Multiple prompt_NOW stuck in .processing (suggest ts=2026-05-14T07:15:42). Concurrent workers race on NOW delivery causing keyboard freeze. Fix: SemaphoreSlim(1) on dispatch + async Task.Run + CPU abort check."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file glob \"**/.wkappbot/pending_prompts/*.json\"",
+      "expect": "(any result)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read file-as-scheduler-pending-prompts-pattern",
+      "expect": "cnt",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "scheduler",
+    "file-based",
+    "pending-prompts",
+    "zero-memory",
+    "pattern",
+    "notify",
+    "recurring",
+    "deferred"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T11:14:28.300666Z",
+  "updated": "2026-05-18T07:23:14.7694972Z",
+  "version": "1.14"
+}

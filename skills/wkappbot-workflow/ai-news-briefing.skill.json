@@ -1,0 +1,60 @@
+{
+  "id": "ai-news-briefing",
+  "app": "wkappbot-workflow",
+  "title": "AI News Briefing — lunch and dinner automated digest",
+  "title_ko": null,
+  "desc": "Twice-daily (11:00, 18:00) AI news digest -- see ai-news-to-suggests for the full pipeline including Gemini filter and improvement workflow.",
+  "steps": [
+    "OVERVIEW: automated AI news digest at 11:00 (lunch) and 18:00 (dinner). Searches 5 keyword queries, filters via Gemini for WKAppBot relevance, registers top 3 as suggests, announces one-line summary via TTS, posts full briefing to Slack.",
+    "SEARCH KEYWORDS: 'AI desktop automation 2026', 'Windows accessibility API AI', 'Claude computer use update', 'UI automation agent framework', 'LLM tool use MCP update'. Tunable — add domain-specific terms as WKAppBot evolves.",
+    "PIPELINE: (1) wkappbot web search <keyword> --limit 3 x5 queries → raw results. (2) wkappbot ask gemini '<filter prompt>' → top 3 relevant items with TITLE/URL/WHY/SUMMARY. (3) wkappbot suggest '[AI-NEWS] title: why' per item. (4) wkappbot speak 'first summary' (TTS one-liner). (5) wkappbot slack send full briefing with all items.",
+    "SCHEDULE: wkappbot schedule add 'bash .../ai-news-briefing.sh' --at 11:00 --repeat 24h (and same for 18:00). Eye must be running for schedule execution.",
+    "SCRIPT LOCATION: bin/wkappbot.hq/scripts/ai-news-briefing.sh",
+    "GEMINI FILTER PROMPT: instructs Gemini to output structured TITLE/URL/WHY/SUMMARY format, or NONE if nothing relevant. Keep prompt tight to avoid hallucinated URLs.",
+    "COST: 5 web searches + 1 Gemini call per run = ~10 API calls/day. Minimal token usage since search results are short and Gemini prompt is focused.",
+    "KNOWN ISSUE: Gemini ask can hang if rate-limited or network slow. Script needs --timeout on ask command to prevent indefinite wait. TODO: add 30s timeout to ask gemini call.",
+    "SUGGEST TAG: all news items tagged [AI-NEWS] in suggest text for easy filtering via 'wkappbot suggest list' grep.",
+    "EXIT ADMIN SESSION: briefing runs as user (no --sudo needed). No admin Eye involvement.",
+    "SUGGEST DEDUPE AND SKILL HEALING: Before filing or resolving AI-NEWS suggests, compare against existing AI-NEWS skills and pending suggests for duplicate URLs/titles. When a news item reveals reusable workflow knowledge, update the related skill during the same pass before resolving.",
+    "Verified 2026-05-17:  (resolve ts=2026-05-15T09:07:44)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "AI-NEWS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ai-news",
+      "expect": "ai-news-briefing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ai-news-competitive-eval",
+      "expect": "SUGGEST-DRIVEN SKILL HEALING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ai-news-briefing",
+      "expect": "ai-news-briefing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "news",
+    "briefing",
+    "automation",
+    "schedule",
+    "gemini",
+    "suggest",
+    "speak",
+    "slack"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T03:55:34.0207283Z",
+  "updated": "2026-05-18T08:03:37.8465333Z",
+  "version": "1.5"
+}

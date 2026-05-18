@@ -13,7 +13,11 @@
     "Windows Terminal Multi-Tab Edge Case (EyeCmdPipeClient.cs:207-212): Each WT tab has OWN CASCADIA_HOSTING_WINDOW_CLASS top-level hwnd (not shared; all tabs same WT pid but unique hwnd per tab). When user types in WT tab, that tab's CASCADIA window IS the foreground. Therefore GetForegroundWindow() directly returns correct tab hwnd. Parent walk unnecessary for WT (console window check catches it). Gotcha: Older logic assumed all WT tabs share one hwnd -- WRONG.",
     "Logging & Telemetry (cdp-state.jsonl): Every validation logged to wkappbot.hq/runtime/cdp-state.jsonl: [VALIDATION] hwnd=0x48152E class=ConsoleWindowClass rect=(L=33,T=26,R=1012,B=538) size=(979x512) IsWindow=True IsVisible=False verdict=not_visible. [LAUNCHER] ask: caller window is off-screen (console:0x... host:0x... fg:0x...). Run from a terminal/IDE owned by your project. Use telemetry to diagnose off-screen or invalid caller rejections in production.",
     "Key Code Locations:\n(1) MyCdpContext.cs:163-227 -- priority cascade + validation orchestration\n(2) MyCdpContext.cs:340-399 -- validation logic (8-point checklist)\n(3) Program.cs:234-258 -- GetParentProcessId loop\n(4) EyeCmdPipeClient.cs:207-212 -- WT tab detection\n(5) CoreRunner.cs:140-144 -- WKAPPBOT_CALLER_HWND env forwarding\n\nKey commits:\n(1) e10bc11e -- persist HWND validation rejections\n(2) ca987a3f -- fix off-screen check + multi-monitor + DWM cloak (RECT fix)\n(3) 655e9d7c -- forward WKAPPBOT_CALLER_HWND through env block\n(4) dd10359f -- place WebBot next to validated caller\n(5) e4737593 -- add foreign-process guard (allow-list)",
-    "SEE ALSO: wkappbot skill read standard-appbot-window -- complete definitive reference for Standard AppBot Window detection, IPC, ConPTY, multi-tab, iconified, placement, all gaps fixed."
+    "SEE ALSO: wkappbot skill read standard-appbot-window -- complete definitive reference for Standard AppBot Window detection, IPC, ConPTY, multi-tab, iconified, placement, all gaps fixed.",
+    "2026-05-18: Added CHROME:WARN CALLER_UNDETECTABLE log in ChromeLauncher.CallerRecovery.cs (commit 5383b02e9) -- emitted when all 3 recovery tiers fail. Also: VS Code/devenv caller window filtered from CWD resolution to prevent prompt injection CWD mismatch (suggest ts=2026-05-14T18:26:23).",
+    "2026-05-18 fix-in-progress: prompt injection CWD mismatch (suggest ts=2026-05-14T18:26:23) -- when wkappbot's parent or ancestor is Code.exe / devenv.exe / rider64 / idea64 / windsurf, GetProcessCurrentDirectory returns IDE install path. Filter these process names when resolving parentCwd in WebCommands.Part1.cs (DeriveCdpPort and ConnectCdp) and AskCommands.Entry.Cdp.cs (EnsureCdpConnection).",
+    "2026-05-18 FIX 2 ready-to-delegate: WebCommands.Part1.cs site A (DeriveCdpPort line 38) already patched to use GetNonIdeProcessCwd. Remaining: site B (ConnectCdp parent CWD line 87), site C (AskCommands.Entry.Cdp.cs EnsureCdpConnection ppid line 278), helper definition in WebCommands.Diagnostics.cs. Helper filters Code, Code - Insiders, devenv, rider64, idea64, windsurf.",
+    "2026-05-18 delegating remaining 3 edits to wkcodex: WebCommands.Part1.cs L87, AskCommands.Entry.Cdp.cs L278, WebCommands.Diagnostics.cs helper definition. Then dotnet publish smoke test."
   ],
   "requirements": null,
   "primary_cmd": null,
@@ -31,6 +35,6 @@
   "regression_script": null,
   "author": null,
   "created": "2026-05-15T15:53:00.714243Z",
-  "updated": "2026-05-15T15:53:01.297966Z",
-  "version": "1.2"
+  "updated": "2026-05-18T07:56:30.6755915Z",
+  "version": "1.9"
 }

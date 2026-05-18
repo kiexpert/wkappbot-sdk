@@ -9,7 +9,9 @@
     "Fix layer 1 (ChromeLauncher.SessionRestore.cs): Before launching Chrome, call SuppressSessionRestoreInPreferences(userDataDir) to patch Default/Preferences: set profile.exit_type=Normal, profile.exited_cleanly=true, delete browser.window_placement. This kills session restore at the source.",
     "Fix layer 2 (CdpClient.WindowStabilize.cs): In SetWindowBoundsWaitStableAsync, on BOUNDS:TIMEOUT, send one final Browser.setWindowBounds with requested coords + short stability poll before surfacing BUG-AUTO suggest.",
     "Verify: after fix, wkappbot ask gpt say hello completes in under 5s with no [CDP:BOUNDS:TIMEOUT] or AutoSuggestPositionMismatch in logs.",
-    "OWNERSHIP NOTE: Both fix layers live in the PRIVATE Core repo only -- SDK launcher has no direct control. ChromeLauncher.SessionRestore.cs and CdpClient.WindowStabilize.cs are in D:\\GitHub\\WKAppBot\\csharp\\src\\WKAppBot.WebBot\\. SDK side: invoke via standard cdp commands; fixes apply automatically at runtime. If position mismatch persists after v7.3 hot-swap, check cdp-mon for BOUNDS:TIMEOUT and verify Core is running v7.3+."
+    "OWNERSHIP NOTE: Both fix layers live in the PRIVATE Core repo only -- SDK launcher has no direct control. ChromeLauncher.SessionRestore.cs and CdpClient.WindowStabilize.cs are in D:\\GitHub\\WKAppBot\\csharp\\src\\WKAppBot.WebBot\\. SDK side: invoke via standard cdp commands; fixes apply automatically at runtime. If position mismatch persists after v7.3 hot-swap, check cdp-mon for BOUNDS:TIMEOUT and verify Core is running v7.3+.",
+    "2026-05-18 verification: Chrome off-screen at -3840,-1079 (suggest ts=2026-05-11T01:12:24) investigated -- ClampBoundsToVisible (MonitorFromPoint-based) is already applied on ALL spawn paths including suggest-triggered CDP open. Bug was pre-existing and fixed by earlier DPI commit. No new code change needed.",
+    "2026-05-18 FIX 1 applied: WebCommands.Diagnostics.cs AutoSuggestPositionMismatch -- added drift<2px early-return to silence (0,0) false positives. Verified via wkedit.sh diff."
   ],
   "requirements": [
     {
@@ -53,6 +55,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T17:34:23.8352695Z",
-  "updated": "2026-05-15T18:48:02.5979043Z",
-  "version": "1.2"
+  "updated": "2026-05-18T07:48:14.4694438Z",
+  "version": "1.6"
 }
