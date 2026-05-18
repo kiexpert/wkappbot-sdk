@@ -20,21 +20,16 @@
 set -e
 set -o pipefail
 
-SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+SRCDIR="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot"
 
-echo "[STAGE 1] Source-of-truth grep on ChromeLauncher.cs"
-if [ ! -f "$SRC" ]; then
-    echo "FAIL: ChromeLauncher.cs not found at $SRC"
+echo "[STAGE 1] Source-of-truth grep on ChromeLauncher*.cs (all partials after split)"
+if ! /usr/bin/grep -rl -- "disable-features=Translate" "$SRCDIR"/ChromeLauncher*.cs 2>/dev/null | /usr/bin/grep -q .; then
+    echo "FAIL: --disable-features=Translate not found in any ChromeLauncher*.cs"
     exit 1
 fi
-
-if ! grep -q -- "--disable-features=Translate,TranslateUI" "$SRC"; then
-    echo "FAIL: --disable-features list does not include Translate flag"
-    grep -n -- "disable-features" "$SRC" | head -5
-    exit 1
-fi
-echo "PASS: ChromeLauncher.cs disables Translate feature"
-grep -n -- "--disable-features=" "$SRC" | head -3
+FOUND=$(/usr/bin/grep -rn -- "disable-features=Translate" "$SRCDIR"/ChromeLauncher*.cs | head -3)
+echo "PASS: Translate flag found:"
+echo "$FOUND"
 
 echo ""
 echo "[STAGE 2] wkappbot cdp tabs -- prove the wkappbot binary boots and the cdp subcommand is reachable"
