@@ -65,6 +65,11 @@ jobs:
         $size = (Get-Item $exe).Length / 1KB
         Write-Host "LegacyControlZoo.exe verified: $([Math]::Round($size, 2)) KB"
 
+    - name: Run a11y tests against LegacyControlZoo
+      shell: pwsh
+      run: |
+        & .\test\legacy-app\test-legacy-app.ps1 -ExePath "test\legacy-app\build\Release\LegacyControlZoo.exe"
+
     - name: Upload LegacyControlZoo artifact
       if: ${{ always() }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
