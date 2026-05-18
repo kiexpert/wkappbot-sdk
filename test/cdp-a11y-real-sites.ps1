@@ -416,8 +416,13 @@ function Test-Eval {
 
 function Test-Scroll {
     param([object]$Ctx)
-    $ok = Run-WK @("a11y","scroll",$Ctx.HW,"--direction","down") $null "$($Ctx.Site) scroll down" 15
+    # Use CDPGRAP form ({proc:chrome,cdp:N}) so the page-level CDP scroll fallback fires.
+    # Bug 2026-05-17T20:15:06: scroll without #scope was auto-redirected to inspect; now fixed.
+    # Fix verified: a11y scroll {proc:chrome,cdp:N} --direction down -> document.scrollingElement.scrollBy via Runtime.evaluate.
+    $ok = Run-WK @("a11y","scroll",$Ctx.CDPGRAP,"--direction","down") $null "$($Ctx.Site) scroll down" 15
     Check-Step $Ctx.Site $ok "scroll down" | Out-Null
+    $okUp = Run-WK @("a11y","scroll",$Ctx.CDPGRAP,"--direction","up","--amount","large") $null "$($Ctx.Site) scroll up large" 15
+    Check-Step $Ctx.Site $okUp "scroll up large" | Out-Null
 }
 
 function Test-Screenshot {
@@ -475,6 +480,21 @@ function Test-YouTube {
 
     Test-Find $ctx "*search*" "TARGET" "find search" | Out-Null
     Test-Eval $ctx "document.title" "YouTube" "read title"
+
+    # REGRESSION: suggest 2026-05-17T20:14:36 -- `a11y read` returned skeleton
+    # HTML on YouTube because the CDP path read document.body.innerText BEFORE
+    # JS finished hydrating dynamic content. Fix: A11yReadBrowserFirst now
+    # WaitForLoadAsync + CdpReadSettle + retry up to 3x if chars < 200.
+    # This test asserts the read returns >= 200 chars of meaningful content.
+    $readResult = Run-WK @("a11y","read",$ctx.CDPGRAP) $null "YOUTUBE a11y read (hydrated)" 30
+    $readChars = $script:LastWKOutput.Length
+    if ($readResult -and $readChars -ge 200 -and $script:LastWKOutput -match '(YouTube|video|subscribe|trending|home|shorts)') {
+        Add-Pass "YOUTUBE" "a11y read returned hydrated content ($readChars chars)"
+    } elseif ($readChars -lt 200) {
+        Add-Bug "YOUTUBE" "youtube-a11y-read-skeleton" "a11y read returned only $readChars chars (skeleton suspected; expected >= 200)"
+    } else {
+        Add-Fail "YOUTUBE" "a11y read content check" "$readChars chars but no YouTube-content keywords"
+    }
 
     $typeOk = Run-WK @("a11y","type","*search*#$($ctx.HW)","wkappbot automation") $null "YOUTUBE type search" 20
     Check-Step "YOUTUBE" $typeOk "type search query" | Out-Null
