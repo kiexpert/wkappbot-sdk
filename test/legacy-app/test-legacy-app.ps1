@@ -11,6 +11,18 @@ if (-not (Test-Path $ExePath)) {
     exit 0
 }
 
+# Skip if wkappbot not available (CI runner without wkappbot license)
+if (-not (Get-Command wkappbot -ErrorAction SilentlyContinue)) {
+    Write-Host "SKIP: wkappbot not in PATH -- a11y tests require wkappbot. Build OK."
+    exit 0
+}
+
+# Skip if wkappbot not available (CI runner without wkappbot license)
+if (-not (Get-Command wkappbot -ErrorAction SilentlyContinue)) {
+    Write-Host "SKIP: wkappbot not in PATH -- a11y tests require wkappbot. Build OK."
+    exit 0
+}
+
 Write-Host "Starting legacy-app a11y tests (all 24 actions)"
 Write-Host "ExePath: $ExePath"
 Write-Host ""
