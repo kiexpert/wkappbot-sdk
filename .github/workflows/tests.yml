@@ -1,10 +1,10 @@
-name: Unit Tests
+﻿name: Unit Tests
 
 on:
   push:
-    paths: ['csharp/**']
+    paths: ['csharp/**', 'test/legacy-app/**']
   pull_request:
-    paths: ['csharp/**']
+    paths: ['csharp/**', 'test/legacy-app/**']
   workflow_dispatch:
 
 permissions:
@@ -35,4 +35,40 @@ jobs:
       with:
         name: test-results
         path: '**/*.trx'
+        if-no-files-found: ignore
+
+  legacy-app-build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+
+    - name: Build LegacyControlZoo
+      shell: cmd
+      run: |
+        cd test\legacy-app
+        cmake -B build -S . -G "Visual Studio 17 2022"
+        cmake --build build --config Release
+
+    - name: Verify executable
+      shell: pwsh
+      run: |
+        $exe = 'test/legacy-app/build/Release/LegacyControlZoo.exe'
+        if (-not (Test-Path $exe)) {
+          throw "LegacyControlZoo.exe not found at $exe"
+        }
+        $size = (Get-Item $exe).Length / 1KB
+        Write-Host "LegacyControlZoo.exe verified: $([Math]::Round($size, 2)) KB"
+
+    - name: Upload LegacyControlZoo artifact
+      if: ${{ always() }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+      with:
+        name: legacy-app-build-${{ github.run_id }}
+        path: test/legacy-app/build/Release/LegacyControlZoo.exe
         if-no-files-found: ignore
