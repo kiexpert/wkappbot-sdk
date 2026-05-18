@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$ExePath = "$PSScriptRoot\build\Release\LegacyControlZoo.exe"
 )
 
@@ -11,13 +11,15 @@ if (-not (Test-Path $ExePath)) {
     exit 0
 }
 
-Write-Host "Starting legacy-app a11y tests"
+Write-Host "Starting legacy-app a11y tests (all 24 actions)"
 Write-Host "ExePath: $ExePath"
 Write-Host ""
 
 # Counters
 $script:TotalPass = 0
 $script:TotalFail = 0
+$script:TotalSoftFail = 0
+$script:TestCount = 0
 
 function Invoke-WK {
     param([string[]]$WkArgs, [int]$TimeoutSec = 10)
@@ -47,7 +49,8 @@ function Invoke-WK {
 function Run-Test {
     param([string]$TestName, [string[]]$WkArgs, [string]$ExpectPattern, [bool]$IsTier1 = $true)
 
-    Write-Host -NoNewline "Testing: $TestName ... "
+    $script:TestCount++
+    Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] $TestName ... "
     $result = Invoke-WK $WkArgs
 
     if ([string]::IsNullOrEmpty($ExpectPattern)) {
@@ -60,7 +63,8 @@ function Run-Test {
                 Write-Host "FAIL [exit:$($result.ExitCode)]"
                 $script:TotalFail++
             } else {
-                Write-Host "BUG (logged)"
+                Write-Host "SOFT-FAIL [exit:$($result.ExitCode)]"
+                $script:TotalSoftFail++
             }
             return $false
         }
@@ -72,10 +76,11 @@ function Run-Test {
         return $true
     } else {
         if ($IsTier1) {
-            Write-Host "FAIL [expected: $ExpectPattern]"
+            Write-Host "FAIL [expected pattern match]"
             $script:TotalFail++
         } else {
-            Write-Host "BUG (logged)"
+            Write-Host "SOFT-FAIL [expected pattern match]"
+            $script:TotalSoftFail++
         }
         return $false
     }
@@ -93,56 +98,120 @@ try {
 }
 
 Write-Host ""
-Write-Host "================================================"
-Write-Host "TIER 1 - UIA Standard Controls (must pass)"
-Write-Host "================================================"
+$grap = "{title:'LegacyControlZoo - WKAppBot Test'}"
+
+Write-Host "=== DISCOVERY ==="
 Write-Host ""
 
-# T1-1: Find the window
-Run-Test "T1-1: windows discovery" @("windows", "LegacyControlZoo") "LegacyControlZoo" $true | Out-Null
+# 1. inspect
+Run-Test "1. inspect" @("a11y", "inspect", $grap) "ControlType|Name|AutomationId" $true | Out-Null
 
-# T1-2: Find via a11y
-Run-Test "T1-2: a11y find" @("a11y", "find", "*LegacyControlZoo*") "# TARGET" $true | Out-Null
+# 2. find
+Run-Test "2. find" @("a11y", "find", "*LegacyControlZoo*") "# TARGET" $true | Out-Null
 
-# T1-3: Screenshot
-Run-Test "T1-3: screenshot" @("a11y", "screenshot", "{title:'LegacyControlZoo - WKAppBot Test'}") "\[OK\]" $true | Out-Null
+# 3. windows
+Run-Test "3. windows" @("windows", "LegacyControlZoo") "LegacyControlZoo" $true | Out-Null
 
-# T1-4: Read
-Run-Test "T1-4: read" @("a11y", "read", "{title:'LegacyControlZoo - WKAppBot Test'}") ".+" $true | Out-Null
+# 4. screenshot
+Run-Test "4. screenshot" @("a11y", "screenshot", $grap) "\[OK\]" $true | Out-Null
 
-# T1-5: Type (send text to control)
-Run-Test "T1-5: type" @("a11y", "type", "{title:'LegacyControlZoo - WKAppBot Test'}", "hello") "\[OK\]" $true | Out-Null
-
-# T1-6: Scroll
-Run-Test "T1-6: scroll" @("a11y", "scroll", "{title:'LegacyControlZoo - WKAppBot Test'}") "\[OK\]" $true | Out-Null
+# 5. ocr
+Run-Test "5. ocr" @("a11y", "ocr", $grap) ".+" $true | Out-Null
 
 Write-Host ""
-Write-Host "================================================"
-Write-Host "TIER 2/3 - Owner-Drawn Controls (logged, not fatal)"
-Write-Host "================================================"
+Write-Host "=== WINDOW MANAGEMENT ==="
 Write-Host ""
 
-# T2-1: Toolbar (owner-drawn, likely to fail)
-Run-Test "T2-1: toolbar find" @("a11y", "find", "*toolbar*#{title:'LegacyControlZoo - WKAppBot Test'}") "# TARGET" $false | Out-Null
+# 6. minimize
+Run-Test "6. minimize" @("a11y", "minimize", $grap) "\[OK\]" $true | Out-Null
 
-# T2-2: Status bar (owner-drawn, likely to fail)
-Run-Test "T2-2: statusbar find" @("a11y", "find", "*status*#{title:'LegacyControlZoo - WKAppBot Test'}") "# TARGET" $false | Out-Null
+# 7. restore (after minimize)
+Run-Test "7. restore" @("a11y", "restore", $grap) "\[OK\]" $true | Out-Null
+
+# 8. maximize
+Run-Test "8. maximize" @("a11y", "maximize", $grap) "\[OK\]" $true | Out-Null
+
+# 9. restore (after maximize)
+Run-Test "9. restore (after maximize)" @("a11y", "restore", $grap) "\[OK\]" $true | Out-Null
+
+# 10. move
+Run-Test "10. move" @("a11y", "move", $grap, "--x", "100", "--y", "100") "\[OK\]" $true | Out-Null
+
+# 11. resize
+Run-Test "11. resize" @("a11y", "resize", $grap, "--width", "800", "--height", "600") "\[OK\]" $true | Out-Null
+
+# 12. focus
+Run-Test "12. focus" @("a11y", "focus", $grap) "\[OK\]" $true | Out-Null
 
 Write-Host ""
-Write-Host "================================================"
-Write-Host "TEARDOWN"
-Write-Host "================================================"
+Write-Host "=== INTERACTION ==="
 Write-Host ""
 
-# Close the application
-Run-Test "Teardown: close" @("a11y", "close", "{title:'LegacyControlZoo - WKAppBot Test'}") "" $false | Out-Null
+# 13. click
+Run-Test "13. click" @("a11y", "click", $grap) "\[OK\]" $true | Out-Null
+
+# 14. invoke
+Run-Test "14. invoke" @("a11y", "invoke", $grap) "\[OK\]" $false | Out-Null
+
+# 15. type
+Run-Test "15. type" @("a11y", "type", $grap, "hello legacy") "\[OK\]" $true | Out-Null
+
+# 16. read
+Run-Test "16. read" @("a11y", "read", $grap) ".+" $true | Out-Null
+
+# 17. set-value
+Run-Test "17. set-value" @("a11y", "set-value", $grap, "test value") "\[OK\]" $false | Out-Null
+
+# 18. scroll
+Run-Test "18. scroll" @("a11y", "scroll", $grap) "\[OK\]" $true | Out-Null
+
+# 19. scroll (up)
+Run-Test "19. scroll --direction up" @("a11y", "scroll", $grap, "--direction", "up") "\[OK\]" $true | Out-Null
 
 Write-Host ""
-Write-Host "================================================"
+Write-Host "=== TREE EXPANSION ==="
+Write-Host ""
+
+# 20. expand
+Run-Test "20. expand" @("a11y", "expand", $grap) "\[OK\]" $false | Out-Null
+
+# 21. collapse
+Run-Test "21. collapse" @("a11y", "collapse", $grap) "\[OK\]" $false | Out-Null
+
+# 22. toggle
+Run-Test "22. toggle" @("a11y", "toggle", $grap) "\[OK\]" $false | Out-Null
+
+# 23. select
+Run-Test "23. select" @("a11y", "select", $grap) "\[OK\]" $false | Out-Null
+
+Write-Host ""
+Write-Host "=== WAIT & CLIPBOARD ==="
+Write-Host ""
+
+# 24. wait
+Run-Test "24. wait" @("a11y", "wait", $grap, "--timeout", "2") "\[OK\]" $true | Out-Null
+
+# 25. clipboard-write
+Run-Test "25. clipboard-write" @("a11y", "clipboard-write", "test clipboard content") "\[OK\]" $true | Out-Null
+
+# 26. clipboard-read
+Run-Test "26. clipboard-read" @("a11y", "clipboard-read") "test clipboard content" $true | Out-Null
+
+Write-Host ""
+Write-Host "=== TEARDOWN ==="
+Write-Host ""
+
+# 27. close
+Run-Test "27. close" @("a11y", "close", $grap) "\[OK\]" $true | Out-Null
+
+Write-Host ""
+Write-Host "=================================================="
 Write-Host "SUMMARY"
-Write-Host "================================================"
-Write-Host "PASSED: $($script:TotalPass)"
-Write-Host "FAILED: $($script:TotalFail)"
+Write-Host "=================================================="
+Write-Host "Total Tests: $($script:TestCount)"
+Write-Host "PASSED (TIER1): $($script:TotalPass)"
+Write-Host "FAILED (TIER1): $($script:TotalFail)"
+Write-Host "SOFT-FAIL (TIER2): $($script:TotalSoftFail)"
 Write-Host ""
 
 if ($script:TotalFail -gt 0) {
