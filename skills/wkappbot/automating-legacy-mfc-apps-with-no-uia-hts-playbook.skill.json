@@ -1,0 +1,29 @@
+{
+  "id": "automating-legacy-mfc-apps-with-no-uia-hts-playbook",
+  "app": "wkappbot",
+  "title": "Automating Legacy MFC Apps With No UIA -- HTS Playbook",
+  "title_ko": null,
+  "desc": "MFC owner-drawn controls have almost no UIA patterns -> Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL -- double input). GetSupportedPatterns() on MFC = COM corruption -- use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein ≤2 for bitmap OCR instability.",
+  "steps": [
+    "[v6.2+ DISCOVERY FAST-PATH] MFC/Afx windows (nkrunlite/Heroes4/HTS) have no meaningful UIA tree -- v6.2 SKIPS UIA batch traversal during discovery (a11y find/inspect/windows/ocr). Completes in 1-5s instead of 50s. Explicit targeting still uses UIA when ControlType exposes a pattern; only the discovery scan is bypassed. Side benefit: simple-pattern a11y find now auto-enumerates MDI child windows, so simple title wildcards resolve MDI panels without requiring {proc:'nkrunlite',title:...} JSON5. Score output (e.g. score={domain:1.00,proc:0.86,cls:0.54,title:0.22}) on [OK] line shows field discrimination -- any 1.00 field not in your grap is a precision candidate.",
+    "LegacyControlZoo: HTS pattern reproduction controls added (MaskEdit rejecting WM_SETTEXT and accepting WM_CHAR only, owner-drawn icon-only Buy/Sell buttons with empty Name, owner-drawn ListBox price grid, modal overlay blocker) provide a no-Heroes4-needed harness to validate WM_CHAR path, OCR fallback, and modal-detection logic in CI."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "hts",
+    "mfc",
+    "ocr",
+    "win32",
+    "uia",
+    "legacy",
+    "owner-drawn",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:53:02.4064792Z",
+  "updated": "2026-05-18T09:26:27.1814875Z",
+  "version": "1.4"
+}

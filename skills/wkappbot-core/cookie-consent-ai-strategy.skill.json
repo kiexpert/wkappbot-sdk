@@ -10,7 +10,8 @@
     "AFFECTED SERVICES: chatgpt.com, gemini.google.com, claude.ai, bing.com/chat, copilot.microsoft.com. May apply to other AI web frontends with usage quotas.",
     "IMPLEMENTATION: The wkcdp cookie auto-approval flow should skip AI service domains. Add to a consent-skip list in ChromeLauncher or CDP cookie handler. Do NOT file a suggest/bug when consent cookies are missing on AI domains -- intentional by design.",
     "OPERATOR ACTION: If ask pipeline hangs due to cookie banner on AI service -- do NOT auto-click Accept. Verify banner is not blocking editor input (z-order check). If blocking, dismiss via X/close only, not Accept. Let the banner remain as rejected/pending in cookie store.",
-    "EXCEPTION: Non-AI service pages (finance, news, e-commerce) may be auto-accepted as before. This strategy applies ONLY to AI quota-tracked services."
+    "EXCEPTION: Non-AI service pages (finance, news, e-commerce) may be auto-accepted as before. This strategy applies ONLY to AI quota-tracked services.",
+    "2026-05-18: triad debate test confirmed cookie no-accept strategy works. GPT responded in 8s after cookie banner auto-dismissed via X-close (commit 62687d6c1). Gemini full bearish analysis delivered. Claude blocked (login required). Strategy validated: no consent cookie = quota benefit maintained."
   ],
   "requirements": [
     {
@@ -47,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T18:24:07.4622569Z",
-  "updated": "2026-05-15T18:24:07.4622655Z",
-  "version": "1.0"
+  "updated": "2026-05-18T12:25:50.5081356Z",
+  "version": "1.1"
 }

@@ -5,7 +5,8 @@
   "title_ko": null,
   "desc": "How to correctly file suggests and contribute skills when working in the wkappbot-sdk project. Critical: CWD determines project association. Always run dev binary FROM sdk folder.",
   "steps": [
-    "Applies to: suggest, suggest resolve, skill contribute, skill edit -- all commands that write to project state"
+    "Applies to: suggest, suggest resolve, skill contribute, skill edit -- all commands that write to project state",
+    "RECOMMENDED WORKFLOW: SDK PoC to Core promotion. (1) SDK builds prototype first (e.g. wkask.ps1 new provider, web-ai-survey script). (2) Validate with real usage -- collect evidence it works. (3) Wrap in wkask.sh bash shim. (4) File suggest to Core: 'support wkappbot ask <provider> officially -- evidence: already working in wkask.sh'. (5) Core implements production version. WHY: SDK owns exploration loop, Core owns production. Never ask Core to build something unvalidated."
   ],
   "requirements": [
     {
@@ -37,6 +38,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-28T08:40:10.1628899Z",
-  "updated": "2026-04-28T08:40:18.5635547Z",
-  "version": "1.1"
+  "updated": "2026-05-18T12:32:47.8494726Z",
+  "version": "1.2"
 }
