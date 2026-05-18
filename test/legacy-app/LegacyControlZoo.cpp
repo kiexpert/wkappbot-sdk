@@ -27,6 +27,13 @@
 #define IDC_TREE            109
 #define IDC_LISTVIEW        110
 #define IDC_CUSTOM_PANEL    111
+// HTS (Heroes4) pattern reproduction controls
+#define IDC_MASKEDIT        120
+#define IDC_BTN_ICON_BUY    121
+#define IDC_BTN_ICON_SELL   122
+#define IDC_PRICE_GRID      123
+#define IDC_MODAL_BTN       124
+#define IDC_MODAL_OVERLAY   125
 
 #define IDM_MDI_CHILD       40001
 #define WTV_OWNERDRAWFIXED  0x0400
@@ -54,6 +61,74 @@ static void DrawTextLabel(HDC hdc, const wchar_t* text, RECT rc, COLORREF fg, UI
     SetTextColor(hdc, fg);
     SelectObject(hdc, g_uiFont);
     DrawTextW(hdc, text, -1, &rc, format);
+}
+
+static LRESULT CALLBACK MaskEditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam,
+                                             LPARAM lParam, UINT_PTR, DWORD_PTR)
+{
+    switch (msg) {
+    case WM_SETTEXT:
+        return FALSE;
+    case WM_CHAR: {
+        if (wParam == VK_BACK) return DefSubclassProc(hwnd, msg, wParam, lParam);
+        if (wParam < 0x30 || wParam > 0x39) { MessageBeep(MB_ICONEXCLAMATION); return 0; }
+        if (GetWindowTextLengthW(hwnd) >= 6) { MessageBeep(MB_ICONEXCLAMATION); return 0; }
+        return DefSubclassProc(hwnd, msg, wParam, lParam);
+    }
+    case WM_GETOBJECT:
+        return 0;
+    }
+    return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
+
+static LRESULT CALLBACK ModalOverlayProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg) {
+    case WM_CREATE:
+        SetTimer(hwnd, 1, 3000, nullptr);
+        return 0;
+    case WM_TIMER:
+        if (wParam == 1) {
+            KillTimer(hwnd, 1);
+            HWND owner = GetWindow(hwnd, GW_OWNER);
+            if (owner) EnableWindow(owner, TRUE);
+            DestroyWindow(hwnd);
+            return 0;
+        }
+        break;
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        FillRectColor(hdc, rc, RGB(255, 255, 200));
+        DrawTextLabel(hdc, L"Modal Dialog (auto-close 3s)", rc, RGB(0, 0, 0),
+                      DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_DESTROY: {
+        HWND owner = GetWindow(hwnd, GW_OWNER);
+        if (owner) EnableWindow(owner, TRUE);
+        return 0;
+    }
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+static void OpenModalOverlay(HWND parent)
+{
+    HWND topLevel = GetAncestor(parent, GA_ROOT);
+    RECT pr;
+    GetWindowRect(topLevel, &pr);
+    int w = 360, h = 120;
+    int x = pr.left + ((pr.right - pr.left) - w) / 2;
+    int y = pr.top + ((pr.bottom - pr.top) - h) / 2;
+    EnableWindow(topLevel, FALSE);
+    CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+        L"LegacyControlZooModalOverlay", L"Modal Dialog",
+        WS_POPUP | WS_VISIBLE | WS_BORDER | WS_CAPTION,
+        x, y, w, h, topLevel, nullptr, g_hinst, nullptr);
 }
 
 static LRESULT NoAccessibilityWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -210,6 +285,38 @@ static void CreateChildControls(HWND child)
     HWND panel = CreateWindowExW(0, kPanelClass, nullptr, WS_CHILD | WS_VISIBLE,
         540, 34, 280, 356, child, reinterpret_cast<HMENU>(IDC_CUSTOM_PANEL), g_hinst, nullptr);
     SendMessageW(panel, WM_SETFONT, reinterpret_cast<WPARAM>(g_uiFont), TRUE);
+
+    // === HTS (Heroes4) pattern controls -- start ===
+    AddStatic(child, L"종목코드:", 14, 400, 70, 20);
+    HWND maskEdit = CreateWindowExW(WS_EX_CLIENTEDGE, WC_EDITW, L"",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
+        86, 398, 110, 24, child, reinterpret_cast<HMENU>(IDC_MASKEDIT), g_hinst, nullptr);
+    SendMessageW(maskEdit, WM_SETFONT, reinterpret_cast<WPARAM>(g_uiFont), TRUE);
+    SetWindowSubclass(maskEdit, MaskEditSubclassProc, 0, 0);
+
+    AddStatic(child, L"매수", 210, 400, 36, 20);
+    CreateWindowExW(0, WC_BUTTONW, L"",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+        210, 420, 50, 30, child, reinterpret_cast<HMENU>(IDC_BTN_ICON_BUY), g_hinst, nullptr);
+    AddStatic(child, L"매도", 268, 400, 36, 20);
+    CreateWindowExW(0, WC_BUTTONW, L"",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_OWNERDRAW,
+        268, 420, 50, 30, child, reinterpret_cast<HMENU>(IDC_BTN_ICON_SELL), g_hinst, nullptr);
+
+    AddStatic(child, L"호가창 (OCR target)", 334, 400, 180, 20);
+    HWND priceGrid = CreateWindowExW(WS_EX_CLIENTEDGE, WC_LISTBOXW, nullptr,
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | LBS_OWNERDRAWFIXED | LBS_NOSEL,
+        334, 420, 190, 80, child, reinterpret_cast<HMENU>(IDC_PRICE_GRID), g_hinst, nullptr);
+    SendMessageW(priceGrid, WM_SETFONT, reinterpret_cast<WPARAM>(g_uiFont), TRUE);
+    SendMessageW(priceGrid, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"071,500 ▲ +1.5%"));
+    SendMessageW(priceGrid, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"071,400 ▲ +1.3%"));
+    SendMessageW(priceGrid, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(L"071,300 ▼ -0.1%"));
+
+    HWND btnModal = CreateWindowExW(0, WC_BUTTONW, L"Open Modal",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+        540, 420, 110, 30, child, reinterpret_cast<HMENU>(IDC_MODAL_BTN), g_hinst, nullptr);
+    SendMessageW(btnModal, WM_SETFONT, reinterpret_cast<WPARAM>(g_uiFont), TRUE);
+    // === HTS pattern controls -- end ===
 }
 
 static LRESULT CALLBACK ChildProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -222,6 +329,10 @@ static LRESULT CALLBACK ChildProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         MEASUREITEMSTRUCT* measure = reinterpret_cast<MEASUREITEMSTRUCT*>(lParam);
         if (measure->CtlID == IDC_OWNER_LIST) {
             measure->itemHeight = 24;
+            return TRUE;
+        }
+        if (measure->CtlID == IDC_PRICE_GRID) {
+            measure->itemHeight = 22;
             return TRUE;
         }
         return FALSE;
@@ -244,8 +355,39 @@ static LRESULT CALLBACK ChildProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
             DrawTextLabel(draw->hDC, L"Owner Drawn BUTTON", draw->rcItem, RGB(255, 255, 255), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             return TRUE;
         }
+        if (draw->CtlID == IDC_BTN_ICON_BUY) {
+            FillRectColor(draw->hDC, draw->rcItem, RGB(40, 160, 80));
+            Rectangle(draw->hDC, draw->rcItem.left, draw->rcItem.top,
+                      draw->rcItem.right, draw->rcItem.bottom);
+            return TRUE;
+        }
+        if (draw->CtlID == IDC_BTN_ICON_SELL) {
+            FillRectColor(draw->hDC, draw->rcItem, RGB(200, 60, 60));
+            Rectangle(draw->hDC, draw->rcItem.left, draw->rcItem.top,
+                      draw->rcItem.right, draw->rcItem.bottom);
+            return TRUE;
+        }
+        if (draw->CtlID == IDC_PRICE_GRID) {
+            wchar_t text[128] = {};
+            SendMessageW(draw->hwndItem, LB_GETTEXT, draw->itemID,
+                         reinterpret_cast<LPARAM>(text));
+            COLORREF bg = (draw->itemID % 2) ? RGB(248, 248, 248) : RGB(255, 255, 255);
+            FillRectColor(draw->hDC, draw->rcItem, bg);
+            RECT t = draw->rcItem; t.left += 6;
+            COLORREF fg = (wcschr(text, L'▲') != nullptr) ? RGB(200, 30, 30)
+                        : (wcschr(text, L'▼') != nullptr) ? RGB(0, 80, 200)
+                        : RGB(20, 20, 20);
+            DrawTextLabel(draw->hDC, text, t, fg);
+            return TRUE;
+        }
         return FALSE;
     }
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDC_MODAL_BTN && HIWORD(wParam) == BN_CLICKED) {
+            OpenModalOverlay(hwnd);
+            return 0;
+        }
+        break;
     case WM_NOTIFY: {
         NMHDR* hdr = reinterpret_cast<NMHDR*>(lParam);
         if (hdr->idFrom == IDC_TREE && hdr->code == NM_CUSTOMDRAW) {
@@ -388,6 +530,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
     RegisterWindowClass(kMenuBarClass, NoAccessibilityWindowProc, reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1));
     RegisterWindowClass(kToolbarClass, NoAccessibilityWindowProc, reinterpret_cast<HBRUSH>(COLOR_BTNFACE + 1));
     RegisterWindowClass(kPanelClass, NoAccessibilityWindowProc, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
+    RegisterWindowClass(L"LegacyControlZooModalOverlay", ModalOverlayProc,
+        reinterpret_cast<HBRUSH>(COLOR_INFOBK + 1));
 
     HWND hwnd = CreateWindowExW(0, kFrameClass, L"LegacyControlZoo - WKAppBot Test",
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,

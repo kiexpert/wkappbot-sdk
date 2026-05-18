@@ -198,6 +198,66 @@ Run-Test "25. clipboard-write" @("a11y", "clipboard-write", "test clipboard cont
 Run-Test "26. clipboard-read" @("a11y", "clipboard-read") "test clipboard content" $true | Out-Null
 
 Write-Host ""
+Write-Host "=== HTS PATTERNS (영웅문 재현) ==="
+Write-Host ""
+
+# HTS-1: UIA should FAIL on masked edit (no accessible name)
+$script:TestCount++
+Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] HTS-1 mask-edit UIA blind (expect NO TARGET) ... "
+$r = Invoke-WK @("a11y", "find", "*종목코드*")
+if ($r.Output -match "NO TARGET|not found|no match" -or -not $r.Ok) {
+    Write-Host "PASS (correct UIA failure)"
+    $script:TotalPass++
+} else {
+    Write-Host "BUG: UIA found masked edit by Korean label (false positive)"
+    $script:TotalSoftFail++
+}
+
+# HTS-2: WM_CHAR path on masked edit (Win32 tier 2)
+Run-Test "HTS-2 mask-edit WM_CHAR type" @("a11y", "type", $grap, "005930", "--force") "\[OK\]" $false | Out-Null
+
+# HTS-3: OCR fallback reads price grid text
+$script:TestCount++
+Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] HTS-3 OCR price-grid pattern ... "
+$r = Invoke-WK @("a11y", "ocr", $grap) 30
+if ($r.Output -match "(\d{3},\d{3}|%)") {
+    Write-Host "PASS (price pattern found in OCR)"
+    $script:TotalPass++
+} else {
+    Write-Host "SOFT-FAIL (OCR returned no price pattern)"
+    $script:TotalSoftFail++
+}
+
+# HTS-4: Icon-only button find
+$script:TestCount++
+Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] HTS-4 icon-button no-name lookup ... "
+$r = Invoke-WK @("a11y", "find", "*매수*")
+if ($r.Ok -and $r.Output -match "# TARGET") {
+    Write-Host "PASS (label-by-proximity match worked)"
+    $script:TotalPass++
+} else {
+    Write-Host "HTS-PATTERN (icon button has no UIA name -- expected miss)"
+    $script:TotalSoftFail++
+}
+
+# HTS-5: Modal dialog detection
+$script:TestCount++
+Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] HTS-5 modal detection ... "
+Invoke-WK @("a11y", "click", $grap, "Open Modal") | Out-Null
+Start-Sleep -Milliseconds 500
+$r = Invoke-WK @("a11y", "find", "{title:'Modal Dialog'}") 5
+if ($r.Output -match "# TARGET|Modal") {
+    Write-Host "PASS (modal detected)"
+    $script:TotalPass++
+} else {
+    Write-Host "SOFT-FAIL (modal not detected via a11y find)"
+    $script:TotalSoftFail++
+}
+
+# Wait for modal auto-close
+Start-Sleep -Seconds 4
+
+Write-Host ""
 Write-Host "=== TEARDOWN ==="
 Write-Host ""
 
