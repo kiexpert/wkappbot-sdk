@@ -1,0 +1,56 @@
+{
+  "id": "wkcdp-mon-anomaly-catalog",
+  "app": "wkappbot-workflow",
+  "title": "wkcdp-mon-anomaly-catalog",
+  "title_ko": null,
+  "desc": "All Chrome CDP anomalies detectable by wkcdp-mon with severity CRIT/WARN/INFO and fix actions",
+  "steps": [
+    "CRIT BLANK_RENDER: readyState=complete AND body.innerHTML less than 300 chars AND FCP not fired. White blank Chrome. Causes: GPU crash, SPA fail, consent overlay. Fix: reload tab.",
+    "CRIT TAB_CRASH: tab URL is chrome-error or crashedTab. Detect via /json URL scan. Fix: Page.close + reopen URL.",
+    "CRIT NAV_ERROR: tab URL contains net::ERR_ or chrome-error. Page shows error screen. Fix: navigate to correct URL.",
+    "WARN LOADING_STALL: readyState != complete AND tab age > 30s. Stuck at spinner. Fix: reload or wait longer.",
+    "WARN LOGIN_PAGE: tab URL contains /login /auth /signin or auth.openai.com. Leaked anonymous AI tab. Fix: TryCloseAnonymousTabAsync.",
+    "WARN FCP_SLOW: First Contentful Paint > 3000ms. Page painted but slow. Heavy page or blocked resource.",
+    "INFO HIDDEN_TAB: document.hidden=true. Tab backgrounded, CDP eval works but visual rendering suspended.",
+    "BLANK_RENDER CORRECT DETECTION: DOM heuristic (body.innerHTML size + FCP) is unreliable -- page can be fully loaded with large DOM and FCP fired yet visually white due to GPU renderer crash. The ONLY reliable detection is Page.captureScreenshot via CDP: take small JPEG (quality=5), sample pixels, flag if >85% near-white (R>240,G>240,B>240). Two-pass: fast DOM check first, screenshot only when DOM check is ambiguous or tab age > 10s.",
+    "CRIT A11Y_READ_MISSING: wkappbot a11y read returns empty or truncated content when page has important info (notifications, alerts, dynamic DOM updates). This is a CRITICAL BROKER issue -- automation silently fails to read critical info. Causes: aria-hidden elements, Shadow DOM, lazy-loaded content, React portals, z-index overlays. Test: after each site navigation, verify a11y read captures expected content vs cdp html. File as suggest immediately if discrepancy found.",
+    "A11Y_READ_MISSING definition: 'important content' = elements that INTERRUPT normal page use and REQUIRE user action. Specifically: JS alert/confirm/prompt dialogs, browser permission popups, cookie consent banners, modal overlays, CAPTCHA challenges, 2FA/OTP prompts, subscription nag screens, notification permission requests, auto-play blocked banners. If a11y read or cdp html does NOT detect these blocking elements, automation silently proceeds past them -- causing injection failures, wrong-element clicks, or stale state bugs. These must be detected BEFORE prompt injection, not after. Test: on each site visit, run a11y find for known overlay patterns and verify result vs cdp html. Discrepancy = CRIT suggest immediately.",
+    "CRIT NAV_ERROR: Tab URL contains net::ERR_ or chrome-error://. Page shows error screen. Detect: URL pattern check in /json scan.",
+    "CRIT BLANK_RENDER: readyState=complete AND body.innerHTML < 300 chars AND FCP not fired. White/blank Chrome. Causes: GPU crash, SPA hydration fail, consent overlay. Detect: extended Runtime.evaluate expression.",
+    "WARN LOADING_STALL: readyState != complete AND tab age > 30s. Page stuck at spinner. Detect: readyState check + age comparison.",
+    "WARN LOGIN_PAGE: Tab URL contains /login /auth /signin or auth.openai.com accounts.google.com. Leaked anonymous AI tab not cleaned. Fix: TryCloseAnonymousTabAsync.",
+    "WARN DUP_TABS: Same URL 2+ times in one session. sandbox-miss accumulation. Fix: close duplicates, check TryCloseAnonymousTabAsync.",
+    "WARN JS_ALERT: Runtime.evaluate blocked (WS open but 300ms receive timeout). JS alert blocking CDP. Fix: wkappbot cdp eval window.onbeforeunload=null.",
+    "WARN HIGH_LAT: LAT avg > 80ms. Chrome slow or overloaded. Check MEM, close unused tabs.",
+    "WARN SESSION_OVERLOAD: sessions > 5 OR total tabs > 10. Zombie Chrome accumulation. Fix: kill stale sessions.",
+    "WARN MEM_HIGH: session MEM > 1GB (CRIT > 2GB). Memory leak or tab overload.",
+    "WARN OLD_SESSION: age > 10h. Stale cookies, expired auth, accumulated drift risk.",
+    "WARN FCP_SLOW: First Contentful Paint > 3000ms. Page rendered but slow. Heavy page or blocked resource.",
+    "INFO HIDDEN_TAB: document.hidden=true. Tab backgrounded. CDP eval works but visual rendering suspended."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx=",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows *chrome*",
+      "expect": "Match",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect {cdp:9741}",
+      "expect": "btn-primary",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-17T05:54:49.0847546Z",
+  "updated": "2026-05-17T19:55:37.5381188Z",
+  "version": "1.23"
+}

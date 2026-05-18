@@ -1,0 +1,38 @@
+{
+  "id": "a11y-broker-detection",
+  "app": "wkappbot-core",
+  "title": "a11y broker detection",
+  "title_ko": null,
+  "desc": "Pre/post broker detection for a11y actions: detect blocking nodes (modal/alert/dialog/overlay) with full grap + content before and after every a11y action",
+  "steps": [
+    "IMPLEMENTATION: in ActionExecutor.cs (or a11y command pipeline), add pre/post broker scan. Pre: before action execute, call BrokerScan(scope). Post: after action, call BrokerScan(scope) again, diff against pre-scan, output NEW brokers only. BrokerScan returns List<BrokerNode> with (Grap, Type, Role, Name, Content). Print each as [BROKER:PRE/POST]. Zero brokers = silent (no output). Non-zero = print and continue (do NOT abort -- let caller decide). Performance: UIA scope scan with 500ms timeout, CDP eval with 300ms timeout.",
+    "BROKER OUTPUT FORMAT: [BROKER:PRE] or [BROKER:POST] + full grap + UIA type + element name + text content. Example: [BROKER:PRE] grap={hwnd:0x1234,proc:chrome,domain:chatgpt.com}#Doc/Dlg_Login type=Dialog name=LoginRequired content=Please log in [OK][Cancel]. Full grap must be copy-paste ready for a11y invoke/click.",
+    "BROKER DETECTION PATTERNS -- UIA: ControlType=Dialog with IsModal=true, Name matches confirm/cancel/allow/deny/accept/cookie/captcha/permission/alert. Web CDP: [role=dialog], [role=alertdialog], .modal, .overlay, cookie-banner, consent elements. Performance: UIA scan 500ms timeout, CDP eval 300ms timeout.",
+    "IMPLEMENTATION: in a11y action pipeline pre/post hooks. Pre: BrokerScan before action execute. Post: BrokerScan after action, diff against pre-scan, output NEW brokers only with [BROKER:POST]. Zero brokers = silent. Non-zero = print and continue (do NOT abort -- caller decides). Output zero-alloc if no broker found."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y click *button*",
+      "expect": "[BROKER] or no broker then click",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read *content*",
+      "expect": "[BROKER:PRE] if dialog present",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx=",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-17T06:35:33.8120784Z",
+  "updated": "2026-05-17T06:37:00.4221061Z",
+  "version": "1.4"
+}

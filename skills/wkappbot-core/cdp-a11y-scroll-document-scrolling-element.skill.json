@@ -1,0 +1,48 @@
+{
+  "id": "cdp-a11y-scroll-document-scrolling-element",
+  "app": "wkappbot-core",
+  "title": "a11y scroll: use document.scrollingElement.scrollBy via Runtime.evaluate",
+  "title_ko": null,
+  "desc": "a11y scroll on Chrome/CDP must use Runtime.evaluate on (document.scrollingElement||documentElement||body).scrollBy, not Input.dispatchMouseEvent deltaY which fails in CI. Also: scroll without #scope is legitimate page-level scroll -- must not auto-redirect to inspect.",
+  "steps": [
+    "BUG ts=2026-05-17T20:15:06: a11y scroll fails universally in CI on real sites",
+    "FIX 1 ShouldAutoInspect: exclude scroll from auto-inspect",
+    "FIX 2 CdpClient.ScrollAsync uses document.scrollingElement.scrollBy via Runtime.evaluate",
+    "Amount aliases: small=120 large=600 page=viewport int=exact default=300",
+    "Never use Input.dispatchMouseEvent deltaY for CDP scroll -- requires real mouse focus"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y scroll {proc:'chrome',cdp:9300} --direction down",
+      "expect": "OK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://github.com",
+      "expect": "OK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y scroll {proc:'chrome',cdp:9300} --direction up --amount large",
+      "expect": "OK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "scroll",
+    "cdp",
+    "chrome",
+    "bug-fix",
+    "ci",
+    "real-sites",
+    "scrollingElement"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T04:32:55.1163428Z",
+  "updated": "2026-05-18T04:32:55.1163561Z",
+  "version": "1.0"
+}

@@ -1,0 +1,57 @@
+{
+  "id": "cdp-tab-management-policy",
+  "app": "wkappbot-core",
+  "title": "CDP tab management policy: anonymous tab cleanup, tracking avoidance, tab cap enforcement",
+  "title_ko": null,
+  "desc": "Operational rules for Chrome CDP tab lifecycle: when to close anonymous/free-tier AI tabs, cleanup procedure (1s grace then kill), tracking avoidance rationale, tab cap enforcement. Read before implementing tab cleanup features.",
+  "steps": [
+    "ANONYMOUS TAB CLEANUP POLICY: Logged-out / free-tier AI tabs (ChatGPT without login, Gemini, Claude.ai) must be cleaned up after each ask to avoid cross-session tracking. These tabs have no persistent identity, so keeping them accumulates fingerprint data across sessions.",
+    "CLEANUP PROCEDURE: (1) Send Page.close or Target.closeTarget via CDP -- 1 second grace period for graceful close. (2) If tab still alive after 1s, force-kill the renderer process (no mercy). Never leave anonymous AI tabs sitting idle.",
+    "CLEANUP TRIGGER: After ask completes on a logged-out AI tab, or when EnforceTabCapAsync fires (tab count exceeds cap). Priority: close logged-out tabs first, keep logged-in tabs.",
+    "IDENTIFICATION: Logged-out tab = URL is chatgpt.com/gemini.google.com/claude.ai AND page title contains 'Log in', 'Sign in', 'ChatGPT' (no user name shown), or cookie consent banner is present. Check document.querySelector('[data-testid=user-menu]') == null for ChatGPT.",
+    "TAB CAP ENFORCEMENT: Max tabs per Chrome = 3 (current default). EnforceTabCapAsync fires on every ask entry via EnsureCdpConnection. PurgeIdleTabsAsync recycles idle tabs (ping 1s + navigate fire-and-forget). Alert dismiss before ping (500ms), 2s total budget per tab.",
+    "TRACKING AVOIDANCE RATIONALE: See cookie-consent-ai-strategy skill. Not accepting cookie consent + purging anonymous tabs prevents AI providers from building cross-session usage profiles. This extends available quota per session. Apply to all AI service domains (chatgpt.com, gemini.google.com, claude.ai, copilot.microsoft.com).",
+    "DO NOT CLOSE: Logged-in tabs (user has authenticated session), tabs actively mid-response, tabs with pending_prompts queue, tabs belonging to a different project CDP port.",
+    "PROFILE FOLDER = FIRST PORT (ALWAYS): When wkappbot creates a new Chrome instance on a different port (e.g., old instance on 9740 was stale, new instance on 9742), the Chrome profile folder name is always based on the FIRST/original port number (9740), not the current port. So profile path = wkappbot.hq/chrome-profiles/9740/ regardless of actual CDP port. Important for debugging: if you see profile data missing or login sessions lost after port change, check that the profile folder matches the first port. Also: tab accumulation (sandbox-miss) causes new tabs to open on the NEW port's Chrome even though they should go to the OLD port -- both Chromes may run simultaneously consuming double memory."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-tab-management-policy",
+      "expect": "ANONYMOUS TAB CLEANUP POLICY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cookie-consent-ai-strategy",
+      "expect": "TRACKING AVOIDANCE RATIONALE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-open-reuse-existing-chrome-tab",
+      "expect": "TAB CAP ENFORCEMENT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "tab",
+    "cdp",
+    "cleanup",
+    "anonymous",
+    "tracking",
+    "quota",
+    "chrome",
+    "policy",
+    "management",
+    "purge",
+    "kill",
+    "close",
+    "lifecycle",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-16T07:23:15.5616798Z",
+  "updated": "2026-05-17T18:31:48.1692999Z",
+  "version": "1.2"
+}

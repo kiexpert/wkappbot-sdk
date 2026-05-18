@@ -1,0 +1,74 @@
+{
+  "id": "a11y-read-inspect-improvement-ideas",
+  "app": "wkappbot",
+  "title": "a11y read/inspect improvements for elevated MFC MDI",
+  "title_ko": null,
+  "desc": "Gaps in a11y read/inspect on nfrunlite elevated MFC MDI and proposals",
+  "steps": [
+    "[GAP-1 READ-FALLBACK] a11y read on MFC root (_NFHeroMainClass) returns empty - 0 UIA children. Win32 has 16 children. Proposal: if read=0 UIA children AND Win32 child>0, auto-emit inspect hint or run inspect.",
+    "[GAP-2 CID-SCOPING] inspect {hwnd:X,cid:Y} ignores cid - dumps root. cid should filter subtree. Workaround: hwnd direct.",
+    "[GAP-3 AMBIGUOUS-LIST] {cls:Afx} AMBIGUOUS lists all child hwnd+title. IS MDI enumeration. Expose as --list flag instead of error.",
+    "[GAP-4 FORCE-NONTTY] inspect fails user-active-skipping mid-script. --force should auto-apply when stdin not tty.",
+    "[GAP-5 CLASSPATH-ELEVATED] cls1/cls2 silent-empty for elevated MDI. Needs Win32 hwnd-chain fallback.",
+    "[WORKAROUND] 1. {cls:Afx} AMBIGUOUS=hwnd list. 2. {hwnd:X} --force=child inspect. 3. {hwnd:X} --force on Document cid=Value read.",
+    "Verified 2026-05-09:  (resolve ts=2026-05-09T07:50:22)",
+    "FIXED 2026-05-18: a11y read CDP path (A11yReadBrowserFirst in A11yCommand.Cdp.cs) now waits for SPA hydration before returning. Sequence: WaitForLoadAsync(2s) + CdpReadSettle(2.5s idle-settle polling body.innerText growth) + 3x retry if result < 200 chars (skeleton threshold). Affects YouTube, Twitter, Gmail -- any SPA that renders skeleton HTML first. Commit: see A11yCommand.Cdp.cs lines 688-880."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y read {proc:'nfrunlite',cls:'_NFHeroMainClass'}",
+      "expect": "empty (0 UIA children on MFC root)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect {proc:'nfrunlite',cls:'Afx:00EB0000:b:00010003:00000006:003307B3'}",
+      "expect": "AMBIGUOUS matched 9 windows",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect {hwnd:0x010F24,proc:'nfrunlite'} --force",
+      "expect": "Window [2029] scoped tree",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read {proc:'chrome'}",
+      "expect": "no fallback hint triggered (UIA children present, Win32>0 AND UIA=0 condition not met)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read {hwnd:0x507b8}",
+      "expect": "# TARGET {proc:'nfrunlite'",
+      "prompt": "All 5 requirements verified manually — hwnd-based a11y read/inspect/find reach nfrunlite via elevated Eye proxy. Bug confirmed: proc-name lookup fails for elevated process, workaround is hwnd direct."
+    },
+    {
+      "cmd": "wkappbot a11y inspect {hwnd:0x507b8}",
+      "expect": "# TARGET {proc:'nfrunlite'",
+      "prompt": "All 5 requirements verified manually — hwnd-based a11y read/inspect/find reach nfrunlite via elevated Eye proxy. Bug confirmed: proc-name lookup fails for elevated process, workaround is hwnd direct."
+    },
+    {
+      "cmd": "wkappbot a11y find {proc:'nfrunlite'}",
+      "expect": "Match - 영웅문Global",
+      "prompt": "All 5 requirements verified manually — hwnd-based a11y read/inspect/find reach nfrunlite via elevated Eye proxy. Bug confirmed: proc-name lookup fails for elevated process, workaround is hwnd direct."
+    },
+    {
+      "cmd": "wkappbot a11y inspect {hwnd:0x507b8} --force",
+      "expect": "Window: [000507B8]",
+      "prompt": "All 5 requirements verified manually — hwnd-based a11y read/inspect/find reach nfrunlite via elevated Eye proxy. Bug confirmed: proc-name lookup fails for elevated process, workaround is hwnd direct."
+    }
+  ],
+  "primary_cmd": "wkappbot a11y read {hwnd:0x507b8}",
+  "tags": [
+    "a11y",
+    "read",
+    "inspect",
+    "mfc",
+    "improvement",
+    "elevated"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T03:53:40.0513165Z",
+  "updated": "2026-05-18T04:21:14.6439675Z",
+  "version": "1.4"
+}

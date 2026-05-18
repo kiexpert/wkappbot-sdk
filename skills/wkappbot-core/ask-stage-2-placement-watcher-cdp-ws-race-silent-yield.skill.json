@@ -1,0 +1,41 @@
+{
+  "id": "ask-stage-2-placement-watcher-cdp-ws-race-silent-yield",
+  "app": "wkappbot-core",
+  "title": "ask Stage 2 placement watcher CDP WS race silent-yield",
+  "title_ko": null,
+  "desc": "Stage 2 placement watcher TryStage2PageLoadWait suppresses BUG-AUTO suggest on benign CDP WS races (ws_receive_error/ws_closed/no_ws_url/timeout/ws_open_failed/cdp_enable_failed). Companion of a11y-focus-steal-user-active-silent-yield. Affects ask gpt/gemini/claude/triad -- stops Stage 2 suggest storm.",
+  "steps": [
+    "Stage 2 placement watcher opens secondary CDP WS for Page.loadEventFired after Stage 1 placement",
+    "Secondary WS races against foreground ASK CDP traffic -- transient ws frame errors are benign",
+    "Silent-yield gate (2026-05-16): BUG-AUTO fires ONLY when placementOk=false AND trigger is cdp_error_frame or error:Exception",
+    "All benign race triggers logged as [PLACEMENT:STAGE2] suppress BUG-AUTO (silent-yield)",
+    "Affected commands: ask gpt, ask gemini, ask claude, ask triad",
+    "Verification: bash evidence/test-stage2-ask-anomaly-ws-receive-error-silent-yield.sh",
+    "2026-05-16 FIXED: CancellationTokenSource timeout changed 3000ms->10000ms in MyCdpContext.Stage23.cs. Added explicit catch(OperationCanceledException) returning 'timeout' instead of swallowing as ws_receive_error. Commit 87d75eb0. Stage23.cs subsequently split into Stage23(327L)+Stage3(148L)+Stage23Ws(161L) partial classes to meet 400-line cap, commit a317dc4b."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt --sync --timeout 30s ping",
+      "expect": "sync acknowledged within 30s",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gemini --sync --timeout 30s ping",
+      "expect": "sync acknowledged within 30s",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "healthy",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-16T02:31:53.7524322Z",
+  "updated": "2026-05-16T12:50:03.5982987Z",
+  "version": "1.2"
+}
