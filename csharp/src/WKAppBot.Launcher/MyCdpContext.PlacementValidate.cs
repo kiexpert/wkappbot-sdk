@@ -22,8 +22,16 @@ partial class Program
         IntPtr chromeHwnd, RECT targetRect, int maxAttempts = 5)
     {
         Console.Error.WriteLine($"[PLACEMENT:VALIDATE-ENTRY] chrome=0x{chromeHwnd.ToInt64():X} target=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom}) maxAttempts={maxAttempts}");
-        const int DeltaPosThreshold  = 15; // x/y px — allow up to ±15px for frame/border variance
-        const int DeltaSizeThreshold = 10; // w/h px — strict enough to verify nominal 800x600
+        // Validation thresholds: must absorb Chrome's outer-vs-client frame variance
+        // plus DPI-rounding drift. Observed on real machines (suggest 2026-05-14T04:15:15):
+        // requested W=818,H=609 (with 18x9 compensation) -> Chrome_BrowserWindow actual
+        // W=782,H=591 -> validated against desired W=800,H=600 yields dW=18, dH=9. The
+        // previous DeltaSizeThreshold=10 rejected dW=18 even though the user-visible
+        // window was visually indistinguishable from target. Mirrors Core's central
+        // ChromeLauncher.PlacementValidationTolerancePx=50 (single source of truth
+        // for outer-vs-client + DPI rounding + multi-monitor handoff drift).
+        const int DeltaPosThreshold  = 30; // x/y px - DPI-rounded frame drift up to ~15px per edge on multi-monitor
+        const int DeltaSizeThreshold = 30; // w/h px - covers Chrome_BrowserWindow 18x9 client-area gap + DPI rounding
         const int StabilizationMs    = 150; // longer settle time for DWM composition
         const int GetRectTimeoutMs   = 200;
         const uint SWP_NOZORDER   = 0x0004;
