@@ -78,6 +78,7 @@ nul
 !scripts/*.ps1
 !setup.ps1
 !tests/**/*.ps1
+!test/**/*.ps1
 *.png
 tmp/
 tmp*
