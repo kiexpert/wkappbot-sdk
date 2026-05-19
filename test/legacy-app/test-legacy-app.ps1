@@ -47,32 +47,21 @@ function Invoke-WK {
     param([string[]]$WkArgs, [int]$TimeoutSec = 30)
 
     $outFile = [System.IO.Path]::GetTempFileName()
-    $errFile = [System.IO.Path]::GetTempFileName()
-    $proc = Start-Process wkappbot -ArgumentList $WkArgs -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru -NoNewWindow
-
-    $exited = $proc.WaitForExit($TimeoutSec * 1000)
-    if (-not $exited) {
-        try { $proc.Kill() } catch {}
-        # Read output files even on timeout -- wkappbot may have written [OK] before launcher exited
-        $earlyOut = ""
-        if (Test-Path $outFile) { $earlyOut += Get-Content $outFile -Raw }
-        if (Test-Path $errFile) { $earlyOut += Get-Content $errFile -Raw }
-        Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue
-        if ($earlyOut -and $earlyOut.Trim().Length -gt 0) {
-            return [pscustomobject]@{ Ok = $true; ExitCode = 0; Output = $earlyOut }
-        }
-        $output = "TIMEOUT after ${TimeoutSec}s: wkappbot $($WkArgs -join ' ')"
-        return [pscustomobject]@{ Ok = $false; ExitCode = 124; Output = $output }
+    # cmd /c redirection captures console-handle output that Start-Process misses in CI
+    $quotedArgs = $WkArgs | ForEach-Object {
+        if ($_ -match '[ {}]') { '"{0}"' -f $_ } else { $_ }
     }
-
-    $out = ""
-    if (Test-Path $outFile) { $out += Get-Content $outFile -Raw }
-    if (Test-Path $errFile) { $out += Get-Content $errFile -Raw }
-
-    Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue
-
-    $exitCode = $proc.ExitCode
-    return [pscustomobject]@{ Ok = ($exitCode -eq 0); ExitCode = $exitCode; Output = $out }
+    $cmdLine = '/c wkappbot.exe ' + ($quotedArgs -join ' ') + ' > "' + $outFile + '" 2>&1'
+    $proc = Start-Process cmd.exe -ArgumentList $cmdLine -PassThru -NoNewWindow
+    $exited = $proc.WaitForExit($TimeoutSec * 1000)
+    if (-not $exited) { try { $proc.Kill() } catch {} }
+    $out = if (Test-Path $outFile) { Get-Content $outFile -Raw -Encoding UTF8 } else { "" }
+    Remove-Item $outFile -Force -ErrorAction SilentlyContinue
+    if (-not $out) { $out = "" }
+    if (-not $exited -and $out.Trim().Length -eq 0) {
+        return [pscustomobject]@{ Ok = $false; ExitCode = 124; Output = "TIMEOUT after ${TimeoutSec}s" }
+    }
+    return [pscustomobject]@{ Ok = ($out -match "\[OK\]"); ExitCode = $proc.ExitCode; Output = $out }
 }
 
 function Run-Test {
