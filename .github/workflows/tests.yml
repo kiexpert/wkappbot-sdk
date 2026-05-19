@@ -1,4 +1,4 @@
-﻿name: Unit Tests
+name: Unit Tests
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   test:
@@ -27,7 +28,7 @@ jobs:
         # WKAppBot.Tests project was part of the private source and is no longer
         # present in this public SDK repo. Test coverage is handled in the private
         # dev repo. This step is a no-op placeholder to keep the workflow green.
-        Write-Host "No public unit tests to run (private source removed)."
+        Write-Host 'No public unit tests to run (private source removed).'
 
     - name: Upload test results
       if: ${{ always() }}
@@ -65,10 +66,30 @@ jobs:
         $size = (Get-Item $exe).Length / 1KB
         Write-Host "LegacyControlZoo.exe verified: $([Math]::Round($size, 2)) KB"
 
+    - name: Download wkappbot from release
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        New-Item -ItemType Directory -Force -Path bin | Out-Null
+        gh release download v7.3.1-sdk --pattern 'wkappbot-*.zip' --dir bin/ --repo kiexpert/wkappbot-sdk
+        $zip = Get-ChildItem bin/wkappbot-*.zip | Select-Object -First 1
+        if (-not $zip) { throw 'Release zip not found' }
+        Expand-Archive -Path $zip.FullName -DestinationPath bin/wkappbot-release -Force
+        $exeDir = Get-ChildItem -Recurse bin/wkappbot-release -Filter wkappbot.exe |
+                   Select-Object -First 1 -ExpandProperty DirectoryName
+        if (-not $exeDir) { throw 'wkappbot.exe not found in release zip' }
+        Add-Content $env:GITHUB_PATH $exeDir
+        Write-Host "PATH += $exeDir"
+
+    - name: Verify wkappbot in PATH
+      shell: pwsh
+      run: wkappbot --version
+
     - name: Run a11y tests against LegacyControlZoo
       shell: pwsh
       run: |
-        & .\test\legacy-app\test-legacy-app.ps1 -ExePath "test\legacy-app\build\Release\LegacyControlZoo.exe"
+        & .\test\legacy-app\test-legacy-app.ps1 -ExePath 'test\legacy-app\build\Release\LegacyControlZoo.exe'
 
     - name: Upload LegacyControlZoo artifact
       if: ${{ always() }}
