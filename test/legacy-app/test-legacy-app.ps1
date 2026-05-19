@@ -11,16 +11,26 @@ if (-not (Test-Path $ExePath)) {
     exit 0
 }
 
-# Skip if wkappbot not available (CI runner without wkappbot license)
+# Skip if wkappbot not available
 if (-not (Get-Command wkappbot -ErrorAction SilentlyContinue)) {
     Write-Host "SKIP: wkappbot not in PATH -- a11y tests require wkappbot. Build OK."
     exit 0
 }
 
-# Skip if wkappbot not available (CI runner without wkappbot license)
-if (-not (Get-Command wkappbot -ErrorAction SilentlyContinue)) {
-    Write-Host "SKIP: wkappbot not in PATH -- a11y tests require wkappbot. Build OK."
-    exit 0
+# Start Eye and wait for it to be ready
+Write-Host "Starting Eye daemon..."
+Start-Process wkappbot.exe -ArgumentList "eye" -WindowStyle Hidden -ErrorAction SilentlyContinue
+$eyeReady = $false
+for ($i = 0; $i -lt 15; $i++) {
+    Start-Sleep -Seconds 1
+    $tick = & wkappbot eye tick 2>&1
+    if ($tick -match "end:|idle:|ctx=") { $eyeReady = $true; break }
+    Write-Host "  Eye not ready yet ($i)..."
+}
+if (-not $eyeReady) {
+    Write-Host "WARN: Eye did not start in 15s -- action commands may not output [OK]"
+} else {
+    Write-Host "Eye ready."
 }
 
 Write-Host "Starting legacy-app a11y tests (all 24 actions)"
