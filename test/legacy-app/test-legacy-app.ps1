@@ -320,8 +320,8 @@ if ($snap2.Output -match "STATE CHANGE DETECTED") {
 # A03: State-change visibility -- read output must have actionable nodes
 $script:TestCount++
 Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] A03 state-change: node list has actionable buttons/inputs ... "
-$rA03 = Invoke-WK @("a11y", "read", $grap)
-$hasActionable = $rA03.Output -match "\[.*(Button|Edit|Combo|Toggle|Link|단추|편집|콤보).*\]"
+$rA03 = Invoke-WK @("a11y", "read", $grap, "--no-diff")
+$hasActionable = $rA03.Output -match "-> a11y (invoke|type|read)"
 if ($hasActionable) {
     Write-Host "PASS (actionable nodes visible in node list)"
     $script:TotalPass++
