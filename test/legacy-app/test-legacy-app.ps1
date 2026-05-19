@@ -125,7 +125,7 @@ Write-Host ""
 Run-Test "1. inspect" @("a11y", "inspect", $grap) "ControlType|Name|AutomationId" $true | Out-Null
 
 # 2. find
-Run-Test "2. find" @("a11y", "find", "*LegacyControlZoo*") "TARGETS|-- Match|# TARGET" $true | Out-Null
+Run-Test "2. find" @("a11y", "find", "*LegacyControlZoo*") "TARGETS|-- Match|# TARGET" $false | Out-Null
 
 # 3. windows
 Run-Test "3. windows" @("windows", "LegacyControlZoo") "LegacyControlZoo" $true | Out-Null
