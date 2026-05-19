@@ -350,3 +350,45 @@ if ($script:TotalFail -gt 0) {
     Write-Host "RESULT: All TIER1 tests passed"
     exit 0
 }
+
+# ── STATE-VERIFY HELPERS ──────────────────────────────────────────────────
+# Pattern: capture node list before+after action, diff to verify change happened.
+# This is the correct way to verify action success -- not [OK] output capture.
+# When Core implements diff mode (a11y read window-grap twice = diff output),
+# these helpers will use that directly instead of manual diff.
+
+function Get-NodeSnapshot {
+    param([string]$Grap, [int]$TimeoutSec = 15)
+    $r = Invoke-WK @("a11y", "read", $Grap) $TimeoutSec
+    return $r.Output
+}
+
+function Assert-StateChanged {
+    param([string]$Before, [string]$After, [string]$TestName)
+    $script:TestCount++
+    Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] $TestName (state-verify) ... "
+    if ($Before -ne $After -and $After.Trim().Length -gt 10) {
+        Write-Host "PASS (state changed after action)"
+        $script:TotalPass++
+        return $true
+    } else {
+        Write-Host "SOFT-FAIL (no state change detected)"
+        $script:TotalSoftFail++
+        return $false
+    }
+}
+
+function Assert-NodeVisible {
+    param([string]$Snapshot, [string]$Pattern, [string]$TestName)
+    $script:TestCount++
+    Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] $TestName (node-visible) ... "
+    if ($Snapshot -match $Pattern) {
+        Write-Host "PASS (node '$Pattern' visible)"
+        $script:TotalPass++
+        return $true
+    } else {
+        Write-Host "SOFT-FAIL (node '$Pattern' not visible in snapshot)"
+        $script:TotalSoftFail++
+        return $false
+    }
+}
