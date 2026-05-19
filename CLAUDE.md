@@ -389,6 +389,13 @@ wkappbot skill read a11y-command-cheatsheet  # a11y action cheatsheet
 # ★ MANDATORY -- wk-tool scripts (read before ANY ask/CDP work)
 wkappbot skill read wktool-pattern        # MANDATORY: wkask/wkcdp usage + QA script pattern (merged)
 
+# a11y node list + CDP acceleration (2026-05-19)
+wkappbot skill read a11y-node-first-content-gating  # window-grap read -> node list + copy-paste cmds (v1.3)
+wkappbot skill read cdp-a11y-acceleration            # CDP-accelerated a11y roadmap P0-P3 + session log
+
+# free web AI CDP routing (2026-05-18)
+wkappbot skill read wkask-free-ai-cdp-routing  # wkask duck/perplexity/mistral/deepseek/hugging/groq/venice/phind
+
 # SDK public skills index (global user distribution)
 wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills for SDK users
 # NOTE: chrome-session-restore-position-fix skill is in Core repo -- register to HQ via skill contribute before adding here
