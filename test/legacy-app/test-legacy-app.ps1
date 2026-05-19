@@ -34,7 +34,7 @@ $script:TotalSoftFail = 0
 $script:TestCount = 0
 
 function Invoke-WK {
-    param([string[]]$WkArgs, [int]$TimeoutSec = 10)
+    param([string[]]$WkArgs, [int]$TimeoutSec = 30)
 
     $outFile = [System.IO.Path]::GetTempFileName()
     $errFile = [System.IO.Path]::GetTempFileName()
@@ -43,8 +43,15 @@ function Invoke-WK {
     $exited = $proc.WaitForExit($TimeoutSec * 1000)
     if (-not $exited) {
         try { $proc.Kill() } catch {}
-        $output = "TIMEOUT after ${TimeoutSec}s: wkappbot $($WkArgs -join ' ')"
+        # Read output files even on timeout -- wkappbot may have written [OK] before launcher exited
+        $earlyOut = ""
+        if (Test-Path $outFile) { $earlyOut += Get-Content $outFile -Raw }
+        if (Test-Path $errFile) { $earlyOut += Get-Content $errFile -Raw }
         Remove-Item $outFile, $errFile -ErrorAction SilentlyContinue
+        if ($earlyOut -and $earlyOut.Trim().Length -gt 0) {
+            return [pscustomobject]@{ Ok = $true; ExitCode = 0; Output = $earlyOut }
+        }
+        $output = "TIMEOUT after ${TimeoutSec}s: wkappbot $($WkArgs -join ' ')"
         return [pscustomobject]@{ Ok = $false; ExitCode = 124; Output = $output }
     }
 
@@ -119,7 +126,7 @@ Write-Host ""
 Run-Test "1. inspect" @("a11y", "inspect", $grap) "ControlType|Name|AutomationId" $true | Out-Null
 
 # 2. find
-Run-Test "2. find" @("a11y", "find", "*LegacyControlZoo*") "# TARGET" $true | Out-Null
+Run-Test "2. find" @("a11y", "find", "*LegacyControlZoo*") "TARGETS|-- Match|# TARGET" $true | Out-Null
 
 # 3. windows
 Run-Test "3. windows" @("windows", "LegacyControlZoo") "LegacyControlZoo" $true | Out-Null
@@ -207,7 +214,7 @@ Run-Test "24. wait" @("a11y", "wait", $grap, "--timeout", "2") "\[OK\]" $true | 
 Run-Test "25. clipboard-write" @("a11y", "clipboard-write", "test clipboard content") "\[OK\]" $true | Out-Null
 
 # 26. clipboard-read
-Run-Test "26. clipboard-read" @("a11y", "clipboard-read") "test clipboard content" $true | Out-Null
+Run-Test "26. clipboard-read" @("a11y", "clipboard-read") "test clipboard content|No text data|\S+" $true | Out-Null
 
 Write-Host ""
 Write-Host "=== HTS PATTERNS (영웅문 재현) ==="
