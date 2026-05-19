@@ -297,18 +297,23 @@ if ($hasNodes -and $hasHints -and (-not $hasMojibake)) {
     $script:TotalSoftFail++
 }
 
-# A02: Type text, read back, verify typed text visible in node output
+# A02: set-value then read -- diff mode detects state change (requires Core diff feature)
 $script:TestCount++
-Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] A02 state-verify: type then read-back ... "
-$editGrap = $grap + "#*Edit*;*Single*"
-Invoke-WK @("a11y", "set-value", $editGrap, "a11y-quality-check") | Out-Null
-Start-Sleep -Milliseconds 500
-$rA02 = Invoke-WK @("a11y", "read", $editGrap) 15
-if ($rA02.Output -match "a11y-quality-check") {
-    Write-Host "PASS (typed text visible in read output)"
+Write-Host -NoNewline "[$('{0:d2}' -f $script:TestCount)] A02 state-verify: set-value + diff read ... "
+# Snapshot 1: baseline read
+$snap1 = Invoke-WK @("a11y", "read", $grap) 15
+# Action: change edit value
+Invoke-WK @("a11y", "set-value", "$grap#*Single-line*", "a11y-diff-check") | Out-Null
+# Snapshot 2: diff read (within 10s -> should show STATE CHANGE DETECTED)
+$snap2 = Invoke-WK @("a11y", "read", $grap) 15
+if ($snap2.Output -match "STATE CHANGE DETECTED") {
+    Write-Host "PASS (diff detected state change after set-value)"
+    $script:TotalPass++
+} elseif ($snap2.Output -match "a11y-diff-check") {
+    Write-Host "PASS (typed value visible in node list)"
     $script:TotalPass++
 } else {
-    Write-Host "SOFT-FAIL (typed text not found -- output: $($rA02.Output.Substring(0,[Math]::Min(80,$rA02.Output.Length))))"
+    Write-Host "SOFT-FAIL (no diff or value visible -- Core diff mode may not be deployed)"
     $script:TotalSoftFail++
 }
 
