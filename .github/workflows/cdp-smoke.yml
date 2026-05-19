@@ -2,8 +2,8 @@ name: CDP Connectivity Smoke
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/30 * * * *'   # every 30 min, all day, zero AI token cost
+  # schedule: disabled -- AI site tests cause tab accumulation and use user Chrome session
+  # Run manually: gh workflow run cdp-smoke.yml
   push:
     paths:
       - 'scripts/test-cdp-connectivity.ps1'
