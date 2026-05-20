@@ -445,3 +445,4 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] sandbox-miss tab accumulation -- EnforceTabCapByLiveCountAsync added (Core 3c59028c4)
 - [x] same-URL tab dedup on sandbox-miss-create (Core f3dfc1ae4)
 - [x] render health check -- CDP screenshot probe, kill+relaunch (SDK 0a630061)
+- [ ] cdp open tab reuse: return existing tab if same URL/domain already open (Core + wkask fix)
