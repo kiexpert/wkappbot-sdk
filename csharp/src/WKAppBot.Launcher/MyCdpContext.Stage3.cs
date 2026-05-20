@@ -126,6 +126,29 @@ partial class Program
             int correctedDx = corrected.Left - actual.Left;
             int correctedDy = corrected.Top  - actual.Top;
 
+            // Noop guard: if the recomputed rect equals stage1Target AND the
+            // actual rect is already within tolerance of stage1Target, skip
+            // the redundant SetWindowPos. Prevents visible re-snap ("dancing")
+            // and confusing duplicate trace records (stage1_initial /
+            // validate_retry / stage3_dpi_correct all logging same position).
+            // Trigger condition: callerDpi != chromeDpi made dpiMatch false,
+            // but the rescale math produced no actual delta (e.g. rounding
+            // returned identical W/H), so the "correction" would just re-fire
+            // Stage 1's coordinates.
+            bool correctionIsNoop = newL == stage1Target.Left
+                && newT == stage1Target.Top
+                && newW == stage1Target.Width
+                && newH == stage1Target.Height;
+            if (correctionIsNoop && dX < DeltaThreshold && dY < DeltaThreshold
+                && dW < DeltaThreshold && dH < DeltaThreshold)
+            {
+                AppendStage3Record(callerDpi, currentDpi, dpiMatch, false, true,
+                    stage1Target, actual, "noop_skip", cmd);
+                Console.Error.WriteLine(
+                    $"[PLACEMENT:STAGE3] correction is no-op (recomputed rect == stage1Target, actual within {DeltaThreshold}px) -- skip SetWindowPos");
+                return;
+            }
+
             SetWindowPos(chromeHwnd, IntPtr.Zero, newL, newT, newW, newH, SWP_NOZORDER | SWP_NOACTIVATE);
             AppendSetWindowPosTrace(chromeHwnd, new RECT { Left = newL, Top = newT, Right = newL + newW, Bottom = newT + newH }, attempt: 0, callerHwnd: callerHwnd, stage: "stage3_dpi_correct");
             Console.Error.WriteLine(
