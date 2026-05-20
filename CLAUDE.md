@@ -448,6 +448,10 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [ ] cdp open tab reuse: return existing tab if same URL/domain already open (Core + wkask fix)
 - [x] wkask eval-js node path fix -- Core requires #node for --eval-js (commits 8ab162a1e, d1f6796ae, 7f67eec89)
 - [ ] wkask cdp port mismatch -- cdp open returns cross-project port (9741 vs project 9740); auto-probe fix WIP
+- [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
+- [x] wkask gpt inspect reading: verified -- a11y inspect returns 📝 markers; PONG_TEST_OK confirmed (Core 5e6cb64b7)
+- [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
+- [x] wkask gpt inspect reading: verified -- a11y inspect returns 📝 markers; PONG_TEST_OK confirmed (Core 5e6cb64b7)
 
 ## harness:safe CLAUDE\.md
 ## harness:safe wkappbot\s+skill
