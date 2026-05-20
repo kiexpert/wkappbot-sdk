@@ -946,8 +946,7 @@ partial class Program
     [System.Runtime.InteropServices.DllImport("kernel32.dll")]
     static extern IntPtr GetConsoleWindow();
     // GetConsoleOutputCP/SetConsoleOutputCP/SetConsoleCP declared below (shared with CoreRunner)
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    static extern IntPtr GetForegroundWindow();
+    static IntPtr GetForegroundWindow() => FocusGuard.GetForegroundWindow(); // CDP-stack hook
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     static extern int GetWindowTextW(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
