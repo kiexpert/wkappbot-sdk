@@ -444,3 +444,4 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [ ] Legacy position bug (레거시 위치 이동) -- Chrome session-restore overrides our placement
 - [ ] sandbox-miss tab accumulation bug -- EnforceTabCapAsync not catching sandbox-miss tabs (13tabs/3GB on personal-docs, 10+ events today on port 9740)
 - [ ] same-URL tab dedup: kill previous tab immediately when new tab with same URL loads (sandbox-miss scenario)
+- [ ] render health check: MyCdpContext detects broken rendering (white screen/blank/crash) via CDP Runtime.evaluate, kills Chrome + relaunches
