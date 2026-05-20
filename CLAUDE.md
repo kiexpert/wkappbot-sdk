@@ -443,3 +443,4 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [ ] Wrong-window placement bug (남의창 근처 이동) -- parent_window_geo loaded for wrong session
 - [ ] Legacy position bug (레거시 위치 이동) -- Chrome session-restore overrides our placement
 - [ ] sandbox-miss tab accumulation bug -- EnforceTabCapAsync not catching sandbox-miss tabs (13tabs/3GB on personal-docs, 10+ events today on port 9740)
+- [ ] same-URL tab dedup: kill previous tab immediately when new tab with same URL loads (sandbox-miss scenario)
