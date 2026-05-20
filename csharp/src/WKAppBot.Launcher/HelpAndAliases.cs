@@ -452,29 +452,22 @@ static class FocusGuard
         var hwnd = GetForegroundWindowRaw();
         try
         {
-            var stack = new StackTrace(skipFrames: 1, fNeedFileInfo: false);
-            var frames = stack.GetFrames();
-            if (frames != null)
+            // Use Environment.StackTrace string -- AOT-safe, no reflection metadata needed.
+            var stackStr = Environment.StackTrace;
+            if (stackStr.IndexOf("cdp", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                foreach (var frame in frames)
+                Console.Error.WriteLine("[BUG] GetForegroundWindow called from CDP context");
+                try
                 {
-                    var method = frame.GetMethod();
-                    var typeName = method?.DeclaringType?.FullName ?? "";
-                    var methodName = method?.Name ?? "";
-                    if (typeName.Contains("cdp", StringComparison.OrdinalIgnoreCase) ||
-                        methodName.Contains("cdp", StringComparison.OrdinalIgnoreCase))
+                    Process.Start(new ProcessStartInfo
                     {
-                        Console.Error.WriteLine("[BUG] GetForegroundWindow called from CDP context");
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = "wkappbot",
-                            Arguments = @"suggest ""[BUG] GetForegroundWindow called from CDP context"" --requirement ""CDP caller HWND detection => use validated caller HWND instead of foreground window"" --requirement ""FocusGuard.GetForegroundWindow => emits auto-suggest when called from CDP stack"" --requirement ""dotnet build csharp/WKAppBot.sln --nologo -v q => exits 0""",
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                        });
-                        break;
-                    }
+                        FileName = "wkappbot",
+                        Arguments = @"suggest ""[BUG] GetForegroundWindow called from CDP context"" --requirement ""wkappbot eye tick => healthy"" --requirement ""wkappbot cdp open https://example.com => OK"" --requirement ""wkappbot ask gpt test => response""",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                    });
                 }
+                catch { }
             }
         }
         catch (Exception ex)
