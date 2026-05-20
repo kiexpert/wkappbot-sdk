@@ -302,8 +302,13 @@ partial class Program
         // these to their "no caller" values on rejected paths above so a stale anchor from
         // a previous invocation isn't reused.
         LastValidatedCallerHwnd = callerHwnd;
-        var rectHwnd = IsWindowVisibleLocal(callerHwnd) ? callerHwnd : GetAncestorLocal(callerHwnd, GA_ROOT_LOCAL);
-        if (rectHwnd == IntPtr.Zero) rectHwnd = callerHwnd;
+        // Guard: GetAncestorLocal(Zero) crashes. Skip GA_ROOT when callerHwnd is Zero.
+        var rectHwnd = callerHwnd;
+        if (callerHwnd != IntPtr.Zero && !IsWindowVisibleLocal(callerHwnd))
+        {
+            var root = GetAncestorLocal(callerHwnd, GA_ROOT_LOCAL);
+            if (root != IntPtr.Zero) rectHwnd = root;
+        }
         LastValidatedCallerRect = TryGetWindowRectLTRB(rectHwnd, out var cRect)
             ? System.Drawing.Rectangle.FromLTRB(cRect.Left, cRect.Top, cRect.Right, cRect.Bottom)
             : System.Drawing.Rectangle.Empty;
