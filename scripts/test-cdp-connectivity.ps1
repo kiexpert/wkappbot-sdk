@@ -29,7 +29,9 @@ function Invoke-WkEval([string]$grap, [string]$js) {
 # ── 1. Eye alive ──────────────────────────────────────────────────────────────
 Write-Host "[1] Eye alive..." -ForegroundColor Cyan
 $tick = (& wkappbot eye tick 2>&1) -join " "
-if ($tick -match 'result=ok|end:0|ctx=|Eye alive' -or $tick.Contains('작업:') -or $tick.Contains('크로[')) { ok "Eye responding" }
+    & wkappbot eye tick 2>$null | Out-Null
+    if ($LASTEXITCODE -eq 0 -or $tick -match 'result=ok|end:0|ctx=|Eye alive|\[CU-') { ok "Eye alive (rc=$LASTEXITCODE)" }
+    else { fail "Eye tick rc=$LASTEXITCODE"; exit 1 }
 else { fail "Eye: $tick"; exit 1 }
 
 # ── 2. CDP open ───────────────────────────────────────────────────────────────
