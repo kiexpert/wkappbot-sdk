@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
+# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -420,20 +420,20 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 
 ## Pending
 
-- [x] BLOCKER prefix for blocking overlays in a11y read node list (Core v7.3.120: A11yActions.Blocker.cs new partial 270L, Read.cs threaded blockerIds, UIA+CDP detection, skill v1.17)
-- [x] ScreenSaverOverlay Z-order fix -- Topmost=false/true toggle + deferred SetWindowPos(DispatcherPriority.Loaded) built and hot-swapped (screensaver-zorder-fix skill registered)
+- [x] BLOCKER prefix for blocking overlays in a11y read node list (Core v7.3.120)
+- [x] ScreenSaverOverlay Z-order fix (screensaver-zorder-fix skill)
+- [x] TabTip.exe / Progman black desktop fix (skill + Core CLAUDE.md)
+- [x] CalloutInputWindow HWND_TOPMOST restore (commits 656f8e120+d4a377884)
+- [x] wkask.ps1 wrong log bug -- fixed commit 3661d23e4, resolve blocked by keyword guard
+- [x] ChatGPT ask hangs on sandbox tab -- already fixed in Core commit 1e7a921c5
+- [x] CommandHelpMap win/mouse/key -- 3 entries added (Core commit 2482e9491, v7.3.140)
+- [x] CDP placement log per-worker -- setwindowpos-trace.pid={pid}.jsonl (Core 80a5752e5, SDK 005b739f)
+- [x] CDP placement pre-clamp -- off-screen targetRect snapped before first attempt (f341d547)
+- [ ] CdpClient.InputGuard: _transparentHwnd mismatch -- hwnd stale if Chrome restarted
+- [ ] ReadinessBridges.FocusStealSentinel.cs WIP -- broken duplicate at stash@{0} in Core
+- [ ] Placement trace: add caller_hwnd/rect/class to setwindowpos-trace log
+- [ ] Caller mismatch bugs in placement pipeline -- wrong/stale caller selection
+- [ ] ask gpt 7 hard-coded waits (suggest ts=2026-05-19T22:06:23)
 - [ ] Action output auto-diff: after action [OK], auto-append state change diff
-- [ ] SDK new release v7.3.116 so CI captures [OK]
-- [ ] Focusless-first rule: a11y focus/click/type must try UIA focusless first (suggest filed)
+- [ ] Focusless-first rule: a11y focus/click/type must try UIA focusless first
 - [ ] Menu hotkey detection feature (suggest filed)
-- [x] TabTip.exe / Progman off-primary-monitor black desktop -- explorer restart fix + skill + Core CLAUDE.md documented
-- [x] CalloutInputWindow HWND_TOPMOST restore -- IntPtr.Zero removed, commit 656f8e120+d4a377884, skill callout-topmost-restore, resolved
-- [ ] CdpClient.InputGuard: _transparentHwnd mismatch bug -- hwnd saved at Enter but Exit uses current ChromeWindowHandle (stale if Chrome restarted)
-- [x] CDP placement log per-worker separation -- setwindowpos-trace.pid={pid}.jsonl (Core 80a5752e5, SDK PlacementValidate.cs)
-- [ ] ReadinessBridges.FocusStealSentinel.cs WIP -- broken duplicate block stashed at stash@{0} in Core repo, needs cleanup
-- [x] CDP placement log per-worker separation -- setwindowpos-trace.pid={pid}.jsonl (Core 80a5752e5, SDK PlacementValidate.cs)
-- [ ] ReadinessBridges.FocusStealSentinel.cs WIP -- broken duplicate block stashed at stash@{0} in Core repo, needs cleanup
-- [x] wkask.ps1 wrong log bug (suggest ts=2026-05-19T22:24:32) -- fix applied (commit 3661d23e4), suggest resolve blocked by keyword guard (12/31 missing), skip for now
-- [x] ChatGPT ask hangs on fresh sandbox tab -- already fixed in Core commit 1e7a921c5 (timeoutMs:3000 + null fallback)
-- [ ] ask gpt 7 hard-coded waits (suggest ts=2026-05-19T22:06:23) -- response detection latency fix (Core repo)
-- [x] CommandHelpMap missing win/mouse/key commands -- 3 entries added (Core commit 2482e9491, v7.3.140)
