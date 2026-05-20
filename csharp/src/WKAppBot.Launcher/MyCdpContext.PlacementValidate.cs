@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 
 namespace WKAppBot.Launcher;
@@ -51,6 +51,27 @@ partial class Program
             if (TryGetWorkArea(centerX, centerY, out var wa)) initialWorkArea = wa;
         }
         catch { /* ignore -- fall back to no reflow detection */ }
+
+        // Pre-clamp: snap off-screen targetRect to nearest work area before first attempt.
+        // The mid-loop reflow clamp only fires when work area CHANGES, so without this
+        // guard an off-screen targetRect burns all 5 attempts at the wrong position.
+        if (initialWorkArea.HasValue)
+        {
+            var _wa = initialWorkArea.Value;
+            int _newW = Math.Min(targetRect.Width,  _wa.Right - _wa.Left);
+            int _newH = Math.Min(targetRect.Height, _wa.Bottom - _wa.Top);
+            int _newL = Math.Max(_wa.Left, Math.Min(targetRect.Left, _wa.Right  - _newW));
+            int _newT = Math.Max(_wa.Top,  Math.Min(targetRect.Top,  _wa.Bottom - _newH));
+            if (_newL != targetRect.Left || _newT != targetRect.Top
+             || _newW != targetRect.Width || _newH != targetRect.Height)
+            {
+                Console.Error.WriteLine(string.Format(
+                    "[PLACEMENT:PRE-CLAMP] off-screen ({0},{1} {2}x{3}) -> ({4},{5} {6}x{7})",
+                    targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
+                    _newL, _newT, _newW, _newH));
+                targetRect = new RECT { Left = _newL, Top = _newT, Right = _newL + _newW, Bottom = _newT + _newH };
+            }
+        }
 
         for (attempt = 1; attempt <= maxAttempts; attempt++)
         {
