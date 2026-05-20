@@ -166,9 +166,19 @@ partial class Program
                 // pixels on a PerMonitorV2-aware process. logical_x/logical_y let
                 // operators compare against any CDP cdp_logical entry instantly.
                 {
+                    // Per-worker log separation: include Chrome PID in filename so
+                    // concurrent webbot sessions don't interleave SetWindowPos traces.
+                    // Pair: Core CdpClient.Window2.cs writes setWindowBounds rows to the
+                    // matching setwindowpos-trace.pid={pid}.jsonl. Falls back to hwnd
+                    // when GetWindowThreadProcessId fails.
+                    int _swpPid = 0;
+                    try { GetWindowThreadProcessIdLocal(chromeHwnd, out _swpPid); } catch { _swpPid = 0; }
+                    string _swpWorkerKey = _swpPid > 0
+                        ? $"pid={_swpPid}"
+                        : $"hwnd=0x{chromeHwnd.ToInt64():X}";
                     var swpLog = System.IO.Path.Combine(
                         System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".",
-                        "wkappbot.hq", "logs", "setwindowpos-trace.jsonl");
+                        "wkappbot.hq", "logs", $"setwindowpos-trace.{_swpWorkerKey}.jsonl");
                     System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(swpLog)!);
                     var _swpDpi = TryGetWindowDpiSafe(chromeHwnd);
                     var _swpScale = _swpDpi > 0 ? _swpDpi / 96.0 : 1.0;
