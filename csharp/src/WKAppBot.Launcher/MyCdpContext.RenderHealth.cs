@@ -44,7 +44,7 @@ partial class Program
 
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             result = await ProbeChromeRenderingHealth(wsUrl, sw, cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -150,44 +150,22 @@ partial class Program
         System.Diagnostics.Stopwatch sw,
         CancellationToken ct)
     {
+        // Step 1: quick WS connect + Page.captureScreenshot (fromSurface=true works minimized)
         using var ws = new ClientWebSocket();
+        ws.Options.SetRequestHeader("User-Agent", "wkappbot-render-probe");
         await ws.ConnectAsync(new Uri(wsUrl), ct).ConfigureAwait(false);
 
-        var expression =
-            "(() => new Promise(resolve => requestAnimationFrame(() => resolve({" +
-            "readyState: document.readyState || ''," +
-            "viewportWidth: window.innerWidth || 0," +
-            "viewportHeight: window.innerHeight || 0," +
-            "elementCount: document.querySelectorAll('*').length," +
-            "textLength: ((document.body && document.body.innerText) || '').trim().length" +
-            "}))))()";
+        await SendCdpText(ws,
+            "{\"id\":12,\"method\":\"Page.captureScreenshot\",\"params\":{\"format\":\"png\",\"fromSurface\":true,\"captureBeyondViewport\":false}}",
+            ct).ConfigureAwait(false);
+        string ssResp = await ReadCdpResponseById(ws, 12, ct).ConfigureAwait(false);
+        int ssBytes = ParseScreenshotByteLength(ssResp);
 
-        var evalPayload = "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{\"awaitPromise\":true,\"returnByValue\":true,\"expression\":"
-            + ToJsonStringLiteral(expression) + "}}";
-        await SendCdpText(ws, evalPayload, ct).ConfigureAwait(false);
-
-        string evalResponse = await ReadCdpResponseById(ws, 11, ct).ConfigureAwait(false);
-        var dom = ParseRenderHealthPayload(evalResponse);
-        if (dom.trigger != "dom_ok")
-        {
-            return new ChromeRenderingHealthResult(false, dom.trigger, dom.readyState, dom.viewportWidth,
-                dom.viewportHeight, dom.elementCount, dom.textLength, 0, sw.ElapsedMilliseconds);
-        }
-
-        await SendCdpText(ws, "{\"id\":12,\"method\":\"Page.captureScreenshot\",\"params\":{\"format\":\"png\",\"fromSurface\":true}}", ct)
-            .ConfigureAwait(false);
-        string screenshotResponse = await ReadCdpResponseById(ws, 12, ct).ConfigureAwait(false);
-        int screenshotBytes = ParseScreenshotByteLength(screenshotResponse);
-
-        bool ok = (dom.readyState == "complete" || dom.readyState == "interactive")
-            && dom.viewportWidth > 0
-            && dom.viewportHeight > 0
-            && dom.elementCount > 0
-            && screenshotBytes > 2048;
-
-        var trigger = ok ? "ok" : "render_unhealthy";
-        return new ChromeRenderingHealthResult(ok, trigger, dom.readyState, dom.viewportWidth,
-            dom.viewportHeight, dom.elementCount, dom.textLength, screenshotBytes, sw.ElapsedMilliseconds);
+        // Screenshot < 500 bytes = blank/white/crash
+        bool healthy = ssBytes >= 500;
+        string trigger = healthy ? "ok" : "render_unhealthy";
+        return new ChromeRenderingHealthResult(
+            healthy, trigger, "n/a", 0, 0, 0, 0, ssBytes, sw.ElapsedMilliseconds);
     }
 
     static async Task SendCdpText(ClientWebSocket ws, string payload, CancellationToken ct)
