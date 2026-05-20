@@ -442,7 +442,7 @@ Run 'wkappbot --help' for full command reference.
 static class FocusGuard
 {
     [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetForegroundWindow")]
-    private static extern IntPtr GetForegroundWindowRaw();
+    internal static extern IntPtr GetForegroundWindowRaw();
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);

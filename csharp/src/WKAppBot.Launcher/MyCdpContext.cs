@@ -192,7 +192,8 @@ partial class Program
         var hostHwnd = GetHostWindowSnapshot();
 
         // fgHwnd: kept for diagnostic logging only -- NOT used as a placement anchor.
-        var fgHwnd = GetForegroundWindow();
+        // Use GetForegroundWindowRaw directly (bypass CDP-stack hook -- this call is intentionally diagnostic).
+        var fgHwnd = FocusGuard.GetForegroundWindowRaw();
 
         // Caller priority:
         //   (1) WKAPPBOT_CALLER_HWND env (set by parent wkappbot process -- nested call anchor)
@@ -224,7 +225,7 @@ partial class Program
                     return p.ToString();
                 }
             }));
-            Console.Error.WriteLine("[LAUNCHER:ERROR] no_caller_window chain=" + chainStr);
+            Console.Error.WriteLine("[LAUNCHER:WARN] no_caller_window chain=" + chainStr + " -- placement will be skipped");
             try
             {
                 var exeDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".";
@@ -244,7 +245,7 @@ partial class Program
                 });
             }
             catch { }
-            Environment.Exit(2);
+            // Placement will be skipped; command continues normally.
         }
 
         // Auto-resolve off-screen caller to valid alternative
