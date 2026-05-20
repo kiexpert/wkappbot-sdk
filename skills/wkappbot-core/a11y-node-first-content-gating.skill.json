@@ -1,0 +1,59 @@
+{
+  "id": "a11y-node-first-content-gating",
+  "app": "wkappbot-core",
+  "title": "a11y progressive disclosure: node list on window-grap, content only on node-grap",
+  "title_ko": null,
+  "desc": "Design intent: window-level grap returns node structure only (roles+names), not content. Content exposed only when a specific node is addressed. Forces AI to understand node importance before extracting data -- mirrors how screen readers work.",
+  "steps": [
+    "INTENT: Window-grap query returns accessibility tree structure (roles, names, counts) not content. AI must navigate to a specific node to get content. Screen reader users Tab through nodes to understand layout first -- AI should do the same. This builds correct mental model and produces node-targeted automation instead of fragile text-grep patterns.",
+    "CURRENT-PROBLEM: a11y read {window-grap} dumps full page text. AI grep-searches it and bypasses the accessibility tree entirely. Node roles, structure, hierarchy all ignored. Result: brittle automation based on text matching instead of node targeting.",
+    "PROPOSED-BEHAVIOR: a11y read {window-grap-only} = window grap with NO scope segment = returns node list only (structure). a11y read {window-grap}#scope = with scope = returns actual content of that node only.",
+    "EXAMPLE-STRUCTURE: wkappbot a11y read \"{domain:'example.ai'}\" (window-only grap, no scope) OUTPUT: [Document] page-title / [Group] chat-area / [Edit] input placeholder=Ask anything / [Button] Send / [Group] conversation-history (2 items) / [Button] New chat. AI sees roles+counts -- enough to decide which node to target next. No conversation content leaked.",
+    "EXAMPLE-CONTENT: wkappbot a11y read \"{domain:'example.ai'}#*conversation*\" (node-scoped) OUTPUT: [Message user] hello / [Message assistant] Hello how can I help you. Content revealed only after explicit node navigation.",
+    "ANALOGY: filesystem ls shows directory structure not file contents. cat path/file shows content only after explicit navigation. Same: a11y structure first, content on explicit node address.",
+    "ESCAPE-HATCH: --content flag on window-grap preserves full-dump for existing scripts. a11y inspect always full UIA dump for debugging. Opt-in migration -- no breaking change on day one.",
+    "IMPACT: AI learns Edit=input surface, Button=action, Group=container with sub-items. Token waste reduced -- only targeted content loaded. Automation quality improves naturally as AI is forced to understand structure.",
+    "IMPLEMENTED v7.3.85 (2026-05-19): A11yReadNodeList added to A11yActions.Read.cs. Window-grap-only read returns: (1) [Document] Title (total N nodes) header, (2) named/actionable nodes only -- unnamed Group/Pane/Custom containers skipped silently, (3) Edit/ComboBox/Search ALWAYS shown as [PINNED] even when in compressed middle section, (4) unnamed Image nodes hidden, (5) Edit nodes show placeholder= attribute, (6) action hints: Edit->a11y type Button/Link->a11y invoke, (7) 8+8 head/tail compression with ** (N more) ** marker, (8) --content flag restores full dump for backward compat. Validated: duck.ai shows [Edit] placeholder + consent button = AI plans full flow immediately. Naver: [PINNED] search input visible despite 51 compressed items.",
+    "COPY-PASTE COMMANDS (v7.3.86, 2026-05-19): Each actionable node in window-grap read now prints an indented copy-paste command. Edit/ComboBox: 'wkappbot a11y type {grap}#*placeholder* INPUT'. Button/Link: 'wkappbot a11y invoke {grap}#*name*'. Container: 'wkappbot a11y read {grap}#*name*'. CRITICAL: grap includes cdp:PORT field per CDP discipline -- {domain:'site.com',cdp:9740}#*node*. Port extracted from original query grap via ExtractNodeListWindowGrap. Pinned Edit nodes always show even when compressed. Validated on naver.com/duck.ai/github.com.",
+    "CI VALIDATION (2026-05-19): Legacy app test A01 caught real encoding bug -- Korean placeholder text (HelpText from UIA) displays as mojibake in node list output. Filed suggest. A02/A03 tests show cmd-slash-c capture returns LAUNCH JSON not node content in CI (v7.3.1 limitation). Action hints absent in CI node list. All findings documented as known issues pending SDK release upgrade.",
+    "FOCUSED NODE MARKER (design rule): a11y read node list MUST preserve document order (natural UIA tree traversal). Do NOT reorder nodes based on focus. Instead, mark the currently focused node inline with a [FOCUSED] prefix at its natural position. Reordering = accessibility violation = test FAIL. Screen readers depend on consistent document order. [FOCUSED] marker only; position unchanged.",
+    "Z-ORDER RULE (corrected 2026-05-19): a11y read node list output order follows UIA Z-order traversal (frontmost element first), NOT arbitrary document order. This is the correct accessibility rule: screen readers read foreground/topmost elements first. Modal dialogs and popups are Z-order front, so they naturally appear first in output. Focused node gets [FOCUSED] marker at its natural Z-order position -- no reordering needed. Reordering by document order would violate Z-order rules and must FAIL accessibility tests.",
+    "BLOCKER PREFIX (2026-05-19): When a blocking overlay (cookie banner, consent dialog, modal popup) is detected in Z-order front position, prefix it with [BLOCKER] in node list output BEFORE the main content nodes. Priority: [BLOCKER] first -> [FOCUSED] in Z-order position -> rest in Z-order. Integrates with experience/brokers/ DB for known blocker patterns. Heuristic for unknowns: top Z-order + covers large area + has dismiss/accept button. AI workflow: see [BLOCKER] -> invoke dismiss button -> re-read -> [BLOCKER] gone -> proceed with main content. This is the correct accessibility interaction pattern for overlays.",
+    "BLOCKER-PREFIX STATUS (2026-05-20): stub inserted in A11yActions.Read.cs in previous session but full DetectBlockerNodes() implementation not yet complete. Next implementation steps: (1) implement DetectBlockerNodes() detecting modal/dialog/consent/overlay by UIA ControlType+Name pattern and CDP role=dialog/aria-modal; (2) prefix matching nodes with [BLOCKER] in node list output; (3) add broker overlay screenshots to bin/wkappbot.hq/experience/brokers/; (4) build + verify on duck.ai cookie consent banner.",
+    "2026-05-20: starting BLOCKER prefix implementation. New partial class A11yActions.Blocker.cs with DetectBlockerNodes() (UIA Dialog/Pane+name regex, CDP role=dialog/aria-modal/class~modal). Node-list emit in A11yActions.Read.cs prepends [BLOCKER] for matching IDs. Delegated to Opus agent in Core repo D:/GitHub/WKAppBot.",
+    "BLOCKER PREFIX SHIPPED (v7.3.120, 2026-05-20): DetectBlockerNodes() implemented in A11yActions.Blocker.cs partial class. UIA path: ControlType=Dialog/alertdialog/alert, Window/Pane/Group/Custom with name matching blocker regex (cookie/consent/accept/agree/gdpr/modal/overlay/dialog/popup/banner/privacy). CDP path: when browser hwnd + cdp port present, eval JS scans DOM for [role=dialog], [role=alertdialog], [aria-modal=true], class~=modal/overlay/backdrop/cookie-banner/consent (size>=50x30). Harvested DOM names are matched against UIA node names by substring; matched runtime IDs added to set. Emit loop in CollectNodeLines prepends [BLOCKER] before [FOCUSED] before typeLabel. Verified on bbc.com with injected role=dialog cookie-consent: output shows '[BLOCKER] [Dialog] Cookie Consent Banner' followed by Accept/Reject child buttons with copy-paste a11y invoke commands. Workflow: AI sees [BLOCKER] -> invokes dismiss button -> re-read -> [BLOCKER] gone -> proceed."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y read \"{domain:'duck.ai'}\"",
+      "expect": "Edit Button Group visible without conversation content",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \"{domain:'duck.ai'}#*Edit*\"",
+      "expect": "input placeholder or value visible",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-node-first-content-gating",
+      "expect": "EXAMPLE-STRUCTURE visible in steps",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "design",
+    "progressive-disclosure",
+    "accessibility",
+    "ux",
+    "screen-reader",
+    "node-first"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T15:01:51.3144878Z",
+  "updated": "2026-05-19T18:43:56.9766404Z",
+  "version": "1.18"
+}

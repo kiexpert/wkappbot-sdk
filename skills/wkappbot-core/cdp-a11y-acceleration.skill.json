@@ -1,0 +1,52 @@
+{
+  "id": "cdp-a11y-acceleration",
+  "app": "wkappbot-core",
+  "title": "CDP-accelerated a11y for Chrome targets (roadmap)",
+  "title_ko": null,
+  "desc": "Replace slow Windows UIA bridge with CDP Accessibility API for Chrome targets. Same tree screen readers see, 5-10x faster. Interface unchanged -- same a11y commands, routing decision inside Core.",
+  "steps": [
+    "WHY: Windows UIA path = COM cross-process marshaling (slow). CDP path = local WebSocket to Chrome internals (fast). Both read the same Chrome internal AX tree. Screen reader users, CDP, and UIA all see the same accessibility tree -- but CDP is the most direct and accurate route.",
+    "ARCHITECTURE: a11y command receives grap -> detect CDP port -> if Chrome+CDP: route to Accessibility.getFullAXTree (find/read) + Input.dispatch* (click/type) + Runtime.evaluate (set-value/invoke). If no CDP: fallback to current UIA path. Non-browser apps always UIA.",
+    "MISMATCH CASES TO HANDLE: (1) aria-hidden=true -- hidden in AX tree (both UIA and CDP AX), visible in CDP DOM. (2) Shadow DOM -- UIA bridge flattens/misses, CDP Accessibility handles correctly. (3) Cross-frame iframes -- UIA misses cross-origin, CDP targets by frameId. (4) Timing: UIA COM lag can return stale state after React render; CDP query is current-state.",
+    "ROADMAP [P0]: Chrome target detection via CDP port in grap -> route find/read through Accessibility.getFullAXTree instead of UIA. Perf target: under 100ms for find on any page.",
+    "ROADMAP [P1]: a11y click/invoke via CDP Input.dispatchMouseEvent + Input.dispatchKeyEvent. a11y type via Input.dispatchKeyEvent per char. a11y set-value via Runtime.evaluate with React-compatible value setter.",
+    "ROADMAP [P2]: a11y scroll via Input.dispatchMouseEvent scroll. a11y screenshot via Page.captureScreenshot (higher quality). a11y wait via CDP Page events (load/DOMContentLoaded) instead of polling UIA.",
+    "ROADMAP [P3]: expose backendDOMNodeId in a11y find output for Chrome targets -- enables direct DOM-to-AX correlation. a11y find --cdp-node option shows: UIA-path + DOM tag#id.class + ARIA role/name side by side.",
+    "SUGGEST: filed 2026-05-18T14:56:04 -- CDP-accelerated a11y for Chrome targets bypass Windows UIA bridge",
+    "SESSION WORK (2026-05-19): Implemented a11y read progressive disclosure (P0 adjacent). a11y read window-grap-only now returns node list via CDP AX tree (Chrome: skips Pane wrappers to RootWebArea). Validated: duck.ai shows [Edit]+[Button] with action hints in under 50ms vs 200ms+ UIA path. Commits in Core: fb5d02bc(feat) fb3b93116(fix) ed5960836(compress) 5d1a0b2cb(hints) d506588ca(unnamed-img+pin) 502936e7d(8+8+placeholder+count) fe6fe4052(copy-paste-cmds) 0ac8fc3a4(cdp-port-fix). Suggest filed: 2026-05-18T15:10."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find \"{proc:'chrome',cdp:9740}\"",
+      "expect": "TARGET found under 100ms",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find \"{proc:'notepad'}\"",
+      "expect": "TARGET found via UIA fallback",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-a11y-acceleration",
+      "expect": "ROADMAP visible in steps",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "a11y",
+    "uia",
+    "chrome",
+    "acceleration",
+    "accessibility",
+    "roadmap",
+    "aria"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T14:57:18.5362136Z",
+  "updated": "2026-05-19T03:00:51.9801646Z",
+  "version": "1.2"
+}

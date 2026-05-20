@@ -1,0 +1,55 @@
+{
+  "id": "wkask-free-ai-cdp-routing",
+  "app": "wkappbot-workflow",
+  "title": "wkask free AI CDP-direct routing",
+  "title_ko": null,
+  "desc": "wkask CDP-direct routing for 8 free web AIs not natively supported by Core: duck perplexity mistral deepseek hugging groq venice phind",
+  "steps": [
+    "WHAT: wkask detects free-provider targets and routes via CDP-direct. Providers: duck=duck.ai perplexity=perplexity.ai mistral=chat.mistral.ai deepseek=chat.deepseek.com hugging=huggingface.co/chat groq=groq.com venice=venice.ai/chat phind=phind.com",
+    "PATTERN: a11y-first no eval-js for actions. (1) cdp open URL gets port. (2) a11y invoke consent banner via *agree*;*accept*;*continue* OR pattern. (3) a11y find grap#*Edit* then Get-VerifiedGrap parses TARGET line. (4) a11y set-value or a11y type with prompt. (5) a11y invoke send button OR a11y type --hotkey Enter fallback. (6) Start-Sleep 15 then a11y read --eval-js for response text only.",
+    "INVOKE-WK: Start-Process file-redirect avoids deadlock. Use -RedirectStandardOutput tmpF -PassThru -NoNewWindow then WaitForExit then Get-Content. NOT ProcessStartInfo+ReadToEnd.",
+    "CONSENT: duck.ai consent banner auto-dismissed via a11y invoke on *agree*;*accept* grap. Re-appears after wkcdp clean.",
+    "KNOWN-ISSUES: duck.ai CAPTCHA when bot-detected. groq and phind are most bot-tolerant. perplexity may need login.",
+    "A11Y-FIRST FIX (2026-05-19): Rewrote CDP block in wkask.ps1 to use a11y actions not eval-js. Consent: a11y invoke grap#*agree*. Input: a11y find grap#*Edit* -> Get-VerifiedGrap -> a11y type. Submit: a11y invoke send button OR a11y type --hotkey Enter. Response read: still a11y read --eval-js (no a11y equivalent). Invoke-WK fixed to Start-Process file-redirect (not ProcessStartInfo+ReadToEnd deadlock). Committed fe6fe405 in wkask-free-ai-cdp-routing wkask.ps1 Core repo.",
+    "GPT-DIRECT ROUTING (2026-05-20): Add gpt=chatgpt.com to cdpProviders. Use a11y set-value NOT a11y type for prompt-textarea (type triggers SendInput focus-guard in hidden window). grap must use domain:chatgpt.com not proc:chrome to target correct tab. Cookie banner: 'reject non-essential' button. Streaming poll: data-is-streaming attr. Response read: querySelectorAll data-message-author-role=assistant last element.",
+    "OPUS DELEGATION RESULT: set-value confirmed working. Final wkask.ps1 GPT routing uses set-value for text insert + hotkey Enter for submit + streaming poll + ChatGPT assistant selector for response."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 phind test -Timeout 5",
+      "expect": "CDP-direct",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 duck test -Timeout 5",
+      "expect": "CDP-direct",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -Command 'Select-String -Pattern cdpProviders D:/GitHub/WKAppBot/bin/wkask.ps1'",
+      "expect": "duck",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep old_ask_gpt D:/GitHub/WKAppBot/bin/wkask.ps1",
+      "expect": "old_ask_gpt",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkask",
+    "cdp",
+    "free-ai",
+    "a11y",
+    "duck",
+    "perplexity",
+    "routing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T14:41:38.1455772Z",
+  "updated": "2026-05-20T03:23:58.4557022Z",
+  "version": "1.7"
+}

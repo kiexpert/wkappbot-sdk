@@ -1,0 +1,63 @@
+{
+  "id": "screensaver-zorder-fix",
+  "app": "wkappbot-core",
+  "title": "ScreenSaverOverlay Z-order Fix on Visibility Show",
+  "title_ko": null,
+  "desc": "ScreenSaverOverlay Z-order fix: WPF Visibility.Hidden->Visible resets HWND Z-order; must re-apply topmost via Topmost-toggle + deferred SetWindowPos at DispatcherPriority.Loaded",
+  "steps": [
+    "Root cause: WPF Window with Visibility=Hidden retains Topmost property but loses HWND Z-order. On Hidden->Visible transition WPF re-creates the window in default Z-order (just above desktop). A single SetWindowPos(HWND_TOPMOST) immediately after Visibility.Visible runs before WPF finishes rendering so the Z-order change is lost.",
+    "Fix in ScreenSaverOverlay.Tick() wasHidden branch at csharp/src/WKAppBot.CLI/ScreenSaverOverlay.cs around line 410: (1) set Visibility=Visible, (2) toggle Window.Topmost=false then true to force WPF to re-emit its internal SetWindowPos, (3) call native SetWindowPos(HWND_TOPMOST) immediately as the belt, (4) schedule deferred SetWindowPos at DispatcherPriority.Loaded as the suspenders -- runs after WPF rendering completes.",
+    "Why both immediate and deferred SetWindowPos: immediate covers fast paths, deferred covers WPF compositor races. The Topmost toggle is what triggers WPFs own internal SetWindowPos -- without it WPF thinks Topmost is already true and does nothing.",
+    "Verification: trigger screensaver via idle 10s+, confirm overlay appears in front of all visible windows (Chrome, file explorer, taskbar).",
+    "ROOT CAUSE (Win11 confirmed 2026-05-20): WS_EX_TRANSPARENT + WS_EX_TOPMOST combination causes Windows 11 to demote the window below regular non-topmost windows. Fix: remove WS_EX_TRANSPARENT from SourceInitialized exStyle, keep only WS_EX_NOACTIVATE+WS_EX_TOOLWINDOW+WS_EX_LAYERED. WS_EX_TRANSPARENT was used for click-through but GetUserIdleMs detects input without needing mouse interception so it is unnecessary.",
+    "PIXEL TRACKING TODO (2026-05-20): Need to hide screensaver window and sample (0,0) behind it to identify real black overlay source. Screensaver title: WKAppBot ScreenSaver #0. Use EnumWindows + ShowWindow(SW_HIDE) + GetPixel + ShowWindow(SW_SHOWNOACTIVATE) pattern. Desktop background color registry = 0 0 0. FindWindow(Progman) = 0. Wallpaper expected at (0,0) = ~#E1C48C.",
+    "Verified 2026-05-19: test-eye-tick-screensaver-zorder.sh (resolve ts=2026-05-19T18:49:17)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx=",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows ScreenSaver",
+      "expect": "hwnd:0x",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find WKAppBot ScreenSaver",
+      "expect": "[OK]",
+      "prompt": "WS_EX_TRANSPARENT removed from SourceInitialized exStyle -- Win11 demotes TOPMOST+TRANSPARENT below normal windows. Added mwin.Window.Topmost=false/true toggle and deferred SetWindowPos at DispatcherPriority.Loaded in Tick() wasHidden branch to survive WPF Z-order reset on Visibility.Hidden->Visible transitions. Class split into 4 partials (Tick/PInvoke/Lifecycle) to satisfy 400-line cap."
+    },
+    {
+      "cmd": "wkappbot skill read a11y-node-first-content-gating",
+      "expect": "BLOCKER",
+      "prompt": "WS_EX_TRANSPARENT removed from SourceInitialized exStyle -- Win11 demotes TOPMOST+TRANSPARENT below normal windows. Added mwin.Window.Topmost=false/true toggle and deferred SetWindowPos at DispatcherPriority.Loaded in Tick() wasHidden branch to survive WPF Z-order reset on Visibility.Hidden->Visible transitions. Class split into 4 partials (Tick/PInvoke/Lifecycle) to satisfy 400-line cap."
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "publish",
+      "prompt": "WS_EX_TRANSPARENT removed from SourceInitialized exStyle -- Win11 demotes TOPMOST+TRANSPARENT below normal windows. Added mwin.Window.Topmost=false/true toggle and deferred SetWindowPos at DispatcherPriority.Loaded in Tick() wasHidden branch to survive WPF Z-order reset on Visibility.Hidden->Visible transitions. Class split into 4 partials (Tick/PInvoke/Lifecycle) to satisfy 400-line cap."
+    }
+  ],
+  "primary_cmd": "wkappbot a11y find WKAppBot ScreenSaver",
+  "tags": [
+    "screensaver",
+    "wpf",
+    "z-order",
+    "topmost",
+    "overlay",
+    "visibility"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-19T18:54:24.725894Z",
+  "updated": "2026-05-19T21:19:11.9831846Z",
+  "version": "1.6"
+}

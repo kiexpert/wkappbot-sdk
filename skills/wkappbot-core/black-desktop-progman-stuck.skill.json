@@ -1,0 +1,51 @@
+{
+  "id": "black-desktop-progman-stuck",
+  "app": "wkappbot-core",
+  "title": "Black desktop: Progman stuck on wrong monitor after topology change",
+  "title_ko": null,
+  "desc": "Win11 multi-monitor race: Progman anchors to secondary monitor after connect/disconnect, leaving primary monitor showing DWM fallback color. Fix: restart explorer.exe (2-3s blip).",
+  "steps": [
+    "SYMPTOM: Primary monitor shows solid black/dark. Apps render normally. Icons missing. GetPixel(0,0) returns HKCU Colors Background value (default black #000000).",
+    "ROOT CAUSE: Win11 Spotlight + multi-monitor topology change race. DesktopSpotlight.dll fails WM_SPAWN_WORKER for all monitors. Progman anchors to secondary only. DWM fallback fills primary.",
+    "DIAGNOSE: FindWindow('Progman') hwnd rect covers secondary monitor only. HKCU\\Control Panel\\Colors\\Background = '0 0 0'.",
+    "FIX: Stop-Process -Name explorer -Force; Start-Sleep -Milliseconds 1500; Start-Process explorer. 2-3s blip then auto-recover.",
+    "VERIFY: GetPixel(screen DC, 0, 0) returns warm wallpaper color. Icons visible again.",
+    "DO NOT call SPI_SETDESKWALLPAPER before fixing Progman -- it re-anchors Progman to wrong monitor.",
+    "OPTIONAL persistent fix: Set-ItemProperty HKCU:\\Control Panel\\Colors Background '255 255 255' so future races show white not black."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read black-desktop-progman-stuck",
+      "expect": "SYMPTOM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read black-desktop-progman-stuck",
+      "expect": "FIX",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read black-desktop-progman-stuck",
+      "expect": "VERIFY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "black",
+    "desktop",
+    "progman",
+    "workerw",
+    "multi-monitor",
+    "explorer",
+    "wallpaper",
+    "spotlight",
+    "win11"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-19T19:55:53.3933188Z",
+  "updated": "2026-05-19T19:55:53.3933274Z",
+  "version": "1.0"
+}

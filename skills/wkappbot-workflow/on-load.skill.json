@@ -14,7 +14,10 @@
     "HANDOFF COMMAND: if user says 'handoff' or 'continue from last session', run: wkappbot skill read claude-session-handoff -- find previous JSONL (index [1]) and extract context.",
     "PROJECT MAIN TASKS -- gg section authoring (only when step 5 cannot find a gg section): ask the user what the main recurring tasks are, then write '## gg Main Workflow' in the repo CLAUDE.md. Each step must be an executable command or Agent() call. TEMPLATE: 1. wkappbot skill read on-load 2. [project task] 3. Agent(model:opus, prompt:'triage: <list>') 4. wkappbot skill read repo-health-doctor",
     "SKILL EDIT DISCIPLINE (read every session): NEVER directly edit .skill.json files. The pipe character is the step separator -- direct edits corrupt steps, miss version bump, disappear from skill search. ALWAYS use wkappbot skill edit <id> or wkappbot skill contribute. If you edited directly by mistake: (1) git checkout -- <path> to revert first. (2) wkappbot skill read <id> to verify it is clean. (3) redo via skill edit. Do NOT install a directly-edited file -- it registers the corrupted version. Correct install flow (exception case only): (A) BEFORE install -- python3 -c 'import json; json.load(open(\"path\"))' to validate JSON, then wkappbot skill read <id> dry-check. (B) install only if steps render cleanly with no broken splits. (C) AFTER install -- wkappbot skill read <id> again to confirm version bumped and all steps visible.",
-    "WKEDIT RULE (MANDATORY): multi-file edits and any file containing multibyte characters (Korean, CJK, emoji) MUST use wkedit, never Edit/Write tool directly. Reason: Edit/Write silently re-encodes to CRLF or wrong encoding -- corrupts multibyte chars and skill steps. Pattern: wkedit file1.py file2.cs file3.md (opens all atomically). Single-file ASCII-only edits may use Edit tool."
+    "WKEDIT RULE (MANDATORY): multi-file edits and any file containing multibyte characters (Korean, CJK, emoji) MUST use wkedit, never Edit/Write tool directly. Reason: Edit/Write silently re-encodes to CRLF or wrong encoding -- corrupts multibyte chars and skill steps. Pattern: wkedit file1.py file2.cs file3.md (opens all atomically). Single-file ASCII-only edits may use Edit tool.",
+    "WINDOWS TOOL SELECTION (read once per session): Claude Code on Windows has a dedicated PowerShell tool. Use it directly for PS cmdlet/pipeline work -- do NOT route through Bash (powershell -File). Priority: Read/Edit/Write/Grep/Glob > PowerShell tool > Bash. Full reference: wkappbot skill read file-command-cheatsheet (step 9).",
+    "TOKEN-EFFICIENT SEARCH: use wkfind BEFORE manual grep/glob/read loops. wkfind <kw1> <kw2> searches code+sessions+logs in one shot with BM25 ranking -- replaces 3-5 tool calls with 1. wkfind log <kw> for runtime logs. wkfind session <kw> for past sessions. Only read specific files AFTER wkfind narrows the target.",
+    "GREP TOOL REMINDER: Claude Code has a dedicated Grep tool (in-process ripgrep, fastest). Use Grep tool for content search -- NOT Bash grep/rg/Select-String. Priority: Grep tool > wkfind > Bash. Looking back at sessions: Bash grep was used almost exclusively -- this is wrong. Grep tool = no subprocess overhead, direct results."
   ],
   "requirements": [
     {
@@ -133,6 +136,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-05-09T17:54:20.2562156Z",
-  "version": "1.51"
+  "updated": "2026-05-20T05:53:07.7928171Z",
+  "version": "1.57"
 }

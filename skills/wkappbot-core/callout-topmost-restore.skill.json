@@ -1,0 +1,51 @@
+{
+  "id": "callout-topmost-restore",
+  "app": "wkappbot-core",
+  "title": "CalloutInputWindow: restore HWND_TOPMOST -- IntPtr.Zero workaround now obsolete",
+  "title_ko": null,
+  "desc": "SetWindowPos in callout used HWND_TOP (IntPtr.Zero) instead of HWND_TOPMOST since dbb715282, causing callout to appear behind other windows. The workaround is obsolete now that MonitorFromWindow guard handles the ghost-window case.",
+  "steps": [
+    "SYMPTOM: Callout window (wkappbot taskkill confirmation, suggest callout etc.) appears behind other windows instead of on top.",
+    "ROOT CAUSE: dbb715282 (2026-05-03) changed SetWindowPos hWndInsertAfter from HWND_TOPMOST(-1) to HWND_TOP(0/IntPtr.Zero) to avoid ghost windows during taskkill teardown. 3d92ec0ac documented the rationale. d8cb39bfb trimmed the comment.",
+    "WHY WORKAROUND OBSOLETE: same dbb715282 added MonitorFromWindow guard that detects off-screen windows and re-snaps them. WS_EX_NOACTIVATE also prevents focus-steal ghost. The IntPtr.Zero workaround no longer needed.",
+    "FIX: change all 3 SetWindowPos hWndInsertAfter to (IntPtr)(-1) in CalloutInputWindow.cs:226,280 and CalloutInputWindow.Ctor.cs:206.",
+    "VERIFY: wkappbot taskkill /IM notepad.exe -- callout appears on top of all windows. Run it while a maximized window is active.",
+    "REVERT RISK: if ghost windows reappear during taskkill teardown, revert to IntPtr.Zero and file a new suggest with repro steps.",
+    "Verified 2026-05-19: test-eye-tick-callout-topmost-hwnd.sh (resolve ts=2026-05-19T20:17:43)",
+    "RESOLVED 2026-05-20: commit 656f8e120 removed WS_EX_TRANSPARENT from SourceInitialized exStyle, commit d4a377884 keyword anchor. Evidence: test-eye-tick-callout-topmost-hwnd.sh. Suggest resolved to history."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read callout-topmost-restore",
+      "expect": "SYMPTOM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read callout-topmost-restore",
+      "expect": "FIX",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read callout-topmost-restore",
+      "expect": "REVERT RISK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot skill read callout-topmost-restore",
+  "tags": [
+    "callout",
+    "topmost",
+    "z-order",
+    "hwnd-top",
+    "hwnd-topmost",
+    "setwindowpos",
+    "ghost",
+    "win11"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-19T20:17:34.7157907Z",
+  "updated": "2026-05-19T20:46:21.586453Z",
+  "version": "1.4"
+}

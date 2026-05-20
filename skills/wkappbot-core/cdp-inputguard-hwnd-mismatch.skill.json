@@ -1,0 +1,50 @@
+{
+  "id": "cdp-inputguard-hwnd-mismatch",
+  "app": "wkappbot-core",
+  "title": "CdpClient InputGuard: _transparentHwnd mismatch fixed -- ExitTransparency uses saved hwnd not current",
+  "title_ko": null,
+  "desc": "EnterTransparency saved WS_EX_TRANSPARENT on hwnd A but ExitTransparency used current ChromeWindowHandle (potentially hwnd B after Chrome restart), leaving hwnd A permanently transparent. Fixed by saving _transparentHwnd at Enter and restoring it at Exit.",
+  "steps": [
+    "BUG: EnterTransparency sets WS_EX_TRANSPARENT on hwnd at Enter time. ExitTransparency reads ChromeWindowHandle at Exit time -- if Chrome restarted between calls, this is a DIFFERENT hwnd. Old hwnd keeps WS_EX_TRANSPARENT forever (click-through, interferes with nearby windows).",
+    "FIX: Added _transparentHwnd field. EnterTransparency saves hwnd on 0->1 edge. ExitTransparency uses _transparentHwnd (saved hwnd) not ChromeWindowHandle. finally block resets _transparentHwnd=Zero and _savedExStyle=0 after restore.",
+    "COMMIT: 04c410483 fix(cdp): InputGuard save _transparentHwnd at Enter.",
+    "SECONDARY BUG (also fixed): _savedExStyle was never reset after restore -- stale value on next cycle if GetWindowLong failed.",
+    "CONTEXT FOR NEXT AGENT (2026-05-20): ask gpt fallback chain is GPT-CDP -> Gemini-CDP -> (dead end). Need to add Groq REST API as final fallback when both fail with __AUTH_WALL__. CallGroqApi is in AskCommands.TriadApi.cs. GROQ_API_KEY is in D:/GitHub/.env. Fix: after AskGemini returns __AUTH_WALL__, load key and call CallGroqApi.",
+    "ask gpt anonymous mode work: (1) remove Gemini+Groq fallback for explicit model, (2) on AUTH_WALL re-navigate to chatgpt.com anonymous, (3) isAnonymous flag skips attachFiles. See AskCommands.ChatGpt.cs ~line 110-320.",
+    "ask gpt delay fixes (2026-05-20): 9s->2s retry delay, cold boot 25s->15s, anon 2s->500ms, cold-boot fast-path skips CountChatGptTurns. Files: AskCommands.ChatGpt.cs, AskCommands.Entry.cs, AskCommands.ChatGpt.SendWait.cs",
+    "SETWINDOWPOS-TRACE caller-mismatch debugging (2026-05-20): SDK Launcher setwindowpos-trace JSON now includes caller_hwnd, caller_class, caller_x/y/w/h, offset_x/y for every SetWindowPos. Trace stages: stage1_initial (first placement post-ShowWindow), validate_retry (PlacementValidate loop attempts), stage3_dpi_correct (DPI rescale). Caller threaded through TryValidateAndCorrectPlacement, SpawnBackgroundPlacementWatcher argv[8], TryStage2PageLoadWait, TryStage3DpiAwareMatch. Also fixed caller-mismatch race: ResolveValidCallerWindow now accepts pre-resolved ancestor+host instead of re-invoking EyeCmdPipeClient.ResolveCallerTerminalHwnd/GetHostWindowSnapshot. Files touched: MyCdpContext.PlacementValidate.cs, Placement.cs, Stage23.cs, Stage3.cs, CallerValidation.cs, MyCdpContext.cs."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-inputguard-hwnd-mismatch",
+      "expect": "BUG",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-inputguard-hwnd-mismatch",
+      "expect": "FIX",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-inputguard-hwnd-mismatch",
+      "expect": "COMMIT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "inputguard",
+    "transparent",
+    "hwnd",
+    "chrome",
+    "ws-ex-transparent",
+    "race"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-19T20:53:12.0791408Z",
+  "updated": "2026-05-20T03:12:18.2393398Z",
+  "version": "1.8"
+}
