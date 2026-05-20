@@ -272,6 +272,24 @@ internal static class EyeCmdPipeClient
         return IntPtr.Zero;
     }
 
+    internal static List<uint> GetAncestorPidChain()
+    {
+        var ancestorPids = new List<uint>();
+        try
+        {
+            int pid = Environment.ProcessId;
+            for (int depth = 0; depth < 8 && pid > 0; depth++)
+            {
+                var parent = GetParentPid(pid);
+                if (parent <= 0 || parent == pid) break;
+                ancestorPids.Add((uint)parent);
+                pid = parent;
+            }
+        }
+        catch { }
+        return ancestorPids;
+    }
+
     /// <summary>
     /// Walk ancestor PIDs looking for a window whose class name is "PseudoConsoleWindow".
     /// Used when GetConsoleWindow() returns 0 (e.g. launcher running detached or under a host

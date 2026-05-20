@@ -209,19 +209,42 @@ partial class Program
                        : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
                        : hostHwnd;
 
-        // Last resort for bash/ConPTY contexts: when the process chain has no
-        // visible window (ancestor walk returns Zero, ConPTY has no console
-        // window, parent has no MainWindowHandle), fall back to the foreground
-        // window IF it passes the known-host-process gate AND is on-screen.
-        // In bash/ConPTY scenarios the foreground IS the user's terminal
-        // (Windows Terminal / conhost) which is a legitimate caller anchor.
-        // Strict gating prevents foreign-app foregrounds (YouTube, other-project
-        // Chrome) from sneaking in as the placement anchor.
-        if (callerHwnd == IntPtr.Zero && fgHwnd != IntPtr.Zero
-            && IsKnownHostProcess(fgHwnd) && !IsWindowOffScreen(fgHwnd))
+        if (callerHwnd == IntPtr.Zero)
         {
-            Console.Error.WriteLine($"[LAUNCHER:FALLBACK] using foreground as last-resort caller hwnd=0x{fgHwnd.ToInt64():X}");
-            callerHwnd = fgHwnd;
+            var chain = EyeCmdPipeClient.GetAncestorPidChain();
+            var chainStr = string.Join(" -> ", chain.Select(p =>
+            {
+                try
+                {
+                    using var px = System.Diagnostics.Process.GetProcessById((int)p);
+                    return p + "(" + px.ProcessName + ")";
+                }
+                catch
+                {
+                    return p.ToString();
+                }
+            }));
+            Console.Error.WriteLine("[LAUNCHER:ERROR] no_caller_window chain=" + chainStr);
+            try
+            {
+                var exeDir = System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".";
+                var lp = System.IO.Path.Combine(exeDir, "wkappbot.hq", "runtime", "cdp-state.jsonl");
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(lp)!);
+                WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(lp, "{\"ts\":\"" + DateTimeOffset.UtcNow.ToString("o") + "\",\"type\":\"no_caller_window\",\"chain\":\"" + chainStr + "\"}" + Environment.NewLine);
+            }
+            catch { }
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "wkappbot",
+                    Arguments = "suggest \"[BUG] no_caller_window chain=" + chainStr + "\" --requirement \"wkappbot eye tick => healthy\" --requirement \"wkappbot cdp open https://example.com => OK\" --requirement \"wkappbot ask gpt test => response\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
+            catch { }
+            Environment.Exit(2);
         }
 
         // Auto-resolve off-screen caller to valid alternative

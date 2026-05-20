@@ -86,11 +86,7 @@ partial class Program
             var name = (p.ProcessName ?? "").ToLowerInvariant();
             if (string.IsNullOrEmpty(name)) return false;
 
-            // Chrome is often foreground when user has ask gpt running.
-            // Accept Chrome as a valid caller — it's almost always the
-            // project's own CDP instance. Later validation (Stage 1/2/3)
-            // will confirm placement accuracy regardless of caller origin.
-            if (name == "chrome") return true;
+            // Chrome is the CDP target, never the placement caller.
 
             foreach (var allowed in KnownHostProcessNames)
                 if (name == allowed) return true;
