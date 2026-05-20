@@ -349,4 +349,5 @@ internal static class EyeCmdPipeClient
         stdout.Write(lineEnd, 0, lineEnd.Length);
         stdout.Flush();
     }
+    // wkask-wrong-log resolved: Eye log override removed (commit 3661d23e4).
 }
