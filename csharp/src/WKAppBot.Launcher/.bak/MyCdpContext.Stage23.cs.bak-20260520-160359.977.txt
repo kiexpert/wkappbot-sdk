@@ -291,7 +291,7 @@ partial class Program
             $"[PLACEMENT:STAGE2] trigger={trigger} elapsed={sw.ElapsedMilliseconds}ms ok={placementOk} attempts={attempts} "
             + $"final=(L={final.Left},T={final.Top},R={final.Right},B={final.Bottom})");
 
-        await RunChromeRenderingHealthCheck(cdpPort, wsUrl, cmd, chromeHwnd).ConfigureAwait(false);
+        await RunChromeRenderingHealthCheck(cdpPort, wsUrl, cmd).ConfigureAwait(false);
 
         // Auto-suggest GATE (silent-yield pattern, 2026-05-16):
         // ws_receive_error / ws_closed / no_ws_url / timeout are BENIGN when the

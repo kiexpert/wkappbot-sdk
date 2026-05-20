@@ -1,0 +1,313 @@
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace WKAppBot.Launcher;
+
+partial class Program
+{
+    sealed record ChromeRenderingHealthResult(
+        bool Success,
+        string Trigger,
+        string ReadyState,
+        int ViewportWidth,
+        int ViewportHeight,
+        int ElementCount,
+        int TextLength,
+        int ScreenshotBytes,
+        long ElapsedMs);
+
+    /// <summary>
+    /// Probe Chrome rendering health via CDP. On a verdict that indicates a
+    /// truly broken page (DOM unhealthy / runtime error / render unhealthy),
+    /// kill the Chrome process and relaunch wkappbot with the original argv
+    /// so the caller's command (cdp open / ask / ...) gets a fresh Chrome.
+    ///
+    /// Transport problems (no_ws_url, timeout, ws_*) are treated as benign --
+    /// we cannot tell from a transport race whether Chrome is actually broken,
+    /// so we only relaunch on DOM-level evidence of failure.
+    /// </summary>
+    static async Task RunChromeRenderingHealthCheck(int cdpPort, string? wsUrl, string cmd, IntPtr chromeHwnd)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        ChromeRenderingHealthResult result;
+
+        if (string.IsNullOrWhiteSpace(wsUrl))
+        {
+            result = new ChromeRenderingHealthResult(false, "no_ws_url", "", 0, 0, 0, 0, 0, 0);
+            AppendChromeRenderingHealthRecord(cdpPort, result, cmd);
+            Console.Error.WriteLine("[RENDER:HEALTH] no CDP ws url -- skip");
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            result = await ProbeChromeRenderingHealth(wsUrl, sw, cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            result = new ChromeRenderingHealthResult(false, "timeout", "", 0, 0, 0, 0, 0, sw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            result = new ChromeRenderingHealthResult(false, "error:" + ex.GetType().Name, "", 0, 0, 0, 0, 0, sw.ElapsedMilliseconds);
+            Console.Error.WriteLine($"[RENDER:HEALTH] probe failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        AppendChromeRenderingHealthRecord(cdpPort, result, cmd);
+        Console.Error.WriteLine(
+            $"[RENDER:HEALTH] trigger={result.Trigger} ok={result.Success} elapsed={result.ElapsedMs}ms "
+            + $"ready={result.ReadyState} viewport={result.ViewportWidth}x{result.ViewportHeight} "
+            + $"elements={result.ElementCount} text={result.TextLength} screenshot_bytes={result.ScreenshotBytes}");
+
+        // Kill+relaunch only on DOM-level failures. Transport errors are racing
+        // the foreground ask pipeline and produce false positives.
+        if (!result.Success && IsKillableRenderTrigger(result.Trigger))
+            KillChromeAndRelaunch(cdpPort, chromeHwnd, result.Trigger, cmd);
+    }
+
+    /// <summary>
+    /// True for verdicts that prove the page is broken at the DOM/runtime
+    /// level (not just a CDP transport hiccup). These triggers map 1:1 to
+    /// the JS probe's return values:
+    ///   dom_unhealthy   -- readyState empty / viewport 0 / 0 elements / blank body
+    ///   runtime_error   -- Runtime.evaluate returned an error block
+    ///   render_unhealthy -- DOM OK but screenshot was suspiciously small
+    /// </summary>
+    static bool IsKillableRenderTrigger(string trigger) =>
+        trigger == "dom_unhealthy"
+        || trigger == "runtime_error"
+        || trigger == "render_unhealthy";
+
+    /// <summary>
+    /// Kill the Chrome owning <paramref name="chromeHwnd"/> and re-spawn the
+    /// current wkappbot with the original argv. Best-effort: every step is
+    /// guarded so a partial failure still leaves the user in a usable state.
+    /// </summary>
+    static void KillChromeAndRelaunch(int cdpPort, IntPtr chromeHwnd, string reason, string cmd)
+    {
+        Console.Error.WriteLine(
+            $"[RENDER:KILL] reason={reason} port={cdpPort} hwnd=0x{chromeHwnd.ToInt64():X} cmd={cmd} -- killing Chrome and relaunching");
+
+        int chromePid = 0;
+        try
+        {
+            // GetWindowThreadProcessIdLocal lives in MyCdpContext.CallerValidation.cs
+            // (same partial class). It writes the owning PID into the out parameter.
+            if (chromeHwnd != IntPtr.Zero)
+                GetWindowThreadProcessIdLocal(chromeHwnd, out chromePid);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[RENDER:KILL] GetWindowThreadProcessId failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        if (chromePid > 0)
+        {
+            try
+            {
+                using var cp = System.Diagnostics.Process.GetProcessById(chromePid);
+                cp.Kill(entireProcessTree: true);
+                Console.Error.WriteLine($"[RENDER:KILL] killed chrome pid={chromePid}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[RENDER:KILL] kill chrome pid={chromePid} failed: {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.Error.WriteLine($"[RENDER:KILL] no chrome pid resolved from hwnd -- skip kill");
+        }
+
+        // Re-spawn wkappbot with original argv (skip argv[0] = exe path).
+        // ProcessStartInfo.ArgumentList handles Win32 quoting automatically.
+        try
+        {
+            var argv = Environment.GetCommandLineArgs();
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = Environment.ProcessPath ?? "wkappbot.exe",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            for (int i = 1; i < argv.Length; i++)
+                psi.ArgumentList.Add(argv[i]);
+            var spawned = System.Diagnostics.Process.Start(psi);
+            Console.Error.WriteLine($"[RENDER:KILL] relaunch spawned pid={(spawned?.Id ?? -1)} argc={argv.Length - 1}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[RENDER:KILL] relaunch failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    static async Task<ChromeRenderingHealthResult> ProbeChromeRenderingHealth(
+        string wsUrl,
+        System.Diagnostics.Stopwatch sw,
+        CancellationToken ct)
+    {
+        using var ws = new ClientWebSocket();
+        await ws.ConnectAsync(new Uri(wsUrl), ct).ConfigureAwait(false);
+
+        var expression =
+            "(() => new Promise(resolve => requestAnimationFrame(() => resolve({" +
+            "readyState: document.readyState || ''," +
+            "viewportWidth: window.innerWidth || 0," +
+            "viewportHeight: window.innerHeight || 0," +
+            "elementCount: document.querySelectorAll('*').length," +
+            "textLength: ((document.body && document.body.innerText) || '').trim().length" +
+            "}))))()";
+
+        var evalPayload = "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{\"awaitPromise\":true,\"returnByValue\":true,\"expression\":"
+            + ToJsonStringLiteral(expression) + "}}";
+        await SendCdpText(ws, evalPayload, ct).ConfigureAwait(false);
+
+        string evalResponse = await ReadCdpResponseById(ws, 11, ct).ConfigureAwait(false);
+        var dom = ParseRenderHealthPayload(evalResponse);
+        if (dom.trigger != "dom_ok")
+        {
+            return new ChromeRenderingHealthResult(false, dom.trigger, dom.readyState, dom.viewportWidth,
+                dom.viewportHeight, dom.elementCount, dom.textLength, 0, sw.ElapsedMilliseconds);
+        }
+
+        await SendCdpText(ws, "{\"id\":12,\"method\":\"Page.captureScreenshot\",\"params\":{\"format\":\"png\",\"fromSurface\":true}}", ct)
+            .ConfigureAwait(false);
+        string screenshotResponse = await ReadCdpResponseById(ws, 12, ct).ConfigureAwait(false);
+        int screenshotBytes = ParseScreenshotByteLength(screenshotResponse);
+
+        bool ok = (dom.readyState == "complete" || dom.readyState == "interactive")
+            && dom.viewportWidth > 0
+            && dom.viewportHeight > 0
+            && dom.elementCount > 0
+            && screenshotBytes > 2048;
+
+        var trigger = ok ? "ok" : "render_unhealthy";
+        return new ChromeRenderingHealthResult(ok, trigger, dom.readyState, dom.viewportWidth,
+            dom.viewportHeight, dom.elementCount, dom.textLength, screenshotBytes, sw.ElapsedMilliseconds);
+    }
+
+    static async Task SendCdpText(ClientWebSocket ws, string payload, CancellationToken ct)
+    {
+        var bytes = Encoding.UTF8.GetBytes(payload);
+        await ws.SendAsync(bytes, WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+    }
+
+    static string ToJsonStringLiteral(string value)
+    {
+        using var ms = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(ms))
+        {
+            writer.WriteStringValue(value);
+        }
+        return Encoding.UTF8.GetString(ms.ToArray());
+    }
+
+    static async Task<string> ReadCdpResponseById(ClientWebSocket ws, int id, CancellationToken ct)
+    {
+        var idNeedle = "\"id\":" + id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var buf = new byte[32768];
+        var sb = new StringBuilder();
+
+        while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
+        {
+            sb.Clear();
+            WebSocketReceiveResult res;
+            do
+            {
+                res = await ws.ReceiveAsync(buf, ct).ConfigureAwait(false);
+                if (res.MessageType == WebSocketMessageType.Close)
+                    throw new IOException("CDP websocket closed");
+                sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
+            }
+            while (!res.EndOfMessage);
+
+            var msg = sb.ToString();
+            if (msg.Contains(idNeedle, StringComparison.Ordinal))
+                return msg;
+        }
+
+        throw new IOException("CDP websocket ended before response id " + id);
+    }
+
+    static (string trigger, string readyState, int viewportWidth, int viewportHeight, int elementCount, int textLength)
+        ParseRenderHealthPayload(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("error", out _))
+                return ("runtime_error", "", 0, 0, 0, 0);
+
+            var value = doc.RootElement
+                .GetProperty("result")
+                .GetProperty("result")
+                .GetProperty("value");
+
+            string readyState = value.TryGetProperty("readyState", out var ready) ? ready.GetString() ?? "" : "";
+            int viewportWidth = value.TryGetProperty("viewportWidth", out var vw) ? vw.GetInt32() : 0;
+            int viewportHeight = value.TryGetProperty("viewportHeight", out var vh) ? vh.GetInt32() : 0;
+            int elementCount = value.TryGetProperty("elementCount", out var ec) ? ec.GetInt32() : 0;
+            int textLength = value.TryGetProperty("textLength", out var tl) ? tl.GetInt32() : 0;
+            bool domOk = !string.IsNullOrEmpty(readyState) && viewportWidth > 0 && viewportHeight > 0 && elementCount > 0;
+            return (domOk ? "dom_ok" : "dom_unhealthy", readyState, viewportWidth, viewportHeight, elementCount, textLength);
+        }
+        catch
+        {
+            return ("parse_error", "", 0, 0, 0, 0);
+        }
+    }
+
+    static int ParseScreenshotByteLength(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("error", out _))
+                return 0;
+            var data = doc.RootElement.GetProperty("result").GetProperty("data").GetString();
+            if (string.IsNullOrEmpty(data))
+                return 0;
+            return (data.Length * 3) / 4;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    static void AppendChromeRenderingHealthRecord(int cdpPort, ChromeRenderingHealthResult result, string cmd)
+    {
+        try
+        {
+            var jsonlPath = ResolveStageJsonlPath();
+            using var ms = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(ms))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("ts", DateTimeOffset.UtcNow);
+                writer.WriteString("kind", "chrome_rendering_health");
+                writer.WriteNumber("cdp_port", cdpPort);
+                writer.WriteBoolean("success", result.Success);
+                writer.WriteString("trigger", result.Trigger);
+                writer.WriteString("ready_state", result.ReadyState);
+                writer.WriteNumber("viewport_width", result.ViewportWidth);
+                writer.WriteNumber("viewport_height", result.ViewportHeight);
+                writer.WriteNumber("element_count", result.ElementCount);
+                writer.WriteNumber("text_length", result.TextLength);
+                writer.WriteNumber("screenshot_bytes", result.ScreenshotBytes);
+                writer.WriteNumber("elapsed_ms", result.ElapsedMs);
+                if (!string.IsNullOrEmpty(cmd)) writer.WriteString("cmd", cmd);
+                writer.WriteEndObject();
+            }
+            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(jsonlPath, Encoding.UTF8.GetString(ms.ToArray()));
+        }
+        catch
+        {
+            // best-effort telemetry only
+        }
+    }
+}
