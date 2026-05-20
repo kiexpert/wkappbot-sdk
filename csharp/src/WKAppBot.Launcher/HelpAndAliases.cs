@@ -441,10 +441,48 @@ Run 'wkappbot --help' for full command reference.
 /// </summary>
 static class FocusGuard
 {
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    public static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetForegroundWindow")]
+    private static extern IntPtr GetForegroundWindowRaw();
+
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    public static IntPtr GetForegroundWindow()
+    {
+        var hwnd = GetForegroundWindowRaw();
+        try
+        {
+            var stack = new StackTrace(skipFrames: 1, fNeedFileInfo: false);
+            var frames = stack.GetFrames();
+            if (frames != null)
+            {
+                foreach (var frame in frames)
+                {
+                    var method = frame.GetMethod();
+                    var typeName = method?.DeclaringType?.FullName ?? "";
+                    var methodName = method?.Name ?? "";
+                    if (typeName.Contains("cdp", StringComparison.OrdinalIgnoreCase) ||
+                        methodName.Contains("cdp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Console.Error.WriteLine("[BUG] GetForegroundWindow called from CDP context");
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "wkappbot",
+                            Arguments = @"suggest ""[BUG] GetForegroundWindow called from CDP context"" --requirement ""CDP caller HWND detection => use validated caller HWND instead of foreground window"" --requirement ""FocusGuard.GetForegroundWindow => emits auto-suggest when called from CDP stack"" --requirement ""dotnet build csharp/WKAppBot.sln --nologo -v q => exits 0""",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[BUG] GetForegroundWindow CDP-stack hook failed: {ex.Message}");
+        }
+        return hwnd;
+    }
 }
 
 /// <summary>Dim stderr writer -- ANSI dim for console, passthrough for pipes.</summary>
