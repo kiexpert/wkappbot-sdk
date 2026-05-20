@@ -434,14 +434,14 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] Placement trace: caller_hwnd/rect/class added to setwindowpos-trace (6a95fd35)
 - [x] Caller mismatch bugs in placement pipeline -- fixed (6a95fd35: caller_hwnd/rect in log, double ancestor walk race, Stage2/3 callerHwnd thread)
 - [x] suggest check --confirm: implemented (Core f1ea6cd27, v7.3.144) -- reads command_history to verify req cmds run recently
-- [ ] wkfind-log.ps1: search runtime/eye logs for command evidence + wkfind log routing
+- [x] wkfind-log.ps1 + wkfind log routing (Core commit 3ce8c7356)
 - [ ] ask gpt 7 hard-coded waits (suggest ts=2026-05-19T22:06:23)
 - [ ] Action output auto-diff: after action [OK], auto-append state change diff
 - [ ] Focusless-first rule: a11y focus/click/type must try UIA focusless first
 - [ ] Menu hotkey detection feature (suggest filed)
-- [ ] Stage3 redundant SetWindowPos -- skip when corrected pos == stage1Target and Chrome already there
+- [x] Stage3 noop-skip guard (SDK cb783a46)
 - [ ] Wrong-window placement bug (남의창 근처 이동) -- parent_window_geo loaded for wrong session
 - [ ] Legacy position bug (레거시 위치 이동) -- Chrome session-restore overrides our placement
-- [ ] sandbox-miss tab accumulation bug -- EnforceTabCapAsync not catching sandbox-miss tabs (13tabs/3GB on personal-docs, 10+ events today on port 9740)
-- [ ] same-URL tab dedup: kill previous tab immediately when new tab with same URL loads (sandbox-miss scenario)
-- [ ] render health check: MyCdpContext detects broken rendering (white screen/blank/crash) via CDP Runtime.evaluate, kills Chrome + relaunches
+- [x] sandbox-miss tab accumulation -- EnforceTabCapByLiveCountAsync added (Core 3c59028c4)
+- [x] same-URL tab dedup on sandbox-miss-create (Core f3dfc1ae4)
+- [x] render health check -- CDP screenshot probe, kill+relaunch (SDK 0a630061)
