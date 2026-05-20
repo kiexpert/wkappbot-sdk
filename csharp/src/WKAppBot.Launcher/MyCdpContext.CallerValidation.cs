@@ -141,7 +141,7 @@ partial class Program
     /// try alternatives: foreground window, host window, or largest visible window.
     /// Returns IntPtr.Zero if no valid on-screen window is found.
     /// </summary>
-    static IntPtr ResolveValidCallerWindow(IntPtr preferredCaller)
+    static IntPtr ResolveValidCallerWindow(IntPtr preferredCaller, IntPtr preResolvedAncestor = default, IntPtr preResolvedHost = default)
     {
         if (preferredCaller != IntPtr.Zero && IsWindowVisibleLocal(preferredCaller))
         {
@@ -165,7 +165,9 @@ partial class Program
 
         // Try ancestor walk -- nearest parent process owning a visible on-screen window.
         // NEVER use GetForegroundWindow() -- it returns whoever holds focus (YouTube, any app).
-        IntPtr ancestor = EyeCmdPipeClient.ResolveCallerTerminalHwnd();
+        IntPtr ancestor = preResolvedAncestor != IntPtr.Zero
+            ? preResolvedAncestor
+            : EyeCmdPipeClient.ResolveCallerTerminalHwnd();
         if (ancestor != IntPtr.Zero && ancestor != preferredCaller && IsWindowVisibleLocal(ancestor))
         {
             if (GetWindowRect(ancestor, out RECT rect))
@@ -180,7 +182,9 @@ partial class Program
         }
 
         // Try host window (parent process)
-        IntPtr host = GetHostWindowSnapshot();
+        IntPtr host = preResolvedHost != IntPtr.Zero
+            ? preResolvedHost
+            : GetHostWindowSnapshot();
         if (host != IntPtr.Zero && host != preferredCaller && host != ancestor && IsWindowVisibleLocal(host))
         {
             if (GetWindowRect(host, out RECT rect))

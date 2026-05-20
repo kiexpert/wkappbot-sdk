@@ -22,7 +22,7 @@ partial class Program
     /// stage1 width/height by (currentDpi / callerDpi) so the visible size
     /// stays consistent across the migration.
     /// </summary>
-    internal static void TryStage3DpiAwareMatch(IntPtr chromeHwnd, RECT stage1Target, uint callerDpi, string cmd)
+    internal static void TryStage3DpiAwareMatch(IntPtr chromeHwnd, RECT stage1Target, uint callerDpi, string cmd, IntPtr callerHwnd = default)
     {
         const int DeltaThreshold = 8;             // px -- minimum drift to bother correcting
         const uint MinDpi = 72, MaxDpi = 480;     // sanity bounds, anything outside means a bad read
@@ -127,6 +127,7 @@ partial class Program
             int correctedDy = corrected.Top  - actual.Top;
 
             SetWindowPos(chromeHwnd, IntPtr.Zero, newL, newT, newW, newH, SWP_NOZORDER | SWP_NOACTIVATE);
+            AppendSetWindowPosTrace(chromeHwnd, new RECT { Left = newL, Top = newT, Right = newL + newW, Bottom = newT + newH }, attempt: 0, callerHwnd: callerHwnd, stage: "stage3_dpi_correct");
             Console.Error.WriteLine(
                 $"[PLACEMENT:STAGE3] DPI mismatch detected at caller={callerScale * 100:F0}% chrome={currentScale * 100:F0}%, "
                 + $"correcting by [dX={correctedDx},dY={correctedDy}] new=(L={newL},T={newT},W={newW},H={newH})");

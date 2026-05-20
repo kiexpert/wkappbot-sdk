@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 
 namespace WKAppBot.Launcher;
@@ -19,19 +19,11 @@ partial class Program
     /// so operators can audit Chrome landing accuracy after the fact.
     /// </summary>
     internal static (bool success, RECT finalRect, int attemptCount) TryValidateAndCorrectPlacement(
-        IntPtr chromeHwnd, RECT targetRect, int maxAttempts = 5, IntPtr callerHwnd = default)
+        IntPtr chromeHwnd, RECT targetRect, int maxAttempts = 5)
     {
-        Console.Error.WriteLine($"[PLACEMENT:VALIDATE-ENTRY] chrome=0x{chromeHwnd.ToInt64():X} caller=0x{callerHwnd.ToInt64():X} target=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom}) maxAttempts={maxAttempts}");
-        // Validation thresholds: must absorb Chrome's outer-vs-client frame variance
-        // plus DPI-rounding drift. Observed on real machines (suggest 2026-05-14T04:15:15):
-        // requested W=818,H=609 (with 18x9 compensation) -> Chrome_BrowserWindow actual
-        // W=782,H=591 -> validated against desired W=800,H=600 yields dW=18, dH=9. The
-        // previous DeltaSizeThreshold=10 rejected dW=18 even though the user-visible
-        // window was visually indistinguishable from target. Mirrors Core's central
-        // ChromeLauncher.PlacementValidationTolerancePx=50 (single source of truth
-        // for outer-vs-client + DPI rounding + multi-monitor handoff drift).
-        const int DeltaPosThreshold  = 30; // x/y px - DPI-rounded frame drift up to ~15px per edge on multi-monitor
-        const int DeltaSizeThreshold = 30; // w/h px - covers Chrome_BrowserWindow 18x9 client-area gap + DPI rounding
+        Console.Error.WriteLine($"[PLACEMENT:VALIDATE-ENTRY] chrome=0x{chromeHwnd.ToInt64():X} target=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom}) maxAttempts={maxAttempts}");
+        const int DeltaPosThreshold  = 15; // x/y px — allow up to ±15px for frame/border variance
+        const int DeltaSizeThreshold = 10; // w/h px — strict enough to verify nominal 800x600
         const int StabilizationMs    = 150; // longer settle time for DWM composition
         const int GetRectTimeoutMs   = 200;
         const uint SWP_NOZORDER   = 0x0004;
@@ -51,27 +43,6 @@ partial class Program
             if (TryGetWorkArea(centerX, centerY, out var wa)) initialWorkArea = wa;
         }
         catch { /* ignore -- fall back to no reflow detection */ }
-
-        // Pre-clamp: snap off-screen targetRect to nearest work area before first attempt.
-        // The mid-loop reflow clamp only fires when work area CHANGES, so without this
-        // guard an off-screen targetRect burns all 5 attempts at the wrong position.
-        if (initialWorkArea.HasValue)
-        {
-            var _wa = initialWorkArea.Value;
-            int _newW = Math.Min(targetRect.Width,  _wa.Right - _wa.Left);
-            int _newH = Math.Min(targetRect.Height, _wa.Bottom - _wa.Top);
-            int _newL = Math.Max(_wa.Left, Math.Min(targetRect.Left, _wa.Right  - _newW));
-            int _newT = Math.Max(_wa.Top,  Math.Min(targetRect.Top,  _wa.Bottom - _newH));
-            if (_newL != targetRect.Left || _newT != targetRect.Top
-             || _newW != targetRect.Width || _newH != targetRect.Height)
-            {
-                Console.Error.WriteLine(string.Format(
-                    "[PLACEMENT:PRE-CLAMP] off-screen ({0},{1} {2}x{3}) -> ({4},{5} {6}x{7})",
-                    targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
-                    _newL, _newT, _newW, _newH));
-                targetRect = new RECT { Left = _newL, Top = _newT, Right = _newL + _newW, Bottom = _newT + _newH };
-            }
-        }
 
         for (attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -182,7 +153,21 @@ partial class Program
                 SetWindowPos(chromeHwnd, IntPtr.Zero,
                     targetRect.Left, targetRect.Top, targetRect.Width, targetRect.Height,
                     SWP_NOZORDER | SWP_NOACTIVATE);
-                AppendSetWindowPosTrace(chromeHwnd, targetRect, attempt, callerHwnd, "validate_retry");
+                // Trace every SetWindowPos to diagnose Chrome drift.
+                // coord_system=win32_physical because SetWindowPos accepts PHYSICAL
+                // pixels on a PerMonitorV2-aware process. logical_x/logical_y let
+                // operators compare against any CDP cdp_logical entry instantly.
+                {
+                    var swpLog = System.IO.Path.Combine(
+                        System.IO.Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".",
+                        "wkappbot.hq", "logs", "setwindowpos-trace.jsonl");
+                    System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(swpLog)!);
+                    var _swpDpi = TryGetWindowDpiSafe(chromeHwnd);
+                    var _swpScale = _swpDpi > 0 ? _swpDpi / 96.0 : 1.0;
+                    var _swpScaleStr = _swpScale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
+                    WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(swpLog,
+                        $"{{\"ts\":\"{DateTimeOffset.UtcNow:O}\",\"action\":\"SetWindowPos\",\"coord_system\":\"win32_physical\",\"hwnd\":\"0x{chromeHwnd.ToInt64():X}\",\"x\":{targetRect.Left},\"y\":{targetRect.Top},\"w\":{targetRect.Width},\"h\":{targetRect.Height},\"dpi_scale\":{_swpScaleStr},\"logical_x\":{(int)(targetRect.Left/_swpScale)},\"logical_y\":{(int)(targetRect.Top/_swpScale)},\"attempt\":{attempt}}}");
+                }
             }
         }
 
@@ -249,68 +234,6 @@ partial class Program
         catch
         {
             // best-effort telemetry only -- never throw from the placement loop
-        }
-    }
-
-    internal static void AppendSetWindowPosTrace(IntPtr chromeHwnd, RECT targetRect, int attempt, IntPtr callerHwnd, string stage)
-    {
-        try
-        {
-            int swpPid = 0;
-            try { GetWindowThreadProcessIdLocal(chromeHwnd, out swpPid); } catch { swpPid = 0; }
-            string workerKey = swpPid > 0
-                ? $"pid={swpPid}"
-                : $"hwnd=0x{chromeHwnd.ToInt64():X}";
-
-            var swpLog = Path.Combine(
-                Path.GetDirectoryName(Environment.ProcessPath ?? "") ?? ".",
-                "wkappbot.hq", "logs", $"setwindowpos-trace.{workerKey}.jsonl");
-            Directory.CreateDirectory(Path.GetDirectoryName(swpLog)!);
-
-            var dpi = TryGetWindowDpiSafe(chromeHwnd);
-            var scale = dpi > 0 ? dpi / 96.0 : 1.0;
-            var scaleStr = scale.ToString("F2", System.Globalization.CultureInfo.InvariantCulture);
-
-            RECT callerRect = default;
-            try
-            {
-                if (callerHwnd == IntPtr.Zero || !GetWindowRect(callerHwnd, out callerRect))
-                    callerRect = default;
-            }
-            catch
-            {
-                callerRect = default;
-            }
-
-            string callerClass = "";
-            try
-            {
-                if (callerHwnd != IntPtr.Zero)
-                {
-                    var sb64 = new StringBuilder(64);
-                    GetClassNameW(callerHwnd, sb64, 64);
-                    callerClass = sb64.ToString()
-                        .Replace("\\", "\\\\")
-                        .Replace("\"", "\\\"");
-                }
-            }
-            catch
-            {
-                callerClass = "";
-            }
-
-            var safeStage = (stage ?? "")
-                .Replace("\\", "\\\\")
-                .Replace("\"", "\\\"");
-            int offsetX = targetRect.Left - callerRect.Left;
-            int offsetY = targetRect.Top - callerRect.Top;
-
-            WKAppBot.Shared.ToolOutputStore.AppBotAppendFile(swpLog,
-                $"{{\"ts\":\"{DateTimeOffset.UtcNow:O}\",\"action\":\"SetWindowPos\",\"stage\":\"{safeStage}\",\"coord_system\":\"win32_physical\",\"hwnd\":\"0x{chromeHwnd.ToInt64():X}\",\"x\":{targetRect.Left},\"y\":{targetRect.Top},\"w\":{targetRect.Width},\"h\":{targetRect.Height},\"dpi_scale\":{scaleStr},\"logical_x\":{(int)(targetRect.Left / scale)},\"logical_y\":{(int)(targetRect.Top / scale)},\"attempt\":{attempt},\"caller_hwnd\":\"0x{callerHwnd.ToInt64():X}\",\"caller_class\":\"{callerClass}\",\"caller_x\":{callerRect.Left},\"caller_y\":{callerRect.Top},\"caller_w\":{callerRect.Width},\"caller_h\":{callerRect.Height},\"offset_x\":{offsetX},\"offset_y\":{offsetY}}}");
-        }
-        catch
-        {
-            // best-effort telemetry only -- never throw from placement tracing
         }
     }
 }

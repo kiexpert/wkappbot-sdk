@@ -225,7 +225,7 @@ partial class Program
         }
 
         // Auto-resolve off-screen caller to valid alternative
-        callerHwnd = ResolveValidCallerWindow(callerHwnd);
+        callerHwnd = ResolveValidCallerWindow(callerHwnd, ancestorHwnd, hostHwnd);
 
         var callerValidation = ValidateCallerHwnd(callerHwnd, consoleHwnd, hostHwnd);
 

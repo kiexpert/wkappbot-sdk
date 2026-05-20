@@ -208,6 +208,7 @@ partial class Program
             System.Threading.Thread.Sleep(50);
 
             SetWindowPos(target, IntPtr.Zero, targetX, targetY, targetW, targetH, SWP_NOZORDER | SWP_NOACTIVATE);
+            AppendSetWindowPosTrace(target, new RECT { Left = targetX, Top = targetY, Right = targetX + targetW, Bottom = targetY + targetH }, attempt: 0, callerHwnd: caller, stage: "stage1_initial");
             Console.Error.WriteLine($"[LAUNCHER] post-launch placed Chrome 0x{target.ToInt64():X} at ({targetX},{targetY},{targetW},{targetH}) near caller 0x{caller.ToInt64():X} (cmd={cmd})");
 
             // Triple-check + auto-correct: Chrome may ignore SetWindowPos when its
@@ -225,7 +226,7 @@ partial class Program
                 Right  = targetX + DefaultChromeW,  // Compare against desired 800x600
                 Bottom = targetY + DefaultChromeH,  // not the compensated 818x609
             };
-            var (placementOk, finalRect, attempts) = TryValidateAndCorrectPlacement(target, expected, maxAttempts: 5);
+            var (placementOk, finalRect, attempts) = TryValidateAndCorrectPlacement(target, expected, maxAttempts: 5, callerHwnd: caller);
             if (!placementOk)
             {
                 Console.Error.WriteLine($"[LAUNCHER:WARN] Chrome placement failed validation after {attempts} attempts. "
@@ -243,7 +244,7 @@ partial class Program
             // the helpers there assume a live Chrome window to act on.
             if (IsWindow(target))
             {
-                SpawnBackgroundPlacementWatcher(target, expected, cmd);
+                SpawnBackgroundPlacementWatcher(target, expected, cmd, caller);
             }
         }
         catch
