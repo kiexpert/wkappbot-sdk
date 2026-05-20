@@ -446,3 +446,5 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] same-URL tab dedup on sandbox-miss-create (Core f3dfc1ae4)
 - [x] render health check -- CDP screenshot probe, kill+relaunch (SDK 0a630061)
 - [ ] cdp open tab reuse: return existing tab if same URL/domain already open (Core + wkask fix)
+- [x] wkask eval-js node path fix -- Core requires #node for --eval-js (commits 8ab162a1e, d1f6796ae, 7f67eec89)
+- [ ] wkask cdp port mismatch -- cdp open returns cross-project port (9741 vs project 9740); auto-probe fix WIP
