@@ -432,7 +432,8 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [ ] CdpClient.InputGuard: _transparentHwnd mismatch -- hwnd stale if Chrome restarted
 - [ ] ReadinessBridges.FocusStealSentinel.cs WIP -- broken duplicate at stash@{0} in Core
 - [ ] Placement trace: add caller_hwnd/rect/class to setwindowpos-trace log
-- [ ] Caller mismatch bugs in placement pipeline -- wrong/stale caller selection
+- [x] Caller mismatch bugs in placement pipeline -- fixed (6a95fd35: caller_hwnd/rect in log, double ancestor walk race, Stage2/3 callerHwnd thread)
+- [ ] suggest check --confirm: implement command_history.jsonl verification before RESOLVED (Core repo)
 - [ ] ask gpt 7 hard-coded waits (suggest ts=2026-05-19T22:06:23)
 - [ ] Action output auto-diff: after action [OK], auto-append state change diff
 - [ ] Focusless-first rule: a11y focus/click/type must try UIA focusless first
