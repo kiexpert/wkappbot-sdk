@@ -205,8 +205,13 @@ partial class Program
         // focus (e.g. YouTube, Chrome, any app) rather than the terminal that invoked wkappbot.
         // fgHwnd is intentionally excluded -- foreground is always "someone else's window"
         // (YouTube, another project's terminal, Chrome itself, etc.). Never use it for placement.
+        // Skip consoleHwnd when GetWindowRect=(0,0,0,0) -- ConPTY PseudoConsoleWindow has zero rect.
+        // ancestorHwnd from P2 walk correctly finds CASCADIA_HOSTING_WINDOW_CLASS instead.
+        var consoleHwndGood = consoleHwnd != IntPtr.Zero
+            && TryGetWindowRectLTRB(consoleHwnd, out var cr) && cr.Right - cr.Left > 0
+            ? consoleHwnd : IntPtr.Zero;
         var callerHwnd = envCallerHwnd != IntPtr.Zero ? envCallerHwnd
-                       : consoleHwnd != IntPtr.Zero ? consoleHwnd
+                       : consoleHwndGood != IntPtr.Zero ? consoleHwndGood
                        : ancestorHwnd != IntPtr.Zero ? ancestorHwnd
                        : hostHwnd;
 
