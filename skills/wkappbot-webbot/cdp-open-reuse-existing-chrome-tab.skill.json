@@ -13,7 +13,8 @@
     "--new-window opt-out: skips reuse probe, forces new Chrome process. Reserved for isolated-process scenarios.",
     "Port isolation: ports are SHA256-derived from git project root CWD. Each project gets a fixed 4-port block (e.g. 9300-9303). Never hardcode port numbers -- always use cdp open output.",
     "SINGLETON HANDOFF PATTERN (2026-05-18): When web open / cdp open triggers Chrome singleton mode, the new Chrome process exits with code=0 (not a failure -- it handed off the URL to the already-running instance). OLD behavior: treat exit=0 as error ('CDP endpoint not ready'). NEW behavior: exit=0 during launch = detect as singleton handoff -> call FindRunningChromePort() to locate existing Chrome -> attach via CDP to that port -> navigate via Target.createTarget(URL). Result: no SQLite profile contention (no second Chrome launched), seamless reuse of existing session. Fix: ChromeLauncher.LaunchCore.cs, commit 48eb07e08 + web-open fix.",
-    "2026-05-18: cookie banner auto-dismiss added to ask flow (commit 62687d6c1). Before prompt injection, JS checks for close/reject buttons on cookie banners and clicks them silently. AI service domains (chatgpt.com, gemini.google.com, claude.ai) never get Accept clicked -- cookie-consent-ai-strategy: no consent cookie = anonymous quota. 500ms settle after dismiss."
+    "2026-05-18: cookie banner auto-dismiss added to ask flow (commit 62687d6c1). Before prompt injection, JS checks for close/reject buttons on cookie banners and clicks them silently. AI service domains (chatgpt.com, gemini.google.com, claude.ai) never get Accept clicked -- cookie-consent-ai-strategy: no consent cookie = anonymous quota. 500ms settle after dismiss.",
+    "TAB-LEVEL REUSE in WebOpenCommand shortcut (2026-05-20): Even after Chrome-process reuse picks the right port, the Target.createTarget shortcut in WebCommands.Part3.cs still spawned a new tab per call. Added a tab-reuse probe BEFORE Target.createTarget: ListTabsAsync, look for exact-URL match then host match (skip #wkbot- fragment tabs), and on match call SwitchToTargetAsync (focusless -- minimizes Chrome first, no SetForegroundWindow). The matched tab hwnd is then obtained via the standard PrintWebTarget path (GetRenderWidgetHwnd). New --new-tab flag opts out for callers needing isolated tabs. Prevents tab accumulation (16+ chatgpt.com tabs) and wkask wrong-tab targeting."
   ],
   "requirements": [
     {
@@ -71,6 +72,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-06T01:18:00Z",
-  "updated": "2026-05-18T11:40:47.2691871Z",
-  "version": "1.4"
+  "updated": "2026-05-20T11:49:49.3674211Z",
+  "version": "1.6"
 }

@@ -183,3 +183,9 @@ This is the encoding enforcement gate -- never skip it.
 Before any delegation or agent task, include 3+ `wkappbot skill read <id>` references in the prompt.
 Use `wkappbot skill search <keyword1> <keyword2>` to find relevant IDs first.
 Agents start with zero context -- skill reads are their only briefing.
+
+## Self-Harness Rules
+
+Declarative rules in CLAUDE.md via ## harness: headings. Fire on every tool call.
+safe: skip all warn+block if toolInput matches. warn: stderr warning. block: stderr + exit 1. done: PostToolUse warning.
+Edit CLAUDE.md to add or fix rules (always safe-exempted).

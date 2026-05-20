@@ -448,3 +448,17 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [ ] cdp open tab reuse: return existing tab if same URL/domain already open (Core + wkask fix)
 - [x] wkask eval-js node path fix -- Core requires #node for --eval-js (commits 8ab162a1e, d1f6796ae, 7f67eec89)
 - [ ] wkask cdp port mismatch -- cdp open returns cross-project port (9741 vs project 9740); auto-probe fix WIP
+
+## harness:safe CLAUDE\.md
+## harness:safe wkappbot\s+skill
+
+## harness:warn wkedit.*--line.*\\
+awk eats backslashes in --line replace
+Use --old-file/--new-file instead
+
+## harness:block (?i)\.skill\.json
+Never edit .skill.json directly
+Use: wkappbot skill edit <id>
+
+## harness:done (?i)skipped|생략|넘어가
+Step may have been skipped -- verify all gg steps ran
