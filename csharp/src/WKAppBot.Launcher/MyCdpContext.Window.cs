@@ -221,6 +221,10 @@ partial class Program
     [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "IsWindowVisible")]
     static extern bool IsWindowVisibleLocal(IntPtr hWnd);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr GetAncestorLocal(IntPtr hWnd, uint gaFlags);
+    const uint GA_ROOT_LOCAL = 2;
+
     [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "EnumWindows")]
     static extern bool EnumWindowsLocal(EnumWindowsProcLocal lpEnumFunc, IntPtr lParam);
 

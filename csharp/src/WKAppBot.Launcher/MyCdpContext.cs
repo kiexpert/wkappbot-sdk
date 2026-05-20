@@ -297,7 +297,9 @@ partial class Program
         // these to their "no caller" values on rejected paths above so a stale anchor from
         // a previous invocation isn't reused.
         LastValidatedCallerHwnd = callerHwnd;
-        LastValidatedCallerRect = TryGetWindowRectLTRB(callerHwnd, out var cRect)
+        var rectHwnd = IsWindowVisibleLocal(callerHwnd) ? callerHwnd : GetAncestorLocal(callerHwnd, GA_ROOT_LOCAL);
+        if (rectHwnd == IntPtr.Zero) rectHwnd = callerHwnd;
+        LastValidatedCallerRect = TryGetWindowRectLTRB(rectHwnd, out var cRect)
             ? System.Drawing.Rectangle.FromLTRB(cRect.Left, cRect.Top, cRect.Right, cRect.Bottom)
             : System.Drawing.Rectangle.Empty;
 
