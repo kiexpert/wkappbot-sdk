@@ -436,7 +436,7 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] suggest check --confirm: implemented (Core f1ea6cd27, v7.3.144) -- reads command_history to verify req cmds run recently
 - [x] wkfind-log.ps1 + wkfind log routing (Core commit 3ce8c7356)
 - [ ] ask gpt 7 hard-coded waits (suggest ts=2026-05-19T22:06:23)
-- [ ] Action output auto-diff: after action [OK], auto-append state change diff
+- [ ] Action output auto-diff: WIP -- A11yActions.ActionDiff.cs compiled+injected but SnapshotNodeLines returns empty (BuildA11yReadNodeListLines needs investigation); suggest ts=2026-05-20T17:33:53
 - [ ] Focusless-first rule: a11y focus/click/type must try UIA focusless first
 - [ ] Menu hotkey detection feature (suggest filed)
 - [x] Stage3 noop-skip guard (SDK cb783a46)
@@ -449,9 +449,9 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] wkask eval-js node path fix -- Core requires #node for --eval-js (commits 8ab162a1e, d1f6796ae, 7f67eec89)
 - [ ] wkask cdp port mismatch -- cdp open returns cross-project port (9741 vs project 9740); auto-probe fix WIP
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
-- [x] wkask gpt inspect reading: verified -- a11y inspect returns 📝 markers; PONG_TEST_OK confirmed (Core 5e6cb64b7)
+- [x] wkask gpt inspect reading: verified + parser improved (Core 6d0aed488): --depth 20 for truncation, ChatGPT말 anchor, 80-line scan window, 나의말/응답복사 terminator
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
-- [x] wkask gpt inspect reading: verified -- a11y inspect returns 📝 markers; PONG_TEST_OK confirmed (Core 5e6cb64b7)
+- [x] wkask gpt inspect reading: verified + parser improved (Core 6d0aed488): --depth 20 for truncation, ChatGPT말 anchor, 80-line scan window, 나의말/응답복사 terminator
 
 ## harness:safe CLAUDE\.md
 ## harness:safe wkappbot\s+skill
