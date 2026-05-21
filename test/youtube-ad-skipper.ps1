@@ -35,6 +35,9 @@ if ($navOut -notmatch 'hwnd:(0x[0-9A-Fa-f]+)') {
     $hwnd = $Matches[1]
     $grapBase = "{hwnd:$hwnd,proc:'chrome',cdp:$port}"
     ok "YouTube tab hwnd $hwnd"
+    # Restore hidden Chrome window so it's visible to the user
+    & wkappbot a11y restore "$grapBase" 2>&1 | Out-Null
+    inf 'Chrome window restored (visible)'
 }
 
 # Lightweight DOM probe: returns ad-state JSON. Read-only -- no .click(), no DOM
