@@ -451,7 +451,7 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] render health check -- CDP screenshot probe, kill+relaunch (SDK 0a630061)
 - [ ] cdp open tab reuse: return existing tab if same URL/domain already open (Core + wkask fix)
 - [x] wkask eval-js node path fix -- Core requires #node for --eval-js (commits 8ab162a1e, d1f6796ae, 7f67eec89)
-- [ ] wkask cdp port mismatch -- cdp open returns cross-project port (9741 vs project 9740); auto-probe fix WIP
+- [x] wkask cdp port mismatch -- eval-js domain check added after cdp open (Core bf3f8e036); --old-file/--new-file hang filed as suggest
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
 - [x] wkask gpt inspect reading: verified + parser improved (Core 6d0aed488): --depth 20 for truncation, ChatGPT말 anchor, 80-line scan window, 나의말/응답복사 terminator
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
