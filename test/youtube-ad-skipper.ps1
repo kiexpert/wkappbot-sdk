@@ -77,6 +77,62 @@ function Unmute-Video {
     return ($r -match 'eval-js OK')
 }
 
+function Test-RenderHealth {
+    # CDP screenshot probe: if Chrome renderer is dead, screenshot fails or returns tiny file
+    $tmp = [System.IO.Path]::GetTempFileName() + '.png'
+    $r = & wkappbot cdp capture "$grapBase" 2>&1 | Out-String
+    if ($r -match 'error|fail|DEAD|not connected' -or -not ($r -match '\.png')) { return $false }
+    # Also check readyState via eval-js
+    $rs = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.readyState' 2>&1 | Out-String
+    if ($rs -match "eval-js OK: (complete|interactive)") { return $true }
+    return $false
+}
+
+function Restart-Chrome {
+    wrn 'Render dead detected -- killing Chrome and reopening'
+    $openOut = & wkappbot cdp open $Url 2>&1 | Out-String
+    if ($openOut -match 'cdp:(\d+)') {
+        $script:port = [int]$Matches[1]
+        if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') {
+            $script:grapBase = "{hwnd:$($Matches[1]),proc:'chrome',cdp:$($script:port)}"
+        } else {
+            $script:grapBase = "{proc:'chrome',cdp:$($script:port),domain:'www.youtube.com'}"
+        }
+        ok "Chrome restarted on port $($script:port)"
+        return $true
+    }
+    err 'Chrome restart failed'
+    return $false
+}
+
+function Test-RenderHealth {
+    # CDP screenshot probe: if Chrome renderer is dead, screenshot fails or returns tiny file
+    $tmp = [System.IO.Path]::GetTempFileName() + '.png'
+    $r = & wkappbot cdp capture "$grapBase" 2>&1 | Out-String
+    if ($r -match 'error|fail|DEAD|not connected' -or -not ($r -match '\.png')) { return $false }
+    # Also check readyState via eval-js
+    $rs = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.readyState' 2>&1 | Out-String
+    if ($rs -match "eval-js OK: (complete|interactive)") { return $true }
+    return $false
+}
+
+function Restart-Chrome {
+    wrn 'Render dead detected -- killing Chrome and reopening'
+    $openOut = & wkappbot cdp open $Url 2>&1 | Out-String
+    if ($openOut -match 'cdp:(\d+)') {
+        $script:port = [int]$Matches[1]
+        if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') {
+            $script:grapBase = "{hwnd:$($Matches[1]),proc:'chrome',cdp:$($script:port)}"
+        } else {
+            $script:grapBase = "{proc:'chrome',cdp:$($script:port),domain:'www.youtube.com'}"
+        }
+        ok "Chrome restarted on port $($script:port)"
+        return $true
+    }
+    err 'Chrome restart failed'
+    return $false
+}
+
 inf "Polling every ${PollSeconds}s (UIA-invoke mode). Ctrl+C to stop."
 $start = Get-Date
 $skipCount = 0
@@ -94,7 +150,11 @@ while ($true) {
     if ($null -eq $state) {
         $consecutiveFails++
         if ($consecutiveFails -ge 5) {
-            wrn 'Probe failed 5 times -- Chrome may be loading'
+            wrn 'Probe failed 5 times -- checking render health'
+            if (-not (Test-RenderHealth)) {
+                wrn '[RENDER DEAD] Chrome renderer failed -- restarting'
+                Restart-Chrome | Out-Null
+            }
             $consecutiveFails = 0
         }
         Start-Sleep -Seconds $PollSeconds
