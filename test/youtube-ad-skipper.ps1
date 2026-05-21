@@ -39,7 +39,7 @@ if ($navOut -notmatch 'hwnd:(0x[0-9A-Fa-f]+)') {
 
 # Lightweight DOM probe: returns ad-state JSON. Read-only -- no .click(), no DOM
 # mutation. Just classList check + element visibility. Cheap, no isTrusted issue.
-$probeJs = 'var p=document.querySelector(".html5-video-player");var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern");var o=document.querySelector(".ytp-ad-overlay-close-button");var v=document.querySelector("video");JSON.stringify({ad:p?p.classList.contains("ad-showing"):false,skip:s?s.offsetHeight>0:false,overlay:o?o.offsetHeight>0:false,muted:v?v.muted:false,ending:v&&v.duration>0&&!v.ended&&(v.duration-v.currentTime)<2.0})'
+$probeJs = 'var p=document.querySelector(".html5-video-player");var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern,[class*=skip-button]");var o=document.querySelector(".ytp-ad-overlay-close-button");var v=document.querySelector("video");var layer=document.querySelector(".ytp-ad-player-overlay,.ytp-ad-module");JSON.stringify({ad:!!(p&&p.classList.contains("ad-showing"))||!!layer,skip:s?s.offsetHeight>0:false,overlay:o?o.offsetHeight>0:false,muted:v?v.muted:false,ending:!!(v&&v.duration>0&&!v.ended&&(v.duration-v.currentTime)<2.0)})'
 
 function Get-AdState {
     $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js $probeJs 2>&1 | Out-String
@@ -94,8 +94,7 @@ while ($true) {
     if ($null -eq $state) {
         $consecutiveFails++
         if ($consecutiveFails -ge 5) {
-            wrn 'Probe failed 5 times -- re-navigating'
-            & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-Null
+            wrn 'Probe failed 5 times -- Chrome may be loading'
             $consecutiveFails = 0
         }
         Start-Sleep -Seconds $PollSeconds
