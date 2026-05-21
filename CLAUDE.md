@@ -454,10 +454,10 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] wkask cdp port mismatch -- eval-js domain check added after cdp open (Core bf3f8e036); --old-file/--new-file hang filed as suggest
 - [x] wkask-gpt: replace blind 15s wait with smart streaming detection (Core 2ac1e6b29)
 - [x] YouTube ad auto-skipper -- JS injection blocked: cdp/a11y eval removed; UIA invoke fallback working
-- [ ] CDP console.log forwarding to stderr -- Runtime.consoleAPICalled not subscribed in EvalAsync
+- [ ] CDP stderr noise reduction -- suppress StartTracked/CDP-fragile/tab-hint verbose logs
 - [x] wkask-gpt: replace blind 15s wait with smart streaming detection (Core 2ac1e6b29)
 - [x] YouTube ad auto-skipper -- JS injection blocked: cdp/a11y eval removed; UIA invoke fallback working
-- [ ] CDP console.log forwarding to stderr -- Runtime.consoleAPICalled not subscribed in EvalAsync
+- [ ] CDP stderr noise reduction -- suppress StartTracked/CDP-fragile/tab-hint verbose logs
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
 - [x] wkask gpt inspect reading: verified + parser improved (Core 6d0aed488): --depth 20 for truncation, ChatGPT말 anchor, 80-line scan window, 나의말/응답복사 terminator
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
