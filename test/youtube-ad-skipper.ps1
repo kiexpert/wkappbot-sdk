@@ -1,40 +1,131 @@
 ﻿#Requires -Version 5.1
-# youtube-ad-skipper.ps1 -- Inject JS into YouTube Chrome page via CDP.
-# Uses a11y read #Doc_RootWebArea --eval-js for direct JS injection.
-# console.log output forwarded to stderr as [CDP:CONSOLE:LOG] msg.
-# Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>]
-param( [string] $Url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' )
+# youtube-ad-skipper.ps1 -- UIA-invoke based YouTube ad skipper.
+# YouTube blocks JS .click() via isTrusted check. We use wkappbot a11y invoke
+# (UIA InvokePattern = trusted input) on the .ytp-skip-ad-button element.
+# Detection (lightweight eval-js poll) -> action (UIA invoke). No JS click ever.
+#
+# Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>] [-RunMinutes <N>]
+param(
+    [string] $Url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    [int]    $RunMinutes = 0,
+    [int]    $PollSeconds = 1
+)
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Continue'
+
 function ts  { Get-Date -Format 'HH:mm:ss' }
 function ok($m)  { Write-Host "$(ts)  OK  $m" -ForegroundColor Green;  [Console]::Out.Flush() }
 function inf($m) { Write-Host "$(ts)  ..  $m" -ForegroundColor Cyan;   [Console]::Out.Flush() }
 function wrn($m) { Write-Host "$(ts)  !!  $m" -ForegroundColor Yellow; [Console]::Out.Flush() }
+function err($m) { Write-Host "$(ts)  XX  $m" -ForegroundColor Red;    [Console]::Out.Flush() }
 
-$js = '(function(){if(window.__wkAd)clearInterval(window.__wkAd);var t=null,n=0;function tick(){var p=document.querySelector(".html5-video-player");if(!p||!p.classList.contains("ad-showing")){t=null;return}if(!t)t=Date.now();var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern");if(s&&s.offsetHeight>0){s.click();n++;console.log("[wk-ad] skip#"+n);t=null;return}var o=document.querySelector(".ytp-ad-overlay-close-button");if(o&&o.offsetHeight>0){o.click();n++;console.log("[wk-ad] overlay#"+n);t=null;return}if(Date.now()-t>3000){console.log("[wk-ad] reload");t=null;var vid=document.querySelector("video");var sec=vid?Math.floor(vid.currentTime):0;var u=new URL(location.href);u.searchParams.set("t",sec+"s");location.href=u.toString()}}window.__wkAd=setInterval(tick,500);document.addEventListener("yt-navigate-finish",function(){t=null});return "wk-ad-skipper-ok"})()'
-
+# Step 1: open the YouTube tab (cdp open auto-creates or reuses).
 inf "Opening $Url"
-$openOut = wkappbot cdp open $Url 2>&1 | Out-String
-if ($openOut -notmatch 'cdp:(\d+)') { Write-Host 'cdp open failed' -ForegroundColor Red; exit 1 }
+$openOut = & wkappbot cdp open $Url 2>&1 | Out-String
+if ($openOut -notmatch 'cdp:(\d+)') { err 'cdp open failed -- aborting'; Write-Host $openOut; exit 1 }
 $port = [int]$Matches[1]
-$hwnd  = if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') { $Matches[1] } else { $null }
-ok "port $port hwnd $hwnd"
-Start-Sleep -Seconds 2
-$g = if ($hwnd) { "{hwnd:$hwnd,proc:'chrome',cdp:$port}" } else { "{proc:'chrome',domain:'www.youtube.com',cdp:$port}" }
+ok "CDP port $port"
 
-function Inject {
-    inf 'Injecting JS...'
-    $r = wkappbot-core.exe a11y read "$g#Doc_RootWebArea" --eval-js $js 2>&1 | Out-String
-    if ($r -match 'wk-ad-skipper-ok') { ok 'JS injected and running' }
-    elseif ($r -match 'CDP:CONSOLE:LOG.*wk-ad') { ok 'Already running (console active)' }
-    else { wrn "Inject output (last 100): $($r -replace '(?s).+(.{100})', '$1')" }
+# Step 2: navigate (also pulls YouTube tab to active state).
+$navOut = & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-String
+if ($navOut -notmatch 'hwnd:(0x[0-9A-Fa-f]+)') {
+    wrn 'navigate did not return hwnd -- continuing with domain grap'
+    $grapBase = "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}"
+} else {
+    $hwnd = $Matches[1]
+    $grapBase = "{hwnd:$hwnd,proc:'chrome',cdp:$port}"
+    ok "YouTube tab hwnd $hwnd"
 }
 
-Inject
-inf 'Monitoring console (re-inject every 30s, Ctrl+C to stop)...'
+# Lightweight DOM probe: returns ad-state JSON. Read-only -- no .click(), no DOM
+# mutation. Just classList check + element visibility. Cheap, no isTrusted issue.
+$probeJs = 'var p=document.querySelector(".html5-video-player");var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern");var o=document.querySelector(".ytp-ad-overlay-close-button");var v=document.querySelector("video");JSON.stringify({ad:p?p.classList.contains("ad-showing"):false,skip:s?s.offsetHeight>0:false,overlay:o?o.offsetHeight>0:false,muted:v?v.muted:false,ending:v&&v.duration>0&&!v.ended&&(v.duration-v.currentTime)<2.0})'
+
+function Get-AdState {
+    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js $probeJs 2>&1 | Out-String
+    foreach ($line in $r -split "`n") {
+        if ($line -match '^\{"ad":') {
+            try { return $line | ConvertFrom-Json } catch { return $null }
+        }
+    }
+    return $null
+}
+
+function Invoke-Skip {
+    # UIA InvokePattern is trusted. YouTube cannot detect/block it the way it
+    # blocks JS element.click(). The skip button UIA AutomationId is
+    # "skip-button:<N>" -- wildcard '#*skip-button*' matches reliably.
+    $r = & wkappbot a11y invoke "$grapBase#*skip-button*" --timeout 8 --force 2>&1 | Out-String
+    if ($r -match '\[STATE CHANGE DETECTED\]|REMOVED.*광고|REMOVED.*skip|invoke -- UIA Invoke') {
+        return $true
+    }
+    return $false
+}
+
+function Invoke-Overlay {
+    $r = & wkappbot a11y invoke "$grapBase#*overlay-close*" --timeout 5 --force 2>&1 | Out-String
+    return ($r -match 'invoke -- UIA Invoke|STATE CHANGE')
+}
+
+function Mute-Video {
+    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.querySelector("video").muted=true;"ok"' 2>&1 | Out-String
+    return ($r -match 'eval-js OK')
+}
+
+function Unmute-Video {
+    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.querySelector("video").muted=false;"ok"' 2>&1 | Out-String
+    return ($r -match 'eval-js OK')
+}
+
+inf "Polling every ${PollSeconds}s (UIA-invoke mode). Ctrl+C to stop."
+$start = Get-Date
+$skipCount = 0
+$overlayCount = 0
+$consecutiveFails = 0
+$wasMuted = $false
+
 while ($true) {
-    Start-Sleep -Seconds 30
-    $alive = wkappbot a11y read "$g#Doc_RootWebArea" --eval-js 'typeof window.__wkAd' 2>&1 | Out-String
-    if ($alive -match 'eval-js OK: number') { inf 'Heartbeat: JS alive' }
-    else { wrn 'JS cleared -- re-injecting'; Inject }
+    if ($RunMinutes -gt 0 -and ((Get-Date) - $start).TotalMinutes -ge $RunMinutes) {
+        ok "RunMinutes ($RunMinutes) reached. Skips=$skipCount Overlays=$overlayCount"
+        break
+    }
+
+    $state = Get-AdState
+    if ($null -eq $state) {
+        $consecutiveFails++
+        if ($consecutiveFails -ge 5) {
+            wrn 'Probe failed 5 times -- re-navigating'
+            & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-Null
+            $consecutiveFails = 0
+        }
+        Start-Sleep -Seconds $PollSeconds
+        continue
+    }
+    $consecutiveFails = 0
+
+    # Pre-emptive mute: video ending -> mute before next ad fires
+    if ($state.ending -and -not $state.muted -and -not $wasMuted) {
+        if (Mute-Video) { inf "Video ending -- pre-muted for next ad"; $wasMuted = $true }
+    }
+
+    if ($state.ad) {
+        if (-not $state.muted) {
+            if (Mute-Video) { wrn 'Ad detected -- MUTED'; $wasMuted = $true }
+        }
+        if ($state.skip) {
+            inf 'Skip visible -- invoking UIA'
+            if (Invoke-Skip) {
+                $skipCount++
+                ok "SKIPPED ad #$skipCount"
+                Unmute-Video | Out-Null; $wasMuted = $false
+                Start-Sleep -Seconds 1
+            }
+        }
+    } elseif ($state.overlay) {
+        if (Invoke-Overlay) { $overlayCount++; ok "Closed overlay #$overlayCount" }
+    } elseif ($wasMuted) {
+        # Ad ended without skip -- unmute
+        Unmute-Video | Out-Null; $wasMuted = $false; ok 'Ad ended -- unmuted'
+    }
+    Start-Sleep -Seconds $PollSeconds
 }
