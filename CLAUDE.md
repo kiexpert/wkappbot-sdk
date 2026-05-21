@@ -480,3 +480,4 @@ Use: wkappbot skill edit <id>
 
 ## harness:done (?i)skipped|?앸왂|?섏뼱媛
 Step may have been skipped -- verify all gg steps ran
+- [x] YouTube ad-skipper: rewrite to use existing Chrome no cdp open
