@@ -6,7 +6,7 @@
 #
 # Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>] [-RunMinutes <N>]
 param(
-    [string] $Url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    [string] $Url = 'https://www.youtube.com/results?search_query=%EC%8A%88%ED%8D%BC%EA%B0%9C%EB%AF%B8+%EC%B5%9C%EC%8B%A0&sp=CAI%253D',
     [int]    $RunMinutes = 0,
     [int]    $PollSeconds = 1
 )
