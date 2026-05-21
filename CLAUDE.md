@@ -455,9 +455,13 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] wkask-gpt: replace blind 15s wait with smart streaming detection (Core 2ac1e6b29)
 - [x] YouTube ad auto-skipper -- JS injection blocked: cdp/a11y eval removed; UIA invoke fallback working
 - [x] CDP stderr noise reduction -- StartTracked/CDP-fragile/tab-hint suppressed (Core f2b13262a)
+- [ ] YouTube ad-skipper But_skip invoke bug -- investigate why a11y invoke fails on YouTube skip button
+- [ ] YouTube ad-skipper But_skip invoke bug -- investigate why a11y invoke fails on YouTube skip button
 - [x] wkask-gpt: replace blind 15s wait with smart streaming detection (Core 2ac1e6b29)
 - [x] YouTube ad auto-skipper -- JS injection blocked: cdp/a11y eval removed; UIA invoke fallback working
 - [x] CDP stderr noise reduction -- StartTracked/CDP-fragile/tab-hint suppressed (Core f2b13262a)
+- [ ] YouTube ad-skipper But_skip invoke bug -- investigate why a11y invoke fails on YouTube skip button
+- [ ] YouTube ad-skipper But_skip invoke bug -- investigate why a11y invoke fails on YouTube skip button
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
 - [x] wkask gpt inspect reading: verified + parser improved (Core 6d0aed488): --depth 20 for truncation, ChatGPT말 anchor, 80-line scan window, 나의말/응답복사 terminator
 - [x] wkask gpt response parsing -- split into wkask-gpt.ps1; switched reading from a11y read #Doc_RootWebArea (empty) to a11y inspect (returns 📝 markers); hashtable splatting fix for -Port param
