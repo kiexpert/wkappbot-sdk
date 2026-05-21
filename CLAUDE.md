@@ -429,6 +429,10 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 - [x] CommandHelpMap win/mouse/key -- 3 entries added (Core commit 2482e9491, v7.3.140)
 - [x] CDP placement log per-worker -- setwindowpos-trace.pid={pid}.jsonl (Core 80a5752e5, SDK 005b739f)
 - [x] CDP placement pre-clamp -- off-screen targetRect snapped before first attempt (f341d547)
+- [x] Guard GetAncestorLocal against Zero hwnd -- crash when all caller sources fail (SDK 670f6786)
+- [x] Remove largest-terminal fallback + skip zero-rect consoleHwnd PseudoConsoleWindow (SDK ba386432)
+- [x] Guard GetAncestorLocal against Zero hwnd -- crash when all caller sources fail (SDK 670f6786)
+- [x] Remove largest-terminal fallback + skip zero-rect consoleHwnd PseudoConsoleWindow (SDK ba386432)
 - [ ] CdpClient.InputGuard: _transparentHwnd mismatch -- hwnd stale if Chrome restarted
 - [ ] ReadinessBridges.FocusStealSentinel.cs WIP -- broken duplicate at stash@{0} in Core
 - [x] Placement trace: caller_hwnd/rect/class added to setwindowpos-trace (6a95fd35)
