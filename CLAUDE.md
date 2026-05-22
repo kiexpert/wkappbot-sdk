@@ -501,3 +501,5 @@ Step may have been skipped -- verify all gg steps ran
 - [ ] wkask-gpt.ps1: Write-CdpDump to log file at type-fail/no-result/parse-fail/exception
 
 - [ ] ChromeLauncher.LaunchPreparation.cs: skip profile ownership check when port is active -- reuse instead of spawning new Chrome
+
+- [ ] suggest triage: run gg workflow + Opus triage for session 2026-05-22
