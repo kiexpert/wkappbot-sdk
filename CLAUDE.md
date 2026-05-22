@@ -508,3 +508,6 @@ Step may have been skipped -- verify all gg steps ran
 
 - [x] IocpPipeRelay: TerminateProcess(Core) on launcher timeout -- resolves a11y wait zombie hang (ts=2026-05-21T17:50:59)
 - [x] suggest ts=2026-05-21T17:50:59 RESOLVED
+
+- [x] CallerValidation: safe foreground fallback for chain=[pid:8] (known host process guard)
+- [ ] no_caller_window chain=8 suggests: 22 items -- merge pending (cross-channel merge blocked)
