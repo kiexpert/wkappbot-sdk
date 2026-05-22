@@ -739,8 +739,8 @@ partial class Program
             if (eyeTimeoutMs == 0 && cmd == "cdp")
             {
                 var cdpSub = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
-                if (cdpSub == "open") eyeTimeoutMs = 9_000;
-                else if (cdpSub == "navigate") eyeTimeoutMs = 9_000;
+                if (cdpSub == "open") eyeTimeoutMs = 90_000;
+                else if (cdpSub == "navigate") eyeTimeoutMs = 25_000;
             }
 
             int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard -> Core fallback

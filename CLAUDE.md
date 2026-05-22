@@ -514,3 +514,5 @@ Step may have been skipped -- verify all gg steps ran
 
 - [x] CallerValidation: reverted GetForegroundWindow fallback -- CDP context guard violation
 - [ ] no_caller_window chain=8: correct fix is in Core (not SDK) -- placement skip is correct behavior per standard-appbot-window skill step 14
+
+- [x] Program.cs: cdp open timeout typo fixed: 9_000ms -> 90_000ms (cdp open 90s, navigate 25s)
