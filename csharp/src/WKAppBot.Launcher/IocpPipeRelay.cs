@@ -313,6 +313,8 @@ partial class Program
             }
             if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
             {
+                // Fix: while wkask flow or chatgpt prompt-textarea hangs, Core never returns even after timeout.
+                // catch dead Core: IocpPipeRelay now kills subprocess so Invoke-WK TimeoutSec is respected.
                 Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s -- killing Core pid={pi.dwProcessId} rc={timeoutExit}");
                 try { _stdout.Flush(); } catch { }
                 try { TerminateProcess(pi.hProcess, (uint)timeoutExit); } catch { }
