@@ -505,3 +505,6 @@ Step may have been skipped -- verify all gg steps ran
 - [ ] suggest triage: run gg workflow + Opus triage for session 2026-05-22
 
 - [x] IocpPipeRelay: kill Core process on launcher timeout (TerminateProcess before TerminateSelf)
+
+- [x] IocpPipeRelay: TerminateProcess(Core) on launcher timeout -- resolves a11y wait zombie hang (ts=2026-05-21T17:50:59)
+- [x] suggest ts=2026-05-21T17:50:59 RESOLVED
