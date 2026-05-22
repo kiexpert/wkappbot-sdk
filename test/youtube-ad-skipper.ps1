@@ -1,97 +1,136 @@
-#Requires -Version 5.1
-# youtube-ad-skipper.ps1 -- UIA ad skipper. Kills Chrome first, opens VISIBLE YouTube.
-# Mutes via keyboard shortcut M, skips via UIA InvokePattern on But_skip element.
+﻿#Requires -Version 5.1
+# youtube-ad-skipper.ps1 -- CDP reload-based ad skipper (v2)
+# Strategy: poll for ads via eval-js, reload with t=cur+0.1&end=dur-0.1 to skip
 param(
     [string] $Url = 'https://www.youtube.com/results?search_query=%EC%8A%88%ED%8D%BC%EA%B0%9C%EB%AF%B8+%EC%B5%9C%EC%8B%A0&sp=CAI%253D',
     [int]    $RunMinutes = 0,
-    [int]    $PollSeconds = 1
+    [int]    $PollSeconds = 2
 )
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Continue'
-function ts  { Get-Date -Format 'HH:mm:ss' }
+function ts   { Get-Date -Format 'HH:mm:ss' }
 function ok($m)  { Write-Host "$(ts)  OK  $m" -ForegroundColor Green;  [Console]::Out.Flush() }
 function inf($m) { Write-Host "$(ts)  ..  $m" -ForegroundColor Cyan;   [Console]::Out.Flush() }
 function wrn($m) { Write-Host "$(ts)  !!  $m" -ForegroundColor Yellow; [Console]::Out.Flush() }
 function err($m) { Write-Host "$(ts)  XX  $m" -ForegroundColor Red;    [Console]::Out.Flush() }
 
-Add-Type -TypeDefinition @"
-using System; using System.Runtime.InteropServices;
-public class WinShow {
-    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
-}
-"@ -ErrorAction SilentlyContinue
-
-# STEP 1: Kill all existing Chrome sessions
-inf 'Killing existing Chrome sessions...'
-& "C:\Windows\System32\taskkill.exe" /F /IM chrome.exe 2>$null
-Start-Sleep -Seconds 2
-
-# STEP 2: Open fresh Chrome
+# STEP 1: Open YouTube via CDP
 inf "Opening $Url"
-$openOut = wkappbot cdp open $Url 2>&1 | Out-String
-if ($openOut -notmatch 'cdp:(\d+)') { err "cdp open failed: $openOut"; exit 1 }
+$openOut = & wkappbot cdp open $Url 2>&1 | Out-String
+if ($openOut -notmatch 'cdp:(\d+)') { err 'cdp open failed'; Write-Host $openOut; exit 1 }
 $port = [int]$Matches[1]
-$hwnd = if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') { $Matches[1] } else { $null }
-ok "Port $port hwnd $hwnd"
+$grap = "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}"
+ok "CDP port $port"
 
-$g = if ($hwnd) { "{hwnd:$hwnd,proc:'chrome',cdp:$port}" } else { "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" }
+$deadline = if ($RunMinutes -gt 0) { (Get-Date).AddMinutes($RunMinutes) } else { $null }
 
-# STEP 3: Force-navigate to override Chrome session restore
-inf "Navigating to $Url (overrides session restore)"
-wkappbot cdp navigate "$g" $Url 2>&1 | Out-Null
-Start-Sleep -Seconds 2
-
-# STEP 4: Make Chrome window VISIBLE via Win32 ShowWindow (cdp open uses SW_HIDE)
-if ($hwnd) {
-    $h = [IntPtr][Convert]::ToInt64($hwnd, 16)
-    [WinShow]::ShowWindow($h, 9)  | Out-Null  # SW_RESTORE
-    Start-Sleep -Milliseconds 300
-    [WinShow]::ShowWindow($h, 3)  | Out-Null  # SW_MAXIMIZE
-    [WinShow]::SetForegroundWindow($h) | Out-Null
-    ok "Chrome shown and maximized: hwnd=$hwnd"
-} else {
-    wkappbot a11y maximize "$g" 2>$null
-    ok 'Chrome maximize (no hwnd fallback)'
+# eval-js helper
+function Eval($js) {
+    $out = & wkappbot a11y read "$grap#Doc_RootWebArea" --eval-js $js 2>&1 | Out-String
+    ($out -split "`n" | Where-Object { $_ -notmatch '^\[|^{\"_\"|^#|^--' } | Select-Object -First 1).Trim()
 }
-Start-Sleep -Seconds 2
 
-$muted = $false
-$skipCount = 0
-$start = Get-Date
+# STEP 2: Setup -- set &end=dur-0.1 on current video to prevent end-roll
+function SetupClip {
+    $state = Eval "var p=document.querySelector('#movie_player');var u=new URL(location.href);var vid=u.searchParams.get('v');var dur=p&&p.getDuration?p.getDuration():0;var clipped=u.searchParams.get('_clipped');JSON.stringify({vid:vid,dur:dur,clipped:clipped,clip:u.searchParams.has('clip')})"
+    if ($state -match '"vid":"([^"]+)".*"dur":([0-9.]+).*"clipped":"?([^",}]*)"?.*"clip":(true|false)') {
+        $vid     = $Matches[1]
+        $dur     = [double]$Matches[2]
+        $clipped = $Matches[3]
+        $isClip  = $Matches[4] -eq 'true'
+        if ($isClip) { inf "Clip playback detected -- skipping setup"; return $vid }
+        if ($clipped -ne '1' -and $dur -gt 2) {
+            $endT = [Math]::Floor($dur - 0.1)
+            inf "Setting &end=$endT for vid=$vid"
+            & wkappbot cdp navigate $grap "https://www.youtube.com/watch?v=$vid&end=$endT&_clipped=1" 2>&1 | Out-Null
+        }
+        return $vid
+    }
+    return $null
+}
 
-inf "Monitoring for ads every ${PollSeconds}s. Ctrl+C to stop."
+# STEP 3: Main ad-watch loop
+inf "Watching for ads (poll every ${PollSeconds}s)..."
+$lastVid = $null
+$reloadCount = @{}
 
 while ($true) {
-    if ($RunMinutes -gt 0 -and ((Get-Date) - $start).TotalMinutes -ge $RunMinutes) {
-        ok "Done. Skips=$skipCount"; break
+    if ($deadline -and (Get-Date) -gt $deadline) { ok "Time limit reached"; break }
+
+    $adState = Eval "
+var p=document.querySelector('#movie_player');
+var u=new URL(location.href);
+var vid=u.searchParams.get('v');
+var dur=p&&p.getDuration?p.getDuration():0;
+var cur=p&&p.getCurrentTime?p.getCurrentTime():0;
+var isMid=document.documentElement.classList.contains('ad-showing');
+var isEnd=!!document.querySelector('.ytp-ad-player-overlay-layout');
+var hasSkip=!!document.querySelector('.ytp-skip-ad-button,.ytp-ad-skip-button-container');
+var isClip=u.searchParams.has('clip');
+var clipped=u.searchParams.get('_clipped');
+var banner=!!document.querySelector('#dismiss-button');
+JSON.stringify({vid:vid,dur:dur,cur:cur,isMid:isMid,isEnd:isEnd,hasSkip:hasSkip,isClip:isClip,clipped:clipped,banner:banner})
+"
+    if ($adState -notmatch '"vid":"([^"]+)"') { Start-Sleep $PollSeconds; continue }
+
+    if ($adState -match '"vid":"([^"]+)"') { $vid = $Matches[1] }
+    if ($adState -match '"dur":([0-9.]+)')  { $dur = [double]$Matches[1] }
+    if ($adState -match '"cur":([0-9.]+)')  { $cur = [double]$Matches[1] }
+    $isMid  = $adState -match '"isMid":true'
+    $isEnd  = $adState -match '"isEnd":true'
+    $hasSkip= $adState -match '"hasSkip":true'
+    $isClip = $adState -match '"isClip":true'
+    $clipped= $adState -match '"clipped":"1"'
+    $banner = $adState -match '"banner":true'
+
+    # New video: setup clip range
+    if ($vid -ne $lastVid -and -not $isClip) {
+        $lastVid = $vid
+        $reloadCount[$vid] = 0
+        if (-not $clipped -and $dur -gt 2) {
+            $endT = [Math]::Floor($dur - 0.1)
+            inf "New video $vid -- setting end=$endT"
+            & wkappbot cdp navigate $grap "https://www.youtube.com/watch?v=$vid&end=$endT&_clipped=1" 2>&1 | Out-Null
+            Start-Sleep 2; continue
+        }
     }
 
-    # Check for skip button via UIA (But_skip automation ID)
-    $found = wkappbot a11y find "$g#But_skip;*skip-button*" --timeout 1 2>&1 | Out-String
-
-    if ($LASTEXITCODE -eq 0 -or $found -match 'TARGET.*skip') {
-        if (-not $muted) {
-            wkappbot a11y type "$g" --hotkey m --force 2>$null
-            $muted = $true
-            wrn 'Ad detected -- MUTED (keyboard M)'
-        }
-        $r = wkappbot a11y invoke "$g#But_skip;*skip-button*" --timeout 8 --force 2>&1 | Out-String
-        if ($r -match 'STATE CHANGE|REMOVED|invoke.*UIA') {
-            $skipCount++
-            ok "SKIPPED ad #$skipCount"
-            Start-Sleep -Seconds 1
-            if ($muted) {
-                wkappbot a11y type "$g" --hotkey m --force 2>$null
-                $muted = $false
-                ok 'Unmuted'
-            }
-        }
-    } elseif ($muted) {
-        wkappbot a11y type "$g" --hotkey m --force 2>$null
-        $muted = $false
-        ok 'Ad ended -- unmuted'
+    # Dismiss premium banner
+    if ($banner) {
+        inf "Dismissing premium banner"
+        & wkappbot a11y invoke "$grap#*dismiss-button*" --force --timeout 3 2>&1 | Out-Null
     }
 
-    Start-Sleep -Seconds $PollSeconds
+    # Ad handling
+    if (($isMid -or $isEnd) -and -not $isClip) {
+        $cnt = $reloadCount[$vid]
+        if ($cnt -ge 5) { wrn "Max reloads ($cnt) for $vid -- skipping"; Start-Sleep $PollSeconds; continue }
+
+        if ($hasSkip) {
+            inf "Skip button found -- invoking"
+            $r = & wkappbot a11y invoke "$grap#*skip-ad-button*" --force --timeout 5 2>&1 | Out-String
+            if ($r -match '\[OK\]') { ok "Ad skipped via button"; $reloadCount[$vid]++; Start-Sleep 2; continue }
+        }
+
+        if ($isEnd) {
+            # End-roll: reload to dur-1 paused
+            $t   = [Math]::Max(0, [Math]::Floor($dur - 1))
+            $endT = [Math]::Floor($dur - 0.1)
+            wrn "End-roll detected -- reloading t=$t end=$endT"
+            & wkappbot cdp navigate $grap "https://www.youtube.com/watch?v=$vid&t=$t&end=$endT&_clipped=1" 2>&1 | Out-Null
+            Start-Sleep 2
+            Eval "document.querySelector('#movie_player')?.pauseVideo()" | Out-Null
+        } else {
+            # Mid/pre-roll: jump past ad cue point
+            $t   = [Math]::Max(0, $cur + 0.1)
+            $endT = [Math]::Floor($dur - 0.1)
+            wrn "Mid/pre-roll detected at t=$([Math]::Floor($cur)) -- reloading to t=$t"
+            & wkappbot cdp navigate $grap "https://www.youtube.com/watch?v=$vid&t=$t&end=$endT&_clipped=1" 2>&1 | Out-Null
+        }
+        $reloadCount[$vid]++
+        ok "Reload #$($reloadCount[$vid]) for $vid"
+        Start-Sleep 3
+    }
+
+    Start-Sleep $PollSeconds
 }
