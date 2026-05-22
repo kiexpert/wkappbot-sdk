@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM Evidence: skill list default sort by recency flat cross-app
 REM Fix: SkillCommand.cs -- flat globally sorted, [app] inline, no GroupBy default
 
@@ -11,4 +11,3 @@ wkappbot skill list wkappbot-workflow 2>&1 | findstr /C:"[wkappbot-workflow]"
 if %ERRORLEVEL%==0 (echo [PASS] app filter shows grouped view) else (echo [FAIL] & exit 1)
 
 wkappbot eye tick
-wkappbot skill list
