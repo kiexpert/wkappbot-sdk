@@ -335,11 +335,12 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 1. **Resume previous work first**: `wkappbot skill read claude-session-handoff` -- find last session JSONL, extract last unfinished task, continue from where it left off. Check memory: `project_main_task_test.md` for current #1 duty (CDP+A11y test). Only skip if user explicitly starts a new topic.
-2. wkappbot skill read on-load
-3. wkappbot suggest list
-4. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
-5. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
-6. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
+2. **[MANDATORY] wkappbot skill list** -- see all available skills before any work. New skills may have patterns that prevent wrong approaches. Edit/Write guard warns if skipped.
+3. wkappbot skill read on-load
+4. wkappbot suggest list
+5. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
+6. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
+7. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
 
 ## Scope of Work (YOU: SDK ONLY, not Core repo)
 
