@@ -519,3 +519,8 @@ Step may have been skipped -- verify all gg steps ran
 - [x] Program.cs: cdp open timeout typo fixed: 9_000ms -> 90_000ms (cdp open 90s, navigate 25s)
 
 - [x] cdp open exit 255 fix: Eye timeout typo 9s->90s (Program.cs 628ed76e)
+
+- [x] on-load skill: step 14 (skill list) needs reorder to step 1 -- dispatching to Opus+Codex
+- [x] stall-guard git exemption fixed (isGitCmd_stall defined before use)
+- [x] skill list default flat recency sort (SkillCommand.cs Core 80485e274)
+- [x] harness skill-list-check-guard: warn on Edit/Write if skill list not viewed in 60min
