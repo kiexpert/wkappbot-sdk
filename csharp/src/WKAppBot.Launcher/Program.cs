@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
 using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
@@ -731,6 +731,16 @@ partial class Program
             {
                 if (forwardArgs[i] == "--timeout" && int.TryParse(forwardArgs[i + 1], out var t) && t > 0) eyeTimeoutMs = t * 1000;
                 if (forwardArgs[i] == "--timeout-exit" && int.TryParse(forwardArgs[i + 1], out var e)) eyeTimeoutExit = e;
+            }
+
+            // cdp open/navigate are long-running (Chrome startup, page load) -- set default Eye pipe
+            // timeout so they don't wait forever if Eye processes the command but never sends EndMarker.
+            // User --timeout overrides this. cdp open: 90s, cdp navigate: 25s.
+            if (eyeTimeoutMs == 0 && cmd == "cdp")
+            {
+                var cdpSub = forwardArgs.Length > 1 ? forwardArgs[1].ToLowerInvariant() : "";
+                if (cdpSub == "open") eyeTimeoutMs = 9_000;
+                else if (cdpSub == "navigate") eyeTimeoutMs = 9_000;
             }
 
             int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard -> Core fallback

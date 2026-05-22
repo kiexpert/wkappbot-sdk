@@ -13,7 +13,9 @@
     "TRACKING AVOIDANCE RATIONALE: See cookie-consent-ai-strategy skill. Not accepting cookie consent + purging anonymous tabs prevents AI providers from building cross-session usage profiles. This extends available quota per session. Apply to all AI service domains (chatgpt.com, gemini.google.com, claude.ai, copilot.microsoft.com).",
     "DO NOT CLOSE: Logged-in tabs (user has authenticated session), tabs actively mid-response, tabs with pending_prompts queue, tabs belonging to a different project CDP port.",
     "PROFILE FOLDER = FIRST PORT (ALWAYS): When wkappbot creates a new Chrome instance on a different port (e.g., old instance on 9740 was stale, new instance on 9742), the Chrome profile folder name is always based on the FIRST/original port number (9740), not the current port. So profile path = wkappbot.hq/chrome-profiles/9740/ regardless of actual CDP port. Important for debugging: if you see profile data missing or login sessions lost after port change, check that the profile folder matches the first port. Also: tab accumulation (sandbox-miss) causes new tabs to open on the NEW port's Chrome even though they should go to the OLD port -- both Chromes may run simultaneously consuming double memory.",
-    "LIVE-COUNT ENFORCEMENT (2026-05-20): Registry-only tab cap counting failed when sandbox-miss-create tabs were created via Target.createTarget but the ask flow exited before AskTargetRegistry.SetEntry. Fix: EnforceTabCapByLiveCountAsync(cdp, port, keepTargetId) in CdpTabManager.cs uses cdp.ListTabsAsync (CDP /json) to count ACTUAL Chrome tabs, then closes oldest non-protected pages (skip keepTargetId, chrome://, devtools://, #wkbot-). Called immediately after sandbox-miss-create and sandbox-mismatch-create in AskCommands.Entry.Cdp.cs. TabCap lowered from 9 to 3 (matches policy step 5). tab_count field added to cdp-tab-growth.jsonl for diagnosis."
+    "LIVE-COUNT ENFORCEMENT (2026-05-20): Registry-only tab cap counting failed when sandbox-miss-create tabs were created via Target.createTarget but the ask flow exited before AskTargetRegistry.SetEntry. Fix: EnforceTabCapByLiveCountAsync(cdp, port, keepTargetId) in CdpTabManager.cs uses cdp.ListTabsAsync (CDP /json) to count ACTUAL Chrome tabs, then closes oldest non-protected pages (skip keepTargetId, chrome://, devtools://, #wkbot-). Called immediately after sandbox-miss-create and sandbox-mismatch-create in AskCommands.Entry.Cdp.cs. TabCap lowered from 9 to 3 (matches policy step 5). tab_count field added to cdp-tab-growth.jsonl for diagnosis.",
+    "NAVIGATE TIMEOUT CLEANUP (v1.4): When NavigateAsync times out (10s), do NOT increase the timeout. Instead: (1) close the stuck tab via TryCloseTabByIdAsync -- graceful HTTP /json/close/{targetId}. (2) wait 1s. (3) if renderer still alive, kill it via TryKillRendererForTarget. Chrome process stays alive. Re-throw the TimeoutException so callers get a clean error. Impl: CdpClient.Core.cs NavigateAsync try-catch TimeoutException block.",
+    "NAVIGATE TIMEOUT (v1.5 update): NavigateAsync timeout handler now closes tab + waits 1s + kills renderer via TryKillRendererForTarget. Chrome stays alive. Default Eye pipe timeout for cdp open and cdp navigate is 9s (not configurable via code -- use --timeout flag to override). See AppBotSleepAsync for condition-based polling pattern."
   ],
   "requirements": [
     {
@@ -53,6 +55,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-16T07:23:15.5616798Z",
-  "updated": "2026-05-20T06:34:20.2692121Z",
-  "version": "1.3"
+  "updated": "2026-05-21T14:34:23.819867Z",
+  "version": "1.5"
 }

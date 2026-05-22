@@ -481,3 +481,23 @@ Use: wkappbot skill edit <id>
 ## harness:done (?i)skipped|?앸왂|?섏뼱媛
 Step may have been skipped -- verify all gg steps ran
 - [x] YouTube ad-skipper: rewrite to use existing Chrome no cdp open
+- [x] youtube-ad-skipper-temp.ps1 Rick Astley URL fixed to 슈퍼개미
+- [x] youtube-ad-skipper.ps1: Win32 ShowWindow + full-path taskkill + cdp navigate after open
+- [x] cdp open exit 255 bug filed as suggest (chain=[pid:8] PseudoConsoleWindow context)
+- [ ] SuggestCommand.cs: add cdp to knownSubcmds, remove web from Resolve.Helpers.cs
+
+- [x] SuggestCommand: extract KnownSubcmds to static field + remove web alias from Resolve.Helpers.cs + build
+
+- [ ] Eye IPC failure: find+fix all silent exits -- add user-visible error messages
+- [x] NavigateAsync timeout: close tab + 1s + kill renderer (CdpClient.Core.cs)
+- [x] CdpClient.Port property added
+- [x] SuggestCommand KnownSubcmds unified static field + cdp added + web removed
+
+- [x] Eye IPC failure messages: pipe.Connect timeout + stall + read fail (EyeCmdPipeClient.cs)
+- [x] cdp open/navigate default timeout 9s (Program.cs)
+- [ ] TryDelegate successPattern: cdp open exits on cdp:PORT without waiting EndMarker
+
+- [x] wkask-gpt.ps1: tree-format fallback parser + noise terminators
+- [ ] wkask-gpt.ps1: Write-CdpDump to log file at type-fail/no-result/parse-fail/exception
+
+- [ ] ChromeLauncher.LaunchPreparation.cs: skip profile ownership check when port is active -- reuse instead of spawning new Chrome

@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -96,6 +96,7 @@ internal static class EyeCmdPipeClient
                 if (!firstReadTask.Wait(firstOutputTimeoutMs))
                 {
                     try { pipe.Close(); } catch { }
+                    Console.Error.WriteLine($"[PIPE] Eye IPC stalled -- no LAUNCH JSON within {firstOutputTimeoutMs}ms, falling back to Core");
                     return false; // no LAUNCH JSON -> Core fallback
                 }
                 peekedLine = firstReadTask.Result;
@@ -152,7 +153,12 @@ internal static class EyeCmdPipeClient
                     if (!line.StartsWith("{\"_\":\"LAUNCH\"") && !line.StartsWith("{\"_\": \"LAUNCH\""))
                         outputLines++;
                 }
-                if (timedOut) exitCode = timeoutExitCode;
+                if (timedOut)
+                {
+                    exitCode = timeoutExitCode;
+                    if (outputLines == 0)
+                        Console.Error.WriteLine($"[PIPE] Eye pipe timeout with no output -- if this repeats, run directly: wkappbot-core {string.Join(" ", args)}");
+                }
             }
             catch (Exception) when (timedOut)
             {
@@ -182,8 +188,12 @@ internal static class EyeCmdPipeClient
 
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            if (!connected)
+                Console.Error.WriteLine($"[PIPE] Eye IPC not responding (300ms timeout) -- falling back to Core. ({ex.GetType().Name})");
+            else
+                Console.Error.WriteLine($"[PIPE] Eye IPC read failed after connect -- {ex.GetType().Name}: {ex.Message}");
             return connected; // false = Eye not running; true = connected but read failed
         }
         finally
@@ -223,7 +233,7 @@ internal static class EyeCmdPipeClient
     /// For each ancestor PID, EnumWindows and return the FIRST visible, non-minimized,
     /// titled top-level window. First hit on the CLOSEST ancestor wins. No class restriction --
     /// VS Code, Claude Code, any IDE, any shell host that launched wkappbot is accepted.
-    /// Spec: "앱봇 부모프로세스 중 가장 근접한 창을 가진 프로세스를 찾으면 그게 AppBot 호출창"
+    /// Spec: "?깅큸 遺紐⑦봽濡쒖꽭??以?媛??洹쇱젒??李쎌쓣 媛吏??꾨줈?몄뒪瑜?李얠쑝硫?洹멸쾶 AppBot ?몄텧李?
     ///
     /// Returns IntPtr.Zero if no ancestor owns a usable window. NO foreground fallback.
     /// </summary>
@@ -260,7 +270,13 @@ internal static class EyeCmdPipeClient
                 // gives their visible ancestor for placement coords.
                 if (IsWindowVisible(hWnd) && GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
                 if (!GetWindowRect(hWnd, out RECT rect)) return true;
-                if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true; // zero rect
+                int rw = rect.Right - rect.Left;
+                int rh = rect.Bottom - rect.Top;
+                if (rw <= 0 && rh <= 0) return true; // zero rect
+                // Skip tiny hidden windows (e.g. ConPTY PseudoConsoleWindow is 16x16).
+                // GA_ROOT of a top-level ConPTY returns itself -- no usable placement rect.
+                // Continue ancestor walk so WindowsTerminal (CASCADIA, large) is found instead.
+                if (!IsWindowVisible(hWnd) && rw < 100 && rh < 80) return true;
                 match = hWnd;
                 return false;
             }, IntPtr.Zero);

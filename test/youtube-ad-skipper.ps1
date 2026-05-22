@@ -1,10 +1,6 @@
-﻿#Requires -Version 5.1
-# youtube-ad-skipper.ps1 -- UIA-invoke based YouTube ad skipper.
-# YouTube blocks JS .click() via isTrusted check. We use wkappbot a11y invoke
-# (UIA InvokePattern = trusted input) on the .ytp-skip-ad-button element.
-# Detection (lightweight eval-js poll) -> action (UIA invoke). No JS click ever.
-#
-# Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>] [-RunMinutes <N>]
+#Requires -Version 5.1
+# youtube-ad-skipper.ps1 -- UIA ad skipper. Kills Chrome first, opens VISIBLE YouTube.
+# Mutes via keyboard shortcut M, skips via UIA InvokePattern on But_skip element.
 param(
     [string] $Url = 'https://www.youtube.com/results?search_query=%EC%8A%88%ED%8D%BC%EA%B0%9C%EB%AF%B8+%EC%B5%9C%EC%8B%A0&sp=CAI%253D',
     [int]    $RunMinutes = 0,
@@ -12,182 +8,90 @@ param(
 )
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Continue'
-
 function ts  { Get-Date -Format 'HH:mm:ss' }
 function ok($m)  { Write-Host "$(ts)  OK  $m" -ForegroundColor Green;  [Console]::Out.Flush() }
 function inf($m) { Write-Host "$(ts)  ..  $m" -ForegroundColor Cyan;   [Console]::Out.Flush() }
 function wrn($m) { Write-Host "$(ts)  !!  $m" -ForegroundColor Yellow; [Console]::Out.Flush() }
 function err($m) { Write-Host "$(ts)  XX  $m" -ForegroundColor Red;    [Console]::Out.Flush() }
 
-# Step 1: open the YouTube tab (cdp open auto-creates or reuses).
+Add-Type -TypeDefinition @"
+using System; using System.Runtime.InteropServices;
+public class WinShow {
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+}
+"@ -ErrorAction SilentlyContinue
+
+# STEP 1: Kill all existing Chrome sessions
+inf 'Killing existing Chrome sessions...'
+& "C:\Windows\System32\taskkill.exe" /F /IM chrome.exe 2>$null
+Start-Sleep -Seconds 2
+
+# STEP 2: Open fresh Chrome
 inf "Opening $Url"
-$openOut = & wkappbot cdp open $Url 2>&1 | Out-String
-if ($openOut -notmatch 'cdp:(\d+)') { err 'cdp open failed -- aborting'; Write-Host $openOut; exit 1 }
+$openOut = wkappbot cdp open $Url 2>&1 | Out-String
+if ($openOut -notmatch 'cdp:(\d+)') { err "cdp open failed: $openOut"; exit 1 }
 $port = [int]$Matches[1]
-ok "CDP port $port"
+$hwnd = if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') { $Matches[1] } else { $null }
+ok "Port $port hwnd $hwnd"
 
-# Step 2: navigate (also pulls YouTube tab to active state).
-$navOut = & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-String
-if ($navOut -notmatch 'hwnd:(0x[0-9A-Fa-f]+)') {
-    wrn 'navigate did not return hwnd -- continuing with domain grap'
-    $grapBase = "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}"
+$g = if ($hwnd) { "{hwnd:$hwnd,proc:'chrome',cdp:$port}" } else { "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" }
+
+# STEP 3: Force-navigate to override Chrome session restore
+inf "Navigating to $Url (overrides session restore)"
+wkappbot cdp navigate "$g" $Url 2>&1 | Out-Null
+Start-Sleep -Seconds 2
+
+# STEP 4: Make Chrome window VISIBLE via Win32 ShowWindow (cdp open uses SW_HIDE)
+if ($hwnd) {
+    $h = [IntPtr][Convert]::ToInt64($hwnd, 16)
+    [WinShow]::ShowWindow($h, 9)  | Out-Null  # SW_RESTORE
+    Start-Sleep -Milliseconds 300
+    [WinShow]::ShowWindow($h, 3)  | Out-Null  # SW_MAXIMIZE
+    [WinShow]::SetForegroundWindow($h) | Out-Null
+    ok "Chrome shown and maximized: hwnd=$hwnd"
 } else {
-    $hwnd = $Matches[1]
-    $grapBase = "{hwnd:$hwnd,proc:'chrome',cdp:$port}"
-    ok "YouTube tab hwnd $hwnd"
-    # Restore hidden Chrome window so it's visible to the user
-    & wkappbot a11y restore "$grapBase" 2>&1 | Out-Null
-    inf 'Chrome window restored (visible)'
+    wkappbot a11y maximize "$g" 2>$null
+    ok 'Chrome maximize (no hwnd fallback)'
 }
+Start-Sleep -Seconds 2
 
-# Lightweight DOM probe: returns ad-state JSON. Read-only -- no .click(), no DOM
-# mutation. Just classList check + element visibility. Cheap, no isTrusted issue.
-$probeJs = 'var p=document.querySelector(".html5-video-player");var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern,[class*=skip-button]");var o=document.querySelector(".ytp-ad-overlay-close-button");var v=document.querySelector("video");var layer=document.querySelector(".ytp-ad-player-overlay,.ytp-ad-module");JSON.stringify({ad:!!(p&&p.classList.contains("ad-showing"))||!!layer,skip:s?s.offsetHeight>0:false,overlay:o?o.offsetHeight>0:false,muted:v?v.muted:false,ending:!!(v&&v.duration>0&&!v.ended&&(v.duration-v.currentTime)<2.0)})'
-
-function Get-AdState {
-    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js $probeJs 2>&1 | Out-String
-    foreach ($line in $r -split "`n") {
-        if ($line -match '^\{"ad":') {
-            try { return $line | ConvertFrom-Json } catch { return $null }
-        }
-    }
-    return $null
-}
-
-function Invoke-Skip {
-    # UIA InvokePattern is trusted. YouTube cannot detect/block it the way it
-    # blocks JS element.click(). The skip button UIA AutomationId is
-    # "skip-button:<N>" -- wildcard '#*skip-button*' matches reliably.
-    $r = & wkappbot a11y invoke "$grapBase#*skip-button*" --timeout 8 --force 2>&1 | Out-String
-    if ($r -match '\[STATE CHANGE DETECTED\]|REMOVED.*광고|REMOVED.*skip|invoke -- UIA Invoke') {
-        return $true
-    }
-    return $false
-}
-
-function Invoke-Overlay {
-    $r = & wkappbot a11y invoke "$grapBase#*overlay-close*" --timeout 5 --force 2>&1 | Out-String
-    return ($r -match 'invoke -- UIA Invoke|STATE CHANGE')
-}
-
-function Mute-Video {
-    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.querySelector("video").muted=true;"ok"' 2>&1 | Out-String
-    return ($r -match 'eval-js OK')
-}
-
-function Unmute-Video {
-    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.querySelector("video").muted=false;"ok"' 2>&1 | Out-String
-    return ($r -match 'eval-js OK')
-}
-
-function Test-RenderHealth {
-    # CDP screenshot probe: if Chrome renderer is dead, screenshot fails or returns tiny file
-    $tmp = [System.IO.Path]::GetTempFileName() + '.png'
-    $r = & wkappbot cdp capture "$grapBase" 2>&1 | Out-String
-    if ($r -match 'error|fail|DEAD|not connected' -or -not ($r -match '\.png')) { return $false }
-    # Also check readyState via eval-js
-    $rs = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.readyState' 2>&1 | Out-String
-    if ($rs -match "eval-js OK: (complete|interactive)") { return $true }
-    return $false
-}
-
-function Restart-Chrome {
-    wrn 'Render dead detected -- killing Chrome and reopening'
-    $openOut = & wkappbot cdp open $Url 2>&1 | Out-String
-    if ($openOut -match 'cdp:(\d+)') {
-        $script:port = [int]$Matches[1]
-        if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') {
-            $script:grapBase = "{hwnd:$($Matches[1]),proc:'chrome',cdp:$($script:port)}"
-        } else {
-            $script:grapBase = "{proc:'chrome',cdp:$($script:port),domain:'www.youtube.com'}"
-        }
-        ok "Chrome restarted on port $($script:port)"
-        return $true
-    }
-    err 'Chrome restart failed'
-    return $false
-}
-
-function Test-RenderHealth {
-    # CDP screenshot probe: if Chrome renderer is dead, screenshot fails or returns tiny file
-    $tmp = [System.IO.Path]::GetTempFileName() + '.png'
-    $r = & wkappbot cdp capture "$grapBase" 2>&1 | Out-String
-    if ($r -match 'error|fail|DEAD|not connected' -or -not ($r -match '\.png')) { return $false }
-    # Also check readyState via eval-js
-    $rs = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js 'document.readyState' 2>&1 | Out-String
-    if ($rs -match "eval-js OK: (complete|interactive)") { return $true }
-    return $false
-}
-
-function Restart-Chrome {
-    wrn 'Render dead detected -- killing Chrome and reopening'
-    $openOut = & wkappbot cdp open $Url 2>&1 | Out-String
-    if ($openOut -match 'cdp:(\d+)') {
-        $script:port = [int]$Matches[1]
-        if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') {
-            $script:grapBase = "{hwnd:$($Matches[1]),proc:'chrome',cdp:$($script:port)}"
-        } else {
-            $script:grapBase = "{proc:'chrome',cdp:$($script:port),domain:'www.youtube.com'}"
-        }
-        ok "Chrome restarted on port $($script:port)"
-        return $true
-    }
-    err 'Chrome restart failed'
-    return $false
-}
-
-inf "Polling every ${PollSeconds}s (UIA-invoke mode). Ctrl+C to stop."
-$start = Get-Date
+$muted = $false
 $skipCount = 0
-$overlayCount = 0
-$consecutiveFails = 0
-$wasMuted = $false
+$start = Get-Date
+
+inf "Monitoring for ads every ${PollSeconds}s. Ctrl+C to stop."
 
 while ($true) {
     if ($RunMinutes -gt 0 -and ((Get-Date) - $start).TotalMinutes -ge $RunMinutes) {
-        ok "RunMinutes ($RunMinutes) reached. Skips=$skipCount Overlays=$overlayCount"
-        break
+        ok "Done. Skips=$skipCount"; break
     }
 
-    $state = Get-AdState
-    if ($null -eq $state) {
-        $consecutiveFails++
-        if ($consecutiveFails -ge 5) {
-            wrn 'Probe failed 5 times -- checking render health'
-            if (-not (Test-RenderHealth)) {
-                wrn '[RENDER DEAD] Chrome renderer failed -- restarting'
-                Restart-Chrome | Out-Null
-            }
-            $consecutiveFails = 0
+    # Check for skip button via UIA (But_skip automation ID)
+    $found = wkappbot a11y find "$g#But_skip;*skip-button*" --timeout 1 2>&1 | Out-String
+
+    if ($LASTEXITCODE -eq 0 -or $found -match 'TARGET.*skip') {
+        if (-not $muted) {
+            wkappbot a11y type "$g" --hotkey m --force 2>$null
+            $muted = $true
+            wrn 'Ad detected -- MUTED (keyboard M)'
         }
-        Start-Sleep -Seconds $PollSeconds
-        continue
-    }
-    $consecutiveFails = 0
-
-    # Pre-emptive mute: video ending -> mute before next ad fires
-    if ($state.ending -and -not $state.muted -and -not $wasMuted) {
-        if (Mute-Video) { inf "Video ending -- pre-muted for next ad"; $wasMuted = $true }
-    }
-
-    if ($state.ad) {
-        if (-not $state.muted) {
-            if (Mute-Video) { wrn 'Ad detected -- MUTED'; $wasMuted = $true }
-        }
-        if ($state.skip) {
-            inf 'Skip visible -- invoking UIA'
-            if (Invoke-Skip) {
-                $skipCount++
-                ok "SKIPPED ad #$skipCount"
-                Unmute-Video | Out-Null; $wasMuted = $false
-                Start-Sleep -Seconds 1
+        $r = wkappbot a11y invoke "$g#But_skip;*skip-button*" --timeout 8 --force 2>&1 | Out-String
+        if ($r -match 'STATE CHANGE|REMOVED|invoke.*UIA') {
+            $skipCount++
+            ok "SKIPPED ad #$skipCount"
+            Start-Sleep -Seconds 1
+            if ($muted) {
+                wkappbot a11y type "$g" --hotkey m --force 2>$null
+                $muted = $false
+                ok 'Unmuted'
             }
         }
-    } elseif ($state.overlay) {
-        if (Invoke-Overlay) { $overlayCount++; ok "Closed overlay #$overlayCount" }
-    } elseif ($wasMuted) {
-        # Ad ended without skip -- unmute
-        Unmute-Video | Out-Null; $wasMuted = $false; ok 'Ad ended -- unmuted'
+    } elseif ($muted) {
+        wkappbot a11y type "$g" --hotkey m --force 2>$null
+        $muted = $false
+        ok 'Ad ended -- unmuted'
     }
+
     Start-Sleep -Seconds $PollSeconds
 }
