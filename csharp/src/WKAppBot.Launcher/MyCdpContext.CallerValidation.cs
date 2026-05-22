@@ -194,24 +194,6 @@ partial class Program
             }
         }
 
-        // Last-resort: if the foreground window belongs to a known host process (terminal/IDE),
-        // use it. Safe because IsKnownHostProcess rejects browsers, media players, and foreign apps.
-        // This covers the Claude Code / IOCP relay path where chain=[pid:8] has no process window.
-        var fg = GetForegroundWindow();
-        if (fg != IntPtr.Zero && fg != preferredCaller && fg != ancestor && fg != host
-            && IsKnownHostProcess(fg) && IsWindowVisibleLocal(fg))
-        {
-            if (GetWindowRect(fg, out RECT fgRect))
-            {
-                var fgCenter = new POINT { X = fgRect.Left + fgRect.Width / 2, Y = fgRect.Top + fgRect.Height / 2 };
-                if (MonitorFromPoint(fgCenter, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
-                {
-                    Console.Error.WriteLine($"[CALLER:RESOLVE] using foreground (known host) 0x{fg.ToInt64():X}");
-                    return fg;
-                }
-            }
-        }
-
         Console.Error.WriteLine($"[CALLER:RESOLVE] FAIL no valid on-screen window found");
         return IntPtr.Zero;
     }

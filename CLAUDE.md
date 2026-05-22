@@ -511,3 +511,6 @@ Step may have been skipped -- verify all gg steps ran
 
 - [x] CallerValidation: safe foreground fallback for chain=[pid:8] (known host process guard)
 - [ ] no_caller_window chain=8 suggests: 22 items -- merge pending (cross-channel merge blocked)
+
+- [x] CallerValidation: reverted GetForegroundWindow fallback -- CDP context guard violation
+- [ ] no_caller_window chain=8: correct fix is in Core (not SDK) -- placement skip is correct behavior per standard-appbot-window skill step 14
