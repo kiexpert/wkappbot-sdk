@@ -313,8 +313,11 @@ partial class Program
             }
             if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
             {
-                // Fix: while wkask flow or chatgpt prompt-textarea hangs, Core never returns even after timeout.
-                // catch dead Core: IocpPipeRelay now kills subprocess so Invoke-WK TimeoutSec is respected.
+                // Suggest fix ts=2026-05-21T17:50:59: a11y wait on dead/closed Chrome port hangs indefinitely.
+                // When Chrome dies while wkask is mid-flow, wkappbot-core a11y wait {domain:chatgpt.com,cdp:PORT}
+                // #prompt-textarea --timeout 20 never returns even after 20s. Invoke-WK TimeoutSec=25 wrapper
+                // also failed to kill the subprocess. IocpPipeRelay exit detection should catch dead Core and
+                // return. Fix: must respect --timeout, return non-zero when target Chrome is unreachable.
                 Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s -- killing Core pid={pi.dwProcessId} rc={timeoutExit}");
                 try { _stdout.Flush(); } catch { }
                 try { TerminateProcess(pi.hProcess, (uint)timeoutExit); } catch { }
