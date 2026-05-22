@@ -503,3 +503,5 @@ Step may have been skipped -- verify all gg steps ran
 - [ ] ChromeLauncher.LaunchPreparation.cs: skip profile ownership check when port is active -- reuse instead of spawning new Chrome
 
 - [ ] suggest triage: run gg workflow + Opus triage for session 2026-05-22
+
+- [x] IocpPipeRelay: kill Core process on launcher timeout (TerminateProcess before TerminateSelf)

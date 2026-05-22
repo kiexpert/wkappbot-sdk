@@ -313,8 +313,9 @@ partial class Program
             }
             if (effectiveTimeoutMs > 0 && _sw.ElapsedMilliseconds > effectiveTimeoutMs)
             {
-                Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s -- exiting");
+                Console.Error.WriteLine($"[LAUNCHER] timeout {timeoutSec}s -- killing Core pid={pi.dwProcessId} rc={timeoutExit}");
                 try { _stdout.Flush(); } catch { }
+                try { TerminateProcess(pi.hProcess, (uint)timeoutExit); } catch { }
                 CloseHandle(hExitEvent); CloseHandle(hPipeOut); CloseHandle(hPipeErr); CloseHandle(hIocp); CloseHandle(pi.hProcess);
                 TerminateSelf((uint)timeoutExit);
                 return timeoutExit;
