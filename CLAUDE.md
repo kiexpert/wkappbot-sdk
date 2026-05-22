@@ -524,3 +524,5 @@ Step may have been skipped -- verify all gg steps ran
 - [x] stall-guard git exemption fixed (isGitCmd_stall defined before use)
 - [x] skill list default flat recency sort (SkillCommand.cs Core 80485e274)
 - [x] harness skill-list-check-guard: warn on Edit/Write if skill list not viewed in 60min
+
+- [ ] YouTube ad-skip bookmarklet: complete version via Opus (strategies verified via CDP)
