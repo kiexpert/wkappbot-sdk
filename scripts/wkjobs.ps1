@@ -116,18 +116,55 @@ function Get-AiJobs {
         $gpMap[$_.Id] = $_
     }
 
-    # Identify AI pids
+    # Build wmiMap + children map for subtree traversal
     $wmiMap = @{}
     foreach ($w in $allWmi) { $wmiMap[[int]$w.ProcessId] = $w }
+    $childMap = @{}
+    foreach ($w in $allWmi) {
+        $pp = [int]$w.ParentProcessId
+        if (-not $childMap.ContainsKey($pp)) { $childMap[$pp] = [System.Collections.Generic.List[int]]::new() }
+        $childMap[$pp].Add([int]$w.ProcessId)
+    }
 
+    # Find my session root: walk $PID up to first terminal/wkchat ancestor
+    $mySubtree = $null
+    if (-not $All) {
+        $TERM_NAMES = @('wkchat','cmd','pwsh','windowsterminal','wt')
+        # Start from parent of $PID (skip self -- wkjobs is a powershell, not the terminal)
+        $w0 = $wmiMap[$PID]
+        $cur = if ($w0) { [int]$w0.ParentProcessId } else { $PID }
+        $sessionRoot = $cur
+        for ($i = 0; $i -lt 15; $i++) {
+            $w = $wmiMap[$cur]; if (-not $w) { break }
+            $nm = [System.IO.Path]::GetFileNameWithoutExtension($w.Name).ToLower()
+            if ($TERM_NAMES -contains $nm) { $sessionRoot = $cur; break }
+            $par = [int]$w.ParentProcessId; if ($par -le 4) { break }
+            $cur = $par; $sessionRoot = $cur
+        }
+        # BFS to collect all descendants of sessionRoot
+        $mySubtree = [System.Collections.Generic.HashSet[int]]::new()
+        $q = [System.Collections.Generic.Queue[int]]::new()
+        $q.Enqueue($sessionRoot)
+        while ($q.Count -gt 0) {
+            $n = $q.Dequeue()
+            if ($mySubtree.Add($n) -and $childMap.ContainsKey($n)) {
+                foreach ($ch in $childMap[$n]) { $q.Enqueue($ch) }
+            }
+        }
+    }
+
+    # Identify AI pids: filter by subtree (default) or session (--All)
     $aiPids = [System.Collections.Generic.HashSet[int]]::new()
     foreach ($w in $allWmi) {
         $baseName = [System.IO.Path]::GetFileNameWithoutExtension($w.Name).ToLower()
         if ($AI_NAMES -contains $baseName) {
-            $gp = $gpMap[[int]$w.ProcessId]
-            if ($All -or ($gp -and $gp.SessionId -eq $mySession)) {
-                $aiPids.Add([int]$w.ProcessId) | Out-Null
+            $wpid = [int]$w.ProcessId
+            $inScope = if ($All) {
+                $gp = $gpMap[$wpid]; $gp -and $gp.SessionId -eq $mySession
+            } else {
+                $mySubtree.Contains($wpid)
             }
+            if ($inScope) { $aiPids.Add($wpid) | Out-Null }
         }
     }
 
