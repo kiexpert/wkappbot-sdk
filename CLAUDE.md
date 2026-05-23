@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
+# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -419,3 +419,13 @@ Step may have been skipped -- verify all gg steps ran
 - [x] wkjobs: condense output to 1 line per process -- CMD args inline, drop CON row (3b7f968)
 - [x] ChatSessionGuard: token-aware cmdline check -- fix false-positive on skill/suggest --steps content (42cee06)
 - [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending)
+- [x] settings.json deny (Edit/Write) removed -- Edit tool now unblocked
+- [x] Codex harness guards verified: spec-gate, brief-guard, wrapper-first, skill-update-pending all working
+- [x] codex-tool-wrappers skill created (design: Claude-named cmd wrappers route through wkharness)
+- [x] Implement Edit.cmd + Edit.ps1 in personal-docs/tools/ + wkwrap --install symlink (done)
+- [x] Write.cmd + Read.cmd + Glob.cmd + Grep.cmd -- all 5 shims done, symlinks in WKAppBot/bin/
+- [x] Agent.cmd: Codex->Opus delegation via wkclaude, brief-guard+spec-gate enforced
+- [ ] ~/.codex/config.toml: add write_file/read_file block hooks
+- [x] Bash.cmd/PowerShell.cmd/Cmd.cmd: all 3 shell shims done + symlinks in WKAppBot/bin
+- [x] exit-255 fix: abs path for cmd.exe/powershell.exe/bash.exe (wrappers shadowed system executables in PATH)
+- [ ] AGENTS.md: add Tool Usage mandatory section (Bash.cmd/PowerShell.cmd/Write.cmd/Edit.cmd/Agent.cmd)
