@@ -410,3 +410,8 @@ Step may have been skipped -- verify all gg steps ran
 - [x] skill-edit-step-ordering-spec: new skill created + suggest filed
 - [x] skill-ify: suggest-workflow (add-requirement step), wkharness-guards (3 new guards), suggest-triage-playbook (skill news step) -- DONE (wkclaude.sh agents)
 - [x] wkjobs.ps1: created scripts/wkjobs.ps1, registered wkjobs-ai-process-monitor skill v1.0
+- [x] wkjobs: sh/cmd wrappers as symlinks to wkwrap.sh/cmd (mode 120000), wkwrap --install cp->ln-s
+- [x] wkjobs.ps1: moved to WKAppBot/bin, scripts/wkjobs.ps1 is absolute symlink (managed from Core)
+- [x] wkjobs -Kill: bugfix Split(",") -> direct string; wkappbot -> wkappbot-core.exe for PseudoConsole
+- [x] wkappbot-taskkill-usage skill: removed Stop-Process steps, correct --force syntax
+- [ ] wkappbot-core: fix [KILL] killed N: line -- add space after ] and inline cmdline args
