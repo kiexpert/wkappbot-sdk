@@ -212,3 +212,31 @@ Add this bin dir to PATH so wrappers resolve without full paths.
 
 Why: native tools bypass wkharness guards (spec-gate, brief-guard, pace-guard, harness:block).
 Violations are blocked by wkharness PreToolUse hook via harness:block patterns in CLAUDE.md.
+
+### Agent.cmd calling conventions (mirrors Claude Code Agent() built-in)
+
+In codex exec mode, native file tools (write_file, apply_patch, read_file) bypass hooks entirely.
+Route file operations through Agent.cmd to enforce harness guards:
+
+`
+# CLI arg style (preferred from shell_command):
+Agent.cmd "prompt" [--model haiku|sonnet|opus]
+Agent.cmd --help
+
+# JSON stdin style (Claude Code tool-dispatch format):
+echo '{"tool_input":{"prompt":"...","model":"haiku"}}' | Agent.cmd
+`
+
+**File operations via Agent.cmd** (enforces wkharness guards on the subagent):
+`
+Agent.cmd "wkappbot skill read wkharness-guards
+wkappbot skill read codex-tool-wrappers
+wkappbot skill read claude-md-harness-rules
+
+Write 'hello' to D:/tmp/test.txt using Write.cmd"
+`
+
+Guards enforced on every Agent.cmd call:
+- brief-guard: 3x wkappbot skill read refs required in prompt
+- spec-gate: --model opus calls require SPEC block
+- claude-md-sync-guard: CLAUDE.md Pending must be current
