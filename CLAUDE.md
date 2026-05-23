@@ -414,4 +414,4 @@ Step may have been skipped -- verify all gg steps ran
 - [x] wkjobs.ps1: moved to WKAppBot/bin, scripts/wkjobs.ps1 is absolute symlink (managed from Core)
 - [x] wkjobs -Kill: bugfix Split(",") -> direct string; wkappbot -> wkappbot-core.exe for PseudoConsole
 - [x] wkappbot-taskkill-usage skill: removed Stop-Process steps, correct --force syntax
-- [ ] wkappbot-core: fix [KILL] killed N: line -- add space after ] and inline cmdline args
+- [x] wkappbot-core: fix [KILL] killed N: line -- space after ] + inline args (FormatKilledEntry, fa8ba7f)
