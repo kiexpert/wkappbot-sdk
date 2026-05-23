@@ -1,0 +1,49 @@
+{
+  "id": "codex-session-tool-usage-statistics-551-sessions-analyzed",
+  "app": "wkappbot-workflow",
+  "title": "Codex session tool usage statistics -- 551 sessions analyzed",
+  "title_ko": null,
+  "desc": "Which tools Codex actually calls, ranked by frequency. Key input for harness coverage planning.",
+  "steps": [
+    "SESSION FILES: C:/Users/kiexp/.codex/sessions/**/*.jsonl (550 files) + history.jsonl. Total 21308 tool calls.",
+    "TOOL TIER: shell_command 18463 (86.6%), apply_patch 1823 (8.6%), web_search 264 (1.2%), _search/_fetch_file 320 (1.5%), MCP github 200 (0.9%).",
+    "SHELL BREAKDOWN (18462 calls): Get-Content 4638, git 2347, wkappbot 2089, Get-ChildItem 1962, rg 1694, Select-String 680, python 392, dotnet 338, gh 114.",
+    "apply_patch TARGETS: .cs 805, .py 411, .ps1 328, .md 254, .sh 73.",
+    "KEY INSIGHT: Codex does NOT use write_file/read_file natively. Writes = apply_patch. Reads = Get-Content via shell. Blocking apply_patch + routing shell_command covers 95pct of tool calls.",
+    "PARSE: response_item + payload.type=function_call -> payload.name=tool. custom_tool_call -> payload.name=apply_patch. mcp_tool_call_end -> payload.invocation.tool.",
+    "RE-RUN ANALYSIS: python3 + glob.glob on .codex/sessions/**/*.jsonl + json.loads per line + Counter on payload.name."
+  ],
+  "requirements": [
+    {
+      "cmd": "ls C:/Users/kiexp/.codex/sessions/2026",
+      "expect": "directory listing of months",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-shell-command-harness-gap-analysis-and-fix-spec",
+      "expect": "FIXED (41e2bc8)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers",
+      "expect": "Edit.cmd Write.cmd steps present",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "session",
+    "tools",
+    "stats",
+    "shell_command",
+    "apply_patch",
+    "analysis"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T15:13:18.8170971Z",
+  "updated": "2026-05-23T15:13:18.8171118Z",
+  "version": "1.0"
+}

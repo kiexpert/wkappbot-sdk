@@ -1,0 +1,53 @@
+{
+  "id": "claude-tool-shim-cmd-pattern",
+  "app": "wkappbot-workflow",
+  "title": "Claude Tool Shim CMD Pattern",
+  "title_ko": null,
+  "desc": "Reusable pattern for creating Claude-named CMD wrappers (Edit.cmd, Write.cmd etc.) that route through wkharness so all existing guards fire identically for Codex and Claude Code sessions.",
+  "steps": [
+    "PATTERN: ToolName.cmd = absolute-path relay to ToolName.ps1. ToolName.ps1 = stdin JSON reader + wkharness pre-check + actual tool logic.",
+    "CMD FILE: use absolute path to .ps1 (D:\\GitHub\\personal-docs\\tools\\ToolName.ps1), NOT %~dp0 -- %~dp0 resolves to the symlink dir, not the source dir.",
+    "PS1 STDIN TRICK (PS5.1): write raw to tmpfile via [IO.File]::WriteAllText, then cmd /c powershell wkharness.ps1 < tmpfile. Cannot pipe variable to child process stdin in PS5.1. Clean tmpfile in finally block.",
+    "HARNESS INTEGRATION: ps1 pipes stdin JSON with tool_name matching Claude built-in name. wkharness fires existing guards (pace-guard, skill-edit-guard etc.) identically to real Claude tool calls.",
+    "PACE-GUARD NOTE: Write/Edit guards fire based on isSonnetSession. When Codex calls Write.cmd, session_id is empty so isSonnetSession defaults to true -- pace-guard may block Codex writes when Sonnet is over budget. Improvement: empty session_id should skip Sonnet pace-guard (file suggest to harness team).",
+    "READ.CMD EXCEPTION: Read has no pace-guard in harness (Claude Code Read is also unrestricted). Read.cmd wkharness pre-check is a no-op for pace, but still catches forbidden path patterns.",
+    "SYMLINK INSTALL: wkwrap --install extended with mklink WKAppBot/bin/ToolName.cmd -> personal-docs/tools/ToolName.cmd. Source in personal-docs, symlinks in WKAppBot/bin/.",
+    "AGENTS.MD: FORBIDDEN write_file read_file. REQUIRED shell echo json pipe to Write.cmd or Edit.cmd."
+  ],
+  "requirements": [
+    {
+      "cmd": "ls D:/GitHub/WKAppBot/bin/Edit.cmd",
+      "expect": "SymbolicLink",
+      "prompt": null
+    },
+    {
+      "cmd": "ls D:/GitHub/WKAppBot/bin/Write.cmd",
+      "expect": "SymbolicLink",
+      "prompt": null
+    },
+    {
+      "cmd": "echo json | D:/GitHub/WKAppBot/bin/Read.cmd",
+      "expect": "file content on stdout",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "wrappers",
+    "cmd",
+    "shim",
+    "pattern",
+    "edit",
+    "write",
+    "read",
+    "wkwrap"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T13:27:13.7556622Z",
+  "updated": "2026-05-23T13:27:13.7556817Z",
+  "version": "1.0"
+}

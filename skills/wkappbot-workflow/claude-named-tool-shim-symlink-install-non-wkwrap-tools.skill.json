@@ -1,0 +1,49 @@
+{
+  "id": "claude-named-tool-shim-symlink-install-non-wkwrap-tools",
+  "app": "wkappbot-workflow",
+  "title": "Claude-named tool shim symlink install (non-wkwrap tools)",
+  "title_ko": null,
+  "desc": "How to manually install Claude-named .cmd shims into WKAppBot/bin/ when wkwrap --install does not cover them.",
+  "steps": [
+    "CONTEXT: wkwrap --install only handles wk*.ps1 files. Claude-named shims live in personal-docs/tools/ and need manual mklink into WKAppBot/bin/.",
+    "SOURCE: D:/GitHub/personal-docs/tools/ owns .cmd and .ps1 for 10 shims: Edit Write Read Glob Grep Agent Bash Cmd PS(owerShell) wkharness.",
+    "INSTALL: run elevated cmd -- mklink D:/GitHub/WKAppBot/bin/TOOL.cmd D:/GitHub/personal-docs/tools/TOOL.cmd",
+    "VERIFY: Get-ChildItem D:/GitHub/WKAppBot/bin/ ",
+    " Where Name -match shim -- check LinkType=SymbolicLink and Target to personal-docs.",
+    "STATUS (2026-05-24): all 10 symlinks confirmed OK. wkharness.cmd was the last missing one, added this session."
+  ],
+  "requirements": [
+    {
+      "cmd": "Get-Item D:/GitHub/WKAppBot/bin/Edit.cmd | Select-Object LinkType",
+      "expect": "SymbolicLink",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Item D:/GitHub/WKAppBot/bin/wkharness.cmd | Select-Object LinkType",
+      "expect": "SymbolicLink",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers",
+      "expect": "wrapper set steps present",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "wrappers",
+    "symlink",
+    "wkwrap",
+    "install",
+    "cmd",
+    "tools"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T15:13:51.8060846Z",
+  "updated": "2026-05-23T15:13:51.8060948Z",
+  "version": "1.0"
+}

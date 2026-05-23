@@ -1,0 +1,57 @@
+{
+  "id": "codex-tool-wrappers",
+  "app": "wkappbot-workflow",
+  "title": "Codex Tool Wrappers",
+  "title_ko": null,
+  "desc": "Claude-named CMD wrappers for Codex: block native write_file/read_file, route through wkharness with Claude tool_name format so all existing guards fire identically.",
+  "steps": [
+    "ARCHITECTURE: Codex native write_file/read_file blocked via hook exit 2. Codex must use shell to call cmd wrappers that match Claude built-in tool names.",
+    "WRAPPER SET: Edit.cmd Write.cmd Read.cmd Glob.cmd Grep.cmd.",
+    "SOURCE: personal-docs/tools/ owns .cmd and .ps1 source files. WKAppBot/bin/ holds symlinks installed by wkwrap --install.",
+    "INSTALL: wkwrap --install extended to mklink WKAppBot/bin/Edit.cmd -> personal-docs/tools/Edit.cmd. Symlinks not copies, no wk prefix.",
+    "INTERFACE: Each wrapper reads stdin JSON matching Claude tool_input format. Edit: {tool_name:'Edit',tool_input:{file_path,old_string,new_string}}. Write: {tool_name:'Write',tool_input:{file_path,content}}.",
+    "HARNESS INTEGRATION: wrapper pipes stdin JSON to wkharness.ps1 unchanged. wkharness sees tool_name:'Edit' same as real Claude Code Edit call. Zero harness changes needed.",
+    "EDIT.CMD IMPL: thin relay to Edit.ps1. Steps: (1) read stdin JSON (2) pipe to wkharness.ps1 exit 1 if blocked (3) parse file_path old_string new_string (4) .bak backup (5) UTF-8 read replace UTF-8 write.",
+    "WRITE.CMD IMPL: relay to Write.ps1. Steps: wkharness pre-check, .bak backup, UTF-8 full overwrite.",
+    "CODEX CONFIG: ~/.codex/config.toml PreToolUse hook matcher=write_file exits 2 with 'use Write.cmd via shell'. matcher=read_file exits 2 with 'use Read.cmd via shell'.",
+    "AGENTS.MD RULES: FORBIDDEN write_file read_file. REQUIRED shell echo json pipe to Write.cmd or Edit.cmd. Never use native Codex file tools.",
+    "SELF-TEST FIX (2026-05-24): Run-Case in wkharness-status.ps1 changed from bare 'powershell' to absolute C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe. PowerShell.cmd wrapper was shadowing PATH, converting all subprocess exit codes to 1 -> 14/51 pass. Fix: 54/55 pass. 4 DenyNativeTool test cases added (apply_patch/write_file/create_file/read_file each verify exit=1 + continue:false JSON).",
+    "DENY-NATIVE-CONFIG (2026-05-24): config.toml PreToolUse has 4 specific matchers (apply_patch, write_file, create_file, read_file) -> DenyNativeTool.ps1 before the .* catch-all. DenyNativeTool.ps1 outputs JSON deny + redirect hint. LIMITATION: config.toml hooks fire only in interactive TUI mode, not codex exec. The .* catch-all (wkharness.ps1) handles shell_command in exec mode.",
+    "AGENT-CMD-DUAL-CONVENTION (2026-05-24): Agent.cmd (personal-docs/tools/Agent.ps1) supports two calling conventions. (1) CLI args: Agent.cmd 'prompt' [--model haiku|sonnet|opus] -- direct invocation from shell. (2) JSON stdin: echo {\"tool_input\":{\"prompt\":\"...\",\"model\":\"haiku\"}} | Agent.cmd -- Claude Code tool-dispatch format. Both paths run wkharness guard first (brief-guard + spec-gate + claude-md-sync). Then delegates to wkclaude.cmd.",
+    "CODEX-RECURSIVE-BLOCK (2026-05-24): C:/Users/kiexp/.codex/rules/default.rules has two prefix_rule entries: pattern=[codex] and pattern=[codex.exe] both with decision=forbidden. This blocks Codex from spawning another Codex exec recursively. wk* tools (wkask, wkcdp, wkclaude) are NOT blocked here -- they route through their own harness. Only codex-to-codex recursion is forbidden."
+  ],
+  "requirements": [
+    {
+      "cmd": "ls D:/GitHub/WKAppBot/bin/Edit.cmd",
+      "expect": "Edit.cmd",
+      "prompt": null
+    },
+    {
+      "cmd": "echo {json} | D:/GitHub/WKAppBot/bin/Edit.cmd",
+      "expect": "Edited:",
+      "prompt": null
+    },
+    {
+      "cmd": "echo {json} | D:/GitHub/WKAppBot/bin/Write.cmd",
+      "expect": "Wrote:",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "wrappers",
+    "edit",
+    "write",
+    "tool-shim",
+    "wkwrap",
+    "cmd"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T12:58:08.7768461Z",
+  "updated": "2026-05-23T17:20:01.0133416Z",
+  "version": "1.8"
+}

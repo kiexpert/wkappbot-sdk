@@ -1,0 +1,48 @@
+{
+  "id": "codex-shell-command-harness-gap-analysis-and-fix-spec",
+  "app": "wkappbot-workflow",
+  "title": "Codex shell_command harness gap -- analysis and fix spec",
+  "title_ko": null,
+  "desc": "Codex shell_command tool flows through wkharness but bypasses all guards -- gap analysis and one-line fix.",
+  "steps": [
+    "FINDING: Every Codex shell_command reaches wkharness via config.toml PreToolUse matcher='.*'. Infrastructure is in place.",
+    "GAP-1 harnessBody switch: shell_command hits 'default { raw }' branch. _harnessInput becomes full JSON string, not the command. harness:block pattern 'git push --force' does NOT match JSON-encoded content.",
+    "GAP-2 guards: toolName -in (Bash,PS) checks exclude shell_command. pace-guard, spec-gate, cd-noise-guard, skill-news-guard all pass silently for Codex.",
+    "GAP-3 file tools: apply_patch (1823 calls, 8.6%) already blocked by harness:block in CLAUDE.md. write_file/read_file rarely used.",
+    "FIX (one line): in wkharness-guards.ps1 switch(toolName) add case 'shell_command' { cmd } between PS and default. Then _harnessInput = bullet shell_command(actual command text). All harness:block patterns fire for Codex identically to Claude.",
+    "EXTEND: change toolName -in (Bash,PS) to toolName -in (Bash,PS,shell_command) in all guards for full parity.",
+    "COVERAGE: 95pct+ of Codex tool calls under harness control after fix (shell_command 86.6% + apply_patch blocked 8.6%).",
+    "STATS 551 sessions: top cmds Get-Content 4638, git 2347, wkappbot 2089, Get-ChildItem 1962, rg 1694."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n shell_command D:/GitHub/personal-docs/tools/wkharness-guards.ps1",
+      "expect": "no match -- confirms gap",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n 'default.*raw' D:/GitHub/personal-docs/tools/wkharness-guards.ps1",
+      "expect": "line 1119: default { raw }",
+      "prompt": null
+    },
+    {
+      "cmd": "cat ~/.codex/config.toml | grep matcher",
+      "expect": "matcher = '.*' -- all tools intercepted",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "shell_command",
+    "harness",
+    "guard",
+    "pace"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T14:47:51.8740905Z",
+  "updated": "2026-05-23T14:47:51.8741Z",
+  "version": "1.0"
+}

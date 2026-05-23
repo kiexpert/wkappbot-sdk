@@ -1,0 +1,46 @@
+{
+  "id": "a11y-action-auto-diff",
+  "app": "wkappbot-core",
+  "title": "a11y Action Auto-Diff",
+  "title_ko": null,
+  "desc": "Auto-diffs parent node state before/after mutating a11y actions. File-edit format output. 1s retry on no-change then error-exit. Broker detection.",
+  "steps": [
+    "FEATURE: reads parent window node list before and after mutating actions (invoke/type/click/toggle/expand/collapse/select/set-value/set-range)",
+    "FORMAT: < [role] removed-node  and  > [role] added-node per line -- matches wkappbot file edit diff style",
+    "NO-CHANGE: if diff empty wait 1s re-read re-diff. Still empty: [WARN] no state change after action + exit 1",
+    "BROKER: if [BLOCKER] appears in post not pre, marks line with <- NEW BROKERR",
+    "SKIP: non-mutating (read/wait/screenshot/inspect/find/windows) skip diff",
+    "IMPL: A11yActions.ActionDiff.cs partial class -- SnapshotNodeLines() DiffAndPrint() TryGetWindowGrap()",
+    "SESSION-2026-05-21: skill registered, codex implementation dispatched to csharp/src/WKAppBot.Core/Actions/A11yActions.ActionDiff.cs"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y invoke {grap}#btn",
+      "expect": "output shows < or > diff lines after [OK] Nms",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y type {grap}#input --text hello",
+      "expect": "diff shows value node changed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y invoke {grap}#no-op",
+      "expect": "[WARN] no state change after action + exit 1 when node list unchanged after 1s retry",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "diff",
+    "action",
+    "ux"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-20T17:42:28.2898381Z",
+  "updated": "2026-05-20T17:43:03.9189556Z",
+  "version": "1.2"
+}

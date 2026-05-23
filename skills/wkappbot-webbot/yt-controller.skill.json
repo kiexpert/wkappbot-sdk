@@ -1,0 +1,39 @@
+{
+  "id": "yt-controller",
+  "app": "wkappbot-webbot",
+  "title": "YouTube Ad-Free Controller",
+  "title_ko": null,
+  "desc": "iframe YouTube player with auto ad-skip. Private URL only.",
+  "steps": [
+    "Open: file:///D:/GitHub/wkappbot-sdk/scripts/yt-controller.html"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read yt-controller",
+      "expect": "URL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search youtube iframe",
+      "expect": "yt-controller",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read youtube-ad-skipper",
+      "expect": "strategies",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "youtube",
+    "ad",
+    "iframe"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T04:02:43.9865987Z",
+  "updated": "2026-05-23T04:02:43.9866072Z",
+  "version": "1.0"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "codex-opus-agent-delegation",
+  "app": "wkappbot-workflow",
+  "title": "Codex to Opus Agent Delegation",
+  "title_ko": null,
+  "desc": "Agent.cmd lets Codex spawn Opus/Sonnet/Haiku subagents through the same brief-guard and spec-gate as Claude Code Agent() calls. Codex becomes orchestrator, Opus handles judgment.",
+  "steps": [
+    "CHAIN: Codex (cheap execution) -> Agent.cmd stdin JSON -> wkharness brief-guard + spec-gate -> wkclaude.cmd --model opus prompt -> Opus result back to Codex -> Codex implements.",
+    "INTERFACE: {tool_name:'Agent', tool_input:{prompt:'SPEC block + 3 skill refs + task', model:'opus'}}. model aliases: opus/sonnet/haiku -> full claude model ID.",
+    "GUARDS FIRED: brief-guard requires 3 wkappbot skill read refs in prompt. spec-gate requires SPEC 1-5 numbered block for Opus. Both enforced identically to Claude Code Agent() calls.",
+    "CODEX USAGE PATTERN: shell 'printf json ",
+    " Agent.cmd'. JSON prompt must contain SPEC block (for Opus) then skill refs then task. Same rules as Claude Code Agent() -- no shortcuts.",
+    "MODEL ROUTING: opus -> claude-opus-4-7. sonnet -> claude-sonnet-4-6. haiku -> claude-haiku-4-5-20251001 (default). Full model IDs passed through unchanged.",
+    "EXECUTION: Agent.ps1 extracts prompt+model, calls wkclaude.cmd -Model modelId prompt. wkclaude runs claude --print non-interactive. Output streams to Codex stdout.",
+    "DIVISION OF LABOR: Codex=cheap executor (file edits, shell, search). Agent.cmd+Opus=judgment (architecture, root-cause, design). Codex calls Opus only when genuinely stuck or need planning -- same escalation rule as Claude Code.",
+    "SOURCE: personal-docs/tools/Agent.ps1 + Agent.cmd. Symlink: WKAppBot/bin/Agent.cmd."
+  ],
+  "requirements": [
+    {
+      "cmd": "echo no-skill-refs-json | D:/GitHub/WKAppBot/bin/Agent.cmd",
+      "expect": "BLOCKED brief-guard",
+      "prompt": null
+    },
+    {
+      "cmd": "echo opus-no-spec-json | D:/GitHub/WKAppBot/bin/Agent.cmd",
+      "expect": "BLOCKED spec-gate",
+      "prompt": null
+    },
+    {
+      "cmd": "echo valid-opus-json | D:/GitHub/WKAppBot/bin/Agent.cmd",
+      "expect": "Spawning claude-opus-4-7 subagent",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "opus",
+    "agent",
+    "delegation",
+    "brief-guard",
+    "spec-gate",
+    "orchestration",
+    "wkclaude"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T13:38:55.1324205Z",
+  "updated": "2026-05-23T13:38:55.1324323Z",
+  "version": "1.0"
+}

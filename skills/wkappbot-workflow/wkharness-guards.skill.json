@@ -95,7 +95,9 @@
     "GUARD 4 UPDATE (2026-05-22): harness:safe CLAUDE.md pattern narrowed from 'CLAUDE\\.md' to '(Edit|Write)\\(.*CLAUDE\\.md' so Bash/wkedit CLAUDE.md calls are no longer falsely exempted from skill-edit-guard. Also added explicit wkedit CLAUDE.md block in wkedit early-exit guard (commit 4feb034, personal-docs).",
     "GUARD spec-gate [Agent, Opus]: Agent(model:opus) requires SPEC block at prompt top. Format: SPEC 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. Missing SPEC gets blocked. Fix: prepend SPEC and retry.",
     "GUARD claude-md-sync-guard [Agent]: CLAUDE.md must have ## Pending section with checkbox item before Agent dispatch. Blocked message: CLAUDE.md missing Pending section. Fix: add ## Pending with TODOs then retry. See wkappbot skill read claude-md-todo-sync.",
-    "GUARD usage-test-guard [Agent, stochastic 50pct]: Randomly redirects Agent(model:opus) to wkclaude.sh habit trainer. Fix: run wkclaude.sh --model opus PROMPT in Bash, no quotes. Append ampersand for background. 50pct fire rate -- retry Agent may pass."
+    "GUARD usage-test-guard [Agent, stochastic 50pct]: Randomly redirects Agent(model:opus) to wkclaude.sh habit trainer. Fix: run wkclaude.sh --model opus PROMPT in Bash, no quotes. Append ampersand for background. 50pct fire rate -- retry Agent may pass.",
+    "Use",
+    "WKCLAUDE-DIRECT-GUARD (2026-05-24): Added to wkharness-guards.ps1 after wrapper-first-guard. Blocks shell tool calls (Bash, PS, shell_command) that invoke wkclaude.cmd/.sh/.ps1 without going through Agent.cmd. Pattern: position-anchored at cmd start or after shell separators. Exemption: commands containing Agent.cmd are allowed. Purpose: enforces brief-guard + spec-gate on all Claude delegation. personal-docs commit 44d889c. Self-test: 56/57."
   ],
   "requirements": [
     {
@@ -142,6 +144,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T09:59:29.2612324Z",
-  "updated": "2026-05-23T06:41:44.0262521Z",
-  "version": "1.144"
+  "updated": "2026-05-23T17:21:14.2098129Z",
+  "version": "1.152"
 }

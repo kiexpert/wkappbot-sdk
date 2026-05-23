@@ -1,0 +1,39 @@
+{
+  "id": "cdp-appbot-sleep",
+  "app": "wkappbot-webbot",
+  "title": "AppBotSleepAsync: CDP condition-based wait (no blind delay)",
+  "title_ko": null,
+  "desc": "CDP-aware polling helper replacing all Task.Delay blind waits. Exit condition is mandatory -- blind sleep is forbidden in CDP code. Default poll 33ms (~30fps).",
+  "steps": [
+    "USE: await CdpClient.AppBotSleepAsync(maxMs, async () => { var r = await EvalAsync(...); return r == expected; })",
+    "SYNC overload: await CdpClient.AppBotSleepAsync(maxMs, () => someFlag)",
+    "Default poll interval: 33ms (~30fps). CDP round-trip is 1-50ms so 33ms catches condition within 1-2 cycles.",
+    "NEVER use Task.Delay >= 1000ms in CDP code without an exit condition. All blind waits are bugs -- file suggest if found.",
+    "Location: CdpClient.Sleep.cs (WKAppBot.WebBot partial class)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://www.youtube.com/",
+      "expect": "cdp:",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find {proc:'chrome'} --timeout 3",
+      "expect": "TARGET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read {proc:'chrome'}",
+      "expect": "text",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T14:34:15.4434844Z",
+  "updated": "2026-05-21T14:34:15.4434928Z",
+  "version": "1.0"
+}

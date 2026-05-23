@@ -1,0 +1,48 @@
+{
+  "id": "cdp-console-log-stderr-forwarding",
+  "app": "wkappbot-core",
+  "title": "CDP console.log forwarding to stderr via Runtime.consoleAPICalled",
+  "title_ko": null,
+  "desc": "Runtime.consoleAPICalled is NOT subscribed in Core CdpClient. console.log in --eval-js JS silently drops to nowhere. Fix: subscribe to Runtime.consoleAPICalled in EvalAsyncCore and write to stderr as [CDP:CONSOLE:LOG] msg.",
+  "steps": [
+    "ROOT CAUSE: CdpClient.Actions.cs EvalAsyncCore only parses exceptionDetails from Runtime.evaluate response. No subscription to Runtime.consoleAPICalled event anywhere in codebase (confirmed grep).",
+    "PREREQUISITE: Runtime.enable IS called (CdpClient.FocusGuard.cs:26) -- so console events would fire once subscribed.",
+    "FIX LOCATION: CdpClient.Actions.cs alongside EvalAsyncCore OR in the CDP connection setup where Runtime.enable is called.",
+    "FIX CODE: subscribe _eventHandlers[\"Runtime.consoleAPICalled\"] to capture type+args and write Console.Error.WriteLine(\"[CDP:CONSOLE:LOG] msg\").",
+    "EXPECTED RESULT: wkappbot a11y read GRAP#Doc_RootWebArea --eval-js \"console.log('test')\" 2>&1 shows [CDP:CONSOLE:LOG] test on stderr.",
+    "USE CASE: YouTube ad-skipper can inject setInterval JS and verify execution via console.log output. Also enables general CDP JS debugging.",
+    "TESTING: after fix, confirm console.log/warn/error/info all appear on stderr with their type prefix."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y read \"{proc:'chrome',cdp:9740}#Doc_RootWebArea\" --eval-js \"console.log('WKTEST_STDERR')\"",
+      "expect": "WKTEST_STDERR",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \"{proc:'chrome',cdp:9740}#Doc_RootWebArea\" --eval-js \"console.error('WKERR')\"",
+      "expect": "WKERR",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read \"{proc:'chrome',cdp:9740}#Doc_RootWebArea\" --eval-js \"console.log('[wk-ad] tick')\"",
+      "expect": "wk-ad",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "eval-js",
+    "console",
+    "stderr",
+    "debug",
+    "runtime"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T07:21:54.3106473Z",
+  "updated": "2026-05-21T07:21:54.3106559Z",
+  "version": "1.0"
+}

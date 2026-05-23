@@ -1,0 +1,51 @@
+{
+  "id": "wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix",
+  "app": "wkappbot-workflow",
+  "title": "wkappbot ask gpt zombie process -- 4-5 GB memory leak detection and fix",
+  "title_ko": null,
+  "desc": "ask gpt --timeout Ns can hang as a zombie consuming 4-5 GB RAM. Detection and immediate kill procedure.",
+  "steps": [
+    "SYMPTOM: system memory 80pct+. Get-Process sorted by WorkingSet64 shows wkappbot-core or wkappbot-core.new at 4000-5000 MB.",
+    "IDENTIFY: Get-CimInstance Win32_Process -Filter Name LIKE wkappbot-core% ",
+    " Select ProcessId,WorkingSetSize,CommandLine. Look for CommandLine containing 'ask' 'gpt' '--timeout'. These are zombie pipeline health checks that hung.",
+    "ROOT CAUSE: ask gpt fires with short --timeout (e.g. 3s) but the CDP/GPT pipeline hangs. Process keeps retrying internally and leaks memory over hours.",
+    "KILL: C:/Windows/System32/taskkill.exe /F /PID <pid1> /PID <pid2>. User must authorize (per CLAUDE.md kill-protection rule).",
+    "FREED: each zombie releases 4-5 GB. Two zombies = ~10 GB. System returns to normal immediately.",
+    "PREVENTION: suggest to WKAppBot team -- add OOM watchdog that kills ask-gpt subprocesses if WorkingSet64 > 2 GB. File suggest with repro steps.",
+    "SEEN: 2026-05-24, PIDs 23840 (4925 MB) and 32976 (4787 MB), both running ask gpt pipeline health check."
+  ],
+  "requirements": [
+    {
+      "cmd": "Get-CimInstance Win32_Process -Filter \" Name LIKE wkappbot-core% \" | Where WorkingSetSize -gt 1000000000",
+      "expect": "shows zombie PIDs",
+      "prompt": null
+    },
+    {
+      "cmd": "C:/Windows/System32/taskkill.exe /F /PID 99999",
+      "expect": "ERROR: The process 99999 not found (safe: nonexistent PID)",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Process | Sort-Object WorkingSet64 -Descending | Select -First 5 Name",
+      "expect": "top process is no longer wkappbot-core after fix --exit-event wkappbot-exit-37856",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot",
+    "memory",
+    "zombie",
+    "ask",
+    "gpt",
+    "leak",
+    "taskkill",
+    "performance"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T15:14:10.7114277Z",
+  "updated": "2026-05-23T15:14:10.7114397Z",
+  "version": "1.0"
+}

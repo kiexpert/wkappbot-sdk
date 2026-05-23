@@ -1,0 +1,50 @@
+{
+  "id": "codex-agents-md-tool-rules",
+  "app": "wkappbot-workflow",
+  "title": "Codex AGENTS.md Tool Rules",
+  "title_ko": null,
+  "desc": "AGENTS.md rules that guide Codex to use Claude-named cmd wrappers instead of native write_file/read_file tools. Required for harness integration to work correctly.",
+  "steps": [
+    "PURPOSE: AGENTS.md is loaded by Codex at session start. Use it to mandate wrapper usage instead of native Codex file tools.",
+    "FORBIDDEN LIST: write_file, read_file -- both blocked by wkharness hook (exit 2 with redirect message).",
+    "REQUIRED PATTERN: all file writes via shell echo json pipe Write.cmd. All file edits via shell echo json pipe Edit.cmd. All reads via shell echo json pipe Read.cmd.",
+    "JSON FORMAT for shell calls: {tool_name:'Write',tool_input:{file_path:'abs/path',content:'...'}} piped to cmd via shell. tool_name must match Claude built-in name exactly for guards to fire.",
+    "AGENTS.MD SECTION TO ADD: ## Tool Usage (MANDATORY) - FORBIDDEN: write_file, read_file (hook blocks these with exit 2). REQUIRED: shell to pipe JSON to Write.cmd / Edit.cmd / Read.cmd. Example: shell 'printf ... ",
+    " Write.cmd'",
+    "PATH REQUIREMENT: WKAppBot/bin/ must be early in PATH so Edit.cmd, Write.cmd, Read.cmd resolve before system commands. Add to Codex env or system PATH.",
+    "AGENT-CMD-MANDATORY (2026-05-24): All agent/subagent delegation MUST go through Agent.cmd (not direct wkclaude calls). Agent.cmd is in WKAppBot/bin/. Usage: Agent.cmd 'prompt' [--model haiku|sonnet|opus] or echo json | Agent.cmd. Guards enforced per call: brief-guard (3+ skill reads), spec-gate (opus needs SPEC block), claude-md-sync. wkclaude-direct-guard in wkharness-guards.ps1 blocks direct wkclaude invocations from shell tools. AGENTS.md section 17 documents all wrapper mappings."
+  ],
+  "requirements": [
+    {
+      "cmd": "cat D:/GitHub/WKAppBot/AGENTS.md",
+      "expect": "Tool Usage section present with FORBIDDEN write_file",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-agents-md-tool-rules",
+      "expect": "steps include FORBIDDEN LIST",
+      "prompt": null
+    },
+    {
+      "cmd": "cat ~/.codex/config.toml",
+      "expect": "PreToolUse hook present for write_file matcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "agents-md",
+    "harness",
+    "tool-rules",
+    "write_file",
+    "forbidden",
+    "wrappers"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T13:29:55.3742874Z",
+  "updated": "2026-05-23T17:21:33.2524439Z",
+  "version": "1.2"
+}

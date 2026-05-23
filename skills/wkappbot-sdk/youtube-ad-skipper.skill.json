@@ -1,0 +1,46 @@
+{
+  "id": "youtube-ad-skipper",
+  "app": "wkappbot-sdk",
+  "title": "YouTube Ad Auto-Skipper",
+  "title_ko": null,
+  "desc": "Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overlay close, and ad-showing DOM class. Reloads on unskippable ads.",
+  "steps": [
+    "Run: powershell -File test/youtube-ad-skipper.ps1 [-Url <yt-url>] [-RunMinutes <N>] [-PollSeconds <N>]\nROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).\nSkip button UIA grap: {proc:'chrome',cdp:PORT,domain:'www.youtube.com'}#*skip-button*  (matches AutomationId 'skip-button:<N>'; do NOT use '*Skip Ad*' -- that string is not present in the UIA tree)\nDetection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.\nAction: when ad+skip are both visible, run 'wkappbot a11y invoke <grap>#*skip-button* --timeout 8 --force'. Success = '[STATE CHANGE DETECTED]' or 'REMOVED' line in output (the 'skip-ad' Group disappears from UIA tree).\nOverlay close: '#*overlay-close*' wildcard for ytp-ad-overlay-close-button.\nTimeout discipline: keep --timeout >= 8s. The original 3s default was too tight on cold UIA tree; original suggest report ('LAUNCHER timeout 3s') was a timeout issue, not a path issue.\nFixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.",
+    "Added 'ending' detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)",
+    "UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains('ad-showing') || !!document.querySelector('.ytp-ad-player-overlay-layout'); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = '?v='+vid+'&t='+(currentTime+0.1)+'&end='+(dur-0.1)+'&_clipped=1'",
+    "COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -> reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -> reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -> invoke #dismiss-button. (4) Clip playback (clip= param) -> skip all processing. (5) Infinite end-roll loop prevention: &end=dur-0.1 is the key param.",
+    "KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains('ad-showing')||!!document.querySelector('.ytp-ad-player-overlay-layout'). Skip first via invoke, fallback to reload."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -File test/youtube-ad-skipper.ps1 -RunMinutes 1",
+      "expect": "Session ended",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y invoke \"{proc:'chrome',cdp:9740}#*Skip Ad*\" --timeout 1",
+      "expect": "[A11Y] or not found",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://www.youtube.com",
+      "expect": "cdp:",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "youtube",
+    "ads",
+    "cdp",
+    "auto",
+    "skip",
+    "loop"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T05:37:30.9154696Z",
+  "updated": "2026-05-22T17:20:15.1944237Z",
+  "version": "1.10"
+}
