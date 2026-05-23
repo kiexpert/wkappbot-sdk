@@ -18,10 +18,29 @@ param(
     [switch]$Tree,
     [switch]$Watch,
     [switch]$All,
+    [switch]$Kill,       # Kill zombie processes (safe ones only; prompts unless -Force)
+    [switch]$Force,      # Skip confirmation in -Kill mode
+    [int]$ZombieMin = 30, # Minutes idle before considered zombie
     [int]$RefreshSec = 2
 )
 
 $AI_NAMES = @('claude', 'codex', 'wkappbot', 'wkappbot-core', 'wkappbot-core.new', 'wkappbot-eye', 'wka11y')
+function Format-Age([datetime]$created) {
+    $span = (Get-Date) - $created
+    if ($span.TotalHours -ge 1) { return '{0}h{1:D2}m' -f [int]$span.TotalHours, $span.Minutes }
+    return '{0}m' -f [int]$span.TotalMinutes
+}
+
+# Safe-to-kill: wkappbot helper cmds (skill/suggest/--version) that are idle+old
+# NEVER kill: wkappbot-core.*, wkchat, claude, codex, eye, chat, guardian, mcp
+function Test-SafeToKill($r) {
+    $name = $r.Name.ToLower()
+    if ($name -ne 'wkappbot') { return $false }         # only wkappbot.exe helpers
+    $cmd = if ($r.Cmd) { $r.Cmd.ToLower() } else { '' }
+    if ($cmd -match '\bchat\b|\beye\b|\bguardian\b|\bmcp\b|\bspeak\b') { return $false }
+    if ($cmd -match '\bskill\b|\bsuggest\b|\bask\b|\b--version\b|\bfile\b|\bwindows\b|\blogcat\b') { return $true }
+    return $false
+}
 # --- Native CWD reader via NtQueryInformationProcess ---
 if (-not ([System.Management.Automation.PSTypeName]'WkJobsNative').Type) {
     Add-Type @"
@@ -198,6 +217,8 @@ function Get-AiJobs {
             Created  = $w.CreationDate
             Cwd      = (Get-ProcessCwd $apid)
             Terminal = (Get-TerminalHost $apid $wmiMap $gpMap)
+            Age      = if ($w.CreationDate) { Format-Age $w.CreationDate } else { "?" }
+            AgeMin   = if ($w.CreationDate) { [int]((Get-Date) - $w.CreationDate).TotalMinutes } else { 0 }
         }
     }
 
@@ -226,6 +247,8 @@ function Get-AiJobs {
             Created  = $w.CreationDate
             Cwd      = (Get-ProcessCwd $apid)
             Terminal = (Get-TerminalHost $apid $wmiMap $gpMap)
+            Age      = if ($w.CreationDate) { Format-Age $w.CreationDate } else { "?" }
+            AgeMin   = if ($w.CreationDate) { [int]((Get-Date) - $w.CreationDate).TotalMinutes } else { 0 }
         }
     }
 
@@ -262,7 +285,7 @@ function Show-Jobs {
     # Header
     Write-Host ''
     Write-Host ('  AI PROCESSES  [session=' + (Get-Process -Id $PID).SessionId + ']  ' + (Get-Date -Format 'HH:mm:ss')) -ForegroundColor White
-    Write-Host ('  {0,-6} {1,-22} {2,5} {3,7} {4,4} {5,-7}  {6}' -f 'PID','NAME','CPU%','MEM(MB)','THR','STATE','CWD  (CMD/CON below)') -ForegroundColor DarkCyan
+    Write-Host ('  {0,-6} {1,-22} {2,5} {3,7} {4,4} {5,-7} {6,6}  {7}' -f 'PID','NAME','CPU%','MEM(MB)','THR','STATE','AGE','CWD  (CMD/CON below)') -ForegroundColor DarkCyan
     Write-Host ('  ' + ('-' * ([math]::Min($w - 4, 100)))) -ForegroundColor DarkGray
 
     if ($aiRows.Count -eq 0) {
@@ -301,12 +324,19 @@ function Show-Jobs {
     } else {
         foreach ($r in ($aiRows | Sort-Object PID)) {
             $cur   = if ($r.Current) { '*' } else { ' ' }
-            $color = Get-StateColor $r
-            $line  = '  {0}{1,-6} {2,-22} {3,5} {4,7} {5,4} {6,-7}' -f $cur, $r.PID, $r.Name, $r.CPU, $r.MemMB, $r.Threads, $r.State
+            $isZombie  = ($r.State -eq 'idle' -and $r.AgeMin -ge $ZombieMin)
+            $isSafe    = $isZombie -and (Test-SafeToKill $r)
+            $color = if ($isSafe)    { 'Red' }
+                     elseif ($isZombie) { 'DarkRed' }
+                     else { Get-StateColor $r }
+            $ageStr = $r.Age
+            $zombie = if ($isSafe) { '[ZOMBIE]' } elseif ($isZombie) { '[old]' } else { '' }
+            $line  = '  {0}{1,-6} {2,-22} {3,5} {4,7} {5,4} {6,-7} {7,6}{8}' -f $cur, $r.PID, $r.Name, $r.CPU, $r.MemMB, $r.Threads, $r.State, $ageStr, $zombie
             Write-Host $line -ForegroundColor $color -NoNewline
             if ($r.Cwd)      { Write-Host ('  ' + $r.Cwd) -ForegroundColor DarkCyan -NoNewline }
             Write-Host ""
-            if ($r.Cmd)      { Write-Host ('         CMD: ' + $r.Cmd) -ForegroundColor DarkGray }
+            $cmdColor = if ($isSafe) { 'DarkRed' } else { 'DarkGray' }
+            if ($r.Cmd)      { Write-Host ('         CMD: ' + $r.Cmd) -ForegroundColor $cmdColor }
             if ($r.Terminal) { Write-Host ('         CON: ' + $r.Terminal) -ForegroundColor DarkYellow }
         }
     }
@@ -330,7 +360,33 @@ function Show-Jobs {
     Write-Host ''
 }
 
-if ($Watch) {
+
+function Invoke-KillZombies {
+    $aiRows, $null2 = Get-AiJobs
+    $targets = $aiRows | Where-Object { $_.State -eq 'idle' -and $_.AgeMin -ge $ZombieMin -and (Test-SafeToKill $_) }
+    if ($targets.Count -eq 0) {
+        Write-Host "  No zombie processes to kill (threshold: ${ZombieMin}m)." -ForegroundColor Green
+        return
+    }
+    Write-Host ""
+    Write-Host "  ZOMBIE CANDIDATES (idle >= ${ZombieMin}m, safe wkappbot helpers):" -ForegroundColor Red
+    Write-Host ("  {0,-6} {1,-22} {2,6}  {3}" -f "PID","NAME","AGE","CMD") -ForegroundColor DarkCyan
+    Write-Host ("  " + "-"*80) -ForegroundColor DarkGray
+    foreach ($r in ($targets | Sort-Object AgeMin -Descending)) {
+        $cmd = if ($r.Cmd) { $r.Cmd.Substring(0, [Math]::Min(70, $r.Cmd.Length)) } else { "" }
+        Write-Host ("  {0,-6} {1,-22} {2,6}  {3}" -f $r.PID, $r.Name, $r.Age, $cmd) -ForegroundColor Red
+    }
+    Write-Host ""
+    if (-not $Force) {
+        $ans = Read-Host "  Kill $($targets.Count) process(es)? [y/N]"
+        if ($ans -notmatch '^[yY]') { Write-Host "  Cancelled." -ForegroundColor DarkGray; return }
+    }
+    $pids = ($targets | ForEach-Object { $_.PID }) -join ','
+    & wkappbot taskkill --force $pids.Split(',')
+}
+if ($Kill) {
+    Invoke-KillZombies
+} elseif ($Watch) {
     while ($true) {
         Clear-Host
         Show-Jobs
