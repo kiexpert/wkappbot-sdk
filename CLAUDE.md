@@ -447,3 +447,10 @@ Use Read.cmd instead of native read_file
 - [x] Agent.cmd: accept plain CLI args like Claude Agent() -- Agent.cmd "prompt" [--model haiku]
 - [x] wkclaude-direct-guard: added to wkharness-guards.ps1 (forces Agent.cmd, blocks direct wkclaude calls)
 - [x] codex-recursive: blocked in default.rules (prefix_rule codex/codex.exe -- stops codex-to-codex recursion)
+- [x] wkharness self-test: 57/57 achieved (codex-sandbox-guard --model codex-mini fix, 2026-05-23)
+- [x] codex-tool-wrappers skill: steps 12-16 added (Windows sandbox bug, PATH-FIX, Agent.cmd dual-conv, bash-wrapper-test)
+- [ ] Codex exec PATH shadowing: PowerShell.cmd shim (WKAppBot/bin) shadows system shell; codex exec uses shim as PS interpreter -- fix: use wkappbot file cmds or prepend system path
+- [x] wkharness self-test: 57/57 achieved (codex-sandbox-guard --model codex-mini fix, 2026-05-23)
+- [x] codex-tool-wrappers skill: steps 12-16 added (Windows sandbox bug, PATH-FIX, Agent.cmd dual-conv, bash-wrapper-test)
+- [x] Codex exec PATH shadowing: PowerShell.cmd shim (WKAppBot/bin) shadows system shell; codex exec uses shim as PS interpreter -- fix: use wkappbot file cmds or prepend system path
+- [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout; wkappbot cmds hang in subprocess
