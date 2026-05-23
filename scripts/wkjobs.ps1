@@ -22,6 +22,78 @@ param(
 )
 
 $AI_NAMES = @('claude', 'codex', 'wkappbot', 'wkappbot-core', 'wkappbot-core.new', 'wkappbot-eye', 'wka11y')
+# --- Native CWD reader via NtQueryInformationProcess ---
+if (-not ([System.Management.Automation.PSTypeName]'WkJobsNative').Type) {
+    Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class WkJobsNative {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_BASIC_INFORMATION {
+        public IntPtr Reserved1; public IntPtr PebBaseAddress;
+        public IntPtr Reserved2_0; public IntPtr Reserved2_1;
+        public IntPtr UniqueProcessId; public IntPtr Reserved3;
+    }
+    [DllImport("ntdll.dll")]
+    public static extern int NtQueryInformationProcess(IntPtr h, int pic, ref PROCESS_BASIC_INFORMATION pbi, uint cb, out uint r);
+    [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint access, bool inh, int pid);
+    [DllImport("kernel32.dll")] public static extern bool ReadProcessMemory(IntPtr h, IntPtr addr, byte[] buf, int n, out IntPtr read);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+    public static string GetCwd(int pid) {
+        const uint VM_READ = 0x10; const uint QUERY_INFO = 0x400;
+        IntPtr hProc = IntPtr.Zero;
+        try {
+            hProc = OpenProcess(VM_READ | QUERY_INFO, false, pid);
+            if (hProc == IntPtr.Zero) return "";
+            var pbi = new PROCESS_BASIC_INFORMATION(); uint retLen;
+            if (NtQueryInformationProcess(hProc, 0, ref pbi, (uint)Marshal.SizeOf(pbi), out retLen) != 0) return "";
+            byte[] peb = new byte[0x28]; IntPtr br;
+            if (!ReadProcessMemory(hProc, pbi.PebBaseAddress, peb, peb.Length, out br)) return "";
+            IntPtr ppAddr = (IntPtr)BitConverter.ToInt64(peb, 0x20);
+            byte[] pp = new byte[0x60];
+            if (!ReadProcessMemory(hProc, ppAddr, pp, pp.Length, out br)) return "";
+            // CurrentDirectory.DosPath UNICODE_STRING at offset 0x38: Length@0x38, Buffer@0x40
+            int cwdLen = BitConverter.ToInt16(pp, 0x38);
+            if (cwdLen <= 0 || cwdLen > 520) return "";
+            IntPtr cwdBuf = (IntPtr)BitConverter.ToInt64(pp, 0x40);
+            byte[] cwdBytes = new byte[cwdLen];
+            if (!ReadProcessMemory(hProc, cwdBuf, cwdBytes, cwdLen, out br)) return "";
+            return Encoding.Unicode.GetString(cwdBytes).TrimEnd('\\', '\0');
+        } catch { return ""; }
+        finally { if (hProc != IntPtr.Zero) CloseHandle(hProc); }
+    }
+}
+"@
+}
+
+function Get-ProcessCwd([int]$procId) {
+    try { [WkJobsNative]::GetCwd($procId) } catch { "" }
+}
+
+function Get-TerminalHost([int]$procId, [hashtable]$wmiMap, [hashtable]$gpMap) {
+    # Walk parent chain: skip wkappbot*/conhost, return first "interesting" terminal ancestor
+    $SKIP = @('wkappbot','wkappbot-core','wkappbot-core.new','wkappbot-eye','claude','codex','conhost','wka11y')
+    $visited = [System.Collections.Generic.HashSet[int]]::new()
+    $cur = $procId
+    for ($i = 0; $i -lt 12; $i++) {
+        if (-not $visited.Add($cur)) { break }
+        $w = $wmiMap[$cur]; if (-not $w) { break }
+        $ppid = [int]$w.ParentProcessId
+        if ($ppid -le 4) { break }
+        $pw = $wmiMap[$ppid]; if (-not $pw) { break }
+        $pname = [System.IO.Path]::GetFileNameWithoutExtension($pw.Name).ToLower()
+        if (-not ($SKIP -contains $pname)) {
+            # Found interesting ancestor — also check if WindowsTerminal is in remaining chain
+            $termTitle = ""
+            $pgp = $gpMap[$ppid]
+            if ($pgp -and $pgp.MainWindowTitle) { $termTitle = " [" + $pgp.MainWindowTitle.Substring(0,[Math]::Min(35,$pgp.MainWindowTitle.Length)) + "]" }
+            return ($pw.Name.TrimEnd('exe').TrimEnd('.') + "(${ppid})" + $termTitle)
+        }
+        $cur = $ppid
+    }
+    return ""
+}
 
 function Get-AiJobs {
     # Current console session id
@@ -87,6 +159,8 @@ function Get-AiJobs {
             Session  = $sess
             Cmd      = if ($w.CommandLine) { $w.CommandLine } else { $w.Name }
             Created  = $w.CreationDate
+            Cwd      = (Get-ProcessCwd $apid)
+            Terminal = (Get-TerminalHost $apid $wmiMap $gpMap)
         }
     }
 
@@ -113,6 +187,8 @@ function Get-AiJobs {
             State    = $state
             Cmd      = if ($w.CommandLine) { $w.CommandLine } else { $w.Name }
             Created  = $w.CreationDate
+            Cwd      = (Get-ProcessCwd $apid)
+            Terminal = (Get-TerminalHost $apid $wmiMap $gpMap)
         }
     }
 
@@ -149,7 +225,7 @@ function Show-Jobs {
     # Header
     Write-Host ''
     Write-Host ('  AI PROCESSES  [session=' + (Get-Process -Id $PID).SessionId + ']  ' + (Get-Date -Format 'HH:mm:ss')) -ForegroundColor White
-    Write-Host ('  {0,-6} {1,-22} {2,5} {3,7} {4,4} {5,-7} {6}' -f 'PID','NAME','CPU%','MEM(MB)','THR','STATE','COMMAND') -ForegroundColor DarkCyan
+    Write-Host ('  {0,-6} {1,-22} {2,5} {3,7} {4,4} {5,-7}  {6}' -f 'PID','NAME','CPU%','MEM(MB)','THR','STATE','CWD  (CMD/CON below)') -ForegroundColor DarkCyan
     Write-Host ('  ' + ('-' * ([math]::Min($w - 4, 100)))) -ForegroundColor DarkGray
 
     if ($aiRows.Count -eq 0) {
@@ -189,9 +265,12 @@ function Show-Jobs {
         foreach ($r in ($aiRows | Sort-Object PID)) {
             $cur   = if ($r.Current) { '*' } else { ' ' }
             $color = Get-StateColor $r
-            $cmd   = Truncate $r.Cmd $cmdWidth
-            $line  = '  {0}{1,-6} {2,-22} {3,5} {4,7} {5,4} {6,-7} {7}' -f $cur, $r.PID, $r.Name, $r.CPU, $r.MemMB, $r.Threads, $r.State, $cmd
-            Write-Host $line -ForegroundColor $color
+            $line  = '  {0}{1,-6} {2,-22} {3,5} {4,7} {5,4} {6,-7}' -f $cur, $r.PID, $r.Name, $r.CPU, $r.MemMB, $r.Threads, $r.State
+            Write-Host $line -ForegroundColor $color -NoNewline
+            if ($r.Cwd)      { Write-Host ('  ' + $r.Cwd) -ForegroundColor DarkCyan -NoNewline }
+            Write-Host ""
+            if ($r.Cmd)      { Write-Host ('         CMD: ' + $r.Cmd) -ForegroundColor DarkGray }
+            if ($r.Terminal) { Write-Host ('         CON: ' + $r.Terminal) -ForegroundColor DarkYellow }
         }
     }
 
