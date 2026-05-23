@@ -438,3 +438,4 @@ Use Read.cmd instead of native read_file
 - [x] Bash.cmd/PowerShell.cmd/Cmd.cmd: all 3 shell shims done + symlinks in WKAppBot/bin
 - [x] exit-255 fix: abs path for cmd.exe/powershell.exe/bash.exe (wrappers shadowed system executables in PATH)
 - [x] AGENTS.md: Tool Usage mandatory section added (section 13, all wrapper mappings)
+- [x] shell_command harness gap fixed: harnessBody switch + all toolName guards extended (41e2bc8)
