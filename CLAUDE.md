@@ -439,3 +439,8 @@ Use Read.cmd instead of native read_file
 - [x] exit-255 fix: abs path for cmd.exe/powershell.exe/bash.exe (wrappers shadowed system executables in PATH)
 - [x] AGENTS.md: Tool Usage mandatory section added (section 13, all wrapper mappings)
 - [x] shell_command harness gap fixed: harnessBody switch + all toolName guards extended (41e2bc8)
+- [x] AGENTS.md Tool Usage section renumbered to 17 (section 13 conflict resolved)
+- [x] harness:block multi-token pattern bug found: Get-HarnessRules \S+ truncates space-patterns; config.toml deny matchers are the real fix
+- [x] DenyNativeTool.ps1: blocks Codex native file tools, redirects to .cmd wrappers (eff966c)
+- [x] config.toml: apply_patch/write_file/create_file/read_file deny matchers before .* catch-all
+- [ ] ask-gpt zombie watchdog: suggest filed (hard-kill at timeout+60s)
