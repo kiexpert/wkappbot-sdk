@@ -415,3 +415,7 @@ Step may have been skipped -- verify all gg steps ran
 - [x] wkjobs -Kill: bugfix Split(",") -> direct string; wkappbot -> wkappbot-core.exe for PseudoConsole
 - [x] wkappbot-taskkill-usage skill: removed Stop-Process steps, correct --force syntax
 - [x] wkappbot-core: fix [KILL] killed N: line -- space after ] + inline args (FormatKilledEntry, fa8ba7f)
+- [x] wkjobs: native taskkill fallback when ChatSessionGuard blocks AI-spawned zombie (95b0bbf)
+- [x] wkjobs: condense output to 1 line per process -- CMD args inline, drop CON row (3b7f968)
+- [x] ChatSessionGuard: token-aware cmdline check -- fix false-positive on skill/suggest --steps content (42cee06)
+- [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending)
