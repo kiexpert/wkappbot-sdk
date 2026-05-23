@@ -1,0 +1,53 @@
+{
+  "id": "launcher-wkappbot-chrome-target-env-pipe-protocol",
+  "app": "wkappbot-sdk",
+  "title": "Launcher WKAPPBOT_CHROME_TARGET env + pipe protocol",
+  "title_ko": null,
+  "desc": "Launcher publishes validated caller-offset Chrome placement target via WKAPPBOT_CHROME_TARGET env var AND forwards through Eye command pipe with __target prefix. Core reads same coords so SetWindowPos, post-launch stability loop, and per-command reposition all use Launcher-computed target. Without this Core falls back to ExpectedBounds (rightmost monitor anchor) and fights Launcher SetWindowPos producing wrong-monitor regression.",
+  "steps": [
+    "PROBLEM: Launcher computes validated caller-offset target via TryMoveWebBotNearCaller then SetWindowPos. Core (separate process) re-derives target from caller HWND which can diverge -- Core ResolveCallerHwnd re-walks process tree and picks different ancestor with off-screen coords -- and falls back to ExpectedBounds (rightmost monitor 1740,20). Result: Chrome bounces between two positions per command.",
+    "PROTOCOL PART 1 ENV VAR: After [PLACEMENT:VALIDATE] log in MyCdpContext.Placement.cs TryMoveWebBotNearCaller, set Environment.SetEnvironmentVariable WKAPPBOT_CHROME_TARGET to x,y,w,h string with DefaultChromeW/H matching Core CdpClient.OuterWidthPx/OuterHeightPx constants. Log [PLACEMENT:ENV] WKAPPBOT_CHROME_TARGET=x,y,w,h.",
+    "PROTOCOL PART 2 PIPE FORWARD: In EyeCmdPipeClient.cs Send method, read WKAPPBOT_CHROME_TARGET env var and prepend __target:VALUE to JSON payload list (alongside __cwd and __hwnd prefixes). Eye-delegated commands forward this to Core which honors the same coords the Launcher SetWindowPos already applied.",
+    "WHY BOTH PATHS: Direct RunCoreDetachedNormal path uses env var inheritance. Eye-delegated path uses pipe prefix because Eye spawns Core in separate context that does not inherit Launcher env block reliably. Both deliver the same payload.",
+    "CORE-SIDE READER: Core ChromeLauncher.ComputePlacementNearCaller + CdpClient.SetWindowBoundsWaitStableAsync must check WKAPPBOT_CHROME_TARGET first before falling back to ExpectedBounds. The --window-position chrome.exe launch flag, post-launch stability loop, and any per-command reposition must all read SAME value.",
+    "FORMAT: comma-separated x,y,width,height (e.g. 100,200,1400,900). Width/height are DESIRED final OUTER size (Chrome process window outer rect including chrome frame).",
+    "FAILURE MODE: env var set wrapped in try/catch -- failure is non-fatal. Without env: Core falls back to ExpectedBounds and overrides Launcher placement. Diagnose via cdp-mon -- if TGT-POS pins to rightmost monitor anchor (1740,20) instead of following caller terminal then env var or pipe forward is missing.",
+    "VERIFICATION: After hot-swap, run wkappbot ask gpt ping from terminal at known position, check cdp-state.jsonl for [PLACEMENT:ENV] line, verify TGT-POS in cdp-mon matches env var coords. Should change per terminal CWD/position.",
+    "RELATED FILES: csharp/src/WKAppBot.Launcher/MyCdpContext.Placement.cs (env set) and csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs (pipe forward). Commit 65c617fe introduced the protocol on 2026-05-16."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt ping",
+      "expect": "PLACEMENT:ENV WKAPPBOT_CHROME_TARGET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://example.com",
+      "expect": "PLACEMENT:VALIDATE caller=",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --help",
+      "expect": "USAGE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "launcher",
+    "chrome",
+    "placement",
+    "env-var",
+    "eye-pipe",
+    "cdp",
+    "multi-monitor",
+    "sdk",
+    "developer"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T05:22:10.1740075Z",
+  "updated": "2026-05-23T05:22:10.1740229Z",
+  "version": "1.0"
+}

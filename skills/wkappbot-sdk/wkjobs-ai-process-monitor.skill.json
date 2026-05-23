@@ -1,0 +1,45 @@
+{
+  "id": "wkjobs-ai-process-monitor",
+  "app": "wkappbot-sdk",
+  "title": "wkjobs: AI process monitor",
+  "title_ko": null,
+  "desc": "Shows all AI processes in the console session with CPU%, memory, state, and spawned child commands",
+  "steps": [
+    "PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core*) sharing the current console session with CPU%, memory, thread count, idle/busy state, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids.",
+    "LOCATION: D:\\GitHub\\wkappbot-sdk\\scripts\\wkjobs.ps1",
+    "FLAGS: -Tree (hierarchy view) ",
+    " -Watch (live refresh, Ctrl+C to exit) ",
+    " -All (include all sessions) ",
+    " -RefreshSec N (Watch interval, default 2)",
+    "COLORS: claude=Cyan(idle) or Green(BUSY), codex=Yellow or DarkYellow, wkappbot-core.new=Magenta, wkappbot-core=DarkGray. BUSY over 20% CPU, active 1-20%, idle under 1%",
+    "SESSION MARKER: * prefix means process is in current console session. Without -All, only current session procs are shown",
+    "SPAWNED SECTION: child processes of AI pids, conhost filtered. Columns: PPID (which AI spawned it), name, PID, CPU%, MEM, state, command line",
+    "INTERNALS: Get-CimInstance Win32_Process for CommandLine+PPID, Win32_PerfFormattedData_PerfProc_Process for CPU% snapshot, Get-Process for WorkingSet64+Threads+SessionId",
+    "NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkjobs.ps1",
+      "expect": "AI PROCESSES section with claude wkappbot codex rows",
+      "prompt": null
+    },
+    {
+      "cmd": "wkjobs.ps1",
+      "expect": "SPAWNED BY AI section with shell child processes of AI pids",
+      "prompt": null
+    },
+    {
+      "cmd": "wkjobs.ps1 -Watch",
+      "expect": "Watch mode line printed",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T06:56:55.2897667Z",
+  "updated": "2026-05-23T06:56:55.2897769Z",
+  "version": "1.0"
+}

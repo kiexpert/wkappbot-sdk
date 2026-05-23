@@ -1,0 +1,37 @@
+{
+  "id": "ai-news-to-suggests",
+  "app": "wkappbot-workflow",
+  "title": "AI News to Suggests -- fetch, filter, queue, and act on improvement items",
+  "title_ko": null,
+  "desc": "Twice-daily (11:00/18:00) pipeline: fetch HN + 9 YouTube AI channels, Gemini-filter for WKAppBot relevance with improvement DIRECTION, register as [AI-NEWS] suggests, triage and delegate work.",
+  "steps": [
+    "OVERVIEW: Full AI news → improvement pipeline. Runs on-demand or scheduled (11:00/18:00). Fetches HN stories, Gemini-filters for WKAppBot relevance (score>=3), registers [AI-NEWS] suggests with improvement DIRECTION, then triages and starts work on top items.",
+    "STEP 1 — FETCH: bash D:/GitHub/WKAppBot/bin/wkappbot.hq/scripts/ai-news-briefing.sh\nFetches 15 stories from 5 HN keyword queries, Gemini-scores each, registers items with score>=3 as [AI-NEWS] suggests (with DIRECTION line), posts to Slack, speaks summary. Fallback: top 3 raw if Gemini returns nothing.",
+    "STEP 2 — REVIEW: wkappbot suggest list\nLook for [AI-NEWS] tagged items. Each has a DIRECTION line from Gemini describing the WKAppBot improvement to make.",
+    "STEP 3 — TRIAGE (optional): For top item, ask triad to validate direction before starting work:\nwkappbot ask triad \"[AI-NEWS] improvement: DIRECTION -- worth doing now vs backlog? technical blockers?\"\nSkip triage for simple/clear improvements.",
+    "STEP 4 — DELEGATE WORK: For mechanical implementation:\nwkappbot ask codex --agent \"implement: DIRECTION\"\nFor design-level changes: ask triad first, then codex. Resolve suggest after completion:\nwkappbot suggest resolve TS \"done: summary\" --i-completed-the-code-and-built-successfully-... evidence.cmd",
+    "SCHEDULE SETUP (run once after Eye start):\nwkappbot schedule add --prompt \"run ai-news briefing\" --cmd \"bash D:/GitHub/WKAppBot/bin/wkappbot.hq/scripts/ai-news-briefing.sh\" --at 11:00 --repeat 24h\nwkappbot schedule add --prompt \"run ai-news briefing\" --cmd \"bash D:/GitHub/WKAppBot/bin/wkappbot.hq/scripts/ai-news-briefing.sh\" --at 18:00 --repeat 24h",
+    "FILTER KEYWORDS (edit in script QUERIES array): AI desktop automation agent 2026 / Claude computer use MCP tool / Windows UI automation accessibility / LLM agent framework tool use / AI code agent computer control",
+    "GEMINI PROMPT FORMAT: Scores 1-5, outputs SCORE/TITLE/URL/DIRECTION blocks for score>=3. DIRECTION = one-sentence WKAppBot improvement direction. Fallback registers top 3 raw if Gemini returns nothing.",
+    "SCRIPT: bin/wkappbot.hq/scripts/ai-news-briefing.sh -- HN Algolia API fetch + python3 dedup + Gemini filter + suggest register + Slack post + speak announce",
+    "SUGGEST TAG: [AI-NEWS] prefix. Filter: wkappbot suggest list -- search for AI-NEWS. Resolve: wkappbot suggest resolve TS \"note\" --i-completed-... evidence.cmd",
+    "GH ACTIONS QUEUE PATH (2026-05-17, commit bb501568): The wkappbot-sdk GH Actions workflow (.github/workflows/ai-news-prefetch.yml) now runs scripts/append-pending-suggests.py which reads data/ai-news-latest.jsonl (score>=3 items only, dedup by first 60 chars of text lowercased) and appends formatted records to /tmp/wkcore/.wkappbot/pending_suggests.jsonl. Each record schema: ts (UTC ISO), from=DG-wkappbot-sdk, cwd=D:\\GitHub\\wkappbot-sdk, text=[AI-NEWS] [HN] TITLE: DIRECTION -- URL, files/slack_ts/review_*/evidence_file/co_resolve all null. WKAppBot core picks up pending_suggests.jsonl on next eye tick / submit cycle. This is the public CI path; local ai-news-briefing.sh (step 2) remains for on-demand runs."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "news",
+    "briefing",
+    "gemini",
+    "suggest",
+    "improvement",
+    "schedule",
+    "automation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T07:28:05.1412564Z",
+  "updated": "2026-05-23T05:23:07.2380527Z",
+  "version": "1.2"
+}

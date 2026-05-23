@@ -312,10 +312,11 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 1. wkappbot skill read on-load
-2. wkappbot suggest list
-3. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
-4. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
-5. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
+2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
+3. wkappbot suggest list
+4. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
+5. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
+6. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
 
 ## Scope of Work (YOU: SDK ONLY, not Core repo)
 
@@ -383,3 +384,29 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 ■ You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit
 https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 4:30 PM.
 ■ First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.
+
+## harness:safe CLAUDE\.md
+
+## harness:warn wkedit.*--line.*\\
+wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
+
+## harness:block (?i)bash.*powershell|bash.*pwsh
+Use PowerShell tool directly
+
+## harness:done (?i)skipped|생략|넘어가
+Step may have been skipped -- verify all gg steps ran
+
+## Pending
+
+- [x] [6] cdp open wrong Chrome 99% -- CORE (CdpClient/ChromeLauncher MRU fallback bug; root cause of [1][2])
+- [x] [1][2] CDP disconnected/timeout -- DEFER (downstream of [6]; auto-resolves after [6] fixed)
+- [x] [4] auto-kill hidden Chrome -- CORE (ChromeLauncher.SessionRestore.cs post-launch hwnd check)
+- [x] [3] schedule missing CommandHelpMap -- CORE (1-line add to CommandHelp.cs)
+- [x] [7] IDEA triad CLI-3 -- DEFER (post-stability)
+- [x] [5] self-evolving YouTube ad-skip -- DEFER (multi-week; not blocking)
+- [x] Fix [6] in Core: agents dispatched (wkclaude.sh background)
+- [x] Fix [3] in Core: agents dispatched (wkclaude.sh background)
+- [x] on-load skill: skill news step added (v1.61)
+- [x] skill-edit-step-ordering-spec: new skill created + suggest filed
+- [x] skill-ify: suggest-workflow (add-requirement step), wkharness-guards (3 new guards), suggest-triage-playbook (skill news step) -- DONE (wkclaude.sh agents)
+- [x] wkjobs.ps1: created scripts/wkjobs.ps1, registered wkjobs-ai-process-monitor skill v1.0
