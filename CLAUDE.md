@@ -396,6 +396,15 @@ Use PowerShell tool directly
 ## harness:done (?i)skipped|생략|넘어가
 Step may have been skipped -- verify all gg steps ran
 
+## harness:block (?i)● write_file\(
+Use Write.cmd or Edit.cmd instead of native write_file
+
+## harness:block (?i)● apply_patch\(
+Use Edit.cmd instead of native apply_patch
+
+## harness:block (?i)● read_file\(
+Use Read.cmd instead of native read_file
+
 ## Pending
 
 - [x] [6] cdp open wrong Chrome 99% -- CORE (CdpClient/ChromeLauncher MRU fallback bug; root cause of [1][2])
@@ -425,7 +434,7 @@ Step may have been skipped -- verify all gg steps ran
 - [x] Implement Edit.cmd + Edit.ps1 in personal-docs/tools/ + wkwrap --install symlink (done)
 - [x] Write.cmd + Read.cmd + Glob.cmd + Grep.cmd -- all 5 shims done, symlinks in WKAppBot/bin/
 - [x] Agent.cmd: Codex->Opus delegation via wkclaude, brief-guard+spec-gate enforced
-- [ ] ~/.codex/config.toml: add write_file/read_file block hooks
+- [x] ~/.codex/config.toml: harness:block patterns for write_file/read_file/apply_patch in CLAUDE.md
 - [x] Bash.cmd/PowerShell.cmd/Cmd.cmd: all 3 shell shims done + symlinks in WKAppBot/bin
 - [x] exit-255 fix: abs path for cmd.exe/powershell.exe/bash.exe (wrappers shadowed system executables in PATH)
-- [ ] AGENTS.md: add Tool Usage mandatory section (Bash.cmd/PowerShell.cmd/Write.cmd/Edit.cmd/Agent.cmd)
+- [x] AGENTS.md: Tool Usage mandatory section added (section 13, all wrapper mappings)

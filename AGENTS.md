@@ -189,3 +189,26 @@ Agents start with zero context -- skill reads are their only briefing.
 Declarative rules in CLAUDE.md via ## harness: headings. Fire on every tool call.
 safe: skip all warn+block if toolInput matches. warn: stderr warning. block: stderr + exit 1. done: PostToolUse warning.
 Edit CLAUDE.md to add or fix rules (always safe-exempted).
+
+## 17. Tool usage mandate (Codex wrappers required)
+
+All file I/O and shell execution MUST route through the Claude-named wrapper .cmd files.
+Wrappers pipe stdin JSON through wkharness.ps1 (pre-tool guard) before executing.
+
+| Intent | Required wrapper | Forbidden native |
+|--------|-----------------|------------------|
+| Write a file | `Write.cmd` | `write_file`, `apply_patch` |
+| Edit a file | `Edit.cmd` | `write_file`, `apply_patch` |
+| Read a file | `Read.cmd` | `read_file` |
+| Glob files | `Glob.cmd` | `list_dir`, `find_files` |
+| Grep/search | `Grep.cmd` | native grep via shell |
+| Shell (bash) | `Bash.cmd` | `shell`, `run_shell`, `execute` |
+| Shell (cmd) | `Cmd.cmd` | `shell cmd /c ...` |
+| Shell (ps) | `PowerShell.cmd` | `shell powershell ...` |
+| Delegate agent | `Agent.cmd` | direct agent spawn |
+
+Wrapper location: `D:\GitHub\WKAppBot\bin\` (symlinked from `D:\GitHub\personal-docs\tools\`).
+Add this bin dir to PATH so wrappers resolve without full paths.
+
+Why: native tools bypass wkharness guards (spec-gate, brief-guard, pace-guard, harness:block).
+Violations are blocked by wkharness PreToolUse hook via harness:block patterns in CLAUDE.md.
