@@ -2,19 +2,23 @@
   "id": "suggest-triage-playbook",
   "app": "wkappbot-workflow",
   "title": "Suggest Triage Playbook",
+  "title_ko": null,
   "desc": "Operator playbook for reviewing wkappbot suggestions: classify duplicates, prioritize by impact, keep evidence requirements explicit, and convert repeated insights into skills.",
   "steps": [
-    "PRIORITY ZERO: Check resolve before triage. Every suggest fix must end with \u0027suggest resolve \u003Cts\u003E ... --commit \u003Chash\u003E\u0027. Do NOT skip resolve, defer it, or move to next batch. Resolve completion (HALF state or full RESOLVED) is the gate for closure. Only after resolve is done may you move to next suggest.",
+    "PRIORITY ZERO: Check resolve before triage. Every suggest fix must end with 'suggest resolve <ts> ... --commit <hash>'. Do NOT skip resolve, defer it, or move to next batch. Resolve completion (HALF state or full RESOLVED) is the gate for closure. Only after resolve is done may you move to next suggest.",
     "Classify each item by audience and responsibility: operator, developer, project, or user.",
     "Merge obvious duplicates conceptually before attempting a fix so one root cause does not create multiple partially solved items.",
     "Prioritize by quick win, frequency, and risk; handle the highest signal items first. For large backlogs: use ask-suggest-priority-batching skill -- one GPT batch rank pass then per-item asks concurrently before acting.",
     "Keep resolve evidence explicit and minimal: one test script, one pass condition, one note.",
     "If a suggestion keeps reappearing, convert the recurring lesson into a skill before closing the item.",
     "Prefer a concise triage note over a long analysis: what it is, why it matters, what the next action is.",
-    "suggest merge --all-matching \u0027pattern\u0027 --title X --work Nh: bulk-merge matching suggests (non-WKAppBot channels only; --dry-run to preview). Cap=20 items. --dry-run shows matches without writing.",
+    "suggest merge --all-matching 'pattern' --title X --work Nh: bulk-merge matching suggests (non-WKAppBot channels only; --dry-run to preview). Cap=20 items. --dry-run shows matches without writing.",
     "Verified 2026-04-26: test-suggest-merge-all-matching.sh (resolve ts=2026-04-26T06:11:13.6770863Z)",
-    "Suggester confirm flow (2026-05-01): (1) maintainer does 1st-party resolve -\u003E HALF state \u002B Slack notice sent to suggester. (2) Suggester runs \u0027suggest check \u003Cts\u003E\u0027 to see regression result. (3) If regression PASS -\u003E \u0027suggest check \u003Cts\u003E\u0027 (author shortcut, preferred) OR \u0027suggest resolve \u003Cts\u003E note --confirm --skill X\u0027 (manual). Running resolve WITHOUT --confirm while HALF exists -\u003E ERROR with copy-pasteable check \u002B confirm commands."
+    "Suggester confirm flow (2026-05-01): (1) maintainer does 1st-party resolve -> HALF state + Slack notice sent to suggester. (2) Suggester runs 'suggest check <ts>' to see regression result. (3) If regression PASS -> 'suggest check <ts>' (author shortcut, preferred) OR 'suggest resolve <ts> note --confirm --skill X' (manual). Running resolve WITHOUT --confirm while HALF exists -> ERROR with copy-pasteable check + confirm commands.",
+    "SKILL NEWS PRE-CHECK: run wkappbot skill news before suggest list each session. Scans last 7 days for CDP/launcher/workflow updates. Context helps triage: recent skill may mean BUG-AUTO already addressed. Added to gg Main Workflow 2026-05-23 as step 2."
   ],
+  "requirements": null,
+  "primary_cmd": null,
   "tags": [
     "workflow",
     "suggest",
@@ -28,6 +32,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-08T16:54:57.9220465Z",
-  "updated": "2026-05-13T05:29:05.5231896Z",
-  "version": "1.12"
+  "updated": "2026-05-23T06:41:23.9293834Z",
+  "version": "1.14"
 }

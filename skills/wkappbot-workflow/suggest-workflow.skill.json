@@ -24,7 +24,8 @@
     "RIQUA [suggest cwd]: ALWAYS run wkappbot-core.exe suggest from the PROJECT REPO ROOT (e.g. D:/GitHub/WkAutoQuant). NEVER cd into the WKAppBot dir to submit -- causes git add to fail (outside repository). Stay in project root.",
     "RIQUA [--confirm silent no-op]: suggest resolve --confirm returns rc=0 but state stays HALF (suggest check still shows Confirm action, history unchanged). Workaround: none known. Bug #19 variant. The Eye auto-confirm (runs hourly) is the only reliable path to RESOLVED for DGWCS items.",
     "RIQUA [commit keyword guard]: --commit <hash> message must contain enough keywords from suggest title. Fix: use a merge/chore commit whose message includes the full suggest title (e.g. chore(suggest): merge [BUG-AUTO] Chrome window...). Find with: git log --oneline --grep=KEYWORD. A fix-commit with a terse message will fail (e.g. 'fix(launcher): add on-screen guard' missing 'position mismatch session restore').",
-    "RIQUA [class guard + source size]: --class <ClassName> is REQUIRED (not optional). The named class file must be <400 lines or resolve fails with 'Source size guard FAILED'. If over 400: (1) split into partial classes first, (2) rebuild + push, (3) THEN resolve. Check size: wc -l <file>.cs before resolving."
+    "RIQUA [class guard + source size]: --class <ClassName> is REQUIRED (not optional). The named class file must be <400 lines or resolve fails with 'Source size guard FAILED'. If over 400: (1) split into partial classes first, (2) rebuild + push, (3) THEN resolve. Check size: wc -l <file>.cs before resolving.",
+    "POST-SUBMIT OPS: wkappbot suggest add-requirement TS 'cmd => expected' appends requirement to already-submitted suggest. wkappbot suggest check TS runs evidence and requirements -- PASS offers confirm, FAIL blocks. Use both for iterative enrichment after initial submit."
   ],
   "requirements": null,
   "primary_cmd": null,
@@ -42,6 +43,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T03:30:00Z",
-  "updated": "2026-05-14T06:41:18.1155457Z",
-  "version": "1.32"
+  "updated": "2026-05-23T06:41:20.9178608Z",
+  "version": "1.34"
 }

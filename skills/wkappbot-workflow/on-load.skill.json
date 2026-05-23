@@ -5,16 +5,17 @@
   "title_ko": "세션 시작 필수 체크리스트: gg 워크플로우 트리거",
   "desc": "Mandatory entry point for every session start, post-compaction, gg/ggg trigger, and handoff resume. Loads suggest-workflow ask-suggest-priority-batching claude-md-guide. Dispatches suggest backlog to Opus agent. Routes gg trigger to project CLAUDE.md gg Main Workflow section. Guides creation of missing gg section for new repos. Run this first on every fresh Claude session new chat wake-up after context compaction or when unsure what to do next.",
   "steps": [
-    "WHEN TO RUN THIS SKILL: (A) session start or post-compaction -> run steps 2+3+4 in order. (B) user sends exactly 'gg'/'ggg' -> run step 5. (C) user is mid-task or sent a casual greeting -> do NOT run the full pipeline.",
+    "WHEN TO RUN THIS SKILL: (A) session start or post-compaction -> run steps 2, 3, 11(skill news), 4 in order. (B) user sends exactly 'gg'/'ggg' -> run step 5. (C) user is mid-task or sent a casual greeting -> do NOT run the full pipeline.",
     "MANDATORY SKILL LOADS (always first): (1) wkappbot skill read suggest-workflow (2) wkappbot skill read ask-suggest-priority-batching. On first session also: wkappbot skill read claude-md-guide. If any skill fails: skip and report.",
     "HANDOFF / CONTEXT RECOVERY (second -- understand what was happening before acting): wkappbot session list --claude --cwd -- find current session [0] and previous session [1]. Read tail of previous session JSONL: Get-Content <prev.jsonl> -Encoding UTF8 -Tail 150. Extract last user request + unfinished items + proposed next step. Post-compaction: also read current session [0] tail to recover pre-compaction context. New session with no prior context: skip gracefully. Full mechanics: wkappbot skill read claude-session-handoff.",
     "CHECK SUGGEST BACKLOG (third -- after context is clear): wkappbot suggest list. Use recovered context from step 3 to prioritize intelligently. Priority: BUG-AUTO -> important -> AI-NEWS dupes. Triage: Agent(model:'opus', prompt:'First run: wkappbot skill read suggest-workflow. Then triage this backlog: <INSERT suggest list output>. Handle BUG-AUTO first, then important, then merge AI-NEWS duplicates via wkappbot suggest merge.'). Fatal = command not found. Non-fatal = empty list / timeout.",
-    "GG TRIGGER: if user message is exactly 'gg'/'ggg', locate '## gg Main Workflow' or '## Main Workflow' in project CLAUDE.md and execute every step sequentially without confirmation. If CLAUDE.md missing or no gg section: follow step 7 to create it first.",
+    "GG TRIGGER: if user message is exactly 'gg'/'ggg', locate '## gg Main Workflow' or '## Main Workflow' in project CLAUDE.md and execute every step sequentially without confirmation. NOTE (2026-05-23): SDK project gg now includes 'wkappbot skill news' as step 2 (before 'suggest list') to surface recently updated skills as triage context. Other projects may adopt the same pattern when their CLAUDE.md gg section is regenerated. If CLAUDE.md missing or no gg section: follow step 8 to create it first.",
     "COMPACTION RECOVERY (only after compaction -- not every session start): steps 2+3 above already reload rules and context. Additionally: (1) wkappbot session list --claude --cwd for session files. (2) wkappbot session list --codex for Codex sessions. (3) codex resume --last to continue Codex directly. (4) wkappbot skill read claude-md-guide + git log --oneline -10.",
     "HANDOFF COMMAND: if user says 'handoff' or 'continue from last session', run: wkappbot skill read claude-session-handoff -- find previous JSONL (index [1]) and extract context.",
     "PROJECT MAIN TASKS -- gg section authoring (only when step 5 cannot find a gg section): ask the user what the main recurring tasks are, then write '## gg Main Workflow' in the repo CLAUDE.md. Each step must be an executable command or Agent() call. TEMPLATE: 1. wkappbot skill read on-load 2. [project task] 3. Agent(model:opus, prompt:'triage: <list>') 4. wkappbot skill read repo-health-doctor",
     "SKILL EDIT DISCIPLINE (read every session): NEVER directly edit .skill.json files. The pipe character is the step separator -- direct edits corrupt steps, miss version bump, disappear from skill search. ALWAYS use wkappbot skill edit <id> or wkappbot skill contribute. If you edited directly by mistake: (1) git checkout -- <path> to revert first. (2) wkappbot skill read <id> to verify it is clean. (3) redo via skill edit. Do NOT install a directly-edited file -- it registers the corrupted version. Correct install flow (exception case only): (A) BEFORE install -- python3 -c 'import json; json.load(open(\"path\"))' to validate JSON, then wkappbot skill read <id> dry-check. (B) install only if steps render cleanly with no broken splits. (C) AFTER install -- wkappbot skill read <id> again to confirm version bumped and all steps visible.",
-    "WKEDIT RULE (MANDATORY): multi-file edits and any file containing multibyte characters (Korean, CJK, emoji) MUST use wkedit, never Edit/Write tool directly. Reason: Edit/Write silently re-encodes to CRLF or wrong encoding -- corrupts multibyte chars and skill steps. Pattern: wkedit file1.py file2.cs file3.md (opens all atomically). Single-file ASCII-only edits may use Edit tool."
+    "WKEDIT RULE (MANDATORY): multi-file edits and any file containing multibyte characters (Korean, CJK, emoji) MUST use wkedit, never Edit/Write tool directly. Reason: Edit/Write silently re-encodes to CRLF or wrong encoding -- corrupts multibyte chars and skill steps. Pattern: wkedit file1.py file2.cs file3.md (opens all atomically). Single-file ASCII-only edits may use Edit tool.",
+    "SKILL NEWS (third -- scan what changed before triage): wkappbot skill news -- lists skills updated in last 7 days sorted by recency. Scan for CDP, launcher, workflow, suggest-related updates. Provides context for intelligent suggest triage (e.g. a new cdp-tab-management-policy skill means CDP suggests may already be addressed). Skip gracefully if command fails."
   ],
   "requirements": [
     {
@@ -50,6 +51,11 @@
     {
       "cmd": "wkappbot skill read claude-md-guide",
       "expect": "KEY MANDATORY RULES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill news",
+      "expect": "recently updated skills list (run BEFORE suggest list)",
       "prompt": null
     }
   ],
@@ -133,6 +139,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-05-09T17:54:20.2562156Z",
-  "version": "1.51"
+  "updated": "2026-05-23T06:03:40.056985Z",
+  "version": "1.61"
 }
