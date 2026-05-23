@@ -15,7 +15,8 @@
     "SESSION MARKER: * prefix means process is in current console session. Without -All, only current session procs are shown",
     "SPAWNED SECTION: child processes of AI pids, conhost filtered. Columns: PPID (which AI spawned it), name, PID, CPU%, MEM, state, command line",
     "INTERNALS: Get-CimInstance Win32_Process for CommandLine+PPID, Win32_PerfFormattedData_PerfProc_Process for CPU% snapshot, Get-Process for WorkingSet64+Threads+SessionId",
-    "NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error"
+    "NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error",
+    "WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD) are relative symlinks to wkwrap.sh in same dir. Run wkwrap.sh --install to add more. See also: wkappbot skill read wkwrap-ai-native-wrappers"
   ],
   "requirements": [
     {
@@ -32,6 +33,11 @@
       "cmd": "wkjobs.ps1 -Watch",
       "expect": "Watch mode line printed",
       "prompt": null
+    },
+    {
+      "cmd": "ls -la scripts/wkjobs.sh | grep -q wkwrap",
+      "expect": "symlink to wkwrap.sh",
+      "prompt": null
     }
   ],
   "primary_cmd": null,
@@ -40,6 +46,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T06:56:55.2897667Z",
-  "updated": "2026-05-23T06:56:55.2897769Z",
-  "version": "1.0"
+  "updated": "2026-05-23T07:44:41.248768Z",
+  "version": "1.3"
 }
