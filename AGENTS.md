@@ -215,6 +215,10 @@ Violations are blocked by wkharness PreToolUse hook via harness:block patterns i
 
 ### Agent.cmd calling conventions (mirrors Claude Code Agent() built-in)
 
+**MANDATORY**: All agent/subagent delegation MUST go through `Agent.cmd`.
+Direct `wkclaude.cmd`, `wkclaude.sh`, or `claude` CLI calls are forbidden.
+Violations are blocked by wkclaude-direct-guard in wkharness.
+
 In codex exec mode, native file tools (write_file, apply_patch, read_file) bypass hooks entirely.
 Route file operations through Agent.cmd to enforce harness guards:
 
