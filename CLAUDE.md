@@ -471,7 +471,7 @@ Use Read.cmd instead of native read_file
 - [x] agent-leak-guard: verify Agent blocked when zombies exist -- CONFIRMED (live test passed)
 - [x] agent-leak-guard: extended to cover Codex shell delegation (Agent.cmd + wrapper pattern match)
 - [x] GetParentPid: PROCESS_BASIC_INFORMATION offset 24->40 fix (was reading BasePriority=8 as parent PID; chain now shows full ancestor tree)
-- [ ] cdp open OK response: missing tab:'ID8:title' composite field (suggest merged 2026-05-24T17:26, Core fix pending)
+- [x] cdp open OK response: tab field added (Core WebCommands.Part1.cs PrintWebTarget; wkcdp/wkask scripts updated) -- OK {hwnd,proc,cdp,domain,tab:ID8:title}
 - [ ] Core Program.PInvoke.GetParentProcessId() offset 24 bug (same as SDK fix d69b080b; suggest 1779611928 filed to Core)
 - [ ] Core CallerPlacementResolver window selection: missing IsWindowVisible guard vs SDK (hidden ConPTY vs visible terminal divergence)
 - [x] EyeCmdPipeClient.ResolveCallerTerminalHwnd(): prefer visible/root/non-degenerate window per ancestor (Opus agent fix, committed 634f5721)

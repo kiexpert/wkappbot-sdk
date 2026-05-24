@@ -1,0 +1,45 @@
+{
+  "id": "cdp-tab-identity-design",
+  "app": "wkappbot-sdk",
+  "title": "CDP Tab Identity Design",
+  "title_ko": null,
+  "desc": "Tab targeting via targetId+TitleHistory composite key; grap tab field design",
+  "steps": [
+    "DESIGN: CDP tab identity uses composite key. Key='targetId[:8]:currentTitle', Value=CdpTab{TargetId, TitleHistory:List<string>, Domain, LastActive}.",
+    "LIFECYCLE: targetId survives tab detach/window-split (renderer moves intact). Invalidated on: page reload, crash recovery, Chrome restart. WebBot restart = full cache eviction OK (no persistence needed).",
+    "CACHE: In-process dict keyed by targetId8. Value = CdpTab{TargetId, TitleHistory(LRU cap=8), Domain, LastActive, BrowserPid}. BrowserPid = Chrome browser-process PID for multi-instance filtering (NOT renderer PID -- non-unique across same-site tabs, see step 7). Title stored only inside TitleHistory, never in any dict key.",
+    "RECOVERY: On WebBot restart (Chrome alive): Target.getTargets() on each project CDP port -> rebuild cache from live targetId+title+url+browserPid. Covers 'WebBot died, Chrome alive' fully. Historical title variants re-accumulated live. Zero file I/O, no HWND props needed.",
+    "SEARCH PRIORITY: 1) targetId prefix match (exact, session-stable) 2) TitleHistory any-entry match (handles dynamic titles: badge counts, play indicators) 3) domain+title fallback (post-restart).",
+    "GRAP SYNTAX: tab field in JSON5 -- {proc:'chrome',cdp:PORT,tab:'6B4A2F8C:Gmail'}. Parser: hex8:text -> targetId prefix + title label. title-only -> history search. cdp open returns tab composite string.",
+    "WHY NOT rendererPID: CDP does not expose renderer PID directly. Same-site tabs share one renderer process -- not unique per tab. targetId is always 1:1 per tab.",
+    "SAME-TITLE DEDUP: multiple tabs with identical title -> MRU (LastActive) wins. TitleHistory prevents dynamic-title false misses ((3) Gmail and Gmail both resolve to same CdpTab).",
+    "WHY NOT HWND PROPS: SetProp interns the name into the global atom table (~16K practical limit) -- title-bearing keys with dynamic titles leak atoms unboundedly -> eventual system-wide failures (RegisterWindowMessage, clipboard). Also HWND is per-window not per-tab: all tabs share one HWND, and tab detach migrates renderer to a new HWND so props cannot follow. Identity lives in-process keyed by targetId only, rehydrated from Target.getTargets().",
+    "TAB MIGRATION: Detach-to-new-window and drag-into-another-window preserve the same targetId (renderer intact). Cache entry needs no migration -- only LastActive/Domain refresh on next Target.getTargets() poll. New title after migration is appended to TitleHistory (LRU cap=8), key unchanged.",
+    "IMPLEMENTATION STATUS: COMPLETE (2026-05-24).\nCore change: WebCommands.Part1.cs PrintWebTarget() -- after CDP connect, calls cdp.GetTitleAsync() then appends tab:'<targetId[:8]>:<sanitizedTitle>' to grap before emitting OK.\nScript updates: wkask.ps1 captures tab field; wkcdp.ps1 open handler parses tab; wkcdp-mon.ps1 shows targetId[:8] per tab line.\nVERIFIED OUTPUT: OK {hwnd:0x00490200,proc:'chrome',cdp:9740,domain:'example.com',tab:'D27B3D0B:Example Domain'}\nhwnd is non-zero when GA_ROOTOWNER (SDK launcher) resolves correct CASCADIA caller. tab is derived from CDP targetId (stable, session-unique), not HWND."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp tabs",
+      "expect": "shows targetId:8char:title composite key per tab",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open <url>",
+      "expect": "returns tab field in composite format",
+      "prompt": null
+    },
+    {
+      "cmd": "tab grap {proc:'chrome',cdp:PORT,tab:'ID:Title'}",
+      "expect": "attaches to correct tab",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T05:25:51.9826578Z",
+  "updated": "2026-05-24T12:06:44.2947063Z",
+  "version": "1.21"
+}
