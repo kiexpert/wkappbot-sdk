@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -321,7 +321,7 @@ internal static class EyeCmdPipeClient
             var pbi = new byte[48]; // PROCESS_BASIC_INFORMATION
             int retLen = 0;
             NtQueryInformationProcess(handle, 0, pbi, pbi.Length, ref retLen);
-            return (int)BitConverter.ToInt64(pbi, 24); // InheritedFromUniqueProcessId
+            return (int)BitConverter.ToInt64(pbi, 40); // InheritedFromUniqueProcessId at offset 40 (64-bit: ExitStatus+pad+Peb+AffinityMask+BasePriority+pad+UniqueProcessId = 40)
         }
         catch { return 0; }
     }

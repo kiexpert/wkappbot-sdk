@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
 using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
@@ -961,7 +961,7 @@ partial class Program
             var pbi = new byte[48]; // PROCESS_BASIC_INFORMATION
             int retLen = 0;
             NtQueryInformationProcess(handle, 0, pbi, pbi.Length, ref retLen);
-            return (int)BitConverter.ToInt64(pbi, 24); // InheritedFromUniqueProcessId at offset 24
+            return (int)BitConverter.ToInt64(pbi, 40); // InheritedFromUniqueProcessId at offset 40 (64-bit)
         }
         catch { return 0; }
     }
