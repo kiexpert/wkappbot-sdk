@@ -470,3 +470,5 @@ Use Read.cmd instead of native read_file
 - [x] agent-leak-guard: stray-brace fix (syntax err, guards disabled) + -All + exit2->Block + powershell abs path (PATH shadow)
 - [x] agent-leak-guard: verify Agent blocked when zombies exist -- CONFIRMED (live test passed)
 - [x] agent-leak-guard: extended to cover Codex shell delegation (Agent.cmd + wrapper pattern match)
+- [x] GetParentPid: PROCESS_BASIC_INFORMATION offset 24->40 fix (was reading BasePriority=8 as parent PID; chain now shows full ancestor tree)
+- [ ] cdp open OK response: missing tab:'ID8:title' composite field (suggest merged 2026-05-24T17:26, Core fix pending)
