@@ -1,4 +1,4 @@
-// Stage 2 / Stage 3 placement corrections for post-launch Chrome windows.
+﻿// Stage 2 / Stage 3 placement corrections for post-launch Chrome windows.
 //
 // Architecture
 // ------------
@@ -396,9 +396,27 @@ partial class Program
 
             if (dpiMatch && dX < DeltaThreshold && dY < DeltaThreshold && dW < DeltaThreshold && dH < DeltaThreshold)
             {
-                AppendStage3Record(callerDpi, currentDpi, true, false, true, stage1Target, actual, "match_confirmed", cmd);
-                Console.Error.WriteLine(
-                    $"[PLACEMENT:STAGE3] DPI match confirmed (caller={callerDpi}/{callerScale * 100:F0}% chrome={currentDpi}/{currentScale * 100:F0}%), no correction needed");
+                // DPI matches and rect is close. Still apply DWM shadow compensation for
+                // pixel-perfect final settle: stage1Target is VISIBLE (DWM) coords but
+                // SetWindowPos takes OUTER coords -- shadow is 7px L/R, 0px T, 7px B on Win11.
+                GetDwmShadowOffsets(chromeHwnd, out int mL, out int mT, out int mR, out int mB);
+                if (mL > 0 || mT > 0 || mR > 0 || mB > 0)
+                {
+                    int sL2 = stage1Target.Left   - mL;
+                    int sT2 = stage1Target.Top    - mT;
+                    int sW2 = stage1Target.Width  + mL + mR;
+                    int sH2 = stage1Target.Height + mT + mB;
+                    SetWindowPos(chromeHwnd, IntPtr.Zero, sL2, sT2, sW2, sH2, SWP_NOZORDER | SWP_NOACTIVATE);
+                    Console.Error.WriteLine(
+                        $"[PLACEMENT:STAGE3] DPI match + shadow settle: shadow=({mL},{mT},{mR},{mB}) outer=({sL2},{sT2},{sW2},{sH2})");
+                    AppendStage3Record(callerDpi, currentDpi, true, true, true, stage1Target, actual, "shadow_settled", cmd);
+                }
+                else
+                {
+                    Console.Error.WriteLine(
+                        $"[PLACEMENT:STAGE3] DPI match confirmed (caller={callerDpi}/{callerScale * 100:F0}% chrome={currentDpi}/{currentScale * 100:F0}%), no shadow -- done");
+                    AppendStage3Record(callerDpi, currentDpi, true, false, true, stage1Target, actual, "match_confirmed", cmd);
+                }
                 return;
             }
 
@@ -459,10 +477,11 @@ partial class Program
             int correctedDx = corrected.Left - actual.Left;
             int correctedDy = corrected.Top  - actual.Top;
 
-            SetWindowPos(chromeHwnd, IntPtr.Zero, newL, newT, newW, newH, SWP_NOZORDER | SWP_NOACTIVATE);
+            GetDwmShadowOffsets(chromeHwnd, out int sL, out int sT, out int sR, out int sB);
+            SetWindowPos(chromeHwnd, IntPtr.Zero, newL - sL, newT - sT, newW + sL + sR, newH + sT + sB, SWP_NOZORDER | SWP_NOACTIVATE);
             Console.Error.WriteLine(
-                $"[PLACEMENT:STAGE3] DPI mismatch detected at caller={callerScale * 100:F0}% chrome={currentScale * 100:F0}%, "
-                + $"correcting by [dX={correctedDx},dY={correctedDy}] new=(L={newL},T={newT},W={newW},H={newH})");
+                $"[PLACEMENT:STAGE3] DPI mismatch + shadow settle: shadow=({sL},{sT},{sR},{sB}) "
+                + $"correcting by [dX={correctedDx},dY={correctedDy}] new visible=({newL},{newT},{newW},{newH})");
 
             AppendStage3Record(callerDpi, currentDpi, dpiMatch, true, true, corrected, actual, "corrected", cmd);
         }

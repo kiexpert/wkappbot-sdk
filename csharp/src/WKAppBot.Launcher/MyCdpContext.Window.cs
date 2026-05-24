@@ -1,4 +1,4 @@
-namespace WKAppBot.Launcher;
+﻿namespace WKAppBot.Launcher;
 
 partial class Program
 {
@@ -82,6 +82,36 @@ partial class Program
         }
         catch { }
         return false;
+    }
+
+    /// <summary>
+    /// Measures DWM shadow offsets: the pixel gap between GetWindowRect (outer,
+    /// includes the invisible resize handle border) and DWMWA_EXTENDED_FRAME_BOUNDS
+    /// (visible rect, excludes the border). On Windows 11: sL=7, sT=0, sR=7, sB=7.
+    /// Falls back to these defaults if the DWM query fails or any offset looks
+    /// unreasonable (>30 px per side). Usage: to place a visible rect at target via
+    /// SetWindowPos, call SetWindowPos(target.Left - sL, target.Top - sT,
+    ///   target.Width + sL + sR, target.Height + sT + sB).
+    /// </summary>
+    static void GetDwmShadowOffsets(IntPtr hwnd, out int sL, out int sT, out int sR, out int sB)
+    {
+        sL = sR = sB = 7; sT = 0; // Windows 11 defaults
+        try
+        {
+            if (GetWindowRect(hwnd, out RECT outer)
+                && DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, out RECT vis, 16) == 0
+                && vis.Width > 0 && vis.Height > 0)
+            {
+                int l = vis.Left   - outer.Left;
+                int t = vis.Top    - outer.Top;
+                int r = outer.Right  - vis.Right;
+                int b = outer.Bottom - vis.Bottom;
+                if (l >= 0 && l <= 30 && t >= 0 && t <= 30
+                    && r >= 0 && r <= 30 && b >= 0 && b <= 30)
+                { sL = l; sT = t; sR = r; sB = b; }
+            }
+        }
+        catch { }
     }
 
     // AOT-friendly: collect monitor rects into a static field via a non-capturing
