@@ -1,0 +1,56 @@
+{
+  "id": "cross-repo-claude-notify",
+  "app": "wkappbot-sdk",
+  "title": "Cross-Repo Claude Notify: type message into another repo Claude session",
+  "title_ko": null,
+  "desc": "Find an active Claude (wkchat) session for a target repo by matching tab title text 'wkchat [REPO]', then type a message into it. Enables wkappbot or harness to wake/notify a Claude session in a different repo -- the universal cross-repo IPC pattern. Caller finds CASCADIA hwnd via wkappbot a11y find proc:wkchat, matches tab text, types message + newline.",
+  "steps": [
+    "FIND TARGET WINDOW: wkappbot a11y find \"{proc:'wkchat'}\" -- scan output for 'Text wkchat [REPO_NAME]' element. The parent CASCADIA hwnd on the same result block is the target window. Example output: window hwnd:0x606A2 + element Text 'wkchat [WkAutoQuant]' -> target hwnd=0x606A2.",
+    "TYPE MESSAGE: wkappbot a11y type \"YOUR_MESSAGE\\n\" hwnd:0xTARGET -- the newline submits. For schedule notifications: 'CLAUDE.md updated: new ### CronCreate heading added. Run CronCreate now.\\n'. For wkappbot-sdk notifying WKAppBot: wkappbot a11y find \"{proc:'wkchat'}\" then extract hwnd where tab text contains [WKAppBot], then type.",
+    "FULL ONE-LINER PATTERN: TARGET=$(wkappbot a11y find \"{proc:'wkchat'}\" 2>&1 ",
+    " grep -B2 'wkchat \\[WKAppBot\\]' ",
+    " grep 'hwnd:0x' ",
+    " grep -oP 'hwnd:0x[0-9A-F]+' ",
+    " head -1) && wkappbot a11y type \"msg\\n\" $TARGET",
+    "CORRECT COMMAND: use 'wkappbot windows \"{proc:'wkchat'}\"' (not a11y find) for full cross-window scan. Output: 'window {hwnd:0xAAAA}' followed by 'element Text wkchat [REPO]' on next line. Parse: for each wkchat tab element, capture the hwnd from the preceding window line. That hwnd is the WT window to type into. Each repo's Claude session is typically in its own WT window, so hwnd is unique per repo. One-liner: wkappbot windows \"{proc:'wkchat'}\" 2>&1 | python3 -c \"import sys,re; txt=sys.stdin.read(); [print(f'{m2.group(1):20} hwnd={m1.group(1)}') for m1,m2 in zip(re.finditer(r'hwnd:(0x[0-9A-Fa-f]+)', txt), re.finditer(r'wkchat \\[([^\\]]+)\\]', txt))]\""
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find \"{proc:'wkchat'}\"",
+      "expect": "element Text 'wkchat [REPO]' visible in output",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y type \"test\\n\" hwnd:0x606A2",
+      "expect": "OK (types into target window)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-repo-claude-notify",
+      "expect": "FIND TARGET WINDOW step visible",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cross-repo",
+    "notify",
+    "wkchat",
+    "ipc",
+    "type",
+    "schedule",
+    "tab",
+    "cascadia",
+    "hwnd",
+    "wakeup",
+    "inter-session",
+    "claude",
+    "message"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T15:36:57.4844921Z",
+  "updated": "2026-05-24T15:38:02.1169632Z",
+  "version": "1.1"
+}
