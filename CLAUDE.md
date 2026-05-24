@@ -426,12 +426,8 @@ Use Read.cmd instead of native read_file
 
 ## Pending
 
-- [x] [6] cdp open wrong Chrome 99% -- CORE (CdpClient/ChromeLauncher MRU fallback bug; root cause of [1][2])
-- [x] [1][2] CDP disconnected/timeout -- DEFER (downstream of [6]; auto-resolves after [6] fixed)
-- [x] [4] auto-kill hidden Chrome -- CORE (ChromeLauncher.SessionRestore.cs post-launch hwnd check)
-- [x] [3] schedule missing CommandHelpMap -- CORE (1-line add to CommandHelp.cs)
-- [x] [7] IDEA triad CLI-3 -- DEFER (post-stability)
-- [x] [5] self-evolving YouTube ad-skip -- DEFER (multi-week; not blocking)
+<!-- compressed 2026-05-25: 60+ resolved items grouped by topic -->
+- [x] CDP core [1][2][3][4][6][7][8][11]: cdp-wrong-Chrome, timeout, CommandHelpMap, auto-kill hidden Chrome -- all Core commits (1bafc6524)
 - [x] Fix [6] in Core: agents dispatched (wkclaude.sh background)
 - [x] Fix [3] in Core: agents dispatched (wkclaude.sh background)
 - [x] on-load skill: skill news step added (v1.61)
@@ -444,8 +440,7 @@ Use Read.cmd instead of native read_file
 - [x] wkappbot-taskkill-usage skill: removed Stop-Process steps, correct --force syntax
 - [x] wkappbot-core: fix [KILL] killed N: line -- space after ] + inline args (FormatKilledEntry, fa8ba7f)
 - [x] wkjobs: native taskkill fallback when ChatSessionGuard blocks AI-spawned zombie (95b0bbf)
-- [x] wkjobs: condense output to 1 line per process -- CMD args inline, drop CON row (3b7f968)
-- [x] ChatSessionGuard: token-aware cmdline check -- fix false-positive on skill/suggest --steps content (42cee06)
+- [x] wkjobs suite: created, symlinks, moved to WKAppBot/bin, Kill/Leaks modes, taskkill-usage skill, ChatSessionGuard token-aware fix (42cee06, 95b0bbf, 3b7f968)
 - [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending) -- merge with [2] zombie over-protect, fix together
 - [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
 - [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
