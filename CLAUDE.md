@@ -474,7 +474,8 @@ Use Read.cmd instead of native read_file
 - [ ] cdp open OK response: missing tab:'ID8:title' composite field (suggest merged 2026-05-24T17:26, Core fix pending)
 - [ ] Core Program.PInvoke.GetParentProcessId() offset 24 bug (same as SDK fix d69b080b; suggest 1779611928 filed to Core)
 - [ ] Core CallerPlacementResolver window selection: missing IsWindowVisible guard vs SDK (hidden ConPTY vs visible terminal divergence)
-- [x] EyeCmdPipeClient.ResolveCallerTerminalHwnd(): prefer visible/root/non-degenerate window per ancestor (Opus agent fix, uncommitted)
-- [ ] Commit EyeCmdPipeClient.cs fix + remove chrome from IsKnownHostProcess fallback
+- [x] EyeCmdPipeClient.ResolveCallerTerminalHwnd(): prefer visible/root/non-degenerate window per ancestor (Opus agent fix, committed 634f5721)
+- [x] Commit EyeCmdPipeClient.cs fix + remove chrome from IsKnownHostProcess fallback (634f5721)
 - [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position from WKAPPBOT_CHROME_TARGET pending, Core scope)
+
 
