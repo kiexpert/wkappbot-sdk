@@ -41,7 +41,7 @@ partial class Program
             // smaller than SetWindowPos dimensions, likely due to Chrome's internal
             // client area calculation. Compensate by requesting slightly larger dimensions.
             const int DefaultChromeW = 800;
-            const int DefaultChromeH = 600;
+            const int DefaultChromeH = 710;  // outer height = content(600) + toolbar(~110px)
             const int CompensationW  = 18;  // pixels to add for Chrome internal sizing
             const int CompensationH  = 9;   // pixels to add for Chrome internal sizing
             int targetW = DefaultChromeW + CompensationW;
