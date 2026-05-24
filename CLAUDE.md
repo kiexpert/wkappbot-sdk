@@ -469,3 +469,4 @@ Use Read.cmd instead of native read_file
 - [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout; wkappbot cmds hang in subprocess
 - [x] agent-leak-guard: stray-brace fix (syntax err, guards disabled) + -All + exit2->Block + powershell abs path (PATH shadow)
 - [x] agent-leak-guard: verify Agent blocked when zombies exist -- CONFIRMED (live test passed)
+- [x] agent-leak-guard: extended to cover Codex shell delegation (Agent.cmd + wrapper pattern match)
