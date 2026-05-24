@@ -1,4 +1,4 @@
-﻿using System.IO.Pipes;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -303,10 +303,54 @@ internal static class EyeCmdPipeClient
                 hiddenFallback = hiddenMatch;
         }
 
-        // No ancestor owns a visible window. Return the closest hidden ConPTY window
-        // (if any) so the caller still has a valid identity hwnd. Do NOT fall back to
-        // foreground -- foreground is someone else's window and would be wrong every time.
-        return hiddenFallback;
+        // No ancestor in our own chain owns a visible window.
+        // SECOND ATTEMPT: walk the ConPTY's owning process parent chain.
+        // ConPTY (PseudoConsoleWindow) is owned by a ConPTY host process (conhost/openconsole).
+        // That host's parent IS the visible terminal (WindowsTerminal). This route survives
+        // dead intermediate launcher-chain PIDs because the ConPTY host is still alive.
+        // GetConsoleWindow() returns it directly; hiddenFallback is the enum-found one.
+        IntPtr conptyHwnd = GetConsoleWindow();
+        if (conptyHwnd == IntPtr.Zero) conptyHwnd = hiddenFallback;
+        if (conptyHwnd != IntPtr.Zero)
+        {
+            GetWindowThreadProcessId(conptyHwnd, out uint conptyPid);
+            if (conptyPid > 0)
+            {
+                var conptyChain = new List<uint>();
+                int cPid = (int)conptyPid;
+                for (int depth = 0; depth < 8 && cPid > 0; depth++)
+                {
+                    var parent = GetParentPid(cPid);
+                    if (parent <= 0 || parent == cPid) break;
+                    conptyChain.Add((uint)parent);
+                    cPid = parent;
+                }
+                foreach (var targetPid in conptyChain)
+                {
+                    IntPtr visibleMatch = IntPtr.Zero;
+                    EnumWindows((hWnd, _) =>
+                    {
+                        GetWindowThreadProcessId(hWnd, out uint wpid);
+                        if (wpid != targetPid) return true;
+                        if (!IsWindow(hWnd) || !IsWindowVisible(hWnd)) return true;
+                        if (GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
+                        if (!GetWindowRect(hWnd, out RECT rect)) return true;
+                        if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true;
+                        visibleMatch = hWnd;
+                        return false;
+                    }, IntPtr.Zero);
+                    if (visibleMatch != IntPtr.Zero)
+                    {
+                        Console.Error.WriteLine($"[CALLER:HWND] via ConPTY owner chain 0x{visibleMatch.ToInt64():X} (conpty=0x{conptyHwnd.ToInt64():X})");
+                        return visibleMatch;
+                    }
+                }
+            }
+        }
+
+        // Truly nothing. Do NOT use GetForegroundWindow -- that is the user's focused
+        // window (someone else's app), never the caller. Return Zero.
+        return IntPtr.Zero;
     }
 
     /// <summary>
