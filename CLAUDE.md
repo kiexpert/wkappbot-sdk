@@ -1,4 +1,4 @@
-# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -442,6 +442,8 @@ Use Read.cmd instead of native read_file
 - [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
 - [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
 - [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design)
+- [x] wkjobs -Leaks mode: filters zombie agent procs, outputs kill cmd one-liner (exit 1 if found)
+- [x] wkharness agent-leak-guard: blocks Agent() if zombie procs exist, shows kill cmd
 - [x] settings.json deny (Edit/Write) removed -- Edit tool now unblocked
 - [x] Codex harness guards verified: spec-gate, brief-guard, wrapper-first, skill-update-pending all working
 - [x] codex-tool-wrappers skill created (design: Claude-named cmd wrappers route through wkharness)
