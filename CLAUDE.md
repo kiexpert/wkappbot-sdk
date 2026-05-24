@@ -427,7 +427,21 @@ Use Read.cmd instead of native read_file
 - [x] wkjobs: native taskkill fallback when ChatSessionGuard blocks AI-spawned zombie (95b0bbf)
 - [x] wkjobs: condense output to 1 line per process -- CMD args inline, drop CON row (3b7f968)
 - [x] ChatSessionGuard: token-aware cmdline check -- fix false-positive on skill/suggest --steps content (42cee06)
-- [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending)
+- [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending) -- merge with [2] zombie over-protect, fix together
+- [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
+- [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
+- [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
+- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
+- [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
+- [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
+- [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design) -- merge with [2] zombie over-protect, fix together
+- [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
+- [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
+- [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
+- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
+- [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
+- [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
+- [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design)
 - [x] settings.json deny (Edit/Write) removed -- Edit tool now unblocked
 - [x] Codex harness guards verified: spec-gate, brief-guard, wrapper-first, skill-update-pending all working
 - [x] codex-tool-wrappers skill created (design: Claude-named cmd wrappers route through wkharness)
