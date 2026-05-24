@@ -388,15 +388,22 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 
 ## Nightly Schedules (harness-enforced)
 
-> Hook (.claude/nightly-schedule-guard.ps1) blocks ALL tools if this section is missing.
-> Only Edit/Write to CLAUDE.md allowed until section declared. Opus handles actual healing.
+> Mechanical gate: .claude/nightly-schedule-guard.ps1 blocks ALL tools (except `wkappbot skill*` and CLAUDE.md edits) if this section is missing.
+> Behavioral gate: BEFORE any Bash/PowerShell call this session (except `wkappbot skill*`):
+>   1. CronList -- verify all 4 jobs below are present
+>   2. If any missing -- CronCreate them first (Opus, durable=true, recurring=true)
+>   3. Only then proceed with the shell command. This is MANDATORY, no exceptions.
 
-| Time  | Repo           | Skill              | Model | Mode          |
-|-------|----------------|--------------------|-------|---------------|
-| 04:13 | wkappbot-sdk   | skill-heal-nightly | Opus  | durable daily |
+| Time        | Repo         | Skill              | Model | Mode              |
+|-------------|--------------|--------------------|-------|-------------------|
+| 04:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
+| 05:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
+| 06:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
+| 07:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
 
-> Run `CronList` to verify active jobs match table. If missing: `wkappbot skill read skill-heal-nightly` step 1.
-> Add new repos by appending rows. Hook checks section existence only.
+> wkappbot skill* commands are EXEMPT from all cron gates -- always allowed.
+> Add new repos by appending rows. Hook checks section existence only; behavioral rule checks CronList.
+
 
 ## harness:safe CLAUDE\.md
 
