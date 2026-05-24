@@ -478,7 +478,9 @@ Use Read.cmd instead of native read_file
 - [x] Commit EyeCmdPipeClient.cs fix + remove chrome from IsKnownHostProcess fallback (634f5721)
 - [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position from WKAPPBOT_CHROME_TARGET pending, Core scope)
 - [x] ResolveCallerTerminalHwnd: add ConPTY owner process chain as 2nd attempt when launcher chain dead-ends (b1150b0b) -- needs real broken-chain verification
-- [ ] Verify ConPTY owner chain path: trigger dead-chain scenario, confirm [CALLER:HWND] via ConPTY log appears and Chrome lands on correct WT
+- [x] Verify ConPTY chain: DEAD -- AllocConsole PCW=[0,0,16,16] no placement; CASCADIA [W]=XAML InputSite; WT_SESSION=empty; largest-CASCADIA only working fallback
+- [ ] Multi-WT disambiguation: research WT GitHub/MSDN for reliable CASCADIA-to-session mapping when multiple WT windows open
+- [ ] WT Vis=True PCW PIDs (20824/21452/12600/8124): test if any in wkappbot ancestor chain -> CASCADIA match
 
 
 

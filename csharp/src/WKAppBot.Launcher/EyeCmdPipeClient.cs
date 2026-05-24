@@ -270,6 +270,41 @@ internal static class EyeCmdPipeClient
         IntPtr hiddenFallback = IntPtr.Zero;
         foreach (var targetPid in ancestorPids)
         {
+            // GA_ROOTOWNER PRE-PASS (verified 2026-05-24): A Windows Terminal tab spawns a
+            // VISIBLE PseudoConsoleWindow (rect [0,0,0,0]) inside its ConPTY host process.
+            // That PCW's GA_ROOTOWNER (flag=3) is the exact CASCADIA tab window that owns it.
+            // This is the only reliable way to map a ConPTY back to its specific WT tab when
+            // the direct launcher->WT ancestry is broken by dead intermediate PIDs -- the
+            // PCW's host process IS in our ancestor chain, so this resolves the correct tab.
+            // GA_ROOT (flag=2) is useless here (returns self for both WT-managed and
+            // AllocConsole'd PCWs). Vis=False PCWs [0,0,16,16] are AllocConsole'd and their
+            // GA_ROOTOWNER == self -- the IsWindowVisible gate skips those. Runs FIRST per
+            // ancestor (inner-to-outer) so the closest ConPTY tab wins.
+            IntPtr cascadiaMatch = IntPtr.Zero;
+            IntPtr pcwForLog = IntPtr.Zero;
+            EnumWindows((hWnd, _) =>
+            {
+                GetWindowThreadProcessId(hWnd, out uint wpid);
+                if (wpid != targetPid) return true; // not this ancestor
+                if (!IsWindow(hWnd) || !IsWindowVisible(hWnd)) return true;
+                var cls = new System.Text.StringBuilder(256);
+                GetClassNameW(hWnd, cls, 256);
+                if (cls.ToString() != "PseudoConsoleWindow") return true;
+                IntPtr rootOwner = GetAncestor(hWnd, 3 /* GA_ROOTOWNER */);
+                if (rootOwner == IntPtr.Zero || rootOwner == hWnd) return true; // self == useless
+                var ocls = new System.Text.StringBuilder(256);
+                GetClassNameW(rootOwner, ocls, 256);
+                if (!ocls.ToString().StartsWith("CASCADIA", StringComparison.Ordinal)) return true;
+                cascadiaMatch = rootOwner;
+                pcwForLog = hWnd;
+                return false; // found the WT tab for this ancestor -- stop scanning
+            }, IntPtr.Zero);
+            if (cascadiaMatch != IntPtr.Zero)
+            {
+                Console.Error.WriteLine($"[CALLER:HWND] via GA_ROOTOWNER PCW=0x{pcwForLog.ToInt64():X} CASCADIA=0x{cascadiaMatch.ToInt64():X}");
+                return cascadiaMatch;
+            }
+
             IntPtr visibleMatch = IntPtr.Zero;
             IntPtr hiddenMatch = IntPtr.Zero;
             EnumWindows((hWnd, _) =>
