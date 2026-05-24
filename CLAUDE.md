@@ -477,5 +477,8 @@ Use Read.cmd instead of native read_file
 - [x] EyeCmdPipeClient.ResolveCallerTerminalHwnd(): prefer visible/root/non-degenerate window per ancestor (Opus agent fix, committed 634f5721)
 - [x] Commit EyeCmdPipeClient.cs fix + remove chrome from IsKnownHostProcess fallback (634f5721)
 - [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position from WKAPPBOT_CHROME_TARGET pending, Core scope)
+- [x] ResolveCallerTerminalHwnd: add ConPTY owner process chain as 2nd attempt when launcher chain dead-ends (b1150b0b) -- needs real broken-chain verification
+- [ ] Verify ConPTY owner chain path: trigger dead-chain scenario, confirm [CALLER:HWND] via ConPTY log appears and Chrome lands on correct WT
+
 
 
