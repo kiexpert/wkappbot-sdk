@@ -386,24 +386,23 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 ■ First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.
 
 
-## Nightly Schedules (harness-enforced)
 
-> Mechanical gate: .claude/nightly-schedule-guard.ps1 blocks ALL tools (except `wkappbot skill*` and CLAUDE.md edits) if this section is missing.
-> Behavioral gate: BEFORE any Bash/PowerShell call this session (except `wkappbot skill*`):
->   1. CronList -- verify all 4 jobs below are present
->   2. If any missing -- CronCreate them first (Opus, durable=true, recurring=true)
->   3. Only then proceed with the shell command. This is MANDATORY, no exceptions.
+## Nightly Schedules
 
-| Time        | Repo         | Skill              | Model | Mode              |
-|-------------|--------------|--------------------|-------|-------------------|
-| 04:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
-| 05:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
-| 06:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
-| 07:13 daily | wkappbot-sdk | skill-heal-nightly | Opus  | durable recurring |
+> Hook (.claude/nightly-schedule-guard.ps1) denies Bash/PS until all headings below have a matching CronCreate in this session's JSONL.
+> Claude reads each `### CronCreate(...)` heading and executes it verbatim at session start. wkappbot skill* always exempt.
 
-> wkappbot skill* commands are EXEMPT from all cron gates -- always allowed.
-> Add new repos by appending rows. Hook checks section existence only; behavioral rule checks CronList.
+### CronCreate(cron="13 4 * * *", durable=true, recurring=true)
+wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
 
+### CronCreate(cron="13 5 * * *", durable=true, recurring=true)
+wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
+
+### CronCreate(cron="13 6 * * *", durable=true, recurring=true)
+wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
+
+### CronCreate(cron="13 7 * * *", durable=true, recurring=true)
+wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
 
 ## harness:safe CLAUDE\.md
 
