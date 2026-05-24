@@ -1,0 +1,35 @@
+{
+  "id": "cross-repo-launcher-build",
+  "app": "wkappbot-sdk",
+  "title": "Cross-repo launcher build",
+  "title_ko": null,
+  "desc": "Core CLI uses SDK WKAppBot.Launcher as single source of truth",
+  "steps": [
+    "WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\\GitHub, append wkappbot-sdk\\csharp\\src\\WKAppBot.Launcher\\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -q wkappbot-sdk D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj",
+      "expect": "0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search cross-repo",
+      "expect": "cross-repo-launcher-build",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot version",
+      "expect": "v7",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T14:06:01.0470815Z",
+  "updated": "2026-05-24T14:06:01.0470945Z",
+  "version": "1.0"
+}
