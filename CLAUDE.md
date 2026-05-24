@@ -512,4 +512,6 @@ Use Read.cmd instead of native read_file
 - [x] nightly-schedule-guard: Agent tool exempted from PreToolUse matcher (self-inflicted bug -- Agent was unnecessarily included)
 
 - [x] nightly-schedule-guard: removed brittle '## Nightly Schedules' section check (encoding mismatch; guard now relies only on CronCreate heading detection)
+- [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
+- [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
 - [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
