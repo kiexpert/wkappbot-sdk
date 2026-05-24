@@ -1,4 +1,4 @@
-namespace WKAppBot.Launcher;
+﻿namespace WKAppBot.Launcher;
 
 partial class Program
 {
@@ -189,11 +189,19 @@ partial class Program
 
             // Pick the most recently started chrome.exe top-level window -- that's
             // the Chrome instance Core just launched (or attached to / reused).
-            // Note: on tab-reuse, the start time will be the original Chrome's
-            // start time, but among multiple chrome.exe processes the recycled
-            // one is typically also the most-recently-used (Chrome reuses the
-            // newest in its session-restore queue).
-            candidates.Sort((a, b) => b.startedAt.CompareTo(a.startedAt));
+            // Secondary key: largest visible window area, so the main browser window
+            // (800x600+) is preferred over a small popup or app window from the same
+            // process when startedAt times are equal (same chrome.exe process).
+            candidates.Sort((a, b) => {
+                int cmp = b.startedAt.CompareTo(a.startedAt);
+                if (cmp != 0) return cmp;
+                // Same process: prefer larger window (browser > popup)
+                bool okA = TryGetWindowRectLTRB(a.hwnd, out var ra);
+                bool okB = TryGetWindowRectLTRB(b.hwnd, out var rb);
+                int areaA = okA ? ra.Width * ra.Height : 0;
+                int areaB = okB ? rb.Width * rb.Height : 0;
+                return areaB.CompareTo(areaA);
+            });
             var target = candidates[0].hwnd;
             Console.Error.WriteLine($"[PLACEMENT:STEP3] target=0x{target.ToInt64():X} pid={candidates[0].pid} startedAt={candidates[0].startedAt:HH:mm:ss}");
 
