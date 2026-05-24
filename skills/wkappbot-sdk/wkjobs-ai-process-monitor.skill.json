@@ -17,7 +17,8 @@
     "INTERNALS: Get-CimInstance Win32_Process for CommandLine+PPID, Win32_PerfFormattedData_PerfProc_Process for CPU% snapshot, Get-Process for WorkingSet64+Threads+SessionId",
     "NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error",
     "WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD) are relative symlinks to wkwrap.sh in same dir. Run wkwrap.sh --install to add more. See also: wkappbot skill read wkwrap-ai-native-wrappers",
-    "SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkjobs.ps1 (edit there). scripts/wkjobs.ps1 is a symlink (mode 120000). wkjobs.sh relay uses local wkwrap.sh copy so wkfind.sh keeps SDK-specific wkfind.ps1."
+    "SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkjobs.ps1 (edit there). scripts/wkjobs.ps1 is a symlink (mode 120000). wkjobs.sh relay uses local wkwrap.sh copy so wkfind.sh keeps SDK-specific wkfind.ps1.",
+    "PATH fix: prepend system dirs before codex exec to avoid PS shim shadowing system shell"
   ],
   "requirements": [
     {
@@ -47,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T06:56:55.2897667Z",
-  "updated": "2026-05-23T08:19:45.5543648Z",
-  "version": "1.5"
+  "updated": "2026-05-23T18:28:57.8752473Z",
+  "version": "1.6"
 }
