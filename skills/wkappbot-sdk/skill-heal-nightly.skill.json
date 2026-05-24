@@ -7,7 +7,8 @@
   "steps": [
     "STEP 1 SCHEDULE GATE (every session start): Run CronList tool. If no job with prompt containing skill-heal-nightly exists at 04:13: run CronCreate(cron='13 4 * * *', durable=true, recurring=true, prompt='Autonomous nightly loop: wkappbot skill read skill-heal-nightly -- then execute STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk'). Note job ID. Update CLAUDE.md Nightly Schedules table row with job ID. This job survives Claude restarts via .claude/scheduled_tasks.json.",
     "STEP 2 HEALING (fires at 04:13 -- Opus agent mandatory): Agent(model='opus', prompt='Nightly skill heal for wkappbot-sdk. Steps: (1) Run: wkappbot skill audit -- list all broken source_refs. (2) For each broken skill: wkappbot skill edit ID to remove or update the broken ref. (3) Run: wkappbot skill read repo-health-doctor -- apply all LITE steps (10=skill audit, 8=README sync, 9=AGENTS parity, 5=CLAUDE.md empty sections). (4) PENDING COMPRESS: read CLAUDE.md Pending section. If done [x] count above 15: group old [x] entries by topic into 1-line summaries, keep open [ ] and recent [x] verbatim. (5) git add -A and git commit -m chore: nightly skill heal DATE. (6) wkappbot speak nightly skill heal complete --bg')",
-    "STEP 3 VERIFY (after Opus agent returns): git log --oneline -1 to confirm commit exists. CronList to confirm job still active. Report summary: skills fixed, Pending items compressed, commit hash."
+    "STEP 3 VERIFY (after Opus agent returns): git log --oneline -1 to confirm commit exists. CronList to confirm job still active. Report summary: skills fixed, Pending items compressed, commit hash.",
+    "UNIVERSAL SCHEDULE INTERFACE: Any entity (wkappbot, harness, external script) can schedule a Claude loop by writing a '### CronCreate(cron=\"...\", durable=true, recurring=true)' heading to CLAUDE.md Nightly Schedules section. PostToolUse hook (claudemd-schedule-sync.ps1) auto-detects new headings on every CLAUDE.md Write/Edit and injects additionalContext so Claude immediately CronCreates them. wkappbot: use 'wkappbot file edit CLAUDE.md' or append via script. Harness: write heading via Edit tool in a harness action. No session restart required -- fires within same turn."
   ],
   "requirements": [
     {
@@ -45,6 +46,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-24T14:31:20.058561Z",
-  "version": "1.0"
+  "updated": "2026-05-24T15:29:12.8013471Z",
+  "version": "1.1"
 }
