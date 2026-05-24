@@ -481,6 +481,7 @@ Use Read.cmd instead of native read_file
 - [x] Verify ConPTY chain: DEAD -- AllocConsole PCW=[0,0,16,16] no placement; CASCADIA [W]=XAML InputSite; WT_SESSION=empty; largest-CASCADIA only working fallback
 - [x] Multi-WT disambiguation: GA_ROOTOWNER(Vis=True PCW) -> CASCADIA verified + deployed (c631b2f3) -- 3 consistent calls on dead-chain env
 - [ ] WT Vis=True PCW PIDs (20824/21452/12600/8124): test if any in wkappbot ancestor chain -> CASCADIA match
+- [x] CDP popup notification: 3 suggests merged; CdpClient.PopupNotification.cs implemented (2c4ab3fee) -- POPUP {proc:'chrome',cdp:PORT,tab:'ID8:title'} emitted after CDP eval actions
 
 
 
