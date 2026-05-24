@@ -1,0 +1,50 @@
+{
+  "id": "skill-heal-nightly",
+  "app": "wkappbot-sdk",
+  "title": "Nightly Skill Heal: AI Self-Improvement Loop",
+  "title_ko": null,
+  "desc": "Autonomous overnight skill healing. Durable CronCreate fires 04:13 daily. Opus agent audits and heals broken skills, compresses CLAUDE.md Pending, commits. Pure Claude-native loop -- no wkappbot dependency for scheduling. wkappbot commands used inside steps only.",
+  "steps": [
+    "STEP 1 SCHEDULE GATE (every session start): Run CronList tool. If no job with prompt containing skill-heal-nightly exists at 04:13: run CronCreate(cron='13 4 * * *', durable=true, recurring=true, prompt='Autonomous nightly loop: wkappbot skill read skill-heal-nightly -- then execute STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk'). Note job ID. Update CLAUDE.md Nightly Schedules table row with job ID. This job survives Claude restarts via .claude/scheduled_tasks.json.",
+    "STEP 2 HEALING (fires at 04:13 -- Opus agent mandatory): Agent(model='opus', prompt='Nightly skill heal for wkappbot-sdk. Steps: (1) Run: wkappbot skill audit -- list all broken source_refs. (2) For each broken skill: wkappbot skill edit ID to remove or update the broken ref. (3) Run: wkappbot skill read repo-health-doctor -- apply all LITE steps (10=skill audit, 8=README sync, 9=AGENTS parity, 5=CLAUDE.md empty sections). (4) PENDING COMPRESS: read CLAUDE.md Pending section. If done [x] count above 15: group old [x] entries by topic into 1-line summaries, keep open [ ] and recent [x] verbatim. (5) git add -A and git commit -m chore: nightly skill heal DATE. (6) wkappbot speak nightly skill heal complete --bg')",
+    "STEP 3 VERIFY (after Opus agent returns): git log --oneline -1 to confirm commit exists. CronList to confirm job still active. Report summary: skills fixed, Pending items compressed, commit hash."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill audit",
+      "expect": "source_refs audit complete",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-heal-nightly",
+      "expect": "STEP 1 SCHEDULE GATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill news",
+      "expect": "recently updated skills list",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "nightly",
+    "heal",
+    "skill",
+    "audit",
+    "cron",
+    "schedule",
+    "autonomous",
+    "sleep",
+    "repair",
+    "compress",
+    "pending",
+    "opus"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T14:31:20.0585515Z",
+  "updated": "2026-05-24T14:31:20.058561Z",
+  "version": "1.0"
+}

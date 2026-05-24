@@ -385,6 +385,19 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 4:30 PM.
 ■ First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.
 
+
+## Nightly Schedules (harness-enforced)
+
+> Hook (.claude/nightly-schedule-guard.ps1) blocks ALL tools if this section is missing.
+> Only Edit/Write to CLAUDE.md allowed until section declared. Opus handles actual healing.
+
+| Time  | Repo           | Skill              | Model | Mode          |
+|-------|----------------|--------------------|-------|---------------|
+| 04:13 | wkappbot-sdk   | skill-heal-nightly | Opus  | durable daily |
+
+> Run `CronList` to verify active jobs match table. If missing: `wkappbot skill read skill-heal-nightly` step 1.
+> Add new repos by appending rows. Hook checks section existence only.
+
 ## harness:safe CLAUDE\.md
 
 ## harness:warn wkedit.*--line.*\\
