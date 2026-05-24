@@ -246,30 +246,67 @@ internal static class EyeCmdPipeClient
 
         // Walk ancestor PIDs in order; for each, EnumWindows looking for a usable window.
         // First hit on the closest ancestor wins.
+        //
+        // PREFERENCE ORDER (per ancestor, closest first):
+        //   1. A VISIBLE, root, non-degenerate window -- the real terminal window we
+        //      want for Chrome placement (Windows Terminal CASCADIA host, VS Code,
+        //      Claude IDE, etc.). Return it immediately.
+        //   2. A hidden window with a non-zero rect (ConPTY PseudoConsoleWindow) --
+        //      kept only as a LAST-RESORT fallback if NO ancestor in the whole chain
+        //      owns a visible window.
+        //
+        // Why visible-first matters: ConPTY (PseudoConsoleWindow) windows live INSIDE
+        // the AppBot's own process (claude.exe etc.), are hidden, sit at a degenerate
+        // (0,0,16,16) rect, and are NOT child windows of the terminal host
+        // (GetParent==0, GetAncestor(GA_ROOT)==self -- verified). They carry no usable
+        // placement coordinates and cannot be walked up to a visible parent. The OLD
+        // code returned the first match per ancestor, so the hidden ConPTY of the
+        // nearest AppBot ancestor short-circuited the walk before it reached the
+        // visible Windows Terminal further up the chain. Downstream
+        // ResolveValidCallerWindow then rejected the hidden window and fell back to a
+        // GLOBAL-largest-window heuristic -- which picks the wrong terminal when more
+        // than one terminal is open. Preferring the visible ancestor window here makes
+        // resolution ancestry-driven and correct regardless of terminal count.
+        IntPtr hiddenFallback = IntPtr.Zero;
         foreach (var targetPid in ancestorPids)
         {
-            IntPtr match = IntPtr.Zero;
+            IntPtr visibleMatch = IntPtr.Zero;
+            IntPtr hiddenMatch = IntPtr.Zero;
             EnumWindows((hWnd, _) =>
             {
                 GetWindowThreadProcessId(hWnd, out uint wpid);
                 if (wpid != targetPid) return true; // not this ancestor
                 if (!IsWindow(hWnd)) return true;
-                // Visible windows must be root (filters owned popups / tool windows).
-                // Hidden windows (e.g. ConPTY PseudoConsoleWindow) skip the root check --
-                // they are not root windows but ARE valid as caller identity + GA_ROOT
-                // gives their visible ancestor for placement coords.
-                if (IsWindowVisible(hWnd) && GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
                 if (!GetWindowRect(hWnd, out RECT rect)) return true;
-                if (rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0) return true; // zero rect
-                match = hWnd;
-                return false;
+                bool degenerate = rect.Right - rect.Left <= 0 && rect.Bottom - rect.Top <= 0;
+                if (IsWindowVisible(hWnd))
+                {
+                    // Visible windows must be root (filters owned popups / tool windows)
+                    // and have a non-degenerate rect to be a real placement anchor.
+                    if (GetAncestor(hWnd, 2 /* GA_ROOT */) != hWnd) return true;
+                    if (degenerate) return true;
+                    visibleMatch = hWnd;
+                    return false; // best candidate for this ancestor -- stop scanning
+                }
+                // Hidden window (e.g. ConPTY PseudoConsoleWindow): remember only as a
+                // last-resort fallback. Reject fully-zero rects -- they carry nothing.
+                if (!degenerate && hiddenMatch == IntPtr.Zero)
+                    hiddenMatch = hWnd;
+                return true;
             }, IntPtr.Zero);
-            if (match != IntPtr.Zero) return match;
+
+            // A visible window on the closest ancestor wins outright.
+            if (visibleMatch != IntPtr.Zero) return visibleMatch;
+            // Otherwise keep the FIRST (closest-ancestor) hidden window seen, but keep
+            // walking -- a further ancestor may still own a visible terminal window.
+            if (hiddenFallback == IntPtr.Zero && hiddenMatch != IntPtr.Zero)
+                hiddenFallback = hiddenMatch;
         }
 
-        // No ancestor owns a usable window. Do NOT fall back to foreground --
-        // foreground is someone else's window and would be wrong every time.
-        return IntPtr.Zero;
+        // No ancestor owns a visible window. Return the closest hidden ConPTY window
+        // (if any) so the caller still has a valid identity hwnd. Do NOT fall back to
+        // foreground -- foreground is someone else's window and would be wrong every time.
+        return hiddenFallback;
     }
 
     /// <summary>
