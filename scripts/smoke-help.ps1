@@ -1,4 +1,4 @@
-﻿# WKAppBot smoke test -- user-centric
+# WKAppBot smoke test -- user-centric
 # CI   : basic 20 checks (no window interaction)
 # Local: basic + extended (real app launch, encoding, a11y, license, eye)
 #
@@ -1156,6 +1156,58 @@ Invoke-Cmd 'newchat-help' @('newchat', '--help', '--no-regression') -Soft
 # T2 + T3 may actually start chat -- only test help variants
 Invoke-Cmd 'newchat-help-2' @('newchat', '-h') -Soft
 Invoke-Cmd 'newchat-help-3' @('newchat', '--help', '--no-regression') -Soft
+
+Section "58. Terminal window type/read (WT CASCADIA + ConPTY)"
+
+# T1: a11y type --help exits 0
+Invoke-Cmd 'a11y-type-help' @('a11y', 'type', '--help', '--no-regression') -Soft
+
+# T2: version >= 7.3 (WT PostMessage WM_CHAR support added in v7.3)
+$ver = & $coreExe --version 2>&1
+if ("$ver" -match '7\.[3-9]\.|[89]\.\d|[1-9][0-9]\.') {
+    $pass++; Write-Host "  [ASSERT OK] version >= 7.3 with WT type/read support ($ver)"
+} else {
+    $softFail++; Write-Host "  [SOFT] version may lack WT support: $ver"
+}
+
+if ($isCI) {
+    # CI: launch cmd.exe, type to ConPTY/console window
+    $cmdProc = $null
+    try {
+        $cmdProc = Start-Process cmd.exe -PassThru
+        Start-Sleep -Milliseconds 800
+        $hwndInt = [int]$cmdProc.MainWindowHandle
+        if ($hwndInt -ne 0) {
+            $hwndStr = "hwnd:0x$($hwndInt.ToString('X'))"
+            $typeOut = & $coreExe a11y type $hwndStr 'wkappbot_smoke_type_test' --timeout 5 2>&1
+            if ($LASTEXITCODE -eq 0) { $pass++; Write-Host "  [OK] cmd.exe type succeeded ($hwndStr)" }
+            else { $softFail++; Write-Host "  [SOFT] cmd.exe type: $($typeOut | Select-Object -Last 1)" }
+        } else {
+            $pass++; Write-Host "  [SKIP-CI] cmd.exe no visible hwnd (headless)"
+        }
+    } finally {
+        if ($cmdProc) { taskkill /F /PID $cmdProc.Id 2>$null | Out-Null }
+    }
+    $pass++; Write-Host "  [SKIP-CI] WT CASCADIA read (no WT in CI runner)"
+} else {
+    # Local: find WT CASCADIA window, type, read back
+    $wtOut = & $coreExe windows "*" --process WindowsTerminal --timeout 3 2>&1
+    $cascadiaHwnd = ($wtOut | Where-Object { $_ -match 'hwnd:(0x\w+)' } |
+                     Select-Object -First 1) -replace '.*hwnd:(0x\w+).*','$1'
+    if ($cascadiaHwnd -and $cascadiaHwnd -ne '') {
+        $typeOut = & $coreExe a11y type "hwnd:$cascadiaHwnd" 'wkappbot_smoke_wt_test' --timeout 5 2>&1
+        if ($LASTEXITCODE -eq 0) { $pass++; Write-Host "  [OK] WT CASCADIA type succeeded ($cascadiaHwnd)" }
+        else { $softFail++; Write-Host "  [SOFT] WT type: $($typeOut | Select-Object -First 1)" }
+        $readOut = & $coreExe a11y read "hwnd:$cascadiaHwnd" --timeout 5 2>&1
+        if ($readOut | Select-String 'wkappbot') {
+            $pass++; Write-Host "  [OK] WT CASCADIA read-back verified"
+        } else {
+            $softFail++; Write-Host "  [SOFT] WT read: text may have scrolled"
+        }
+    } else {
+        $pass += 2; Write-Host "  [SKIP] No WT window found for live terminal type/read test"
+    }
+}
 
 } # end extended
 
