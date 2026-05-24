@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
+# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -505,3 +505,11 @@ Use Read.cmd instead of native read_file
 
 
 
+- [x] cross-repo-claude-notify: WM_CHAR to InputSite (focusless write) + UIAutomation TextPattern (focusless read) verified, skill v1.6
+- [x] wt-terminal-a11y-type-read-design skill: design spec created for Core a11y type/read WT support
+- [x] a11y type WT bug suggest filed (CASCADIA_HOSTING_WINDOW_CLASS 10s timeout)
+- [x] Core: TerminalWindowHelper.cs + ActionExecutor hooks for a11y type/read on WT -- PostMessage WM_CHAR + FlaUI TextPattern, v7.3.224 deployed (Opus agent)
+- [x] nightly-schedule-guard: Agent tool exempted from PreToolUse matcher (self-inflicted bug -- Agent was unnecessarily included)
+
+- [x] nightly-schedule-guard: removed brittle '## Nightly Schedules' section check (encoding mismatch; guard now relies only on CronCreate heading detection)
+- [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
