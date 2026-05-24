@@ -467,3 +467,5 @@ Use Read.cmd instead of native read_file
 - [x] codex-tool-wrappers skill: steps 12-18 added (Windows sandbox bug, PATH-FIX, Agent.cmd dual-conv, bash-wrapper-test, subprocess-wkappbot timeout finding)
 - [x] Codex exec PATH shadowing: PowerShell.cmd shim (WKAppBot/bin) shadows system shell; codex exec uses shim as PS interpreter -- fix: use wkappbot file cmds or prepend system path
 - [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout; wkappbot cmds hang in subprocess
+- [x] agent-leak-guard: stray-brace fix (syntax err, guards disabled) + -All + exit2->Block + powershell abs path (PATH shadow)
+- [ ] agent-leak-guard: verify Agent blocked when zombies exist
