@@ -1,0 +1,37 @@
+{
+  "id": "ev-contrib-ux-2073971",
+  "app": "test-ev",
+  "title": "EV Contrib UX ev-contrib-ux-2073971",
+  "title_ko": null,
+  "desc": "evidence test",
+  "steps": [
+    "step one",
+    "step two",
+    "step three"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "test-ev",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ev-contrib-ux-2073971",
+      "expect": "step one",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T14:30:19.0522176Z",
+  "updated": "2026-05-24T14:30:19.0522311Z",
+  "version": "1.0"
+}

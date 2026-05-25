@@ -1,0 +1,53 @@
+{
+  "id": "wt-terminal-a11y-type-read-design",
+  "app": "wkappbot-sdk",
+  "title": "WT Terminal a11y Type/Read Design",
+  "title_ko": null,
+  "desc": "Design spec: CASCADIA_HOSTING_WINDOW_CLASS support for a11y type and read. type uses PostMessage WM_CHAR to InputSite (focusless, no 10s timeout). read uses TextPattern.DocumentRange.GetText. Both verified.",
+  "steps": [
+    "ROOT CAUSE: wkappbot a11y type on CASCADIA_HOSTING_WINDOW_CLASS fails after 10s UIA timeout. ValuePattern.SetValue unavailable on WT terminal; SendInput misses InputSite child. a11y read returns only Name+Value concat, ignores existing TextPattern on terminal Text element.",
+    "TARGET FILES: Add TerminalWindowHelper.cs to WKAppBot.Win32. Hook ActionExecutor type action (pre-check IsTerminalWindow) and read action (check TextPattern before Name+Value fallback).",
+    "TERMINALWINDOWHELPER API: (1) IsTerminalWindow(hwnd)=GetClassName==CASCADIA_HOSTING_WINDOW_CLASS. (2) FindInputSite(hwnd)=EnumChildWindows for Windows.UI.Input.InputSite.WindowClass child. (3) TypeToTerminal(hwnd,text)=PostMessage(inputSite,WM_CHAR=0x0102,char,Zero) per char 10ms NO SetForegroundWindow. (4) ReadTerminalText(hwnd,tabName)=AutomationElement.FromHandle(hwnd).FindFirst(Descendants,NameProperty==tabName).TextPattern.DocumentRange.GetText(4000).",
+    "TYPE HOOK in ActionExecutor: before UIA SetValue path add: if(TerminalWindowHelper.IsTerminalWindow(resolvedHwnd)){TerminalWindowHelper.TypeToTerminal(resolvedHwnd,text);return Ok;} -- eliminates 10s timeout, fully focusless.",
+    "READ HOOK in ActionExecutor: after GetAutomationElement add: if(element.GetSupportedPatterns().Contains(TextPattern.Pattern)){return ((TextPattern)element.GetCurrentPattern(TextPattern.Pattern)).DocumentRange.GetText(4000);} -- TextPattern on WT terminal Text element already implemented, just not called.",
+    "POWERSHELL PROOF (verified in session): TypeToTerminal -- WkAutoQuant Claude received WM_CHAR message and responded without focus disruption. ReadTerminalText -- full terminal text returned via UIAutomationClient. Both confirmed focusless via screenshot.",
+    "SMOKE TESTS: wkappbot a11y type test CASCADIA_HWND => OK no 10s wait. wkappbot a11y read CASCADIA_HWND => terminal text returned not empty. focus stays on caller window throughout."
+  ],
+  "requirements": [
+    {
+      "cmd": "proposed: wkappbot a11y type 'test' CASCADIA_HWND",
+      "expect": "OK text appears without 10s timeout",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot a11y read CASCADIA_HWND",
+      "expect": "terminal text content returned not empty",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot a11y type 'msg' CASCADIA_HWND",
+      "expect": "focus stays on caller window",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "type",
+    "read",
+    "windows-terminal",
+    "cascadia",
+    "inputsite",
+    "wm-char",
+    "textpattern",
+    "focusless",
+    "design",
+    "core-fix"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T16:28:38.1282151Z",
+  "updated": "2026-05-24T16:28:38.1282291Z",
+  "version": "1.0"
+}

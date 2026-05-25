@@ -510,3 +510,6 @@ Use Read.cmd instead of native read_file
 - [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
 - [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
 - [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
+
+- [x] nightly-schedule-guard: fixed 3 bugs (slug regex, cwd backslash, Join-String PS5.1 incompatible)
+- [x] nightly-schedule-guard: globalize to ~/.claude/settings.json PreToolUse + remove local PreToolUse from settings.local.json

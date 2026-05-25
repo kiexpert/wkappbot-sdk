@@ -5,14 +5,14 @@
   "title_ko": null,
   "desc": "Find an active Claude (wkchat) session for a target repo by matching tab title text 'wkchat [REPO]', then type a message into it. Enables wkappbot or harness to wake/notify a Claude session in a different repo -- the universal cross-repo IPC pattern. Caller finds CASCADIA hwnd via wkappbot a11y find proc:wkchat, matches tab text, types message + newline.",
   "steps": [
-    "FIND TARGET WINDOW: wkappbot a11y find \"{proc:'wkchat'}\" -- scan output for 'Text wkchat [REPO_NAME]' element. The parent CASCADIA hwnd on the same result block is the target window. Example output: window hwnd:0x606A2 + element Text 'wkchat [WkAutoQuant]' -> target hwnd=0x606A2.",
-    "TYPE MESSAGE: wkappbot a11y type \"YOUR_MESSAGE\\n\" hwnd:0xTARGET -- the newline submits. For schedule notifications: 'CLAUDE.md updated: new ### CronCreate heading added. Run CronCreate now.\\n'. For wkappbot-sdk notifying WKAppBot: wkappbot a11y find \"{proc:'wkchat'}\" then extract hwnd where tab text contains [WKAppBot], then type.",
-    "FULL ONE-LINER PATTERN: TARGET=$(wkappbot a11y find \"{proc:'wkchat'}\" 2>&1 ",
-    " grep -B2 'wkchat \\[WKAppBot\\]' ",
-    " grep 'hwnd:0x' ",
-    " grep -oP 'hwnd:0x[0-9A-F]+' ",
-    " head -1) && wkappbot a11y type \"msg\\n\" $TARGET",
-    "CORRECT COMMAND: use 'wkappbot windows \"{proc:'wkchat'}\"' (not a11y find) for full cross-window scan. Output: 'window {hwnd:0xAAAA}' followed by 'element Text wkchat [REPO]' on next line. Parse: for each wkchat tab element, capture the hwnd from the preceding window line. That hwnd is the WT window to type into. Each repo's Claude session is typically in its own WT window, so hwnd is unique per repo. One-liner: wkappbot windows \"{proc:'wkchat'}\" 2>&1 | python3 -c \"import sys,re; txt=sys.stdin.read(); [print(f'{m2.group(1):20} hwnd={m1.group(1)}') for m1,m2 in zip(re.finditer(r'hwnd:(0x[0-9A-Fa-f]+)', txt), re.finditer(r'wkchat \\[([^\\]]+)\\]', txt))]\""
+    "IDENTIFY REPO SESSION (one-liner): Add-Type ProcCwd class below, then: Get-Process wkchat ",
+    " ForEach-Object { [PSCustomObject]@{PID=$_.Id; CWD=[ProcCwd]::GetCwd($_.Id)} } ",
+    " Format-Table. Maps each wkchat PID to its repo CWD (e.g. PID=16944 CWD=D:\\GitHub\\WkAutoQuant). Use to find target PID for a given repo path.",
+    "PROCWD CLASS (copy-paste): Add-Type -TypeDefinition @' using System; using System.Runtime.InteropServices; using System.Text; public class ProcCwd { [DllImport(kernel32.dll)] static extern IntPtr OpenProcess(uint da, bool ih, int pid); [DllImport(kernel32.dll)] static extern bool ReadProcessMemory(IntPtr ph, IntPtr ba, byte[] buf, int sz, out int rd); [DllImport(kernel32.dll)] static extern bool CloseHandle(IntPtr h); [DllImport(ntdll.dll)] static extern int NtQueryInformationProcess(IntPtr ph, int pic, ref PBI pbi, int sz, out int rl); [StructLayout(LayoutKind.Sequential)] public struct PBI { public IntPtr r1, PebBase, r2, r3, r4, r5; } public static string GetCwd(int pid) { var h=OpenProcess(0x1410,false,pid); if(h==IntPtr.Zero) return null; try { var pbi=new PBI(); int rl; if(NtQueryInformationProcess(h,0,ref pbi,Marshal.SizeOf(pbi),out rl)!=0) return null; var peb=new byte[0x400]; int rd; if(!ReadProcessMemory(h,pbi.PebBase,peb,peb.Length,out rd)) return null; var ppA=BitConverter.ToInt64(peb,0x20); var pp=new byte[0x500]; if(!ReadProcessMemory(h,new IntPtr(ppA),pp,pp.Length,out rd)) return null; short len=BitConverter.ToInt16(pp,0x38); long ptr=BitConverter.ToInt64(pp,0x40); if(len<=0",
+    "",
+    "ptr==0) return null; var b=new byte[len]; if(!ReadProcessMemory(h,new IntPtr(ptr),b,len,out rd)) return null; return Encoding.Unicode.GetString(b).TrimEnd(new char[]{(char)92,(char)47}); } finally { CloseHandle(h); } } } '@",
+    "FIND CASCADIA HWND: wkappbot windows {proc:'wkchat'} output parse -- each result block has 'window {hwnd:0xNNNN CASCADIA}' line + 'element Text wkchat [REPO]' line. Target hwnd = CASCADIA hwnd of the WT window whose active tab is the repo's Claude session. Verified pattern: hwnd:0x606A2 contained WkAutoQuant as active tab (window title reflects active tab task).",
+    "FOCUSLESS WRITE (copy-paste): Add-Type -TypeDefinition @' using System; using System.Runtime.InteropServices; using System.Text; public class WtWrite { [DllImport(user32.dll)] static extern bool EnumChildWindows(IntPtr p, EnumChildProc cb, IntPtr lp); [DllImport(user32.dll)] static extern int GetClassName(IntPtr h, StringBuilder s, int n); [DllImport(user32.dll)] static extern bool PostMessage(IntPtr h, uint msg, IntPtr wp, IntPtr lp); public delegate bool EnumChildProc(IntPtr h, IntPtr lp); public static IntPtr FindInputSite(IntPtr hwnd) { IntPtr r=IntPtr.Zero; EnumChildWindows(hwnd,(h,lp)=>{ var c=new StringBuilder(256); GetClassName(h,c,256); if(c.ToString().Contains(InputSite)){r=h;return false;} return true; },IntPtr.Zero); return r; } public static void Type(IntPtr cascadiaHwnd, string text) { var site=FindInputSite(cascadiaHwnd); if(site==IntPtr.Zero) return; foreach(char c in text){PostMessage(site,0x0102u,(IntPtr)c,IntPtr.Zero);System.Threading.Thread.Sleep(10);} } } '@ ; [WtWrite]::Type([IntPtr]0xCACADIA_HWND, message"
   ],
   "requirements": [
     {
@@ -51,6 +51,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T15:36:57.4844921Z",
-  "updated": "2026-05-24T15:38:02.1169632Z",
-  "version": "1.1"
+  "updated": "2026-05-24T16:22:40.3424352Z",
+  "version": "1.7"
 }

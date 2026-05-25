@@ -1,0 +1,36 @@
+{
+  "id": "ev-draft-2073949",
+  "app": "test-ev",
+  "title": "Draft Test ev-draft-2073949",
+  "title_ko": null,
+  "desc": "draft persistence evidence",
+  "steps": [
+    "step one",
+    "step two"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "test-ev",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ev-draft-2073949",
+      "expect": "step one",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T14:30:17.7952651Z",
+  "updated": "2026-05-24T14:30:17.7952776Z",
+  "version": "1.0"
+}

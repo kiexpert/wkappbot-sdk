@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "cdp-command-guide",
   "app": "wkappbot-workflow",
   "title": "CDP Command Complete Guide",
@@ -23,7 +23,8 @@
     "cdp-mon JS ALERT detection: Get-TabIdle connects WebSocket (200ms timeout); if connect OK but Runtime.evaluate times out (300ms) -> Alert=true. JS alerts block all CDP eval -- tab shows LAT=ALERT in report. Post-command alerts (fired after wkappbot exits) are NOT detected by cdp-mon; only stale alerts blocking at poll time are caught. Fix: wkappbot cdp eval '{cdp:PORT}' 'window.onbeforeunload=null' to clear blocking handlers.",
     "cdp-mon IME DAEMON: Watch-ImeDaemon counts *ime-relay-daemon* processes; if 2+ found, auto-kills oldest by StartTime (unless -nofix). Root cause of duplicates: HasRealImeContext(WT hwnd) was returning true on CASCADIA_HOSTING_WINDOW_CLASS (ConPTY) because ImmGetContext returns non-null even though IME is non-functional. Fix (commit 139cf6fb): check UnicodeWindowClasses list BEFORE ImmGetContext -- if class matches WT/Chrome/WinRT, return false immediately.",
     "cdp-mon PS5.1 GOTCHAS: (1) localhost resolves to IPv6 on Win11 but Chrome CDP binds 127.0.0.1 only -- always use http://127.0.0.1:PORT/json with 'Host: localhost' header. (2) switch -Wildcard incompatible with scriptblock cases in PS5.1 -- use if/elseif chain. (3) ?? null-coalescing not available in PS5.1 -- use if/else. (4) Nullable struct: .Value.L fails -- PS unwraps nullable automatically, use .L.",
-    "cdp-mon TAB ACCUMULATION BUG (gemini-whisper, fixed fe65cbf0): WhisperStudy was passing --target-tag {engine}-whisper to EnsureCdpConnection, causing sandbox-miss on wrong Chrome instance (HTS port 9712 instead of project port). Fix: removed --target-tag arg entirely -- EnsureCdpConnection URL-matches existing Gemini tab by host, no new tab creation. Symptom: cdp-tab-growth.jsonl shows repeated gemini-whisper sandbox-miss-create entries on unexpected port."
+    "cdp-mon TAB ACCUMULATION BUG (gemini-whisper, fixed fe65cbf0): WhisperStudy was passing --target-tag {engine}-whisper to EnsureCdpConnection, causing sandbox-miss on wrong Chrome instance (HTS port 9712 instead of project port). Fix: removed --target-tag arg entirely -- EnsureCdpConnection URL-matches existing Gemini tab by host, no new tab creation. Symptom: cdp-tab-growth.jsonl shows repeated gemini-whisper sandbox-miss-create entries on unexpected port.",
+    "CALLER HWND DETECTION: Launcher walks ancestor PID chain via NtQueryInformationProcess PROCESS_BASIC_INFORMATION.InheritedFromUniqueProcessId (64-bit offset=40). If chain shows [{pid:8}] only, the binary predates the offset-40 fix (offset was 24=BasePriority=8). Fix landed in SDK commit d69b080b (2026-05-24). With the fix, chain shows full powershell->claude->wkchat ancestry and HWND resolves to the nearest terminal/IDE window."
   ],
   "requirements": [
     {
@@ -59,6 +60,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:34:33.318371Z",
-  "updated": "2026-05-09T16:20:32.3883447Z",
-  "version": "1.14"
+  "updated": "2026-05-24T08:30:25.7710307Z",
+  "version": "1.15"
 }

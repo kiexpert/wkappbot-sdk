@@ -16,7 +16,8 @@
     "BUGS FIXED (do not regress): Gap A stale CallerHwndForPlacement reset (7c19f50cb). Gap B EyeMcpClient static leak (d7bc05191). Gap G IsWindow validation on pipe parse (d7bc05191). Gap I MCP _meta validation (d7bc05191). Gap D/J Admin Eye --sudo (d557c6486). P1/P3 foreground removed (08b0b423). P2 hidden-window support (e450655a). GA_ROOT simplification (6d656296d). WithAutoReconnectAsync on CDP DOM calls (26dd30c8). Chrome placement on every ask command (2ca0500a7).",
     "WHAT NOT TO DO: Never use GetForegroundWindow() for caller detection. Never require IsWindowVisible in P2. Never use two IPC fields (__hwnd + __conhwnd) -- one hwnd handles all use cases. Never fall back to foreground when Zero returned -- skip and keep Chrome in place. Never reject ConPTY by class name in P2. Never use negative x coordinate as off-screen signal -- use MonitorFromPoint.",
     "DPI-AWARE COORDINATE PIPELINE: AppBot window rect (GetWindowRect) returns PHYSICAL pixel coordinates when process is PerMonitorV2 DPI-aware (set via TrySetPerMonitorV2DpiAwareness at Launcher startup). Three DPI values matter: (1) callerDpi = GetDpiForWindow(callerHwnd) -- DPI of the monitor hosting the caller window. (2) chromeDpi = GetDpiForWindow(chromeHwnd via Win32) -- DPI of the monitor hosting Chrome. (3) System DPI = GetDpiForSystem() -- baseline 96dpi reference. All placement calculations must stay in PHYSICAL pixels end-to-end. Do not mix logical and physical coordinates. MonitorFromPoint + GetMonitorInfo.rcWork always returns physical coords when process is PerMonitorV2 aware. ClampBoundsToVisible operates in physical coords. If caller and Chrome are on different DPI monitors, the raw rect coords are already correct in physical space -- no scaling needed between monitors when using physical coords throughout.",
-    "DPI verified 2026-05-16: wkappbot-core.exe now sets PerMonitorV2 awareness in Program.Dispatch.Run() via NativeMethods.TrySetPerMonitorV2DpiAwarenessOnce(). Caller GetWindowRect + CDP Browser.setWindowBounds + Win32 SetWindowPos all exchange PHYSICAL pixels end-to-end. No LogicalToPhysical conversion needed in TryMoveChromeToCallerAsync."
+    "DPI verified 2026-05-16: wkappbot-core.exe now sets PerMonitorV2 awareness in Program.Dispatch.Run() via NativeMethods.TrySetPerMonitorV2DpiAwarenessOnce(). Caller GetWindowRect + CDP Browser.setWindowBounds + Win32 SetWindowPos all exchange PHYSICAL pixels end-to-end. No LogicalToPhysical conversion needed in TryMoveChromeToCallerAsync.",
+    "WINDOW SELECTION DIVERGENCE (2026-05-24): SDK Launcher ResolveCallerTerminalHwnd() guards with IsWindowVisible before accepting a window. Core CallerPlacementResolver.ResolveHwndFromPidChain() only checks non-zero rect (no visibility check). If the same ancestor PID owns both a hidden ConPTY window and a visible terminal window, Core picks the hidden one while SDK picks the visible one -- placement diverges. Fix: Core should add IsWindowVisible guard matching SDK behavior. Tracked via suggest 1779611928."
   ],
   "requirements": [
     {
@@ -46,6 +47,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T15:41:54.5684714Z",
-  "updated": "2026-05-15T16:17:46.3306732Z",
-  "version": "1.5"
+  "updated": "2026-05-24T08:39:09.1156992Z",
+  "version": "1.6"
 }

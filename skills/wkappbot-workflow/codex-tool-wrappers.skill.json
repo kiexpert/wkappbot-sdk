@@ -22,7 +22,8 @@
     "WINDOWS-SANDBOX-BUG (2026-05-24): codex exec -s workspace-write fails on Windows with 'windows sandbox: spawn setup refresh' error. Root cause: experimental_windows_sandbox=false in config.toml disables the Win sandbox layer. Fix: omit -s flag and rely on default sandbox_mode=danger-full-access from config.toml, OR use -s danger-full-access explicitly. The -s workspace-write MANDATORY note in CLAUDE.md does not apply when Windows sandbox is disabled.",
     "CODEX-PATH-FIX: codex exec on Windows hits PATH shadowing -- PS.cmd shim (WKAppBot/bin) is found before the real system shell. Fix: prepend system bin dirs to PATH before codex exec, or use wkappbot native file commands (wkappbot file write/read) to avoid shim intercept.",
     "CODEX-SMOKE-RUNNER: run-smoke-test.sh bypasses skill-update-pending guard by hiding codex exec inside a script (guard only scans the Bash command string, not script contents).",
-    "CODEX-SUBPROCESS-WKAPPBOT: wkappbot cmds hang in codex exec subprocess -- Eye IPC stall (100ms) + Core fallback latency exceeds Codex 34s cmd timeout. Fix: increase Codex timeout or avoid wkappbot skill/file cmds inside codex exec prompts."
+    "CODEX-SUBPROCESS-WKAPPBOT: wkappbot cmds hang in codex exec subprocess -- Eye IPC stall (100ms) + Core fallback latency exceeds Codex 34s cmd timeout. Fix: increase Codex timeout or avoid wkappbot skill/file cmds inside codex exec prompts.",
+    "CLI ARG FALLBACK IMPLEMENTED (2026-05-25): All 6 .ps1 shims (Bash/Read/Edit/Grep/Glob/PS) now detect [Console]::IsInputRedirected. When false (Codex subprocess), positional args are promoted to Claude-format JSON and piped through wkharness. Committed to personal-docs as 4d7aea0. Codex can now call: Bash.cmd 'echo test', Read.cmd 'D:/path/file', Grep.cmd 'pattern' 'dir' without stdin."
   ],
   "requirements": [
     {
@@ -56,6 +57,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T12:58:08.7768461Z",
-  "updated": "2026-05-23T18:58:50.5665302Z",
-  "version": "1.14"
+  "updated": "2026-05-24T19:44:21.3678711Z",
+  "version": "1.16"
 }

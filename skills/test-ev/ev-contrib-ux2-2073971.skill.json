@@ -1,0 +1,37 @@
+{
+  "id": "ev-contrib-ux2-2073971",
+  "app": "test-ev",
+  "title": "EV Contrib UX2 ev-contrib-ux2-2073971",
+  "title_ko": null,
+  "desc": "ev test 2",
+  "steps": [
+    "file step alpha",
+    "file step beta",
+    "file step gamma"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "test-ev",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ev-contrib-ux2-2073971",
+      "expect": "file step",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-24T14:30:20.8031839Z",
+  "updated": "2026-05-24T14:30:20.8032019Z",
+  "version": "1.0"
+}
