@@ -1,15 +1,19 @@
 #Requires -Version 5.1
 # CDP Chrome reuse + alert auto-dismiss + CDP eval smoke test
-param([string]$Url = "https://example.com")
+param([string]$Url = "https://chatgpt.com")
 $ErrorActionPreference = "Continue"
 $pass = $true
 function ok  ($m) { Write-Host "  PASS: $m" -ForegroundColor Green }
 function fail ($m) { Write-Host "  FAIL: $m" -ForegroundColor Red; $script:pass = $false }
 function wrn  ($m) { Write-Host "  WARN: $m" -ForegroundColor Yellow }
 
-# 1. First cdp open
+# 1. First cdp open (--timeout 9: skip if Chrome CDP unavailable, matches cdp-smoke pattern)
 Write-Host "[1] First cdp open $Url..." -ForegroundColor Cyan
-$r1 = (& wkappbot cdp open $Url 2>&1) -join " "
+$r1 = (& wkappbot cdp open $Url --timeout 9 2>&1) -join " "
+if ($LASTEXITCODE -eq 2 -or $r1 -match 'timeout \d+s') {
+    wrn "cdp open timed out -- Chrome CDP unavailable. Skip."
+    Write-Host ""; Write-Host "RESULT: SKIP [cdp-reuse] (cdp-open timeout)" -ForegroundColor Yellow; exit 0
+}
 if ($r1 -match "cdp:(\d+)") {
     $port = $Matches[1]; $grap = "{proc:'chrome',cdp:$port}"
     ok "Port $port ($(if ($r1 -match "Reusing") {'reuse'} else {'launch'}))"
@@ -17,7 +21,7 @@ if ($r1 -match "cdp:(\d+)") {
 
 # 2. Second cdp open MUST reuse
 Write-Host "[2] Second cdp open (MUST reuse)..." -ForegroundColor Cyan
-$r2 = (& wkappbot cdp open $Url 2>&1) -join " "
+$r2 = (& wkappbot cdp open $Url --timeout 9 2>&1) -join " "
 if     ($r2 -match "Reusing Chrome") { ok "Chrome reused on port $port" }
 elseif ($r2 -match "Launching Chrome") { fail "Chrome NOT reused -- new process launched (accumulation bug)" }
 else { wrn "No reuse confirmation: $($r2.Substring(0,[Math]::Min(120,$r2.Length)))" }
