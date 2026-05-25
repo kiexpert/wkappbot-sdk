@@ -187,6 +187,19 @@ partial class Program
                 return;
             }
 
+            // Filter to the Chrome process that is actually listening on our CDP port.
+            // Prevents picking the user personal Chrome when they open one after WKAppBot.
+            var expectedPort = GetExpectedCdpPort();
+            if (expectedPort.HasValue && TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
+            {
+                var filtered = candidates.Where(c => c.pid == cdpPid).ToList();
+                Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port {expectedPort.Value} -> pid={cdpPid}, filtered to {filtered.Count} candidate(s)");
+                if (filtered.Count > 0)
+                    candidates = filtered;
+                else
+                    Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP-pid filter yielded 0 -- falling back to unfiltered");
+            }
+
             // Pick the most recently started chrome.exe top-level window -- that's
             // the Chrome instance Core just launched (or attached to / reused).
             // Secondary key: largest visible window area, so the main browser window
@@ -258,5 +271,47 @@ partial class Program
         {
             // best-effort -- never crash the launcher exit path
         }
+    }
+
+    // Returns the PID of the process currently LISTENING on the given TCP port.
+    // Used to pin Chrome placement to the chrome.exe that actually owns our CDP
+    // port, so a user personal Chrome opened afterwards is never picked.
+    // Best-effort: returns false (pid=-1) on any P/Invoke failure.
+    [System.Runtime.InteropServices.DllImport("iphlpapi.dll")]
+    static extern uint GetExtendedTcpTable(IntPtr pTcpTable, ref uint pdwSize, bool bOrder, int ulAf, int TableClass, uint Reserved);
+
+    static bool TryGetListeningPid(int port, out int pid)
+    {
+        pid = -1;
+        const int AF_INET = 2;
+        const int TCP_TABLE_OWNER_PID_LISTENER = 4;
+        try
+        {
+            uint size = 0;
+            GetExtendedTcpTable(IntPtr.Zero, ref size, false, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
+            if (size == 0) return false;
+            var buf = System.Runtime.InteropServices.Marshal.AllocHGlobal((int)size);
+            try
+            {
+                uint ret = GetExtendedTcpTable(buf, ref size, false, AF_INET, TCP_TABLE_OWNER_PID_LISTENER, 0);
+                if (ret != 0) return false;
+                int count = System.Runtime.InteropServices.Marshal.ReadInt32(buf, 0);
+                int offset = 4;
+                for (int i = 0; i < count; i++)
+                {
+                    int localPortBe = System.Runtime.InteropServices.Marshal.ReadInt32(buf, offset + 8);
+                    int localPort = System.Net.IPAddress.NetworkToHostOrder(localPortBe) & 0xFFFF;
+                    if (localPort == port)
+                    {
+                        pid = System.Runtime.InteropServices.Marshal.ReadInt32(buf, offset + 20);
+                        return true;
+                    }
+                    offset += 24;
+                }
+            }
+            finally { System.Runtime.InteropServices.Marshal.FreeHGlobal(buf); }
+        }
+        catch { }
+        return false;
     }
 }
