@@ -448,14 +448,9 @@ Use Read.cmd instead of native read_file
 - [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
 - [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
 - [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
-- [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design) -- merge with [2] zombie over-protect, fix together
-- [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
-- [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
-- [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
-- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
-- [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
-- [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
 - [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design)
+- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
+- [x] [8] schedule CommandHelpMap STALE + [11] cdp open wrong Chrome STALE -- fixed in Core placement commits (1bafc6524)
 - [x] wkjobs -Leaks mode: filters zombie agent procs, outputs kill cmd one-liner (exit 1 if found)
 - [x] wkharness agent-leak-guard: blocks Agent() if zombie procs exist, shows kill cmd
 - [x] settings.json deny (Edit/Write) removed -- Edit tool now unblocked
@@ -508,7 +503,6 @@ Use Read.cmd instead of native read_file
 
 - [x] nightly-schedule-guard: removed brittle '## Nightly Schedules' section check (encoding mismatch; guard now relies only on CronCreate heading detection)
 - [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
-- [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
 - [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
 
 - [x] nightly-schedule-guard: fixed 3 bugs (slug regex, cwd backslash, Join-String PS5.1 incompatible)
@@ -527,4 +521,5 @@ Use Read.cmd instead of native read_file
 - [x] version bump v7.4.0-sdk: Directory.Build.props 7.3->7.4 + CLAUDE.md header v7.3.0->v7.4.0 + CHANGELOG.md fix
 - [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
 - [x] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
-- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)- [ ] nightly-heal: skill audit + repo-health-doctor LITE + Pending compress- [ ] nightly-heal: skill audit + repo-health-doctor LITE + Pending compress
+- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)
+- [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done
