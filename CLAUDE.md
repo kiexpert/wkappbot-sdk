@@ -520,3 +520,5 @@ Use Read.cmd instead of native read_file
 - [x] Codex tool wrappers: open-pipe stdin hang fixed in 8 wrappers; Write.ps1+Cmd.ps1 CLI fallback added
 - [x] wkjobs: add recursive ancestor walk for bash/sh under AI procs; show shell count in -Leaks mode
 - [x] screensaver: WKAPPBOT_NO_SCREENSAVER=1 set in Windows User env -- unset via reg delete or PS SetEnvironmentVariable (skill updated)
+- [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd
+- [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd

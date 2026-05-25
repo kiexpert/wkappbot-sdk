@@ -63,7 +63,8 @@ async function main() {
     const files = await walk(root);
     for (const file of files) {
       try {
-        const raw = JSON.parse(await fs.readFile(file, 'utf8'));
+        const content = await fs.readFile(file, 'utf8');
+        const raw = JSON.parse(content.replace(/^﻿/, ''));  // strip UTF-8 BOM
         skills.push(normalizeSkill(file, raw, root));
       } catch (err) {
         console.warn(`skip ${file}: ${err.message}`);

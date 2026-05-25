@@ -27,6 +27,7 @@ jobs:
         run: node scripts/build-skills-registry.mjs
 
       - name: Commit generated registry
+        continue-on-error: true  # main is protected; push requires PR
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
