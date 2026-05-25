@@ -193,6 +193,7 @@ partial class Program
             //                     wkappbot skill read standard-appbot-window
             //                     wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
             var expectedPort = GetExpectedCdpPort();
+            Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port filter: expectedPort={expectedPort?.ToString() ?? "null"}");
             if (expectedPort.HasValue && TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
             {
                 var filtered = candidates.Where(c => c.pid == cdpPid).ToList();
@@ -303,7 +304,9 @@ partial class Program
                 for (int i = 0; i < count; i++)
                 {
                     int localPortBe = System.Runtime.InteropServices.Marshal.ReadInt32(buf, offset + 8);
-                    int localPort = System.Net.IPAddress.NetworkToHostOrder(localPortBe) & 0xFFFF;
+                    // dwLocalPort is big-endian 16-bit in the lower 2 bytes of the DWORD;
+                    // swap only bytes 0 and 1 (not full 32-bit NetworkToHostOrder which zeroes the result).
+                    int localPort = ((localPortBe & 0xFF) << 8) | ((localPortBe >> 8) & 0xFF);
                     if (localPort == port)
                     {
                         pid = System.Runtime.InteropServices.Marshal.ReadInt32(buf, offset + 20);

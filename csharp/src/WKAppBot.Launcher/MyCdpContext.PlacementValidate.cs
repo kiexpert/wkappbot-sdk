@@ -23,7 +23,7 @@ partial class Program
     {
         Console.Error.WriteLine($"[PLACEMENT:VALIDATE-ENTRY] chrome=0x{chromeHwnd.ToInt64():X} target=(L={targetRect.Left},T={targetRect.Top},R={targetRect.Right},B={targetRect.Bottom}) maxAttempts={maxAttempts}");
         const int DeltaPosThreshold  = 15; // x/y px — allow up to ±15px for frame/border variance
-        const int DeltaSizeThreshold = 10; // w/h px — strict enough to verify nominal 800x600
+        const int DeltaSizeThreshold = 30; // w/h px— Chrome outer window drifts ~14-18px from SetWindowPos target (DWM frame); mirrors Core 50px tolerance
         const int StabilizationMs    = 150; // longer settle time for DWM composition
         const int GetRectTimeoutMs   = 200;
         const uint SWP_NOZORDER   = 0x0004;
