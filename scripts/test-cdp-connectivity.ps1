@@ -32,16 +32,13 @@ $tick = (& wkappbot eye tick 2>&1) -join " "
 if ($tick -match 'result=ok|end:0|ctx=') { ok "Eye responding" }
 else { fail "Eye: $tick"; exit 1 }
 
-# ── 2. CDP open (120s timeout -- auth-wall sites block indefinitely without it) ──
-Write-Host "[2] cdp open $Url (timeout=120s)..." -ForegroundColor Cyan
-$cdpJob = Start-Job -ScriptBlock { param($u) & wkappbot cdp open $u 2>&1 } -ArgumentList $Url
-if (-not (Wait-Job $cdpJob -Timeout 120)) {
-    Remove-Job $cdpJob -Force
-    wrn "cdp open timed out 120s -- auth-wall or bot-protection. Chrome launched OK."
+# ── 2. CDP open (90s timeout -- auth-wall sites block indefinitely without it) ──
+Write-Host "[2] cdp open $Url (--timeout 90)..." -ForegroundColor Cyan
+$cdpRaw = (& wkappbot cdp open $Url --timeout 90 2>&1) -join " "
+if ($LASTEXITCODE -eq 2 -or $cdpRaw -match 'timeout \d+s') {
+    wrn "cdp open timed out 90s -- auth-wall or bot-protection. Chrome launched OK."
     Write-Host ""; Write-Host "RESULT: SKIP [$name] (cdp-open timeout)" -ForegroundColor Yellow; exit 0
 }
-$cdpRaw = (Receive-Job $cdpJob) -join " "
-Remove-Job $cdpJob -Force -ErrorAction SilentlyContinue
 if ($cdpRaw -match 'cdp:(\d+)') {
     $port = $Matches[1]
     $grap = "{proc:'chrome',cdp:$port}"
