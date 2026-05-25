@@ -13,7 +13,8 @@
     "FORMAT: comma-separated x,y,width,height (e.g. 100,200,1400,900). Width/height are DESIRED final OUTER size (Chrome process window outer rect including chrome frame).",
     "FAILURE MODE: env var set wrapped in try/catch -- failure is non-fatal. Without env: Core falls back to ExpectedBounds and overrides Launcher placement. Diagnose via cdp-mon -- if TGT-POS pins to rightmost monitor anchor (1740,20) instead of following caller terminal then env var or pipe forward is missing.",
     "VERIFICATION: After hot-swap, run wkappbot ask gpt ping from terminal at known position, check cdp-state.jsonl for [PLACEMENT:ENV] line, verify TGT-POS in cdp-mon matches env var coords. Should change per terminal CWD/position.",
-    "RELATED FILES: csharp/src/WKAppBot.Launcher/MyCdpContext.Placement.cs (env set) and csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs (pipe forward). Commit 65c617fe introduced the protocol on 2026-05-16."
+    "RELATED FILES: csharp/src/WKAppBot.Launcher/MyCdpContext.Placement.cs (env set) and csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs (pipe forward). Commit 65c617fe introduced the protocol on 2026-05-16.",
+    "PREFLIGHT FIX (2026-05-25): TryValidateAndCorrectPlacement now does a no-sleep preflight position read before the 5-attempt loop. If Chrome is already within threshold (attempts=0), Stage 2/3 watcher is also skipped. Result: cdp open on already-placed Chrome returns in <200ms instead of 750ms+"
   ],
   "requirements": [
     {
@@ -48,6 +49,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T05:22:10.1740075Z",
-  "updated": "2026-05-23T05:22:10.1740229Z",
-  "version": "1.0"
+  "updated": "2026-05-25T13:28:40.3659501Z",
+  "version": "1.2"
 }
