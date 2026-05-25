@@ -514,3 +514,5 @@ Use Read.cmd instead of native read_file
 - [x] nightly-schedule-guard: fixed 3 bugs (slug regex, cwd backslash, Join-String PS5.1 incompatible)
 - [x] nightly-schedule-guard: globalize to ~/.claude/settings.json PreToolUse + remove local PreToolUse from settings.local.json
 - [x] wkdoctor: flutter-doctor-style health check tool (bin/wkdoctor.ps1 + wkdoctor.cmd), 10 checks, -Json flag, .gitignore exemption added
+- [x] wkdoctor: fix robustness -- remove all wkappbot subprocess calls (IPC stall), use PE VersionInfo + process check + file count instead
+- [x] wkdoctor: split check logic into wkappbot.hq/doctor/*.ps1 plugin modules; orchestrator dot-sources them; Opus adds healing logic per module
