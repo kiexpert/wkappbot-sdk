@@ -1,0 +1,43 @@
+{
+  "id": "nightly-schedule-guard",
+  "app": "wkappbot-workflow",
+  "title": "Nightly Schedule Guard",
+  "title_ko": null,
+  "desc": "PreToolUse hook: blocks Bash/PowerShell until CLAUDE.md CronCreate entries are registered in session JSONL. Global hook in ~/.claude/settings.json.",
+  "steps": [
+    "PURPOSE: blocks Bash/PowerShell until all ### CronCreate(...) headings in CLAUDE.md have matching session JSONL entries",
+    "SATISFY: call CronCreate tool for each heading in CLAUDE.md at session start -- cron= and prompt= must match exactly",
+    "EXEMPT: CronCreate/CronList/CronDelete tools; Edit/Write on CLAUDE.md; any cmd matching wkappbot skill*",
+    "AUTO-INJECT: if CLAUDE.md has no CronCreate headings and no Nightly Schedules section, appends sample template",
+    "LOCATION: script=D:/GitHub/wkappbot-sdk/.claude/nightly-schedule-guard.ps1  global-hook=~/.claude/settings.json PreToolUse matcher=Bash",
+    "PowerShell",
+    "DENY MSG: [NIGHTLY-GUARD] CronCreate missing or prompt mismatch for: <cron>. Prompt must match CLAUDE.md exactly. wkappbot skill* exempt. -> Fix: call CronCreate tool for each heading, or run: wkappbot skill read nightly-schedule-guard",
+    "BUG FIXES 2026-05-25: slug regex, cwd backslash, Join-String PS5.1 incompatible -- all fixed",
+    "GLOBALIZATION 2026-05-25: moved from per-repo settings.local.json to global ~/.claude/settings.json (now covers all repos)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read nightly-schedule-guard",
+      "expect": "ID: nightly-schedule-guard",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search nightly guard",
+      "expect": "nightly-schedule-guard",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search cron guard",
+      "expect": "nightly-schedule-guard",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-25T03:53:08.7760503Z",
+  "updated": "2026-05-25T04:28:30.4329191Z",
+  "version": "1.2"
+}

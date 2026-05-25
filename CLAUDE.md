@@ -518,4 +518,5 @@ Use Read.cmd instead of native read_file
 - [x] wkdoctor: split check logic into wkappbot.hq/doctor/*.ps1 plugin modules; orchestrator dot-sources them; Opus adds healing logic per module
 - [x] wkdoctor: 04-config.ps1 heal path replaced setup.ps1 subprocess with inline JSON write (IPC stall fix)
 - [x] Codex tool wrappers: open-pipe stdin hang fixed in 8 wrappers; Write.ps1+Cmd.ps1 CLI fallback added
-- [ ] wkjobs: add recursive ancestor walk for bash/sh under AI procs; show shell count in -Leaks mode
+- [x] wkjobs: add recursive ancestor walk for bash/sh under AI procs; show shell count in -Leaks mode
+- [x] screensaver: WKAPPBOT_NO_SCREENSAVER=1 set in Windows User env -- unset via reg delete or PS SetEnvironmentVariable (skill updated)

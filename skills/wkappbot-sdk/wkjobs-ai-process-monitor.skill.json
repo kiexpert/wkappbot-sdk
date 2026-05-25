@@ -18,7 +18,12 @@
     "NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error",
     "WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD) are relative symlinks to wkwrap.sh in same dir. Run wkwrap.sh --install to add more. See also: wkappbot skill read wkwrap-ai-native-wrappers",
     "SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkjobs.ps1 (edit there). scripts/wkjobs.ps1 is a symlink (mode 120000). wkjobs.sh relay uses local wkwrap.sh copy so wkfind.sh keeps SDK-specific wkfind.ps1.",
-    "PATH fix: prepend system dirs before codex exec to avoid PS shim shadowing system shell"
+    "PATH fix: prepend system dirs before codex exec to avoid PS shim shadowing system shell",
+    "RECURSIVE ANCESTOR WALK (2026-05-25): spawned-section check now uses Test-HasAiAncestor (depth-8 pid->parent walk) instead of direct-parent-only test. Fixes invisible bash/sh under claude->cmd->bash chains (cmd.exe parent was not in aiPids). -Leaks output now shows SHELLS(N) count and warns when >10. bash/sh NOT added to AI_NAMES -- they are tracked as spawned children only.",
+    "VERIFY: syntax-check edits by tokenizing the script via PSParser Tokenize, invoking the system shell by absolute path to avoid PATH-shim shadowing.",
+    "EDIT-VIA-WKEDIT note: wkedit re-applies indent-based block context, so multi-line inserts may keep slightly off cosmetic indentation -- harmless for .ps1 (whitespace-insensitive); verify braces balance by reading back the region.",
+    "LEAKS MODE OUTPUT FORMAT (2026-05-25): -Leaks now shows two counters: LEAKS(N) for zombie AI procs + SHELLS(N) for bash/sh under AI ancestors. Format: 'LEAKS(0): clean  |  SHELLS(15)' (green) or 'LEAKS(0): clean  |  SHELLS(15): >10 [warn]' (yellow if >10). When leaks found: 'LEAKS(N): agent-spawned zombies detected  |  SHELLS(N)' (red). bash/sh counted from spawned section using recursive ancestor walk.",
+    "bash/sh detection: Test-HasAiAncestor depth-8 walk added; -Leaks now shows SHELLS(N) count in output"
   ],
   "requirements": [
     {
@@ -48,6 +53,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T06:56:55.2897667Z",
-  "updated": "2026-05-23T18:28:57.8752473Z",
-  "version": "1.6"
+  "updated": "2026-05-25T09:21:34.4444455Z",
+  "version": "1.15"
 }

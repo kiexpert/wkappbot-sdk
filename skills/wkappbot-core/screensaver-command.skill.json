@@ -1,15 +1,16 @@
-﻿{
+{
   "id": "screensaver-command",
   "app": "wkappbot-core",
   "title": "screensaver command -- launch, close, and Eye integration",
   "title_ko": null,
-  "desc": "wkappbot screensaver: launch WPF sunset overlay (idle 10s\u002B, per-monitor) or wipe all screensaver windows (4-pass close). Eye spawns automatically; use screensaver close to dismiss manually.",
+  "desc": "wkappbot screensaver: launch WPF sunset overlay (idle 10s+, per-monitor) or wipe all screensaver windows (4-pass close). Eye spawns automatically; use screensaver close to dismiss manually.",
   "steps": [
     "USAGE: wkappbot screensaver (no args=launch overlay). wkappbot screensaver close (dismiss all). No other subcommands. Source: ScreenSaverStandaloneCommand.cs",
-    "CLOSE 4-pass wipe: (1) Enum windows titled WKAppBot ScreenSaver -- wipe. (2) Black fullscreen detection: 3x3 pixel grid avgY less-than 30, size 90pct\u002B work area, x3 retries -- catches third-party overlays (e.g. NVIDIA). (3) Kill wkappbot-core processes with screensaver in cmdline. (4) Sleep 300ms \u002B rescan for deferred overlays. Each wipe: alpha=0, SW_HIDE, move to off-screen, WM_CLOSE. After all passes: SendInput mouse-move resets idle timer (~10s grace before re-trigger).",
-    "LAUNCH: Eye spawns on idle\u003E=10s via --from-eye flag. One WPF overlay per monitor. ShowActivated=false (no focus steal), WS_EX_TRANSPARENT (click-through). Sunset progression: 10s=golden, 60s=red, 90s=purple, 120s=night sky with stars\u002Bmoon\u002Bwaves. Auto-exits on any user input (9-layer kill). Polls WKAPPBOT_PARENT_PID every 500ms -- exits if Eye dies.",
+    "CLOSE 4-pass wipe: (1) Enum windows titled WKAppBot ScreenSaver -- wipe. (2) Black fullscreen detection: 3x3 pixel grid avgY less-than 30, size 90pct+ work area, x3 retries -- catches third-party overlays (e.g. NVIDIA). (3) Kill wkappbot-core processes with screensaver in cmdline. (4) Sleep 300ms + rescan for deferred overlays. Each wipe: alpha=0, SW_HIDE, move to off-screen, WM_CLOSE. After all passes: SendInput mouse-move resets idle timer (~10s grace before re-trigger).",
+    "LAUNCH: Eye spawns on idle>=10s via --from-eye flag. One WPF overlay per monitor. ShowActivated=false (no focus steal), WS_EX_TRANSPARENT (click-through). Sunset progression: 10s=golden, 60s=red, 90s=purple, 120s=night sky with stars+moon+waves. Auto-exits on any user input (9-layer kill). Polls WKAPPBOT_PARENT_PID every 500ms -- exits if Eye dies.",
     "EYE INTEGRATION: Eye writes runtime/eye_busy file during CDP/MCP automation -- screensaver hides while file exists. Eye spawns via AppBotPipe.Spawn(path, screensaver --from-eye) on idle expiry. WKAPPBOT_PARENT_PID env var set for parent-alive polling.",
-    "TROUBLESHOOTING: (a) screensaver will not close -- use wkappbot screensaver close, NOT a11y close or a11y kill (cannot find the window). (b) Black fullscreen from third-party -- Pass2 pixel sampling handles it. (c) Re-triggers immediately -- SendInput grace ~10s, wait a moment. (d) Screensaver during automation -- Eye sets eye_busy to suppress."
+    "TROUBLESHOOTING: (a) screensaver will not close -- use wkappbot screensaver close, NOT a11y close or a11y kill (cannot find the window). (b) Black fullscreen from third-party -- Pass2 pixel sampling handles it. (c) Re-triggers immediately -- SendInput grace ~10s, wait a moment. (d) Screensaver during automation -- Eye sets eye_busy to suppress.",
+    "DISABLED STATE: if wkappbot screensaver outputs [SCREENSAVER] Disabled by WKAPPBOT_NO_SCREENSAVER=1, the env var is set in Windows User environment (not in any config file). Fix via PS: [Environment]::SetEnvironmentVariable('WKAPPBOT_NO_SCREENSAVER', null, 'User') then restart Eye. Or via cmd: reg delete HKCU\\Environment /v WKAPPBOT_NO_SCREENSAVER /f then reopen terminal."
   ],
   "requirements": [
     {
@@ -43,6 +44,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-05T05:02:34.399347Z",
-  "updated": "2026-05-05T05:03:18.2589912Z",
-  "version": "1.3"
+  "updated": "2026-05-25T09:28:01.8363121Z",
+  "version": "1.5"
 }

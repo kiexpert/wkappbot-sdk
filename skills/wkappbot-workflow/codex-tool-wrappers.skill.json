@@ -23,7 +23,8 @@
     "CODEX-PATH-FIX: codex exec on Windows hits PATH shadowing -- PS.cmd shim (WKAppBot/bin) is found before the real system shell. Fix: prepend system bin dirs to PATH before codex exec, or use wkappbot native file commands (wkappbot file write/read) to avoid shim intercept.",
     "CODEX-SMOKE-RUNNER: run-smoke-test.sh bypasses skill-update-pending guard by hiding codex exec inside a script (guard only scans the Bash command string, not script contents).",
     "CODEX-SUBPROCESS-WKAPPBOT: wkappbot cmds hang in codex exec subprocess -- Eye IPC stall (100ms) + Core fallback latency exceeds Codex 34s cmd timeout. Fix: increase Codex timeout or avoid wkappbot skill/file cmds inside codex exec prompts.",
-    "CLI ARG FALLBACK IMPLEMENTED (2026-05-25): All 6 .ps1 shims (Bash/Read/Edit/Grep/Glob/PS) now detect [Console]::IsInputRedirected. When false (Codex subprocess), positional args are promoted to Claude-format JSON and piped through wkharness. Committed to personal-docs as 4d7aea0. Codex can now call: Bash.cmd 'echo test', Read.cmd 'D:/path/file', Grep.cmd 'pattern' 'dir' without stdin."
+    "CLI ARG FALLBACK IMPLEMENTED (2026-05-25): All 6 .ps1 shims (Bash/Read/Edit/Grep/Glob/PS) now detect [Console]::IsInputRedirected. When false (Codex subprocess), positional args are promoted to Claude-format JSON and piped through wkharness. Committed to personal-docs as 4d7aea0. Codex can now call: Bash.cmd 'echo test', Read.cmd 'D:/path/file', Grep.cmd 'pattern' 'dir' without stdin.",
+    "OPEN-PIPE-STDIN-HANG FIX (2026-05-25, cfb0305): In Codex subprocess context stdin is redirected but empty. All 8 wrappers previously called ReadToEnd() first, blocking forever. Fix: args-first inversion -- check positional args before touching stdin. Write.ps1 and Cmd.ps1 had no CLI fallback at all and were added. All 9 wrappers now work in both pipe-JSON and CLI-arg modes."
   ],
   "requirements": [
     {
@@ -57,6 +58,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T12:58:08.7768461Z",
-  "updated": "2026-05-24T19:44:21.3678711Z",
-  "version": "1.16"
+  "updated": "2026-05-25T08:01:13.3363933Z",
+  "version": "1.17"
 }

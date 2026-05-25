@@ -1,0 +1,43 @@
+{
+  "id": "wkdoctor-sdk-environment-health-check",
+  "app": "wkappbot-sdk",
+  "title": "wkdoctor: SDK environment health check",
+  "title_ko": null,
+  "desc": "flutter-doctor-style health check for wkappbot-sdk environment",
+  "steps": [
+    "USAGE: wkdoctor [-Json] -- flutter-doctor style [+]/[x]/[!] output, exit 1 on failures",
+    "LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cmd in SDK repo",
+    "CHECKS (10): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in ~/.claude/settings.json, bin/ in PATH, .wkappbot/config.json, wkappbot.hq/ dir",
+    "FLAGS: -Json for machine-readable output (ConvertTo-Json), exit 0=all pass, exit 1=any fail",
+    "RUN: wkdoctor  OR  wkdoctor -Json (pipe to ConvertFrom-Json for parsed output)",
+    "SETUP CHECK: run after fresh clone + setup.ps1 to verify environment is healthy",
+    "ROBUSTNESS: all checks use file/process/PE-version APIs only -- zero wkappbot subprocess calls (avoids Eye IPC stall in subprocess context)",
+    "ARCHITECTURE: wkdoctor.ps1 is a thin orchestrator; check logic lives in bin/wkappbot.hq/doctor/*.ps1 plugins (01-binaries, 02-runtime, 03-skills, 04-config, 05-hq). Each module calls Add-Check/Emit from orchestrator scope. No wkappbot subprocess calls -- uses PE VersionInfo + Get-Process + file count for robustness in any execution context.",
+    "PLUGIN STATUS: 5 modules written (01-binaries, 02-runtime, 03-skills, 04-config, 05-hq). Orchestrator rewritten as thin dot-source loader. All wkappbot subprocess calls removed. Opus healing review pending."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkdoctor",
+      "expect": "[+] wkappbot.exe",
+      "prompt": null
+    },
+    {
+      "cmd": "wkdoctor -Json",
+      "expect": "pass",
+      "prompt": null
+    },
+    {
+      "cmd": "wkdoctor",
+      "expect": "wkdoctor:",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-25T04:29:28.4578344Z",
+  "updated": "2026-05-25T05:12:01.116287Z",
+  "version": "1.7"
+}
