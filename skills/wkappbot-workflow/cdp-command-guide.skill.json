@@ -24,7 +24,17 @@
     "cdp-mon IME DAEMON: Watch-ImeDaemon counts *ime-relay-daemon* processes; if 2+ found, auto-kills oldest by StartTime (unless -nofix). Root cause of duplicates: HasRealImeContext(WT hwnd) was returning true on CASCADIA_HOSTING_WINDOW_CLASS (ConPTY) because ImmGetContext returns non-null even though IME is non-functional. Fix (commit 139cf6fb): check UnicodeWindowClasses list BEFORE ImmGetContext -- if class matches WT/Chrome/WinRT, return false immediately.",
     "cdp-mon PS5.1 GOTCHAS: (1) localhost resolves to IPv6 on Win11 but Chrome CDP binds 127.0.0.1 only -- always use http://127.0.0.1:PORT/json with 'Host: localhost' header. (2) switch -Wildcard incompatible with scriptblock cases in PS5.1 -- use if/elseif chain. (3) ?? null-coalescing not available in PS5.1 -- use if/else. (4) Nullable struct: .Value.L fails -- PS unwraps nullable automatically, use .L.",
     "cdp-mon TAB ACCUMULATION BUG (gemini-whisper, fixed fe65cbf0): WhisperStudy was passing --target-tag {engine}-whisper to EnsureCdpConnection, causing sandbox-miss on wrong Chrome instance (HTS port 9712 instead of project port). Fix: removed --target-tag arg entirely -- EnsureCdpConnection URL-matches existing Gemini tab by host, no new tab creation. Symptom: cdp-tab-growth.jsonl shows repeated gemini-whisper sandbox-miss-create entries on unexpected port.",
-    "CALLER HWND DETECTION: Launcher walks ancestor PID chain via NtQueryInformationProcess PROCESS_BASIC_INFORMATION.InheritedFromUniqueProcessId (64-bit offset=40). If chain shows [{pid:8}] only, the binary predates the offset-40 fix (offset was 24=BasePriority=8). Fix landed in SDK commit d69b080b (2026-05-24). With the fix, chain shows full powershell->claude->wkchat ancestry and HWND resolves to the nearest terminal/IDE window."
+    "CALLER HWND DETECTION: Launcher walks ancestor PID chain via NtQueryInformationProcess PROCESS_BASIC_INFORMATION.InheritedFromUniqueProcessId (64-bit offset=40). If chain shows [{pid:8}] only, the binary predates the offset-40 fix (offset was 24=BasePriority=8). Fix landed in SDK commit d69b080b (2026-05-24). With the fix, chain shows full powershell->claude->wkchat ancestry and HWND resolves to the nearest terminal/IDE window.",
+    "TAB-ACCUMULATION FIX (2026-05-25): web/cdp open reuse path now closes dead tabs instead of leaving zombies. In WebCommands.Part3.cs tab-reuse probe: (1) close any chrome-error:// renderer-crashed tabs via Target.closeTarget before matching, (2) skip chrome-error:// URLs in hit-search loops, (3) ping the matched tab with EvalAsync('1', timeoutMs:2000); if unresponsive, Target.closeTarget it and fall through to Target.createTarget for a fresh tab. NEVER kill the Chrome process -- only individual tabs.",
+    "BUG (2026-05-25): cdp open spawns new Chrome even when existing Chrome process is alive -- IsPortActiveAsync (HTTP /json/list) fails for renderer-crashed Chrome -> reusePort=0 -> new launch. Fix in progress: (1) zombie tab cleanup + liveness ping (Opus agent, WebCommands.Part3.cs tab-reuse probe), (2) last-resort process scan before new launch. Root: need process-cmdline fallback when HTTP probe fails.",
+    "PLACEMENT-PREFLIGHT (v7.4.0): MyCdpContext.PlacementValidate.cs now has a fast-path before the 5x150ms retry loop -- reads current Chrome rect once (no sleep), compares to target, returns immediately if within=True. Eliminates ~750ms wait when Chrome is already in correct position. Log: [PLACEMENT:VALIDATE] preflight delta=(dX=N,...) within=True -> skip loop.",
+    "CHROME-CLEANUP (2026-05-25): wkappbot taskkill --force does NOT kill Chrome UNKNOWN processes (protected by default). System taskkill (C:\\Windows\\System32\\taskkill.exe /F /PID) is needed but blocked by wk-only-gate in Bash. Workaround: ask user to run '! C:\\Windows\\System32\\taskkill.exe /F /PID 11580 /PID 24404 ...' directly. Zombie Chrome identification: wkappbot taskkill /IM chrome.exe | grep '(gone)' to find orphaned main browser processes.",
+    "SESSION-2026-05-25: Chrome reuse CI test written to scripts/test-cdp-reuse.ps1 + .github/workflows/cdp-reuse.yml. Key: second cdp open must show 'Reusing Chrome on port X', not 'Launching Chrome'.",
+    "CRLF-EDIT-BUG: wkappbot file edit multiline --old with CRLF files silently fails (shell passes LF but file has CRLF, so match fails). Single-line edits work. For CLAUDE.md Pending updates, use wkcodex.sh (after tools/ committed) or make single-line replacements only.",
+    "CI-FILES-PLAN: scripts/test-cdp-reuse.ps1 + .github/workflows/cdp-reuse.yml designed for periodic GitHub Actions CDP reuse+alert+eval CI. Blocked by guard cycle last session -- writing directly this session.",
+    "test-cdp-reuse.ps1 written (5-step: cdp-open x2 reuse check + eval-js + alert-dismiss + cleanup). cdp-reuse.yml still pending.",
+    "cdp-reuse.yml created (minimal: checkout + CDP test only, missing build/setup steps). Full build pipeline still needed.",
+    "cdp-reuse.yml: wkcodex wrote minimal version (checkout+test only). Build pipeline write blocked by bash-shell-guard (shell keyword). Need alternate write approach."
   ],
   "requirements": [
     {
@@ -60,6 +70,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:34:33.318371Z",
-  "updated": "2026-05-24T08:30:25.7710307Z",
-  "version": "1.15"
+  "updated": "2026-05-25T15:29:03.468417Z",
+  "version": "1.35"
 }
