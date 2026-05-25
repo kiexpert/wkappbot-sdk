@@ -1,4 +1,4 @@
-# WKAppBot v7.3.0 - Windows + Android App Automation Test Framework
+# WKAppBot v7.4.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -523,4 +523,5 @@ Use Read.cmd instead of native read_file
 - [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd
 - [x] wkedit BOM bug: suggest filed (ID 1779706204.086049) -- adds BOM to files that had none
 - [x] build-skills-registry: BOM parse fix (strip ﻿) + protected-branch push set to continue-on-error
-- [ ] cdp-smoke: cdp open hangs 6min on auth-wall sites (claude/gemini/groq/perplexity/character-ai) -- fix: 120s job timeout + if:always log upload
+- [x] cdp-smoke: cdp open hangs 6min on auth-wall sites (claude/gemini/groq/perplexity/character-ai) -- fix: Core NavigateAsync 3s cap (32cef1d5d) + smoke --timeout 9s + workflow if:always log upload
+- [x] version bump v7.4.0-sdk: Directory.Build.props 7.3->7.4 + CLAUDE.md header v7.3.0->v7.4.0 + CHANGELOG.md fix

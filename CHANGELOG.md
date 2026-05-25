@@ -3,6 +3,21 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.4.0-sdk] - 2026-05-25
+
+### Added
+- **`wkdoctor`**: flutter-doctor-style SDK health check tool (`bin/wkdoctor.ps1`) — 10 checks with self-healing, plugin modules in `bin/wkappbot.hq/doctor/`, `-Json` flag for CI integration
+- **Bootstrap auto-build**: `setup.ps1` auto-builds launcher from source on first clone; `build.cmd` creates `wkappbot.exe` inline (no subprocess calls)
+- **Nightly schedule guard**: globalized to `~/.claude/settings.json` PreToolUse hook; no longer per-project `settings.local.json`
+
+### Fixed (CRITICAL)
+- **`cdp open` 6-minute hang on auth-wall sites** (claude.ai, gemini.google.com, groq.com, perplexity.ai, character.ai): `NavigateAsync` blocked until readyState complete; `EvalAsync` retries (SPA-title loop x10 + `InjectBarAsync`) stacked to 6+ min on Cloudflare/OAuth redirect pages. Fix: cap `NavigateAsync` to 3s in `WebCommands.Part3.cs` — port is live after `ConnectCdp`, full page load is Chrome's job.
+
+### Fixed
+- **CDP smoke test**: `--timeout` 9s (3s=fast site, 9s=human patience limit); log upload changed to `if: always()` so cancelled jobs also upload artifacts
+- **build-skills-registry**: UTF-8 BOM strip before JSON parse; push set to `continue-on-error`
+- **cross-repo-claude-notify skill**: PROCWD CLASS step recovered after pipe separator split bug corrupted step content
+
 ## [7.3.1-sdk] - 2026-05-16
 
 ### Fixed (CRITICAL)
