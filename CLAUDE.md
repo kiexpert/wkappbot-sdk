@@ -526,4 +526,4 @@ Use Read.cmd instead of native read_file
 - [x] cdp-smoke: cdp open hangs 6min on auth-wall sites (claude/gemini/groq/perplexity/character-ai) -- fix: Core NavigateAsync 3s cap (32cef1d5d) + smoke --timeout 9s + workflow if:always log upload
 - [x] version bump v7.4.0-sdk: Directory.Build.props 7.3->7.4 + CLAUDE.md header v7.3.0->v7.4.0 + CHANGELOG.md fix
 - [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
-- [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
+- [ ] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
