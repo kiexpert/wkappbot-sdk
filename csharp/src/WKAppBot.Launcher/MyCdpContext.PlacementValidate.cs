@@ -44,6 +44,29 @@ partial class Program
         }
         catch { /* ignore -- fall back to no reflow detection */ }
 
+        // Fast path: read position now without any settle delay. If Chrome is
+        // already within threshold (common on tab-reuse or already-placed window)
+        // return immediately -- no need to run the correction loop.
+        {
+            RECT pre = default; bool gotPre = false;
+            var preTask = System.Threading.Tasks.Task.Run(() => { gotPre = TryGetWindowRectLTRB(chromeHwnd, out pre); });
+            if (preTask.Wait(GetRectTimeoutMs) && gotPre)
+            {
+                int pdX = Math.Abs(pre.Left   - targetRect.Left);
+                int pdY = Math.Abs(pre.Top    - targetRect.Top);
+                int pdW = Math.Abs(pre.Width  - targetRect.Width);
+                int pdH = Math.Abs(pre.Height - targetRect.Height);
+                bool preOk = pdX < DeltaPosThreshold && pdY < DeltaPosThreshold
+                          && pdW < DeltaSizeThreshold && pdH < DeltaSizeThreshold;
+                Console.Error.WriteLine($"[PLACEMENT:VALIDATE] preflight delta=(dX={pdX},dY={pdY},dW={pdW},dH={pdH}) within={preOk}");
+                if (preOk)
+                {
+                    AppendPlacementValidation(0, targetRect, pre, success: true, note: "preflight_ok");
+                    return (true, pre, 0);
+                }
+            }
+        }
+
         for (attempt = 1; attempt <= maxAttempts; attempt++)
         {
             // Step 1: wait for the window to settle. SetWindowPos returns before
