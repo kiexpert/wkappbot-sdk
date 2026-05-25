@@ -521,4 +521,6 @@ Use Read.cmd instead of native read_file
 - [x] wkjobs: add recursive ancestor walk for bash/sh under AI procs; show shell count in -Leaks mode
 - [x] screensaver: WKAPPBOT_NO_SCREENSAVER=1 set in Windows User env -- unset via reg delete or PS SetEnvironmentVariable (skill updated)
 - [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd
-- [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd
+- [x] wkedit BOM bug: suggest filed (ID 1779706204.086049) -- adds BOM to files that had none
+- [x] build-skills-registry: BOM parse fix (strip ﻿) + protected-branch push set to continue-on-error
+- [ ] cdp-smoke: cdp open hangs 6min on auth-wall sites (claude/gemini/groq/perplexity/character-ai) -- fix: 120s job timeout + if:always log upload

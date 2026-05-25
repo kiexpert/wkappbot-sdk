@@ -6,11 +6,12 @@
   "desc": "wkappbot screensaver: launch WPF sunset overlay (idle 10s+, per-monitor) or wipe all screensaver windows (4-pass close). Eye spawns automatically; use screensaver close to dismiss manually.",
   "steps": [
     "USAGE: wkappbot screensaver (no args=launch overlay). wkappbot screensaver close (dismiss all). No other subcommands. Source: ScreenSaverStandaloneCommand.cs",
-    "CLOSE 4-pass wipe: (1) Enum windows titled WKAppBot ScreenSaver -- wipe. (2) Black fullscreen detection: 3x3 pixel grid avgY less-than 30, size 90pct+ work area, x3 retries -- catches third-party overlays (e.g. NVIDIA). (3) Kill wkappbot-core processes with screensaver in cmdline. (4) Sleep 300ms + rescan for deferred overlays. Each wipe: alpha=0, SW_HIDE, move to off-screen, WM_CLOSE. After all passes: SendInput mouse-move resets idle timer (~10s grace before re-trigger).",
+    "CLOSE cmd: wkappbot screensaver close immediately removes ALL covering windows -- own screensaver AND other programs overlays. 4-pass wipe: (1) Enum WKAppBot ScreenSaver windows -- wipe. (2) Black fullscreen detect: 3x3 pixel grid avgY<30, 90pct+ work area, x3 retries. (3) Kill wkappbot-core procs with screensaver in cmdline. (4) Sleep 300ms + rescan. Each wipe: alpha=0, SW_HIDE, move off-screen, WM_CLOSE. After: SendInput mouse-move resets idle timer (~10s).",
     "LAUNCH: Eye spawns on idle>=10s via --from-eye flag. One WPF overlay per monitor. ShowActivated=false (no focus steal), WS_EX_TRANSPARENT (click-through). Sunset progression: 10s=golden, 60s=red, 90s=purple, 120s=night sky with stars+moon+waves. Auto-exits on any user input (9-layer kill). Polls WKAPPBOT_PARENT_PID every 500ms -- exits if Eye dies.",
     "EYE INTEGRATION: Eye writes runtime/eye_busy file during CDP/MCP automation -- screensaver hides while file exists. Eye spawns via AppBotPipe.Spawn(path, screensaver --from-eye) on idle expiry. WKAPPBOT_PARENT_PID env var set for parent-alive polling.",
     "TROUBLESHOOTING: (a) screensaver will not close -- use wkappbot screensaver close, NOT a11y close or a11y kill (cannot find the window). (b) Black fullscreen from third-party -- Pass2 pixel sampling handles it. (c) Re-triggers immediately -- SendInput grace ~10s, wait a moment. (d) Screensaver during automation -- Eye sets eye_busy to suppress.",
-    "DISABLED STATE: if wkappbot screensaver outputs [SCREENSAVER] Disabled by WKAPPBOT_NO_SCREENSAVER=1, the env var is set in Windows User environment (not in any config file). Fix via PS: [Environment]::SetEnvironmentVariable('WKAPPBOT_NO_SCREENSAVER', null, 'User') then restart Eye. Or via cmd: reg delete HKCU\\Environment /v WKAPPBOT_NO_SCREENSAVER /f then reopen terminal."
+    "DISABLED STATE: if wkappbot screensaver outputs [SCREENSAVER] Disabled by WKAPPBOT_NO_SCREENSAVER=1, the env var is set in Windows User environment (not in any config file). Fix via PS: [Environment]::SetEnvironmentVariable('WKAPPBOT_NO_SCREENSAVER', null, 'User') then restart Eye. Or via cmd: reg delete HKCU\\Environment /v WKAPPBOT_NO_SCREENSAVER /f then reopen terminal.",
+    "PERIODIC OVERLAY REMOVAL (while active): SS-Master watchdog thread in ScreenSaverOverlay.Lifecycle.cs runs WipeBlockingOverlays() every 30s while screensaver is visible. Target = OTHER programs overlays only (NOT own screensaver). Known blockers killed regardless of size: NVIDIA Overlay, nvsphelper64, nvcontainer, TextInputHost. Unknown procs: removed if covering >=75% screen width+height. Wipe: alpha=0, SW_HIDE, (-32000,-32000), WM_CLOSE. Log: [SS:WIPE] 0xHWND pid=N proc=name knownBlocker=true/false"
   ],
   "requirements": [
     {
@@ -44,6 +45,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-05T05:02:34.399347Z",
-  "updated": "2026-05-25T09:28:01.8363121Z",
-  "version": "1.5"
+  "updated": "2026-05-25T09:58:45.0158946Z",
+  "version": "1.21"
 }

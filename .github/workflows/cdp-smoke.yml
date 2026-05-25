@@ -15,7 +15,7 @@ permissions:
 jobs:
   cdp-smoke:
     runs-on: windows-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
 
     strategy:
       fail-fast: false
@@ -133,7 +133,7 @@ jobs:
 
 
       - name: Upload logs on failure
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fail-${{ matrix.target.name }}-${{ github.run_number }}
