@@ -1,0 +1,98 @@
+{
+  "id": "cdp-port-isolation-window-property",
+  "app": "wkappbot-webbot",
+  "title": "CDP Port Isolation via Window Property per wkappbot Instance",
+  "title_ko": null,
+  "desc": "Each wkappbot instance binds its launched CDP port to a Window Property keyed by ProjectRoot.Hash8 on the parent console (or desktop) HWND so sibling instances cannot steal each other's Chrome via host or port scans. Strict CWD-hash isolation: ProjectRoot honors AsyncLocal CallerCwdOverride from EyeCmdPipeServer (so Eye serving sibling repos uses the actual caller's hash, not the cached first-call hash), and FindRunningChromePort matches userDataDir by exact path equality on both the WMI cmdline parse and the /json/version udd field. No more substring-contains matches; no more 'trust derived port if udd absent' fallback.",
+  "steps": [
+    "On Chrome launch or detected reuse: ChromeLauncher.RegisterLaunchedPort(port) writes prop WKAPPBOT_CDP_PORT_<hash8> on GetConsoleWindow (fallback GetDesktopWindow).",
+    "FindBestPortForHostAsync consults GetLaunchedPort first: only matches this instance's port; returns -1 when nothing registered so caller takes the launch path instead of stealing a sibling's Chrome.",
+    "FindFirstFreePortAsync returns the registered port directly when present (no scan race with siblings).",
+    "EnsureCdpConnection (AskCommands.Entry.Cdp) sets DefaultUserDataDirBase + ProjectHash BEFORE any port discovery so the registry lookup sees the correct per-project bucket.",
+    "ConnectCdp (WebCommands) prefers GetLaunchedPort over the caller's default 9222 to survive cross-instance sibling registrations on the same machine.",
+    "ProjectRoot.Find/Hash8 honor AsyncLocal CallerCwdOverride: when EyeCmdPipeServer dispatches an in-process command (CallerCwd.Value set), it also sets ProjectRoot.CallerCwdOverride.Value so the per-call hash is re-derived from the actual caller's CWD. The static _root/_hash8 cache is bypassed entirely on Eye-routed calls, fixing the long-running-Eye leak where every cross-repo command silently used the first caller's hash.",
+    "FindRunningChromePort and KillStaleChromesAsync use CmdLineUserDataDirEquals: parses --user-data-dir=PATH from the chrome.exe cmdline and compares the canonicalized full path with strict equality. No substring contains-checks.",
+    "FindRunningChromePortByCdpScan returns 0 when the probed Chrome's /json/version response lacks a userDataDir field. The previous 'trust derived port' fallback for older Chromium is removed -- it could claim a sibling Chrome whenever our derived port collided.",
+    "Last-resort recovery (2026-05-25): when all CDP HTTP probes return 0 but a chrome.exe for our udd is still process-alive (renderer crash / brief hang), scan processes by cmdline udd via FindChromeProcessByUserDataDir (process-only, no HTTP), verify by ConnectAsync + Target.createTarget, reuse on success, and only kill the zombie when tab creation also fails -- prevents duplicate Chrome spawn alongside the live one."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://example.com",
+      "expect": "Chrome launches and registers port via SetPropW WKAPPBOT_CDP_PORT_<hash8>; second wkappbot in another CWD launches its own Chrome instead of attaching",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gemini hi",
+      "expect": "[CHROME:PORTREG] log line shows registered port and key; subsequent calls reuse the same port without scanning 9222-9230",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp list",
+      "expect": "lists tabs only on this instance's Chrome (port from GetLaunchedPort), not a sibling's Chrome",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot cdp open https://example.com",
+  "tags": [
+    "cdp",
+    "isolation",
+    "multi-instance",
+    "window-property",
+    "chrome"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.PortRegistry.cs",
+      "line": 1,
+      "pattern": "RegisterLaunchedPort",
+      "note": "core registry: SetPropW/GetPropW keyed by ProjectHash"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.Ports.cs",
+      "line": 29,
+      "pattern": "FindBestPortForHostAsync",
+      "note": "per-instance gating, returns -1 when no own port"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.cs",
+      "line": 422,
+      "pattern": "RegisterLaunchedPort(port)",
+      "note": "launch + reuse paths bind the port"
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Entry.Cdp.cs",
+      "line": 244,
+      "pattern": "EnsureCdpConnection",
+      "note": "ProjectHash set before host scan; ownPort path"
+    },
+    {
+      "file": "csharp/src/Shared/ProjectRoot.cs",
+      "line": 38,
+      "pattern": "CallerCwdOverride",
+      "note": "AsyncLocal override so Hash8 reflects per-call caller CWD inside long-running Eye"
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/EyeCmdPipeServer.cs",
+      "line": 183,
+      "pattern": "ProjectRoot.CallerCwdOverride",
+      "note": "Eye sets the override alongside CallerCwd on every dispatch path (DispatchBg, MCP-route, in-process, ask/agent bg)"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.Profile.cs",
+      "line": 110,
+      "pattern": "CmdLineUserDataDirEquals",
+      "note": "strict --user-data-dir parse with exact path equality, used by FindRunningChromePort, FindFreePortAsync, KillStaleChromesAsync"
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.Profile.cs",
+      "line": 175,
+      "pattern": "FindRunningChromePortByCdpScan",
+      "note": "udd field is mandatory; no fallback to trust derived port"
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T00:00:00Z",
+  "updated": "2026-05-25T14:00:43.7988899Z",
+  "version": "1.3"
+}
