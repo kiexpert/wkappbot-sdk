@@ -527,3 +527,4 @@ Use Read.cmd instead of native read_file
 - [x] version bump v7.4.0-sdk: Directory.Build.props 7.3->7.4 + CLAUDE.md header v7.3.0->v7.4.0 + CHANGELOG.md fix
 - [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
 - [x] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
+- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)
