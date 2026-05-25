@@ -53,10 +53,7 @@ function Resolve-BinDir {
 
     $candidate = Join-Path $scriptRoot 'bin'
     if (Test-Path -LiteralPath $candidate -PathType Container) {
-        $exeProbe = Join-Path $candidate 'wkappbot.exe'
-        if (Test-Path -LiteralPath $exeProbe -PathType Leaf) {
-            return (Resolve-Path -LiteralPath $candidate).Path
-        }
+        return (Resolve-Path -LiteralPath $candidate).Path
     }
 
     $cmd = Get-Command wkappbot -ErrorAction SilentlyContinue
@@ -73,6 +70,24 @@ if (-not $binDirResolved) {
     exit 1
 }
 Write-Ok "bin dir: $binDirResolved"
+
+# ---------------------------------------------------------------- 0. auto-build launcher if missing
+$wkexeCheck = Join-Path $binDirResolved 'wkappbot.exe'
+if (-not (Test-Path -LiteralPath $wkexeCheck -PathType Leaf)) {
+    Write-Step "wkappbot.exe not found -- building launcher from SDK source..."
+    $launcherProj = Join-Path $scriptRoot 'csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj'
+    if (-not (Test-Path -LiteralPath $launcherProj)) {
+        Write-Err "Launcher project not found: $launcherProj -- cannot auto-build"
+        exit 1
+    }
+    $dotnetExe = 'C:\Program Files\dotnet\dotnet.exe'
+    & $dotnetExe publish $launcherProj -c Release --verbosity minimal
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Launcher build failed (exit $LASTEXITCODE)"
+        exit 1
+    }
+    Write-Ok "Launcher built and deployed to $binDirResolved"
+}
 
 # ---------------------------------------------------------------- 1. config.json
 $configDir  = Join-Path $scriptRoot '.wkappbot'
