@@ -32,11 +32,11 @@ $tick = (& wkappbot eye tick 2>&1) -join " "
 if ($tick -match 'result=ok|end:0|ctx=') { ok "Eye responding" }
 else { fail "Eye: $tick"; exit 1 }
 
-# ── 2. CDP open (90s timeout -- auth-wall sites block indefinitely without it) ──
-Write-Host "[2] cdp open $Url (--timeout 90)..." -ForegroundColor Cyan
-$cdpRaw = (& wkappbot cdp open $Url --timeout 90 2>&1) -join " "
+# ── 2. CDP open (9s timeout -- 3s=fast 9s=human patience limit, anything longer = skip) ──
+Write-Host "[2] cdp open $Url (--timeout 9)..." -ForegroundColor Cyan
+$cdpRaw = (& wkappbot cdp open $Url --timeout 9 2>&1) -join " "
 if ($LASTEXITCODE -eq 2 -or $cdpRaw -match 'timeout \d+s') {
-    wrn "cdp open timed out 90s -- auth-wall or bot-protection. Chrome launched OK."
+    wrn "cdp open timed out 9s -- slow/auth-wall site. Skip."
     Write-Host ""; Write-Host "RESULT: SKIP [$name] (cdp-open timeout)" -ForegroundColor Yellow; exit 0
 }
 if ($cdpRaw -match 'cdp:(\d+)') {
