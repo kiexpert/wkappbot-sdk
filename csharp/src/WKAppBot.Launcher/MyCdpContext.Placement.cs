@@ -189,6 +189,9 @@ partial class Program
 
             // Filter to the Chrome process that is actually listening on our CDP port.
             // Prevents picking the user personal Chrome when they open one after WKAppBot.
+            // 남의창 이동 재발 시: wkappbot skill read standard-chrome-window
+            //                     wkappbot skill read standard-appbot-window
+            //                     wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
             var expectedPort = GetExpectedCdpPort();
             if (expectedPort.HasValue && TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
             {
