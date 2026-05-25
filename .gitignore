@@ -78,6 +78,8 @@ nul
 !scripts/*.ps1
 !setup.ps1
 !tests/**/*.ps1
+!bin/wkdoctor.ps1
+!bin/wkappbot.cmd
 *.png
 tmp/
 tmp*
