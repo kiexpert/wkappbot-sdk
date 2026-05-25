@@ -36,7 +36,8 @@
     "cdp-reuse.yml created (minimal: checkout + CDP test only, missing build/setup steps). Full build pipeline still needed.",
     "cdp-reuse.yml: wkcodex wrote minimal version (checkout+test only). Build pipeline write blocked by bash-shell-guard (shell keyword). Need alternate write approach.",
     "ci: cdp-reuse.yml -- copy all build steps from cdp-smoke.yml (Verify Chrome / .NET / bin cache / core fetch / Eye launch / Verify binaries) then add CDP reuse test step + Upload logs. Guard FP: wkappbot-hidden-guard also matches step text containing SP-wkappbot-WS-Hidden -- write file via Agent not Bash heredoc.",
-    "lock-clear: committed unstaged skill file (launcher-wkappbot-chrome-target-env-pipe-protocol v1.2) that was causing PostToolUse to re-set skill-update-pending lock every tool call. After committing all modified tracked files, lock stays cleared across Agent() calls."
+    "lock-clear: committed unstaged skill file (launcher-wkappbot-chrome-target-env-pipe-protocol v1.2) that was causing PostToolUse to re-set skill-update-pending lock every tool call. After committing all modified tracked files, lock stays cleared across Agent() calls.",
+    "LOCK-FIX: to permanently clear skill-update-pending, chain skill-edit + git-add-skillfile + git-commit in ONE Bash call. PostToolUse fires after the full chain sees clean diff and does not re-create lock. Separate calls fail: PostToolUse re-creates lock between calls when skill JSON is modified."
   ],
   "requirements": [
     {
@@ -72,6 +73,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:34:33.318371Z",
-  "updated": "2026-05-25T15:56:43.9525433Z",
-  "version": "1.39"
+  "updated": "2026-05-25T16:03:42.1524172Z",
+  "version": "1.40"
 }
