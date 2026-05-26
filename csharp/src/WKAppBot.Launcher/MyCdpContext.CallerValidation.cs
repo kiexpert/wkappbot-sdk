@@ -124,7 +124,7 @@ partial class Program
 
     /// <summary>
     /// Resolve a valid on-screen caller window. If the given caller is off-screen,
-    /// try alternatives: foreground window, host window, or largest visible window.
+    /// try deterministic caller-derived alternatives only.
     /// Returns IntPtr.Zero if no valid on-screen window is found.
     /// </summary>
     static IntPtr ResolveValidCallerWindow(IntPtr preferredCaller)
@@ -178,30 +178,6 @@ partial class Program
                     return host;
                 }
             }
-        }
-
-        // Fallback: find largest on-screen TERMINAL/IDE window owned by a known host process.
-        // MUST use IsKnownHostProcess guard -- without it, EnumWindows picks the globally
-        // largest visible window (another project's terminal, Chrome, YouTube, etc.) and
-        // Chrome ends up placed on a completely unrelated app's window ("남의 창" contamination).
-        var largestWindow = IntPtr.Zero;
-        int largestArea = 0;
-        EnumWindowsLocal((hwnd, _) =>
-        {
-            if (!IsWindowVisibleLocal(hwnd)) return true;
-            if (!IsKnownHostProcess(hwnd)) return true;  // project boundary guard
-            if (!GetWindowRect(hwnd, out RECT rect)) return true;
-            var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
-            if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) == IntPtr.Zero) return true;
-            int area = rect.Width * rect.Height;
-            if (area > largestArea) { largestArea = area; largestWindow = hwnd; }
-            return true;
-        }, IntPtr.Zero);
-
-        if (largestWindow != IntPtr.Zero)
-        {
-            Console.Error.WriteLine($"[CALLER:RESOLVE] using largest terminal window 0x{largestWindow.ToInt64():X}");
-            return largestWindow;
         }
 
         Console.Error.WriteLine($"[CALLER:RESOLVE] FAIL no valid on-screen window found");
