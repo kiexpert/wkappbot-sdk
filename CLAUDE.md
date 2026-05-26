@@ -545,4 +545,4 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [ ] taskkill suggest 2026-05-26T02:23:25 full 2/2 confirm: needs DG-wkappbot-sdk main-CWD --confirm (worktree channel cannot self-confirm). REQ1 (a11y windows per-process pid/mem/handles/threads/cpu) is OUT-OF-SCOPE separate command enhancement -- file own suggest or address separately
 - [x] nightly-heal 2026-05-27 STEP 2: skill audit (3 ok, 54 cross-repo refs expected) + repo-health LITE (README sync, AGENTS parity, sections OK) + Pending dedupe + commit 4750ecfc
 - [x] nightly-heal 2026-05-27 STEP 2 (repeat): skill audit (3 ok, 54 expected) + repo-health LITE (README pending, AGENTS/CLAUDE parity OK, sections OK) + commit 871bd83b
-- [ ] nightly-heal 2026-05-27 STEP 2 (3rd repeat): autonomous re-execution
+- [x] nightly-heal 2026-05-27 STEP 2 (3rd): skill audit 3ok/54expected/590norefs, repo-health LITE clean, commit 4544a346
