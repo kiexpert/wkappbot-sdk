@@ -13,7 +13,8 @@
     "ProjectRoot.Find/Hash8 honor AsyncLocal CallerCwdOverride: when EyeCmdPipeServer dispatches an in-process command (CallerCwd.Value set), it also sets ProjectRoot.CallerCwdOverride.Value so the per-call hash is re-derived from the actual caller's CWD. The static _root/_hash8 cache is bypassed entirely on Eye-routed calls, fixing the long-running-Eye leak where every cross-repo command silently used the first caller's hash.",
     "FindRunningChromePort and KillStaleChromesAsync use CmdLineUserDataDirEquals: parses --user-data-dir=PATH from the chrome.exe cmdline and compares the canonicalized full path with strict equality. No substring contains-checks.",
     "FindRunningChromePortByCdpScan returns 0 when the probed Chrome's /json/version response lacks a userDataDir field. The previous 'trust derived port' fallback for older Chromium is removed -- it could claim a sibling Chrome whenever our derived port collided.",
-    "Last-resort recovery (2026-05-25): when all CDP HTTP probes return 0 but a chrome.exe for our udd is still process-alive (renderer crash / brief hang), scan processes by cmdline udd via FindChromeProcessByUserDataDir (process-only, no HTTP), verify by ConnectAsync + Target.createTarget, reuse on success, and only kill the zombie when tab creation also fails -- prevents duplicate Chrome spawn alongside the live one."
+    "Last-resort recovery (2026-05-25): when all CDP HTTP probes return 0 but a chrome.exe for our udd is still process-alive (renderer crash / brief hang), scan processes by cmdline udd via FindChromeProcessByUserDataDir (process-only, no HTTP), verify by ConnectAsync + Target.createTarget, reuse on success, and only kill the zombie when tab creation also fails -- prevents duplicate Chrome spawn alongside the live one.",
+    "BUG FIX (2026-05-26): FindRunningChromePortAny port-file guard was causing Chrome multiplication. When disk port file is missing/expired (ReadPortFile returns 0), the guard  evaluated  = true, skipping ALL Chromes. Fix: change to . Missing file = recovery mode; trust ourBase prefix check for isolation. Committed to Core ChromeLauncher.ProcessDiscovery.cs"
   ],
   "requirements": [
     {
@@ -93,6 +94,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-05T00:00:00Z",
-  "updated": "2026-05-25T14:00:43.7988899Z",
-  "version": "1.3"
+  "updated": "2026-05-26T03:37:56.9284621Z",
+  "version": "1.5"
 }
