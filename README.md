@@ -1,4 +1,4 @@
-# WKAppBot — Computer Use, App Use, AppBot
+﻿# WKAppBot ??Computer Use, App Use, AppBot
 
 [![build-launcher](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml)
 [![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)
@@ -6,7 +6,7 @@
 
 ![WKAppBot Sudo License Demo](docs/wkappbot-sudo-license-demo-preview.gif)
 
-> ▶ **[전체 영상 보기 →](https://kiexpert.github.io/wkappbot-sdk/)**  ·  Sudo 라이선스로 이런 봇을 만들 수 있습니다
+> ??**[?꾩껜 ?곸긽 蹂닿린 ??(https://kiexpert.github.io/wkappbot-sdk/)**  쨌  Sudo ?쇱씠?좎뒪濡??대윴 遊뉗쓣 留뚮뱾 ???덉뒿?덈떎
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://dot.net)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey)](https://github.com/kiexpert/wkappbot-sdk/blob/main/docs/INSTALL.md)
@@ -18,20 +18,20 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 
 ---
 
-> 🤖 **Let your AI agent control any Windows app — without screen takeover.**  
-> 🔥 **Self-healing UIA + Vision fallback — works even when the DOM lies.**  
-> ⚡ **Multi-AI triad (GPT + Gemini + Claude) in one command.**
+> ?쨼 **Let your AI agent control any Windows app ??without screen takeover.**  
+> ?뵦 **Self-healing UIA + Vision fallback ??works even when the DOM lies.**  
+> ??**Multi-AI triad (GPT + Gemini + Claude) in one command.**
 
 ---
 
 ## Why this exists
 
-Computer Use lets an AI click, type, and read the screen. **App Use** is the layer above: agents that drive *specific* applications the way a power user does — focuslessly, alongside the human, without seizing the screen.
+Computer Use lets an AI click, type, and read the screen. **App Use** is the layer above: agents that drive *specific* applications the way a power user does ??focuslessly, alongside the human, without seizing the screen.
 
 WKAppBot gives AI agents:
 
-- **Eyes** — read any UI, extract text, recognize controls
-- **Hands** — click, type, scroll, invoke — without stealing focus
+- **Eyes** ??read any UI, extract text, recognize controls
+- **Hands** ??click, type, scroll, invoke ??without stealing focus
 
 No app rewrite. No vendor API. If a human can use it, WKAppBot can automate it.
 
@@ -53,24 +53,24 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 | Feature | WKAppBot | Playwright | PyAutoGUI | AutoHotkey |
 |---------|----------|------------|-----------|------------|
-| Focusless operation | ✅ | ❌ | ❌ | ❌ |
-| UIA + Win32 + CDP unified | ✅ | Web only | Mouse/KB only | Win32 only |
-| Self-healing Vision fallback | ✅ | ❌ | ❌ | ❌ |
-| AI-native (LLM delegation) | ✅ | ❌ | ❌ | ❌ |
-| Android via ADB | ✅ | ❌ | ❌ | ❌ |
-| MFC/HTS owner-drawn support | ✅ | ❌ | ❌ | Partial |
+| Focusless operation | ??| ??| ??| ??|
+| UIA + Win32 + CDP unified | ??| Web only | Mouse/KB only | Win32 only |
+| Self-healing Vision fallback | ??| ??| ??| ??|
+| AI-native (LLM delegation) | ??| ??| ??| ??|
+| Android via ADB | ??| ??| ??| ??|
+| MFC/HTS owner-drawn support | ??| ??| ??| Partial |
 
 ---
 
-## 🚀 What's New in v7.3
+## ?? What's New in v7.3
 
-- **Caller HWND ancestor walk** — Launcher resolves the AppBot caller window strictly via the process-ancestor chain (no foreground fallbacks). ConPTY hidden terminals are included via `GetWindowRect`, and visible windows apply the `GA_ROOT` filter. Off-screen callers are rejected fail-fast.
-- **Chrome session restore guard** — Two-layer fix for Chrome session-restore position override: `ChromeLauncher.SessionRestore` clears the cached geometry and `CdpClient.WindowStabilize` re-asserts the target rect post-restore.
-- **IME Relay jamo-sync** — Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus`.
-- **Publish defense** — `IncludeAllContentForSelfExtract=true` to suppress `System.IO.FileSystem.Watcher` shim-assembly false positives during hot-swap.
-- **wkfind / wkask tools** — Unified code+session search (`wkfind`) with GlobCoverageScore ranking, plus live ask-pipeline monitor (`wkask`) for QA-first regression checks.
+- **Caller HWND ancestor walk** ??Launcher resolves the AppBot caller window strictly via the process-ancestor chain (no foreground fallbacks). ConPTY hidden terminals are included via `GetWindowRect`, and visible windows apply the `GA_ROOT` filter. Off-screen callers are rejected fail-fast.
+- **Chrome session restore guard** ??Two-layer fix for Chrome session-restore position override: `ChromeLauncher.SessionRestore` clears the cached geometry and `CdpClient.WindowStabilize` re-asserts the target rect post-restore.
+- **IME Relay jamo-sync** ??Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus`.
+- **Publish defense** ??`IncludeAllContentForSelfExtract=true` to suppress `System.IO.FileSystem.Watcher` shim-assembly false positives during hot-swap.
+- **wkfind / wkask tools** ??Unified code+session search (`wkfind`) with GlobCoverageScore ranking, plus live ask-pipeline monitor (`wkask`) for QA-first regression checks.
 
-→ Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
+??Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 
 ---
 
@@ -78,11 +78,11 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 | OS | Status |
 |----|--------|
-| Windows 11 | ✅ Fully supported |
-| Windows 10 22H2+ | ✅ Fully supported |
-| Windows 10 < 22H2 | ⚠️ Untested |
-| Windows Server 2019+ | ✅ Headless mode (no GUI a11y) |
-| macOS / Linux | ❌ Not supported |
+| Windows 11 | ??Fully supported |
+| Windows 10 22H2+ | ??Fully supported |
+| Windows 10 < 22H2 | ?좑툘 Untested |
+| Windows Server 2019+ | ??Headless mode (no GUI a11y) |
+| macOS / Linux | ??Not supported |
 
 ---
 
@@ -101,22 +101,22 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ## Real-World Use Cases
 
-These are the kinds of jobs WKAppBot was actually built to handle — not theoretical demos:
+These are the kinds of jobs WKAppBot was actually built to handle ??not theoretical demos:
 
-### 🤖 AI Trading Bot — Built with Sudo License
+### ?쨼 AI Trading Bot ??Built with Sudo License
 
-| 🔐 AUTO PIN ENTRY | 📊 ALL SYSTEMS READY | 🧠 PORTFOLIO ANALYSIS |
+| ?뵍 AUTO PIN ENTRY | ?뱤 ALL SYSTEMS READY | ?쭬 PORTFOLIO ANALYSIS |
 |:-:|:-:|:-:|
 | ![](docs/screenshots/wkappbot-sudo-demo-pin-entry.jpg) | ![](docs/screenshots/wkappbot-sudo-demo-all-ready.jpg) | ![](docs/screenshots/wkappbot-sudo-demo-portfolio.jpg) |
-| Legacy HTS에 보안 PIN 자동 입력 | 모든 창 자동 배치 — 준비 완료 | AI가 22종목 매수/제외 자동 판단 |
+| Legacy HTS??蹂댁븞 PIN ?먮룞 ?낅젰 | 紐⑤뱺 李??먮룞 諛곗튂 ??以鍮??꾨즺 | AI媛 22醫낅ぉ 留ㅼ닔/?쒖쇅 ?먮룞 ?먮떒 |
 
-> **Sudo 라이선스**로 이런 봇을 직접 만들 수 있습니다 → **[라이선스 보기](./PRICING.md)**
+> **Sudo ?쇱씠?좎뒪**濡??대윴 遊뉗쓣 吏곸젒 留뚮뱾 ???덉뒿?덈떎 ??**[?쇱씠?좎뒪 蹂닿린](./PRICING.md)**
 
-- **AI-driven trading on Korean HTS terminals.** LS증권 HTS 투혼 is built on MFC owner-drawn controls that no UIA tool can see. WKAppBot's CCA + OCR + Vision fallback locks onto chart panels, order forms, and balance grids, so an AI agent can read positions, place orders, and verify fills without screen scraping.
-- **Browser AI session automation.** Pump prompts straight into a live Claude / ChatGPT / Gemini browser tab over CDP — no copy-paste, no clipboard race, no losing the conversation. Cross-prompt chunking handles long inputs; attachment lock prevents stray drops.
+- **AI-driven trading on Korean HTS terminals.** LS利앷텒 HTS ?ы샎 is built on MFC owner-drawn controls that no UIA tool can see. WKAppBot's CCA + OCR + Vision fallback locks onto chart panels, order forms, and balance grids, so an AI agent can read positions, place orders, and verify fills without screen scraping.
+- **Browser AI session automation.** Pump prompts straight into a live Claude / ChatGPT / Gemini browser tab over CDP ??no copy-paste, no clipboard race, no losing the conversation. Cross-prompt chunking handles long inputs; attachment lock prevents stray drops.
 - **Multi-monitor focusless automation.** UIA Invoke / Value / Toggle never steal focus. The user keeps typing in another app on another monitor while WKAppBot drives a headless workflow in the background.
 - **Android app control via ADB.** `adb://device/...` graps reach into the accessibility tree of any phone or emulator, including foldables (Galaxy Fold5 tested), with the same command surface as Windows automation.
-- **Auto-dismiss Hancom / Office popups.** `wkappbot dismiss` plus a handler YAML eats save-prompt, license-nag, and "do you want to update?" dialogs across 한컴오피스, MS Office, and updater stacks — keeping batch jobs from stalling overnight.
+- **Auto-dismiss Hancom / Office popups.** `wkappbot dismiss` plus a handler YAML eats save-prompt, license-nag, and "do you want to update?" dialogs across ?쒖뺨?ㅽ뵾?? MS Office, and updater stacks ??keeping batch jobs from stalling overnight.
 
 ---
 
@@ -173,7 +173,7 @@ wkappbot skill list
 wkappbot skill read focusless-first-principle
 wkappbot skill read grap
 ```
-Skills capture per-project knowhow — UIA quirks, CDP gotchas, owner-drawn-control workarounds — so every session starts informed instead of exploring from scratch.
+Skills capture per-project knowhow ??UIA quirks, CDP gotchas, owner-drawn-control workarounds ??so every session starts informed instead of exploring from scratch.
 
 ### Suggest-Driven Backlog
 ```bash
@@ -188,29 +188,10 @@ AI agents queue findings without interrupting the current task. Evidence scripts
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Your terminal / Claude Code / Codex / any AI agent     │
-└───────────────────────┬─────────────────────────────────┘
-                        │ wkappbot <command>
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  wkappbot.exe  (MIT launcher, ~1 MB, AOT)               │
-│  • routes CLI args → core via named pipe                │
-│  • hot-swap: detects .new.exe, drains, renames atomic   │
-│  • license check via GitHub collaborator API            │
-└───────────────────────┬─────────────────────────────────┘
-                        │ named pipe  wkappbot_eye_ipc_{hash}
-                        ▼
-┌─────────────────────────────────────────────────────────┐
-│  wkappbot-core.exe  (closed, ~25 MB, single-file)       │
-│  • all CLI commands: a11y, ask, skill, eye, file, …     │
-│  • AppBot Eye daemon: Slack socket + MCP broker         │
-│  • UIA / Win32 / CDP / ADB automation engines           │
-│  • Vision / OCR pipeline + Experience DB                │
-└─────────────────────────────────────────────────────────┘
-         │ UIA / Win32                │ CDP (DevTools)
-         ▼                            ▼
-   Windows apps                 Chrome / Edge
+?뚢????????????????????????????????????????????????????????????? Your terminal / Claude Code / Codex / any AI agent     ???붴????????????????????????р???????????????????????????????????                        ??wkappbot <command>
+                        ???뚢????????????????????????????????????????????????????????????? wkappbot.exe  (MIT launcher, ~1 MB, AOT)               ???? ??routes CLI args ??core via named pipe                ???? ??hot-swap: detects .new.exe, drains, renames atomic   ???? ??license check via GitHub collaborator API            ???붴????????????????????????р???????????????????????????????????                        ??named pipe  wkappbot_eye_ipc_{hash}
+                        ???뚢????????????????????????????????????????????????????????????? wkappbot-core.exe  (closed, ~25 MB, single-file)       ???? ??all CLI commands: a11y, ask, skill, eye, file, ??    ???? ??AppBot Eye daemon: Slack socket + MCP broker         ???? ??UIA / Win32 / CDP / ADB automation engines           ???? ??Vision / OCR pipeline + Experience DB                ???붴???????????????????????????????????????????????????????????         ??UIA / Win32                ??CDP (DevTools)
+         ??                           ??   Windows apps                 Chrome / Edge
    (WPF, MFC, UWP)              (web apps, AI chat)
 ```
 
@@ -218,17 +199,17 @@ Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root
 
 ---
 
-## 📚 Documentation
+## ?뱴 Documentation
 
-**→ [kiexpert.github.io/wkappbot-sdk](https://kiexpert.github.io/wkappbot-sdk/)**
+**??[kiexpert.github.io/wkappbot-sdk](https://kiexpert.github.io/wkappbot-sdk/)**
 
 | | |
 |---|---|
-| [설치 가이드](https://kiexpert.github.io/wkappbot-sdk/guide/install) | 클론·빌드·PATH 설정 |
-| [빠른 시작 (10분)](https://kiexpert.github.io/wkappbot-sdk/guide/quickstart) | 첫 자동화까지 |
-| [CLI 명령어 레퍼런스](https://kiexpert.github.io/wkappbot-sdk/reference/commands) | 전체 명령 + 출력 샘플 |
-| [grap 패턴](https://kiexpert.github.io/wkappbot-sdk/reference/grap) | Grab Accessible Pattern 문법 |
-| [트러블슈팅](https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting) | 자주 겪는 문제 해결 |
+| [?ㅼ튂 媛?대뱶](https://kiexpert.github.io/wkappbot-sdk/guide/install) | ?대줎쨌鍮뚮뱶쨌PATH ?ㅼ젙 |
+| [鍮좊Ⅸ ?쒖옉 (10遺?](https://kiexpert.github.io/wkappbot-sdk/guide/quickstart) | 泥??먮룞?붽퉴吏 |
+| [CLI 紐낅졊???덊띁?곗뒪](https://kiexpert.github.io/wkappbot-sdk/reference/commands) | ?꾩껜 紐낅졊 + 異쒕젰 ?섑뵆 |
+| [grap ?⑦꽩](https://kiexpert.github.io/wkappbot-sdk/reference/grap) | Grab Accessible Pattern 臾몃쾿 |
+| [?몃윭釉붿뒋??(https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting) | ?먯＜ 寃る뒗 臾몄젣 ?닿껐 |
 
 ---
 
@@ -265,19 +246,19 @@ Pre-built binaries are also available if you prefer not to build:
 
 | | |
 |---|---|
-| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — extract anywhere |
-| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every build → `wkappbot-bin-{run_id}` (90-day retention) |
+| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` ??extract anywhere |
+| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every build ??`wkappbot-bin-{run_id}` (90-day retention) |
 
-**Recommended layout** — clone under `Documents\` so your personal automation data (experience DB, logs, skills) stays in your home directory and is easy to find, back up, or exclude from sharing:
+**Recommended layout** ??clone under `Documents\` so your personal automation data (experience DB, logs, skills) stays in your home directory and is easy to find, back up, or exclude from sharing:
 
-> **Why Documents?** WKAppBot learns from your usage and stores UI experience data under `bin\wkappbot.hq\`. Keeping this under your personal Documents folder protects your privacy — it stays separate from shared or version-controlled paths.
+> **Why Documents?** WKAppBot learns from your usage and stores UI experience data under `bin\wkappbot.hq\`. Keeping this under your personal Documents folder protects your privacy ??it stays separate from shared or version-controlled paths.
 
 ```
-%USERPROFILE%\Documents\wkappbot\  ← recommended clone location (easy to find in Explorer)
+%USERPROFILE%\Documents\wkappbot\  ??recommended clone location (easy to find in Explorer)
   bin\
-    wkappbot.exe                 ← launcher / busybox entry point
-    wkappbot-core.exe            ← core worker (hot-swapped on update)
-    wkappbot.hq\                 ← runtime data: skills, logs, experience DB (auto-created)
+    wkappbot.exe                 ??launcher / busybox entry point
+    wkappbot-core.exe            ??core worker (hot-swapped on update)
+    wkappbot.hq\                 ??runtime data: skills, logs, experience DB (auto-created)
   csharp\
   handlers\
   skills\
@@ -308,13 +289,13 @@ wkappbot --version
 wkappbot skill list
 ```
 
-> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed — the binary is self-contained.
+> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed ??the binary is self-contained.
 
 ---
 
 ## Activate License
 
-Free tier works out of the box — no signup. To unlock CDP browser automation,
+Free tier works out of the box ??no signup. To unlock CDP browser automation,
 multi-AI `ask`, `schedule`, or `--sudo` admin access:
 
 ```bash
@@ -322,7 +303,7 @@ gh auth login              # authenticate with GitHub
 wkappbot license status    # confirms current tier (Free until you subscribe)
 ```
 
-Then follow [SUBSCRIBE.md](./SUBSCRIBE.md) — KIS bank transfer with your GitHub
+Then follow [SUBSCRIBE.md](./SUBSCRIBE.md) ??KIS bank transfer with your GitHub
 username as the memo, accept the GitHub collaborator invite, and the same binary
 unlocks Pro features within 1 hour. See [PRICING.md](./PRICING.md) for tier details.
 
@@ -375,9 +356,9 @@ scenario: { name: "Order placement" }
 app: { launch: "trading.exe", wait_for_window: { title_contains: "HTS" } }
 steps:
   - { name: "Enter stock code", target: { automation_id: "codeEdit" }, action: type_text, params: { text: "005930" } }
-  - { name: "Click buy",        target: { name: "매수" },               action: click }
+  - { name: "Click buy",        target: { name: "留ㅼ닔" },               action: click }
   - { name: "Verify",           target: { automation_id: "resultLabel" }, action: assert,
-      params: { type: text_contains, expected: "주문완료" } }
+      params: { type: text_contains, expected: "二쇰Ц?꾨즺" } }
 ```
 
 ---
@@ -394,7 +375,7 @@ WKAppBot.Android    AdbClient, AndroidA11yTree
 WKAppBot.Launcher   Hot-swap staging, pipe relay, admin elevation
 ```
 
-Eye (always-on) ↔ MCP worker (Core) over JSON-RPC named pipe.  
+Eye (always-on) ??MCP worker (Core) over JSON-RPC named pipe.  
 UIA isolated in a separate MCP worker process -- prevents ConPTY LPC deadlock.
 
 ---
@@ -407,7 +388,7 @@ bin/wkappbot-core.exe     core worker        (auto hot-swapped on publish)
 bin/wkappbot.hq/          runtime HQ -- experience DB, skills, sessions, logs
 ```
 
-.NET 8.0 · `net8.0-windows10.0.22621.0` · Korean UI support
+.NET 8.0 쨌 `net8.0-windows10.0.22621.0` 쨌 Korean UI support
 
 ---
 
@@ -423,19 +404,18 @@ Do not use the name to imply endorsement or affiliation without written permissi
 
 - [CLAUDE.md](./CLAUDE.md) -- detailed operational guidance for AI agents
 - [AGENTS.md](./AGENTS.md) -- shared AI engineering rules
-- `wkappbot skill list` — accumulated knowhow: grap syntax, UIA quirks, CDP gotchas, and more
+- `wkappbot skill list` ??accumulated knowhow: grap syntax, UIA quirks, CDP gotchas, and more
 
 ---
 
 ## Support This Project
 
-If WKAppBot saves you time, consider buying me a coffee ☕
-
+If WKAppBot saves you time, consider buying me a coffee ??
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal)](https://paypal.me/kiexpert)
 
 ---
 
-## ⭐ Star History & Community
+## 狩?Star History & Community
 
 [![Stars](https://img.shields.io/github/stars/kiexpert/wkappbot-sdk?style=social)](https://github.com/kiexpert/wkappbot-sdk/stargazers)
 [![Forks](https://img.shields.io/github/forks/kiexpert/wkappbot-sdk?style=social)](https://github.com/kiexpert/wkappbot-sdk/network/members)
@@ -443,10 +423,10 @@ If WKAppBot saves you time, consider buying me a coffee ☕
 
 [![Star History Chart](https://api.star-history.com/svg?repos=kiexpert/wkappbot-sdk&type=Date)](https://star-history.com/#kiexpert/wkappbot-sdk&Date)
 
-- 💬 **Questions or design discussions?** Join us on [GitHub Discussions](https://github.com/kiexpert/wkappbot-sdk/discussions).
-- 🐛 **Found a bug or have a feature request?** Open an [issue](https://github.com/kiexpert/wkappbot-sdk/issues).
-- 🛠 **Built something with WKAppBot?** Open a PR to add your project to a community showcase — we'd love to feature it.
-- ⭐ **Liking the project?** Drop a star — it genuinely helps surface this work to other developers.
+- ?뮠 **Questions or design discussions?** Join us on [GitHub Discussions](https://github.com/kiexpert/wkappbot-sdk/discussions).
+- ?맀 **Found a bug or have a feature request?** Open an [issue](https://github.com/kiexpert/wkappbot-sdk/issues).
+- ?썱 **Built something with WKAppBot?** Open a PR to add your project to a community showcase ??we'd love to feature it.
+- 狩?**Liking the project?** Drop a star ??it genuinely helps surface this work to other developers.
 
 ---
 
