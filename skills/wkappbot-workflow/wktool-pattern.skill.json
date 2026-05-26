@@ -15,7 +15,8 @@
     "QA SCRIPT PATTERN -- auto-suggest on confirmed bugs: wkappbot-core.exe suggest 'BUG: description' with exact port, observed vs expected, repro command. 3 requirements using wkappbot commands only.",
     "BUG EVIDENCE WORKFLOW: when filing suggest about ask/CDP failure, run wkask --raw to capture full log. Include [WARN]/[ERROR] lines in suggest text. wkcdp output is ready-made evidence for session anomalies.",
     "EXTEND THE PATTERN: any recurring monitor task = new wk-tool script in D:/GitHub/WKAppBot/bin/. Name: wk<domain>.ps1. Add test subcommand that validates heuristic vs eval-js agreement. Claude orchestrates, scripts execute.",
-    "CDP-MON USAGE: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1 for detailed per-port view (PID, MB, age, TGT-POS, ACT-POS, drift, tabs, latency). Use when wkcdp output is not detailed enough. Key columns: TGT-POS (where Chrome should be), ACT-POS (where it actually is), DRIFT (delta). CRIT=off-screen, WARN=drift/age/dup-tabs. Note: off-screen detection uses MonitorFromPoint API (fixed 2026-05-14) -- negative coords are valid on left monitors."
+    "CDP-MON USAGE: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1 for detailed per-port view (PID, MB, age, TGT-POS, ACT-POS, drift, tabs, latency). Use when wkcdp output is not detailed enough. Key columns: TGT-POS (where Chrome should be), ACT-POS (where it actually is), DRIFT (delta). CRIT=off-screen, WARN=drift/age/dup-tabs. Note: off-screen detection uses MonitorFromPoint API (fixed 2026-05-14) -- negative coords are valid on left monitors.",
+    "PATH-RESOLVED SCRIPTS: WKAppBot/bin is in PATH. Use short names directly -- wkcdp-mon.ps1, wkask.ps1, wkcdp-mon.cmd etc. In PowerShell: wkcdp-mon.ps1. In Bash/CMD: wkcdp-mon.cmd. Never hardcode absolute paths for bin tools. If unsure: where wkcdp-mon"
   ],
   "requirements": [
     {
@@ -53,6 +54,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-10T13:32:49.8983722Z",
-  "updated": "2026-05-15T15:53:13.11515Z",
-  "version": "1.12"
+  "updated": "2026-05-26T01:45:09.0048325Z",
+  "version": "1.14"
 }

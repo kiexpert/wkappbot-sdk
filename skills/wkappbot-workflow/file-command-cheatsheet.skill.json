@@ -13,7 +13,8 @@
     "WRITE: wkappbot file write <path> --content \"...\" (.bak/ created on overwrite)",
     "! CP949 files: Korean source with Han comments -- verify encoding before edit",
     "! After edit: U+FFFD detected -> auto Slack alert fired",
-    "wkappbot file edit PATH --old-string 'text' --new-string 'text' for INLINE string replacement. --old/--new flags take FILE PATHS (not strings). Without --old-string, value is treated as a file path relative to CWD."
+    "wkappbot file edit PATH --old-string 'text' --new-string 'text' for INLINE string replacement. --old/--new flags take FILE PATHS (not strings). Without --old-string, value is treated as a file path relative to CWD.",
+    "REPLACE-ALL GOTCHA: if --new-string contains --old-string as substring, --replace-all causes recursive double-replacement. Fix: include anchoring context in old-string (e.g. if (argFilter not just argFilter) so the replacement result does NOT contain the old-string."
   ],
   "requirements": null,
   "primary_cmd": null,
@@ -32,6 +33,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T13:00:00Z",
-  "updated": "2026-05-24T19:44:31.3741984Z",
-  "version": "1.7"
+  "updated": "2026-05-26T01:48:04.0958784Z",
+  "version": "1.9"
 }
