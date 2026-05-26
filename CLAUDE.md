@@ -522,4 +522,5 @@ Use Read.cmd instead of native read_file
 - [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
 - [x] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
 - [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing (wkharness-status py py-check script ps)
-- [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)
+- [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)
+- [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve
