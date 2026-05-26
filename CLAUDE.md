@@ -522,7 +522,7 @@ Use Read.cmd instead of native read_file
 - [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
 - [x] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
 - [x] suggest triage: OperationCanceledException cluster (27 entries) pairwise-merged; MERGE*2 + CDP timeout 46-66 remain
-- [ ] suggest triage: resolve MERGE*2 + CDP timeout cluster (46-66, 2026-05-26T03-06) + CommandHelpMap missing
+- [x] suggest triage: MERGE*2 entries all resolved; CDP timeout 22 entries blocked by CMD execution guard + CommandHelpMap missing
 - [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [x] cdp open Chrome multiplication: FindRunningChromePortAny port-file guard fixed (registered>0 condition) -- Core 8819ed449 built+hot-swapped
 - [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)
 - [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve- [x] taskkill /IM auto-kill non-protected (Core 7aaeba959): ZOMBIE+UNKNOWN killed immediately like Windows taskkill; PROTECTED (Eye/screensaver/whisper-ring/mcp-from-eye) preserved + --force hint; per-process [NMB h=H t=T] metrics; suggest 2026-05-26T02:23:25 resolved HALF (evidence test-taskkill-im-autokill.sh PASS); skill taskkill-compat-shim v1.10
