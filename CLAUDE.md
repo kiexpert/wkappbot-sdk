@@ -424,6 +424,21 @@ Use Edit.cmd instead of native apply_patch
 ## harness:block (?i)● read_file\(
 Use Read.cmd instead of native read_file
 
+## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*(?:MyCdpContext|ChromeLauncher|CallerPlacement|CallerHwnd|PlacementValidate|Stage23)
+wkappbot skill read standard-appbot-window               # usage -- caller window detection (P2 ancestor walk)
+wkappbot skill read standard-chrome-window               # impl -- Chrome window placement for CDP
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # task -- HWND validation 3-tier + edge cases
+
+## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*EyeCmdPipe
+wkappbot skill read standard-appbot-window               # usage -- caller HWND IPC forwarding
+wkappbot skill read eye-ipc-caller-hwnd-resolution       # impl -- Eye IPC caller HWND resolution cascade
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # task -- HWND validation
+
+## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*\.(?:cs|csproj|sln|csx|py|pyw|ps1|psm1|psd1|c|cc|cpp|cxx|h|hh|hpp|hxx|vb|fs|fsx|go|rs|java|kt|ts|tsx|js|jsx|rb|php)\b
+wkappbot skill read sdk-launcher-maintenance             # usage -- build/test/hot-swap/release loop
+wkappbot skill read wkappbot-build-verify-workflow       # impl -- build + verify after any source edit
+wkappbot skill read wkharness-guards                     # task -- harness guard system
+
 ## Pending
 
 <!-- compressed 2026-05-25: 60+ resolved items grouped by topic -->
@@ -525,5 +540,7 @@ Use Read.cmd instead of native read_file
 - [x] suggest triage: MERGE*2 entries all resolved; CDP timeout 22 entries blocked by CMD execution guard + CommandHelpMap missing
 - [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [x] cdp open Chrome multiplication: FindRunningChromePortAny port-file guard fixed (registered>0 condition) -- Core 8819ed449 built+hot-swapped
 - [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)
-- [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve- [x] taskkill /IM auto-kill non-protected (Core 7aaeba959): ZOMBIE+UNKNOWN killed immediately like Windows taskkill; PROTECTED (Eye/screensaver/whisper-ring/mcp-from-eye) preserved + --force hint; per-process [NMB h=H t=T] metrics; suggest 2026-05-26T02:23:25 resolved HALF (evidence test-taskkill-im-autokill.sh PASS); skill taskkill-compat-shim v1.10
+- [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve- [x] taskkill /IM auto-kill non-protected (Core 7aaeba959): ZOMBIE+UNKNOWN killed immediately like Windows taskkill; PROTECTED (Eye/screensaver/whisper-ring/mcp-from-eye) preserved + --force hint; per-process [NMB h=H t=T] metrics; suggest 2026-05-26T02:23:25 resolved HALF (evidence test-taskkill-im-autokill.sh PASS);skill taskkill-compat-shim v1.10
+- [ ] gg triage 2026-05-26: GPT-ranked backlog (24 urgent + 33 important). Priority order: H=suggest --dismiss-stale flag first (kills noise at source), then dedupe A(OperationCanceledException ~20)/B(CDP timeout ~12)/C(FOCUS-STEAL ~6)/I(CORE MERGEx2) clusters, then J(cdp open 6min hang)/G(WK_SKILL_LOCK cross-repo)/L(CDP cannot navigate)/E(IOException skill lock)/K(wkedit BOM)/F(--exec CommandHelpMap), D(taskkill ts=2026-05-26T02:23:25 confirm). Opus triage agent dispatched.
+- [ ] gg triage 2026-05-26: GPT-ranked backlog (24 urgent + 33 important). Priority order: H=suggest --dismiss-stale flag first (kills noise at source), then dedupe A(OperationCanceledException ~20)/B(CDP timeout ~12)/C(FOCUS-STEAL ~6)/I(CORE MERGEx2) clusters, then J(cdp open 6min hang)/G(WK_SKILL_LOCK cross-repo)/L(CDP cannot navigate)/E(IOException skill lock)/K(wkedit BOM)/F(--exec CommandHelpMap), D(taskkill ts=2026-05-26T02:23:25 confirm). Opus triage agent dispatched.
 - [ ] taskkill suggest 2026-05-26T02:23:25 full 2/2 confirm: needs DG-wkappbot-sdk main-CWD --confirm (worktree channel cannot self-confirm). REQ1 (a11y windows per-process pid/mem/handles/threads/cpu) is OUT-OF-SCOPE separate command enhancement -- file own suggest or address separately
