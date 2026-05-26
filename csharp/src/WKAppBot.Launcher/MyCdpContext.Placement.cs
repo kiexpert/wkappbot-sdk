@@ -147,11 +147,9 @@ partial class Program
             }
             catch { /* env set failure is non-fatal -- Core falls back to ExpectedBounds */ }
 
-            // Find chrome.exe Browser window. Chrome_BrowserWindow is the main frame;
-            // Chrome_WidgetWin_1 is a renderer tab window (different process).
-            // Prioritize Chrome_BrowserWindow. If not found, fall back to Chrome_WidgetWin_1.
-            var browserWindowCandidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
-            var rendererCandidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+            // Find the visible chrome.exe top-level browser frame.
+            // Modern Chrome on Windows uses Chrome_WidgetWin_1 for the browser frame.
+            var candidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
 
             EnumWindowsLocal((hwnd, _) =>
             {
@@ -168,17 +166,12 @@ partial class Program
                     if (!string.Equals(p.ProcessName, "chrome", StringComparison.OrdinalIgnoreCase))
                         return true;
 
-                    if (clsStr == "Chrome_BrowserWindow")
-                        browserWindowCandidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
-                    else if (clsStr == "Chrome_WidgetWin_1")
-                        rendererCandidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
+                    if (clsStr == "Chrome_WidgetWin_1")
+                        candidates.Add((hwnd, wpid, p.StartTime.ToUniversalTime()));
                 }
                 catch { }
                 return true;
             }, IntPtr.Zero);
-
-            // Prefer browser window; fall back to renderer only if no browser window found
-            var candidates = browserWindowCandidates.Count > 0 ? browserWindowCandidates : rendererCandidates;
 
             Console.Error.WriteLine($"[PLACEMENT:STEP2] found {candidates.Count} Chrome candidate(s)");
             if (candidates.Count == 0)
