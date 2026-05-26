@@ -1,0 +1,39 @@
+{
+  "id": "taskkill-compat-shim-a11y-first-kill-routing",
+  "app": "wkappbot-core",
+  "title": "taskkill compat shim: a11y-first kill routing",
+  "title_ko": null,
+  "desc": "v1.6 STRICT POLICY: --force <pid1,pid2,...> is the ONLY way to kill anything via taskkill -- listed PIDs are killed exactly, others survive. All other invocations (/IM, /PID, bare *.exe) are CLASSIFY-ONLY: enumerate matches, print PROTECTED/ZOMBIE/UNKNOWN report, exit 1, kill nothing. v1.6: --force now also prints a PRESERVED block listing every matching PID in scope (from /IM filter, or the wkappbot family if no /IM was given) that was NOT in the --force list, with classification tag. Output ends with 'Killed: N / Preserved: M' summary plus a copy-paste hint when surviving zombies remain. The --force-all flag has been REMOVED. Implementation: TaskkillCompatCommand.cs (TaskkillForcePids) + TaskkillCompatCommand.Classify.cs (TaskkillPrintForceReport). Help text: CommandHelp.cs taskkill entry.",
+  "steps": [
+    "Invoke via taskkill.exe (busybox symlink) OR wkappbot taskkill -- both routed through TaskkillCompatCommand.",
+    "/PID N maps to regex:^\\[N\\] (anchored PID prefix). /IM name maps to regex:^\\[\\d+\\]name\\.exe$ (exact, anchored image name).",
+    "Bare positional: digits -> /PID, *.exe -> /IM, else passed as grap pattern. Multiple targets dispatch one a11y kill per target.",
+    "/F is ignored (a11y kill is force by default). /T tree-kill is noted -- a11y kill already sweeps child processes. /FI filter triggers a warning with grap workaround.",
+    "For complex filters use grap directly: wkappbot a11y kill {proc:'...',title:'...'} -- the shim covers taskkill's classic subset only.",
+    "Run 'wkappbot taskkill --help' to see the full help served from CommandHelpMap.",
+    "Verified 2026-04-21: test-taskkill-help.cmd (resolve ts=2026-04-20T04:06)",
+    "Verified 2026-05-03: callout window placement during 'wkappbot taskkill' now validates monitor home via MonitorFromWindow(MONITOR_DEFAULTTONULL) in CalloutInputWindow.Ctor.cs SourceInitialized; orphan windows snap to primary monitor work-area+20,20 via SetWindowPos with SWP_NOACTIVATE. Resolves BUG-AUTO 2026-05-02T18:14:50.",
+    "v1.5 (2026-05-06): --force-all REMOVED. --force <pids> is the ONLY kill path. Default = classify-only + exit 1. PIDs not in --force list always survive. Verified via PowerShell: /IM exits 1 with full classification; --force 52600 kills exactly 52600 (76988 survives); --force-all returns exit 2 'unknown flag'.",
+    "v1.6 (2026-05-05): --force output now shows BOTH a KILLED block (--force list) AND a PRESERVED block (other matching PIDs in /IM scope, or wkappbot family if no /IM) with classification tags. Footer adds 'Killed: N / Preserved: M' plus a hint to follow up on surviving zombies. Verified: --force 14588 /IM PING.EXE on 3 spawned PINGs printed [1 KILLED] + [2 PRESERVED UNKNOWN] + summary; --force 99999998 with no /IM listed 12 wkappbot-family PIDs grouped Protected/Unknown/Zombie.",
+    "v1.7 (2026-05-06): taskkill classify and --force KILLED/PRESERVED per-PID lines now include image, parent PID/name, creation time as HH:mm:ss, reason, and cmdline truncated to 100 chars.",
+    "REQUESTED BEHAVIOR (suggest 2026-05-26): /IM should auto-kill non-protected processes immediately (matching Windows taskkill semantics). Protected processes printed separately with '--force <pids>' copy-paste hint. Extended per-process info: caller window, CPU%, memory MB, handle count, thread count shown alongside cmdline. Blank '>' for zombie cmdlines = gap (cmdline inaccessible for true OS zombies, but last known should be cached). Current policy: CLASSIFY-ONLY for all non --force invocations (v1.6 STRICT)."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "operator",
+    "taskkill",
+    "kill",
+    "a11y",
+    "grap",
+    "compat",
+    "shim",
+    "busybox"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T05:29:34.0120523Z",
+  "updated": "2026-05-26T02:25:15.2087105Z",
+  "version": "1.9"
+}
