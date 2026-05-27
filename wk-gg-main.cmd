@@ -85,10 +85,45 @@ if exist D:\GitHub\WkAutoQuant\.git (
     git log --oneline -3 2>nul
 )
 
+REM ============ 9. SMOKE TESTS ============
+echo.
+echo [9/11] SMOKE TESTS
+if exist D:\GitHub\WKAppBot\bin\cdp-smoke-test.sh (
+    echo Running CDP smoke test...
+    bash D:\GitHub\WKAppBot\bin\cdp-smoke-test.sh 2>nul | tail -3
+) else (
+    echo (no smoke test found)
+)
+
+REM ============ 10. GITHUB ACTIONS STATUS ============
+echo.
+echo [10/11] GITHUB ACTIONS (recent failures)
+if exist D:\GitHub\wkappbot-sdk\.github\workflows (
+    echo Checking workflow runs...
+    gh run list --limit 5 2>nul | head -10
+    echo.
+    echo Failed runs:
+    gh run list --status failure --limit 3 2>nul | head -5
+) else (
+    echo (no workflows found)
+)
+
+REM ============ 11. GITHUB ISSUES + BUGS ============
+echo.
+echo [11/12] GITHUB ISSUES + BUG REPORTS (daily)
+echo Recent open issues (last 7 days):
+gh issue list --limit 10 --state open --search "created:>2026-05-21" 2>nul | head -8
+
+echo.
+echo Recent PR comments with 'bug' keyword:
+gh pr list --limit 5 --state open 2>nul | while read pr (
+    gh pr view !pr! --json comments --jq '.comments[] | select(.body | contains("bug")) | .author.login + ": " + .body' 2>nul | head -2
+)
+
 REM ============ ALERT ANALYSIS ============
 cd /d D:\GitHub\wkappbot-sdk
 echo.
-echo [ANALYZING ALERTS...]
+echo [12/12] ANALYZING ALERTS...
 
 powershell -Command @"
   `$critical = 0
