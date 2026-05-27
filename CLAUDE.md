@@ -550,3 +550,9 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [ ] Chrome infinite multiplication bug: 21 windows (NOT reproduced in test; both cdp open calls reused port 9740 correctly). Previous fix in Core commit 8819ed449 (FindRunningChromePortAny port-file guard) appears active. SDK Placement.cs skill refs added for future debugging. May be environment-specific or timing-dependent.
 - [x] Chrome infinite multiplication bug investigation: added diagnostic check (MyCdpContext.ChromeHealthCheck.cs) to detect when >=5 Chrome processes exist before launch. Root cause confirmed as Core FindRunningChromePortAny guard (fixed in 8819ed449 but possibly not deployed). Next: verify Core binary deployment.
 - [x] Chrome health diagnostic wiring: DiagnoseExcessiveChromeProcesses() called in MyCdpContext.TryTrackMyCdpAccess after isCdpFamily check. Rebuild verified 0 errors. Commit 6df38b66.
+
+## 2026-05-27 Session Fix Log
+
+- [x] CDP smoke test port separation bug: root cause = hardcoded PORT=9980 with no extraction from 'wkappbot cdp open' response. Fixed by parsing OK {cdp:PORT,...} and extracting actual CDP port. Result: all 10 tests PASS (was 5/10 FAIL). Execution time: 116s (was 201s). File: D:/GitHub/WKAppBot/bin/cdp-smoke-test.sh (Core repo)
+- [x] wkjobs.ps1 PowerShell scoping bug: Test-HasAiAncestor($pid) parameter conflicted with built-in $pid automatic variable. Renamed parameter to $procId to avoid WriteError. File: D:/GitHub/WKAppBot/bin/wkjobs.ps1 (Core repo)
+- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
