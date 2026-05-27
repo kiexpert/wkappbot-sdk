@@ -34,9 +34,11 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`7.3` -- bumped at 2026-05-16 -- Chrome window position mismatch fix (session restore override, two-layer fix), IME Relay jamo-sync (kana/hangul input relay), Eye startup FileNotFoundException false positive fix (single-file publish defense), Launcher HWND ancestor-walk caller resolution (P2 ConPTY support), standard-appbot-window / standard-chrome-window skills
+`7.4` -- bumped at 2026-05-25 -- `wkdoctor` flutter-doctor-style SDK health check (10 checks, self-healing, `-Json`), bootstrap auto-build (`setup.ps1` builds launcher on first clone), nightly schedule guard globalized to `~/.claude/settings.json` PreToolUse, `cdp open` 6-minute auth-wall hang fix (NavigateAsync capped to 3s), CDP smoke `--timeout` 9s, build-skills-registry UTF-8 BOM strip
 
 ## Previous versions
+
+`7.3` -- bumped at 2026-05-16 -- Chrome window position mismatch fix (session restore override, two-layer fix), IME Relay jamo-sync (kana/hangul input relay), Eye startup FileNotFoundException false positive fix (single-file publish defense), Launcher HWND ancestor-walk caller resolution (P2 ConPTY support), standard-appbot-window / standard-chrome-window skills
 
 `7.2` -- bumped at 2026-05-08 -- `wkappbot session list` (Claude+Codex+Gemini session discovery, keyword filter, age in seconds), Korean skill search fix (UnsafeRelaxedJsonEscaping), tiered skill search (OR/AND/phrase scoring), IME Han/Yeong grace period + ForceSystemImeMode (ConPTY fix), EnsureClaudeGuideSetup auto-CLAUDE.md (global workflow keywords / project tech-stack keywords), mystery-window-diagnosis skill, suggest push via WkNotify, CDP port SHA256 enforcement, tab recycling 2s budget with alert dismiss, SuggestCheck evidence mandatory + requirement runner
 
