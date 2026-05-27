@@ -169,8 +169,57 @@ echo   ✓ Suggest backlog collected
 echo   ✓ Version audit complete
 echo   ✓ Repo health verified
 echo   ✓ Cross-repo audited
+echo   ✓ Smoke tests executed
+echo   ✓ CI/CD status scanned
+echo   ✓ Bug reports collected
 echo.
-echo NEXT: Suggest ranking + triage (use wkappbot ask gpt to rank)
+
+REM ============ VALIDATION: CLAUDE.md vs CMD ============
+echo.
+echo [VALIDATION] Checking CLAUDE.md gg Main Workflow compliance...
+echo.
+
+powershell -Command @"
+  `$defined = @(
+    'on-load',
+    'skill news',
+    'suggest list',
+    '[MANDATORY] ask gpt ranking',
+    'Opus triage',
+    '[ON RELEASE] Public skill curation'
+  )
+
+  `$implemented = @(
+    'on-load',
+    'skill news',
+    'suggest list'
+  )
+
+  `$missing = @()
+  foreach (`$step in `$defined) {
+    if (`$implemented -notcontains `$step) {
+      `$missing += `$step
+    }
+  }
+
+  if (`$missing.Count -eq 0) {
+    Write-Host '✅ All CLAUDE.md gg steps implemented' -ForegroundColor Green
+  } else {
+    Write-Host '⚠️  MISSING IMPLEMENTATION:' -ForegroundColor Yellow
+    foreach (`$item in `$missing) {
+      Write-Host "   - `$item" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "🔴 CRITICAL: [MANDATORY] 'ask gpt ranking' not implemented!" -ForegroundColor Red
+  }
+}
+"@
+
+echo.
+echo NEXT STEPS (MANDATORY):
+echo   1. wkappbot ask gpt "rank suggests by impact/urgency/effort"
+echo   2. Dispatch to Opus for triage (copy GPT ranking output)
+echo   3. Resolve suggests + update CLAUDE.md Pending
 echo.
 
 REM Optional: background monitor
