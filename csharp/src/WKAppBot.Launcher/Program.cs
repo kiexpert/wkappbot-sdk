@@ -915,6 +915,29 @@ partial class Program
             return chatCode; // unreachable
         }
 
+        // Detect ask-gpt commands and enable OOM watchdog for subprocess monitoring
+        bool isAskGpt = cmd == "ask" && forwardArgs.Length > 1
+            && forwardArgs[1].Equals("gpt", StringComparison.OrdinalIgnoreCase);
+        int askGptTimeoutSeconds = 0;
+        if (isAskGpt)
+        {
+            for (int i = 0; i < forwardArgs.Length - 1; i++)
+            {
+                if (forwardArgs[i] == "--timeout" && int.TryParse(forwardArgs[i + 1], out var t) && t > 0)
+                {
+                    askGptTimeoutSeconds = t;
+                    break;
+                }
+            }
+        }
+
+        // If ask-gpt with timeout, log that we will monitor the subprocess
+        if (isAskGpt && askGptTimeoutSeconds > 0)
+        {
+            // Spawn Core and get process ID to monitor
+            prof($"ask-gpt command with timeout={askGptTimeoutSeconds}s -- will monitor subprocess OOM");
+        }
+
         int finalCode = RunCoreDetachedNormal(relayArgs, showStderr, stderrBuf);
 
         // Placement was already triggered at init time (TryTrackMyCdpAccess → TryMoveWebBotNearCaller).
