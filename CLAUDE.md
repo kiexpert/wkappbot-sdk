@@ -483,7 +483,7 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [x] harness:block multi-token pattern bug found: Get-HarnessRules \S+ truncates space-patterns; config.toml deny matchers are the real fix
 - [x] DenyNativeTool.ps1: blocks Codex native file tools, redirects to .cmd wrappers (eff966c)
 - [x] config.toml: apply_patch/write_file/create_file/read_file deny matchers before .* catch-all
-- [ ] ask-gpt zombie watchdog: suggest filed (hard-kill at timeout+60s)
+- [x] ask-gpt zombie watchdog: suggest filed (hard-kill at timeout+60s) [IMPL 2026-05-27]
 - [x] Agent.cmd: accept plain CLI args like Claude Agent() -- Agent.cmd "prompt" [--model haiku]
 - [x] wkclaude-direct-guard: added to wkharness-guards.ps1 (forces Agent.cmd, blocks direct wkclaude calls)
 - [x] codex-recursive: blocked in default.rules (prefix_rule codex/codex.exe -- stops codex-to-codex recursion)
@@ -539,7 +539,7 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [x] suggest triage: OperationCanceledException cluster (27 entries) pairwise-merged; MERGE*2 + CDP timeout 46-66 remain
 - [x] suggest triage: MERGE*2 entries all resolved; CDP timeout 22 entries blocked by CMD execution guard + CommandHelpMap missing
 - [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [x] cdp open Chrome multiplication: FindRunningChromePortAny port-file guard fixed (registered>0 condition) -- Core 8819ed449 built+hot-swapped
-- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7)
+- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7) [IMPL 2026-05-27]
 - [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve- [x] taskkill /IM auto-kill non-protected (Core 7aaeba959): ZOMBIE+UNKNOWN killed immediately like Windows taskkill; PROTECTED (Eye/screensaver/whisper-ring/mcp-from-eye) preserved + --force hint; per-process [NMB h=H t=T] metrics; suggest 2026-05-26T02:23:25 resolved HALF (evidence test-taskkill-im-autokill.sh PASS);skill taskkill-compat-shim v1.10
 - [ ] gg triage 2026-05-26: GPT-ranked backlog (24 urgent + 33 important). Priority order: H=suggest --dismiss-stale flag first (kills noise at source), then dedupe A(OperationCanceledException ~20)/B(CDP timeout ~12)/C(FOCUS-STEAL ~6)/I(CORE MERGEx2) clusters, then J(cdp open 6min hang)/G(WK_SKILL_LOCK cross-repo)/L(CDP cannot navigate)/E(IOException skill lock)/K(wkedit BOM)/F(--exec CommandHelpMap), D(taskkill ts=2026-05-26T02:23:25 confirm). Opus triage agent dispatched.
 - [ ] taskkill suggest 2026-05-26T02:23:25 full 2/2 confirm: needs DG-wkappbot-sdk main-CWD --confirm (worktree channel cannot self-confirm). REQ1 (a11y windows per-process pid/mem/handles/threads/cpu) is OUT-OF-SCOPE separate command enhancement -- file own suggest or address separately
