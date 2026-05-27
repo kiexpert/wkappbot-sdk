@@ -547,4 +547,4 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [x] nightly-heal 2026-05-27 STEP 2 (repeat): skill audit (3 ok, 54 expected) + repo-health LITE (README pending, AGENTS/CLAUDE parity OK, sections OK) + commit 871bd83b
 - [x] nightly-heal 2026-05-27 STEP 2 (3rd): skill audit 3ok/54expected/590norefs, repo-health LITE clean, commit 4544a346
 - [ ] gg workflow 2026-05-27: on-load, skill news, suggest list, ask gpt ranking, Opus triage pending
-- [ ] Chrome infinite multiplication bug: 21 windows. Diagnose port/session restore regression (commit 8819ed449). Codex/Agent pending.
+- [ ] Chrome infinite multiplication bug: 21 windows (NOT reproduced in test; both cdp open calls reused port 9740 correctly). Previous fix in Core commit 8819ed449 (FindRunningChromePortAny port-file guard) appears active. SDK Placement.cs skill refs added for future debugging. May be environment-specific or timing-dependent.
