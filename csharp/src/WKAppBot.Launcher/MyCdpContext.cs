@@ -47,6 +47,7 @@ partial class Program
         // `slack` MUST NOT trigger caller validation or placement -- they don't move Chrome,
         // and running GetForegroundWindow / ancestor walk on every a11y call is unnecessary overhead.
         var isCdpFamily = cmd is "cdp" or "ask";
+        if (isCdpFamily) DiagnoseExcessiveChromeProcesses(cmd);
         if (!isCdpFamily && !hasEvalJs)
             return false;
 
