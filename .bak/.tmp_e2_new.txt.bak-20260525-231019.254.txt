@@ -1,0 +1,68 @@
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[WEB] reuse-check non-fatal error: {ex.Message}");
+                    reusePort = 0;
+                }
+            }
+
+            // Last-resort process scan (2026-05-25): every HTTP probe above failed but a
+            // chrome.exe for our user-data-dir may still be process-alive with a momentarily
+            // unreachable CDP endpoint (renderer crash / brief hang). Without this we would
+            // spawn a SECOND Chrome next to the existing one. Scan by cmdline udd, then VERIFY
+            // by actually connecting + Target.createTarget. Only if tab creation ALSO fails do
+            // we treat it as a real zombie and kill it before falling through to a fresh launch.
+            if (!forceNewWindow && reusePort <= 0)
+            {
+                try
+                {
+                    var uddScan = ChromeLauncher.GetDefaultUserDataDir();
+                    var (zpid, zport) = ChromeLauncher.FindChromeProcessByUserDataDir(uddScan);
+                    if (zport > 0)
+                    {
+                        Console.Error.WriteLine($"[WEB] HTTP probes failed but chrome.exe pid={zpid} alive on port={zport} (our udd) -- verifying via Target.createTarget");
+                        bool recovered = false;
+                        try
+                        {
+                            using var verifyCdp = new WKAppBot.WebBot.CdpClient();
+                            verifyCdp.ConnectAsync(zport).GetAwaiter().GetResult();
+                            var probe = verifyCdp.SendAsync("Target.createTarget",
+                                new System.Text.Json.Nodes.JsonObject { ["url"] = "about:blank" }, timeoutMs: 4000)
+                                .GetAwaiter().GetResult();
+                            var probeTab = probe?["targetId"]?.GetValue<string>();
+                            if (!string.IsNullOrEmpty(probeTab))
+                            {
+                                try
+                                {
+                                    verifyCdp.SendAsync("Target.closeTarget",
+                                        new System.Text.Json.Nodes.JsonObject { ["targetId"] = probeTab }, timeoutMs: 2000)
+                                        .GetAwaiter().GetResult();
+                                }
+                                catch { }
+                                recovered = true;
+                            }
+                        }
+                        catch (Exception vex)
+                        {
+                            Console.Error.WriteLine($"[WEB] recovery connect/createTarget failed: {vex.Message}");
+                        }
+                        if (recovered)
+                        {
+                            reusePort = zport;
+                            ChromeLauncher.RegisterLaunchedPort(zport);
+                            Console.Error.WriteLine($"[WEB] Recovered live Chrome on port={zport} via process scan -- reusing instead of launching");
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine($"[WEB] chrome.exe pid={zpid} is a zombie (CDP dead) -- killing before fresh launch");
+                            try { ChromeLauncher.KillChromeOnPortAsync(zport, uddScan).GetAwaiter().GetResult(); } catch { }
+                            try { System.Diagnostics.Process.GetProcessById(zpid).Kill(true); } catch { }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[WEB] last-resort process scan non-fatal: {ex.Message}");
+                }
+            }
+
+            if (reusePort > 0)

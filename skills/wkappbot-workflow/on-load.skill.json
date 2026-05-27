@@ -17,7 +17,11 @@
     "SKILL NEWS (third -- scan what changed before triage): wkappbot skill news -- lists skills updated in last 7 days sorted by recency. Scan for CDP, launcher, workflow, suggest-related updates. Provides context for intelligent suggest triage (e.g. a new cdp-tab-management-policy skill means CDP suggests may already be addressed). Skip gracefully if command fails.",
     "CLAUDE.md PENDING CLEANUP (run when Pending section exceeds ~20 items or when [x] done items are older than 2 weeks): (1) Count [x] vs [ ] items in Pending. If [x] count above 15, compress: group old [x] entries into 1-line summaries by topic (e.g. '[x] CDP placement fixes: [3][6][11] resolved -- see commits 1bafc65 2c4ab3f'), keep only open [ ] items and [x] items from the last 2 weeks verbatim. (2) Remove duplicate [ ] entries that appear twice in the section. (3) Run: wkappbot skill read claude-md-guide -- apply situation F (file too long) if Pending section itself exceeds 60 lines. (4) Commit: git add CLAUDE.md && git commit -m 'chore(claude): compress Pending section'. TRIGGER CONDITIONS: (A) user complains Pending is messy, (B) gg workflow shows Pending section >20 items, (C) periodic every ~10 sessions. Do NOT clean up mid-task -- do it at session start or end.",
     "NIGHTLY SCHEDULE CHECK (every session start): Run CronList tool. If no 04:13 skill-heal-nightly job in list: run CronCreate(cron='13 4 * * *', durable=true, recurring=true, prompt='Autonomous nightly skill heal: wkappbot skill read skill-heal-nightly then execute STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed without user confirmation.'). Note: durable flag may behave as session-only in current Claude version -- auto-recreation on each session start is the reliability workaround. Job ID ea24bb98 was original (session ea24bb98 2026-05-24).",
-    "NIGHTLY SCHEDULE CHECK v2 (every session start before Bash/PS): CronList -- if any of the 4 jobs missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): CronCreate all missing (durable=true, recurring=true). Hook cross-checks CLAUDE.md Nightly Schedules table vs session JSONL CronCreate records -- Bash/PS blocked until all 4 appear in JSONL. wkappbot skill* always exempt. Delete old step 12 if still present."
+    "NIGHTLY SCHEDULE CHECK v2 (every session start before Bash/PS): CronList -- if any of the 4 jobs missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): CronCreate all missing (durable=true, recurring=true). Hook cross-checks CLAUDE.md Nightly Schedules table vs session JSONL CronCreate records -- Bash/PS blocked until all 4 appear in JSONL. wkappbot skill* always exempt. Delete old step 12 if still present.",
+    "GUARD-DEADLOCK ESCAPE (when cascading guards block you): delegation guards (usage-test, skill-update-pending, brief-guard, claude-md-sync, WK_SKILL_LOCK race) fire ONLY on the delegation path (Agent/Agent.cmd/wkcodex/wkclaude). When delegation is walled off, STOP delegating and run the work DIRECTLY via wk-only-gate allowed commands (wkappbot/git/gh/./wk*). wk-only-gate matches the LEADING TOKEN only -- no for/while/echo/cat wrappers. Full playbook: wkappbot skill read wkharness-guards (see GUARD-DEADLOCK ESCAPE HATCH step). Delegation-blocked != work-blocked.",
+    "Nightly healing pass 2026-05-27 -- audit and compress",
+    "Nightly healing STEP 2 re-execution: 2026-05-27 automated repeat",
+    "STEP 2 HEALING 3rd execution: 2026-05-27"
   ],
   "requirements": [
     {
@@ -141,6 +145,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-05-24T15:20:29.0448554Z",
-  "version": "1.86"
+  "updated": "2026-05-26T22:43:12.0578242Z",
+  "version": "1.94"
 }

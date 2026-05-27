@@ -129,58 +129,45 @@ partial class Program
     /// </summary>
     static IntPtr ResolveValidCallerWindow(IntPtr preferredCaller)
     {
-        if (preferredCaller != IntPtr.Zero && IsWindowVisibleLocal(preferredCaller))
-        {
-            if (GetWindowRect(preferredCaller, out RECT rect))
-            {
-                var centerPt = new POINT
-                {
-                    X = rect.Left + (rect.Right - rect.Left) / 2,
-                    Y = rect.Top + (rect.Bottom - rect.Top) / 2
-                };
-                IntPtr monitor = MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL);
-                if (monitor != IntPtr.Zero)
-                {
-                    Console.Error.WriteLine($"[CALLER:RESOLVE] preferred 0x{preferredCaller.ToInt64():X} valid");
-                    return preferredCaller;
-                }
-            }
-        }
+        if (TryAcceptResolvedCaller(preferredCaller, "preferred"))
+            return preferredCaller;
 
         Console.Error.WriteLine($"[CALLER:RESOLVE] preferred off-screen/invalid, trying alternatives...");
 
         // Try ancestor walk -- nearest parent process owning a visible on-screen window.
         // NEVER use GetForegroundWindow() -- it returns whoever holds focus (YouTube, any app).
         IntPtr ancestor = EyeCmdPipeClient.ResolveCallerTerminalHwnd();
-        if (ancestor != IntPtr.Zero && ancestor != preferredCaller && IsWindowVisibleLocal(ancestor))
-        {
-            if (GetWindowRect(ancestor, out RECT rect))
-            {
-                var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
-                if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
-                {
-                    Console.Error.WriteLine($"[CALLER:RESOLVE] using ancestor 0x{ancestor.ToInt64():X}");
-                    return ancestor;
-                }
-            }
-        }
+        if (ancestor != preferredCaller && TryAcceptResolvedCaller(ancestor, "ancestor"))
+            return ancestor;
 
         // Try host window (parent process)
         IntPtr host = GetHostWindowSnapshot();
-        if (host != IntPtr.Zero && host != preferredCaller && host != ancestor && IsWindowVisibleLocal(host))
-        {
-            if (GetWindowRect(host, out RECT rect))
-            {
-                var centerPt = new POINT { X = rect.Left + rect.Width / 2, Y = rect.Top + rect.Height / 2 };
-                if (MonitorFromPoint(centerPt, MONITOR_DEFAULTTONULL) != IntPtr.Zero)
-                {
-                    Console.Error.WriteLine($"[CALLER:RESOLVE] using host 0x{host.ToInt64():X}");
-                    return host;
-                }
-            }
-        }
+        if (host != preferredCaller && host != ancestor && TryAcceptResolvedCaller(host, "host"))
+            return host;
 
         Console.Error.WriteLine($"[CALLER:RESOLVE] FAIL no valid on-screen window found");
         return IntPtr.Zero;
+    }
+
+    static bool TryAcceptResolvedCaller(IntPtr hwnd, string label)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            Console.Error.WriteLine($"[CALLER:RESOLVE] {label} missing");
+            return false;
+        }
+
+        // Use the same multi-monitor-aware validation as the final caller gate.
+        // The old center-point-only MonitorFromPoint check rejected legitimate
+        // windows whose rect intersected a monitor but whose center landed in a
+        // monitor gap or stale DWM coordinate edge case.
+        if (IsWindowOffScreen(hwnd))
+        {
+            Console.Error.WriteLine($"[CALLER:RESOLVE] {label} rejected: {DescribeCallerRect(hwnd)}");
+            return false;
+        }
+
+        Console.Error.WriteLine($"[CALLER:RESOLVE] {label} 0x{hwnd.ToInt64():X} valid: {DescribeCallerRect(hwnd)}");
+        return true;
     }
 }

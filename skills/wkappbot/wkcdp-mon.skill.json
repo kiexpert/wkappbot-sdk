@@ -1,0 +1,61 @@
+{
+  "id": "wkcdp-mon",
+  "app": "wkappbot",
+  "title": "wkcdp-mon: CDP Chrome Session Monitor",
+  "title_ko": "wkcdp-mon: CDP 크롬 세션 모니터",
+  "desc": "CDP Chrome session monitor: port, process, tabs, memory, position, idle kill",
+  "steps": [
+    "PURPOSE: wkcdp-mon.ps1 lists all active wkappbot CDP Chrome sessions. Shows port, CWD, PID, memory, age, window position vs target, open tab count. Run to see which Chrome windows are open and which are stale.",
+    "PATH: D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1 (wkcdp-mon.cmd/.sh wrappers in same dir)",
+    "FLAGS: (no flag)=one-shot ",
+    " -f=follow/watch mode 3s refresh ",
+    " -i N=interval seconds ",
+    " -tabs=tab list per session ",
+    " -DryRun=list stale idle sessions to be killed ",
+    " -KillIdle=kill stale idle sessions (age>30m, LAT avg=0, foreign CWD)",
+    "SLOW STARTUP: Add-Type C# compile on first run causes 3-5s delay. Normal.",
+    "RUN: PowerShell tool: & 'D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1'",
+    "KILL idle: & 'D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1' -KillIdle",
+    "FLAGS UPDATE (2026-05-26): -KillIdle = kill CURRENT CWD Chrome sessions (own project cleanup). -KillForeign = kill OTHER CWD Chrome sessions (protects current CWD, old behavior). -DryRun works with both flags to preview victims. Fixed: logic was inverted before this date.",
+    "CWD INVERSION FIX (2026-05-26): -KillIdle kills SAME-CWD Chrome (own project), -KillForeign kills OTHER-CWD Chrome (foreign projects). Previous logic was inverted. Committed to WKAppBot repo as 92e2380d2.",
+    "KILL-EXECUTE BUG FIXED (2026-05-26): wkcdp-mon.ps1 line ~468 gated the actual-kill behind if (-not KillIdle), which made -KillForeign (and any non-KillIdle invocation) fall into the [DRY-RUN] would kill branch and return WITHOUT killing. Fixed to: if (DryRun -or (-not KillIdle -and -not KillForeign)) { dry-run; return } so -KillForeign without -DryRun now actually Stop-Process the victims. .ps1 runs from file so the fix is live immediately (no build). If a kill prints [DRY-RUN] unexpectedly, check this gate. Force-kill fallback that always works: wkappbot taskkill --force PID,PID,... on the Chrome browser PIDs from the monitor list."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkcdp-mon.ps1",
+      "expect": "CDP session table with port CWD memory age columns",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcdp-mon.ps1 -DryRun",
+      "expect": "stale idle sessions list",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcdp-mon.ps1 -tabs",
+      "expect": "tab list per session",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkcdpmon",
+    "cdpmon",
+    "cdp-mon",
+    "chrome-monitor",
+    "chrome-list",
+    "chrome-kill",
+    "chrome-process",
+    "cdp-monitor",
+    "cdp-list",
+    "cdp-session",
+    "cdp-chrome",
+    "chrome-cleanup"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-25T04:00:49.9803933Z",
+  "updated": "2026-05-26T13:54:08.7035136Z",
+  "version": "1.6"
+}

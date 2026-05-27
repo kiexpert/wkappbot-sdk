@@ -1,0 +1,88 @@
+{"_":"LAUNCH","pid":145892,"sid":1,"fg":"0x6344A","fgT":"⠐ Analyze token issuance issue in Hantoo Daily","cwd":"D:\\GitHub\\wkappbot-sdk","chain":[{"pid":8,"name":"?"}]}                                                                                ╔════════════════════════════════════════════════════════════╗
+║  ⏳ PENDING CO-RESOLVE  (7건 체크 대기)                          ║
+╠════════════════════════════════════════════════════════════╣
+║ DG-WKAppBot: wkappbot suggest check 2026-04-28T05:06:42 --c║
+║   "a11y screenshot multi-node crop + union: grap resolv..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-01T20:11:01║
+║   "wkappbot-managed Chrome window geometry persistence:..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-01T20:31:21║
+║   "merge: window geometry persistence series -- console..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-02T15:55:57║
+║   "web open fails silently when Chrome profile already ..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-02T15:57:16║
+║   "a11y inspect blocked by user-active guard even when ..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-02T15:59:18║
+║   "wkappbot screenshot saves to user Desktop by default..."║
+║ DG-wkappbot-sdk: wkappbot suggest check 2026-05-04T00:00:24║
+║   "[BUG-AUTO] [ASK] OutOfMemoryException: Insufficient ..."║
+╠────────────────────────────────────────────────────────────╣
+║ 💡 아직 확인 전이라면 요구사항을 추가할 수 있어요:                             ║
+║   wkappbot suggest add-requirement <ts> "cmd => ok"        ║
+║   [--skill <id>]  -- 연결된 스킬도 즉시 업데이트                       ║
+╚════════════════════════════════════════════════════════════╝
+
+
+Slack setup required -- create the config file with these fields:
+
+  IMPORTANT: The human must log into Slack admin first.
+  You (AI) cannot authenticate -- ask the user, then continue your work.
+  Run this to notify the user via TTS while you proceed:
+    wkappbot speak "Slack setup needs your login. Please open api.slack.com and log in." --bg
+
+  File: C:\Users\kiexp\AppData\Local\Temp\.net\wkappbot-core\PSRNfyCS+qbwIaBmcx_xn3AFj6WRpaI=\wkappbot.hq\profiles\slack_exp\webhook.json
+  {{
+    "bot_token": "xoxb-...",       // Bot User OAuth Token
+    "app_token": "xapp-...",       // App-Level Token (Socket Mode)
+    "channel":   "C0...",           // Channel ID to post to
+    "socket_mode": true
+  }}
+
+How to get tokens (human must be logged into Slack admin):
+  1. Go to https://api.slack.com/apps -> Create New App (From Scratch)
+  2. OAuth & Permissions -> Bot Token Scopes: add these scopes:
+     chat:write, chat:write.customize, channels:read,
+     channels:history, app_mentions:read, files:write
+  3. Install to Workspace -> copy Bot User OAuth Token (xoxb-...)
+  4. Basic Information -> App-Level Tokens -> Generate (connections:write)
+  5. Socket Mode -> Enable Socket Mode
+  6. Event Subscriptions -> Enable -> Subscribe: app_mention, message.channels
+  7. Invite bot to your channel: /invite @YourBotName
+  8. Get channel ID: right-click channel name -> View channel details -> ID at bottom
+  🔴긴급 3  🟡중요 30  ⚪방치 24    기타 15  
+
+  🔴긴급 (3건) ──────────────────────────────────────────────
+  [ 4] 05-15 22:19  DG-wkappbot-sdk   [BUG-AUTO] FileNotFoundException: Could not load file or assem…
+       ts=2026-05-15T13:19:08
+  [38] 05-10 20:31  DG-wkappbot-sdk   [BUG-AUTO] [ASK] InvalidOperationException: Not connected: Web… 🔗
+       ts=2026-05-10T11:31:26
+  [39] 05-10 20:02  DG-wkappbot-sdk   [BUG-AUTO] [ASK] OutOfMemoryException: Insufficient memory to … ⏳ 🔗
+       ts=2026-05-04T00:00:24
+
+  🟡중요 (30건) ──────────────────────────────────────────────
+  [ 1] 05-16 01:38  DG-wkappbot-sdk   [MERGE×2] [MERGE x2] Stage 2 ask anomaly ws_receive_error -- C… 🔗
+       ts=2026-05-15T16:38:43
+  [ 2] 05-16 01:35  DG-wkappbot-sdk   [MERGE×1] [MERGE x3] Chrome window position mismatch -- sessio… 🔗
+       ts=2026-05-15T16:35:10
+  [ 3] 05-16 01:34  DG-wkappbot-sdk   [MERGE×2] [BUG-AUTO] Chrome window position mismatch: session … 🔗
+       ts=2026-05-15T16:34:20
+      ... +27건 더  (--page 2 또는 --all)
+
+  ⚪방치 (24건) ──────────────────────────────────────────────
+  [47] 05-03 15:34  DG-wkappbot-sdk   pending_prompts cross-Eye theft + silent inject loss: WkNotify… 🔗
+       ts=2026-05-03T06:34:39
+  [48] 05-03 15:34  DG-wkappbot-sdk   pending_prompts cross-Eye theft + silent inject loss: WkNotify… 🔗
+       ts=2026-05-03T06:34:06
+      ... +22건 더  (--page 2 또는 --all)
+
+    기타 (15건) ──────────────────────────────────────────────
+  [27] 05-13 14:54  DG-wkappbot-sdk   BUG: launcher creates window with blank title instead of displ… 🔗
+       ts=2026-05-13T05:54:50
+  [28] 05-13 14:54  DG-wkappbot-sdk   BUG: launcher creates window with blank title instead of displ… 🔗
+       ts=2026-05-13T05:54:48
+  [29] 05-13 14:34  DG-wkappbot-sdk   [MERGE×2] Chrome placement PseudoConsole caller 🔗
+       ts=2026-05-13T05:34:03
+      ... +12건 더  (--page 2 또는 --all)
+
+  resolve: wkappbot suggest resolve <N|ts> "note" --i-completed-...
+  merge:   wkappbot suggest merge <ts1> <ts2> --title ... --work ...
+  (+ 530 suggest(s) from other projects -- use --all to show)

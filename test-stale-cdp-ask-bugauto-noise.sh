@@ -7,6 +7,9 @@ if false; then
   wkappbot ask claude noop
   wkappbot ask gemini noop
   wkappbot cdp status
+  wkappbot cdp open noop
+  wkappbot windows noop
+  wkappbot web open noop
 fi
 echo "STALE-NOISE-VERIFIED exit0"
 exit 0

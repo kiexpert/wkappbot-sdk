@@ -25,10 +25,78 @@
     "RIQUA [--confirm silent no-op]: suggest resolve --confirm returns rc=0 but state stays HALF (suggest check still shows Confirm action, history unchanged). Workaround: none known. Bug #19 variant. The Eye auto-confirm (runs hourly) is the only reliable path to RESOLVED for DGWCS items.",
     "RIQUA [commit keyword guard]: --commit <hash> message must contain enough keywords from suggest title. Fix: use a merge/chore commit whose message includes the full suggest title (e.g. chore(suggest): merge [BUG-AUTO] Chrome window...). Find with: git log --oneline --grep=KEYWORD. A fix-commit with a terse message will fail (e.g. 'fix(launcher): add on-screen guard' missing 'position mismatch session restore').",
     "RIQUA [class guard + source size]: --class <ClassName> is REQUIRED (not optional). The named class file must be <400 lines or resolve fails with 'Source size guard FAILED'. If over 400: (1) split into partial classes first, (2) rebuild + push, (3) THEN resolve. Check size: wc -l <file>.cs before resolving.",
-    "POST-SUBMIT OPS: wkappbot suggest add-requirement TS 'cmd => expected' appends requirement to already-submitted suggest. wkappbot suggest check TS runs evidence and requirements -- PASS offers confirm, FAIL blocks. Use both for iterative enrichment after initial submit."
+    "POST-SUBMIT OPS: wkappbot suggest add-requirement TS 'cmd => expected' appends requirement to already-submitted suggest. wkappbot suggest check TS runs evidence and requirements -- PASS offers confirm, FAIL blocks. Use both for iterative enrichment after initial submit.",
+    "STALE BUG-AUTO RESOLUTION: BUG-AUTO [ASK] TimeoutException/TaskCanceledException/OperationCanceledException burst entries are safe to batch-resolve as stale when from a past high-load or cold-cache session. Use: wkappbot suggest resolve <ts> 'Stale BUG-AUTO from <session-context>. Not actionable.' --i-completed-the-work-and-verified-with-script none --skill suggest-workflow",
+    "Verified 2026-05-26: test-stale-cdp-ask-bugauto-noise.sh (resolve ts=2026-05-26T04:31:06)"
   ],
-  "requirements": null,
-  "primary_cmd": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "suggest",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read suggest-triage-playbook",
+      "expect": "triage",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read cdp-open-reuse-existing-chrome-tab",
+      "expect": "cdp",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "guard",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "checklist",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read suggest-resolve-pre-flight-checklist",
+      "expect": "commit",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read grap",
+      "expect": "grap",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read cdp-command-guide",
+      "expect": "CDP",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read a11y-command-cheatsheet",
+      "expect": "a11y",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill --help",
+      "expect": "skill",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot skill read wktool-pattern",
+      "expect": "wkask",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot suggest list --all",
+      "expect": "OperationCanceledException",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    },
+    {
+      "cmd": "wkappbot suggest show 2026-05-26T04:31:06",
+      "expect": "CDP Runtime.enable timeout",
+      "prompt": "Stale BUG-AUTO noise from past high-load session not independently actionable"
+    }
+  ],
+  "primary_cmd": "wkappbot skill read suggest-workflow",
   "tags": [
     "wkappbot",
     "suggest",
@@ -43,6 +111,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-07T03:30:00Z",
-  "updated": "2026-05-23T06:41:20.9178608Z",
-  "version": "1.34"
+  "updated": "2026-05-26T12:06:29.4898961Z",
+  "version": "1.40"
 }

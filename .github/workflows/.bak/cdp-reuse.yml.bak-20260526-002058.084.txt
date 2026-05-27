@@ -1,0 +1,22 @@
+name: CDP Reuse
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  cdp-reuse:
+    name: cdp-reuse
+    runs-on: windows-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: CDP reuse test
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File scripts/test-cdp-reuse.ps1 -Url https://example.com

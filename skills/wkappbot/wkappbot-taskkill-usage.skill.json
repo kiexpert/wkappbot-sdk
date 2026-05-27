@@ -8,7 +8,8 @@
     "CLASSIFY (callout popup, no actual kill): wkappbot taskkill /IM wkappbot-core.exe\nEach match = 2 lines:\n  Line1: PID {id} {image} [{ctime}] reason PROTECTED/ZOMBIE/UNKNOWN\n  Line2:       > full command line (not truncated)\nForce-kill: wkappbot taskkill --force 1234,5678",
     "Zombie Eye cleanup (100+ procs after 24h):\nHigh CPU = old Eye daemon. Kill all but newest:\n  Get-Process wkappbot-core ",
     "--force PID: CDP port guard (--remote-debugging-port) is now bypassed when --force + explicit PID list are both provided (Core fix 9e62e69e7). Chrome CDP sessions are killable via --force without --arg workaround.",
-    "PENDING behavior improvement (suggest filed 2026-05-26): /IM should auto-kill non-protected (ZOMBIE/UNKNOWN) processes immediately like Windows taskkill; PROTECTED shown separately with '--force <pids>' hint. Per-process info should include: PID, caller window, CPU%, memory, handle count, thread count (in addition to existing cmdline). Currently /IM = classify-only, blank > for zombie cmdlines."
+    "PENDING behavior improvement (suggest filed 2026-05-26): /IM should auto-kill non-protected (ZOMBIE/UNKNOWN) processes immediately like Windows taskkill; PROTECTED shown separately with '--force <pids>' hint. Per-process info should include: PID, caller window, CPU%, memory, handle count, thread count (in addition to existing cmdline). Currently /IM = classify-only, blank > for zombie cmdlines.",
+    "TEST A verified 2026-05-26: wkappbot taskkill --force 17076 killed live CDP Chrome (--remote-debugging-port=9982) via WM_CLOSE gracefully after Core fix 9e62e69e7. Build clean+publish succeeded on retry (CS0009 transient artifact fixed by dotnet clean first)."
   ],
   "requirements": [
     {
@@ -33,6 +34,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-09T03:24:58.1574359Z",
-  "updated": "2026-05-26T02:24:46.6418025Z",
-  "version": "1.7"
+  "updated": "2026-05-26T02:46:05.8605021Z",
+  "version": "1.8"
 }

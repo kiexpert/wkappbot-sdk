@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+PYTHON=/d/SDK/py312/Scripts/python.exe
+PYTHONW=/d/SDK/py312/Scripts/pythonw.exe
+echo === Daemon Heal ===
+PID=$(powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | Where-Object { \extglob.CommandLine -match 'wkwave_daemon' } | Select-Object -ExpandProperty ProcessId" 2>/dev/null | tr -d "\r")
+if [ -n "$PID" ]; then
+  echo [wkwave_daemon] OK pid=$PID
+else
+  echo [wkwave_daemon] starting...
+  $PYTHON scripts/wkwave_daemon.py >> wavevault/auto_study/morning_cycle.log 2>&1 &
+  disown
+  sleep 2
+  echo [wkwave_daemon] started
+fi
+PID2=$(powershell.exe -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe'\" | Where-Object { \extglob.CommandLine -match 'hts_realtime_watcher' } | Select-Object -ExpandProperty ProcessId" 2>/dev/null | tr -d "\r")
+if [ -n "$PID2" ]; then
+  echo [hts_watcher] OK pid=$PID2
+else
+  echo [hts_watcher] starting...
+  $PYTHONW scripts/hts_realtime_watcher.py --market both >> wavevault/auto_study/hts_watcher_new.log 2>&1 &
+  disown
+  sleep 2
+  echo [hts_watcher] started
+fi
+echo === Done ===

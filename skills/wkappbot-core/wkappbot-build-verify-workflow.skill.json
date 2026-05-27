@@ -1,0 +1,94 @@
+{
+  "id": "wkappbot-build-verify-workflow",
+  "app": "wkappbot-core",
+  "title": "WKAppBot build + verify workflow (for AI code agents)",
+  "title_ko": null,
+  "desc": "How to build and verify WKAppBot after code changes. Required reading for Codex / Haiku / any AI CLI delegated to refactor or edit wkappbot source. Covers the single publish command, green-build signature, hot-swap staging output, and failure diagnosis.",
+  "steps": [
+    "Single build command (Release mode, all projects): C:/Program Files/dotnet/dotnet publish D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity minimal",
+    "Working directory: anywhere, but D:/GitHub/WKAppBot is canonical. Must use the quoted Program Files path on Windows; plain dotnet may hit an older SDK",
+    "Green-build signature (last 3 lines of output): wkappbot-core.new.exe staged for hot-swap AND skills installed to HQ. Exit code 0. Presence of warning CS8604 or similar nullable warnings is fine -- only CS-prefixed errors block",
+    "Typical red-build signatures: error CS0xxx (compile error), error MSB (msbuild error), FileNotFoundException on copy. Show the error line; do not retry blindly",
+    "Timeout budget: 180-300 seconds on warm build (incremental), up to 420 seconds on cold. Use timeout 300000 ms when calling via Bash tool",
+    "After successful build the canonical wkappbot-core.exe is NOT yet updated. The launcher rename-swap happens on next wkappbot invocation (hot-swap layer 3). Running wkappbot --version triggers the swap",
+    "Launcher auto-swap failing? See hot-swap operator cheatsheet (hot-swap-stuck-orphan-mcp-workers-kill-force-swap). Short answer: wkappbot --sudo --force-swap eye tick when admin orphan blocks",
+    "For a quick smoke check post-build: wkappbot --version should print the expected base version (currently 6.0.x). wkappbot exec list should list built-in presets including codex notepad calc",
+    "Refactor verification loop: 1. make change 2. dotnet publish 3. check last 3 lines for staged + skills installed 4. wkappbot --version to force swap 5. wkappbot <affected-command> smoke test 6. git add + commit ONLY after steps 2-5 all green",
+    "Common refactor-breaking error: CS0246 (type or namespace not found) usually means a new file was created but not referenced OR an extracted method left a dangling reference. Read the error location and verify both sites",
+    "Project structure (relevant for where to place new partials): csharp/src/WKAppBot.CLI/Commands/ for CLI command handlers. csharp/src/WKAppBot.Win32/ for Win32 P/Invoke + UIA. csharp/src/WKAppBot.WebBot/ for CDP. csharp/src/WKAppBot.Vision/ for Tesseract + OCR. csharp/src/WKAppBot.Core/ for ScenarioRunner and ActionExecutor",
+    "Partial-class pattern (for splits): new file must have namespace WKAppBot.CLI (or matching namespace) AND internal partial class Program (or matching container). No using-statement changes beyond what the extracted code actually uses",
+    "2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP, #67 diagnostics, #76 stderr) - low severity, covered by build verify",
+    "2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP, #67 diagnostics, #76 stderr) - low severity, covered by build verify",
+    "After deploy: run 'wkappbot skill sync' to push local skill edits to HQ. If split-brain conflicts appear, the WKAppBot MAINTAINER must resolve all immediately: 'wkappbot skill sync --resolve <id>'. Never leave conflicts pending -- downstream repos silently diverge.",
+    "DEPLOY ALL THREE (MANDATORY): when manually copying wkappbot-core.exe to bin/, always copy to wkappbot-core.exe AND wkappbot-core.new.exe AND wkappbot-core.exe.bak simultaneously. Eye FSW watches .new.exe and will hot-swap it back -- if .new.exe has an old/broken version, it reverts your fix. Single-file copy is insufficient. Pattern: Copy-Item good.exe bin/wkappbot-core.exe -Force; Copy-Item good.exe bin/wkappbot-core.new.exe -Force; Copy-Item good.exe bin/wkappbot-core.exe.bak -Force",
+    "CHROME PLACEMENT TOLERANCE: DeltaSizeThreshold in SDK Launcher PlacementValidate.cs must stay >= 30 (10 was too tight -- Chrome outer window is 18px narrower than SetWindowPos target due to window frame drift). Core uses ChromeLauncher.PlacementValidationTolerancePx=50; Launcher mirrors it at 30.",
+    "TWO-TREE ARCHITECTURE (MANDATORY, discovered 2026-05-18): This repo has TWO separate source trees -- (A) csharp/ = private internal source (v7.3.X) → deploys to bin/wkappbot-core.exe. (B) sdk/ = git submodule (kiexpert/wkappbot-sdk, v6.0.X) → deploys to sdk/bin/wkappbot-core.exe. These are DIFFERENT binaries at DIFFERENT paths. The user runs bin/wkappbot-core.exe. sdk/bin/ is the public SDK binary. NEVER confuse them.",
+    "CORRECT BUILD COMMAND for private csharp/ → bin/ deploy (MANDATORY): dotnet publish D:\\GitHub\\WKAppBot\\csharp\\src\\WKAppBot.CLI\\WKAppBot.CLI.csproj -c Release -r win-x64 --self-contained true. The DeployToSdkBin target in the csproj auto-copies wkappbot-core.exe to bin/ (or stages .new.exe for hot-swap if Eye has the file locked). Version: v7.3.X where X = git rev-list count since WKAppBotBaseVersion=7.3 was set in csharp/Directory.Build.props.",
+    "WRONG BUILD for private fixes (FORBIDDEN): sdk\\build.cmd builds the SDK submodule (sdk/csharp/, v6.0) and deploys to sdk/bin/ NOT to bin/. Fixes committed to csharp/ will NOT be deployed if you run sdk\\build.cmd. Symptom: wkappbot --version stays at old patch number even after build says [Deploy] updated. Root cause confirmed: sdk/csharp/src/WKAppBot.CLI/ RepoBin = sdk/bin/, not bin/. Discovered 2026-05-18 when 3 Opus agents ran sdk\\build.cmd and fixes were undeployed for multiple cycles.",
+    "BUILD VERIFICATION AFTER FIX (MANDATORY): after dotnet publish on csharp/, verify ALL of: (1) ls -la bin/wkappbot-core.exe shows TODAY's timestamp (2) wkappbot --version shows v7.3.X where X is HIGHER than before your commit (3) wkappbot --version output does NOT come from the sdk/bin/ path. If version did not increment, you likely built from the wrong tree. Also correct step 7: base version is 7.3.X (NOT 6.0.x -- that was the SDK).",
+    "HQ PATH LESSON (2026-05-18): suggest add-requirement writes to different HQ than suggest resolve (DataDir vs WkHq.GetHqDir()). Fixed in v7.3.74 -- all 15 CRUD sites now use WkHq.GetHqDir(). Before v7.3.74, add-requirement wrote to runtime temp HQ (AppData) while resolve read project HQ (bin/wkappbot.hq/). Requirements added via add-requirement were invisible to resolve. Verify fix: after add-requirement, check bin/wkappbot.hq/suggestions.jsonl for the new requirement field.",
+    "BUILD BREAK PATTERN (2026-05-22): A11yActions.Click.cs and A11yActions.Invoke.cs were deleted by f7f496191 (FOCUSLESS-HOMEWORK merge) without updating call sites. A11yClick/A11yInvoke CS0103. Fix: git checkout f7f496191~1 -- csharp/src/WKAppBot.CLI/Commands/A11yActions.Click.cs A11yActions.Invoke.cs to restore. Then build confirms 0 errors. Lesson: when merging large suggest refactors, always run dotnet build immediately after and before next commit.",
+    "Verified 2026-05-22: test-build-a11y-click-invoke-restore.sh (resolve ts=2026-05-22T02:26:41)",
+    "Eye OOM pattern (2026-05-22): CDP ReconnectAsync + heal loop with no circuit-breaker causes unbounded retry. Fix pattern: add _consecutiveHealFails counter; after N failures stop retrying (circuit open); reset on successful connect. Max backoff 60s. Files: CdpClient.cs (ReconnectAsync delays[]), CdpClient.ReconnectHeal.cs (heal attempts).",
+    "Eye Guardian memory threshold (2026-05-23): Guardian polls Eye PID every --poll-ms. Add WorkingSet check: if Eye WorkingSet > 4GB, log [EYE-GUARDIAN] OOM detected (XGB), kill Eye PID, respawn. Key files: AppBotEyeCommands.cs (guardian args + poll loop) + AppBotEyeGlobalMode.cs (line 200 _prevWorkingSetMB). Guardian is separate process watching Eye PID via --eye-pid or similar arg.",
+    "Guardian log rotation (2026-05-23): when Guardian kills Eye for OOM, also rotate eye.pid=N.log -- rename to eye.pid=N.log.old-YYYYMMDD. Also add log size cap in guardian poll: if log file > 50MB, truncate/rotate immediately before OOM crash happens. Files: AppBotEyeCommands.cs guardian OOM handler + existing log rotation at line 1281 AppBotEyeGlobalMode.cs.",
+    "skill read Claude Code export (2026-05-23): new feature -- after skill read, detect parent process (claude-code = node.exe ancestor), then write .claude/skills/<id>/SKILL.md (paths frontmatter from skill tags) + ~/.claude/projects/<slug>/memory/skill_<id>.md (index entry). Implementation file: SkillCommand.ClaudeExport.cs (partial class). Slug formula: cwd.Replace(':','-').Replace('\\','-').Replace('//','-'). Paths heuristic: skill tags like 'cdp' -> csharp/**/*Cdp*.cs, 'placement' -> csharp/**/*Placement*.cs.",
+    "MANDATORY after ANY Core source edit: (1) publish: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release -r win-x64 --sc true -o bin/ -- verify 0 Error(s) + staged-for-hot-swap in output. (2) swap: wkappbot --version shows new version. (3) smoke: wkappbot cdp open <affected-url>. (4) commit only after all 3 pass. Build alone does NOT deploy.",
+    "2026-05-26: CDP Chrome multiplication fix - ChromeLauncher.ProcessDiscovery.cs FindRunningChromePortAny port-file guard changed from (registered!=port) to (registered>0 && registered!=port). Build: dotnet clean + dotnet publish WKAppBot.CLI.csproj -c Release",
+    "BUILD VIA HARNESS: use wkappbot exec to run dotnet through the harness (direct dotnet is blocked by wk-only-gate). Example: wkappbot exec 'C:/Program Files/dotnet/dotnet' publish 'D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y --help",
+      "expect": "help text printed",
+      "prompt": "fixed by 5dcd9ef16: restored A11yActions.Click.cs+A11yActions.Invoke.cs deleted by f7f496191 without updating call sites. Build 0 CS errors confirmed."
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "entries listed",
+      "prompt": "fixed by 5dcd9ef16: restored A11yActions.Click.cs+A11yActions.Invoke.cs deleted by f7f496191 without updating call sites. Build 0 CS errors confirmed."
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skills listed",
+      "prompt": "fixed by 5dcd9ef16: restored A11yActions.Click.cs+A11yActions.Invoke.cs deleted by f7f496191 without updating call sites. Build 0 CS errors confirmed."
+    }
+  ],
+  "primary_cmd": "wkappbot a11y --help",
+  "tags": [
+    "wkappbot",
+    " build",
+    " verify",
+    " publish",
+    " dotnet",
+    " ai-delegation",
+    " operator",
+    " cheatsheet",
+    " refactor-safety"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/Directory.Build.props",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "CLAUDE.md",
+      "line": null,
+      "pattern": "Build & Deploy",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T16:44:12.0816945Z",
+  "updated": "2026-05-26T04:03:39.4629012Z",
+  "version": "1.29"
+}

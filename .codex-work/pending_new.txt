@@ -1,0 +1,27 @@
+<!-- compressed 2026-05-26: resolved items grouped by topic -->
+- [x] CDP core fixes [1-11]: wrong-Chrome, timeout, CommandHelpMap, auto-kill hidden Chrome, schedule-removed -- Core commits (1bafc6524)
+- [x] wkjobs suite: created + WKAppBot/bin symlinks, Kill/Leaks modes, native taskkill fallback, ChatSessionGuard token-aware, FormatKilledEntry (42cee06, 95b0bbf, 3b7f968, fa8ba7f); taskkill-usage skill
+- [x] Codex tool wrappers: Edit/Write/Read/Glob/Grep/Bash/PowerShell/Cmd/Agent .cmd shims + WKAppBot/bin symlinks, CLI-arg fallback, stdin-hang fix, PATH-shadow exit-255 fix, config.toml deny matchers, DenyNativeTool.ps1 (eff966c); codex-tool-wrappers skill
+- [x] Harness guards: agent-leak-guard, wkclaude-direct-guard, codex-recursive block, shell_command gap (41e2bc8), wkharness self-test 57/57 (codex-sandbox-guard fix)
+- [x] nightly-schedule-guard: Agent-exempt, CronCreate-heading-only detection, 3 PS5.1 bugfixes, globalized to ~/.claude/settings.json
+- [x] wkdoctor: flutter-style health check (bin/wkdoctor.ps1+.cmd), 10 checks, plugin modules under wkappbot.hq/doctor/, IPC-stall-free (PE VersionInfo), inline-JSON heal
+- [x] Caller-HWND resolution: GetParentPid offset 24->40 fix, ResolveCallerTerminalHwnd visible/root preference + ConPTY chain 2nd attempt (634f5721, b1150b0b), Multi-WT GA_ROOTOWNER->CASCADIA disambiguation (c631b2f3), Core GA_ROOTOWNER pre-pass (8135f358)
+- [x] CDP popup notification: CdpClient.PopupNotification.cs (2c4ab3fee); cdp open OK tab field; a11y type/read on WT (TerminalWindowHelper.cs, v7.3.224); cross-repo-claude-notify skill v1.6
+- [x] skill-ify pass: suggest-workflow, wkharness-guards, suggest-triage-playbook, skill-edit-step-ordering-spec, cdp-tab-identity-design, wt-terminal-a11y-type-read-design; on-load corruption repaired (v1.80)
+- [x] screensaver: WKAPPBOT_NO_SCREENSAVER env + WipeBlockingOverlays 30s periodic confirmed correct
+- [x] wkedit BOM bug suggest filed; build-skills-registry BOM parse fix + protected-branch continue-on-error
+- [x] cdp-smoke: auth-wall hang fix (Core NavigateAsync 3s cap 32cef1d5d, smoke --timeout 9s); cdp open reuse preflight fast-path; cdp-reuse.yml full build pipeline
+- [x] version bump v7.4.0-sdk (Directory.Build.props + CLAUDE.md header + CHANGELOG)
+- [x] SECURITY.md supported-versions table -> 7.4.x (nightly heal 2026-05-26, 1130ecdc)
+- [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582) -- merge with zombie over-protect
+- [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
+- [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
+- [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
+- [ ] ask-gpt zombie watchdog: suggest filed (hard-kill at timeout+60s)
+- [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout
+- [ ] Core Program.PInvoke.GetParentProcessId() offset 24 bug (same as SDK fix d69b080b; suggest 1779611928 to Core)
+- [ ] Core CallerPlacementResolver window selection: missing IsWindowVisible guard vs SDK
+- [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position pending, Core scope)
+- [ ] WT Vis=True PCW PIDs (20824/21452/12600/8124): test if any in wkappbot ancestor chain -> CASCADIA match
+- [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1)
+- [ ] suggest triage: merge CDP timeout cluster (A/F/G groups 27+ BUG-AUTO) + CommandHelpMap missing

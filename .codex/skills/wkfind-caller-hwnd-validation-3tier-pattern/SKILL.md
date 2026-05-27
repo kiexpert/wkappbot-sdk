@@ -1,0 +1,46 @@
+---
+id: wkfind-caller-hwnd-validation-3tier-pattern
+app: wkappbot
+description: "Complete pattern for Windows process->window mapping. Solves GetForegroundWindow() gotcha with 3-tier priority (console>host>foreground) and 8-point edge case validation. Covers multi-monitor, DWM cloak, PseudoConsoleWindow rejection, foreign-process guard, RECT marshalling bug fix, WT multi-tab support."
+tags: [caller-window, hwnd-validation, process-chain, multi-monitor, windows-terminal, chrome-placement, wkfind, edge-cases]
+---
+
+> **Refresh**: `wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern --if-newer` — v1.6 (2026-05-15)
+
+# wkfind: Caller HWND validation - 3-tier priority cascade pattern
+
+## Steps
+
+1. Recognize the GetForegroundWindow() Gotcha: GetForegroundWindow() returns whoever is CURRENTLY IN FOREGROUND (browser, IDE, another app), NOT the launcher's actual caller. Chrome gets placed on wrong window or wrong project. Correct model: 'Caller HWND' is contextual to Launcher's process ancestry -- who spawned us?
+2. 3-Tier Priority Cascade (MyCdpContext.cs:163-170): var fgHwnd = GetForegroundWindow(); var consoleHwnd = GetConsoleWindow(); var hostHwnd = GetHostWindowSnapshot(); var callerHwnd = consoleHwnd != IntPtr.Zero ? consoleHwnd : hostHwnd != IntPtr.Zero ? hostHwnd : fgHwnd; Rationale: Console (GetConsoleWindow) when run from ConPTY/cmd/pwsh. If not, walk parent chain (Program.cs:234-258) for first process with MainWindowHandle (Terminal, IDE, wkappbot). Fallback to GetForegroundWindow only if both fail.
+3. Edge Case Validation Checklist (MyCdpContext.cs:340-399):
+(1) Desktop Window Rejection: SHELLDLL_DefView, Progman, WorkerW are shell background, not valid callers.
+(2) PseudoConsoleWindow Rejection: ConPTY spawns hidden child (class=PseudoConsoleWindow) -- NOT visual terminal.
+(3) Off-Screen Detection: IsRectOutsideAllMonitors(rect) checks intersection with ANY monitor. Handles multi-monitor negative coords on left/secondary monitors.
+(4) DWM Cloak: DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED) detects hidden (UWP suspended, Win+Tab, virtual-desktop).
+(5) Foreign-Process Guard: Reject foreground unless it's known host (terminal, IDE, wkappbot). 40+ allow-listed: cmd, powershell, pwsh, bash, wt, code, devenv, rider, etc.
+(6) RECT Marshalling: Win32 RECT=(L,T,R,B). DO NOT use System.Drawing.Rectangle (X,Y,W,H) -- coords get mangled on negative secondary-monitor positions.
+(7) Visibility: IsWindowVisible(hwnd) && IsWindow(hwnd) && GetWindowRect succeeds.
+(8) Degenerate: Reject if Width<=0 or Height<=0.
+4. Parent Process Chain Walk (Program.cs:234-258 + MyCdpContext.cs:634-647): GetParentProcessId(pid) via NtQueryInformationProcess, max 10 iterations. Path: cmd.exe (MainWindowHandle=terminal hwnd) <- powershell.exe <- wkappbot.exe (our launcher). Code: static IntPtr GetHostWindowSnapshot() { var parentPid = GetParentProcessId(Environment.ProcessId); if (parentPid <= 0) return IntPtr.Zero; using var parent = System.Diagnostics.Process.GetProcessById(parentPid); return parent.MainWindowHandle; }
+5. Environment Variable Forwarding (CoreRunner.cs + EyeCmdPipeClient.cs): After validation, persist caller HWND for downstream: (1) Launcher: static LastValidatedCallerHwnd = callerHwnd; compute LastValidatedCallerRect (System.Drawing.Rectangle.FromLTRB). (2) CoreRunner: Append WKAPPBOT_CALLER_HWND=0x... to CreateProcessW env block so Core subprocess accesses it. (3) ChromeLauncher: Post-launch TryMoveWebBotNearCaller() SetWindowPos Chrome next to caller. Use SWP_NOZORDER|SWP_NOACTIVATE so focus never stolen from terminal.
+6. Windows Terminal Multi-Tab Edge Case (EyeCmdPipeClient.cs:207-212): Each WT tab has OWN CASCADIA_HOSTING_WINDOW_CLASS top-level hwnd (not shared; all tabs same WT pid but unique hwnd per tab). When user types in WT tab, that tab's CASCADIA window IS the foreground. Therefore GetForegroundWindow() directly returns correct tab hwnd. Parent walk unnecessary for WT (console window check catches it). Gotcha: Older logic assumed all WT tabs share one hwnd -- WRONG.
+7. Logging & Telemetry (cdp-state.jsonl): Every validation logged to wkappbot.hq/runtime/cdp-state.jsonl: [VALIDATION] hwnd=0x48152E class=ConsoleWindowClass rect=(L=33,T=26,R=1012,B=538) size=(979x512) IsWindow=True IsVisible=False verdict=not_visible. [LAUNCHER] ask: caller window is off-screen (console:0x... host:0x... fg:0x...). Run from a terminal/IDE owned by your project. Use telemetry to diagnose off-screen or invalid caller rejections in production.
+8. Key Code Locations:
+(1) MyCdpContext.cs:163-227 -- priority cascade + validation orchestration
+(2) MyCdpContext.cs:340-399 -- validation logic (8-point checklist)
+(3) Program.cs:234-258 -- GetParentProcessId loop
+(4) EyeCmdPipeClient.cs:207-212 -- WT tab detection
+(5) CoreRunner.cs:140-144 -- WKAPPBOT_CALLER_HWND env forwarding
+
+Key commits:
+(1) e10bc11e -- persist HWND validation rejections
+(2) ca987a3f -- fix off-screen check + multi-monitor + DWM cloak (RECT fix)
+(3) 655e9d7c -- forward WKAPPBOT_CALLER_HWND through env block
+(4) dd10359f -- place WebBot next to validated caller
+(5) e4737593 -- add foreign-process guard (allow-list)
+9. SEE ALSO: wkappbot skill read standard-appbot-window -- complete definitive reference for Standard AppBot Window detection, IPC, ConPTY, multi-tab, iconified, placement, all gaps fixed.
+10. CROSS-PROJECT HWND CONTAMINATION GUARD (2026-05-16, MyCdpContext.CallerValidation.cs): EnumWindows fallback that picks largest visible window on monitor MUST gate every candidate through IsKnownHostProcess(hwnd) -- without this filter the largest visible window is often another project's terminal/Chrome/YouTube and Chrome ends up placed on a completely unrelated app's window (cross-project contamination in multi-project setups). Pattern: EnumWindows -> IsWindowVisible -> IsKnownHostProcess -> GetWindowRect -> MonitorFromPoint -> area-max.
+11. NON-FATAL PLACEMENT POLICY (2026-05-16, MyCdpContext.cs commit ddc80962): Placement no longer aborts the ask/cdp command when caller validation returns no_caller_window / invalid_window_type / caller_foreign_process. Only caller_offscreen hard-blocks (Chrome would land off-screen). Other failures log [LAUNCHER] cmd: reason -- placement skipped and proceed without placement; LastValidatedCallerHwnd stays Zero so TryMoveWebBotNearCaller is skipped. Rationale: placement is optional polish; never block the user's command on it.
+12. FGHWND LAST-RESORT TIER (2026-05-16, commits e3fba700 + c8e8a825): Final caller resolution priority chain is env > console > ancestor > host > fgHwnd. fgHwnd was removed entirely in e3fba700 (foreground = customer window, not caller terminal) but restored as LAST-RESORT ONLY in c8e8a825 because non-TTY envs (Claude Code shell, CI runners) have no console or ancestor in their process chain. Code: callerHwnd = envCallerHwnd != Zero ? env : console != Zero ? console : ancestor != Zero ? ancestor : host != Zero ? host : fgHwnd. fgHwnd diagnostic log retained even when not used.
+13. INIT-TIME PLACEMENT (2026-05-16, Program.cs commit a4fd566c): TryMoveWebBotNearCaller now fires ONCE at MyCdpContext init time inside TryTrackMyCdpAccess (pre-launch / pre-Eye-delegate). Removed the two post-Core-exit / post-Eye-exit placement calls in Program.cs and the IsCdpFamilyCommand(cmd is cdp or ask) gate that used to filter them. Stage 2/3 watcher (MyCdpContext.Stage23.cs) handles post-CDP-connect re-validation for fresh Chrome launches. Rationale: eliminates timing race where Chrome moved AFTER it had already stolen focus / settled at the wrong position; one placement at init plus Stage 2/3 retry covers fresh-launch and reused-Chrome cases.

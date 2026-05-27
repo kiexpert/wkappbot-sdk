@@ -1,0 +1,8 @@
+@echo off
+REM Evidence: wkask.ps1 has old_ask_gpt watch logic (Eye log override removed)
+REM Fix commit: 3661d23e4 (fix(wkask): watch dispatch log directly)
+wkappbot ask --help 2>/dev/null
+wkappbot ask --help 2>/dev/null
+wkappbot file grep "old_ask_gpt" D:/GitHub/WKAppBot/bin/wkask.ps1
+if %errorlevel% neq 0 exit /b 1
+exit /b 0

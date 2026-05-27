@@ -1,0 +1,8 @@
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[WEB] reuse-check non-fatal error: {ex.Message}");
+                    reusePort = 0;
+                }
+            }
+
+            if (reusePort > 0)

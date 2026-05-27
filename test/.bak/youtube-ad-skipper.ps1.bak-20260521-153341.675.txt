@@ -1,0 +1,68 @@
+﻿#Requires -Version 5.1
+# youtube-ad-skipper.ps1 -- Inject JS into YouTube; JS handles skip/reload autonomously.
+# JS runs in browser until page reload. PowerShell re-injects every 5s after reload.
+# Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>]
+param(
+    [string] $Url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ErrorActionPreference = 'Continue'
+function ts  { Get-Date -Format 'HH:mm:ss' }
+function ok($m)  { Write-Host "$(ts)  OK  $m" -ForegroundColor Green;  [Console]::Out.Flush() }
+function inf($m) { Write-Host "$(ts)  ..  $m" -ForegroundColor Cyan;   [Console]::Out.Flush() }
+function wrn($m) { Write-Host "$(ts)  !!  $m" -ForegroundColor Yellow; [Console]::Out.Flush() }
+
+# JS injected into the page -- runs every 500ms inside the browser.
+# Detects ad-showing, clicks skip/overlay, reloads if ad persists 3s.
+$js = @'
+(function(){
+  if(window.__wkAd){clearInterval(window.__wkAd.t);}
+  var adSince=null, n=0;
+  function tick(){
+    var p=document.querySelector('.html5-video-player');
+    var isAd=p&&p.classList.contains('ad-showing');
+    if(!isAd){adSince=null;return;}
+    if(!adSince)adSince=Date.now();
+    var s=document.querySelector('.ytp-skip-ad-button,.ytp-ad-skip-button-modern');
+    if(s&&s.offsetHeight>0){s.click();n++;console.log('[wk-ad] skip#'+n);adSince=null;return;}
+    var o=document.querySelector('.ytp-ad-overlay-close-button');
+    if(o&&o.offsetHeight>0){o.click();n++;console.log('[wk-ad] overlay#'+n);adSince=null;return;}
+    if(Date.now()-adSince>3000){console.log('[wk-ad] reload(stuck 3s)');adSince=null;location.reload();}
+  }
+  window.__wkAd={t:setInterval(tick,500),n:0};
+  document.addEventListener('yt-navigate-finish',function(){adSince=null;});
+  return 'wk-ad-skipper t='+window.__wkAd.t;
+})()'@
+
+# Open YouTube
+inf "Opening $Url"
+$openOut = wkappbot cdp open $Url 2>&1 | Out-String
+if ($openOut -notmatch 'cdp:(\d+)') { Write-Host 'cdp open failed' -ForegroundColor Red; exit 1 }
+$port = [int]$Matches[1]
+$hwnd = if ($openOut -match 'hwnd:(0x[0-9A-Fa-f]+)') { $Matches[1] } else { $null }
+ok "port $port hwnd $hwnd"
+Start-Sleep -Seconds 2
+
+$g = if ($hwnd) { "{hwnd:$hwnd,cdp:$port}" } else { "{domain:'www.youtube.com',cdp:$port}" }
+
+function Inject {
+    inf 'Injecting...'
+    $r = wkappbot a11y read "$g#Doc_RootWebArea" --eval-js $js 2>&1 | Out-String
+    if ($r -match 'wk-ad-skipper') { ok "Injected! $($r -replace '(?s).*(wk-ad-skipper[^\s]+)','$1')"; return $true }
+    wrn 'Inject failed'; return $false
+}
+
+Inject | Out-Null
+
+# Re-injection watcher: check every 5s if JS timer is still alive.
+# After page reload the timer is gone -- re-inject immediately.
+inf 'Watching for reloads (Ctrl+C to stop)...'
+while ($true) {
+    Start-Sleep -Seconds 5
+    $alive = wkappbot a11y read "$g#Doc_RootWebArea" --eval-js 'typeof window.__wkAd' 2>&1 | Out-String
+    if ($alive -notmatch 'object') {
+        wrn 'JS cleared (reload detected) -- re-injecting'
+        $ok = Inject
+        if (-not $ok) { Start-Sleep -Seconds 3 }
+    }
+}

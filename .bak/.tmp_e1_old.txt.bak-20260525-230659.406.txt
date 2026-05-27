@@ -1,0 +1,6 @@
+
+    /// <summary>
+    /// Find a free port starting from candidatePort.
+    /// If taken by a Chrome with a DIFFERENT userDataDir, increment and retry (up to 20 times).
+    /// When userDataDir is null/empty, behaves as a pure free-port probe (any active port skipped).
+}

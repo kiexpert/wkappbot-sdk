@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Evidence: Chrome launch args include --disable-features=Translate so
+# the translate infobar does NOT auto-appear on Korean pages (Naver).
+#
+# Regression test for suggest 2026-05-17T20:23:43.
+# Fix: D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs (line 807)
+#   added "Translate" to existing --disable-features list alongside TranslateUI.
+#
+# Run criterion: the published wkappbot-core source emits the Translate
+# feature flag in its launch args. We grep the source-of-truth file.
+
+set -e
+set -o pipefail
+
+SRC="D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/ChromeLauncher.cs"
+
+if [ ! -f "$SRC" ]; then
+    echo "FAIL: ChromeLauncher.cs not found at $SRC"
+    exit 1
+fi
+
+# Must contain "Translate," (note trailing comma -- proves it is part of a
+# list, not just the older TranslateUI flag).
+if grep -q -- "--disable-features=Translate,TranslateUI" "$SRC"; then
+    echo "PASS: ChromeLauncher.cs disables Translate feature (Naver infobar blocked)"
+    grep -n -- "--disable-features=" "$SRC" | head -3
+    exit 0
+fi
+
+echo "FAIL: --disable-features list does not include Translate flag"
+grep -n -- "disable-features" "$SRC" | head -5
+exit 1

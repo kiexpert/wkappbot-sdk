@@ -1,0 +1,111 @@
+﻿#Requires -Version 5.1
+# youtube-ad-skipper.ps1 -- UIA-invoke based YouTube ad skipper.
+# YouTube blocks JS .click() via isTrusted check. We use wkappbot a11y invoke
+# (UIA InvokePattern = trusted input) on the .ytp-skip-ad-button element.
+# Detection (lightweight eval-js poll) -> action (UIA invoke). No JS click ever.
+#
+# Usage: powershell -File test\youtube-ad-skipper.ps1 [-Url <url>] [-RunMinutes <N>]
+param(
+    [string] $Url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    [int]    $RunMinutes = 0,
+    [int]    $PollSeconds = 2
+)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ErrorActionPreference = 'Continue'
+
+function ts  { Get-Date -Format 'HH:mm:ss' }
+function ok($m)  { Write-Host "$(ts)  OK  $m" -ForegroundColor Green;  [Console]::Out.Flush() }
+function inf($m) { Write-Host "$(ts)  ..  $m" -ForegroundColor Cyan;   [Console]::Out.Flush() }
+function wrn($m) { Write-Host "$(ts)  !!  $m" -ForegroundColor Yellow; [Console]::Out.Flush() }
+function err($m) { Write-Host "$(ts)  XX  $m" -ForegroundColor Red;    [Console]::Out.Flush() }
+
+# Step 1: open the YouTube tab (cdp open auto-creates or reuses).
+inf "Opening $Url"
+$openOut = & wkappbot cdp open $Url 2>&1 | Out-String
+if ($openOut -notmatch 'cdp:(\d+)') { err 'cdp open failed -- aborting'; Write-Host $openOut; exit 1 }
+$port = [int]$Matches[1]
+ok "CDP port $port"
+
+# Step 2: navigate (also pulls YouTube tab to active state).
+$navOut = & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-String
+if ($navOut -notmatch 'hwnd:(0x[0-9A-Fa-f]+)') {
+    wrn 'navigate did not return hwnd -- continuing with domain grap'
+    $grapBase = "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}"
+} else {
+    $hwnd = $Matches[1]
+    $grapBase = "{hwnd:$hwnd,proc:'chrome',cdp:$port}"
+    ok "YouTube tab hwnd $hwnd"
+}
+
+# Lightweight DOM probe: returns ad-state JSON. Read-only -- no .click(), no DOM
+# mutation. Just classList check + element visibility. Cheap, no isTrusted issue.
+$probeJs = 'var p=document.querySelector(".html5-video-player");var s=document.querySelector(".ytp-skip-ad-button,.ytp-ad-skip-button-modern");var o=document.querySelector(".ytp-ad-overlay-close-button");JSON.stringify({ad:p?p.classList.contains("ad-showing"):false,skip:s?s.offsetHeight>0:false,overlay:o?o.offsetHeight>0:false})'
+
+function Get-AdState {
+    $r = & wkappbot a11y read "$grapBase#Doc_RootWebArea" --eval-js $probeJs 2>&1 | Out-String
+    foreach ($line in $r -split "`n") {
+        if ($line -match '^\{"ad":') {
+            try { return $line | ConvertFrom-Json } catch { return $null }
+        }
+    }
+    return $null
+}
+
+function Invoke-Skip {
+    # UIA InvokePattern is trusted. YouTube cannot detect/block it the way it
+    # blocks JS element.click(). The skip button UIA AutomationId is
+    # "skip-button:<N>" -- wildcard '#*skip-button*' matches reliably.
+    $r = & wkappbot a11y invoke "$grapBase#*skip-button*" --timeout 8 --force 2>&1 | Out-String
+    if ($r -match '\[STATE CHANGE DETECTED\]|REMOVED.*광고|REMOVED.*skip|invoke -- UIA Invoke') {
+        return $true
+    }
+    return $false
+}
+
+function Invoke-Overlay {
+    $r = & wkappbot a11y invoke "$grapBase#*overlay-close*" --timeout 5 --force 2>&1 | Out-String
+    return ($r -match 'invoke -- UIA Invoke|STATE CHANGE')
+}
+
+inf "Polling every ${PollSeconds}s (UIA-invoke mode). Ctrl+C to stop."
+$start = Get-Date
+$skipCount = 0
+$overlayCount = 0
+$consecutiveFails = 0
+
+while ($true) {
+    if ($RunMinutes -gt 0 -and ((Get-Date) - $start).TotalMinutes -ge $RunMinutes) {
+        ok "RunMinutes ($RunMinutes) reached. Skips=$skipCount Overlays=$overlayCount"
+        break
+    }
+
+    $state = Get-AdState
+    if ($null -eq $state) {
+        $consecutiveFails++
+        if ($consecutiveFails -ge 5) {
+            wrn 'Probe failed 5 times -- re-navigating'
+            & wkappbot cdp navigate "{proc:'chrome',cdp:$port,domain:'www.youtube.com'}" $Url 2>&1 | Out-Null
+            $consecutiveFails = 0
+        }
+        Start-Sleep -Seconds $PollSeconds
+        continue
+    }
+    $consecutiveFails = 0
+
+    if ($state.ad -and $state.skip) {
+        inf 'Ad showing + skip visible -- invoking UIA'
+        if (Invoke-Skip) {
+            $skipCount++
+            ok "SKIPPED ad #$skipCount"
+            Start-Sleep -Seconds 1
+        } else {
+            wrn 'UIA invoke did not register state change -- retry next tick'
+        }
+    } elseif ($state.overlay) {
+        if (Invoke-Overlay) {
+            $overlayCount++
+            ok "Closed overlay #$overlayCount"
+        }
+    }
+    Start-Sleep -Seconds $PollSeconds
+}

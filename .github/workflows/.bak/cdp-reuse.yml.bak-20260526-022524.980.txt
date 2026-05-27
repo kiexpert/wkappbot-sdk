@@ -1,0 +1,116 @@
+name: CDP Reuse
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
+  push:
+    paths:
+      - 'scripts/test-cdp-reuse.ps1'
+      - '.github/workflows/cdp-reuse.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cdp-reuse:
+    name: cdp-reuse
+    runs-on: windows-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Chrome
+        run: |
+          $c = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (Test-Path $c) { Write-Host "Chrome OK: $c" }
+          else { Write-Error "Chrome not found" }
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore NuGet cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('csharp/**/*.csproj', 'csharp/**/*.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore bin cache
+        id: bin_cache
+        uses: actions/cache/restore@v5
+        with:
+          path: bin
+          key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-sdk-build-run-
+            ${{ runner.os }}-sdk-build-
+
+      - name: Build launcher
+        if: ${{ steps.bin_cache.outputs.cache-hit != 'true' || hashFiles('bin/wkappbot.exe') == '' }}
+        shell: SHELLTYPE
+        run: |
+          New-Item -ItemType Directory -Force -Path bin | Out-Null
+          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
+            --configuration Release -p:SkipDeployLauncher=true -o bin
+
+      - name: Fetch core binary (private release)
+        if: ${{ hashFiles('bin/wkappbot-core.exe') == '' }}
+        shell: SHELLTYPE
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+        run: |
+          if (-not $env:CORE_REPO -or -not $env:GH_TOKEN) {
+            throw 'WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT secrets required'
+          }
+          $tag = gh release list --repo $env:CORE_REPO --json tagName,createdAt `
+            | ConvertFrom-Json `
+            | Where-Object { $_.tagName -like 'core-*' } `
+            | Sort-Object createdAt -Descending `
+            | Select-Object -First 1 -ExpandProperty tagName
+          if (-not $tag) { throw "No core-* release found in $env:CORE_REPO." }
+          gh release download $tag --repo $env:CORE_REPO --pattern "wkappbot-core.exe" --dir bin --clobber
+          if (-not (Test-Path bin/wkappbot-core.exe)) { throw "wkappbot-core.exe not found" }
+          Write-Host "Core fetched: $tag"
+
+      - name: Seed bin/wkappbot.hq
+        shell: SHELLTYPE
+        run: |
+          New-Item -ItemType Directory -Force -Path bin/wkappbot.hq/skills | Out-Null
+          if (Test-Path wkappbot.hq) { Copy-Item wkappbot.hq/* bin/wkappbot.hq -Recurse -Force }
+          if (Test-Path skills) { Copy-Item skills/* bin/wkappbot.hq/skills -Recurse -Force }
+
+      - name: Add bin to PATH
+        run: echo "${{ github.workspace }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify binaries
+        shell: SHELLTYPE
+        run: |
+          if (!(Test-Path ./bin/wkappbot.exe))      { throw 'bin/wkappbot.exe missing' }
+          if (!(Test-Path ./bin/wkappbot-core.exe)) { throw 'bin/wkappbot-core.exe missing' }
+          $v = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
+          if (!$v) { throw 'wkappbot --version produced no version line' }
+          Write-Host "Binary OK: $v"
+
+      - name: Start Eye
+        shell: SHELLTYPE
+        run: |
+          [Diagnostics.Process]::Start('wkappbot.exe', 'eye') | Out-Null
+          Start-Sleep -Seconds 3
+          wkappbot eye tick
+
+      - name: CDP reuse test
+        shell: SHELLTYPE
+        run: PSEXEC -ExecutionPolicy Bypass -File scripts/test-cdp-reuse.ps1 -Url https://example.com
+
+      - name: Upload logs on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fail-cdp-reuse-${{ github.run_number }}
+          path: bin/wkappbot.hq/logs/
+          retention-days: 1
