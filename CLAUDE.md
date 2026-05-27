@@ -424,20 +424,45 @@ Use Edit.cmd instead of native apply_patch
 ## harness:block (?i)??read_file\(
 Use Read.cmd instead of native read_file
 
-## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*(?:MyCdpContext|ChromeLauncher|CallerPlacement|CallerHwnd|PlacementValidate|Stage23)
-wkappbot skill read standard-appbot-window               # usage -- caller window detection (P2 ancestor walk)
-wkappbot skill read standard-chrome-window               # impl -- Chrome window placement for CDP
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # task -- HWND validation 3-tier + edge cases
+## harness:skill csharp/**/*MyCdpContext*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
 
-## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*EyeCmdPipe
-wkappbot skill read standard-appbot-window               # usage -- caller HWND IPC forwarding
-wkappbot skill read eye-ipc-caller-hwnd-resolution       # impl -- Eye IPC caller HWND resolution cascade
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # task -- HWND validation
+## harness:skill csharp/**/*ChromeLauncher*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
 
-## harness:skill (?:Edit\(|Write\(|Bash\((?:[\w./\\-]+\s+)*?[\w./\\-]*edit(?:\.\w+)?\b).*\.(?:cs|csproj|sln|csx|py|pyw|ps1|psm1|psd1|c|cc|cpp|cxx|h|hh|hpp|hxx|vb|fs|fsx|go|rs|java|kt|ts|tsx|js|jsx|rb|php)\b
-wkappbot skill read sdk-launcher-maintenance             # usage -- build/test/hot-swap/release loop
-wkappbot skill read wkappbot-build-verify-workflow       # impl -- build + verify after any source edit
-wkappbot skill read wkharness-guards                     # task -- harness guard system
+## harness:skill csharp/**/*CallerPlacement*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
+
+## harness:skill csharp/**/*CallerHwnd*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
+
+## harness:skill csharp/**/*PlacementValidate*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
+
+## harness:skill csharp/**/*Stage23*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read standard-chrome-window
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
+
+## harness:skill csharp/**/*EyeCmdPipe*.cs
+wkappbot skill read standard-appbot-window
+wkappbot skill read eye-ipc-caller-hwnd-resolution
+wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
+
+## harness:skill csharp/**/*.cs
+wkappbot skill read sdk-launcher-maintenance
+wkappbot skill read wkappbot-build-verify-workflow
+wkappbot skill read wkharness-guards
 
 ## Pending
 
@@ -556,3 +581,4 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [x] CDP smoke test port separation bug: root cause = hardcoded PORT=9980 with no extraction from 'wkappbot cdp open' response. Fixed by parsing OK {cdp:PORT,...} and extracting actual CDP port. Result: all 10 tests PASS (was 5/10 FAIL). Execution time: 116s (was 201s). File: D:/GitHub/WKAppBot/bin/cdp-smoke-test.sh (Core repo)
 - [x] wkjobs.ps1 PowerShell scoping bug: Test-HasAiAncestor($pid) parameter conflicted with built-in $pid automatic variable. Renamed parameter to $procId to avoid WriteError. File: D:/GitHub/WKAppBot/bin/wkjobs.ps1 (Core repo)
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
+- [ ] Chrome 60-process multiplication: detected during gg workflow (ask gpt command spawned 60 Chrome instead of 1-2). Suspect Eye auto-respawn loop OR Core FindRunningChromePortAny guard (8819ed449) not deployed. CRITICAL: blocks suggest triage. Opus investigation pending.
