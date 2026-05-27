@@ -470,113 +470,33 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 
 ## Pending
 
-<!-- compressed 2026-05-25: 60+ resolved items grouped by topic -->
-- [x] wk-gg-main.cmd: created comprehensive 12-stage workflow script (health check, git status, suggest backlog, GitHub issues, alert analysis, CLAUDE.md compliance check) -- committed 09758591
+<!-- compressed 2026-05-28: ~84 resolved items grouped by topic (raw history in git) -->
+- [x] DONE (wkjobs suite): scripts/wkjobs.ps1 + WKAppBot/bin move + sh/cmd symlinks; Kill/Leaks modes; recursive bash/sh ancestor walk; native-taskkill fallback when ChatSessionGuard blocks; ChatSessionGuard token-aware fix; wkjobs-ai-process-monitor skill (42cee06, 95b0bbf, 3b7f968, fa8ba7f)
+- [x] DONE (taskkill compat): FormatKilledEntry spacing; --force CDP-port-guard bypass (Core 9e62e69e7); /IM auto-kill ZOMBIE+UNKNOWN, PROTECTED preserved + per-proc [NMB h t] metrics (Core 7aaeba959); taskkill-compat-shim skill v1.10
+- [x] DONE (Codex harness/wrappers): all 5 file shims + 3 shell shims (Edit/Write/Read/Glob/Grep/Bash/PowerShell/Cmd) + WKAppBot/bin symlinks; Agent.cmd Codex->Opus delegation + CLI-arg form; config.toml deny matchers + DenyNativeTool.ps1 (eff966c); exit-255 abs-path fix; open-pipe stdin-hang fix; shell_command harness gap (41e2bc8); spec-gate/brief-guard/wrapper-first/skill-update-pending verified; codex-tool-wrappers skill
+- [x] DONE (harness guards): agent-leak-guard (stray-brace fix, Agent-block-on-zombie CONFIRMED, Codex-delegation coverage); wkclaude-direct-guard; codex-recursive block; wkharness self-test 57/57
+- [x] DONE (caller-HWND resolution): GetParentPid offset 24->40 fix; ResolveCallerTerminalHwnd visible/root/non-degenerate per ancestor (634f5721) + ConPTY owner 2nd attempt (b1150b0b); ConPTY chain DEAD verified -> largest-CASCADIA fallback; GA_ROOTOWNER multi-WT disambiguation deployed (c631b2f3); Core WindowDetection.cs pre-pass (8135f358) + Core CLI uses SDK launcher (ff23fde97); cross-repo-launcher-build skill
+- [x] DONE (CDP/Chrome): cdp open OK-response tab field (Core WebCommands.Part1.cs); CDP popup notification merged + CdpClient.PopupNotification.cs (2c4ab3fee); cdp open auth-wall 6min hang -> NavigateAsync 3s cap (32cef1d5d) + smoke --timeout 9s; cdp open reuse fast-path preflight; cdp-reuse.yml full build pipeline; Chrome multiplication FindRunningChromePortAny guard (Core 8819ed449)
+- [x] DONE (a11y WT terminal): wt-terminal-a11y-type-read-design skill; a11y type WT bug suggest filed; Core TerminalWindowHelper.cs + ActionExecutor WM_CHAR/TextPattern hooks v7.3.224; cross-repo-claude-notify skill v1.6
+- [x] DONE (nightly-schedule-guard): 3 bug fixes (slug regex, cwd backslash, PS5.1 Join-String); globalized to ~/.claude/settings.json PreToolUse; Agent tool exempted; section-check removed; personal-docs CMD wrappers CLI fallback
+- [x] DONE (wkdoctor): bin/wkdoctor.ps1 + .cmd, 10 checks + -Json; subprocess->PE-VersionInfo robustness; plugin-module split (wkappbot.hq/doctor/*.ps1); 04-config inline JSON heal
+- [x] DONE (misc): wk-gg-main.cmd 12-stage workflow (09758591); ask-gpt OOM watchdog (c55bafd1); screensaver WKAPPBOT_NO_SCREENSAVER guidance; wkedit BOM bug suggest filed; build-skills-registry BOM strip; version bump v7.4.0-sdk; CDP-core [1-11] Core commits (1bafc6524); skill-edit-step-ordering-spec + cdp-tab-identity-design + suggest-workflow/wkharness-guards/suggest-triage-playbook skill updates; suggest triage OperationCanceledException(27)+MERGE*2 clusters
 - [ ] Chrome multiplication bug 2026-05-28: 32+ Chrome processes detected on cdp open. Core FindRunningChromePortAny guard (commit 8819ed449) appears not deployed or still broken -- Opus investigation pending
-- [x] CDP core [1][2][3][4][6][7][8][11]: cdp-wrong-Chrome, timeout, CommandHelpMap, auto-kill hidden Chrome -- all Core commits (1bafc6524)
-- [x] Fix [6] in Core: agents dispatched (wkclaude.sh background)
-- [x] Fix [3] in Core: agents dispatched (wkclaude.sh background)
-- [x] on-load skill: skill news step added (v1.61)
-- [x] skill-edit-step-ordering-spec: new skill created + suggest filed
-- [x] skill-ify: suggest-workflow (add-requirement step), wkharness-guards (3 new guards), suggest-triage-playbook (skill news step) -- DONE (wkclaude.sh agents)
-- [x] wkjobs.ps1: created scripts/wkjobs.ps1, registered wkjobs-ai-process-monitor skill v1.0
-- [x] wkjobs: sh/cmd wrappers as symlinks to wkwrap.sh/cmd (mode 120000), wkwrap --install cp->ln-s
-- [x] wkjobs.ps1: moved to WKAppBot/bin, scripts/wkjobs.ps1 is absolute symlink (managed from Core)
-- [x] wkjobs -Kill: bugfix Split(",") -> direct string; wkappbot -> wkappbot-core.exe for PseudoConsole
-- [x] wkappbot-taskkill-usage skill: removed Stop-Process steps, correct --force syntax
-- [x] wkappbot-core: fix [KILL] killed N: line -- space after ] + inline args (FormatKilledEntry, fa8ba7f)
-- [x] wkjobs: native taskkill fallback when ChatSessionGuard blocks AI-spawned zombie (95b0bbf)
-- [x] wkjobs suite: created, symlinks, moved to WKAppBot/bin, Kill/Leaks modes, taskkill-usage skill, ChatSessionGuard token-aware fix (42cee06, 95b0bbf, 3b7f968)
 - [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending) -- merge with [2] zombie over-protect, fix together
 - [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
 - [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
 - [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
-- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
-- [x] [8] schedule CommandHelpMap: STALE -- schedule cmd removed from Core entirely
-- [x] [11] cdp open wrong Chrome: STALE -- fixed in Core placement commits (1bafc6524)
-- [x] cdp-tab-identity-design skill: created (targetId+TitleHistory composite key design)
-- [x] on-load skill corruption (by co-resolve check): repaired by Opus agent (v1.80, steps restored)
-- [x] [8] schedule CommandHelpMap STALE + [11] cdp open wrong Chrome STALE -- fixed in Core placement commits (1bafc6524)
-- [x] wkjobs -Leaks mode: filters zombie agent procs, outputs kill cmd one-liner (exit 1 if found)
-- [x] wkharness agent-leak-guard: blocks Agent() if zombie procs exist, shows kill cmd
-- [x] settings.json deny (Edit/Write) removed -- Edit tool now unblocked
-- [x] Codex harness guards verified: spec-gate, brief-guard, wrapper-first, skill-update-pending all working
-- [x] codex-tool-wrappers skill created (design: Claude-named cmd wrappers route through wkharness)
-- [x] Implement Edit.cmd + Edit.ps1 in personal-docs/tools/ + wkwrap --install symlink (done)
-- [x] Write.cmd + Read.cmd + Glob.cmd + Grep.cmd -- all 5 shims done, symlinks in WKAppBot/bin/
-- [x] Agent.cmd: Codex->Opus delegation via wkclaude, brief-guard+spec-gate enforced
-- [x] ~/.codex/config.toml: harness:block patterns for write_file/read_file/apply_patch in CLAUDE.md
-- [x] Bash.cmd/PowerShell.cmd/Cmd.cmd: all 3 shell shims done + symlinks in WKAppBot/bin
-- [x] exit-255 fix: abs path for cmd.exe/powershell.exe/bash.exe (wrappers shadowed system executables in PATH)
-- [x] AGENTS.md: Tool Usage mandatory section added (section 13, all wrapper mappings)
-- [x] shell_command harness gap fixed: harnessBody switch + all toolName guards extended (41e2bc8)
-- [x] AGENTS.md Tool Usage section renumbered to 17 (section 13 conflict resolved)
-- [x] harness:block multi-token pattern bug found: Get-HarnessRules \S+ truncates space-patterns; config.toml deny matchers are the real fix
-- [x] DenyNativeTool.ps1: blocks Codex native file tools, redirects to .cmd wrappers (eff966c)
-- [x] config.toml: apply_patch/write_file/create_file/read_file deny matchers before .* catch-all
-- [x] ask-gpt zombie watchdog: OOM watchdog implemented + deployed (c55bafd1: Program.AskGptWatchdog.cs, 2GB auto-kill on timeout+60s)
-- [x] Agent.cmd: accept plain CLI args like Claude Agent() -- Agent.cmd "prompt" [--model haiku]
-- [x] wkclaude-direct-guard: added to wkharness-guards.ps1 (forces Agent.cmd, blocks direct wkclaude calls)
-- [x] codex-recursive: blocked in default.rules (prefix_rule codex/codex.exe -- stops codex-to-codex recursion)
-- [x] wkharness self-test: 57/57 achieved (codex-sandbox-guard --model codex-mini fix, 2026-05-23)
-- [x] codex-tool-wrappers skill: steps 12-18 added (Windows sandbox bug, PATH-FIX, Agent.cmd dual-conv, bash-wrapper-test, subprocess-wkappbot timeout finding)
-- [x] Codex exec PATH shadowing: PowerShell.cmd shim (WKAppBot/bin) shadows system shell; codex exec uses shim as PS interpreter -- fix: use wkappbot file cmds or prepend system path
 - [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout; wkappbot cmds hang in subprocess
-- [x] agent-leak-guard: stray-brace fix (syntax err, guards disabled) + -All + exit2->Block + powershell abs path (PATH shadow)
-- [x] agent-leak-guard: verify Agent blocked when zombies exist -- CONFIRMED (live test passed)
-- [x] agent-leak-guard: extended to cover Codex shell delegation (Agent.cmd + wrapper pattern match)
-- [x] GetParentPid: PROCESS_BASIC_INFORMATION offset 24->40 fix (was reading BasePriority=8 as parent PID; chain now shows full ancestor tree)
-- [x] cdp open OK response: tab field added (Core WebCommands.Part1.cs PrintWebTarget; wkcdp/wkask scripts updated) -- OK {hwnd,proc,cdp,domain,tab:ID8:title}
 - [ ] Core Program.PInvoke.GetParentProcessId() offset 24 bug (same as SDK fix d69b080b; suggest 1779611928 filed to Core)
 - [ ] Core CallerPlacementResolver window selection: missing IsWindowVisible guard vs SDK (hidden ConPTY vs visible terminal divergence)
-- [x] EyeCmdPipeClient.ResolveCallerTerminalHwnd(): prefer visible/root/non-degenerate window per ancestor (Opus agent fix, committed 634f5721)
-- [x] Commit EyeCmdPipeClient.cs fix + remove chrome from IsKnownHostProcess fallback (634f5721)
 - [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position from WKAPPBOT_CHROME_TARGET pending, Core scope)
-- [x] ResolveCallerTerminalHwnd: add ConPTY owner process chain as 2nd attempt when launcher chain dead-ends (b1150b0b) -- needs real broken-chain verification
-- [x] Verify ConPTY chain: DEAD -- AllocConsole PCW=[0,0,16,16] no placement; CASCADIA [W]=XAML InputSite; WT_SESSION=empty; largest-CASCADIA only working fallback
-- [x] Multi-WT disambiguation: GA_ROOTOWNER(Vis=True PCW) -> CASCADIA verified + deployed (c631b2f3) -- 3 consistent calls on dead-chain env
 - [ ] WT Vis=True PCW PIDs (20824/21452/12600/8124): test if any in wkappbot ancestor chain -> CASCADIA match
-- [x] CDP popup notification: 3 suggests merged; CdpClient.PopupNotification.cs implemented (2c4ab3fee) -- POPUP {proc:'chrome',cdp:PORT,tab:'ID8:title'} emitted after CDP eval actions
-- [x] Core GA_ROOTOWNER fix: WindowDetection.cs pre-pass added (8135f358), Core CLI now uses SDK launcher (ff23fde97), skill cross-repo-launcher-build created
-
-
-
-- [x] cross-repo-claude-notify: WM_CHAR to InputSite (focusless write) + UIAutomation TextPattern (focusless read) verified, skill v1.6
-- [x] wt-terminal-a11y-type-read-design skill: design spec created for Core a11y type/read WT support
-- [x] a11y type WT bug suggest filed (CASCADIA_HOSTING_WINDOW_CLASS 10s timeout)
-- [x] Core: TerminalWindowHelper.cs + ActionExecutor hooks for a11y type/read on WT -- PostMessage WM_CHAR + FlaUI TextPattern, v7.3.224 deployed (Opus agent)
-- [x] nightly-schedule-guard: Agent tool exempted from PreToolUse matcher (self-inflicted bug -- Agent was unnecessarily included)
-
-- [x] nightly-schedule-guard: removed brittle '## Nightly Schedules' section check (encoding mismatch; guard now relies only on CronCreate heading detection)
-- [x] personal-docs CMD wrappers: add CLI arg fallback for Codex compatibility (Bash/Read/Edit/Grep/Glob/PowerShell .ps1 files patched)
 - [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
-
-- [x] nightly-schedule-guard: fixed 3 bugs (slug regex, cwd backslash, Join-String PS5.1 incompatible)
-- [x] nightly-schedule-guard: globalize to ~/.claude/settings.json PreToolUse + remove local PreToolUse from settings.local.json
-- [x] wkdoctor: flutter-doctor-style health check tool (bin/wkdoctor.ps1 + wkdoctor.cmd), 10 checks, -Json flag, .gitignore exemption added
-- [x] wkdoctor: fix robustness -- remove all wkappbot subprocess calls (IPC stall), use PE VersionInfo + process check + file count instead
-- [x] wkdoctor: split check logic into wkappbot.hq/doctor/*.ps1 plugin modules; orchestrator dot-sources them; Opus adds healing logic per module
-- [x] wkdoctor: 04-config.ps1 heal path replaced setup.ps1 subprocess with inline JSON write (IPC stall fix)
-- [x] Codex tool wrappers: open-pipe stdin hang fixed in 8 wrappers; Write.ps1+Cmd.ps1 CLI fallback added
-- [x] wkjobs: add recursive ancestor walk for bash/sh under AI procs; show shell count in -Leaks mode
-- [x] screensaver: WKAPPBOT_NO_SCREENSAVER=1 set in Windows User env -- unset via reg delete or PS SetEnvironmentVariable (skill updated)
-- [x] screensaver: WipeBlockingOverlays() 30s periodic is correct (removes OTHER programs overlays); own screensaver closed only on explicit close cmd
-- [x] wkedit BOM bug: suggest filed (ID 1779706204.086049) -- adds BOM to files that had none
-- [x] build-skills-registry: BOM parse fix (strip 癤? + protected-branch push set to continue-on-error
-- [x] cdp-smoke: cdp open hangs 6min on auth-wall sites (claude/gemini/groq/perplexity/character-ai) -- fix: Core NavigateAsync 3s cap (32cef1d5d) + smoke --timeout 9s + workflow if:always log upload
-- [x] version bump v7.4.0-sdk: Directory.Build.props 7.3->7.4 + CLAUDE.md header v7.3.0->v7.4.0 + CHANGELOG.md fix
-- [x] cdp open slow on reuse: TryValidateAndCorrectPlacement preflight fast-path -- preflight within=True skips 5x150ms loop immediately
-- [x] cdp-reuse.yml: add full build pipeline (Chrome verify, .NET setup, bin cache, core fetch, Eye start)
-- [x] suggest triage: OperationCanceledException cluster (27 entries) pairwise-merged; MERGE*2 + CDP timeout 46-66 remain
-- [x] suggest triage: MERGE*2 entries all resolved; CDP timeout 22 entries blocked by CMD execution guard + CommandHelpMap missing
-- [x] nightly-heal 2026-05-26: skill audit + repo-health LITE (SECURITY 7.4.x, AGENTS/CLAUDE parity OK) + Pending dedupe done- [x] cdp open Chrome multiplication: FindRunningChromePortAny port-file guard fixed (registered>0 condition) -- Core 8819ed449 built+hot-swapped
-- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)- [x] taskkill --force PID: CDP port guard bypass fix committed (Core 9e62e69e7) [IMPL 2026-05-27]
-- [ ] taskkill /IM: auto-kill non-protected (ZOMBIE/UNKNOWN) + extended process info (CPU%/mem/handles/threads) + suggest resolve- [x] taskkill /IM auto-kill non-protected (Core 7aaeba959): ZOMBIE+UNKNOWN killed immediately like Windows taskkill; PROTECTED (Eye/screensaver/whisper-ring/mcp-from-eye) preserved + --force hint; per-process [NMB h=H t=T] metrics; suggest 2026-05-26T02:23:25 resolved HALF (evidence test-taskkill-im-autokill.sh PASS);skill taskkill-compat-shim v1.10
+- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)
+- [ ] taskkill /IM: extended process info (CPU%/mem/handles/threads) for a11y windows is OUT-OF-SCOPE separate command enhancement -- file own suggest
 - [ ] gg triage 2026-05-26: GPT-ranked backlog (24 urgent + 33 important). Priority order: H=suggest --dismiss-stale flag first (kills noise at source), then dedupe A(OperationCanceledException ~20)/B(CDP timeout ~12)/C(FOCUS-STEAL ~6)/I(CORE MERGEx2) clusters, then J(cdp open 6min hang)/G(WK_SKILL_LOCK cross-repo)/L(CDP cannot navigate)/E(IOException skill lock)/K(wkedit BOM)/F(--exec CommandHelpMap), D(taskkill ts=2026-05-26T02:23:25 confirm). Opus triage agent dispatched.
 - [ ] taskkill suggest 2026-05-26T02:23:25 full 2/2 confirm: needs DG-wkappbot-sdk main-CWD --confirm (worktree channel cannot self-confirm). REQ1 (a11y windows per-process pid/mem/handles/threads/cpu) is OUT-OF-SCOPE separate command enhancement -- file own suggest or address separately
-- [x] nightly-heal 2026-05-27 STEP 2: skill audit (3 ok, 54 cross-repo refs expected) + repo-health LITE (README sync, AGENTS parity, sections OK) + Pending dedupe + commit 4750ecfc
-- [x] nightly-heal 2026-05-27 STEP 2 (repeat): skill audit (3 ok, 54 expected) + repo-health LITE (README pending, AGENTS/CLAUDE parity OK, sections OK) + commit 871bd83b
-- [x] nightly-heal 2026-05-27 STEP 2 (3rd): skill audit 3ok/54expected/590norefs, repo-health LITE clean, commit 4544a346
+- [x] nightly-heal 2026-05-27 (x3): skill audit 3ok/54-cross-repo-expected/590norefs, repo-health LITE clean each run (commits 4750ecfc, 871bd83b, 4544a346)
 - [ ] gg workflow 2026-05-27: on-load, skill news, suggest list, ask gpt ranking, Opus triage pending
 - [ ] Chrome infinite multiplication bug: 21 windows (NOT reproduced in test; both cdp open calls reused port 9740 correctly). Previous fix in Core commit 8819ed449 (FindRunningChromePortAny port-file guard) appears active. SDK Placement.cs skill refs added for future debugging. May be environment-specific or timing-dependent.
 - [x] Chrome infinite multiplication bug investigation: added diagnostic check (MyCdpContext.ChromeHealthCheck.cs) to detect when >=5 Chrome processes exist before launch. Root cause confirmed as Core FindRunningChromePortAny guard (fixed in 8819ed449 but possibly not deployed). Next: verify Core binary deployment.
@@ -588,4 +508,4 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] wkjobs.ps1 PowerShell scoping bug: Test-HasAiAncestor($pid) parameter conflicted with built-in $pid automatic variable. Renamed parameter to $procId to avoid WriteError. File: D:/GitHub/WKAppBot/bin/wkjobs.ps1 (Core repo)
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
 - [ ] Chrome 60-process multiplication: detected during gg workflow (ask gpt command spawned 60 Chrome instead of 1-2). Suspect Eye auto-respawn loop OR Core FindRunningChromePortAny guard (8819ed449) not deployed. CRITICAL: blocks suggest triage. Opus investigation pending.
-- [ ] nightly-heal 2026-05-28: skill audit + repo health LITE + CLAUDE.md Pending compress + commit- [ ] nightly-heal 2026-05-28: skill audit + repo health LITE + CLAUDE.md Pending compress + commit
+- [x] nightly-heal 2026-05-28: skill audit (3ok/54 cross-repo expected/601 norefs -- all stale refs point to Core repo csharp/src, not SDK-owned) + repo-health LITE (README What's New v7.3->v7.4 fix, AGENTS/CLAUDE parity OK, no empty sections) + Pending compress (~84 [x] -> 10 topic summaries)

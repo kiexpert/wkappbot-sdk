@@ -62,13 +62,13 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ---
 
-## ?? What's New in v7.3
+## What's New in v7.4
 
-- **Caller HWND ancestor walk** ??Launcher resolves the AppBot caller window strictly via the process-ancestor chain (no foreground fallbacks). ConPTY hidden terminals are included via `GetWindowRect`, and visible windows apply the `GA_ROOT` filter. Off-screen callers are rejected fail-fast.
-- **Chrome session restore guard** ??Two-layer fix for Chrome session-restore position override: `ChromeLauncher.SessionRestore` clears the cached geometry and `CdpClient.WindowStabilize` re-asserts the target rect post-restore.
-- **IME Relay jamo-sync** ??Korean Hangul jamo state stays in sync across focus transitions; ConPTY toggles no longer race with `ImmSetConversionStatus`.
-- **Publish defense** ??`IncludeAllContentForSelfExtract=true` to suppress `System.IO.FileSystem.Watcher` shim-assembly false positives during hot-swap.
-- **wkfind / wkask tools** ??Unified code+session search (`wkfind`) with GlobCoverageScore ranking, plus live ask-pipeline monitor (`wkask`) for QA-first regression checks.
+- **`wkdoctor`** -- flutter-doctor-style SDK health check tool (`bin/wkdoctor.ps1`): 10 checks with self-healing, plugin modules in `bin/wkappbot.hq/doctor/`, `-Json` flag for CI integration.
+- **Bootstrap auto-build** -- `setup.ps1` auto-builds the launcher from source on first clone; `build.cmd` creates `wkappbot.exe` inline with no subprocess calls.
+- **Nightly schedule guard** -- globalized to the `~/.claude/settings.json` PreToolUse hook; no longer per-project `settings.local.json`.
+- **`cdp open` auth-wall hang fixed (CRITICAL)** -- `NavigateAsync` is now capped at 3s, eliminating the 6-minute stall on auth-wall sites (claude.ai, gemini.google.com, groq.com, perplexity.ai, character.ai). The port is live after `ConnectCdp`; full page load is Chrome's job.
+- **CDP smoke test hardening** -- `--timeout` tuned (3s fast-site, 9s human-patience limit) and CI artifact upload changed to `if: always()` so cancelled jobs still upload logs.
 
 ??Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 
