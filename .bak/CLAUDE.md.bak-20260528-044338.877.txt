@@ -588,4 +588,4 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] wkjobs.ps1 PowerShell scoping bug: Test-HasAiAncestor($pid) parameter conflicted with built-in $pid automatic variable. Renamed parameter to $procId to avoid WriteError. File: D:/GitHub/WKAppBot/bin/wkjobs.ps1 (Core repo)
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
 - [ ] Chrome 60-process multiplication: detected during gg workflow (ask gpt command spawned 60 Chrome instead of 1-2). Suspect Eye auto-respawn loop OR Core FindRunningChromePortAny guard (8819ed449) not deployed. CRITICAL: blocks suggest triage. Opus investigation pending.
-- [ ] nightly-heal 2026-05-28: skill audit + repo health LITE + CLAUDE.md Pending compress + commit- [ ] nightly-heal 2026-05-28: skill audit + repo health LITE + CLAUDE.md Pending compress + commit
+- [ ] nightly-heal 2026-05-28: skill audit + repo health LITE + CLAUDE.md Pending compress + commit

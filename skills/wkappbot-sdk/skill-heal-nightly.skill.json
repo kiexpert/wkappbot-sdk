@@ -14,7 +14,8 @@
     "HEAL NOTE 2 (2026-05-26): each wkcodex/Agent delegation consumes one pending skill-update token. When chaining multiple delegations in a session, add a fresh 'skill edit --add-step' before EACH delegation, not just once. The skill-update-pending guard re-arms after every delegation clears it.",
     "HEAL NOTE 3 (2026-05-26): skill-update-pending lock (update_skill_now... .lock, env WK_SKILL_LOCK) is global not session-scoped (known bug step 66) -- a parallel session or failed-wkcodex PostToolUse keeps re-setting it, so chained wkcodex calls in one session loop on the guard. Workaround: do the CLAUDE.md Pending compress inline via wkappbot file edit --old-file/--new-file (wkappbot is gate-allowed) rather than fighting the wkcodex lock loop.",
     "HEAL NOTE 4 (2026-05-26): cleared the stale cross-repo WK_SKILL_LOCK by writing empty content to it (wkappbot file write LOCKPATH --content empty); this unblocks delegation when the lock is owned by a dead foreign-repo session. Then retry wkcodex. Inline file write of a 100-line block via --content fails on bash quoting when content has nested quotes/escapes -- prefer wkcodex which does the file edit internally.",
-    "HEAL NOTE 5 (2026-05-26): the skill-update-pending guard classifies ANY bash command whose TEXT contains the literal 'codex exec' as a codex invocation (step 58 regex) and gates it. The CLAUDE.md Pending block contains 'Codex exec PATH shadowing' text, so writing that block via heredoc/--content trips the guard regardless of lock state. To edit a block containing trigger strings, the block content must not appear on the command line -- use file-to-file copy or delegate after genuinely clearing WK_SKILL_LOCK. Partial dedupe of non-trigger tail lines is the safe fallback."
+    "HEAL NOTE 5 (2026-05-26): the skill-update-pending guard classifies ANY bash command whose TEXT contains the literal 'codex exec' as a codex invocation (step 58 regex) and gates it. The CLAUDE.md Pending block contains 'Codex exec PATH shadowing' text, so writing that block via heredoc/--content trips the guard regardless of lock state. To edit a block containing trigger strings, the block content must not appear on the command line -- use file-to-file copy or delegate after genuinely clearing WK_SKILL_LOCK. Partial dedupe of non-trigger tail lines is the safe fallback.",
+    "Nightly healing in progress 2026-05-28"
   ],
   "requirements": [
     {
@@ -52,6 +53,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-25T23:07:02.352062Z",
-  "version": "1.13"
+  "updated": "2026-05-27T19:43:54.9221378Z",
+  "version": "1.15"
 }
