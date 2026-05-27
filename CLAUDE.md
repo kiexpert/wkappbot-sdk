@@ -368,6 +368,7 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 # NOTE: chrome-session-restore-position-fix skill is in Core repo -- register to HQ via skill contribute before adding here
 
 ## Gotchas
+- **CRITICAL: Zombie process accumulation under system lag** -- System lag → Eye IPC slow → suggest/ask commands hang → child wkappbot-core processes spawn but never exit → exponential accumulation overnight → system crash by morning. Mitigation: `powershell -File bin/zombie-watchdog.ps1 -MaxAge 45` runs continuously, killing processes older than 45s with no output. Root cause: Eye IPC timeout in suggest/ask flow needs timeout wrapper. Workaround: manually run `Get-Process wkappbot-core | Stop-Process -Force` to emergency-clean stale processes.
 - `suggest list` crashes with JsonException if a delta-comment wrote raw JSON into a string field. Workaround: `python3 -c "import json; [print(l[:80]) for l in open('suggestions.jsonl') if json.loads(l)]"` to read valid lines.
 - `wkappbot suggest` silently drops submit when PENDING CO-RESOLVE banner shows. Use `wkappbot-core.exe suggest "..."` to bypass.
 - `skill audit` shows FILE MISSING for `csharp/src/WKAppBot.*` paths ??expected in SDK repo (files live in the WKAppBot core repo). Not broken.
@@ -403,6 +404,9 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 
 ### CronCreate(cron="13 7 * * *", durable=true, recurring=true)
 wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
+
+### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
+powershell -File "D:\GitHub\wkappbot-sdk\bin\zombie-watchdog.ps1" -Interval 30 -MaxAge 45
 
 ## harness:safe CLAUDE\.md
 
@@ -467,6 +471,8 @@ wkappbot skill read wkharness-guards
 ## Pending
 
 <!-- compressed 2026-05-25: 60+ resolved items grouped by topic -->
+- [x] wk-gg-main.cmd: created comprehensive 12-stage workflow script (health check, git status, suggest backlog, GitHub issues, alert analysis, CLAUDE.md compliance check) -- committed 09758591
+- [ ] Chrome multiplication bug 2026-05-28: 32+ Chrome processes detected on cdp open. Core FindRunningChromePortAny guard (commit 8819ed449) appears not deployed or still broken -- Opus investigation pending
 - [x] CDP core [1][2][3][4][6][7][8][11]: cdp-wrong-Chrome, timeout, CommandHelpMap, auto-kill hidden Chrome -- all Core commits (1bafc6524)
 - [x] Fix [6] in Core: agents dispatched (wkclaude.sh background)
 - [x] Fix [3] in Core: agents dispatched (wkclaude.sh background)
