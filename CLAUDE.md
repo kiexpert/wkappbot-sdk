@@ -412,7 +412,7 @@ wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
 ## harness:block (?i)bash.*powershell|bash.*pwsh
 Use PowerShell tool directly
 
-## harness:done (?i)skipped|?앸왂|?섏뼱媛
+## harness:done (?i)skipped|완료|완성|끝
 Step may have been skipped -- verify all gg steps ran
 
 ## harness:block (?i)??write_file\(
