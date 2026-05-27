@@ -483,7 +483,7 @@ wkappbot skill read wkharness-guards                     # task -- harness guard
 - [x] harness:block multi-token pattern bug found: Get-HarnessRules \S+ truncates space-patterns; config.toml deny matchers are the real fix
 - [x] DenyNativeTool.ps1: blocks Codex native file tools, redirects to .cmd wrappers (eff966c)
 - [x] config.toml: apply_patch/write_file/create_file/read_file deny matchers before .* catch-all
-- [x] ask-gpt zombie watchdog: suggest filed (hard-kill at timeout+60s) [IMPL 2026-05-27]
+- [x] ask-gpt zombie watchdog: OOM watchdog implemented + deployed (c55bafd1: Program.AskGptWatchdog.cs, 2GB auto-kill on timeout+60s)
 - [x] Agent.cmd: accept plain CLI args like Claude Agent() -- Agent.cmd "prompt" [--model haiku]
 - [x] wkclaude-direct-guard: added to wkharness-guards.ps1 (forces Agent.cmd, blocks direct wkclaude calls)
 - [x] codex-recursive: blocked in default.rules (prefix_rule codex/codex.exe -- stops codex-to-codex recursion)
