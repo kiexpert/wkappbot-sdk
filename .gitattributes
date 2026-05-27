@@ -13,3 +13,6 @@
 *.exe binary
 *.dll binary
 *.zip binary
+# Normalize line endings and encoding
+*.md      text eol=lf working-tree-encoding=UTF-8 diff=markdown
+CLAUDE.md text eol=lf working-tree-encoding=UTF-8 diff=markdown
