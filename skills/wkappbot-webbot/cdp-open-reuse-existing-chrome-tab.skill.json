@@ -14,7 +14,8 @@
     "Port isolation: ports are SHA256-derived from git project root CWD. Each project gets a fixed 4-port block (e.g. 9300-9303). Never hardcode port numbers -- always use cdp open output.",
     "ROOT CAUSE (2026-05-26): Chrome multiplication bug in FindRunningChromePortAny. When port file expired/missing, every cdp open call creates a new Chrome because the port-file guard (registered!=port) evaluates 0!=foundPort=true and skips all Chrome processes. Fix committed to Core: change guard to (registered>0 && registered!=port) - missing port file = recovery mode, accept any Chrome under ourBase prefix.",
     "HARNESS BUILD PATTERN: wkappbot exec is the correct path to run dotnet/external tools when wk-only-gate blocks direct shell commands. Use: wkappbot exec 'C:/Program Files/dotnet/dotnet' publish <proj> -c Release",
-    "MULTIPLICATION ROOT CAUSE + FIX (2026-05-26, Core 577dc035b + a18790a75): cdp open was launching a NEW Chrome on every call (viral multiplication, whole 4-port block consumed per project) because GetLaunchedPort in ChromeLauncher.PortRegistry.cs probed the Window Property (WKAPPBOT_CDP_PORT_hash8) on the CALLER HWND FIRST -- but that HWND is unstable across ConPTY / Windows Terminal tabs, so it missed every time and fell through to launch. The on-disk port file also had a 24h mtime expiry that ignored long-lived Chrome. FIX: reordered GetLaunchedPort to read the project-hash DISK port file FIRST (caller-HWND-independent, survives terminal/tab/CLI churn), validated live by IsPortActiveAsync (delete file if dead); Window Property demoted to an optional secondary fast-path; removed the 24h mtime expiry (liveness-checked instead). Lesson: any per-project reuse key MUST be HWND-independent; keying reuse to the caller window guarantees duplication under ConPTY/WT."
+    "MULTIPLICATION ROOT CAUSE + FIX (2026-05-26, Core 577dc035b + a18790a75): cdp open was launching a NEW Chrome on every call (viral multiplication, whole 4-port block consumed per project) because GetLaunchedPort in ChromeLauncher.PortRegistry.cs probed the Window Property (WKAPPBOT_CDP_PORT_hash8) on the CALLER HWND FIRST -- but that HWND is unstable across ConPTY / Windows Terminal tabs, so it missed every time and fell through to launch. The on-disk port file also had a 24h mtime expiry that ignored long-lived Chrome. FIX: reordered GetLaunchedPort to read the project-hash DISK port file FIRST (caller-HWND-independent, survives terminal/tab/CLI churn), validated live by IsPortActiveAsync (delete file if dead); Window Property demoted to an optional secondary fast-path; removed the 24h mtime expiry (liveness-checked instead). Lesson: any per-project reuse key MUST be HWND-independent; keying reuse to the caller window guarantees duplication under ConPTY/WT.",
+    "3. VERIFY SESSION HEALTH (before troubleshooting): wkcdp-mon shows [PORT] [PID] [MEM] [TGT-POS] [ACT-POS] [DRIFT] [LAT]. Check: (1) DRIFT=OK means position stable, (2) LAT=0/0/0 means responsive, (3) MEM < 500M per session is healthy. If DRIFT shows d-###,### or LAT shows timeouts, Chrome window position may have drifted off-screen or session is hung. Use wkcdp-mon to diagnose before retrying cdp open."
   ],
   "requirements": [
     {
@@ -72,6 +73,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-06T01:18:00Z",
-  "updated": "2026-05-26T14:12:18.0179632Z",
-  "version": "1.7"
+  "updated": "2026-05-27T12:52:10.1293364Z",
+  "version": "1.9"
 }

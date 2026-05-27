@@ -1,0 +1,44 @@
+{
+  "id": "cdp-smoke-test",
+  "app": "wkappbot-webbot",
+  "title": "cdp-smoke-test",
+  "title_ko": null,
+  "desc": "CDP command smoke test: 10 subcommands in ~15s, reports PASS/FAIL",
+  "steps": [
+    "RUN: bash D:/GitHub/WKAppBot/bin/cdp-smoke-test.sh 2>/dev/null",
+    "TESTS: open --new-window, url, title, navigate, html, status, fetch, tabs, open-reuse, close",
+    "EXPECT: 10/10 pass under 20s",
+    "FAIL GUIDE: url-title empty=stdout bug. wrong tab=domain grap. open hangs=zombie Chrome",
+    "BASELINE: Before smoke test, run wkcdp-mon to establish baseline: record [PORT] [MEM] [LAT(avg)] for each session. After test, compare: (1) MEM growth > 100M/session = memory leak, (2) LAT spike > 50ms avg = performance regression, (3) DRIFT change = position handling issue, (4) extra procs in Get-Process chrome = zombie accumulation. wkcdp-mon baseline → test → post-test wkcdp-mon = complete health diagnostic."
+  ],
+  "requirements": [
+    {
+      "cmd": "bash D:/GitHub/WKAppBot/bin/cdp-smoke-test.sh 2>/dev/null",
+      "expect": "ALL PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp url {proc:'chrome',cdp:9980} 2>/dev/null",
+      "expect": "https://",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp navigate {proc:'chrome',cdp:9980,domain:'example.com'} https://ietf.org 2>/dev/null",
+      "expect": "Title:",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "test",
+    "smoke",
+    "regression"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T17:50:12.0495073Z",
+  "updated": "2026-05-27T12:52:19.3684835Z",
+  "version": "1.2"
+}

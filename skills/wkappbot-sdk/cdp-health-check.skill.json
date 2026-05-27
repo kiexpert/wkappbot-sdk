@@ -1,0 +1,42 @@
+{
+  "id": "cdp-health-check",
+  "app": "wkappbot-sdk",
+  "title": "CDP Health Check Monitor",
+  "title_ko": null,
+  "desc": "Detects Chrome multiplication, port leaks, Eye status, memory anomalies. Auto-alerts when thresholds exceeded.",
+  "steps": [
+    "Run: powershell D:/GitHub/wkappbot-sdk/bin/cdp-health-check.ps1 -Alert",
+    "Detects Chrome >5, ports >4, memory >500MB/session",
+    "Auto-fires wkappbot speak alert if anomaly found"
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell D:/GitHub/wkappbot-sdk/bin/cdp-health-check.ps1",
+      "expect": "[CHROME]",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell D:/GitHub/wkappbot-sdk/bin/cdp-health-check.ps1",
+      "expect": "[PORTS]",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell D:/GitHub/wkappbot-sdk/bin/cdp-health-check.ps1",
+      "expect": "All healthy|WARNINGS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "monitor",
+    "chrome",
+    "cdp",
+    "health"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-27T15:56:55.9091654Z",
+  "updated": "2026-05-27T15:56:55.9091745Z",
+  "version": "1.0"
+}
