@@ -85,29 +85,61 @@ if exist D:\GitHub\WkAutoQuant\.git (
     git log --oneline -3 2>nul
 )
 
-REM ============ SUMMARY ============
+REM ============ ALERT ANALYSIS ============
 cd /d D:\GitHub\wkappbot-sdk
 echo.
-echo ════════════════════════════════════════════
-echo ✅ wk-gg-main COMPLETE
-echo ════════════════════════════════════════════
+echo [ANALYZING ALERTS...]
+
+powershell -Command @"
+  `$critical = 0
+  `$warnings = @()
+
+  # Chrome check
+  `$chrome = @(Get-Process chrome -EA SilentlyContinue).Count
+  if (`$chrome -gt 5) { `$critical += 1; `$warnings += "Chrome: `$chrome processes" }
+
+  # Eye check
+  `$eye = @(Get-Process wkappbot-core -EA SilentlyContinue | Where-Object {`$_.CommandLine -match 'eye'}).Count
+  if (`$eye -eq 0) { `$critical += 1; `$warnings += "Eye: NOT RUNNING" }
+
+  # Port check
+  `$ports = (netstat -ano 2>$null | Select-String "973[0-9].*LISTEN" | Measure-Object).Count
+  if (`$ports -gt 4) { `$warnings += "Ports: `$ports active" }
+
+  # Display alerts
+  if (`$critical -eq 0 -and `$warnings.Count -eq 0) {
+    Write-Host "════════════════════════════════════════════" -ForegroundColor Green
+    Write-Host "✅ ALL SYSTEMS NOMINAL - NO ALERTS" -ForegroundColor Green
+    Write-Host "════════════════════════════════════════════" -ForegroundColor Green
+  } else {
+    Write-Host "════════════════════════════════════════════" -ForegroundColor Red
+    Write-Host "⚠️  ALERTS DETECTED - ACTION REQUIRED" -ForegroundColor Red
+    Write-Host "════════════════════════════════════════════" -ForegroundColor Red
+    if (`$critical -gt 0) {
+      Write-Host ""
+      Write-Host "🔴 CRITICAL (`$critical):" -ForegroundColor Red
+      `$warnings | ForEach-Object { Write-Host "   - `$_" }
+    }
+  }
+}
+"@
+
 echo.
-echo COLLECTED:
-echo   ✓ System health (Chrome, ports, Eye, memory)
-echo   ✓ Local git status ^& commits
-echo   ✓ CLAUDE.md Pending items count
-echo   ✓ Latest skill updates (7d)
-echo   ✓ Suggest backlog (긴급/중요)
-echo   ✓ Version audit (README/SECURITY/CLAUDE)
-echo   ✓ Repo health check
-echo   ✓ Cross-repo commits (Core/personal/WkAutoQuant)
+echo WORKFLOW SUMMARY:
+echo   ✓ System health checked
+echo   ✓ Git status collected
+echo   ✓ CLAUDE.md Pending items listed
+echo   ✓ Skill updates scanned
+echo   ✓ Suggest backlog collected
+echo   ✓ Version audit complete
+echo   ✓ Repo health verified
+echo   ✓ Cross-repo audited
 echo.
-echo READY FOR: Suggest ranking + triage
+echo NEXT: Suggest ranking + triage (use wkappbot ask gpt to rank)
 echo.
 
 REM Optional: background monitor
 if "%1"=="--watch" (
-    echo.
     echo Launching health monitor (Ctrl+C to exit)...
     powershell -File "D:\GitHub\wkappbot-sdk\bin\cdp-health-check.ps1" -Watch
 )
