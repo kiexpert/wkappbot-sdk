@@ -1,5 +1,5 @@
 @echo off
-REM wk-gg-main.cmd - Haiku main workflow: CDP health + suggest triage + repo status
+REM wk-gg-main.cmd - Main workflow: CDP health + suggest triage + repo status
 REM Collects all info needed for product quality decisions + suggest triage
 REM Usage: wk-gg-main [--watch]
 
@@ -7,7 +7,7 @@ setlocal enabledelayedexpansion
 
 echo.
 echo ============================================================
-echo   wk-gg-main: Comprehensive Status Report ^& Suggest Triage
+echo   wk-gg-main: Comprehensive Status Report
 echo   Time: %date% %time%
 echo ============================================================
 echo.
@@ -16,14 +16,14 @@ REM ============ 1. SYSTEM HEALTH ============
 echo [1/8] SYSTEM HEALTH
 powershell -File "D:\GitHub\wkappbot-sdk\bin\cdp-health-check.ps1" -Alert 2>nul
 if !errorlevel! equ 0 (
-    echo. ^& echo ✅ System healthy
+    echo System healthy
 ) else (
-    echo. ^& echo ⚠️ System health check warning
+    echo System health check warning
 )
 
 REM ============ 2. GIT STATUS ============
 echo.
-echo [2/8] GIT STATUS (last 5 commits ^& pending changes)
+echo [2/8] GIT STATUS (last 5 commits + pending changes)
 cd /d D:\GitHub\wkappbot-sdk
 git log --oneline -5 2>nul
 powershell -Command "git status --short 2>$null | Select-Object -First 10"
@@ -31,7 +31,7 @@ powershell -Command "git status --short 2>$null | Select-Object -First 10"
 REM ============ 3. CLAUDE.MD PENDING ============
 echo.
 echo [3/8] CLAUDE.MD PENDING ITEMS
-powershell -Command "(Select-String '^- \[.\]' D:\GitHub\wkappbot-sdk\CLAUDE.md -ErrorAction SilentlyContinue | Measure-Object).Count"
+powershell -Command "(Select-String '^- \[.\]' 'D:\GitHub\wkappbot-sdk\CLAUDE.md' -ErrorAction SilentlyContinue | Measure-Object).Count"
 echo pending items listed above
 
 REM ============ 4. SKILL NEWS ============
@@ -48,9 +48,9 @@ REM ============ 6. VERSION AUDIT ============
 echo.
 echo [6/8] VERSION AUDIT (sync check)
 echo Checking README/SECURITY/AGENTS/CLAUDE version consistency...
-powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\README.md -ErrorAction SilentlyContinue | Select-Object -First 1"
-powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\CLAUDE.md -ErrorAction SilentlyContinue | Select-Object -First 1"
-powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\csharp\src\WKAppBot.Launcher\Directory.Build.props -ErrorAction SilentlyContinue | Select-Object -First 1"
+powershell -Command "Select-String 'v7\.' 'D:\GitHub\wkappbot-sdk\README.md' -ErrorAction SilentlyContinue | Select-Object -First 1"
+powershell -Command "Select-String 'v7\.' 'D:\GitHub\wkappbot-sdk\CLAUDE.md' -ErrorAction SilentlyContinue | Select-Object -First 1"
+powershell -Command "Select-String 'v7\.' 'D:\GitHub\wkappbot-sdk\csharp\src\WKAppBot.Launcher\Directory.Build.props' -ErrorAction SilentlyContinue | Select-Object -First 1"
 
 REM ============ 7. REPO HEALTH ============
 echo.
@@ -89,8 +89,8 @@ REM ============ 9. SMOKE TESTS ============
 echo.
 echo [9/11] SMOKE TESTS
 if exist D:\GitHub\WKAppBot\bin\cdp-smoke-test.sh (
-    echo Running CDP smoke test...
-    echo (via: bash D:\GitHub\WKAppBot\bin\cdp-smoke-test.sh)
+    echo Smoke test available
+    echo (Run: bash D:\GitHub\WKAppBot\bin\cdp-smoke-test.sh)
 ) else (
     echo (no smoke test found)
 )
@@ -114,102 +114,95 @@ echo [11/12] GITHUB ISSUES + BUG REPORTS (daily)
 echo Recent open issues (last 7 days):
 powershell -Command "gh issue list --limit 10 --state open --search 'created:>2026-05-21' 2>$null | Select-Object -First 8"
 
-echo.
-echo Recent PR comments with 'bug' keyword:
-powershell -Command "gh pr list --limit 5 --state open 2>$null | ForEach-Object { gh pr view $_ --json comments --jq '.comments[] | select(.body | contains(\"bug\")) | .author.login + \": \" + .body' 2>$null | Select-Object -First 2 }"
+REM ============ RETURN TO SDK REPO ============
+cd /d D:\GitHub\wkappbot-sdk
 
 REM ============ ALERT ANALYSIS ============
-cd /d D:\GitHub\wkappbot-sdk
 echo.
 echo [12/12] ANALYZING ALERTS...
+echo.
 
 powershell -Command @"
-  `$critical = 0
-  `$warnings = @()
+[int]`$critical = 0
+[object[]]`$warnings = @()
 
-  # Chrome check
-  `$chrome = @(Get-Process chrome -EA SilentlyContinue).Count
-  if (`$chrome -gt 5) { `$critical += 1; `$warnings += "Chrome: `$chrome processes" }
+`$chrome = @(Get-Process chrome -ErrorAction SilentlyContinue).Count
+if (`$chrome -gt 5) { `$critical += 1; `$warnings += "Chrome: `$chrome processes" }
 
-  # Eye check
-  `$eye = @(Get-Process wkappbot-core -EA SilentlyContinue | Where-Object {`$_.CommandLine -match 'eye'}).Count
-  if (`$eye -eq 0) { `$critical += 1; `$warnings += "Eye: NOT RUNNING" }
+`$eye = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue | Where-Object {`$_.CommandLine -match 'eye'}).Count
+if (`$eye -eq 0) { `$critical += 1; `$warnings += "Eye: NOT RUNNING" }
 
-  # Port check
-  `$ports = (netstat -ano 2>$null | Select-String "973[0-9].*LISTEN" | Measure-Object).Count
-  if (`$ports -gt 4) { `$warnings += "Ports: `$ports active" }
+`$ports = (netstat -ano 2>$null | Select-String "973[0-9].*LISTEN" | Measure-Object).Count
+if (`$ports -gt 4) { `$warnings += "Ports: `$ports active" }
 
-  # Display alerts
-  if (`$critical -eq 0 -and `$warnings.Count -eq 0) {
-    Write-Host "════════════════════════════════════════════" -ForegroundColor Green
-    Write-Host "✅ ALL SYSTEMS NOMINAL - NO ALERTS" -ForegroundColor Green
-    Write-Host "════════════════════════════════════════════" -ForegroundColor Green
-  } else {
-    Write-Host "════════════════════════════════════════════" -ForegroundColor Red
-    Write-Host "⚠️  ALERTS DETECTED - ACTION REQUIRED" -ForegroundColor Red
-    Write-Host "════════════════════════════════════════════" -ForegroundColor Red
+if (`$critical -eq 0 -and `$warnings.Count -eq 0) {
+    Write-Host "============================================================" -ForegroundColor Green
+    Write-Host "All systems nominal - no alerts" -ForegroundColor Green
+    Write-Host "============================================================" -ForegroundColor Green
+} else {
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host "ALERTS DETECTED - ACTION REQUIRED" -ForegroundColor Red
+    Write-Host "============================================================" -ForegroundColor Red
     if (`$critical -gt 0) {
-      Write-Host ""
-      Write-Host "🔴 CRITICAL (`$critical):" -ForegroundColor Red
-      `$warnings | ForEach-Object { Write-Host "   - `$_" }
+        Write-Host ""
+        Write-Host "CRITICAL (`$critical):" -ForegroundColor Red
+        `$warnings | ForEach-Object { Write-Host "   - `$_" }
     }
-  }
 }
 "@
 
 echo.
 echo WORKFLOW SUMMARY:
-echo   ✓ System health checked
-echo   ✓ Git status collected
-echo   ✓ CLAUDE.md Pending items listed
-echo   ✓ Skill updates scanned
-echo   ✓ Suggest backlog collected
-echo   ✓ Version audit complete
-echo   ✓ Repo health verified
-echo   ✓ Cross-repo audited
-echo   ✓ Smoke tests executed
-echo   ✓ CI/CD status scanned
-echo   ✓ Bug reports collected
+echo   System health checked
+echo   Git status collected
+echo   CLAUDE.md Pending items listed
+echo   Skill updates scanned
+echo   Suggest backlog collected
+echo   Version audit complete
+echo   Repo health verified
+echo   Cross-repo audited
+echo   Smoke tests available
+echo   CI/CD status scanned
+echo   Bug reports collected
 echo.
 
 REM ============ VALIDATION: CLAUDE.md vs CMD ============
 echo.
-echo [VALIDATION] Checking CLAUDE.md gg Main Workflow compliance...
+echo [VALIDATION] Checking CLAUDE.md workflow compliance...
 echo.
 
 powershell -Command @"
-  `$defined = @(
+`$defined = @(
     'on-load',
     'skill news',
     'suggest list',
     '[MANDATORY] ask gpt ranking',
     'Opus triage',
     '[ON RELEASE] Public skill curation'
-  )
+)
 
-  `$implemented = @(
+`$implemented = @(
     'on-load',
     'skill news',
     'suggest list'
-  )
+)
 
-  `$missing = @()
-  foreach (`$step in `$defined) {
+`$missing = @()
+foreach (`$step in `$defined) {
     if (`$implemented -notcontains `$step) {
-      `$missing += `$step
+        `$missing += `$step
     }
-  }
+}
 
-  if (`$missing.Count -eq 0) {
-    Write-Host '✅ All CLAUDE.md gg steps implemented' -ForegroundColor Green
-  } else {
-    Write-Host '⚠️  MISSING IMPLEMENTATION:' -ForegroundColor Yellow
+if (`$missing.Count -eq 0) {
+    Write-Host 'All CLAUDE.md steps implemented' -ForegroundColor Green
+} else {
+    Write-Host 'MISSING IMPLEMENTATION:' -ForegroundColor Yellow
     foreach (`$item in `$missing) {
-      Write-Host "   - `$item" -ForegroundColor Yellow
+        Write-Host "   - `$item" -ForegroundColor Yellow
     }
     Write-Host ""
-    Write-Host "🔴 CRITICAL: [MANDATORY] 'ask gpt ranking' not implemented!" -ForegroundColor Red
-  }
+    Write-Host "CRITICAL: [MANDATORY] 'ask gpt ranking' not implemented!" -ForegroundColor Red
 }
 "@
 
