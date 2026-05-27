@@ -59,7 +59,7 @@ powershell -Command "wkappbot skill read repo-health-doctor 2>$null | Select-Obj
 
 REM ============ 8. CROSS-REPO AUDIT ============
 echo.
-echo [8/8] CROSS-REPO AUDIT (오지랖)
+echo [8/8] CROSS-REPO AUDIT (other repos)
 echo.
 
 REM Core repo
