@@ -6,10 +6,10 @@ REM Usage: wk-gg-main [--watch]
 setlocal enabledelayedexpansion
 
 echo.
-echo ╔════════════════════════════════════════════════════════════╗
-echo ║ wk-gg-main: Comprehensive Status Report ^& Suggest Triage ║
-echo ║ Time: %date% %time%                                     ║
-echo ╚════════════════════════════════════════════════════════════╝
+echo ============================================================
+echo   wk-gg-main: Comprehensive Status Report ^& Suggest Triage
+echo   Time: %date% %time%
+echo ============================================================
 echo.
 
 REM ============ 1. SYSTEM HEALTH ============
@@ -48,14 +48,14 @@ REM ============ 6. VERSION AUDIT ============
 echo.
 echo [6/8] VERSION AUDIT (sync check)
 echo Checking README/SECURITY/AGENTS/CLAUDE version consistency...
-findstr "v7\." D:\GitHub\wkappbot-sdk\README.md 2>nul | head -1
-findstr "v7\." D:\GitHub\wkappbot-sdk\CLAUDE.md 2>nul | head -1
-findstr "v7\." D:\GitHub\wkappbot-sdk\csharp\src\WKAppBot.Launcher\Directory.Build.props 2>nul | head -1
+powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\README.md -ErrorAction SilentlyContinue | Select-Object -First 1"
+powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\CLAUDE.md -ErrorAction SilentlyContinue | Select-Object -First 1"
+powershell -Command "Select-String 'v7\.' D:\GitHub\wkappbot-sdk\csharp\src\WKAppBot.Launcher\Directory.Build.props -ErrorAction SilentlyContinue | Select-Object -First 1"
 
 REM ============ 7. REPO HEALTH ============
 echo.
 echo [7/8] REPO HEALTH (on-load skill check)
-wkappbot skill read repo-health-doctor 2>nul | head -5
+powershell -Command "wkappbot skill read repo-health-doctor 2>$null | Select-Object -First 5"
 
 REM ============ 8. CROSS-REPO AUDIT ============
 echo.
