@@ -1,0 +1,52 @@
+{
+  "id": "sdk-gg-main-automation",
+  "app": "wkappbot-sdk",
+  "title": "gg-main: SDK Product Manager Main Duties Automation",
+  "title_ko": null,
+  "desc": "Proactive system health check for product quality & friction detection. Covers: Eye process count, Chrome multiplication, CI/build status, suggest backlog, CDP anomalies, release readiness. Works WITH Opus agent to detect and autonomously fix all discovered risks per escalation rules. Exit: 0=Green (ready), 1=Amber (issues). Runs every 3 hours via CronCreate with Opus auto-remediation.",
+  "steps": [
+    "Run: bash scripts/gg-main.sh or wk-gg-main.cmd from repo root",
+    "SECTION E (Eye): wkappbot-core should be 1-3. If >3: zombie lag possible",
+    "SECTION Z (Chrome): Chrome should be 1-3. If >5: multiplication bug (Core issue)",
+    "SECTION C (CI): Recent runs should all be 'completed success'. If fail: gh run view --log-failed",
+    "SECTION P (Suggests): Check urgent/important counts. High (>10): batch triage or file suggest",
+    "SECTION D (CDP): Red flags: Chrome>5, Eye>3 cores, Memory>2GB/session, off-screen TGT-POS",
+    "SECTION A (Remediation): Green=ready, Amber=issues detected. Resolve per escalation rules",
+    "SECTION R (Release): Before ship: version refs match across VERSIONING/README/CHANGELOG/SECURITY",
+    "AUTOMATION: If nightly-schedule enabled, runs 4x daily (04:13/05:13/06:13/07:13) via CronCreate",
+    "POST-ACTION: Log findings to suggest or CLAUDE.md Pending. Escalate to appropriate owner. Re-run after 5min if Amber",
+    "ENHANCED: Detects 8 issue categories (1)Chrome mult >5/critical >20 (2)Eye IPC lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout risk (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Color-coded alerts + exit codes: 0=Green 1=Warning 2=Critical"
+  ],
+  "requirements": [
+    {
+      "cmd": "bash scripts/gg-main.sh",
+      "expect": "===.*gg-main.*COMPLETE===.*Status:",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-gg-main.cmd",
+      "expect": "===.*gg-main.*COMPLETE===.*Status:",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File scripts/gg-main.ps1",
+      "expect": "===.*gg-main.*COMPLETE===.*Status:",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "automation",
+    "gg-workflow",
+    "health-check",
+    "product-quality",
+    "anomaly-detection"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T03:59:22.3966318Z",
+  "updated": "2026-05-28T04:06:55.5879493Z",
+  "version": "1.2"
+}

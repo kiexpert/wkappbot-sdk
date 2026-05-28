@@ -166,6 +166,63 @@ if ($WARNINGS.Count -gt 0) {
   Write-Host ""
 }
 
+# ============================================================================
+# AUTO-CLEANUP: Zombie Process Remediation
+# ============================================================================
+if ($CRITICAL_ALERTS.Count -gt 0 -or $WARNINGS.Count -gt 0) {
+  Write-Host "=== AUTO-CLEANUP: Zombie Process Removal ===" -ForegroundColor Magenta
+  Write-Host "[Attempting to clean zombie processes...]" -ForegroundColor Gray
+
+  $BEFORE_CHROME = $CHROME_COUNT
+  $BEFORE_CORE = $CORE_COUNT
+  $BEFORE_TOTAL = $total_procs
+
+  # Kill zombie wkappbot-core processes older than 30s with no recent activity
+  $zombie_killed = 0
+  Get-Process wkappbot-core -ErrorAction SilentlyContinue | ForEach-Object {
+    $age = (Get-Date) - $_.StartTime
+    if ($age.TotalSeconds -gt 30) {
+      try {
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        $zombie_killed++
+        Write-Host "  🗑️  Killed wkappbot-core PID $($_.Id) (age: $([math]::Round($age.TotalSeconds))s)" -ForegroundColor Gray
+      } catch {}
+    }
+  }
+
+  # Kill duplicate Chrome processes if >5
+  if ($CHROME_COUNT -gt 5) {
+    $chrome_list = Get-Process chrome -ErrorAction SilentlyContinue | Sort-Object StartTime
+    $keep_count = [math]::Min(2, $chrome_list.Count)
+    $chrome_list | Select-Object -Skip $keep_count | ForEach-Object {
+      try {
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        $zombie_killed++
+        Write-Host "  🗑️  Killed duplicate chrome PID $($_.Id)" -ForegroundColor Gray
+      } catch {}
+    }
+  }
+
+  Write-Host "  ✓ Cleanup complete: $zombie_killed processes removed" -ForegroundColor Green
+  Write-Host ""
+
+  # RE-CHECK SYSTEM STATUS AFTER CLEANUP
+  Write-Host "=== RE-VERIFICATION (After Cleanup) ===" -ForegroundColor Cyan
+
+  $CHROME_COUNT_NEW = @(Get-Process chrome -ErrorAction SilentlyContinue).Count
+  $CORE_COUNT_NEW = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue).Count
+  $total_procs_new = @(Get-Process wkappbot*, chrome -ErrorAction SilentlyContinue).Count
+
+  $chrome_delta = [math]::Max(0, $BEFORE_CHROME - $CHROME_COUNT_NEW)
+  $core_delta = [math]::Max(0, $BEFORE_CORE - $CORE_COUNT_NEW)
+  $total_delta = [math]::Max(0, $BEFORE_TOTAL - $total_procs_new)
+
+  Write-Host "Chrome: $BEFORE_CHROME → $CHROME_COUNT_NEW (↓$chrome_delta)" -ForegroundColor Green
+  Write-Host "Core: $BEFORE_CORE → $CORE_COUNT_NEW (↓$core_delta)" -ForegroundColor Green
+  Write-Host "Total: $BEFORE_TOTAL → $total_procs_new (↓$total_delta)" -ForegroundColor Green
+  Write-Host ""
+}
+
 if ($CRITICAL_ALERTS.Count -eq 0 -and $WARNINGS.Count -eq 0) {
   Write-Host "✅ ALL SYSTEMS GREEN - No issues detected" -ForegroundColor Green
   Write-Host ""
@@ -174,6 +231,6 @@ if ($CRITICAL_ALERTS.Count -eq 0 -and $WARNINGS.Count -eq 0) {
   Write-Host "Status: 🔴 CRITICAL - Immediate action required" -ForegroundColor Red
   exit 2
 } else {
-  Write-Host "Status: ⚠️  WARNING - Monitor closely" -ForegroundColor Yellow
+  Write-Host "Status: ⚠️  WARNING - Cleanup attempted, monitor next cycle" -ForegroundColor Yellow
   exit 1
 }
