@@ -36,7 +36,12 @@ function Kill-ProcessSafe {
         $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
         if ($proc) {
             Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
-            return $true
+            Start-Sleep -Milliseconds 300
+            if (!(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+            # Fallback: native taskkill
+& taskkill /F/PID $ProcessId 2>$null | Out-Null
+            Start-Sleep -Milliseconds 300
+            return !(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
         }
     } catch {}
     return $false
