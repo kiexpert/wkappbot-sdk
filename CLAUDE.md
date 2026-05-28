@@ -508,4 +508,5 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
+- [ ] gg workflow 2026-05-28 session 2: CronCreate 6/6 registered, Eye respawned (was dead), suggest triage: [3]=STALE-resolve, [2]=RESOLVED-resolve, [1]=STALE-resolve, [5]=FIXED-resolve, [4]=SKIP. Opus resolve agent dispatched.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
