@@ -509,12 +509,7 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
-- [x] DONE 2026-05-29: gg smoke loop step 0, wkask.ps1 12/16 bugs fixed, taskkill fallback fixed, .bak/ removed
-- [x] DONE: wkzombie -ExcludeFilter param added, CronCreate updated to skip mcp processes
-- [x] DONE: wkzombie.ps1 created in repo root (commit 57b29223). Relay to bin/zombie-watchdog.ps1. ./wkzombie.ps1 passes wk-only-gate (no dash in name). CronCreate updated to ./wkzombie.ps1 -MaxAge 45.
-- [x] DONE: wkzombie.ps1 singleton (cmdline search, all instances), CmdlineFilter param, wktaskkill.ps1 smart-kill (ZOMBIE+UNKNOWN auto-kill)
-- [x] DONE: wktaskkill.ps1 deleted -- redundant. Core v1.9 already auto-kills ZOMBIE+UNKNOWN via TaskkillAutoKillNonProtected()
+- [x] DONE (compressed 2026-05-29 cluster): wkzombie/taskkill cleanup -- wkzombie.ps1 root relay+singleton+CmdlineFilter+ExcludeFilter (commit 57b29223, CronCreate now ./wkzombie.ps1 -MaxAge 45 skipping mcp); wktaskkill.ps1 deleted as redundant (Core v1.9 TaskkillAutoKillNonProtected already auto-kills ZOMBIE+UNKNOWN); --dry-run added to wkappbot taskkill (Core 78e272ee2, Classify.cs WMI hang reverted); gg smoke loop step 0 + wkask.ps1 12/16 bugs fixed + .bak/ removed
 - [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
-- [x] DONE: --dry-run added to wkappbot taskkill (Core commit 78e272ee2). Classify.cs WMI hang reverted.
 - [ ] taskkill bash fix: All Process.GetProcessById calls now have Task.Run 100ms timeout (commits af807931e, c29bbd1b2). GetProcessCommandLine also wrapped. Build pending - Eye auto-build triggered by git commit. Test: wkappbot taskkill /IM bash.exe --dry-run should show bash processes.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)

@@ -16,7 +16,9 @@
     "AUTOMATION: If nightly-schedule enabled, runs 4x daily (04:13/05:13/06:13/07:13) via CronCreate",
     "POST-ACTION: Log findings to suggest or CLAUDE.md Pending. Escalate to appropriate owner. Re-run after 5min if Amber",
     "ENHANCED: Detects 8 issue categories (1)Chrome mult >5/critical >20 (2)Eye IPC lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout risk (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Color-coded alerts + exit codes: 0=Green 1=Warning 2=Critical",
-    "GUARD CASCADE FIX: wk-tool-skill-gate fires before wkcodex.sh -- read wk-ai-tools skill first. Pattern: wk-only-gate + stall-guard + opus-budget-guard all fire together when total pace > target. Escape path: wkcodex.sh (harness:safe) after reading wk-ai-tools. For zombie-watchdog: wkcodex.sh run powershell -File D:/GitHub/wkappbot-sdk/bin/zombie-watchdog.ps1 -Interval 30 -MaxAge 45"
+    "GUARD CASCADE FIX: wk-tool-skill-gate fires before wkcodex.sh -- read wk-ai-tools skill first. Pattern: wk-only-gate + stall-guard + opus-budget-guard all fire together when total pace > target. Escape path: wkcodex.sh (harness:safe) after reading wk-ai-tools. For zombie-watchdog: wkcodex.sh run powershell -File D:/GitHub/wkappbot-sdk/bin/zombie-watchdog.ps1 -Interval 30 -MaxAge 45",
+    "PRIMARY DUTY SMOKE LOOP (2026-05-29): Before all other gg steps, run smoke tests and loop until 0 errors: (1) wkappbot ask gpt 'say: test' -- verify CDP pipeline alive. (2) wkappbot taskkill /IM wkappbot-core.exe --dry-run -- verify classify works without hang. (3) wkjobs.sh -Leaks -- verify LEAKS=0. Show ALL errors as inline warnings. For each error: diagnose root cause, apply fix, rebuild if needed, retest. Only advance to next gg step when all 3 smoke tests pass clean. This is the main quality gate -- never skip even if time-consuming.",
+    "SMOKE LOOP ADDED TO GG STEP 0 (2026-05-29): Primary gg duty now starts with smoke test loop: (1) CDP ask gpt test (2) taskkill dry-run (3) wkjobs Leaks. Loop until 0 errors. MCP skip: wkzombie -ExcludeFilter mcp needed to avoid killing long-running MCP. zombie-watchdog taskkill fallback fixed to use native System32/taskkill.exe (was calling wkappbot shim). .bak/ removed from git tracking."
   ],
   "requirements": [
     {
@@ -48,6 +50,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T03:59:22.3966318Z",
-  "updated": "2026-05-28T06:10:37.4262751Z",
-  "version": "1.3"
+  "updated": "2026-05-28T17:32:45.8678486Z",
+  "version": "1.6"
 }
