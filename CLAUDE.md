@@ -513,4 +513,7 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] DONE: wkzombie.ps1 singleton (cmdline search, all instances), CmdlineFilter param, wktaskkill.ps1 smart-kill (ZOMBIE+UNKNOWN auto-kill)
 - [x] DONE: wktaskkill.ps1 deleted -- redundant. Core v1.9 already auto-kills ZOMBIE+UNKNOWN via TaskkillAutoKillNonProtected()
 - [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
+- [x] DONE: --dry-run added to wkappbot taskkill (Core commit 78e272ee2). Classify.cs WMI hang reverted.
+- [ ] FIX: IsDescendantOfAiProcess in TaskkillCompatCommand.Helpers.cs uses WMI ManagementObjectSearcher -> hangs PID 11940. Fix: replace GetParentProcessId with SafeGetParentPid (NativeAPI). Needed to unblock bash classification fix.
+- [ ] bash orphan classification: "claude" token removed -> bash=UNKNOWN -> IsDescendantOfAiProcess hang. Blocked pending WMI fix above.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
