@@ -509,4 +509,5 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
 - [ ] gg workflow 2026-05-28 session 2: CronCreate 6/6 registered, Eye respawned (was dead), suggest triage: [3]=STALE-resolve, [2]=RESOLVED-resolve, [1]=STALE-resolve, [5]=FIXED-resolve, [4]=SKIP. Opus resolve agent dispatched.
+- [ ] TODO: create wkzombie.ps1 + wkzombie.sh in repo root (pace-guard blocked file creation). Content: one-shot wkappbot-core zombie cleanup, param MaxAge=45. Use wkedit.sh or Write tool when pace normalizes. Then update CronCreate zombie-watchdog entry to use ./wkzombie.ps1 -MaxAge 45.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
