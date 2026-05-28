@@ -514,5 +514,5 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] DONE: wktaskkill.ps1 deleted -- redundant. Core v1.9 already auto-kills ZOMBIE+UNKNOWN via TaskkillAutoKillNonProtected()
 - [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
 - [x] DONE: --dry-run added to wkappbot taskkill (Core commit 78e272ee2). Classify.cs WMI hang reverted.
-- [ ] taskkill bash fix: FindCallingAiProcessPid PID-11940 hang. Root: NativeAPI too fast -> reaches 11940 "?" -> Process.GetProcessById hangs. WMI slower so hits cmd(74840) as AI first. Real fix: pid<=4 early exit + Process.GetProcessById timeout in FindCallingAiProcessPid. Committed reverts: 6e90967d2.
+- [ ] taskkill bash fix INCOMPLETE: SafeGetProcessName/SafeGetCreationTime/PidAlive/FindCallingAiProcessPid all need Task.Run 100ms wrapper on Process.GetProcessById. bash hangs in TaskkillBuildRow (commit ad0f381ac partial). Delegate to Opus next session (Thu after budget reset).
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
