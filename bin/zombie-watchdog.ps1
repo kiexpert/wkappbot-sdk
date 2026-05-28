@@ -5,10 +5,21 @@
 param(
     [int]$Interval = 30,      # Check interval (seconds)
     [int]$MaxAge = 60,        # Kill if older than N seconds (no log output in MaxAge window)
-    [switch]$DryRun = $false
+    [switch]$DryRun = $false,
+    [string]$CmdlineFilter = ""  # Filter: only kill if cmdline contains this string (empty=all)
 )
 
 $startTime = Get-Date
+$pidFile = "$env:TEMP\wkzombie.pid"
+if (Test-Path $pidFile) {
+    $oldPid = [int](Get-Content $pidFile -EA SilentlyContinue)
+    if ($oldPid -and (Get-Process -Id $oldPid -EA SilentlyContinue)) {
+        Stop-Process -Id $oldPid -Force -EA SilentlyContinue
+        Write-Host "[wkzombie] stopped previous instance PID $oldPid"
+    }
+    Remove-Item $pidFile -Force -EA SilentlyContinue
+}
+$PID | Set-Content $pidFile -Force
 $lastClean = Get-Date
 
 function Get-ProcessAge {
@@ -24,9 +35,14 @@ function Get-ProcessAge {
 }
 
 function Is-StaleZombie {
-    param([int]$ProcessId, [int]$MaxAgeThreshold)
+    param([int]$ProcessId, [int]$MaxAgeThreshold, [string]$CmdlineFilter = "")
     $age = Get-ProcessAge $ProcessId
-    return $age -ge $MaxAgeThreshold -and $age -gt 0
+    if ($age -lt $MaxAgeThreshold -or $age -le 0) { return $false }
+    if ($CmdlineFilter) {
+        $cmdl = (Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -EA SilentlyContinue).CommandLine
+        if (!$cmdl -or $cmdl -notlike "*$CmdlineFilter*") { return $false }
+    }
+    return $true
 }
 
 function Kill-ProcessSafe {
@@ -47,12 +63,12 @@ function Kill-ProcessSafe {
     return $false
 }
 
-Write-Host "🔷 Zombie watchdog started (MaxAge=${MaxAge}s, Interval=${Interval}s, DryRun=$DryRun)"
+Write-Host "🔷 Zombie watchdog started (MaxAge=${MaxAge}s, Interval=${Interval}s, DryRun=$DryRun$(if($CmdlineFilter){", Filter=*$CmdlineFilter*"}))"
 
 while ($true) {
     try {
-        $zombies = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue |
-                     Where-Object { Is-StaleZombie $_.Id $MaxAge })
+$zombies = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue |
+                     Where-Object { Is-StaleZombie $_.Id $MaxAge $CmdlineFilter })
 
         if ($zombies.Count -gt 0) {
             $killed = 0
