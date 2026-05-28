@@ -489,10 +489,11 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [ ] taskkill /IM: extended process info (CPU%/mem/handles/threads) for a11y windows is OUT-OF-SCOPE separate command enhancement -- file own suggest
 - [ ] gg triage 2026-05-26: GPT-ranked backlog (24 urgent + 33 important). Priority order: H=suggest --dismiss-stale flag first (kills noise at source), then dedupe A(OperationCanceledException ~20)/B(CDP timeout ~12)/C(FOCUS-STEAL ~6)/I(CORE MERGEx2) clusters, then J(cdp open 6min hang)/G(WK_SKILL_LOCK cross-repo)/L(CDP cannot navigate)/E(IOException skill lock)/K(wkedit BOM)/F(--exec CommandHelpMap), D(taskkill ts=2026-05-26T02:23:25 confirm). Opus triage agent dispatched.
 - [ ] taskkill suggest 2026-05-26T02:23:25 full 2/2 confirm: needs DG-wkappbot-sdk main-CWD --confirm (worktree channel cannot self-confirm). REQ1 (a11y windows per-process pid/mem/handles/threads/cpu) is OUT-OF-SCOPE separate command enhancement -- file own suggest or address separately
-- [ ] gg workflow 2026-05-28: on-load ✓, skill news ✓, suggest list ✓, ask gpt ranking BLOCKED (Chrome mult), Opus triage in progress
-  - [CRITICAL] [3] InvalidOperationException CDP option: diagnose root cause
-  - [HIGH] [2] Chrome placement drift: resolve (verified fix in place 2026-05-28)
-  - [MEDIUM] [1] ConnectAsync refused MERGE×2: investigate/merge stale
-  - [MEDIUM] [5] ask gpt timeout MERGE×2: root-cause Chrome multiplication
-  - [SKIP] [4] FOCUSLESS-HOMEWORK: Core-owned
+- [ ] gg workflow 2026-05-28: on-load ✓, skill news ✓, suggest list ✓, ask gpt ranking BLOCKED (Chrome mult), triage findings (suggest resolve IPC-blocked):
+  - [CRITICAL] [3] InvalidOperationException CDP option: STALE BUG-AUTO (user hardcoded port 9980, not code bug). Error message correct + actionable.
+  - [HIGH] [2] Chrome placement drift: RESOLVED in Core SetWindowBoundsWaitStableAsync. SDK validation in MyCdpContext.CallerValidation verified 2026-05-28.
+  - [MEDIUM] [1] ConnectAsync refused MERGE×2: Likely stale BUG-AUTO from 2026-05-27 high-load period. Needs investigate/merge.
+  - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
+  - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
+  - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
