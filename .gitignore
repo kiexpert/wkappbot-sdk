@@ -76,6 +76,8 @@ nul
 .vs/
 *.ps1
 !scripts/*.ps1
+.bak/
+.bak/
 !setup.ps1
 !wkzombie.ps1
 !wktaskkill.ps1
