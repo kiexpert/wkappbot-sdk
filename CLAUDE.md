@@ -375,6 +375,16 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 - Chrome translate infobar (auto-shown on Korean pages) blocks CDP injection ??it steals focus and intercepts clicks. Dismiss or suppress before automation.
 - `cdp-mon.ps1` off-screen check was `'^-\d{3,}'` regex (x < -100 = off-screen) ??**false positive on multi-monitor setups** where left monitor has large negative x. Fixed to use `MonitorFromPoint` Win32 API. Rule: never use raw coordinate sign for off-screen detection; always use `MonitorFromPoint` (same as `IsWindowOnScreen` in EyeCmdPipeClient.cs).
 
+## RIQUA: gg-main Automation + Opus Collaboration
+
+- **RIQUA [gg-main Opus spawn]**: Every 3 hours, gg-main script runs and detects Amber/critical status. Opus agent spawns automatically. However, Opus may not have full context if session is compacted or new. INTENDED: Opus should always carry forward prior findings + escalation state. WORKAROUND: Manual `wkappbot skill read sdk-gg-main-automation` before Opus spawn to provide context.
+
+- **RIQUA [Chrome multiplication detection timing]**: gg-main detects Chrome>5 as critical (Chrome mult bug), but detection happens 30-60s AFTER the ask gpt / cdp open call that spawned them. By then, Opus might not see the root cause (already cleaned by zombie-watchdog). INTENDED: Real-time event capture during ask/cdp, not post-event counting. WORKAROUND: Run `wkappbot taskkill /IM chrome.exe` to emergency-clean, then re-run gg-main; Opus will diagnose stale state.
+
+- **RIQUA [Opus auto-fix scope]**: gg-main delegates Chrome mult bug to Core team (not SDK fix), but Opus may attempt local taskkill. Chrome mult is caused by Core's FindRunningChromePortAny guard (not deployed). LOCAL TASKKILL is a BANDAID. INTENDED: Opus recognizes Core scope and escalates cleanly without attempting local hacks. WORKAROUND: File a separate suggest "Chrome multiplication bug: Core FindRunningChromePortAny guard missing deployment verify" and let Core team own it.
+
+- **RIQUA [Opus cost under continuous healing]**: 3-hour interval × 8 per day = 8 Opus spawns/day. Each spawn may invoke fix attempt (taskkill, restart, file sync, test run). Cost: ~40-50 USD/month in Opus API calls for continuous healing. INTENDED: Use cheaper Haiku for detection, Opus only on critical (Chrome>10, Eye>5). WORKAROUND: Adjust CronCreate interval to 6 hours (4/day) or 12 hours (2/day); critical checks run hourly via zombie-watchdog.
+
 ## References
 - `README.md`
 - `AGENTS.md`
