@@ -416,7 +416,7 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
 
 ### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
-./wkzombie.ps1 -MaxAge 45
+./wkzombie.ps1 -MaxAge 45 -ExcludeFilter mcp
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
@@ -509,7 +509,8 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
-- [x] DONE 2026-05-29: gg smoke loop added as primary duty (step 0) - CDP ask + taskkill dry-run + wkjobs Leaks. wkask.ps1 12/16 bugs fixed. zombie-watchdog taskkill fallback fixed (native path). .bak/ removed from git. uncle-process kill spec documented for Opus next session.
+- [x] DONE 2026-05-29: gg smoke loop step 0, wkask.ps1 12/16 bugs fixed, taskkill fallback fixed, .bak/ removed
+- [x] DONE: wkzombie -ExcludeFilter param added, CronCreate updated to skip mcp processes
 - [x] DONE: wkzombie.ps1 created in repo root (commit 57b29223). Relay to bin/zombie-watchdog.ps1. ./wkzombie.ps1 passes wk-only-gate (no dash in name). CronCreate updated to ./wkzombie.ps1 -MaxAge 45.
 - [x] DONE: wkzombie.ps1 singleton (cmdline search, all instances), CmdlineFilter param, wktaskkill.ps1 smart-kill (ZOMBIE+UNKNOWN auto-kill)
 - [x] DONE: wktaskkill.ps1 deleted -- redundant. Core v1.9 already auto-kills ZOMBIE+UNKNOWN via TaskkillAutoKillNonProtected()
