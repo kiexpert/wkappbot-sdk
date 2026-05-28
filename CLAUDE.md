@@ -311,10 +311,11 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ## gg Main Workflow
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
+0. **[CRITICAL FIRST] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories with immediate alerts). If exit code=2 (critical): escalate to Opus for emergency fixes. If exit code=1 (warning): log to CLAUDE.md Pending, continue workflow.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
 3. wkappbot suggest list
-4. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step
+4. [MANDATORY] Sonnet (YOU, main session) MUST run: wkappbot ask gpt "rank these suggests by impact/urgency/effort: <paste suggest list output>" -- do NOT skip or delegate this step (note: will timeout if Chrome>5 or Eye>3; rerun after fix)
 5. Agent(model:opus, prompt:'run wkappbot skill read suggest-workflow first, then triage this backlog using the GPT ranking already provided: <paste GPT ranking result>')
 6. [ON RELEASE] Public skill curation: Agent(model:opus, prompt:'run wkappbot skill read on-load + wkappbot skill read wkharness-guards + wkappbot skill read sdk-public-skill-index, then select non-confidential skills from all apps and register/update them under wkappbot-sdk with audience:user or audience:developer. Criteria: useful to global automation devs, no internal business secrets, no ops-only content.')
 
