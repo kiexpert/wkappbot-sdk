@@ -11,14 +11,16 @@ param(
 
 $startTime = Get-Date
 $pidFile = "$env:TEMP\wkzombie.pid"
-if (Test-Path $pidFile) {
-    $oldPid = [int](Get-Content $pidFile -EA SilentlyContinue)
-    if ($oldPid -and (Get-Process -Id $oldPid -EA SilentlyContinue)) {
-        Stop-Process -Id $oldPid -Force -EA SilentlyContinue
-        Write-Host "[wkzombie] stopped previous instance PID $oldPid"
-    }
-    Remove-Item $pidFile -Force -EA SilentlyContinue
+# Kill ALL previous zombie-watchdog instances by cmdline search
+$killed = @(Get-Process powershell, pwsh -EA SilentlyContinue | Where-Object {
+    $_.Id -ne $PID -and
+    (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -EA SilentlyContinue).CommandLine -like "*zombie-watchdog*"
+})
+foreach ($p in $killed) {
+    Stop-Process -Id $p.Id -Force -EA SilentlyContinue
+    Write-Host "[wkzombie] stopped old instance PID $($p.Id)"
 }
+if ($killed.Count -gt 0) { Write-Host "[wkzombie] cleared $($killed.Count) old instance(s)" }
 $PID | Set-Content $pidFile -Force
 $lastClean = Get-Date
 
