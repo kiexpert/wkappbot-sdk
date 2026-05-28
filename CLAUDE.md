@@ -437,7 +437,7 @@ Use Write.cmd or Edit.cmd instead of native write_file
 ## harness:block (?i)\bapply_patch\(
 Use Edit.cmd instead of native apply_patch
 
-## harness:block (?i)??read_file\(
+## harness:block (?i)\bread_file\(
 Use Read.cmd instead of native read_file
 
 ## harness:skill csharp/**/*MyCdpContext*.cs
