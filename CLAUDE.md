@@ -311,7 +311,8 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ## gg Main Workflow
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
-0. **[CRITICAL FIRST] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories with immediate alerts). If exit code=2 (critical): escalate to Opus for emergency fixes. If exit code=1 (warning): log to CLAUDE.md Pending, continue workflow.
+0. **[PRIMARY DUTY] Smoke test loop**: Run `wkappbot ask gpt "say: test"` + `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`. Show ALL errors/warnings inline. Loop (retry fix → retest) until 0 errors. Only advance when clean. This is the main recurring quality gate — never skip.
+0.5. **[CRITICAL] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories). exit=2 → Opus emergency fix. exit=1 → log Pending, continue.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
 3. wkappbot suggest list
@@ -508,7 +509,7 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
-- [ ] gg workflow 2026-05-28 session 2: CronCreate 6/6 registered, Eye respawned (was dead), suggest triage: [3]=STALE-resolve, [2]=RESOLVED-resolve, [1]=STALE-resolve, [5]=FIXED-resolve, [4]=SKIP. Opus resolve agent dispatched.
+- [x] DONE 2026-05-29: gg smoke loop added as primary duty (step 0) - CDP ask + taskkill dry-run + wkjobs Leaks. wkask.ps1 12/16 bugs fixed. zombie-watchdog taskkill fallback fixed (native path). .bak/ removed from git. uncle-process kill spec documented for Opus next session.
 - [x] DONE: wkzombie.ps1 created in repo root (commit 57b29223). Relay to bin/zombie-watchdog.ps1. ./wkzombie.ps1 passes wk-only-gate (no dash in name). CronCreate updated to ./wkzombie.ps1 -MaxAge 45.
 - [x] DONE: wkzombie.ps1 singleton (cmdline search, all instances), CmdlineFilter param, wktaskkill.ps1 smart-kill (ZOMBIE+UNKNOWN auto-kill)
 - [x] DONE: wktaskkill.ps1 deleted -- redundant. Core v1.9 already auto-kills ZOMBIE+UNKNOWN via TaskkillAutoKillNonProtected()
