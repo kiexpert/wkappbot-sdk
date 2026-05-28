@@ -17,7 +17,8 @@
     "HEAL NOTE 5 (2026-05-26): the skill-update-pending guard classifies ANY bash command whose TEXT contains the literal 'codex exec' as a codex invocation (step 58 regex) and gates it. The CLAUDE.md Pending block contains 'Codex exec PATH shadowing' text, so writing that block via heredoc/--content trips the guard regardless of lock state. To edit a block containing trigger strings, the block content must not appear on the command line -- use file-to-file copy or delegate after genuinely clearing WK_SKILL_LOCK. Partial dedupe of non-trigger tail lines is the safe fallback.",
     "Nightly healing in progress 2026-05-28",
     "SDK PROCESS CLEANUP TOOLS (2026-05-28, added for Haiku clarity): Two new wk* scripts in D:/GitHub/wkappbot-sdk/ root: (1) ./wkzombie.ps1 -MaxAge 45 -- kills wkappbot-core processes older than MaxAge seconds. Singleton: auto-kills previous instances first. -CmdlineFilter eye kills only eye-related zombies. -DryRun lists without killing. (2) ./wktaskkill.ps1 /IM wkappbot-core.exe -- smart wrapper: runs wkappbot taskkill classify then auto-kills ZOMBIE-classified processes. UNKNOWN stays PROTECTED by Core design (TaskkillCompatCommand.Classify.cs). Use wktaskkill for structured cleanup, wkzombie for age-based cleanup after Eye IPC hangs.",
-    "Nightly heal run 2026-05-29: session audit in progress."
+    "Nightly heal run 2026-05-29: session audit in progress.",
+    "Nightly heal run 2026-05-29 second pass: session audit in progress."
   ],
   "requirements": [
     {
@@ -55,6 +56,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-28T19:43:25.2400437Z",
-  "version": "1.17"
+  "updated": "2026-05-28T20:43:32.3899855Z",
+  "version": "1.19"
 }
