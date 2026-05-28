@@ -510,4 +510,7 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
 - [ ] gg workflow 2026-05-28 session 2: CronCreate 6/6 registered, Eye respawned (was dead), suggest triage: [3]=STALE-resolve, [2]=RESOLVED-resolve, [1]=STALE-resolve, [5]=FIXED-resolve, [4]=SKIP. Opus resolve agent dispatched.
 - [x] DONE: wkzombie.ps1 created in repo root (commit 57b29223). Relay to bin/zombie-watchdog.ps1. ./wkzombie.ps1 passes wk-only-gate (no dash in name). CronCreate updated to ./wkzombie.ps1 -MaxAge 45.
+- [x] DONE: wkzombie.ps1 singleton (cmdline search, all instances), CmdlineFilter param, wktaskkill.ps1 smart-kill (ZOMBIE+UNKNOWN auto-kill)
+- [ ] wktaskkill.ps1: verify against Core taskkill source, implement properly if output format differs
+- [ ] Suggest to Core: native --smart / --auto flag for wkappbot taskkill (ZOMBIE+UNKNOWN auto-kill without --force)
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
