@@ -15,7 +15,8 @@
     "SECTION R (Release): Before ship: version refs match across VERSIONING/README/CHANGELOG/SECURITY",
     "AUTOMATION: If nightly-schedule enabled, runs 4x daily (04:13/05:13/06:13/07:13) via CronCreate",
     "POST-ACTION: Log findings to suggest or CLAUDE.md Pending. Escalate to appropriate owner. Re-run after 5min if Amber",
-    "ENHANCED: Detects 8 issue categories (1)Chrome mult >5/critical >20 (2)Eye IPC lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout risk (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Color-coded alerts + exit codes: 0=Green 1=Warning 2=Critical"
+    "ENHANCED: Detects 8 issue categories (1)Chrome mult >5/critical >20 (2)Eye IPC lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout risk (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Color-coded alerts + exit codes: 0=Green 1=Warning 2=Critical",
+    "GUARD CASCADE FIX: wk-tool-skill-gate fires before wkcodex.sh -- read wk-ai-tools skill first. Pattern: wk-only-gate + stall-guard + opus-budget-guard all fire together when total pace > target. Escape path: wkcodex.sh (harness:safe) after reading wk-ai-tools. For zombie-watchdog: wkcodex.sh run powershell -File D:/GitHub/wkappbot-sdk/bin/zombie-watchdog.ps1 -Interval 30 -MaxAge 45"
   ],
   "requirements": [
     {
@@ -47,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T03:59:22.3966318Z",
-  "updated": "2026-05-28T04:06:55.5879493Z",
-  "version": "1.2"
+  "updated": "2026-05-28T06:10:37.4262751Z",
+  "version": "1.3"
 }

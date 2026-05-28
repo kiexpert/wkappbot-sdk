@@ -15,7 +15,8 @@
     "HEAL NOTE 3 (2026-05-26): skill-update-pending lock (update_skill_now... .lock, env WK_SKILL_LOCK) is global not session-scoped (known bug step 66) -- a parallel session or failed-wkcodex PostToolUse keeps re-setting it, so chained wkcodex calls in one session loop on the guard. Workaround: do the CLAUDE.md Pending compress inline via wkappbot file edit --old-file/--new-file (wkappbot is gate-allowed) rather than fighting the wkcodex lock loop.",
     "HEAL NOTE 4 (2026-05-26): cleared the stale cross-repo WK_SKILL_LOCK by writing empty content to it (wkappbot file write LOCKPATH --content empty); this unblocks delegation when the lock is owned by a dead foreign-repo session. Then retry wkcodex. Inline file write of a 100-line block via --content fails on bash quoting when content has nested quotes/escapes -- prefer wkcodex which does the file edit internally.",
     "HEAL NOTE 5 (2026-05-26): the skill-update-pending guard classifies ANY bash command whose TEXT contains the literal 'codex exec' as a codex invocation (step 58 regex) and gates it. The CLAUDE.md Pending block contains 'Codex exec PATH shadowing' text, so writing that block via heredoc/--content trips the guard regardless of lock state. To edit a block containing trigger strings, the block content must not appear on the command line -- use file-to-file copy or delegate after genuinely clearing WK_SKILL_LOCK. Partial dedupe of non-trigger tail lines is the safe fallback.",
-    "Nightly healing in progress 2026-05-28"
+    "Nightly healing in progress 2026-05-28",
+    "SDK PROCESS CLEANUP TOOLS (2026-05-28, added for Haiku clarity): Two new wk* scripts in D:/GitHub/wkappbot-sdk/ root: (1) ./wkzombie.ps1 -MaxAge 45 -- kills wkappbot-core processes older than MaxAge seconds. Singleton: auto-kills previous instances first. -CmdlineFilter eye kills only eye-related zombies. -DryRun lists without killing. (2) ./wktaskkill.ps1 /IM wkappbot-core.exe -- smart wrapper: runs wkappbot taskkill classify then auto-kills ZOMBIE-classified processes. UNKNOWN stays PROTECTED by Core design (TaskkillCompatCommand.Classify.cs). Use wktaskkill for structured cleanup, wkzombie for age-based cleanup after Eye IPC hangs."
   ],
   "requirements": [
     {
@@ -53,6 +54,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-27T19:43:54.9221378Z",
-  "version": "1.15"
+  "updated": "2026-05-28T08:46:40.6784001Z",
+  "version": "1.16"
 }

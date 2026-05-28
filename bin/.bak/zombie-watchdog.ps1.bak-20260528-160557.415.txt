@@ -5,23 +5,10 @@
 param(
     [int]$Interval = 30,      # Check interval (seconds)
     [int]$MaxAge = 60,        # Kill if older than N seconds (no log output in MaxAge window)
-    [switch]$DryRun = $false,
-    [string]$CmdlineFilter = ""  # Filter: only kill if cmdline contains this string (empty=all)
+    [switch]$DryRun = $false
 )
 
 $startTime = Get-Date
-$pidFile = "$env:TEMP\wkzombie.pid"
-# Kill ALL previous zombie-watchdog instances by cmdline search
-$killed = @(Get-Process powershell, pwsh -EA SilentlyContinue | Where-Object {
-    $_.Id -ne $PID -and
-    (Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -EA SilentlyContinue).CommandLine -like "*zombie-watchdog*"
-})
-foreach ($p in $killed) {
-    Stop-Process -Id $p.Id -Force -EA SilentlyContinue
-    Write-Host "[wkzombie] stopped old instance PID $($p.Id)"
-}
-if ($killed.Count -gt 0) { Write-Host "[wkzombie] cleared $($killed.Count) old instance(s)" }
-$PID | Set-Content $pidFile -Force
 $lastClean = Get-Date
 
 function Get-ProcessAge {
@@ -37,14 +24,9 @@ function Get-ProcessAge {
 }
 
 function Is-StaleZombie {
-    param([int]$ProcessId, [int]$MaxAgeThreshold, [string]$CmdlineFilter = "")
+    param([int]$ProcessId, [int]$MaxAgeThreshold)
     $age = Get-ProcessAge $ProcessId
-    if ($age -lt $MaxAgeThreshold -or $age -le 0) { return $false }
-    if ($CmdlineFilter) {
-        $cmdl = (Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -EA SilentlyContinue).CommandLine
-        if (!$cmdl -or $cmdl -notlike "*$CmdlineFilter*") { return $false }
-    }
-    return $true
+    return $age -ge $MaxAgeThreshold -and $age -gt 0
 }
 
 function Kill-ProcessSafe {
@@ -54,23 +36,18 @@ function Kill-ProcessSafe {
         $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
         if ($proc) {
             Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Milliseconds 300
-            if (!(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
-            # Fallback: native taskkill
-& "$env:SystemRoot/System32/taskkill.exe" /F /PID $ProcessId 2>$null | Out-Null
-            Start-Sleep -Milliseconds 300
-            return !(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)
+            return $true
         }
     } catch {}
     return $false
 }
 
-Write-Host "🔷 Zombie watchdog started (MaxAge=${MaxAge}s, Interval=${Interval}s, DryRun=$DryRun$(if($CmdlineFilter){", Filter=*$CmdlineFilter*"}))"
+Write-Host "🔷 Zombie watchdog started (MaxAge=${MaxAge}s, Interval=${Interval}s, DryRun=$DryRun)"
 
 while ($true) {
     try {
-$zombies = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue |
-                     Where-Object { Is-StaleZombie $_.Id $MaxAge $CmdlineFilter })
+        $zombies = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue |
+                     Where-Object { Is-StaleZombie $_.Id $MaxAge })
 
         if ($zombies.Count -gt 0) {
             $killed = 0
@@ -81,7 +58,7 @@ $zombies = @(Get-Process wkappbot-core -ErrorAction SilentlyContinue |
                     $cmdl = (Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -EA SilentlyContinue).CommandLine
                     if (Kill-ProcessSafe $proc.Id) {
                         $killed++
-                        Write-Host "  [KILL] $($proc.Name) PID $($proc.Id) age=$(Get-ProcessAge $proc.Id)s | $(if($cmdl){$cmdl.Substring(0,[Math]::Min(120,$cmdl.Length))}else{"(no cmdline)"})"
+                        Write-Host "  [KILL] PID $($proc.Id) age=$(Get-ProcessAge $proc.Id)s | $(if($cmdl){$cmdl.Substring(0,[Math]::Min(120,$cmdl.Length))}else{"(no cmdline)"})"
                     }
                 }
             }

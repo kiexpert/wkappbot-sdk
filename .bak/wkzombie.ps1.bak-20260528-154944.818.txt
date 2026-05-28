@@ -1,0 +1,1 @@
+& "$PSScriptRoot/bin/zombie-watchdog.ps1" @args

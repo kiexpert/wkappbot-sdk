@@ -1,0 +1,1 @@
+& "C:/Program Files/dotnet/dotnet" publish "D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj" -c Release --verbosity minimal
