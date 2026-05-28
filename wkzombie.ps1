@@ -1,7 +1,7 @@
 # wkzombie.ps1 -- one-shot zombie cleanup (wk*-safe). Use -ExcludeFilter to skip services (e.g. mcp).
 param([int]$MaxAge=45,[switch]$DryRun,[string]$CmdlineFilter="",[string]$ExcludeFilter="")
 $z=@(Get-Process wkappbot-core -EA SilentlyContinue|Where-Object{
-    $age=[int]((Get-Date)-$_.StartTime).TotalSeconds
+$age=try{[int]((Get-Date)-$_.StartTime).TotalSeconds}catch{-1}
     if($age-lt$MaxAge){return $false}
     if($CmdlineFilter){
         $cmd=(Get-CimInstance Win32_Process -Filter "ProcessId=$($_.Id)" -EA 0).CommandLine
@@ -15,7 +15,7 @@ $z=@(Get-Process wkappbot-core -EA SilentlyContinue|Where-Object{
 })
 if(!$z.Count){Write-Host "[wkzombie] clean (0 zombies, MaxAge=${MaxAge}s)";exit 0}
 foreach($p in $z){
-    $age=[int]((Get-Date)-$p.StartTime).TotalSeconds
+$age=try{[int]((Get-Date)-$p.StartTime).TotalSeconds}catch{0}
     $cmd=(Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -EA 0).CommandLine
     $short=if($cmd){$cmd.Substring(0,[Math]::Min(100,$cmd.Length))}else{"(no cmdline)"}
     if($DryRun){Write-Host "[wkzombie] DRY PID $($p.Id) $($p.Name) age=${age}s | $short"}
