@@ -431,10 +431,10 @@ Use PowerShell tool directly
 ## harness:done (?i)skipped|완료|완성|끝
 Step may have been skipped -- verify all gg steps ran
 
-## harness:block (?i)??write_file\(
+## harness:block (?i)\bwrite_file\(
 Use Write.cmd or Edit.cmd instead of native write_file
 
-## harness:block (?i)??apply_patch\(
+## harness:block (?i)\bapply_patch\(
 Use Edit.cmd instead of native apply_patch
 
 ## harness:block (?i)??read_file\(
