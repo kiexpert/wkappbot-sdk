@@ -415,7 +415,7 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
 
 ### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
-powershell -File "D:\GitHub\wkappbot-sdk\bin\zombie-watchdog.ps1" -Interval 30 -MaxAge 45
+./wkzombie.ps1 -MaxAge 45
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
