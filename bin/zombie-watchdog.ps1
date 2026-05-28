@@ -58,7 +58,7 @@ while ($true) {
                     $cmdl = (Get-CimInstance Win32_Process -Filter "ProcessId=$($proc.Id)" -EA SilentlyContinue).CommandLine
                     if (Kill-ProcessSafe $proc.Id) {
                         $killed++
-                        Write-Host "  [KILL] PID $($proc.Id) age=$(Get-ProcessAge $proc.Id)s | $(if($cmdl){$cmdl.Substring(0,[Math]::Min(120,$cmdl.Length))}else{"(no cmdline)"})"
+                        Write-Host "  [KILL] $($proc.Name) PID $($proc.Id) age=$(Get-ProcessAge $proc.Id)s | $(if($cmdl){$cmdl.Substring(0,[Math]::Min(120,$cmdl.Length))}else{"(no cmdline)"})"
                     }
                 }
             }
