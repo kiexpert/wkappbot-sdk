@@ -493,7 +493,78 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 
 - [x] overnight-bugfix-release: DONE 2026-05-30. wkask.sh exec stray `\n` fixed (single-line exec), wkask.ps1 colour-helper mojibake -> ASCII tags, wkcdp-mon.ps1 Invoke-KillIdle off-screen via MonitorFromPoint (multi-monitor safe), wkzombie.ps1 null StartTime safe-skip verified, wkci.sh +x set; bumped SDK to v7.5.0-sdk (CHANGELOG/VERSIONING/README/SECURITY/CLAUDE.md); WKAppBot core commit 41f722f49; GitHub release v7.5.0-sdk. <task-id>b8gg2us89</task-id>
 
-<!-- compressed 2026-05-30 nightly-heal: 76 v7.5 release detail items grouped into the overnight-bugfix-release summary above; raw history in git -->
+<!-- compressed 2026-05-30 nightly-heal: 76 v7.5 release detail items; raw history in git -->
+- [x] wkask.ps1 BUG-1: skip 2s warmup on warm Chrome reuse
+- [x] wkask.ps1 BUG-2: smart streaming composer button re-enable wait
+- [x] wkask.ps1 BUG-3: text stability poll fallback for streaming
+- [x] wkask.ps1 BUG-4: cdp open timeout root cause logged
+- [x] wkask.ps1 BUG-5: duplicate submit check lines 293-296 removed
+- [x] wkask.ps1 BUG-6: duplicate submit check lines 312-317 removed
+- [x] wkask.ps1 BUG-7: submit invoke 3s timeout + warn on failure
+- [x] wkask.ps1 BUG-8: cdp close cleanup on timeout exit
+- [x] wkask.ps1: mojibake colour-helper -> ASCII [OK]/[INFO]/[WARN]/[ERR]
+- [x] wkask.ps1: inputPatterns and submit grap audited clean
+- [x] wkask.ps1: cdp open warm path tab reuse optimization
+- [x] wkask.sh: \n literal bug identified (Bypass \n -File = broken)
+- [x] wkask.sh: fix committed standalone (c9ef90241 WKAppBot repo)
+- [x] wkask.sh: final single-line exec confirmed in 41f722f49
+- [x] wkask.sh: Write tool baseline fix applied (7a5470c58 WKAppBot)
+- [x] wkcdp-mon: age>2h force-kill regardless of LAT status
+- [x] wkcdp-mon: off-screen bypass LAT when age>30m
+- [x] wkcdp-mon: CWD fallback from --user-data-dir arg
+- [x] wkcdp-mon: header format fix
+- [x] wkcdp-mon: MonitorFromPoint multi-monitor off-screen (41f722f49)
+- [x] wkzombie: ExcludeFilter flag (-ExcludeFilter mcp)
+- [x] wkzombie: null StartTime try/catch -> age=-1 skip
+- [x] wkzombie: CmdlineFilter flag
+- [x] wkzombie: singleton guard prevents double instances
+- [x] wkzombie: root relay log
+- [x] wkci.sh: created CI health check script
+- [x] wkci.sh: --details flag for job/step level warnings
+- [x] wkci.sh: skill refs on warning output
+- [x] wkci.sh: executable bit 100755
+- [x] CronCreate: wkcdp-mon.sh -KillForeign hourly at :37
+- [x] CronCreate: wkzombie.ps1 every 5min -MaxAge 45 -ExcludeFilter mcp
+- [x] CronCreate: gg-main every 3h Amber/critical -> Opus spawn
+- [x] CronCreate: 4 nightly skill-heal schedules 04-07:13
+- [x] Chrome auto-cleanup: gg-main-enhanced >5 -> kill duplicates keep 2
+- [x] Chrome DiagnoseExcessiveChromeProcesses SDK-side
+- [x] Chrome CleanExcessiveChromeProcesses keep 2 oldest
+- [x] harness:skill lock: ChromeLauncher.Kill.cs added
+- [x] CDP smoke port-separation fix (project-assigned port)
+- [x] gg step 0: CDP 1-second rule smoke test documented
+- [x] gg step 0: wkcdp-mon.sh -KillForeign as first step
+- [x] gg step 0: wkask.sh gpt "say: test" -Timeout 10 rule
+- [x] gg step 0.5: gg-main-enhanced.ps1 8-category health check
+- [x] taskkill --dry-run: flag added (Core 78e272ee2)
+- [x] taskkill: claude removed from _wkProtectedTokens
+- [x] taskkill: AI CLI image-name check added
+- [x] taskkill: WMI hang PID 11940 documented
+- [x] taskkill: thread pool deadlock Task.Run analyzed
+- [x] suggest: ChromeLauncher graceful close filed
+- [x] suggest: cdp open >1s Core bug filed
+- [x] RIQUA: Chrome multiplication fix deployed 2026-05-28
+- [x] RIQUA: Opus cost reduction (5-min watchdog removed)
+- [x] RIQUA: gg-main Opus spawn context updated
+- [x] CLAUDE.md: harness:skill lock ChromeLauncher.Kill.cs
+- [x] CLAUDE.md: version v7.4.0 -> v7.5.0
+- [x] CHANGELOG.md: v7.5.0-sdk section added
+- [x] VERSIONING.md: current-version v7.5.0-sdk
+- [x] README.md: What's New v7.5 updated
+- [x] SECURITY.md: supported-versions v7.5 updated
+- [x] gh release: v7.5.0-sdk created and pushed
+- [x] WKAppBot 41f722f49: wkask+wkcdp-mon+wkask.sh (local, large-file push blocked)
+- [x] pending-protect: task-id added to overnight entry
+- [x] pending-protect: 72 session items restored as [x] block
+- [x] harness baseline analysis: 103 items from prior session on-disk
+- [x] gg workflow ask gpt ranking: BLOCKED Chrome mult, documented
+- [x] gg workflow Opus triage: dispatched for suggest backlog
+- [x] suggest triage 2026-05-29: [3]=STALE [2]=RESOLVED [1]=investigate
+- [x] skill news checked before suggests
+- [x] on-load session checklist run
+- [x] nightly-heal pass1: skill audit + compress 86->15 (699f0afc)
+- [x] nightly-heal pass2: 3ok/54-cross-repo/622-norefs; v7.5 OK (c48e0add)
+- [x] wkcdp-mon KillForeign: 50 Chrome detected 2026-05-30 gg-main-enhanced cleaned 54 procs -> 1 session remaining
 - [x] DONE (compressed v7.5 release 2026-05-30): wkask.ps1 8 bugs (warmup-skip, smart-streaming-wait, button/text-stability poll, cascade-timeout root cause log, dup-submit-check removal x2, invoke-timeout, cdp-close cleanup) + ASCII tags + warm reuse fast-path; wkask.sh \n literal exec fix (final commit 41f722f49); wkcdp-mon (age>2h force-kill, off-screen+stale kill, CWD fallback, header, MonitorFromPoint multi-monitor); wkzombie (ExcludeFilter, null-StartTime safe, CmdlineFilter, singleton, root relay); wkci.sh (--details, skill refs, +x); CronCreate (KillForeign hourly, wkzombie 5min, gg-main 3h, 4x nightly heal); Chrome multiplication (MyCdpContext.ChromeHealthCheck Diagnose+Clean, gg-main-enhanced integration); harness:skill ChromeLauncher.Kill.cs lock; CDP smoke port-separation; gg step 0/0.5 (1s rule, KillForeign first, scripts/gg-main-enhanced.ps1); taskkill (--dry-run, AI CLI image-name protect, claude/codex/gemini); 3 suggests filed; RIQUA blocks updated x3; doc bump v7.4->v7.5 (CLAUDE/CHANGELOG/VERSIONING/README/SECURITY); gh release v7.5.0-sdk; pending-protect baseline analysis + task-id; gg step 4/5 + suggest triage 2026-05-29
 - [x] nightly-heal 2026-05-30: skill audit 3ok/54-stale-cross-repo-expected/622-norefs; repo-health LITE OK (version sync 7.5 across all docs); Pending compressed 86->15 items
 - [x] nightly-heal 2026-05-30 pass2: skill audit 3ok/54-cross-repo/622-norefs; version sync v7.5 OK; no compress needed (count already at threshold)
