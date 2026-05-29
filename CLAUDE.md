@@ -311,7 +311,7 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ## gg Main Workflow
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
-0. **[PRIMARY DUTY] Smoke test loop**: Run `wkappbot ask gpt "say: test"` + `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`. Show ALL errors/warnings inline. Loop (retry fix → retest) until 0 errors. Only advance when clean. This is the main recurring quality gate — never skip.
+0. **[PRIMARY DUTY] Smoke test loop**: `wkcdp-mon.sh -KillForeign` (Chrome cleanup first) + `wkappbot ask gpt "say: test"` + `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`. Show ALL errors/warnings inline. Loop (retry fix → retest) until 0 errors. Only advance when clean.
 0.5. **[CRITICAL] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories). exit=2 → Opus emergency fix. exit=1 → log Pending, continue.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
@@ -417,6 +417,9 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 
 ### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
 ./wkzombie.ps1 -MaxAge 45 -ExcludeFilter mcp
+
+### CronCreate(cron="37 * * * *", durable=true, recurring=true)
+wkcdp-mon.sh -KillForeign
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
