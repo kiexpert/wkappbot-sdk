@@ -516,5 +516,6 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
 - [x] DONE 2026-05-29: nightly skill heal pass1 (ed787ad2) + pass2 (audit 3ok/54-cross-repo-expected/616-norefs; version sync 7.4 across VERSIONING/README/CHANGELOG/SECURITY; Pending [x]=6 below compress threshold). taskkill --dry-run working. wkzombie -ExcludeFilter mcp added.
 - [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
-- [x] DONE: nightly heals pass1-4 2026-05-29 (ed787ad2, 292b386a, 020e849b). 3 ok/54 cross-repo stale.
+- [x] DONE: nightly heals pass1-4, chrome hourly KillForeign CronCreate, CDP CI rate-limit fixed (gh run rerun), leelw-markany collaborator, wkci.sh CI health check script.
+- [ ] wkci.sh: needs git commit after file creation
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
