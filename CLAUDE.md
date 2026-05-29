@@ -491,8 +491,83 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 
 ## Pending
 
-- [x] DONE 2026-05-30 overnight-bugfix-release: wkask.sh exec stray `\n` fixed, wkask.ps1 colour-helper mojibake -> ASCII tags, wkcdp-mon.ps1 Invoke-KillIdle off-screen via MonitorFromPoint, wkzombie.ps1 null StartTime safe-skip verified, wkci.sh +x set; bumped SDK to v7.5.0-sdk (CHANGELOG/VERSIONING/README/SECURITY/CLAUDE.md); WKAppBot core commit 41f722f49 (push blocked by pre-existing large-file commits unrelated to release); GitHub release v7.5.0-sdk
+- [x] overnight-bugfix-release: DONE 2026-05-30. wkask.sh exec stray `\n` fixed (single-line exec), wkask.ps1 colour-helper mojibake -> ASCII tags, wkcdp-mon.ps1 Invoke-KillIdle off-screen via MonitorFromPoint (multi-monitor safe), wkzombie.ps1 null StartTime safe-skip verified, wkci.sh +x set; bumped SDK to v7.5.0-sdk (CHANGELOG/VERSIONING/README/SECURITY/CLAUDE.md); WKAppBot core commit 41f722f49; GitHub release v7.5.0-sdk. <task-id>b8gg2us89</task-id>
 
+<!-- compressed 2026-05-30: overnight session work items restored from session JSONL baseline -->
+- [x] wkask.ps1 BUG-1: skip 2s warmup delay when Chrome already warm (fresh-launch detection)
+- [x] wkask.ps1 BUG-2: smart streaming wait -- monitor composer button re-enable instead of blind 15s sleep
+- [x] wkask.ps1 BUG-3: smart streaming wait fallback -- text stability poll when button-wait unavailable
+- [x] wkask.ps1 BUG-4: cascading timeout root cause -- cdp open fail now logs root cause before chaining
+- [x] wkask.ps1 BUG-5: remove duplicate submit check at lines 293-296 (deadlock risk on double invoke)
+- [x] wkask.ps1 BUG-6: remove duplicate submit check at lines 312-317 (same pattern, different block)
+- [x] wkask.ps1 BUG-7: submit invoke timeout 3s + warn on failure instead of silent skip
+- [x] wkask.ps1 BUG-8: cdp close cleanup on timeout exit -- prevents tab accumulation on hang
+- [x] wkask.ps1: replace mojibake colour-helper prefixes with clean ASCII [OK]/[INFO]/[WARN]/[ERR]/== tags
+- [x] wkask.ps1: inputPatterns and submit grap patterns audited -- no corrupted Korean found in committed version
+- [x] wkask.ps1: streaming wait logic complete -- all 8 identified bugs addressed
+- [x] wkask.ps1: cdp open warm path optimization -- reuse existing Chrome tab when already on target URL
+- [x] wkask.sh: exec line \n literal bug identified (literal backslash-n between Bypass and -File)
+- [x] wkask.sh: fix attempt 1 -- Edit tool single-line exec (applied, reverted by next add/commit)
+- [x] wkask.sh: fix attempt 2 -- Write tool single-line (blocked by pending-protect)
+- [x] wkask.sh: fix attempt 3 -- applied and committed as standalone (c9ef90241 in WKAppBot repo)
+- [x] wkask.sh: verified single-line exec in final overnight commit 41f722f49
+- [x] wkcdp-mon: age>2h force-kill regardless of LAT status (prevent zombie Chrome accumulation)
+- [x] wkcdp-mon: off-screen Chrome bypass LAT condition when age>30m (off-screen + stale = kill)
+- [x] wkcdp-mon: CWD fallback from --user-data-dir arg for unknown/unknown project paths
+- [x] wkcdp-mon: header fix for consistent output format
+- [x] wkcdp-mon: MonitorFromPoint (WkWin32::IsOnAnyMonitor) replaces negative-coord regex for off-screen
+- [x] wkzombie: ExcludeFilter flag -- skip processes matching filter (e.g., -ExcludeFilter mcp)
+- [x] wkzombie: null StartTime safe handling -- try/catch returns age=-1 to skip inaccessible processes
+- [x] wkzombie: CmdlineFilter flag -- only kill processes whose cmdline matches pattern
+- [x] wkzombie: singleton guard -- prevents multiple simultaneous watchdog instances
+- [x] wkzombie: root relay -- logs kills to root-level log file for auditability
+- [x] wkci.sh: created CI health check script with run-level pass/fail reporting
+- [x] wkci.sh: --details flag for job/step level warning detection (not just top-level run status)
+- [x] wkci.sh: skill refs on warning output (guides user to fix relevant skills)
+- [x] wkci.sh: executable bit set to 100755 (was 100644)
+- [x] CronCreate: wkcdp-mon.sh -KillForeign every hour at :37 (prevents Chrome accumulation)
+- [x] CronCreate: wkzombie.ps1 every 5 minutes (-MaxAge 45 -ExcludeFilter mcp)
+- [x] CronCreate: gg-main health check every 3 hours (Amber/critical -> Opus spawn)
+- [x] CronCreate: 4 nightly skill-heal schedules at 04:13, 05:13, 06:13, 07:13
+- [x] Chrome multiplication auto-cleanup: gg-main-enhanced.ps1 detects >5 Chrome + kills duplicates
+- [x] Chrome DiagnoseExcessiveChromeProcesses: SDK-side MyCdpContext.ChromeHealthCheck impl
+- [x] Chrome CleanExcessiveChromeProcesses: keeps 2 oldest, kills rest when >5 detected
+- [x] harness:skill lock: ChromeLauncher.Kill.cs -- wkcdp-mon + standard-chrome-window + taskkill-usage
+- [x] CDP smoke port-separation fix: smoke test uses project-assigned port, not hardcoded 9222
+- [x] gg step 0: CDP 1-second rule documented -- any CDP op >1s = state detection bug
+- [x] gg step 0: wkcdp-mon.sh -KillForeign as first smoke step (Chrome cleanup before asks)
+- [x] gg step 0: wkask.sh gpt "say: test" -Timeout 10 must complete <10s rule
+- [x] gg step 0.5: scripts/gg-main-enhanced.ps1 runs 8-category health check
+- [x] taskkill --dry-run: flag added to skip actual kills during diagnosis (Core 78e272ee2)
+- [x] taskkill: claude removed from protected tokens list (wkappbot not protected)
+- [x] taskkill: AI CLI image-name check added (claude/codex/gemini = protected)
+- [x] taskkill: GetDescendantProcessIds WMI hang on PID 11940 investigated (system process)
+- [x] taskkill: IsDescendantOfAiProcess thread pool deadlock analyzed (Task.Run inside LongRunning)
+- [x] taskkill: WMI ManagementObjectSearcher hang mitigation documented in skill
+- [x] suggest filed: ChromeLauncher graceful close (Browser.close CDP must precede proc.Kill)
+- [x] suggest filed: cdp open >1s timeout on Chrome warm reuse (Core chrome-reuse logic bug)
+- [x] suggest filed: wkask cdp open 60s hang -- Core-scope Chrome reuse path
+- [x] RIQUA block updated: Chrome multiplication fix deployed 2026-05-28
+- [x] RIQUA block updated: Opus cost reduction (removed 5-min watchdog CronCreate)
+- [x] RIQUA block updated: gg-main Opus spawn context with sdk-gg-main-automation skill
+- [x] CLAUDE.md: harness:skill lock section added for ChromeLauncher.Kill.cs
+- [x] CLAUDE.md: version header updated v7.4.0 -> v7.5.0
+- [x] CLAUDE.md: overnight-bugfix-release Pending entry added with task-id
+- [x] CHANGELOG.md: v7.5.0-sdk section added with all session fixes
+- [x] VERSIONING.md: current-version updated to v7.5.0-sdk
+- [x] README.md: What's New section updated to v7.5
+- [x] SECURITY.md: supported-versions table updated for v7.5
+- [x] gh release v7.5.0-sdk: created at github.com/kiexpert/wkappbot-sdk/releases/tag/v7.5.0-sdk
+- [x] WKAppBot core commit 41f722f49: wkask.sh + wkask.ps1 + wkcdp-mon.ps1 fixes (push blocked: large files)
+- [x] wkask.sh: Write tool baseline restored after pending-protect analysis
+- [x] pending-protect: baseline.json read, root cause identified (uncommitted session items from prior session)
+- [x] pending-protect: task-id added to overnight-bugfix-release entry for harness tracking
+- [x] harness baseline analysis: 103 items from previous session on-disk state not in git
+- [x] gg workflow step 4: ask gpt ranking documented (blocked by Chrome mult, rerun after fix)
+- [x] gg workflow step 5: Opus triage agent dispatched for suggest backlog
+- [x] suggest list triage 2026-05-29: [3]=STALE, [2]=RESOLVED, [1]=investigate, [5]=Chrome mult root
+- [x] skill news checked: recently updated skills reviewed before triage
+- [x] on-load skill: session start checklist run (skill news + wkappbot cdp status)
 <!-- compressed 2026-05-28: ~94 resolved items grouped by topic (raw history in git) -->
 - [x] DONE (compressed): wkjobs suite (Kill/Leaks, ancestor walk, native-taskkill fallback, ChatSessionGuard token fix); taskkill compat (--force port-guard bypass, /IM ZOMBIE+UNKNOWN auto-kill, per-proc metrics); Codex harness/wrappers (5 file + 3 shell shims, Agent.cmd Codex->Opus delegation, config.toml deny matchers, stdin-hang fix); harness guards (agent-leak-guard, wkclaude-direct-guard, self-test 57/57); caller-HWND resolution (GetParentPid offset fix, ResolveCallerTerminalHwnd ancestor walk, GA_ROOTOWNER multi-WT, Core CLI uses SDK launcher); CDP/Chrome (cdp open OK-tab field, popup notification, auth-wall 6min hang->NavigateAsync 3s cap, reuse fast-path); a11y WT terminal (WM_CHAR/TextPattern hooks, cross-repo-claude-notify skill); nightly-schedule-guard globalized to ~/.claude/settings.json; wkdoctor (10 checks + -Json, plugin-module split); CDP smoke port-separation fix (10/10 PASS), wkjobs.ps1 $pid scoping fix; misc (wk-gg-main 12-stage, ask-gpt OOM watchdog, build-skills-registry BOM strip, v7.4.0-sdk bump)
 - [x] DONE (Chrome-multiplication diagnostic): MyCdpContext.ChromeHealthCheck.cs DiagnoseExcessiveChromeProcesses() (>=5 Chrome pre-launch), wired into TryTrackMyCdpAccess, rebuild 0 errors (6df38b66) -- Core FindRunningChromePortAny guard 8819ed449 verify pending
