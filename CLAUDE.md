@@ -311,7 +311,12 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 ## gg Main Workflow
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
-0. **[PRIMARY DUTY] Smoke test loop**: `wkcdp-mon.sh -KillForeign` (Chrome cleanup first) + `wkappbot ask gpt "say: test"` + `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`. Show ALL errors/warnings inline. Loop (retry fix → retest) until 0 errors. Only advance when clean.
+0. **[PRIMARY DUTY] Smoke test loop**: 
+   - `wkcdp-mon.sh -KillForeign` (Chrome cleanup first, check LAT avg — any >1000ms = CDP bug)
+   - `wkappbot ask gpt "say: test"` — measure time, if >1s warn "CDP state detection bug"
+   - `wkask.sh gpt "say: test" -Timeout 10` — must complete <10s else cdp open bug
+   - `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`
+   - Show ALL errors/warnings inline. Loop until 0 errors. 1-SECOND RULE: any CDP op >1s = BUG.
 0.5. **[CRITICAL] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories). exit=2 → Opus emergency fix. exit=1 → log Pending, continue.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
@@ -517,5 +522,9 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] DONE 2026-05-29: nightly skill heal pass1 (ed787ad2) + pass2 (audit 3ok/54-cross-repo-expected/616-norefs; version sync 7.4 across VERSIONING/README/CHANGELOG/SECURITY; Pending [x]=6 below compress threshold). taskkill --dry-run working. wkzombie -ExcludeFilter mcp added.
 - [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
 - [x] DONE: nightly heals pass1-4, chrome hourly KillForeign CronCreate, CDP CI rate-limit fixed (gh run rerun), leelw-markany collaborator, wkci.sh CI health check script.
-- [ ] wkci.sh: needs git commit after file creation
+- [x] DONE: wkci.sh committed (dca7593f). wkcdp-mon improvements in progress.
+- [x] DONE: wkcdp-mon age>2h force-kill + CWD fallback + header fix (955d1c096)
+- [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
+- [x] DONE: wkask.sh \n bug fixed (Edit tool). cdp open 60s timeout investigating.
+- [ ] CDP ask QA sweep: Haiku scanning wkask.ps1 + gg-main.sh for all user-visible bugs (1s rule). wkask bug fixed, cdp open timeout = Core Chrome reuse bug.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
