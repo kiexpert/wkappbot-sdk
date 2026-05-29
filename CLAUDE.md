@@ -526,5 +526,6 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] DONE: wkcdp-mon age>2h force-kill + CWD fallback + header fix (955d1c096)
 - [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
 - [x] DONE: wkask.sh \n bug fixed (Edit tool). cdp open 60s timeout investigating.
-- [ ] CDP ask QA sweep: Haiku scanning wkask.ps1 + gg-main.sh for all user-visible bugs (1s rule). wkask bug fixed, cdp open timeout = Core Chrome reuse bug.
+- [x] CDP ask QA: wkask.sh \n fix, BUG-1/2/3/5/6/7/8 fixed. wkci.sh --details job/step level check added.
+- [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
