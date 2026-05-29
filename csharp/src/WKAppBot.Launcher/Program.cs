@@ -700,6 +700,8 @@ partial class Program
         // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
+        var isFileMutation = cmd == "file" && forwardArgs.Length > 1
+            && forwardArgs[1].ToLowerInvariant() is "edit" or "write" or "undo";
         // suggest + skill: try Eye first (100ms guard) for fast in-process handling,
         // Core fallback when Eye is busy or broken. Was previously direct-Core-only --
         // changed 2026-04-29 to give Eye the fast path (~50ms vs 500ms cold-start Core).
@@ -733,7 +735,8 @@ partial class Program
                 if (forwardArgs[i] == "--timeout-exit" && int.TryParse(forwardArgs[i + 1], out var e)) eyeTimeoutExit = e;
             }
 
-            int firstOutputMs = isFirstOutputGuardCmd ? 100 : 0; // 100ms first-output guard -> Core fallback
+            if (isFileMutation && eyeTimeoutMs <= 0) eyeTimeoutMs = 30_000;
+            int firstOutputMs = isFirstOutputGuardCmd && !isFileMutation ? 100 : 0; // 100ms first-output guard -> Core fallback
             prof($"Eye pipe attempt cmd={cmd}");
             if (EyeCmdPipeClient.TryDelegate(relayArgs, out int code, eyeTimeoutMs, eyeTimeoutExit, firstOutputMs))
             {
