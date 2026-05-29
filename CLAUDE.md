@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.4.0 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.5.0 - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -490,6 +490,8 @@ wkappbot skill read wkappbot-build-verify-workflow  # Impl: publish process, hot
 wkappbot skill read wkharness-guards  # Task: guard reference when unblocking edits
 
 ## Pending
+
+- [x] DONE 2026-05-30 overnight-bugfix-release: wkask.sh exec stray `\n` fixed, wkask.ps1 colour-helper mojibake -> ASCII tags, wkcdp-mon.ps1 Invoke-KillIdle off-screen via MonitorFromPoint, wkzombie.ps1 null StartTime safe-skip verified, wkci.sh +x set; bumped SDK to v7.5.0-sdk (CHANGELOG/VERSIONING/README/SECURITY/CLAUDE.md); WKAppBot core commit 41f722f49 (push blocked by pre-existing large-file commits unrelated to release); GitHub release v7.5.0-sdk
 
 <!-- compressed 2026-05-28: ~94 resolved items grouped by topic (raw history in git) -->
 - [x] DONE (compressed): wkjobs suite (Kill/Leaks, ancestor walk, native-taskkill fallback, ChatSessionGuard token fix); taskkill compat (--force port-guard bypass, /IM ZOMBIE+UNKNOWN auto-kill, per-proc metrics); Codex harness/wrappers (5 file + 3 shell shims, Agent.cmd Codex->Opus delegation, config.toml deny matchers, stdin-hang fix); harness guards (agent-leak-guard, wkclaude-direct-guard, self-test 57/57); caller-HWND resolution (GetParentPid offset fix, ResolveCallerTerminalHwnd ancestor walk, GA_ROOTOWNER multi-WT, Core CLI uses SDK launcher); CDP/Chrome (cdp open OK-tab field, popup notification, auth-wall 6min hang->NavigateAsync 3s cap, reuse fast-path); a11y WT terminal (WM_CHAR/TextPattern hooks, cross-repo-claude-notify skill); nightly-schedule-guard globalized to ~/.claude/settings.json; wkdoctor (10 checks + -Json, plugin-module split); CDP smoke port-separation fix (10/10 PASS), wkjobs.ps1 $pid scoping fix; misc (wk-gg-main 12-stage, ask-gpt OOM watchdog, build-skills-registry BOM strip, v7.4.0-sdk bump)

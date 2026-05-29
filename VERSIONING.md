@@ -34,9 +34,11 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`7.4` -- bumped at 2026-05-25 -- `wkdoctor` flutter-doctor-style SDK health check (10 checks, self-healing, `-Json`), bootstrap auto-build (`setup.ps1` builds launcher on first clone), nightly schedule guard globalized to `~/.claude/settings.json` PreToolUse, `cdp open` 6-minute auth-wall hang fix (NavigateAsync capped to 3s), CDP smoke `--timeout` 9s, build-skills-registry UTF-8 BOM strip
+`7.5` -- bumped at 2026-05-30 -- wkask.sh streaming exec fix (stray `\n` literal removed), wkask.ps1 colour-helper mojibake cleanup ([OK]/[INFO]/[WARN]/[ERR] ASCII tags), wkcdp-mon.ps1 multi-monitor off-screen detection via `MonitorFromPoint`, wkzombie.ps1 null-StartTime safe-skip verified, wkci.sh executable bit set, Chrome multiplication SDK-side auto-cleanup (`MyCdpContext.ChromeHealthCheck`) integrated with `gg-main-enhanced`
 
 ## Previous versions
+
+`7.4` -- bumped at 2026-05-25 -- `wkdoctor` flutter-doctor-style SDK health check (10 checks, self-healing, `-Json`), bootstrap auto-build (`setup.ps1` builds launcher on first clone), nightly schedule guard globalized to `~/.claude/settings.json` PreToolUse, `cdp open` 6-minute auth-wall hang fix (NavigateAsync capped to 3s), CDP smoke `--timeout` 9s, build-skills-registry UTF-8 BOM strip
 
 `7.3` -- bumped at 2026-05-16 -- Chrome window position mismatch fix (session restore override, two-layer fix), IME Relay jamo-sync (kana/hangul input relay), Eye startup FileNotFoundException false positive fix (single-file publish defense), Launcher HWND ancestor-walk caller resolution (P2 ConPTY support), standard-appbot-window / standard-chrome-window skills
 

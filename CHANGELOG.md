@@ -3,6 +3,22 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.5.0-sdk] - 2026-05-30
+
+### Fixed
+- **wkask.sh**: `exec` line had stray `\n` literal between `Bypass` and `-File`, which broke the streaming relay entirely. Restored to a single line.
+- **wkask.ps1**: colour-helper prefixes (`ok`/`inf`/`wrn`/`err`/`hdr`) were stored as mojibake bytes, rendering as `??` in console output. Replaced with clean ASCII tags (`[OK]/[INFO]/[WARN]/[ERR]/==`).
+- **wkcdp-mon.ps1** (`Invoke-KillIdle`): off-screen check used negative-coord regex `^-\d{3,}`, false-positive on multi-monitor setups where the left monitor has large negative X. Now uses `MonitorFromPoint` (`WkWin32::IsOnAnyMonitor`), matching the anomaly-report logic.
+- **wkzombie.ps1**: verified `try/catch` around `StartTime` returns `age=-1` and skips the process (Access Denied no longer kills protected wkappbot-core).
+- **wkci.sh**: file mode set to executable (was `100644`, now `100755`) so CI helpers run without explicit `bash` prefix.
+
+### Added
+- **gg-main-enhanced**: Chrome multiplication auto-cleanup (>5 → kill duplicates, keep 2 oldest) integrated into the 3-hour health check loop.
+- **MyCdpContext.ChromeHealthCheck**: `DiagnoseExcessiveChromeProcesses()` and `CleanExcessiveChromeProcesses()` for SDK-side mitigation when Core `FindRunningChromePortAny` guard is not yet deployed (deploy verification pending on Core repo).
+
+### Notes
+- WKAppBot core repo (`D:/GitHub/WKAppBot`) commit `41f722f49` carries the `wkask`/`wkcdp-mon` source fixes; push to private remote is blocked by pre-existing large-file commits unrelated to this release. Local fix is active in `D:/GitHub/WKAppBot/bin/` and consumed by both the SDK launcher and operator scripts.
+
 ## [7.4.0-sdk] - 2026-05-25
 
 ### Added

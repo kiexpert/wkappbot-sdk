@@ -62,13 +62,19 @@ Most automation tools steal focus, break on owner-drawn controls, and go silent 
 
 ---
 
-## What's New in v7.4
+## What's New in v7.5
 
-- **`wkdoctor`** -- flutter-doctor-style SDK health check tool (`bin/wkdoctor.ps1`): 10 checks with self-healing, plugin modules in `bin/wkappbot.hq/doctor/`, `-Json` flag for CI integration.
-- **Bootstrap auto-build** -- `setup.ps1` auto-builds the launcher from source on first clone; `build.cmd` creates `wkappbot.exe` inline with no subprocess calls.
-- **Nightly schedule guard** -- globalized to the `~/.claude/settings.json` PreToolUse hook; no longer per-project `settings.local.json`.
-- **`cdp open` auth-wall hang fixed (CRITICAL)** -- `NavigateAsync` is now capped at 3s, eliminating the 6-minute stall on auth-wall sites (claude.ai, gemini.google.com, groq.com, perplexity.ai, character.ai). The port is live after `ConnectCdp`; full page load is Chrome's job.
-- **CDP smoke test hardening** -- `--timeout` tuned (3s fast-site, 9s human-patience limit) and CI artifact upload changed to `if: always()` so cancelled jobs still upload logs.
+- **`wkask.sh` streaming fix (CRITICAL)** -- a stray `\n` literal in the `exec` line broke the bash relay entirely. Restored to a single-line `exec powershell ... -File wkask.ps1 "$@"`.
+- **`wkask.ps1` colour-helper cleanup** -- mojibake `??` prefixes replaced with clean ASCII tags (`[OK]/[INFO]/[WARN]/[ERR]/==`) so codex/bash streaming stays readable.
+- **`wkcdp-mon.ps1` multi-monitor off-screen detection** -- `Invoke-KillIdle` now uses `MonitorFromPoint` (`WkWin32::IsOnAnyMonitor`) instead of a negative-coord regex, eliminating false positives on left-monitor setups.
+- **`wkzombie.ps1` null-StartTime guard** -- Access-Denied processes return `age=-1` and are skipped, not killed.
+- **Chrome multiplication SDK-side mitigation** -- `MyCdpContext.ChromeHealthCheck.CleanExcessiveChromeProcesses()` auto-cleans duplicate Chrome processes when more than 5 are detected, preserving the 2 oldest. Integrated with `gg-main-enhanced.ps1`.
+
+### v7.4 highlights (still active)
+
+- **`wkdoctor`** flutter-doctor-style SDK health check (10 checks, self-healing, `-Json`).
+- **Bootstrap auto-build** -- `setup.ps1` auto-builds the launcher from source on first clone.
+- **`cdp open` auth-wall hang fixed (CRITICAL)** -- `NavigateAsync` capped at 3s, no more 6-minute stalls on auth-wall sites.
 
 ??Full notes: [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest)
 
