@@ -229,7 +229,7 @@ echo ""
 # ============================================================================
 echo "==[ V ] VERSION CONSISTENCY =="
 VER_VERSIONING=$(grep -A3 '## Current version' VERSIONING.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
-VER_CHANGELOG=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' CHANGELOG.md 2>/dev/null | head -1)
+VER_CHANGELOG=$(grep -E '^## \[' CHANGELOG.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
 VER_README=$(grep -iE 'v[0-9]+\.[0-9]' README.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
 VER_SECURITY=$(grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' SECURITY.md 2>/dev/null | head -1)
 echo "  VERSIONING.md: $VER_VERSIONING"
@@ -259,12 +259,13 @@ echo "==[ R ] RELEASE STATUS =="
 if command -v gh >/dev/null 2>&1 && [ -n "$VER_VERSIONING" ]; then
   TAG="$VER_VERSIONING"
   [[ "$TAG" =~ ^v ]] || TAG="v$TAG"
-  if gh release view "$TAG" --repo kiexpert/wkappbot-sdk >/dev/null 2>&1; then
-    echo "  GitHub release $TAG: present"
+  RELEASE_HIT=$(gh release list --repo kiexpert/wkappbot-sdk --limit 5 2>/dev/null | grep -iE "${TAG//./\\.}" | head -1)
+  if [ -n "$RELEASE_HIT" ]; then
+    echo "  GitHub release ${TAG}*: present ($RELEASE_HIT)"
   else
-    note_warn "GitHub release $TAG missing for VERSIONING.md current version" \
+    note_warn "GitHub release ${TAG}* missing for VERSIONING.md current version" \
       "sdk-launcher-maintenance" \
-      "gh release create $TAG --title \"WKAppBot $TAG\" --notes \"(CHANGELOG top section)\""
+      "gh release create ${TAG}-sdk --title \"WKAppBot ${TAG}-sdk\" --notes \"(CHANGELOG top section)\""
   fi
 else
   echo "  [SKIP] gh or VERSIONING.md unavailable"
