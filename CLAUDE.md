@@ -421,6 +421,7 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 - [x] gg-main 3h health check 2026-05-31: Eye 10->cleaned, Chrome 9->7, CI all green, v7.5 ok. Core guard still needed.
 - [x] nightly-heal 2026-05-31: skill audit 3ok/54-cross-repo/630-norefs; WKAppBot force-push in progress (binary removed from history)
 - [x] nightly-heal 2026-05-31 pass2: 3ok/54-cross-repo/630-norefs; v7.5 OK
+- [x] gg-main 3h 2026-05-31 06:31: CI all green, v7.5 ok. Eye 34->10(warn), Chrome 12(warn), OFF-SCREEN(-32000). Haiku fixed wkask.sh 94026081c.
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
