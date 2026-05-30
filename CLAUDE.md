@@ -429,6 +429,7 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 - [x] CDP fix 2 (Core ce6ee8569): BatchGetChromeCmdLines -- KillStaleChromesAsync O(1) wmic call vs O(N)
 - [x] gg-main 3h health check 2026-05-31: Eye 10->cleaned, Chrome 9->7, CI all green, v7.5 ok. Core guard still needed.
 - [x] nightly-heal 2026-05-31: skill audit 3ok/54-cross-repo/630-norefs; WKAppBot force-push in progress (binary removed from history)
+- [ ] nightly-heal 2026-05-31 pass2: skill audit + version check
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
