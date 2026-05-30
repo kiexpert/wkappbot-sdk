@@ -209,17 +209,32 @@ fi
 echo ""
 
 # ============================================================================
-# SECTION D: CDP Anomaly Cross-Ref
+# SECTION D: CDP Live Monitoring -- anomalies become tracked debug items
 # ============================================================================
-echo "==[ D ] CDP ANOMALY CROSS-REF =="
-if [[ "$CHROME_COUNT" =~ ^[0-9]+$ ]] && [ "$CHROME_COUNT" -gt 5 ]; then
-  echo "  Chrome multiplication active ($CHROME_COUNT) -- see Z + P sections"
-fi
-if [ -n "$CDP_OUT" ] && ! echo "$CDP_OUT" | grep -q "WKCDP-TIMEOUT"; then
-  if echo "$CDP_OUT" | grep -qE 'd[0-9]{3,}'; then
-    note_warn "CDP DRIFT detected (Chrome placement off TGT-POS)" \
-      "standard-chrome-window" \
-      "wkcdp-mon.sh -KillIdle  +  inspect MyCdpContext placement validation"
+echo "==[ D ] CDP LIVE MONITORING =="
+CDP_LIVE=$(timeout 20 wkcdp-mon.sh 2>/dev/null || echo "WKCDP-TIMEOUT")
+if echo "$CDP_LIVE" | grep -q "WKCDP-TIMEOUT"; then
+  note_warn "wkcdp-mon timed out" "wkcdp-mon" "Restart Eye"
+else
+  [[ "$CHROME_COUNT" =~ ^[0-9]+$ ]] && [ "$CHROME_COUNT" -gt 5 ] && echo "  Chrome multiplication active ($CHROME_COUNT)"
+  LOGIN_PORTS=$(echo "$CDP_LIVE" | grep -i "LOGIN_PAGE" | grep -oE '[0-9]{4}' | tr '\n' ' ')
+  if [ -n "$LOGIN_PORTS" ]; then
+    note_crit "LOGIN_PAGE port(s) $LOGIN_PORTS -- session expired, automation BLOCKED" \
+      "cdp-command-guide" "Open Chrome on those ports and sign in manually"
+    wkappbot speak "CDP keongo: login expired ports $LOGIN_PORTS manual re-login needed" --bg 2>/dev/null || true
+    wkappbot suggest "BUG-CDP: LOGIN_PAGE ports $LOGIN_PORTS -- session expired, re-login needed" \
+      --requirement "proposed: wkappbot cdp open https://chatgpt.com => OK" \
+      --requirement "proposed: wkcdp-mon.sh => no LOGIN_PAGE warnings" \
+      --requirement "proposed: wkappbot probe gpt say test => response" 2>/dev/null || true
+  fi
+  DEAD=$(echo "$CDP_LIVE" | grep -E '[[:space:]]0/0/[0-2][[:space:]]' | grep -v "^PORT" | head -2)
+  [ -n "$DEAD" ] && note_warn "DEAD LAT sessions (Chrome unresponsive)" "cdp-command-guide" "wkcdp-mon.sh -KillForeign"
+  DRIFT=$(echo "$CDP_LIVE" | grep -E 'd-?[0-9]{4,}' | grep -v "^PORT" | head -2)
+  [ -n "$DRIFT" ] && note_warn "OFF-SCREEN Chrome (large DRIFT)" "standard-chrome-window" "Check TGT-POS vs ACT-POS"
+  KILL_OUT=$(timeout 30 wkcdp-mon.sh -KillForeign 2>/dev/null || echo "")
+  if echo "$KILL_OUT" | grep -q "\[KILLED\]"; then
+    KILLED=$(echo "$KILL_OUT" | grep "\[KILLED\]" | grep -oE 'proj=[^ ]+' | sed 's/proj=//' | tr '\n' ' ')
+    note_warn "KillForeign removed stale session(s): $KILLED" "sdk-gg-main-automation" "Check suggest list for BUG-AUTO from these projects"
   fi
 fi
 echo ""

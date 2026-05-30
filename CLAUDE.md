@@ -423,8 +423,8 @@ wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent.
 ### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
 ./wkzombie.ps1 -MaxAge 45 -ExcludeFilter mcp
 
-### CronCreate(cron="37 * * * *", durable=true, recurring=true)
-wkcdp-mon.sh -KillForeign
+<!-- KillForeign hourly cron REMOVED 2026-05-31: blind kill without diagnosis. CDP issues now handled by gg-main 3h cycle with full diagnosis + escalation. -->
+- [x] gg-main Section D rewrite: CDP live monitoring with auto-suggest on LOGIN_PAGE/DEAD-LAT/DRIFT/kills
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push). CWD=D:/GitHub/wkappbot-sdk.
@@ -571,7 +571,8 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] CI fix: wkappbot-daily-board push blocked by branch protection -> continue-on-error + upload-artifact fallback
 - [x] gg-main 12:30 2026-05-30: Chrome 18->2sessions, Eye 5->4, CI all green (952562b9 daily-board fix verified)
 - [x] gg-main script audit: Opus rewrote with --all suggest, all bad conditions, skill refs per warning (3e253b4c)
-- [ ] CDP ask CRITICAL: cdp open hanging 143min/66min/27min -- Chrome multiplication causes zombie port detection infinite wait. Opus investigating ChromeLauncher state-check + timeout.
+- [ ] wk-gg-main.sh + wk-gg-main.cmd: create .sh relay + fix .cmd to call bash scripts/gg-main.sh (currently calls nonexistent .ps1)
+- [x] CDP ask CRITICAL FIXED 2026-05-30 (Core 82d60f74f, NOT pushed): cdp open 143min hang root cause = wmic/netstat ReadToEnd() sync pipe read no timeout + LaunchWait HttpClient default 100s. Fix: ChromeLauncher.Timeout.cs helper (async drain+hard-kill) applied to SingletonGuard.GetCommandLineWithStatus 2500ms, Kill.GetCommandLine 2000ms, Kill.FindPidListeningOnPort 3000ms; LaunchWait HttpClient.Timeout=1500ms. Build GREEN v7.5.15 hot-swapped. Smoke cdp open 30-58s (was 143min). Awaiting user push to Core.
 - [x] DONE (compressed v7.5 release 2026-05-30): wkask.ps1 8 bugs (warmup-skip, smart-streaming-wait, button/text-stability poll, cascade-timeout root cause log, dup-submit-check removal x2, invoke-timeout, cdp-close cleanup) + ASCII tags + warm reuse fast-path; wkask.sh \n literal exec fix (final commit 41f722f49); wkcdp-mon (age>2h force-kill, off-screen+stale kill, CWD fallback, header, MonitorFromPoint multi-monitor); wkzombie (ExcludeFilter, null-StartTime safe, CmdlineFilter, singleton, root relay); wkci.sh (--details, skill refs, +x); CronCreate (KillForeign hourly, wkzombie 5min, gg-main 3h, 4x nightly heal); Chrome multiplication (MyCdpContext.ChromeHealthCheck Diagnose+Clean, gg-main-enhanced integration); harness:skill ChromeLauncher.Kill.cs lock; CDP smoke port-separation; gg step 0/0.5 (1s rule, KillForeign first, scripts/gg-main-enhanced.ps1); taskkill (--dry-run, AI CLI image-name protect, claude/codex/gemini); 3 suggests filed; RIQUA blocks updated x3; doc bump v7.4->v7.5 (CLAUDE/CHANGELOG/VERSIONING/README/SECURITY); gh release v7.5.0-sdk; pending-protect baseline analysis + task-id; gg step 4/5 + suggest triage 2026-05-29
 - [x] nightly-heal 2026-05-30: skill audit 3ok/54-stale-cross-repo-expected/622-norefs; repo-health LITE OK (version sync 7.5 across all docs); Pending compressed 86->15 items
 - [x] nightly-heal 2026-05-30 pass2: skill audit 3ok/54-cross-repo/622-norefs; version sync v7.5 OK; no compress needed (count already at threshold)
