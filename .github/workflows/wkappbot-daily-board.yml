@@ -110,9 +110,17 @@ jobs:
             fs.writeFileSync('docs/board-data.json', JSON.stringify(data, null, 2) + '\n');
 
       - name: Commit snapshot
+        continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/board-data.json
           git commit -m "docs: update daily board snapshot" || exit 0
-          git push
+          git push || echo "push blocked by branch protection -- snapshot stored as artifact only"
+
+      - name: Upload board snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: board-data-${{ steps.date.outputs.day }}
+          path: docs/board-data.json
+          retention-days: 30
