@@ -228,7 +228,7 @@ echo ""
 # SECTION V: Version Consistency
 # ============================================================================
 echo "==[ V ] VERSION CONSISTENCY =="
-VER_VERSIONING=$(grep -A1 '## Current version' VERSIONING.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
+VER_VERSIONING=$(grep -A3 '## Current version' VERSIONING.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
 VER_CHANGELOG=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' CHANGELOG.md 2>/dev/null | head -1)
 VER_README=$(grep -iE 'v[0-9]+\.[0-9]' README.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
 VER_SECURITY=$(grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' SECURITY.md 2>/dev/null | head -1)
