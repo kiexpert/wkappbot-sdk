@@ -411,15 +411,6 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 ### CronCreate(cron="13 4 * * *", durable=true, recurring=true)
 wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
 
-### CronCreate(cron="13 5 * * *", durable=true, recurring=true)
-wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
-
-### CronCreate(cron="13 6 * * *", durable=true, recurring=true)
-wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
-
-### CronCreate(cron="13 7 * * *", durable=true, recurring=true)
-wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk. Proceed autonomously without user confirmation.
-
 ### CronCreate(cron="*/5 * * * *", durable=true, recurring=true)
 ./wkzombie.ps1 -MaxAge 45 -ExcludeFilter mcp
 
