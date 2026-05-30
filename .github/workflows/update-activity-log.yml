@@ -38,9 +38,17 @@ jobs:
           EOF
 
       - name: Commit activity log
+        continue-on-error: true
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add docs/activity-log.json
           git diff --cached --quiet || git commit -m "chore: update activity log"
-          git push
+          git push || echo "push blocked by branch protection -- activity log stored as artifact"
+
+      - name: Upload activity log artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: activity-log-${{ github.sha }}
+          path: docs/activity-log.json
+          retention-days: 7

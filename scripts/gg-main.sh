@@ -228,10 +228,10 @@ echo ""
 # SECTION V: Version Consistency
 # ============================================================================
 echo "==[ V ] VERSION CONSISTENCY =="
-VER_VERSIONING=$(grep -iE '(Current[[:space:]-]*version|^##.*v[0-9])' VERSIONING.md 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' | head -1)
-VER_CHANGELOG=$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' CHANGELOG.md 2>/dev/null | head -1)
-VER_README=$(grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' README.md 2>/dev/null | head -1)
-VER_SECURITY=$(grep -oE 'v?[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' SECURITY.md 2>/dev/null | head -1)
+VER_VERSIONING=$(grep -A1 '## Current version' VERSIONING.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
+VER_CHANGELOG=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+)?' CHANGELOG.md 2>/dev/null | head -1)
+VER_README=$(grep -iE 'v[0-9]+\.[0-9]' README.md 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' | head -1)
+VER_SECURITY=$(grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-z]+)?' SECURITY.md 2>/dev/null | head -1)
 echo "  VERSIONING.md: $VER_VERSIONING"
 echo "  CHANGELOG.md:  $VER_CHANGELOG"
 echo "  README.md:     $VER_README"
