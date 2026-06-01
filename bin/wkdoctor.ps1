@@ -27,7 +27,7 @@ function Emit {
     Write-Host $line -ForegroundColor $color
 }
 
-# Load check modules (sorted by name, so 01- runs before 02- etc.)
+# Load check modules (sorted by name, so 00- runs before 01- etc.)
 $doctorDir = Join-Path $binDir 'wkappbot.hq\doctor'
 if (Test-Path $doctorDir -PathType Container) {
     Get-ChildItem $doctorDir -Filter '*.ps1' | Sort-Object Name | ForEach-Object { . $_.FullName }
