@@ -68,28 +68,17 @@ function Invoke-WkwrapHotSwap {
         if (Test-Path -LiteralPath $Backup) {
             Remove-Item -LiteralPath $Backup -Force -ErrorAction SilentlyContinue
         }
-        try {
-            Move-Item -LiteralPath $Target -Destination $Backup -Force -ErrorAction Stop
-        }
-        catch {
-            throw "failed to park current wrapper as .old: $($_.Exception.Message)"
-        }
+        Move-Item -LiteralPath $Target -Destination $Backup -Force -ErrorAction Stop
     }
 
-    & $Csc /nologo /target:exe "/out:$Temp" $Source
+    & $Csc /nologo /target:exe "/out:$Temp" $Source *> $null
     if ($LASTEXITCODE -ne 0 -or -not (Test-PortableExe -Path $Temp)) {
-        throw "wrapper rebuild failed (csc exit $LASTEXITCODE)"
+        throw 'rebuild failed'
     }
 
-    try {
-        Move-Item -LiteralPath $Temp -Destination $Target -Force -ErrorAction Stop
-    }
-    catch {
-        throw "failed to install rebuilt wrapper: $($_.Exception.Message)"
-    }
-
+    Move-Item -LiteralPath $Temp -Destination $Target -Force -ErrorAction Stop
     if (-not (Test-PortableExe -Path $Target)) {
-        throw "installed wrapper is not a valid PE"
+        throw 'install failed'
     }
 }
 
@@ -105,38 +94,33 @@ foreach ($cand in $cscCandidates) {
 }
 
 if ($targetOk -and -not $targetBroken) {
-    Add-Check 'wkwrap.exe recovery' 'ok' 'already healthy'
-    Emit 'ok' 'wkwrap.exe recovery' $targetPath
+    Add-Check 'wkwrap.exe recovery' 'ok' 'healthy'
+    Emit 'ok' 'wkwrap.exe recovery' ''
 }
 elseif (-not $hasSource) {
-    Add-Check 'wkwrap.exe recovery' 'fail' "source missing: $sourcePath"
-    Emit 'fail' 'wkwrap.exe recovery' 'source missing'
+    Add-Check 'wkwrap.exe recovery' 'fail' 'source missing'
+    Emit 'fail' 'wkwrap.exe recovery' ''
 }
 elseif (-not $usedCsc) {
-    Add-Check 'wkwrap.exe recovery' 'fail' 'csc.exe not found'
-    Emit 'fail' 'wkwrap.exe recovery' 'csc.exe missing'
+    Add-Check 'wkwrap.exe recovery' 'fail' 'csc missing'
+    Emit 'fail' 'wkwrap.exe recovery' ''
 }
 else {
     try {
         Invoke-WkwrapHotSwap -Source $sourcePath -Target $targetPath -Backup $backupPath -Temp $tempPath -Csc $usedCsc
-        Add-Check 'wkwrap.exe recovery' 'ok' "self-healed from $sourcePath"
-        Emit 'ok' 'wkwrap.exe recovery' "self-healed via $usedCsc"
+        Add-Check 'wkwrap.exe recovery' 'ok' 'recovered'
+        Emit 'ok' 'wkwrap.exe recovery' ''
     }
     catch {
-        Add-Check 'wkwrap.exe recovery' 'fail' $_.Exception.Message
-        Emit 'fail' 'wkwrap.exe recovery' $_.Exception.Message
         if (Test-PortableExe -Path $backupPath) {
             try {
                 Copy-Item -LiteralPath $backupPath -Destination $targetPath -Force -ErrorAction Stop
-                if (Test-PortableExe -Path $targetPath) {
-                    Add-Check 'wkwrap.exe rollback' 'warn' 'restored from .old backup'
-                    Emit '!' 'wkwrap.exe rollback' 'restored from .old backup'
-                }
             }
             catch {
-                Add-Check 'wkwrap.exe rollback' 'warn' "rollback failed: $($_.Exception.Message)"
-                Emit '!' 'wkwrap.exe rollback' 'rollback failed'
+                # Keep the failure surface terse; the check status below is enough.
             }
         }
+        Add-Check 'wkwrap.exe recovery' 'fail' 'recovery failed'
+        Emit 'fail' 'wkwrap.exe recovery' ''
     }
 }
