@@ -27,6 +27,23 @@ function Emit {
     Write-Host $line -ForegroundColor $color
 }
 
+function Get-DoctorNote {
+    $warnItems = @($items | Where-Object { $_.Status -eq 'warn' })
+    if ($fail -gt 0) {
+        return '문제는 남아 있습니다.'
+    }
+    if ($warnItems.Count -eq 0) {
+        return '모두 정상입니다.'
+    }
+
+    $warnNames = @($warnItems | ForEach-Object { $_.Name })
+    if ($warnNames.Count -gt 0 -and (@($warnNames -join ' ') -match 'codex')) {
+        return "복구는 정상이고 codex 링크 경고만 남았습니다."
+    }
+
+    return "복구는 정상이고 경고 $($warnItems.Count)건만 남았습니다."
+}
+
 # Load check modules (sorted by name, so 00- runs before 01- etc.)
 $doctorDir = Join-Path $binDir 'wkappbot.hq\doctor'
 if (Test-Path $doctorDir -PathType Container) {
@@ -41,6 +58,7 @@ if (-not $Json) {
     Write-Host ''
     $color = if ($fail -gt 0) { 'Red' } elseif ($warn -gt 0) { 'Yellow' } else { 'Green' }
     Write-Host "wkdoctor: $pass ok, $warn warn, $fail fail" -ForegroundColor $color
+    Write-Host "wkdoctor note: $(Get-DoctorNote)" -ForegroundColor $color
 }
 if ($Json) {
     [PSCustomObject]@{ pass = $pass; warn = $warn; fail = $fail; items = $items } | ConvertTo-Json -Depth 5
