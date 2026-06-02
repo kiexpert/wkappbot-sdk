@@ -12,7 +12,7 @@ fi
 OPEN_OUTPUT="$(wkappbot cdp open "$VIEWER_URL")"
 echo "$OPEN_OUTPUT"
 
-GRAP="$(printf '%s\n' "$OPEN_OUTPUT" | grep -Eo "\{proc:'chrome',cdp:[0-9]+\}" | tail -n 1 || true)"
+GRAP="$(printf '%s\n' "$OPEN_OUTPUT" | grep -Eo "\{[^}]*proc:'chrome'[^}]*cdp:[0-9]+[^}]*\}" | tail -n 1 || true)
 if [[ -z "$GRAP" ]]; then
   GRAP="{proc:'chrome'}"
 fi
