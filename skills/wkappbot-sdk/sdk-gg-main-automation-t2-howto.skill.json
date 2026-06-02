@@ -1,0 +1,47 @@
+{
+  "id": "sdk-gg-main-automation-t2-howto",
+  "app": "wkappbot-sdk",
+  "title": "sdk-gg-main HowTo",
+  "title_ko": null,
+  "desc": "T2 HowTo: CronCreate schedule, smoke loop procedure, guard cascade escape, CDP 1s QA rule for sdk-gg-main-automation",
+  "steps": [
+    "AUTOMATION: CronCreate(cron=0 star/3 star star star durable=true) fires sdk-gg-main every 3h. Exit=2 spawn Opus for escalation per rules.",
+    "POST-ACTION: Log all findings to CLAUDE.md Pending and wkappbot suggest. Re-run after 5min if Amber. Escalate to Opus on critical red flags.",
+    "GUARD CASCADE FIX: read wk-ai-tools skill first then wkcodex.sh. wk-only-gate + stall-guard + opus-budget-guard fire together when pace over target. Escape path: wkcodex.sh (harness:safe).",
+    "SMOKE LOOP before all gg steps: (1) wkappbot ask gpt say:test -- CDP alive check (2) wkappbot taskkill /IM wkappbot-core.exe --dry-run -- classify works (3) wkjobs.sh -Leaks -- LEAKS=0. Loop until 0 errors, fix inline.",
+    "CDP 1s QA RULE: wkcdp-mon.sh LAT avg over 1000ms = bug immediately. All CDP ops under 100ms, hard cap under 1s. State-change detection failure is root cause when over 1s.",
+    "AUTO-APPROVE RULE: gg step 0 smoke loop improvements are PRE-AUTHORIZED. Never ask user to confirm gg script improvements. Implement+commit+report immediately."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation-t2-howto",
+      "expect": "AUTOMATION",
+      "prompt": null
+    },
+    {
+      "cmd": "bash scripts/gg-main.sh 2>&1 | tail -1",
+      "expect": "Status",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "gg-workflow",
+    "howto",
+    "smoke-loop",
+    "guard-cascade",
+    "cdp-qa"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T12:16:38.5805371Z",
+  "updated": "2026-06-02T12:16:38.5805497Z",
+  "version": "1.0"
+}

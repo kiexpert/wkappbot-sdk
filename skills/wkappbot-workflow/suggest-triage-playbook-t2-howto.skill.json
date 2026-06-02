@@ -1,0 +1,47 @@
+{
+  "id": "suggest-triage-playbook-t2-howto",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Triage HowTo",
+  "title_ko": null,
+  "desc": "T2 HowTo: suggester confirm flow, delegation patterns, skill-news pre-check, stale-resolve recipe for suggest-triage-playbook",
+  "steps": [
+    "SUGGESTER CONFIRM FLOW: (1) maintainer resolve -> HALF state + Slack. (2) Suggester runs suggest check TS. (3) PASS -> suggest check TS (author shortcut) OR suggest resolve TS note --confirm --skill X. Running resolve without --confirm while HALF exists -> ERROR with copy-pasteable commands.",
+    "SKILL NEWS PRE-CHECK: run wkappbot skill news before suggest list each session. Recent skill may mean BUG-AUTO already addressed. Added to gg Main Workflow 2026-05-23 as step 2.",
+    "DELEGATION FALLBACK: when opus-budget-guard blocks, delegate MECHANICAL merge/resolve/confirm to Haiku agent via in-IDE Bash tool. Do NOT route wkappbot suggest through Codex/wkcodex -- Eye IPC stall causes 34s timeout. Keep scope judgment and code fixes on main session.",
+    "CMD-SAFE BRIEF: Agent.cmd chokes on colons parens pipes in args. Write a cmd-safe brief file with NO colons NO parens NO pipes. Identify suggests by text signature, let delegated agent read ts from its own suggest list output. Agent.cmd skips claude-md-sync-guard.",
+    "RESOLVE DELEGATION: stale BUG-AUTO resolve requires real evidence script plus --i-completed-the-code-...-script flag plus --skill. Create one shared evidence script, delegate per-ts resolve loop to wkcodex. Loop oldest-pair merges until 1 remains.",
+    "MULTI-BATCH DELEGATION: every wkcodex/Agent completion arms skill-update-pending lock. Multi-round loop must interleave wkappbot skill edit BEFORE each dispatch to clear lock. Budget one throwaway skill edit per delegation round.",
+    "FULL STALE-RESOLVE RECIPE: (1) evidence .sh source-contains affectedCommands via if-false block. (2) 9 distinct skill read requirements via add-requirement. (3) commit in Core repo whose message contains full suggest title. (4) resolve via wkappbot-core.exe with --i-completed flags --skill suggest-workflow --commit HASH --class skill-only."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-triage-playbook-t2-howto",
+      "expect": "SUGGESTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "긴급\\|urgent",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "suggest",
+    "triage",
+    "howto",
+    "resolve",
+    "delegation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T13:57:23.2110123Z",
+  "updated": "2026-06-02T13:57:23.2110214Z",
+  "version": "1.0"
+}

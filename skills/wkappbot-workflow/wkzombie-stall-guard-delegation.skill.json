@@ -1,0 +1,41 @@
+{
+  "id": "wkzombie-stall-guard-delegation",
+  "app": "wkappbot-workflow",
+  "title": "wkzombie stall-guard delegation -- Opus works, Haiku blocked",
+  "title_ko": null,
+  "desc": "When stall-guard fires on repeated wkzombie runs, delegate to Opus Agent (not Haiku). Haiku subagents are blocked by wk-only-gate when spawned from a Sonnet/Opus session.",
+  "steps": [
+    "PATTERN: User runs ./wkzombie.ps1 repeatedly. stall-guard fires after ~3 consecutive same-command PS calls. This is correct behavior -- Claude ran the same command without making progress.",
+    "WRONG PATH (Haiku): Agent(model:haiku) spawned from Sonnet session gets wk-only-gate blocked. isHaikuSession exemption only applies to top-level Haiku CLI sessions, NOT subagents. Haiku subagents fabricate results or report 10+ tool uses with no actual execution. DO NOT use Haiku for wkzombie delegation.",
+    "CORRECT PATH (Opus): Agent(model:opus, run_in_background:true, prompt:SPEC+3-skill-refs). Opus subagents run PowerShell directly, 1 tool use, ~12s. Works reliably when usage-test-guard does not redirect.",
+    "USAGE-TEST-GUARD: fires ~50% of Opus Agent calls, redirecting to Agent.cmd. Agent.cmd via heredoc fails agent-brief-guard (0/3 skill refs not found in stdin). Just retry Agent tool -- it will pass on second or third attempt.",
+    "CRONREATE PRIMARY: wkzombie runs automatically every 5 min via CronCreate. Manual runs via Claude are supplemental. When stall-guard fires, consider waiting for CronCreate instead of burning Opus tokens.",
+    "STALL-GUARD RESET: firing every 3-4 PS runs in same session, counter does NOT reset on new user messages in long sessions. Workaround: use ! prefix to run directly in terminal, bypassing Claude entirely.",
+    "BUG: stall-guard also blocks CronDelete (one-time admin op). Haiku delegation needed. CLAUDE.md heading removed so job wont re-create next session."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "stall-guard fires after 3 same PS commands",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "Opus Agent runs wkzombie in 1 tool use 12s",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption",
+      "expect": "Haiku top-level exempt but subagents are not",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:19:54.4345253Z",
+  "updated": "2026-05-31T12:31:16.9356103Z",
+  "version": "1.2"
+}

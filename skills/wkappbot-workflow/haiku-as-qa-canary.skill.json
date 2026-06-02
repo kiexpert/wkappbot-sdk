@@ -1,0 +1,55 @@
+{
+  "id": "haiku-as-qa-canary",
+  "app": "wkappbot-workflow",
+  "title": "Haiku as QA canary — fresh-eyes mechanical execution surfaces validator and CLI failure modes",
+  "title_ko": null,
+  "desc": "When you need to verify a new guard, skill, or CLI actually works, delegate the mechanical execution to Haiku. Haiku does not preemptively work around rules, so validator UX gaps, escape-char handling bugs, --id quirks, silent-fail patterns, and other real failure modes surface immediately. Pairs naturally with opus-files-bugs-on-sight: every Haiku canary run that exposes a quirk should be filed as a wkappbot suggest BUG in the same turn.",
+  "steps": [
+    "Trigger: you just shipped a new harness guard, a new wkappbot skill, a new CLI wrapper, or anything user-visible that needs real-world validation. Theoretical compliance is not enough; the question is does it actually behave as advertised when a model that does not know the new rules runs straight at it.",
+    " Spawn a Haiku agent to perform the mechanical task end-to-end. Brief MUST be self-contained (3 wkappbot skill read refs per agent-brief-guard) and authorize the Haiku to inspect related files, reshape args, fall back to wkappbot-core.exe when eye blocks, and write a short report.",
+    " Why Haiku surfaces real failure modes: Haiku does not preload the new rule and try to comply; it just runs the command. So validator UX gaps print directly, escape-char bugs trigger, auto-gen ID quirks land in the user-visible output, encoding-guard rejections show their threshold math. Sonnet and Opus tend to anticipate and dodge these surfaces.",
+    " Bug-discovery payoff is automatic: anything weird Haiku hits gets reported back as part of its 150-word summary, then filed via opus-files-bugs-on-sight. One canary run typically surfaces 1-3 real quirks worth filing.",
+    " Examples of good QA-canary targets: a newly added PreToolUse harness gate (Haiku tries to commit and hits the block), a new wkappbot subcommand validator (Haiku invokes it with realistic args), a new skill contribute flow (Haiku tries to register a skill and surfaces draft-file quirks).",
+    " Anti-examples: DO NOT canary irreversible actions (email send, git push, force-reset, suggest resolve --confirm), production data writes, anything where a malformed invocation costs more than a retry.",
+    " Real precedent 2026-05-29: one Haiku registration of a new skill surfaced three quirks in wkappbot skill contribute. vague missing fields error not naming the field, --id flag being overridden by auto-generated long ID, and shell redirect chars (=> arrow) in --steps not being escaped. All three were filed as BUG suggests in the same turn. None of those would have surfaced on Sonnet running the same command, because Sonnet would have built a defensive argument shape from the skill-contribute-edit doc upfront.",
+    "HARNESS MESSAGE QA: Haiku is the designated reviewer for harness error/warning messages. Task: run commands that should trigger each guard, verify (1) message is clear and actionable, (2) skill refs in message are valid and readable, (3) TRY suggestion is correct for the situation. Bad messages = agents stall or take wrong action. File wkappbot suggest for any unclear/wrong message found.",
+    "QA AUDIT 2026-05-31: sdk-gg-main-automation/wktool-pattern/wkappbot-taskkill-usage audited for broken links. Found: wktool-pattern step 7 uses deprecated a11y eval-js (should be a11y read --eval-js). sdk-gg-main-automation steps 21-24 are RIQUA/session logs = T3 candidate. wkappbot-taskkill-usage wktaskkill.ps1 path unverified."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read haiku-as-qa-canary",
+      "expect": "returns the skill successfully",
+      "prompt": null
+    },
+    {
+      "cmd": "Agent(model:haiku, ...) invocation on mechanical CLI task",
+      "expect": "Haiku surfaces validator quirks in its summary",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: one Haiku registration run",
+      "expect": "typically yields 1-3 BUG suggests on the skill subsystem",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "claude-code",
+    "agent",
+    "haiku",
+    "qa",
+    "canary",
+    "dogfooding",
+    "validator",
+    "ux",
+    "bug-discovery",
+    "mechanical-cli",
+    "standing-order"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T16:51:09.622206Z",
+  "updated": "2026-05-31T13:52:11.9816457Z",
+  "version": "1.3"
+}

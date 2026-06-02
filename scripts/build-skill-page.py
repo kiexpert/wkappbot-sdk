@@ -1,0 +1,632 @@
+#!/usr/bin/env python3
+"""Build the WKAppBot public skill marketing page from live HQ catalogs."""
+
+from __future__ import annotations
+
+import html
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+
+HQ_SKILL_DIRS = [
+    Path("D:/GitHub/WKAppBot/bin/wkappbot.hq/skills"),
+    Path("D:/SDK/bin/wkappbot.hq/skills"),
+]
+REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
+OUTPUT = REPO_ROOT / "docs" / "index.html"
+ENV_FILE = Path("D:/GitHub/.env")
+STEP_PREVIEW_LIMIT = 44
+
+ALLOWED_APPS = ("wkappbot",)
+EXCLUDED_APPS = (
+    "personal-docs",
+    "WkAutoQuant",
+    "wkautoquant",
+    "invest-kr",
+    "paypal-developer",
+    "chrome-cdp",
+    "competitive",
+    "hantoo",
+    "kiwoom",
+    "DG-",
+    "jobkorea",
+    "naver",
+    "kakao",
+    "eunha",
+    "willkim",
+    "opengov",
+    "headhunter",
+    "senior",
+    "unemployment",
+    "youtube-trader",
+)
+
+SENSITIVE_PATTERNS = (
+    re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
+    re.compile(r"\b\d{8,}\b"),
+    re.compile(r"\b(?=[A-Za-z0-9+/_=-]{32,}\b)(?=[A-Za-z0-9+/_=-]*[A-Z])(?=[A-Za-z0-9+/_=-]*\d)[A-Za-z0-9+/_=-]+\b"),
+)
+
+
+def load_env_mask_values(path: Path = ENV_FILE) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return []
+
+    values: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        value = stripped.split("=", 1)[1].strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+        if value:
+            values.append(value)
+    return sorted(dict.fromkeys(values), key=len, reverse=True)
+
+
+ENV_MASK_VALUES = load_env_mask_values()
+
+
+def mask_sensitive(value: str) -> str:
+    masked = value
+    for secret in ENV_MASK_VALUES:
+        masked = masked.replace(secret, "***")
+    for pattern in SENSITIVE_PATTERNS:
+        masked = pattern.sub("***", masked)
+    return masked
+
+
+def as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def as_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [as_text(item) for item in value if as_text(item)]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def load_json(path: Path) -> dict[str, Any] | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def infer_audience(record: dict[str, Any], tags: list[str]) -> str:
+    audience = as_text(record.get("audience"))
+    if audience:
+        return audience
+
+    tag_blob = " ".join(tags).lower()
+    inferred: list[str] = []
+    if "user" in tag_blob:
+        inferred.append("user")
+    if "developer" in tag_blob or "dev" in tag_blob or "sdk" in tag_blob:
+        inferred.append("developer")
+    if inferred:
+        return "/".join(dict.fromkeys(inferred))
+
+    return "user/developer"
+
+
+def app_allowed(app: str) -> bool:
+    normalized = app.strip().lower()
+    if any(normalized.startswith(excluded.lower()) for excluded in EXCLUDED_APPS):
+        return False
+    return any(normalized.startswith(allowed.lower()) for allowed in ALLOWED_APPS)
+
+
+def record_mentions_excluded_app(record: dict[str, Any]) -> bool:
+    parts: list[str] = []
+    for key in ("id", "app", "title", "title_ko", "desc", "audience"):
+        parts.append(as_text(record.get(key)))
+    parts.extend(as_list(record.get("tags")))
+    parts.extend(as_list(record.get("steps")))
+    blob = "\n".join(parts).lower()
+    return any(excluded.lower() in blob for excluded in EXCLUDED_APPS)
+
+
+def include_skill(app: str, audience: str, tags: list[str]) -> bool:
+    if not app_allowed(app):
+        return False
+
+    blob = f"{audience} {' '.join(tags)}".lower()
+    has_public = "user" in blob or "developer" in blob
+    has_private = any(word in blob for word in ("operator", "project", "private", "internal"))
+
+    if has_public:
+        return True
+    if has_private:
+        return False
+    return audience.strip().lower() in ("", "unclassified", "public")
+
+
+def star_count(step_count: int) -> int:
+    if step_count >= 10:
+        return 3
+    if step_count >= 5:
+        return 2
+    return 1
+
+
+def truncate(value: str, limit: int = 80) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "..."
+
+
+def preview_step(value: str) -> str:
+    compact = " ".join(value.split())
+    if len(compact) <= STEP_PREVIEW_LIMIT:
+        return compact
+    return compact[:STEP_PREVIEW_LIMIT].rstrip() + "..."
+
+
+def collect_skills() -> list[dict[str, Any]]:
+    skills_by_id: dict[str, dict[str, Any]] = {}
+
+    for root in HQ_SKILL_DIRS:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*.skill.json")):
+            record = load_json(path)
+            if not record:
+                continue
+
+            skill_id = as_text(record.get("id")) or path.stem.replace(".skill", "")
+            app = as_text(record.get("app")) or "wkappbot"
+            if record_mentions_excluded_app(record):
+                continue
+            tags = as_list(record.get("tags"))
+            audience = infer_audience(record, tags)
+            if not include_skill(app, audience, tags):
+                continue
+
+            steps = as_list(record.get("steps"))
+            title = mask_sensitive(as_text(record.get("title_ko")) or as_text(record.get("title")) or skill_id)
+            desc = mask_sensitive(as_text(record.get("desc")))
+            stars = star_count(len(steps))
+
+            skills_by_id.setdefault(
+                skill_id,
+                {
+                    "id": mask_sensitive(skill_id),
+                    "title": title,
+                    "desc": desc,
+                    "steps": [mask_sensitive(step) for step in steps],
+                    "tags": [mask_sensitive(tag) for tag in tags[:8]],
+                    "audience": mask_sensitive(audience),
+                    "app": mask_sensitive(app),
+                    "stars": stars,
+                    "source": str(path),
+                    "premium": stars == 3 and "developer" in audience.lower(),
+                },
+            )
+
+    return sorted(
+        skills_by_id.values(),
+        key=lambda item: (-int(item["stars"]), str(item["app"]).lower(), str(item["title"]).lower()),
+    )
+
+
+def e(value: Any) -> str:
+    return html.escape(as_text(value), quote=True)
+
+
+def render_stars(count: int) -> str:
+    return "".join("&#9733;" for _ in range(count)) + "".join("&#9734;" for _ in range(3 - count))
+
+
+def render_skill_card(skill: dict[str, Any]) -> str:
+    title = e(skill["title"])
+    desc = e(truncate(str(skill["desc"] or "No description yet.")))
+    app = e(skill["app"])
+    audience = e(skill["audience"])
+    tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
+    steps = skill["steps"][:5] or ["This skill is available in the live WKAppBot catalog."]
+    step_items = "".join(
+        f'<li data-full="{e(step)}">{e(preview_step(step))}</li>'
+        for step in steps
+    )
+    premium = bool(skill["premium"])
+    premium_class = " premium" if premium else ""
+    overlay = '<div class="unlock">Unlock with Pro</div>' if premium else ""
+
+    return f"""
+      <article class="skill-card{premium_class}" data-search="{e(title + ' ' + desc + ' ' + app + ' ' + ' '.join(skill['tags']))}">
+        <div class="card-top">
+          <span class="app-badge">{app}</span>
+          <span class="stars" aria-label="{skill['stars']} star rating">{render_stars(int(skill['stars']))}</span>
+        </div>
+        <h3>{title}</h3>
+        <p>{desc}</p>
+        <div class="meta">{audience}</div>
+        <div class="tags">{tags}</div>
+        <div class="steps-wrap">
+          <ol class="steps">{step_items}</ol>
+          {overlay}
+        </div>
+      </article>"""
+
+
+def build_html(skills: list[dict[str, Any]]) -> str:
+    count = len(skills)
+    cards = "\n".join(render_skill_card(skill) for skill in skills)
+    premium_count = sum(1 for skill in skills if skill["premium"])
+    apps = len({skill["app"] for skill in skills})
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WKAppBot Skill Browser</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }}
+    a {{ color: inherit; }}
+    .shell {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; }}
+    header {{
+      min-height: 88vh;
+      display: grid;
+      align-content: center;
+      gap: 28px;
+      padding: 48px 0 32px;
+    }}
+    nav {{
+      position: fixed;
+      z-index: 5;
+      top: 0;
+      left: 0;
+      right: 0;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7,9,13,.82);
+      backdrop-filter: blur(14px);
+    }}
+    nav .shell {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      min-height: 64px;
+      gap: 16px;
+    }}
+    .brand {{ font-weight: 800; }}
+    .nav-links {{ display: flex; gap: 16px; color: var(--muted); font-size: 14px; }}
+    .nav-button {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+      color: var(--text);
+      min-height: 32px;
+      padding: 0 10px;
+      cursor: pointer;
+      font: inherit;
+    }}
+    .hero-grid {{
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(280px, .88fr);
+      gap: 40px;
+      align-items: center;
+      padding-top: 64px;
+    }}
+    h1 {{
+      margin: 0;
+      max-width: 920px;
+      font-size: clamp(42px, 8vw, 94px);
+      line-height: .96;
+      letter-spacing: 0;
+    }}
+    .hero-copy {{ color: var(--muted); max-width: 720px; font-size: 20px; }}
+    .hero-panel {{
+      border: 1px solid var(--line);
+      background: linear-gradient(150deg, rgba(16,23,34,.96), rgba(21,29,42,.78));
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.36);
+    }}
+    .stat-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }}
+    .stat {{ border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: rgba(255,255,255,.03); }}
+    .stat strong {{ display: block; font-size: 28px; }}
+    .stat span {{ color: var(--muted); font-size: 12px; }}
+    .toolbar {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 22px 0;
+      position: sticky;
+      top: 64px;
+      z-index: 4;
+      background: rgba(7,9,13,.94);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }}
+    input[type="search"] {{
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #0c111a;
+      color: var(--text);
+      padding: 0 16px;
+      font-size: 16px;
+      outline: none;
+    }}
+    .result-count {{ color: var(--muted); white-space: nowrap; }}
+    .skills-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+      padding: 28px 0 70px;
+    }}
+    .skill-card {{
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }}
+    .card-top {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; }}
+    .app-badge {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .stars {{ color: var(--warn); font-size: 14px; white-space: nowrap; }}
+    h2 {{ margin: 0 0 14px; font-size: 34px; }}
+    h3 {{ margin: 16px 0 8px; font-size: 20px; line-height: 1.2; }}
+    .skill-card p {{ margin: 0; color: var(--muted); min-height: 48px; }}
+    .meta {{ margin-top: 12px; color: var(--accent-2); font-size: 13px; }}
+    .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }}
+    .chip {{
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }}
+    .steps-wrap {{ position: relative; margin-top: 12px; }}
+    .steps {{
+      margin: 0;
+      padding-left: 20px;
+      color: #d8e0ec;
+      font-size: 13px;
+      max-height: 112px;
+      overflow: hidden;
+    }}
+    .premium .steps {{ filter: blur(5px); user-select: none; }}
+    .unlock {{
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }}
+    .cta-band {{
+      padding: 72px 0;
+      border-top: 1px solid var(--line);
+      background: #090d14;
+    }}
+    .pricing {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+    }}
+    .price-card {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      background: var(--panel);
+      min-height: 220px;
+    }}
+    .price-card.featured {{ border-color: rgba(110,231,183,.65); background: var(--panel-2); }}
+    .price {{ font-size: 34px; font-weight: 900; margin: 12px 0; }}
+    .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #04110d;
+      font-weight: 800;
+      text-decoration: none;
+      margin-top: 14px;
+    }}
+    footer {{ color: var(--muted); padding: 28px 0 42px; }}
+    @media (max-width: 820px) {{
+      .hero-grid, .toolbar, .pricing {{ grid-template-columns: 1fr; }}
+      header {{ min-height: auto; padding-top: 84px; }}
+      .result-count {{ white-space: normal; }}
+      nav .shell {{ align-items: flex-start; flex-direction: column; padding: 12px 0; }}
+      .toolbar {{ top: 92px; }}
+    }}
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="shell">
+      <div class="brand">WKAppBot Skills</div>
+      <div class="nav-links">
+        <a href="#skills">Browse</a>
+        <a href="#pricing">Pricing</a>
+        <button id="githubLogin" class="nav-button" type="button">Login with GitHub</button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="shell">
+    <div class="hero-grid">
+      <div>
+        <h1>AI brings the intelligence WKAppBot grows knowledge Together they compound</h1>
+        <p class="hero-copy">{count} total live skills from installed WKAppBot HQ catalogs, filtered for user and developer workflows.</p>
+      </div>
+      <aside class="hero-panel" aria-label="Skill catalog statistics">
+        <div class="stat-grid">
+          <div class="stat"><strong>{count}</strong><span>live skills</span></div>
+          <div class="stat"><strong>{apps}</strong><span>apps indexed</span></div>
+          <div class="stat"><strong>{premium_count}</strong><span>pro previews</span></div>
+        </div>
+        <p class="hero-copy">Search versioned knowhow, spot implementation depth, and preview the compounding knowledge base that every WKAppBot session grows.</p>
+      </aside>
+    </div>
+  </header>
+
+  <main id="skills" class="shell">
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
+      <div id="resultCount" class="result-count">{count} skills</div>
+    </div>
+    <section class="skills-grid" id="skillGrid">
+{cards}
+    </section>
+  </main>
+
+  <section class="cta-band" id="pricing">
+    <div class="shell">
+      <h2>Get Full Access</h2>
+      <p class="hero-copy">Move from browsing public knowhow to running premium developer workflows, guarded automations, and private team skill trees.</p>
+      <div class="pricing">
+        <article class="price-card">
+          <h3>Free</h3>
+          <div class="price">$0</div>
+          <p>Browse public skills and run the base automation surface.</p>
+          <a class="button" href="INSTALL.md">Start</a>
+        </article>
+        <article class="price-card featured">
+          <h3>Pro</h3>
+          <div class="price">$49</div>
+          <p>Unlock premium developer skill steps, CDP workflows, and multi-AI knowledge loops.</p>
+          <a class="button" href="pricing.md">Upgrade</a>
+        </article>
+        <article class="price-card">
+          <h3>Team</h3>
+          <div class="price">Custom</div>
+          <p>Private catalogs, team guardrails, and workflow-specific onboarding.</p>
+          <a class="button" href="LICENSING.md">Contact</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="shell">Generated from live WKAppBot HQ skill catalogs.</footer>
+
+  <script>
+    const search = document.getElementById('search');
+    const cards = Array.from(document.querySelectorAll('.skill-card'));
+    const resultCount = document.getElementById('resultCount');
+    const githubLogin = document.getElementById('githubLogin');
+    const stepItems = Array.from(document.querySelectorAll('.steps li[data-full]'));
+
+    function expandSteps() {{
+      for (const item of stepItems) {{
+        item.textContent = item.dataset.full;
+      }}
+    }}
+
+    async function checkGitHubAccess() {{
+      const token = localStorage.getItem('gh_token');
+      if (!token) return;
+      try {{
+        const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {{
+          headers: {{
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github+json'
+          }}
+        }});
+        if (response.status === 200) expandSteps();
+      }} catch (error) {{
+        console.warn('GitHub access check failed', error);
+      }}
+    }}
+
+    githubLogin.addEventListener('click', () => {{
+      const clientId = window.WKAPPBOT_GITHUB_CLIENT_ID || '';
+      if (!clientId) {{
+        window.location.href = 'https://github.com/settings/applications/new';
+        return;
+      }}
+      const oauth = new URL('https://github.com/login/oauth/authorize');
+      oauth.searchParams.set('client_id', clientId);
+      oauth.searchParams.set('scope', 'read:user');
+      oauth.searchParams.set('redirect_uri', window.location.href.split('#')[0]);
+      window.location.href = oauth.toString();
+    }});
+
+    function applySearch() {{
+      const q = search.value.trim().toLowerCase();
+      let visible = 0;
+      for (const card of cards) {{
+        const match = !q || card.dataset.search.toLowerCase().includes(q);
+        card.style.display = match ? '' : 'none';
+        if (match) visible += 1;
+      }}
+      resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
+    }}
+    search.addEventListener('input', applySearch);
+    checkGitHubAccess();
+  </script>
+</body>
+</html>
+"""
+
+
+def main() -> int:
+    skills = collect_skills()
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_text(build_html(skills), encoding="utf-8")
+    print(f"Generated {OUTPUT} with {len(skills)} skills")
+    return 0 if len(skills) > 50 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -18,7 +18,13 @@
     "Nightly healing in progress 2026-05-28",
     "SDK PROCESS CLEANUP TOOLS (2026-05-28, added for Haiku clarity): Two new wk* scripts in D:/GitHub/wkappbot-sdk/ root: (1) ./wkzombie.ps1 -MaxAge 45 -- kills wkappbot-core processes older than MaxAge seconds. Singleton: auto-kills previous instances first. -CmdlineFilter eye kills only eye-related zombies. -DryRun lists without killing. (2) ./wktaskkill.ps1 /IM wkappbot-core.exe -- smart wrapper: runs wkappbot taskkill classify then auto-kills ZOMBIE-classified processes. UNKNOWN stays PROTECTED by Core design (TaskkillCompatCommand.Classify.cs). Use wktaskkill for structured cleanup, wkzombie for age-based cleanup after Eye IPC hangs.",
     "Nightly heal run 2026-05-29: session audit in progress.",
-    "Nightly heal run 2026-05-29 second pass: session audit in progress."
+    "Nightly heal run 2026-05-29 second pass: session audit in progress.",
+    "Nightly heal run 2026-05-30: session audit in progress.",
+    "Nightly heal run 2026-05-30 pass2: session audit in progress.",
+    "Nightly heal run 2026-05-30 pass3: session audit in progress.",
+    "Nightly heal run 2026-05-30 pass4: session audit in progress.",
+    "Nightly heal run 2026-05-31: skill audit in progress.",
+    "Nightly heal run 2026-05-31 pass2: skill audit in progress."
   ],
   "requirements": [
     {
@@ -56,6 +62,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-28T20:43:32.3899855Z",
-  "version": "1.19"
+  "updated": "2026-05-30T20:43:34.9527488Z",
+  "version": "1.30"
 }

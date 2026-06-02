@@ -1,0 +1,44 @@
+{
+  "id": "sdk-gg-main-automation-t3-ref",
+  "app": "wkappbot-sdk",
+  "title": "sdk-gg-main Reference",
+  "title_ko": null,
+  "desc": "T3 Reference: session history and key decisions for sdk-gg-main-automation",
+  "steps": [
+    "2026-05-29: CI health check wkci.sh created. Smoke loop added to gg step 0. wkzombie -ExcludeFilter mcp needed.",
+    "2026-05-30: gg-main.sh rewritten with all-channel suggests, 9 bad-condition checks, skill refs per warning.",
+    "2026-05-30: CDP ask CRITICAL -- cdp open hanging 143min. ChromeLauncher timeout in state-check. Core fix 82d60f74f + ce6ee8569.",
+    "2026-05-31: KillForeign blind cron deleted. Section D rewrite -- LOGIN_PAGE/DEAD-LAT/DRIFT/kill events to auto-file suggests.",
+    "2026-06-02: wkask.sh backslash-n bug fixed 7x Codex revert. wkask.ps1 double BOM fixed. Chrome restore added. Log -Recurse removed. old_ask_gpt hardcode fixed. Core built+deployed."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation-t3-ref",
+      "expect": "2026",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation",
+      "expect": "Steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "gg-workflow",
+    "ref",
+    "history"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T12:17:09.598784Z",
+  "updated": "2026-06-02T12:17:09.5987968Z",
+  "version": "1.0"
+}

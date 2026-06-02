@@ -10,7 +10,7 @@ echo wkwrap.cmd --install ^| --status ^| (called as wkXXX.cmd -^> relay to wkXXX
 echo bash/Claude: wkXXX.sh  ^|  CMD/user: wkXXX.cmd  ^|  PS direct: wkXXX.ps1
 goto :eof
 :relay
-powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%DIR%%SELF%.ps1" %*
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%DIR%%SELF%.ps1" %*
 exit /b %ERRORLEVEL%
 :install
 set /a n=0

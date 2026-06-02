@@ -11,7 +11,7 @@
     "WKCDP COMMANDS (exact paths):\nSTATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1\nCLEAN STALE (kills idle sessions >2h): powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean\nKILL PORT: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 kill 9740\nCOOKIES CHECK: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 cookies\nDETAIL VIEW: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1\nwkcdp output: N session(s) WARN/CRIT flags. Run clean first, then re-check. CRIT=off-screen(false positive possible on left monitor), WARN=drift/age/dup-tabs.",
     "QA SCRIPT PATTERN -- state-check first (cheapest): check TGT-POS from cdp-mon. Off-screen (x<-100) = geometry bug = skip eval, auto-file suggest immediately. No Chrome invocation needed.",
     "QA SCRIPT PATTERN -- minimized recovery: before eval-js, check if Chrome minimized. If yes: wkappbot a11y restore GRAP, wait 2s, then eval. Minimized Chrome does not render -- DOM checks return false negatives.",
-    "QA SCRIPT PATTERN -- eval-js (medium cost): wkappbot a11y eval-js 'JS' --grap {proc:chrome,cdp:PORT}. Keep JS under 200 chars. Return null for not-found. Cross-validate with fast heuristic (file size, log keyword). Mismatch = update threshold.",
+    "QA SCRIPT PATTERN -- eval-js: wkappbot a11y read GRAP --eval-js JS. Keep JS under 200 chars. Return null for not-found. Cross-validate with fast heuristic. Note: standalone a11y eval-js removed; use a11y read --eval-js.",
     "QA SCRIPT PATTERN -- auto-suggest on confirmed bugs: wkappbot-core.exe suggest 'BUG: description' with exact port, observed vs expected, repro command. 3 requirements using wkappbot commands only.",
     "BUG EVIDENCE WORKFLOW: when filing suggest about ask/CDP failure, run wkask --raw to capture full log. Include [WARN]/[ERROR] lines in suggest text. wkcdp output is ready-made evidence for session anomalies.",
     "EXTEND THE PATTERN: any recurring monitor task = new wk-tool script in D:/GitHub/WKAppBot/bin/. Name: wk<domain>.ps1. Add test subcommand that validates heuristic vs eval-js agreement. Claude orchestrates, scripts execute.",
@@ -54,6 +54,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-10T13:32:49.8983722Z",
-  "updated": "2026-05-26T01:45:09.0048325Z",
-  "version": "1.14"
+  "updated": "2026-05-31T14:18:00.8791036Z",
+  "version": "1.16"
 }

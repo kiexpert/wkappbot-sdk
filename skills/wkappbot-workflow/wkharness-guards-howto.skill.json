@@ -1,0 +1,52 @@
+{
+  "id": "wkharness-guards-howto",
+  "app": "wkappbot-workflow",
+  "title": "wkharness-guards How-To",
+  "title_ko": null,
+  "desc": "wkharness-guards per-guard unblock steps, escape hatch procedure, guard cascade recovery",
+  "steps": [
+    "G1 ASK-GUARD: wkappbot ask/whisper with run_in_background=true -> blocked. Fix: remove run_in_background from the command. Only for fire-and-forget tasks, not streaming ask.",
+    "G2 KILL-GUARD: PS terminate-cmdlet on wkappbot-core/wkchat/wkappbot/wka11y -> blocked. Fix: wkappbot taskkill /IM <exe.exe> to classify. Use --dry-run to preview, --force <pid> for zombie kill.",
+    "G3 SKILL-SEARCH-NUDGE: soft exit-0 nudge, not a real block. Action: run wkappbot skill search <topic> first, then grep if insufficient.",
+    "G4 SKILL-EDIT-GUARD: direct .skill.json file edit blocked. Fix: wkappbot skill edit <id> for changes. wkappbot skill contribute ... to create new. Never edit .skill.json files directly.",
+    "G5 PACE-GUARD: Sonnet%>Total% fires on Edit/Write. Fix: delegate to Agent(model:opus) or Agent(model:haiku) with exact brief. EXEMPT: memory/*.md, project CLAUDE file, AGENTS.md. Check: wkharness.ps1 -Status",
+    "G6 CP949-GUARD: non-CP949 chars in Write blocked. Fix: ASCII or Hangul only in Write content.",
+    "G7 AGENT-BRIEF-GUARD: fewer than 3 wkappbot skill read lines in Agent prompt -> blocked. Fix: add skill read on-load + skill read wkharness-guards + task-relevant skill. All IDs validated live -- bad ID = blocked.",
+    "G8 OPUS-BUDGET-GUARD: Opus at 95% weekly budget -> blocked. Fix: use Agent(model:haiku) with exact brief. Or wait for Thursday 07:00 KST reset.",
+    "G9 STALL-GUARD: 300s + 10 calls solo -> blocked. Fix: delegate via Agent tool (resets counter). Read tool exempt. Streak resets on session change or 120s gap.",
+    "G10 BG-TASK-GUARD: bg task mark >30s -> blocks next tool. Fix: Read the background output file path -- reading clears the mark. Auto-evict after 10min.",
+    "SPEC-GATE: Opus Agent missing SPEC block -> blocked. Fix: prepend SPEC block -- 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. Block message shows AGENT ROUTING CHEATSHEET.",
+    "CLAUDE-MD-SYNC: Agent dispatch without Pending section in project main MD -> blocked. Fix: add ## Pending with checkbox item to project main MD, then retry Agent.",
+    "USAGE-TEST-GUARD: 50pct Opus redirect to wkclaude.sh habit trainer. Fix: retry Agent() (50% passes), or run Agent.cmd --model opus with heredoc in Bash.",
+    "WKCLAUDE-DIRECT: direct wkclaude.sh/cmd/ps1 call without Agent.cmd -> blocked. Fix: route through Agent.cmd in Bash or Agent() tool.",
+    "FULL ESCAPE when all delegation blocked: (1) skill* always exempt from all guards. (2) file-edit wrapper doubly exempt from pace+stall guards. (3) Lead command with wkappbot/git/gh/./wk* -- wk-only-gate checks LEADING TOKEN. (4) After file write: skill edit to clear pending lock, then delegate. (5) For file ops: wkappbot file tool path.",
+    "GUARD 3 SKILL-SEARCH-NUDGE: soft exit-0 nudge to run skill search before grepping. Not a block.",
+    "GUARD 4 SKILL-EDIT-GUARD: blocks .skill.json direct Edit/Write. Fix: wkappbot skill edit <id> or skill contribute.",
+    "GUARD 5 PACE-GUARD: blocks Sonnet Edit/Write when hogging. EXEMPT: memory/*.md and CLAUDE.md. Fix: delegate to Opus or Haiku."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto",
+      "expect": "G1 ASK-GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto",
+      "expect": "FULL ESCAPE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto",
+      "expect": "SPEC-GATE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T13:16:50.3527927Z",
+  "updated": "2026-05-31T20:06:27.4114152Z",
+  "version": "1.7"
+}

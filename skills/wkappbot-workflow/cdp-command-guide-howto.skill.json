@@ -1,0 +1,54 @@
+{
+  "id": "cdp-command-guide-howto",
+  "app": "wkappbot-workflow",
+  "title": "CDP Command Guide: Step-by-Step Howto",
+  "title_ko": null,
+  "desc": "CDP step-by-step: open, navigate, html, capture, eval-js, tabs, abnormal-tab recovery, error handling. See cdp-command-guide for quick-ref, cdp-command-guide-ref for full reference.",
+  "steps": [
+    "FIRST STEP ALWAYS -- cdp open: wkappbot cdp open <url> returns OK {proc:'chrome',cdp:9300,hwnd:0x...,domain:'...'}. ONLY command that auto-detects/launches Chrome. SAVE the cdp:{port} from output.",
+    "cdp:{port} IN GRAP IS MANDATORY for all other commands: {proc:'chrome',cdp:9300}. Omitting it = error. Bare URL as first arg = error. Copy port from cdp open output exactly.",
+    "NAVIGATE: wkappbot cdp navigate GRAP 'https://example.com' -- waits for load. Reuses existing tab or opens new one if host changed. GRAP = {proc:'chrome',cdp:PORT}.",
+    "READ HTML: wkappbot cdp html GRAP -- returns full outerHTML for scraping/inspection.",
+    "CAPTURE: wkappbot cdp capture GRAP -- saves PNG screenshot, prints path.",
+    "URL+TITLE: wkappbot cdp url GRAP then cdp title GRAP -- returns current page URL or document title.",
+    "EVAL JS: wkappbot a11y read GRAP --eval-js 'document.title' -- a11y eval removed; always use a11y read --eval-js.",
+    "TABS: wkappbot cdp tabs -- list all tabs. wkappbot cdp close GRAP -- close current tab.",
+    "PORT FORMULA: SHA256(project-git-root)[0:4] % 174 * 4 + 9300, aligned to 0xFFFC. Same project = same port always. Wrong port = not in project CDP block error.",
+    "ABNORMAL TAB RECOVERY: If tab crashed (chrome-error://) -- cdp open auto-closes it and opens fresh tab. If tab unresponsive -- EvalAsync ping fails after 2000ms, tab closed and recreated. NEVER kill Chrome process for a crashed tab -- close only the bad tab.",
+    "ERROR RECOVERY: grap required -> pass {proc:'chrome',cdp:PORT} not raw URL. not in project CDP block -> wrong port, re-run cdp open. No node with given id -> DOM changed, re-run cdp html. CDP:DIALOG:BLOCKED -> JS alert auto-dismissed, command retried. LAT=ALERT -> clear with: wkappbot cdp eval GRAP 'window.onbeforeunload=null'"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-command-guide-howto",
+      "expect": "FIRST STEP ALWAYS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-command-guide-howto",
+      "expect": "NAVIGATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-command-guide-howto",
+      "expect": "ERROR RECOVERY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "chrome",
+    "howto",
+    "navigate",
+    "eval",
+    "tabs",
+    "error-recovery",
+    "beginner"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T13:05:36.1979591Z",
+  "updated": "2026-05-31T13:05:36.1979673Z",
+  "version": "1.0"
+}

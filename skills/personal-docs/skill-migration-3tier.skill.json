@@ -1,0 +1,67 @@
+{
+  "id": "skill-migration-3tier",
+  "app": "personal-docs",
+  "title": "Skill Migration: 3-Tier Split + ID Fix",
+  "title_ko": null,
+  "desc": "Migration guide: fat/long skills to 3-tier lazy-loading. Covers snapshot, ID shortening, T1/T2/T3 split, ref updates, atomic switch, regression verification. Opus-reviewed.",
+  "steps": [
+    "STEP 0 SNAPSHOT: export and version the skill before touching it. Write the rollback command. Confirm snapshot exists before proceeding.",
+    "CROSS-REPO USE: this guide applies to any repo. Any agent (WKAppBot, wkappbot-sdk, WkAutoQuant, personal-docs) can follow these steps. The wkappbot skill catalog is global -- wkappbot skill read skill-migration-3tier works from any repo. Pilot each repo independently: run STEP 0 snapshot, then split one low-blast skill per repo before touching shared skills.",
+    "STEP 1b DESC AUDIT: description over 1024 chars also causes Codex to skip the skill entirely (same as ID violation). Check: wkappbot skill read <id> and measure Desc field length. Fix: shorten to under 1024 chars. Violations seen: WkAutoQuant-hantoo-rest-chart-integration. Codex hard limits: ID<=64 chars AND Desc<=1024 chars -- both required.",
+    "STEP 0b TARGET DISCOVERY: Priority = load frequency x step count. Highest-value targets: (1) wkappbot skill read on-load -- loaded every session start, check version number (v100+ = high churn). (2) claude-code-agent-tier-routing -- loaded before every delegation. (3) wkharness-pre-commit-source-gate -- loaded at every commit attempt. (4) skill-contribute-edit -- loaded at every skill operation. Method: wkappbot skill read <id> and check Version number and step count. Version over 20 plus steps over 12 = strong split candidate. Do this audit before choosing what to split next.",
+    "WHEN TO EXECUTE: do not wait for a 'good time' -- calculate. Formula: (step count x avg 80 tokens) x (sessions per day x days until you fix it) vs Opus split cost 5000-15000 tokens. If the recurring tax exceeds the split cost within 3 days: split today. on-load example: 40 steps x 80 tokens x 3 sessions/day = 9600 tokens/day wasted. Opus split cost ~8000. Payoff in under 1 day. See token-economy skill for full framework.",
+    "PROGRESS LOG 2026-05-31 on-load split IN PROGRESS Opus session. Snapshot at memory/on-load-v1.102-snapshot-20260531.txt. Brief at memory/on-load-split-brief-20260531.md. Tier plan T1 4 steps T2 12 steps T3 16 steps sum 32 ge original 28 zero loss. Codex executing per brief.",
+    "CLAUDE.MD MIGRATION: same 3-tier principle applies to CLAUDE.md itself. CLAUDE.md is loaded every session in full -- verbose sections are a per-session tax. Plan: wkappbot skill read claudemd-slim-plan. Token savings formula: wkappbot skill read token-economy. Execution order: skill splits first (reduces context already), then CLAUDE.md slim (removes pointers to now-lean skills). Opus only.",
+    "INTEGRITY CHECKLIST (mandatory after any split/edit): (1) FILE: grep the edited file for key strings -- verify variable names not stripped, no garbled code. (2) INSTALL: wkappbot skill search <id> -- verify T1/T2/T3 all appear in results. (3) PARSE: run wkpace.cmd or wkharness.ps1 -Test -- verify no parse errors from modified harness files. REAL EXAMPLES of skipping this: (a) on-load-howto not installed = T2 invisible to next session; (b) wkharness-session-init.ps1 garbled code from dollar-underscore stripping = all Agent calls blocked until Opus fixed it; (c) stall-guard message edit + unstaged PS5.1 inline-if error = harness parse failure. Skipping integrity check = token cost doubles on the next session that hits the hidden break.",
+    "TIP: delegate integrity check to Haiku. After any split/edit, spawn: Agent.cmd --model haiku with 3 tasks: (1) grep key strings in modified file, (2) wkappbot skill search <id> verify T1/T2/T3 visible, (3) wkpace.cmd to confirm no parse error. Haiku is pace-exempt and catches errors Sonnet would rationalize away. Pattern: Sonnet edits -> Haiku verifies -> Sonnet reports. Never self-certify.",
+    "SESSION 2026-05-31 wkharness-guards + cdp-command-guide 3-tier split attempt: cdp T2/T3 already existed but T1 not trimmed, T2 missing cdp open step, T3 missing 20 steps. wkharness-guards T2/T3 completely missing. Background agents stuck at Spawning. skill contribute failed (quoting issue). NEXT: create T2/T3 via skill contribute + add-step sequence."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "STEP 0 SNAPSHOT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "STEP 8 ATOMIC SWITCH",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "PILOT ORDER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read token-economy",
+      "expect": "cost-benefit formula for deciding when to split now vs later",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claudemd-slim-plan",
+      "expect": "CLAUDE.md token optimization plan (same 3-tier principle applied to CLAUDE.md)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-tree",
+    "migration",
+    "split",
+    "3tier",
+    "id-fix",
+    "codex",
+    "cross-repo",
+    "스킬트리",
+    "마이그레이션",
+    "분리",
+    "아이디수정",
+    "코덱스"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T07:12:24.9139351Z",
+  "updated": "2026-05-31T13:14:02.9402945Z",
+  "version": "1.20"
+}

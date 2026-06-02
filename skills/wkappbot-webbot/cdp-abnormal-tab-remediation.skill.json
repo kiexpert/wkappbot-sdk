@@ -1,0 +1,39 @@
+{
+  "id": "cdp-abnormal-tab-remediation",
+  "app": "wkappbot-webbot",
+  "title": "CDP abnormal tab recovery -- prevent blind EDITOR-WAIT hang on crashed/session-restore tab",
+  "title_ko": null,
+  "desc": "After wkzombie kills Eye, Chrome tab left in dirty state (crashed, session-restore, nav-stuck). Current EDITOR-WAIT loops until timeout creating zombies. IsBadTabState detects and fresh-navigates before wait.",
+  "steps": [
+    "SYMPTOM: ask gpt hangs 15s EDITOR-WAIT repeatedly, zombie wkappbot-core accumulates. Cause: wkzombie force-kills Eye leaving Chrome tab dirty (chrome-error://, Aw Snap, session-restore dialog blocking editor).",
+    "DETECTION (IsBadTabState): url starts with chrome-error:// or chrome://crash, or title contains Aw Snap. Implemented in CdpClient.TabRecovery.cs as static bool IsBadTabState(string url, string title).",
+    "RECOVERY: on bad tab detected, navigate fresh https://chatgpt.com before entering EDITOR-WAIT. Max 3s detection budget, silent fail on exception.",
+    "IMPLEMENTATION STATUS: CdpClient.TabRecovery.cs DONE at D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/. AskCommands.ChatGpt.EditorWait.cs PENDING -- insert try-catch IsBadTabState block at line 51 after cdp.EnsureChromeNotIconic() and before Console.Write EDITOR-WAIT.",
+    "NEXT STEPS: see CLAUDE.md CDP-TODO-1 (wire EditorWait.cs) CDP-TODO-2 (build) CDP-TODO-3 (commit). New session required due to pace exhaustion."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot ask gpt say:test",
+      "expect": "response within 30s after Chrome crash-recovery",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "no zombie from blind EDITOR-WAIT on crashed tab",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-abnormal-tab-remediation",
+      "expect": "wiring steps actionable for next session",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T05:27:54.8278449Z",
+  "updated": "2026-05-31T12:35:35.537611Z",
+  "version": "1.14"
+}
