@@ -471,6 +471,11 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       border-color: rgba(110,231,183,.7);
       color: var(--accent);
     }}
+    .pro-unlock-button.denied {{
+      border-color: rgba(248,113,113,.7);
+      color: #f87171;
+      background: rgba(40,15,15,.92);
+    }}
     .pro-unlock-button.unlocked {{
       display: none;
     }}
@@ -609,16 +614,27 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     }}
     window.unlockAll = unlockAll;
 
-    function showLockedState() {{
-      proUnlockButton.classList.remove('unlocked');
+    function showIdleState() {{
+      proUnlockButton.classList.remove('unlocked', 'denied');
       proUnlockButton.textContent = String.fromCodePoint(0x1f512);
       proUnlockButton.title = 'Enter PAT to unlock Pro';
       proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
     }}
 
+    function showDeniedState(reason) {{
+      proUnlockButton.classList.remove('unlocked');
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }}
+
     async function checkGitHubAccess(token) {{
       if (!token) {{
-        showLockedState();
+        showIdleState();
         return;
       }}
       try {{
@@ -630,12 +646,16 @@ def build_html(skills: list[dict[str, Any]]) -> str:
         }});
         if (response.status === 204) {{
           unlockAll();
+        }} else if (response.status === 401) {{
+          showDeniedState('invalid');
+        }} else if (response.status === 403 || response.status === 404) {{
+          showDeniedState('noaccess');
         }} else {{
-          showLockedState();
+          showIdleState();
         }}
       }} catch (error) {{
         console.warn('GitHub access check failed', error);
-        showLockedState();
+        showIdleState();
       }}
     }}
 
@@ -653,13 +673,17 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     }});
 
     proUnlockButton.addEventListener('click', () => {{
-      const token = window.prompt('Enter GitHub Personal Access Token', localStorage.getItem('gh_token') || '');
-      if (!token) {{
-        showLockedState();
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {{
+        localStorage.removeItem('gh_token');
+        showIdleState();
         return;
       }}
-      localStorage.setItem('gh_token', token.trim());
-      checkGitHubAccess(token.trim());
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
     }});
 
     function applySearch() {{
