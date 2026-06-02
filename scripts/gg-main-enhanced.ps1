@@ -147,6 +147,68 @@ if ($disk_queue -gt 80) {
 Write-Host ""
 
 # ============================================================================
+# ISSUE #9: Public Skill Page Freshness
+# ============================================================================
+Write-Host "==[ ISSUE #9 ] Public Skill Page Freshness ==" -ForegroundColor Cyan
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$ghCommand = Get-Command gh -ErrorAction SilentlyContinue
+
+if ($ghCommand) {
+  try {
+    $pages = gh api repos/kiexpert/wkappbot-sdk/pages 2>$null | ConvertFrom-Json
+    $pagesStatus = $pages.status
+    if ($pagesStatus -eq "built") {
+      Write-Host "  [OK] GitHub Pages status: built" -ForegroundColor Green
+    } else {
+      Write-Host "  [WARN]  WARNING: GitHub Pages status is '$pagesStatus' (expected built)" -ForegroundColor Yellow
+      $WARNINGS += "GitHub Pages not built (status=$pagesStatus)"
+    }
+  } catch {
+    Write-Host "  [WARN]  WARNING: Cannot read GitHub Pages status via gh api" -ForegroundColor Yellow
+    $WARNINGS += "GitHub Pages status unavailable"
+  }
+} else {
+  Write-Host "  [WARN]  WARNING: gh CLI not available; cannot check GitHub Pages status" -ForegroundColor Yellow
+  $WARNINGS += "GitHub Pages status unavailable (gh missing)"
+}
+
+$docsIndex = Join-Path $repoRoot "docs/index.html"
+if (Test-Path $docsIndex) {
+  $docsAgeHours = ((Get-Date) - (Get-Item $docsIndex).LastWriteTime).TotalHours
+  if ($docsAgeHours -gt 25) {
+    Write-Host "  [WARN]  WARNING: docs/index.html is $([math]::Round($docsAgeHours, 1)) hours old (>25)" -ForegroundColor Yellow
+    $WARNINGS += "docs/index.html stale ($([math]::Round($docsAgeHours, 1))h > 25h)"
+  } else {
+    Write-Host "  [OK] docs/index.html fresh ($([math]::Round($docsAgeHours, 1))h old)" -ForegroundColor Green
+  }
+} else {
+  Write-Host "  [WARN]  WARNING: docs/index.html missing" -ForegroundColor Yellow
+  $WARNINGS += "docs/index.html missing"
+}
+
+if ($ghCommand) {
+  try {
+    $lastRun = gh run list --repo kiexpert/wkappbot-sdk --workflow build-skill-page.yml --limit 1 --json databaseId,status,conclusion,createdAt 2>$null | ConvertFrom-Json | Select-Object -First 1
+    if ($lastRun -and $lastRun.status -eq "completed" -and $lastRun.conclusion -eq "success") {
+      Write-Host "  [OK] build-skill-page last run: success (#$($lastRun.databaseId), $($lastRun.createdAt))" -ForegroundColor Green
+    } elseif ($lastRun) {
+      Write-Host "  [WARN]  WARNING: build-skill-page last run status=$($lastRun.status), conclusion=$($lastRun.conclusion)" -ForegroundColor Yellow
+      $WARNINGS += "build-skill-page last run not successful (status=$($lastRun.status), conclusion=$($lastRun.conclusion))"
+    } else {
+      Write-Host "  [WARN]  WARNING: No build-skill-page workflow runs found" -ForegroundColor Yellow
+      $WARNINGS += "build-skill-page workflow run missing"
+    }
+  } catch {
+    Write-Host "  [WARN]  WARNING: Cannot read build-skill-page workflow status via gh run list" -ForegroundColor Yellow
+    $WARNINGS += "build-skill-page workflow status unavailable"
+  }
+} else {
+  Write-Host "  [WARN]  WARNING: gh CLI not available; cannot check build-skill-page workflow" -ForegroundColor Yellow
+  $WARNINGS += "build-skill-page workflow status unavailable (gh missing)"
+}
+Write-Host ""
+
+# ============================================================================
 # FINAL ALERT SUMMARY
 # ============================================================================
 Write-Host "=== ALERT SUMMARY ===" -ForegroundColor Cyan
