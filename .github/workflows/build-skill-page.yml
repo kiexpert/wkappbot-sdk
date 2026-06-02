@@ -6,32 +6,24 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-skill-page:
+  verify-pages-docs:
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Build skill page
-        run: python scripts/build-skill-page.py
-
-      - name: Commit generated page
+      - name: Verify committed Pages docs
         shell: pwsh
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/skills/index.html
-          if (git diff --cached --quiet) {
-            Write-Host "No generated page changes."
-            exit 0
+          git status --short
+
+          foreach ($path in @('docs/index.html', 'docs/skills/index.html')) {
+            if (Test-Path $path) {
+              Write-Host "Found $path"
+            } else {
+              Write-Warning "$path is missing. GitHub Pages deploys from committed docs/ content; run scripts/build-skill-page.py locally before committing when regenerating the skill browser."
+            }
           }
-          git commit -m "chore: build skill page [skip ci]"
-          git push
