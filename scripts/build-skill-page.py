@@ -449,6 +449,31 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       color: white;
       font-weight: 800;
     }}
+    .pro-unlock-button {{
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 12;
+      display: inline-grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12,17,26,.9);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 16px 48px rgba(0,0,0,.34);
+      backdrop-filter: blur(12px);
+    }}
+    .pro-unlock-button:hover {{
+      border-color: rgba(110,231,183,.7);
+      color: var(--accent);
+    }}
+    .pro-unlock-button.unlocked {{
+      display: none;
+    }}
     .cta-band {{
       padding: 72px 0;
       border-top: 1px solid var(--line);
@@ -559,23 +584,43 @@ def build_html(skills: list[dict[str, Any]]) -> str:
   </section>
 
   <footer class="shell">Generated from live WKAppBot HQ skill catalogs.</footer>
+  <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro">&#128274;</button>
 
   <script>
     const search = document.getElementById('search');
     const cards = Array.from(document.querySelectorAll('.skill-card'));
     const resultCount = document.getElementById('resultCount');
     const githubLogin = document.getElementById('githubLogin');
+    const proUnlockButton = document.getElementById('proUnlockButton');
     const stepItems = Array.from(document.querySelectorAll('.steps li[data-full]'));
+    const premiumCards = Array.from(document.querySelectorAll('.skill-card.premium'));
 
-    function expandSteps() {{
+    function unlockAll() {{
       for (const item of stepItems) {{
         item.textContent = item.dataset.full;
       }}
+      for (const overlay of document.querySelectorAll('.unlock')) {{
+        overlay.remove();
+      }}
+      for (const card of premiumCards) {{
+        card.classList.remove('premium');
+      }}
+      proUnlockButton.classList.add('unlocked');
+    }}
+    window.unlockAll = unlockAll;
+
+    function showLockedState() {{
+      proUnlockButton.classList.remove('unlocked');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
     }}
 
-    async function checkGitHubAccess() {{
-      const token = localStorage.getItem('gh_token');
-      if (!token) return;
+    async function checkGitHubAccess(token) {{
+      if (!token) {{
+        showLockedState();
+        return;
+      }}
       try {{
         const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {{
           headers: {{
@@ -583,9 +628,14 @@ def build_html(skills: list[dict[str, Any]]) -> str:
             Accept: 'application/vnd.github+json'
           }}
         }});
-        if (response.status === 200) expandSteps();
+        if (response.status === 204) {{
+          unlockAll();
+        }} else {{
+          showLockedState();
+        }}
       }} catch (error) {{
         console.warn('GitHub access check failed', error);
+        showLockedState();
       }}
     }}
 
@@ -602,6 +652,16 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       window.location.href = oauth.toString();
     }});
 
+    proUnlockButton.addEventListener('click', () => {{
+      const token = window.prompt('Enter GitHub Personal Access Token', localStorage.getItem('gh_token') || '');
+      if (!token) {{
+        showLockedState();
+        return;
+      }}
+      localStorage.setItem('gh_token', token.trim());
+      checkGitHubAccess(token.trim());
+    }});
+
     function applySearch() {{
       const q = search.value.trim().toLowerCase();
       let visible = 0;
@@ -613,7 +673,13 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
     }}
     search.addEventListener('input', applySearch);
-    checkGitHubAccess();
+    window.addEventListener('message', (event) => {{
+      const message = event.data || {{}};
+      if (message.type !== 'auth' || !message.token) return;
+      localStorage.setItem('gh_token', message.token);
+      checkGitHubAccess(message.token);
+    }});
+    checkGitHubAccess(localStorage.getItem('gh_token'));
   </script>
 </body>
 </html>

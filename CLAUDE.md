@@ -497,7 +497,11 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] README: Artificial Knowledge Platform pitch 섹션 추가 (edea870c) -- push 대기 중
 - [ ] 3tier migration 잔여: wktool-pattern(12), grap(10), wkcdp-mon, sdk-public-skill-index
 - [ ] skill browser 파이프라인: build-skill-page.py + .env 마스킹 + 44자 트런케이션 + GHA 워크플로 완성 중
-- [ ] 주업무 파이프라인 전수조사 중 (CDP ask / gg-main / 스킬트리 커버리지)
+- [x] 주업무 파이프라인 전수조사 완료 + gg-main ISSUE #9 Web 섹션 추가
+- [x] sdk-skill-browser-pipeline T1/T2/T3 스킬 등록 완료
+- [x] sonnet-bug-stop-policy-ref PATTERN 9 추가 (guard early not late)
+- [x] docs/skills/ 구조 재편 + check-skill-browser.sh + check-skill-tree.sh self-healing 완성
+- [ ] check-skill-tree.sh 첫 실행 + gg-main 통합 + push 대기
 - [x] Codex 재도입 세션 종료: hwnd:0x10480 (Review Gemini work) + hwnd:0x20628 (Implement skill tree) 모두 종료
 - [ ] CDP ask 박멸 작업 중: wkask.ps1 line 149 Chrome restore 블록 추가 필요 (가드 cascade로 직접 편집 불가 상태)
 - [ ] Core push 완료 2026-06-02: 36b1892bb..8e2e209c7 (wkask 수정 포함)

@@ -179,6 +179,31 @@
       color: white;
       font-weight: 800;
     }
+    .pro-unlock-button {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 12;
+      display: inline-grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12,17,26,.9);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 16px 48px rgba(0,0,0,.34);
+      backdrop-filter: blur(12px);
+    }
+    .pro-unlock-button:hover {
+      border-color: rgba(110,231,183,.7);
+      color: var(--accent);
+    }
+    .pro-unlock-button.unlocked {
+      display: none;
+    }
     .cta-band {
       padding: 72px 0;
       border-top: 1px solid var(--line);
@@ -238,11 +263,11 @@
     <div class="hero-grid">
       <div>
         <h1>AI brings the intelligence WKAppBot grows knowledge Together they compound</h1>
-        <p class="hero-copy">418 total live skills from installed WKAppBot HQ catalogs, filtered for user and developer workflows.</p>
+        <p class="hero-copy">420 total live skills from installed WKAppBot HQ catalogs, filtered for user and developer workflows.</p>
       </div>
       <aside class="hero-panel" aria-label="Skill catalog statistics">
         <div class="stat-grid">
-          <div class="stat"><strong>418</strong><span>live skills</span></div>
+          <div class="stat"><strong>420</strong><span>live skills</span></div>
           <div class="stat"><strong>8</strong><span>apps indexed</span></div>
           <div class="stat"><strong>73</strong><span>pro previews</span></div>
         </div>
@@ -254,7 +279,7 @@
   <main id="skills" class="shell">
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
-      <div id="resultCount" class="result-count">418 skills</div>
+      <div id="resultCount" class="result-count">420 skills</div>
     </div>
     <section class="skills-grid" id="skillGrid">
 
@@ -3134,6 +3159,36 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
         <div class="tags"></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="NIGHTLY-GUARD UNLOCK: Check CronList tool output. If any job missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): create all 4 via CronCreate(cron, durable=true, recurring=true, prompt=&#x27;wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent&#x27;). This unblocks Bash/PS commands blocked by harness nightly-guard.">NIGHTLY-GUARD UNLOCK: Check CronList tool ou...</li><li data-full="BINARY STATUS CHECK: Locate wkappbot.exe in D:/GitHub/WKAppBot/bin/ (main), D:/GitHub/WKAppBot/bin/wkappbot.hq/launcher-stage/ (fallback), D:/GitHub/wkappbot-sdk/bin/ (SDK deploy). Record: file size, last modified, version via file properties. Slow response suggests corrupted/incomplete binary.">BINARY STATUS CHECK: Locate wkappbot.exe in...</li><li data-full="SAFETY BACKUP: Create backup before rebuild: cp wkappbot.exe wkappbot.exe.bak.$(date +%s) in all three bin/ directories. Preserves fallback for rollback.">SAFETY BACKUP: Create backup before rebuild:...</li><li data-full="FULL DOTNET PUBLISH: Execute: dotnet publish D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --verbosity minimal. Monitor output for: (1) &#x27;Restoring/restored&#x27; = dependency check OK. (2) &#x27;Generating native code&#x27; = AOT compilation started (this is normal, takes 30-60s). (3) &#x27;wkappbot.dll&#x27; = intermediate build OK. (4) &#x27;[Launcher] deployed&#x27; = deployment completed to both SDK and Core bin/ paths.">FULL DOTNET PUBLISH: Execute: dotnet publish...</li><li data-full="DEPLOYMENT VERIFICATION: Expect output lines: &#x27;[Launcher] renamed: wkappbot.exe -&gt; wkappbot.old-TIMESTAMP.exe in D:/GitHub/wkappbot-sdk/bin&#x27; AND &#x27;[Launcher] deployed: wkappbot.exe -&gt; D:/GitHub/wkappbot-sdk/bin&#x27; AND same for D:/GitHub/WKAppBot/bin. Backup auto-renamed with timestamp. Two deploy confirmations = success.">DEPLOYMENT VERIFICATION: Expect output lines...</li></ol>
+          
+        </div>
+      </article>
+
+      <article class="skill-card" data-search="SDK Skill Browser HowTo T2 HowTo: step-by-step guide to set up, run, and maintain the skill browser mar... wkappbot-sdk sdk skill-browser howto setup gha">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>SDK Skill Browser HowTo</h3>
+        <p>T2 HowTo: step-by-step guide to set up, run, and maintain the skill browser mar...</p>
+        <div class="meta">developer</div>
+        <div class="tags"><span class="chip">sdk</span><span class="chip">skill-browser</span><span class="chip">howto</span><span class="chip">setup</span><span class="chip">gha</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="INITIAL SETUP: git clone wkappbot-sdk. pip install nothing needed (stdlib only). Ensure D:/GitHub/WKAppBot/bin/wkappbot.hq/skills/ exists (HQ skill catalog). Set GH_PAT env var for Pages status check and OAuth.">INITIAL SETUP: git clone wkappbot-sdk. pip i...</li><li data-full="BUILD: python scripts/build-skill-page.py -- auto-finds HQ catalog, filters apps, masks secrets, writes docs/skills/index.html. Run after any skill changes to refresh.">BUILD: python scripts/build-skill-page.py --...</li><li data-full="GITHUB PAGES: Settings &gt; Pages &gt; Source: main branch /docs. URL: https://***.github.io/wkappbot-sdk/. Check: gh api repos/.../pages">GITHUB PAGES: Settings &gt; Pages &gt; Source: mai...</li><li data-full="grep status.">grep status.</li><li data-full="GHA TRIGGER FROM CORE: add .github/workflows/notify-sdk.yml to Core repo with repository_dispatch event skill-catalog-updated targeting ***/wkappbot-sdk. SDK workflow listens and rebuilds.">GHA TRIGGER FROM CORE: add .github/workflows...</li></ol>
+          
+        </div>
+      </article>
+
+      <article class="skill-card" data-search="SDK Skill Browser Reference T3 Reference: design decisions, architecture choices, and evolution history of... wkappbot-sdk sdk skill-browser ref design history">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>SDK Skill Browser Reference</h3>
+        <p>T3 Reference: design decisions, architecture choices, and evolution history of...</p>
+        <div class="meta">developer</div>
+        <div class="tags"><span class="chip">sdk</span><span class="chip">skill-browser</span><span class="chip">ref</span><span class="chip">design</span><span class="chip">history</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="ARCHITECTURE DECISION (2026-06-02): skills are JSON but JSON schema hidden. Build script outputs skills-data.js as a JS variable wrap -- prevents direct JSON API scraping and hides internal schema from casual inspection.">ARCHITECTURE DECISION (2026-06-02): skills a...</li><li data-full="PRIVACY DESIGN: masking is BUILD-TIME not runtime. .env values replaced with *** in Python before HTML generation. Even if user reads JS, they only see ***. App allowlist (wkappbot-* only) removes personal trading/private data entirely.">PRIVACY DESIGN: masking is BUILD-TIME not ru...</li><li data-full="UI EVOLUTION: v1 = pre-baked HTML 14367 lines. v2 = split panel left/right. v3 = skills-data.js + dynamic render. Each version cleaner and more maintainable.">UI EVOLUTION: v1 = pre-baked HTML 14367 line...</li><li data-full="MARKETING INSIGHT: 416 live skills IS the product demo. The skill browser proves the flywheel works. sonnet-bug-stop-policy-ref proves AI sessions learn. wkappbot-the-artificial-knowledge-platform explains why it matters.">MARKETING INSIGHT: 416 live skills IS the pr...</li><li data-full="SONNET PATTERN 9 (2026-06-02): Sonnet spent entire session fighting guards instead of delegating. Spent 40+ tool calls on wkask.sh backslash-n bug that 8 Codex sessions kept reintroducing. Root cause: no harness:block on the Core repo for bin/wkask.sh BEFORE the Codex sessions started. Fix: add harness:block early, not after 7 reverts. Lesson: the FIRST revert of a critical script is the time to add the guard, not the eighth.">SONNET PATTERN 9 (2026-06-02): Sonnet spent...</li></ol>
           
         </div>
       </article>
@@ -6980,23 +7035,43 @@ WHY SO HEAVY: this chain is designed for real code fixes (built, deployed, commi
   </section>
 
   <footer class="shell">Generated from live WKAppBot HQ skill catalogs.</footer>
+  <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro">&#128274;</button>
 
   <script>
     const search = document.getElementById('search');
     const cards = Array.from(document.querySelectorAll('.skill-card'));
     const resultCount = document.getElementById('resultCount');
     const githubLogin = document.getElementById('githubLogin');
+    const proUnlockButton = document.getElementById('proUnlockButton');
     const stepItems = Array.from(document.querySelectorAll('.steps li[data-full]'));
+    const premiumCards = Array.from(document.querySelectorAll('.skill-card.premium'));
 
-    function expandSteps() {
+    function unlockAll() {
       for (const item of stepItems) {
         item.textContent = item.dataset.full;
       }
+      for (const overlay of document.querySelectorAll('.unlock')) {
+        overlay.remove();
+      }
+      for (const card of premiumCards) {
+        card.classList.remove('premium');
+      }
+      proUnlockButton.classList.add('unlocked');
+    }
+    window.unlockAll = unlockAll;
+
+    function showLockedState() {
+      proUnlockButton.classList.remove('unlocked');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
     }
 
-    async function checkGitHubAccess() {
-      const token = localStorage.getItem('gh_token');
-      if (!token) return;
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showLockedState();
+        return;
+      }
       try {
         const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {
           headers: {
@@ -7004,9 +7079,14 @@ WHY SO HEAVY: this chain is designed for real code fixes (built, deployed, commi
             Accept: 'application/vnd.github+json'
           }
         });
-        if (response.status === 200) expandSteps();
+        if (response.status === 204) {
+          unlockAll();
+        } else {
+          showLockedState();
+        }
       } catch (error) {
         console.warn('GitHub access check failed', error);
+        showLockedState();
       }
     }
 
@@ -7023,6 +7103,16 @@ WHY SO HEAVY: this chain is designed for real code fixes (built, deployed, commi
       window.location.href = oauth.toString();
     });
 
+    proUnlockButton.addEventListener('click', () => {
+      const token = window.prompt('Enter GitHub Personal Access Token', localStorage.getItem('gh_token') || '');
+      if (!token) {
+        showLockedState();
+        return;
+      }
+      localStorage.setItem('gh_token', token.trim());
+      checkGitHubAccess(token.trim());
+    });
+
     function applySearch() {
       const q = search.value.trim().toLowerCase();
       let visible = 0;
@@ -7034,7 +7124,13 @@ WHY SO HEAVY: this chain is designed for real code fixes (built, deployed, commi
       resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
     }
     search.addEventListener('input', applySearch);
-    checkGitHubAccess();
+    window.addEventListener('message', (event) => {
+      const message = event.data || {};
+      if (message.type !== 'auth' || !message.token) return;
+      localStorage.setItem('gh_token', message.token);
+      checkGitHubAccess(message.token);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
   </script>
 </body>
 </html>

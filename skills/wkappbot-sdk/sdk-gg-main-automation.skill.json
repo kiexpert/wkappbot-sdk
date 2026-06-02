@@ -15,7 +15,8 @@
     "SECTION R (Release): Before ship verify version refs match VERSIONING/README/CHANGELOG/SECURITY",
     "ENHANCED: 8 issue categories (1)Chrome mult >5/crit>20 (2)Eye lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Exit: 0=Green 1=Warn 2=Crit. See howto T2 smoke-loop T3 history.",
     "2026-06-02: wkappbot-the-artificial-knowledge-platform skill added to README.md pitch section. Resolving suggest ts=2026-06-02T13:55:57",
-    "2026-06-02 marketing: build-skill-page.py automation script + docs/index.html + GHA workflow pending Codex"
+    "2026-06-02 marketing: build-skill-page.py automation script + docs/index.html + GHA workflow pending Codex",
+    "SECTION SKILL-TREE: bash scripts/check-skill-tree.sh -- auto-heals T2/T3 skills missing parent T1 backlinks. Runs after skill migrations. 103 skills checked, auto-adds 'Parent T1: wkappbot skill read BASE' step to orphaned skills. Run separately (slow: ~103 skill reads). Not in 3h loop -- run on-demand or post-migration."
   ],
   "requirements": [
     {
@@ -47,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T03:59:22.3966318Z",
-  "updated": "2026-06-02T14:41:11.3099466Z",
-  "version": "1.27"
+  "updated": "2026-06-02T16:54:46.7916349Z",
+  "version": "1.28"
 }

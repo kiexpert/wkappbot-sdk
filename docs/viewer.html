@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WKAppBot Skill Viewer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b10;
+      --panel: rgba(15, 22, 32, 0.92);
+      --line: rgba(148, 163, 184, 0.26);
+      --text: #e5edf7;
+      --muted: #92a1b5;
+      --accent: #4fd1c5;
+      --accent-strong: #79ffe1;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(79, 209, 197, 0.12), transparent 28rem),
+        linear-gradient(135deg, #080b10 0%, #101827 52%, #05070b 100%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    iframe {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: var(--bg);
+    }
+
+    .auth-overlay {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: min(480px, calc(100vw - 36px));
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.42);
+      backdrop-filter: blur(16px);
+    }
+
+    .auth-overlay input {
+      min-width: 0;
+      flex: 1 1 auto;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0 10px;
+      background: rgba(3, 7, 18, 0.82);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+    }
+
+    .auth-overlay input::placeholder {
+      color: var(--muted);
+    }
+
+    .auth-overlay input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.18);
+    }
+
+    .auth-overlay button {
+      flex: 0 0 auto;
+      height: 36px;
+      border: 1px solid rgba(121, 255, 225, 0.5);
+      border-radius: 6px;
+      padding: 0 12px;
+      background: rgba(79, 209, 197, 0.18);
+      color: var(--accent-strong);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .auth-overlay button:hover {
+      background: rgba(79, 209, 197, 0.26);
+    }
+
+    @media (max-width: 520px) {
+      .auth-overlay {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
+      }
+
+      .auth-overlay button {
+        padding: 0 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <iframe id="skillFrame" src="skills/index.html" title="WKAppBot Skills"></iframe>
+
+  <form class="auth-overlay" id="authForm">
+    <input id="tokenInput" type="password" autocomplete="off" placeholder="GitHub PAT">
+    <button type="submit">Enter GitHub PAT</button>
+  </form>
+
+  <script>
+    const frame = document.getElementById('skillFrame');
+    const form = document.getElementById('authForm');
+    const tokenInput = document.getElementById('tokenInput');
+    const params = new URLSearchParams(window.location.search);
+
+    function readToken() {
+      return params.get('token') || localStorage.getItem('gh_token') || '';
+    }
+
+    function postAuth(token) {
+      if (!token || !frame.contentWindow) return;
+      frame.contentWindow.postMessage({ type: 'auth', token }, '*');
+      try {
+        if (typeof frame.contentWindow.unlockAll === 'function') {
+          frame.contentWindow.unlockAll();
+        }
+      } catch (error) {
+        console.warn('Unable to call skill frame unlockAll', error);
+      }
+    }
+
+    const initialToken = readToken();
+    if (initialToken) {
+      localStorage.setItem('gh_token', initialToken);
+      tokenInput.value = initialToken;
+    }
+
+    frame.addEventListener('load', () => postAuth(readToken()));
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const token = tokenInput.value.trim();
+      if (!token) return;
+      localStorage.setItem('gh_token', token);
+      postAuth(token);
+    });
+
+    window.addEventListener('message', (event) => {
+      const message = event.data || {};
+      if (message.type !== 'auth' || !message.token) return;
+      const token = String(message.token).trim();
+      if (!token) return;
+      localStorage.setItem('gh_token', token);
+      tokenInput.value = token;
+      postAuth(token);
+    });
+  </script>
+</body>
+</html>
