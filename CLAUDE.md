@@ -487,32 +487,17 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 
 ## Pending
 
+<!-- compressed 2026-06-03 nightly-heal: ~30 resolved [x] items folded into topic summaries below; raw history in git -->
+- [x] DONE (compressed 2026-06-02 skill-browser + 3tier cluster): wkask.ps1 log fixes (-Recurse removed 60cd98a68, old_ask_gpt->dynamic 4be08fc1c); wksplit-cs test AskCommands.Entry.Cdp.cs (457->4 parts); 3tier migration sdk-gg-main-automation (25->9) + suggest-triage-playbook (22->8); README Artificial Knowledge Platform pitch (edea870c); main-pipeline survey + gg-main ISSUE #9 Web section; sdk-skill-browser-pipeline T1/T2/T3 registered; sonnet-bug-stop-policy-ref PATTERN 9; docs/skills restructure + check-skill-browser.sh + check-skill-tree.sh self-healing (74 linked 0 fixed); open-skill-viewer.sh + docs/viewer.html PAT inject; PAT pro unlock (b26ad540); 3-state auth (b057a503); Codex sessions closed; wkharness/skill split cluster (wkharness-guards T1 102->8 + T2/T3, cdp-command-guide T1 32->7, wktool-pattern step7 + wkappbot-taskkill-usage steps7-8 fixes, agent-brief-guard heredoc scan suggest ts=2026-05-31T05:19:21)
 - [ ] wkask.sh \n bug: Codex agent "Review recent Codex Gemini work" keeps reverting bin/wkask.sh to broken version. Fixed 3x this session. Need Codex deny rule for this file.
 - [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start → 닫기 dialog). Needs auto-restore or on-screen Chrome guard before ask.
 - [ ] wkask Gemini: Google cookie consent banner off-screen (Chrome minimized). Same root cause as GPT issue.
-- [x] wkask.ps1 log fixes: -Recurse removed (60cd98a68), old_ask_gpt→dynamic (4be08fc1c), both pushed
 - [ ] wkask Gemini -Wait arch bug: sync exec + completed log → suggest needed (wkappbot ask gemini direct works)
-- [x] wksplit-cs test: AskCommands.Entry.Cdp.cs (457 lines) → 4 parts in .tmp/AskCommands.Entry.Cdp/
-- [x] 3tier migration DONE: sdk-gg-main-automation (25→9), suggest-triage-playbook (22→8)
-- [x] README: Artificial Knowledge Platform pitch 섹션 추가 (edea870c) -- push 대기 중
 - [ ] 3tier migration 잔여: wktool-pattern(12), grap(10), wkcdp-mon, sdk-public-skill-index
 - [ ] skill browser 파이프라인: build-skill-page.py + .env 마스킹 + 44자 트런케이션 + GHA 워크플로 완성 중
-- [x] 주업무 파이프라인 전수조사 완료 + gg-main ISSUE #9 Web 섹션 추가
-- [x] sdk-skill-browser-pipeline T1/T2/T3 스킬 등록 완료
-- [x] sonnet-bug-stop-policy-ref PATTERN 9 추가 (guard early not late)
-- [x] docs/skills/ 구조 재편 + check-skill-browser.sh + check-skill-tree.sh self-healing 완성
-- [x] check-skill-tree.sh 실행 완료: 74 linked, 0 fixed (모두 이미 역링크 있음)
-- [x] open-skill-viewer.sh + docs/viewer.html (iframe + postMessage PAT 주입) 생성
-- [x] PAT pro unlock flow 커밋 (b26ad540)
-- [ ] 3-state auth (no-token/404/200) + private repo data source 구현 중
-- [ ] push pending
-- [x] Codex 재도입 세션 종료: hwnd:0x10480 (Review Gemini work) + hwnd:0x20628 (Implement skill tree) 모두 종료
+- [ ] open-skill-viewer.sh grap regex 버그 수정 필요: {hwnd:...,proc:chrome,cdp:PORT} 패턴
 - [ ] CDP ask 박멸 작업 중: wkask.ps1 line 149 Chrome restore 블록 추가 필요 (가드 cascade로 직접 편집 불가 상태)
 - [ ] Core push 완료 2026-06-02: 36b1892bb..8e2e209c7 (wkask 수정 포함)
-
-- [x] 3-tier skill split: wkharness-guards (T1 102->8 steps, T2+T3 created) + cdp-command-guide (T1 32->7, T2 cdp-open added, T3 ref expanded)
-- [x] skill fixes: wktool-pattern step7 (a11y eval-js->read --eval-js) + wkappbot-taskkill-usage steps7-8 (wktaskkill.ps1 deleted ref)
-- [x] wkharness.ps1 fix: agent-brief-guard scans heredoc body for skill reads (personal-docs tools/wkharness.ps1 lines 105-138; new $isHeredocDispatch trigger; self-test 139/140 unchanged; suggest [4] ts=2026-05-31T05:19:21)
 - [ ] ask-suggest-priority-batching-howto skill updated cross-session (v1.1)
 - [ ] Haiku subagent wk-only-gate bug: isHaikuSession not propagated to subagents spawned from Sonnet session. Suggest needed.
 - [ ] pending-protect: session added multiple items (gg-main, Eye hang, CDP tab, stall-guard, cdp open hang, GHA status checks)
@@ -532,14 +517,9 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [ ] [CDP-TODO-5] Haiku isHaikuSession not propagated to subagents (suggest filed). Core fix needed for proper Haiku subagent exemption.
 - [ ] [CDP-TODO-6] CronDelete stall-guard false positive (suggest needed). One-time admin ops should be exempt.
 
-- [x] overnight-bugfix-release: DONE 2026-05-30. wkask.sh exec stray `\n` fixed (single-line exec), wkask.ps1 colour-helper mojibake -> ASCII tags, wkcdp-mon.ps1 Invoke-KillIdle off-screen via MonitorFromPoint (multi-monitor safe), wkzombie.ps1 null StartTime safe-skip verified, wkci.sh +x set; bumped SDK to v7.5.0-sdk (CHANGELOG/VERSIONING/README/SECURITY/CLAUDE.md); WKAppBot core commit 41f722f49; GitHub release v7.5.0-sdk. <task-id>b8gg2us89</task-id>
-
-<!-- compressed 2026-06-01 nightly-heal: 78 v7.5 release detail items folded into the DONE summary 2 lines below; raw history in git -->
+<!-- compressed 2026-06-03 nightly-heal: v7.5 release + nightly-heal history (2026-05-30..06-01) folded into one DONE summary; raw history in git -->
+- [x] DONE (compressed v7.5 release + nightly-heal 2026-05-30..06-01): overnight-bugfix-release v7.5.0-sdk (wkask.sh stray \n single-line exec fix, wkask.ps1 mojibake->ASCII tags + 8 bug fixes warmup/streaming/stability/cascade/dup/invoke/cdp-close, wkcdp-mon MonitorFromPoint multi-monitor + age>2h kill + CWD fallback, wkzombie null-StartTime safe + ExcludeFilter/CmdlineFilter/singleton, wkci.sh +x --details, task-id b8gg2us89); CDP CRITICAL fix Core 82d60f74f (cdp open 143min->30-58s via ChromeLauncher.Timeout.cs async-drain timeouts + HttpClient 1500ms, GREEN v7.5.15 hot-swap); Chrome multiplication MyCdpContext.ChromeHealthCheck Diagnose+Clean + gg-main-enhanced; CronCreate (KillForeign hourly, wkzombie 5min, gg-main 3h, 4x nightly heal); gg step 0/0.5 (1s rule, scripts/gg-main-enhanced.ps1); taskkill --dry-run + AI CLI protect; doc bump v7.4->v7.5 all files; gh release v7.5.0-sdk; WKAppBot core 41f722f49; nightly-heal 3 passes 3ok/54-cross-repo/622-721-norefs each, version sync OK, Pending compress 86->15 + 104->30 (699f0afc, c48e0add)
 - [ ] wk-gg-main.sh + wk-gg-main.cmd: create .sh relay + fix .cmd to call bash scripts/gg-main.sh (currently calls nonexistent .ps1)
-- [x] CDP ask CRITICAL FIXED 2026-05-30 (Core 82d60f74f, NOT pushed): cdp open 143min hang root cause = wmic/netstat ReadToEnd() sync pipe read no timeout + LaunchWait HttpClient default 100s. Fix: ChromeLauncher.Timeout.cs helper (async drain+hard-kill) applied to SingletonGuard.GetCommandLineWithStatus 2500ms, Kill.GetCommandLine 2000ms, Kill.FindPidListeningOnPort 3000ms; LaunchWait HttpClient.Timeout=1500ms. Build GREEN v7.5.15 hot-swapped. Smoke cdp open 30-58s (was 143min). Awaiting user push to Core.
-- [x] DONE (compressed v7.5 release 2026-05-30): wkask.ps1 8 bugs (warmup-skip, smart-streaming-wait, button/text-stability poll, cascade-timeout root cause log, dup-submit-check removal x2, invoke-timeout, cdp-close cleanup) + ASCII tags + warm reuse fast-path; wkask.sh \n literal exec fix (final commit 41f722f49); wkcdp-mon (age>2h force-kill, off-screen+stale kill, CWD fallback, header, MonitorFromPoint multi-monitor); wkzombie (ExcludeFilter, null-StartTime safe, CmdlineFilter, singleton, root relay); wkci.sh (--details, skill refs, +x); CronCreate (KillForeign hourly, wkzombie 5min, gg-main 3h, 4x nightly heal); Chrome multiplication (MyCdpContext.ChromeHealthCheck Diagnose+Clean, gg-main-enhanced integration); harness:skill ChromeLauncher.Kill.cs lock; CDP smoke port-separation; gg step 0/0.5 (1s rule, KillForeign first, scripts/gg-main-enhanced.ps1); taskkill (--dry-run, AI CLI image-name protect, claude/codex/gemini); 3 suggests filed; RIQUA blocks updated x3; doc bump v7.4->v7.5 (CLAUDE/CHANGELOG/VERSIONING/README/SECURITY); gh release v7.5.0-sdk; pending-protect baseline analysis + task-id; gg step 4/5 + suggest triage 2026-05-29
-- [x] nightly-heal 2026-05-30 (all 4 passes + 2026-05-31 x2): skill audit 3ok/54-cross-repo/622-norefs each run; v7.5 version sync OK; KillForeign cleared personal-docs 2.7h session; Pending compress 86->15 (699f0afc, c48e0add)
-- [x] nightly-heal 2026-06-01: skill audit 3ok/54-cross-repo-expected/721-norefs (baseline; all broken refs cross-repo wkappbot-core/wkappbot/hts-heroes per CLAUDE.md gotcha); repo-health LITE OK (v7.5.0-sdk sync across CHANGELOG/VERSIONING/README/SECURITY); Pending compressed 104->~30 [x] (78 v7.5 release items folded into existing summary)
 <!-- compressed 2026-05-28: ~94 resolved items grouped by topic (raw history in git) -->
 - [x] DONE (compressed): wkjobs suite (Kill/Leaks, ancestor walk, native-taskkill fallback, ChatSessionGuard token fix); taskkill compat (--force port-guard bypass, /IM ZOMBIE+UNKNOWN auto-kill, per-proc metrics); Codex harness/wrappers (5 file + 3 shell shims, Agent.cmd Codex->Opus delegation, config.toml deny matchers, stdin-hang fix); harness guards (agent-leak-guard, wkclaude-direct-guard, self-test 57/57); caller-HWND resolution (GetParentPid offset fix, ResolveCallerTerminalHwnd ancestor walk, GA_ROOTOWNER multi-WT, Core CLI uses SDK launcher); CDP/Chrome (cdp open OK-tab field, popup notification, auth-wall 6min hang->NavigateAsync 3s cap, reuse fast-path); a11y WT terminal (WM_CHAR/TextPattern hooks, cross-repo-claude-notify skill); nightly-schedule-guard globalized to ~/.claude/settings.json; wkdoctor (10 checks + -Json, plugin-module split); CDP smoke port-separation fix (10/10 PASS), wkjobs.ps1 $pid scoping fix; misc (wk-gg-main 12-stage, ask-gpt OOM watchdog, build-skills-registry BOM strip, v7.4.0-sdk bump)
 - [x] DONE (Chrome-multiplication diagnostic): MyCdpContext.ChromeHealthCheck.cs DiagnoseExcessiveChromeProcesses() (>=5 Chrome pre-launch), wired into TryTrackMyCdpAccess, rebuild 0 errors (6df38b66) -- Core FindRunningChromePortAny guard 8819ed449 verify pending
@@ -566,15 +546,10 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
   - [MEDIUM] [5] ask gpt OperationCanceledException MERGE×2: Root cause = Chrome multiplication (20+→28 procs). Core FindRunningChromePortAny guard may need deploy verify.
   - [SKIP] [4] FOCUSLESS-HOMEWORK SendInput: Core-owned, not SDK scope.
   - BLOCKER: suggest resolve/merge commands timing out (Eye IPC lag + suggest check hangs). Manual triage complete; formal resolution blocked pending Eye restart.
-- [x] DONE (compressed 2026-05-29 cluster): wkzombie/taskkill cleanup -- wkzombie.ps1 root relay+singleton+CmdlineFilter+ExcludeFilter (commit 57b29223, CronCreate now ./wkzombie.ps1 -MaxAge 45 skipping mcp); wktaskkill.ps1 deleted as redundant (Core v1.9 TaskkillAutoKillNonProtected already auto-kills ZOMBIE+UNKNOWN); --dry-run added to wkappbot taskkill (Core 78e272ee2, Classify.cs WMI hang reverted); gg smoke loop step 0 + wkask.ps1 12/16 bugs fixed + .bak/ removed
+<!-- compressed 2026-06-03 nightly-heal: 2026-05-29 cluster + wkci/wkcdp-mon/wkask DONE lines folded below; raw history in git -->
+- [x] DONE (compressed 2026-05-29 cluster): wkzombie/taskkill cleanup (wkzombie.ps1 root relay+singleton+CmdlineFilter+ExcludeFilter commit 57b29223, CronCreate ./wkzombie.ps1 -MaxAge 45 skip mcp; wktaskkill.ps1 deleted redundant per Core v1.9 auto-kill; --dry-run added Core 78e272ee2); gg smoke loop step 0 + wkask.ps1 12/16 bugs + .bak/ removed; nightly skill heal pass1 ed787ad2 + pass2 (3ok/54-cross-repo/616-norefs, v7.4 sync); chrome hourly KillForeign CronCreate; CDP CI rate-limit fix (gh run rerun); leelw-markany collaborator; wkci.sh committed dca7593f --details job/step; wkcdp-mon age>2h kill + CWD fallback + header 955d1c096; wkask.sh \n bug fixed + BUG-1/2/3/5/6/7/8 fixed
 - [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
-- [x] DONE 2026-05-29: nightly skill heal pass1 (ed787ad2) + pass2 (audit 3ok/54-cross-repo-expected/616-norefs; version sync 7.4 across VERSIONING/README/CHANGELOG/SECURITY; Pending [x]=6 below compress threshold). taskkill --dry-run working. wkzombie -ExcludeFilter mcp added.
 - [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
-- [x] DONE: nightly heals pass1-4, chrome hourly KillForeign CronCreate, CDP CI rate-limit fixed (gh run rerun), leelw-markany collaborator, wkci.sh CI health check script.
-- [x] DONE: wkci.sh committed (dca7593f). wkcdp-mon improvements in progress.
-- [x] DONE: wkcdp-mon age>2h force-kill + CWD fallback + header fix (955d1c096)
 - [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
-- [x] DONE: wkask.sh \n bug fixed (Edit tool). cdp open 60s timeout investigating.
-- [x] CDP ask QA: wkask.sh \n fix, BUG-1/2/3/5/6/7/8 fixed. wkci.sh --details job/step level check added.
 - [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)

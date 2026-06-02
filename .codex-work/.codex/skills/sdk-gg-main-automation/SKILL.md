@@ -5,7 +5,7 @@ description: "Proactive system health check for product quality & friction detec
 tags: [sdk, automation, gg-workflow, health-check, product-quality, anomaly-detection]
 ---
 
-> **Refresh**: `wkappbot skill read sdk-gg-main-automation --if-newer` — v1.27 (2026-05-28)
+> **Refresh**: `wkappbot skill read sdk-gg-main-automation --if-newer` — v1.28 (2026-05-28)
 
 # gg-main: SDK Product Manager Main Duties Automation
 
@@ -22,3 +22,4 @@ tags: [sdk, automation, gg-workflow, health-check, product-quality, anomaly-dete
 9. ENHANCED: 8 issue categories (1)Chrome mult >5/crit>20 (2)Eye lag >3/>8 (3)Off-screen Chrome (4)Zombies >30/>50 (5)Memory >2GB/>4GB (6)IPC timeout (7)Stale BUG-AUTO >5 (8)Disk I/O >80%. Exit: 0=Green 1=Warn 2=Crit. See howto T2 smoke-loop T3 history.
 10. 2026-06-02: wkappbot-the-artificial-knowledge-platform skill added to README.md pitch section. Resolving suggest ts=2026-06-02T13:55:57
 11. 2026-06-02 marketing: build-skill-page.py automation script + docs/index.html + GHA workflow pending Codex
+12. SECTION SKILL-TREE: bash scripts/check-skill-tree.sh -- auto-heals T2/T3 skills missing parent T1 backlinks. Runs after skill migrations. 103 skills checked, auto-adds 'Parent T1: wkappbot skill read BASE' step to orphaned skills. Run separately (slow: ~103 skill reads). Not in 3h loop -- run on-demand or post-migration.

@@ -24,7 +24,8 @@
     "Nightly heal run 2026-05-30 pass3: session audit in progress.",
     "Nightly heal run 2026-05-30 pass4: session audit in progress.",
     "Nightly heal run 2026-05-31: skill audit in progress.",
-    "Nightly heal run 2026-05-31 pass2: skill audit in progress."
+    "Nightly heal run 2026-05-31 pass2: skill audit in progress.",
+    "Nightly heal run 2026-06-03: skill audit in progress."
   ],
   "requirements": [
     {
@@ -62,6 +63,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-05-30T20:43:34.9527488Z",
-  "version": "1.30"
+  "updated": "2026-06-02T19:50:41.4434457Z",
+  "version": "1.31"
 }

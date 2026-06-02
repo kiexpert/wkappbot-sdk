@@ -5,7 +5,7 @@ description: "Full pipeline to generate a live marketing skill browser webpage f
 tags: [sdk, skill-browser, marketing, github-pages, pipeline, gha, pro-unlock]
 ---
 
-> **Refresh**: `wkappbot skill read sdk-skill-browser-pipeline --if-newer` — v1.3 (2026-06-02)
+> **Refresh**: `wkappbot skill read sdk-skill-browser-pipeline --if-newer` — v1.4 (2026-06-02)
 
 # SDK Skill Browser Pipeline
 
@@ -22,3 +22,4 @@ tags: [sdk, skill-browser, marketing, github-pages, pipeline, gha, pro-unlock]
 9. QA CHECK: bash scripts/check-skill-browser.sh -- curl-based smoke test (no CDP needed, public page). Checks: HTTP 200 for /skills/ and /, skill card count > 10, Sonnet/harness hero text, Pro lock elements, local docs/skills/index.html freshness. Exit 0 = all pass. Add to gg-main ISSUE 9 section. Run after every push to verify Pages deployment.
 10. SKILL TREE QA (check-skill-tree.sh): wkappbot skill list extracts IDs via sed pattern s/.*(\([^)]*\)).*/\1/ NOT awk. Fixed pattern for T2/T3: grep -E -(howto|ref|t23-) then sed extract. Script finds skills missing parent T1 backlink. Run: bash scripts/check-skill-tree.sh
 11. AUTO-HEAL backlinks: when check-skill-tree.sh finds NO_PARENT_LINK, auto-fix via: wkappbot skill edit ID --add-step 'Parent T1: wkappbot skill read BASE'. Script becomes self-healing: find orphan + auto-add parent step + report FIXED. Same pattern as wkappbot self-healing principle -- document AND enforce.
+12. 3-STATE AUTH LOGIC: (1) no localStorage token = show PAT input prompt. (2) token stored but fetch raw.githubusercontent.com/kiexpert/wkappbot-harness returns 404 = logged in but not subscriber, show Upgrade CTA. (3) token stored and 200 = collaborator, unlock full steps. Two data sources: skills-data-public.js from public SDK repo (44-char preview), skills-data-full.js from private wkappbot-harness (full steps). The 404 vs 200 from private repo IS the auth check -- no separate collaborator API call needed.
