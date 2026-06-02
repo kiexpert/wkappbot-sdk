@@ -1,0 +1,41 @@
+{
+  "id": "sdk-gg-main-automation-ref",
+  "app": "wkappbot-sdk",
+  "title": "sdk-gg-main Reference (alias)",
+  "title_ko": null,
+  "desc": "T3 Reference alias: see sdk-gg-main-automation-t3-ref for full content. Session history and key decisions.",
+  "steps": [
+    "See sdk-gg-main-automation-t3-ref for full reference.",
+    "2026-06-02: wkask fixes, Chrome restore, skill browser pipeline, marketing page created."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation-ref",
+      "expect": "2026",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation",
+      "expect": "Run",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "gg-workflow",
+    "ref",
+    "t3"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T15:22:21.9574289Z",
+  "updated": "2026-06-02T15:22:21.9574407Z",
+  "version": "1.0"
+}

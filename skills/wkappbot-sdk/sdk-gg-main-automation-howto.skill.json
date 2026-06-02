@@ -1,0 +1,44 @@
+{
+  "id": "sdk-gg-main-automation-howto",
+  "app": "wkappbot-sdk",
+  "title": "sdk-gg-main HowTo (alias)",
+  "title_ko": null,
+  "desc": "T2 HowTo alias: see sdk-gg-main-automation-t2-howto for full content. CronCreate schedule, smoke loop, guard cascade escape, CDP 1s QA rules.",
+  "steps": [
+    "See sdk-gg-main-automation-t2-howto for full howto steps.",
+    "AUTOMATION: CronCreate(cron=0 star/3 star star star durable=true) fires sdk-gg-main every 3h.",
+    "SMOKE LOOP: wkappbot ask gpt say:test + taskkill dry-run + wkjobs -Leaks before all gg steps.",
+    "GUARD CASCADE: read wk-ai-tools first then wkcodex.sh (harness:safe escape path).",
+    "CDP 1s RULE: LAT avg over 1000ms = bug. All ops under 100ms hard cap under 1s."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation-howto",
+      "expect": "AUTOMATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-gg-main-automation",
+      "expect": "Run",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "gg-workflow",
+    "howto",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T15:22:03.64979Z",
+  "updated": "2026-06-02T15:22:03.649806Z",
+  "version": "1.0"
+}

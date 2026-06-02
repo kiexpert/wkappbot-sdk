@@ -1,0 +1,48 @@
+{
+  "id": "sdk-skill-browser-pipeline-howto",
+  "app": "wkappbot-sdk",
+  "title": "SDK Skill Browser HowTo",
+  "title_ko": null,
+  "desc": "T2 HowTo: step-by-step guide to set up, run, and maintain the skill browser marketing pipeline",
+  "steps": [
+    "INITIAL SETUP: git clone wkappbot-sdk. pip install nothing needed (stdlib only). Ensure D:/GitHub/WKAppBot/bin/wkappbot.hq/skills/ exists (HQ skill catalog). Set GH_PAT env var for Pages status check and OAuth.",
+    "BUILD: python scripts/build-skill-page.py -- auto-finds HQ catalog, filters apps, masks secrets, writes docs/skills/index.html. Run after any skill changes to refresh.",
+    "GITHUB PAGES: Settings > Pages > Source: main branch /docs. URL: https://kiexpert.github.io/wkappbot-sdk/. Check: gh api repos/.../pages ",
+    " grep status.",
+    "GHA TRIGGER FROM CORE: add .github/workflows/notify-sdk.yml to Core repo with repository_dispatch event skill-catalog-updated targeting kiexpert/wkappbot-sdk. SDK workflow listens and rebuilds.",
+    "PRO SUBSCRIBER MGMT: gh api repos/kiexpert/wkappbot-harness/collaborators -X PUT -f permission=pull to add subscriber. Remove: gh api repos/.../collaborators/USERNAME -X DELETE. Payment flow via payment-to-license-activation skill.",
+    "LAYOUT CUSTOMIZATION: edit docs/skills/index.html JS section HERO_QUOTE to change reflection text. Edit CSS var --accent for brand color. Edit CATEGORY_MAP in skills-data.js for grouping.",
+    "HARNESS MONETIZATION: Free=view skill titles+preview. Pro=full steps+no blur. Enterprise=custom skill tree. Subscription = GitHub collaborator on wkappbot-harness private repo."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-skill-browser-pipeline-howto",
+      "expect": "INITIAL SETUP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-skill-browser-pipeline",
+      "expect": "RUN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "skill-browser",
+    "howto",
+    "setup",
+    "gha"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T16:11:03.9696912Z",
+  "updated": "2026-06-02T16:11:03.9697056Z",
+  "version": "1.0"
+}

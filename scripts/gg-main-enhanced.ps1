@@ -172,18 +172,18 @@ if ($ghCommand) {
   $WARNINGS += "GitHub Pages status unavailable (gh missing)"
 }
 
-$docsIndex = Join-Path $repoRoot "docs/index.html"
+$docsIndex = Join-Path $repoRoot "docs/skills/index.html"
 if (Test-Path $docsIndex) {
   $docsAgeHours = ((Get-Date) - (Get-Item $docsIndex).LastWriteTime).TotalHours
   if ($docsAgeHours -gt 25) {
-    Write-Host "  [WARN]  WARNING: docs/index.html is $([math]::Round($docsAgeHours, 1)) hours old (>25)" -ForegroundColor Yellow
-    $WARNINGS += "docs/index.html stale ($([math]::Round($docsAgeHours, 1))h > 25h)"
+    Write-Host "  [WARN]  WARNING: docs/skills/index.html is $([math]::Round($docsAgeHours, 1)) hours old (>25)" -ForegroundColor Yellow
+    $WARNINGS += "docs/skills/index.html stale ($([math]::Round($docsAgeHours, 1))h > 25h)"
   } else {
-    Write-Host "  [OK] docs/index.html fresh ($([math]::Round($docsAgeHours, 1))h old)" -ForegroundColor Green
+    Write-Host "  [OK] docs/skills/index.html fresh ($([math]::Round($docsAgeHours, 1))h old)" -ForegroundColor Green
   }
 } else {
-  Write-Host "  [WARN]  WARNING: docs/index.html missing" -ForegroundColor Yellow
-  $WARNINGS += "docs/index.html missing"
+  Write-Host "  [WARN]  WARNING: docs/skills/index.html missing" -ForegroundColor Yellow
+  $WARNINGS += "docs/skills/index.html missing"
 }
 
 if ($ghCommand) {

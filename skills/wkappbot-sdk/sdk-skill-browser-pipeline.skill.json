@@ -1,0 +1,50 @@
+{
+  "id": "sdk-skill-browser-pipeline",
+  "app": "wkappbot-sdk",
+  "title": "SDK Skill Browser Pipeline",
+  "title_ko": null,
+  "desc": "Full pipeline to generate a live marketing skill browser webpage from wkappbot HQ skill catalog. Reads 416 public skills, masks .env secrets, 44-char preview truncation with GitHub OAuth Pro unlock, split-panel UI, auto-rebuilds via GHA on push.",
+  "steps": [
+    "RUN: python D:/GitHub/wkappbot-sdk/scripts/build-skill-page.py -- reads HQ catalog, filters wkappbot-* apps only, masks .env values, outputs docs/skills/index.html",
+    "STRUCTURE: docs/index.html (wkappbot product intro) + docs/skills/index.html (split-panel skill browser with Sonnet reflection hero). GitHub Pages source: main branch /docs",
+    "SPLIT-PANEL UI: left panel = skill list with category accordion + search. Right panel = skill detail on click. Pro skills show 44-char preview with blur overlay and GitHub OAuth unlock.",
+    "PRIVACY: app allowlist (wkappbot-* only, excludes personal-docs/wkautoquant/invest-kr). .env values masked at build time. JSON schema hidden in skills-data.js variable.",
+    "GHA AUTO-REBUILD: .github/workflows/build-skill-page.yml triggers on push to main. Also triggers via repository_dispatch from Core repo push (skill-catalog-updated event).",
+    "PRO UNLOCK: JS checks GitHub OAuth token in localStorage. Fetches api.github.com/repos/kiexpert/wkappbot-harness/collaborators. Collaborator = Pro subscriber = full step content unlocked.",
+    "HERO SECTION: Sonnet reflection quote from sonnet-bug-stop-policy-ref + AK Platform pitch from wkappbot-the-artificial-knowledge-platform. Scroll down to skill browser.",
+    "SITE: https://kiexpert.github.io/wkappbot-sdk/skills/"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-skill-browser-pipeline",
+      "expect": "RUN",
+      "prompt": null
+    },
+    {
+      "cmd": "python D:/GitHub/wkappbot-sdk/scripts/build-skill-page.py",
+      "expect": "skills-data",
+      "prompt": null
+    },
+    {
+      "cmd": "gh api repos/kiexpert/wkappbot-sdk/pages",
+      "expect": "built",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "skill-browser",
+    "marketing",
+    "github-pages",
+    "pipeline",
+    "gha",
+    "pro-unlock"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T16:10:37.0421133Z",
+  "updated": "2026-06-02T16:10:37.0421258Z",
+  "version": "1.0"
+}

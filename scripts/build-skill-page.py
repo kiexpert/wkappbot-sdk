@@ -15,7 +15,7 @@ HQ_SKILL_DIRS = [
     Path("D:/SDK/bin/wkappbot.hq/skills"),
 ]
 REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
-OUTPUT = REPO_ROOT / "docs" / "index.html"
+OUTPUT = REPO_ROOT / "docs" / "skills" / "index.html"
 ENV_FILE = Path("D:/GitHub/.env")
 STEP_PREVIEW_LIMIT = 44
 
@@ -540,19 +540,19 @@ def build_html(skills: list[dict[str, Any]]) -> str:
           <h3>Free</h3>
           <div class="price">$0</div>
           <p>Browse public skills and run the base automation surface.</p>
-          <a class="button" href="INSTALL.md">Start</a>
+          <a class="button" href="../INSTALL.md">Start</a>
         </article>
         <article class="price-card featured">
           <h3>Pro</h3>
           <div class="price">$49</div>
           <p>Unlock premium developer skill steps, CDP workflows, and multi-AI knowledge loops.</p>
-          <a class="button" href="pricing.md">Upgrade</a>
+          <a class="button" href="../pricing.md">Upgrade</a>
         </article>
         <article class="price-card">
           <h3>Team</h3>
           <div class="price">Custom</div>
           <p>Private catalogs, team guardrails, and workflow-specific onboarding.</p>
-          <a class="button" href="LICENSING.md">Contact</a>
+          <a class="button" href="../LICENSING.md">Contact</a>
         </article>
       </div>
     </div>

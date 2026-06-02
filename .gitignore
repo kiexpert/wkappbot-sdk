@@ -1,6 +1,7 @@
 # Runtime artifacts
 .dotnet/
 .wkappbot/
+.tmp/
 smoke-temp/
 .ci-test-tmp/
 
