@@ -501,7 +501,11 @@ wkappbot skill read wkharness-guards  # Task: guard reference when unblocking ed
 - [x] sdk-skill-browser-pipeline T1/T2/T3 스킬 등록 완료
 - [x] sonnet-bug-stop-policy-ref PATTERN 9 추가 (guard early not late)
 - [x] docs/skills/ 구조 재편 + check-skill-browser.sh + check-skill-tree.sh self-healing 완성
-- [ ] check-skill-tree.sh 첫 실행 + gg-main 통합 + push 대기
+- [x] check-skill-tree.sh 실행 완료: 74 linked, 0 fixed (모두 이미 역링크 있음)
+- [x] open-skill-viewer.sh + docs/viewer.html (iframe + postMessage PAT 주입) 생성
+- [x] PAT pro unlock flow 커밋 (b26ad540)
+- [ ] 3-state auth (no-token/404/200) + private repo data source 구현 중
+- [ ] push pending
 - [x] Codex 재도입 세션 종료: hwnd:0x10480 (Review Gemini work) + hwnd:0x20628 (Implement skill tree) 모두 종료
 - [ ] CDP ask 박멸 작업 중: wkask.ps1 line 149 Chrome restore 블록 추가 필요 (가드 cascade로 직접 편집 불가 상태)
 - [ ] Core push 완료 2026-06-02: 36b1892bb..8e2e209c7 (wkask 수정 포함)

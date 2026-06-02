@@ -1,7 +1,7 @@
 # wkdoctor -- wkappbot-sdk health check orchestrator
 # Usage: wkdoctor [-Json]
 # Drop custom checks as *.ps1 into wkappbot.hq/doctor/ for plugin extension
-param([switch]$Json)
+param([switch]$Json, [switch]$EmergencyKill)
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $binDir     = $scriptRoot
@@ -42,6 +42,68 @@ function Get-DoctorNote {
     }
 
     return "복구는 정상이고 경고 $($warnItems.Count)건만 남았습니다."
+}
+
+# --emergency-kill: iterative hysteresis reaper.
+# Trigger=60% RAM, recover=50% RAM. Safe pool only: orphaned codex/python/node + WmiPrvSE.
+# NEVER kills claude.exe / wkappbot-core / wkchat / wka11y / user apps.
+if ($EmergencyKill) {
+    function Get-RamPct {
+        try {
+            $cs = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
+            return [int](100 - ($cs.FreePhysicalMemory * 100 / $cs.TotalVisibleMemorySize))
+        } catch { return 0 }
+    }
+
+    function Build-SafePool {
+        $pool = [System.Collections.Generic.List[PSCustomObject]]::new()
+        foreach ($img in @('codex', 'python', 'pythonw', 'node')) {
+            try {
+                Get-Process $img -ErrorAction SilentlyContinue | ForEach-Object {
+                    $p = $_
+                    $parentName = try { (Get-Process -Id (
+                        (Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction Stop).ParentProcessId
+                        ) -ErrorAction Stop).Name.ToLower() } catch { '' }
+                    if ($parentName -notin @('claude', 'wkappbot-core', 'wkchat', 'wka11y')) {
+                        $pool.Add([PSCustomObject]@{ Id = $p.Id; Name = $p.Name; WS = $p.WorkingSet64 })
+                    }
+                }
+            } catch {}
+        }
+        try {
+            Get-Process WmiPrvSE -ErrorAction SilentlyContinue | ForEach-Object {
+                $pool.Add([PSCustomObject]@{ Id = $_.Id; Name = $_.Name; WS = $_.WorkingSet64 })
+            }
+        } catch {}
+        return @($pool | Sort-Object WS -Descending)
+    }
+
+    $killed = 0
+    $hogInfo = 'unknown'
+    $pool = Build-SafePool
+    foreach ($proc in $pool) {
+        $ram = Get-RamPct
+        if ($ram -lt 50) { break }
+        try {
+            & wkappbot taskkill --force $proc.Id 2>&1 | Out-Null
+            $killed++
+            $wsMb = [int]($proc.WS / 1MB)
+            Write-Host "[ek] killed $($proc.Name) pid=$($proc.Id) ws=${wsMb}MB ram=$ram%" -ForegroundColor Yellow
+        } catch {}
+    }
+    $finalRam = Get-RamPct
+    if ($finalRam -ge 50) {
+        try {
+            $top = Get-Process | Where-Object { $_.Name -notmatch '^(Idle|System)$' } |
+                   Sort-Object WorkingSet64 -Descending | Select-Object -First 1
+            if ($top) { $hogInfo = "$($top.Name) pid=$($top.Id) $([int]($top.WorkingSet64/1MB))MB" }
+            & wkappbot speak "[emergency] RAM $finalRam% -- pool exhausted, top hog: $hogInfo" --bg 2>&1 | Out-Null
+        } catch {}
+        Write-Host "[ek] pool exhausted -- RAM $finalRam% top hog: $hogInfo" -ForegroundColor Red
+    }
+    $ekColor = if ($killed -gt 0) { 'Yellow' } else { 'Green' }
+    Write-Host "[emergency-kill] done killed=$killed finalRam=$finalRam%" -ForegroundColor $ekColor
+    exit 0
 }
 
 # Load check modules (sorted by name, so 00- runs before 01- etc.)
