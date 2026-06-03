@@ -35,6 +35,8 @@ jobs:
           "/reference/commands"
           "/reference/grap"
           "/advanced/licensing"
+          "/skills/"
+          "/skills/sonnet-reflection/"
         )
         FAIL=0
         for page in "${PAGES[@]}"; do
