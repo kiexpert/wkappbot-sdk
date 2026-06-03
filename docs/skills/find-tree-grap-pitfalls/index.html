@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,9 +117,11 @@
       <h1>wkappbot find -- Tree Output Design &amp; Grap Pitfalls</h1>
       <p class="description">Hard-won lessons from implementing find tree: grap candidate scoring, Afx MFC class detection, glob char-class pitfall in PatternMatcher, hwnd fallback strategy. 2026-04-23.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">find</span><span class="chip">grap</span><span class="chip">tree</span><span class="chip">patternmatcher</span><span class="chip">glob</span><span class="chip">hwnd</span><span class="chip">mfc</span><span class="chip">legacy</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[FIND-TREE-DEFAULT] wkappbot find &lt;keyword&gt; outputs Win32+UIA grap path tree by default (no flag).
+      <div class="steps-wrap">
+        <ol class="steps"><li>[FIND-TREE-DEFAULT] wkappbot find &lt;keyword&gt; outputs Win32+UIA grap path tree by default (no flag).
 Each line = copy-paste ready grap. Win32 levels use &quot;/&quot;. UIA suffix after &quot;#&quot;. &quot;#&quot; ALWAYS present before UIA nodes.
 grap &quot;title&quot; == &quot;*title*&quot; -- contains-match by default, &quot;*&quot; wrapping is redundant noise.
 EXAMPLE:
@@ -126,7 +143,10 @@ FIX: plain Contains: title.Contains(innerText, OrdinalIgnoreCase).
 Glob-special: &quot;[&quot;, &quot;]&quot;, &quot;*&quot;, &quot;?&quot;. Safe alt: JSON5 {proc:&#x27;nfrunlite&#x27;,title:&#x27;주문종합&#x27;}.</li><li>[HWND-FALLBACK-STRATEGY] hwnd changes on every restart -- never use as primary grap.
 STRATEGY: 1) Build candidates by score. 2) Verify with plain Contains (not PatternMatcher). 3) First passing -&gt; emit. 4) All fail -&gt; {proc:&#x27;name&#x27;,hwnd:0x...} as VISIBLE session-scoped fallback.
 Never silently emit hwnd as stable -- {proc,hwnd} signals fragility to caller.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -1,0 +1,43 @@
+{
+  "id": "skill-heal-nightly-ref",
+  "app": "wkappbot-sdk",
+  "title": "Nightly Heal Reference",
+  "title_ko": null,
+  "desc": "T3 Reference: history and guard notes for skill-heal-nightly",
+  "steps": [
+    "HEAL NOTE: skill-update-pending lock is global not session-scoped -- parallel sessions keep re-setting it. Workaround: Pending compress inline via wkappbot file edit.",
+    "HEAL NOTE: cleared stale WK_SKILL_LOCK by writing empty content to lock file -- unblocks delegation when owned by dead foreign-repo session.",
+    "GUARD-DEADLOCK: skill-update-pending guard classifies ANY bash containing codex exec literal as codex invocation. Avoid trigger strings in Pending block content.",
+    "SCHEDULE HISTORY: CronCreate job ID cb503e44 registered 2026-06-02. Nightly heals running since 2026-05-24 v1.0."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-heal-nightly-ref",
+      "expect": "HEAL NOTE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-heal-nightly",
+      "expect": "STEP 2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-heal",
+    "nightly",
+    "ref",
+    "history"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T22:22:44.9284232Z",
+  "updated": "2026-06-02T22:22:44.9284325Z",
+  "version": "1.0"
+}

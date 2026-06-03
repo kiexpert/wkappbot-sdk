@@ -1,0 +1,55 @@
+{
+  "id": "skill-browser-qa-howto",
+  "app": "wkappbot-sdk",
+  "title": "Skill Browser QA HowTo",
+  "title_ko": null,
+  "desc": "T2 execution tier for skill-browser-qa. Step-by-step commands for static grep checks, build, localhost server startup, and each runtime browser test scenario.",
+  "steps": [
+    "PARENT T1: wkappbot skill read skill-browser-qa",
+    "STATIC GREP COMMANDS (run from repo root D:/GitHub/wkappbot-sdk):\\n  grep -c githubLogin docs/skills/index.html  # expect 0\\n  grep -rn 'data-full' docs/skills/*/index.html ",
+    " grep -v index.html  # expect 0 lines (detail pages only)\\n  grep -l 'blurred' docs/skills/*/index.html ",
+    " head -5  # spot-check premium pages exist\\n  grep -n 'Part of:' docs/skills/a11y-command-cheatsheet-howto/index.html  # expect match\\n  grep -n 'function unlockAll() {' docs/skills/a11y-command-cheatsheet-howto/index.html  # single brace",
+    "BUILD COMMAND: python scripts/build-skill-page.py 2>&1 ",
+    " tail -1\\n  Success pattern: 'Generated docs/skills/index.html with N skills and N detail pages'\\n  Failure: non-zero exit -> check Python traceback for syntax/import errors",
+    "LOCALHOST SERVER STARTUP:\\n  python -m http.server 8888 --directory docs\\n  Verify: curl http://localhost:8888/skills/ returns HTTP 200\\n  Stop: kill the python process after QA (wkappbot taskkill /IM python.exe --dry-run first)",
+    "CDP-BASED BROWSER TEST (no manual browser needed):\\n  wkappbot cdp open http://localhost:8888/skills/  # opens in assigned Chrome\\n  wkappbot cdp open http://localhost:8888/skills/a11y-command-cheatsheet-howto/  # premium detail page\\n  wkappbot ask gpt 'describe what you see -- is there a lock icon, blur on steps, back link?'",
+    "RESET COOKIE STATE FOR TESTING:\\n  wkappbot cdp eval \"localStorage.removeItem('gh_token')\" {proc:'chrome',cdp:PORT}\\n  Reload page -> confirm blur/lock restored (no auto-unlock)",
+    "VALID PAT TEST:\\n  wkappbot cdp eval \"localStorage.setItem('gh_token','YOUR_PAT_HERE'); location.reload()\" {proc:'chrome',cdp:PORT}\\n  Confirm: blur removed, 'Pro access verified' shown, lock button hidden",
+    "CLEANUP: stop http.server process after all checks pass"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-browser-qa-howto",
+      "expect": "PARENT T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-browser-qa",
+      "expect": "STATIC CHECKS",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/build-skill-page.py",
+      "expect": "Generated",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-browser",
+    "qa",
+    "howto",
+    "t2",
+    "localhost",
+    "commands",
+    "grep",
+    "build",
+    "cdp"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T06:47:00.674822Z",
+  "updated": "2026-06-03T06:47:00.6748312Z",
+  "version": "1.0"
+}

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkfind Caller HWND 3-Tier T3 Reference</h1>
       <p class="description">T3 ref. Historical 3-tier model (obsolete), FIX SPEC 2026-05-20, CLAUDE.md guard added, verified test.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../wkfind-caller-hwnd-validation-3tier-pattern/">wkfind-caller-hwnd-validation-3tier-pattern</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>HISTORICAL 3-TIER (OBSOLETE): step 1 &#x27;console&gt;host&gt;foreground&#x27; and &#x27;GetForegroundWindow fallback&#x27; from old model are SUPERSEDED by current GA_ROOTOWNER pre-pass. Do NOT implement the old model.</li><li>FIX SPEC 2026-05-20: MyCdpContext.cs lines 220-225 remove GetForegroundWindow fallback. MyCdpContext.CallerValidation.cs line 93 remove Chrome from IsKnownHostProcess. EyeCmdPipeClient.cs add GetAncestorPidChain().</li><li>CLAUDE.md GUARD added 2026-05-20 (commit 311fda436): before any callerHwnd/placement change, must read standard-appbot-window + standard-chrome-window + this skill. 5 absolute rules documented.</li><li>Verified 2026-05-28: ev-caller-rect-stability.sh (resolve ts=2026-05-28T05:10:11). 2026-05-18: CHROME:WARN CALLER_UNDETECTABLE added in ChromeLauncher.CallerRecovery.cs (commit 5383b02e9).</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>HISTORICAL 3-TIER (OBSOLETE): step 1 &#x27;console&gt;host&gt;foreground&#x27; and &#x27;GetForegroundWindow fallback&#x27; from old model are SUPERSEDED by current GA_ROOTOWNER pre-pass. Do NOT implement the old model.</li><li>FIX SPEC 2026-05-20: MyCdpContext.cs lines 220-225 remove GetForegroundWindow fallback. MyCdpContext.CallerValidation.cs line 93 remove Chrome from IsKnownHostProcess. EyeCmdPipeClient.cs add GetAncestorPidChain().</li><li>CLAUDE.md GUARD added 2026-05-20 (commit 311fda436): before any callerHwnd/placement change, must read standard-appbot-window + standard-chrome-window + this skill. 5 absolute rules documented.</li><li>Verified 2026-05-28: ev-caller-rect-stability.sh (resolve ts=2026-05-28T05:10:11). 2026-05-18: CHROME:WARN CALLER_UNDETECTABLE added in ChromeLauncher.CallerRecovery.cs (commit 5383b02e9).</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Chrome window position mismatch: session restore override fix</h1>
       <p class="description">Two-layer fix for Chrome ignoring --window-position launch flag due to session restore override (Default/Preferences browser.window_placement rehydration). Pre-launch Preferences patch + post-timeout final reapply.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cdp</span><span class="chip">chrome</span><span class="chip">window-position</span><span class="chip">session-restore</span><span class="chip">bug-auto</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Root cause: Chrome session restore (--restore-last-session / Default/Preferences browser.window_placement) overrides --window-position launch arg. Drift pattern: requested=(-2449,-362) vs actual=(-1169,357) drift 1280x719px.</li><li>Fix layer 1 (ChromeLauncher.SessionRestore.cs): Before launching Chrome, call SuppressSessionRestoreInPreferences(userDataDir) to patch Default/Preferences: set profile.exit_type=Normal, profile.exited_cleanly=true, delete browser.window_placement. This kills session restore at the source.</li><li>Fix layer 2 (CdpClient.WindowStabilize.cs): In SetWindowBoundsWaitStableAsync, on BOUNDS:TIMEOUT, send one final Browser.setWindowBounds with requested coords + short stability poll before surfacing BUG-AUTO suggest.</li><li>Verify: after fix, wkappbot ask gpt say hello completes in under 5s with no [CDP:BOUNDS:TIMEOUT] or AutoSuggestPositionMismatch in logs.</li><li>OWNERSHIP NOTE: Both fix layers live in the PRIVATE Core repo only -- SDK launcher has no direct control. ChromeLauncher.SessionRestore.cs and CdpClient.WindowStabilize.cs are in D:\GitHub\WKAppBot\csharp\src\WKAppBot.WebBot\. SDK side: invoke via standard cdp commands; fixes apply automatically at runtime. If position mismatch persists after v7.3 hot-swap, check cdp-mon for BOUNDS:TIMEOUT and verify Core is running v7.3+.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Root cause: Chrome session restore (--restore-last-session / Default/Preferences browser.window_placement) overrides --window-position launch arg. Drift pattern: requested=(-2449,-362) vs actual=(-1169,357) drift 1280x719px.</li><li>Fix layer 1 (ChromeLauncher.SessionRestore.cs): Before launching Chrome, call SuppressSessionRestoreInPreferences(userDataDir) to patch Default/Preferences: set profile.exit_type=Normal, profile.exited_cleanly=true, delete browser.window_placement. This kills session restore at the source.</li><li>Fix layer 2 (CdpClient.WindowStabilize.cs): In SetWindowBoundsWaitStableAsync, on BOUNDS:TIMEOUT, send one final Browser.setWindowBounds with requested coords + short stability poll before surfacing BUG-AUTO suggest.</li><li>Verify: after fix, wkappbot ask gpt say hello completes in under 5s with no [CDP:BOUNDS:TIMEOUT] or AutoSuggestPositionMismatch in logs.</li><li>OWNERSHIP NOTE: Both fix layers live in the PRIVATE Core repo only -- SDK launcher has no direct control. ChromeLauncher.SessionRestore.cs and CdpClient.WindowStabilize.cs are in D:\GitHub\WKAppBot\csharp\src\WKAppBot.WebBot\. SDK side: invoke via standard cdp commands; fixes apply automatically at runtime. If position mismatch persists after v7.3 hot-swap, check cdp-mon for BOUNDS:TIMEOUT and verify Core is running v7.3+.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>CLAUDE.md Pending Section Sync Workflow</h1>
       <p class="description">Keep CLAUDE.md Pending in sync with actual work. CLAUDE.md is canonical -- if not there it does not exist.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">todo</span><span class="chip">pending</span><span class="chip">claudemd</span><span class="chip">sync</span><span class="chip">session-end</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WHEN: session end, batch work complete, or user asks for todo sync.</li><li>STEP 1 git log: git log --oneline --since=last-sync to list all commits.</li><li>STEP 2 match to pending: for each [ ] item in CLAUDE.md, if commit covers it -&gt; mark [x].</li><li>STEP 3 add new items: new work not in list -&gt; [x] done or [ ] pending.</li><li>STEP 4 commit: git add CLAUDE.md &amp;&amp; git commit -m chore todo sync pending section.</li><li>CANONICAL RULE: CLAUDE.md is only source of truth. Never track todos in conversation only.</li><li>ENCODING RULE: CLAUDE.md has Korean -- use wkcodex.sh for edits not Edit/Write tool directly.</li><li>NEW ITEM FORMAT: - [x] short description, no dates (git log has dates).</li><li>SCOPE: only this repo items. Skip wkappbot core infra (belongs to wkappbot team).</li><li>CRLF NOTE (2026-05-25): CLAUDE.md uses CRLF line endings. wkappbot file edit multiline replacements on CRLF files cause double-insertion and whitespace stripping bugs. Use wkcodex.sh for CLAUDE.md Pending updates, or make only single-line replacements where old_string does NOT appear in new_string.</li><li>CRLF APPEND WORKAROUND: wkappbot file edit multiline replacements cause 4x double-insertion on CRLF files. Safe alternative for adding pending items: (1) wkappbot file write CLAUDE.md --append --text &#x27;- [ ] item&#x27; to add at file end, or (2) use --old-file/--new-file flags to avoid shell escaping. Old string must NOT appear in new string -- if it does, CRLF causes repeated replacement.</li><li>COMPRESS PATTERN (2026-05-26): when Pending [x] count exceeds 15, group old done items by topic (e.g. &#x27;harness/wrappers&#x27;, &#x27;wkdoctor&#x27;, &#x27;caller-hwnd/CASCADIA&#x27;, &#x27;CDP/Chrome&#x27;, &#x27;agent-leak-guard&#x27;, &#x27;nightly-schedule-guard&#x27;) into one-line topic summaries with key commit hashes preserved. Keep ALL [ ] open items verbatim and the most recent ~8 [x] verbatim. Delete exact-duplicate lines (CRLF appends often double-write). Delegate the rewrite to wkcodex.sh since CLAUDE.md is CRLF + Korean.</li><li>BATCH RESOLVE 2026-05-29: CommandHelpMap mail (ts=2026-05-28T19:37:17) + eye-replace (ts=2026-05-28T19:36:34) resolved via single evidence-rewrite + Pending bullet commit. Evidence scripts converted from set-e+dotnet-build-pipe antipattern to plain if-not-grep block per suggest-resolve-evidence-conventions step 25. Same commit appended IOException File.Copy overwrite=false bullet (ts=2026-05-28T19:50:08) to Pending.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>WHEN: session end, batch work complete, or u...</li><li>STEP 1 git log: git log --oneline --since=la...</li><li>STEP 2 match to pending: for each [ ] item i...</li><li>STEP 3 add new items: new work not in list -...</li><li>STEP 4 commit: git add CLAUDE.md &amp;&amp; git comm...</li><li>CANONICAL RULE: CLAUDE.md is only source of...</li><li>ENCODING RULE: CLAUDE.md has Korean -- use w...</li><li>NEW ITEM FORMAT: - [x] short description, no...</li><li>SCOPE: only this repo items. Skip wkappbot c...</li><li>CRLF NOTE (2026-05-25): CLAUDE.md uses CRLF...</li><li>CRLF APPEND WORKAROUND: wkappbot file edit m...</li><li>COMPRESS PATTERN (2026-05-26): when Pending...</li><li>BATCH RESOLVE 2026-05-29: CommandHelpMap mai...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'claude-md-todo-sync';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>a11y screenshot: crash-safe layered alpha restore guard</h1>
       <p class="description">Crash-safe restore of layered window alpha during a11y screenshot suppression -- prevents windows staying invisible after taskkill/AccessViolation/SIGKILL of the screenshot process</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PROBLEM SuppressBlockingWindows in ScreenshotCommand.cs sets WS_EX_LAYERED + alpha=0 on every window above the capture rect; expects RestoreBlockingWindows to restore at end. External kill bypasses finally -- window stays invisible.</li><li>FIX ScreenshotCommand.AlphaRecovery.cs adds AlphaRecord(hwnd,prevStyle,prevAlpha) which writes to %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl BEFORE SetLayeredWindowAttributes(0,0,LWA_ALPHA).</li><li>HOOKS Console.CancelKeyPress + AppDomain.ProcessExit + AppDomain.UnhandledException registered on first AlphaRecord() call.</li><li>RECOVERY RecoverOrphanedAlpha() runs in Program.Dispatch.Run() at every wkappbot startup; scans alpha-pending-*.jsonl, restores files whose PID is dead.</li><li>INVARIANT persist BEFORE alpha=0; recovery is idempotent.</li><li>ENTRY POINTS AlphaRecord, AlphaClearPending, RecoverOrphanedAlpha in csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.AlphaRecovery.cs</li><li>PROBLEM: SuppressBlockingWindows in csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.cs sets WS_EX_LAYERED + alpha=0 on every window above the capture rect; RestoreBlockingWindows in the matching finally puts it back. External kill (taskkill /F, OS AccessViolation, SIGKILL) bypasses the finally so windows stay invisible at alpha=0 -- user has to admin-PowerShell SetLayeredWindowAttributes back to 255.</li><li>PERSIST: ScreenshotCommand.AlphaRecovery.cs (new file) provides AlphaRecord(hwnd,prevStyle,prevAlpha) -- appends one JSONL line {hwnd,prevStyle,prevAlpha} to %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl. SuppressBlockingWindows MUST call AlphaRecord BEFORE SetLayeredWindowAttributes(0,0,LWA_ALPHA) -- a kill in that 1-call gap is the only race we cannot self-cover.</li><li>GRACEFUL HOOKS: First AlphaRecord() call also registers Console.CancelKeyPress + AppDomain.CurrentDomain.ProcessExit + AppDomain.CurrentDomain.UnhandledException; each handler reads the per-PID pending file and restores. Covers Ctrl-C, normal exit, .NET unhandled exception.</li><li>STARTUP RECOVERY: Program.Dispatch.cs Run() calls RecoverOrphanedAlpha() once before dispatch. RecoverOrphanedAlpha enumerates %TEMP%/wkappbot-screenshot/alpha-pending-*.jsonl, parses PID from filename, skips if PID is alive (file owner still running), otherwise restores each recorded window and deletes the file. This is the SIGKILL/AccessViolation/power-loss safety net -- the next wkappbot invocation heals what the dead one left behind.</li><li>CLEAR ON SUCCESS: RestoreBlockingWindows tail calls AlphaClearPending() which deletes %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl. A clean run leaves no residue. Recovery is idempotent (re-applying a saved alpha to an already-restored window is a no-op), so a redundant restore from both in-process AND startup-scan is harmless.</li><li>EVIDENCE: D:/GitHub/WKAppBot/.wkappbot/evidence-alpha-restore.ps1 verifies (1) AlphaRecord, RecoverOrphanedAlpha, AlphaClearPending defined; (2) AlphaRecord wired in Suppress; (3) AlphaClearPending wired in Restore; (4) RecoverOrphanedAlpha wired in Run; (5) all 3 exit hooks present; (6) built binary newer than source.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>PROBLEM SuppressBlockingWindows in Screensho...</li><li>FIX ScreenshotCommand.AlphaRecovery.cs adds...</li><li>HOOKS Console.CancelKeyPress + AppDomain.Pro...</li><li>RECOVERY RecoverOrphanedAlpha() runs in Prog...</li><li>INVARIANT persist BEFORE alpha=0; recovery i...</li><li>ENTRY POINTS AlphaRecord, AlphaClearPending,...</li><li>PROBLEM: SuppressBlockingWindows in csharp/s...</li><li>PERSIST: ScreenshotCommand.AlphaRecovery.cs...</li><li>GRACEFUL HOOKS: First AlphaRecord() call als...</li><li>STARTUP RECOVERY: Program.Dispatch.cs Run()...</li><li>CLEAR ON SUCCESS: RestoreBlockingWindows tai...</li><li>EVIDENCE: D:/GitHub/WKAppBot/.wkappbot/evide...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-screenshot-crash-safe-layered-alpha-restore-guard';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

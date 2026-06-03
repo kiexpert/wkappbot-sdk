@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,9 +117,11 @@
       <h1>v6.0 sudo pipe + encoding fixes (2026-04-20)</h1>
       <p class="description">Three bugs fixed: wkappbot_elevated pipe routing, --sudo proxy Korean mojibake, and CreateProcessA argv UTF-8 recovery.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">news</span><span class="chip">sudo</span><span class="chip">encoding</span><span class="chip">eye</span><span class="chip">pipe</span><span class="chip">argv</span><span class="chip">unicode</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>FIX 1: wkappbot_elevated pipe routing (root cause of 30s proxy timeout).
+      <div class="steps-wrap">
+        <ol class="steps"><li>FIX 1: wkappbot_elevated pipe routing (root cause of 30s proxy timeout).
 Normal Eye was opening ElevatedEyeServer on wkappbot_elevated alongside admin Eye.
 Client connected to whichever accepted first -- normal Eye intercepted, then spawned
 non-elevated subprocess which timed out (stdoutDone=False stderrDone=False).
@@ -122,7 +139,10 @@ Solution: TryRecoverUtf8Argv() in Program.cs, runs at Main() entry before any ar
 Algorithm: GetCommandLineA() raw bytes -&gt; strict UTF-8 decode -&gt; if valid: CommandLineToArgvW re-parse.
 CP949 Korean lead bytes (0xBE, 0xB3...) fail UTF-8 check immediately -&gt; CreateProcessW callers pass through unchanged.
 NativeMethods added: GetCommandLineA, CommandLineToArgvW, LocalFree (shell32+kernel32).</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Ask Suggest Priority Batching</h1>
       <p class="description">Reduce ask-gpt calls when triaging wkappbot suggest backlogs. Use when you have a page of suggestions and want one GPT ranking pass, then one ask per suggestion in priority order.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">gpt</span><span class="chip">suggest</span><span class="chip">priority</span><span class="chip">batching</span><span class="chip">triage</span><span class="chip">workflow</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Batch triage: one GPT ranking pass for full page, then per-item queries fired concurrently. next:ask-suggest-priority-batching-howto for execution steps. cluster:ask-suggest-priority-batching-ref for calibration history.</li><li>DELEGATION PATTERN: Sonnet fires queries and waits. After responses arrive, brief Opus with ts+title+result+fix-path. Opus edits/builds/resolves. Sonnet never writes code inline.</li><li>TIMEOUT=20s (--timeout 20s). No response in 20s = proceed with codebase analysis immediately. Never block indefinitely. No retry.</li><li>STOP after firing queries. Do NOT use Sonnet tokens while GPT runs. Resume only after responses or 20s timeout. This is the whole point of batching.</li><li>PIPELINE HEALTH CHECK: ping --new-session --sync --timeout 20s before triage. Broken pipeline = file BUG-AUTO + continue with codebase analysis fallback.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Batch triage: one GPT ranking pass for full page, then per-item queries fired concurrently. next:ask-suggest-priority-batching-howto for execution steps. cluster:ask-suggest-priority-batching-ref for calibration history.</li><li>DELEGATION PATTERN: Sonnet fires queries and waits. After responses arrive, brief Opus with ts+title+result+fix-path. Opus edits/builds/resolves. Sonnet never writes code inline.</li><li>TIMEOUT=20s (--timeout 20s). No response in 20s = proceed with codebase analysis immediately. Never block indefinitely. No retry.</li><li>STOP after firing queries. Do NOT use Sonnet tokens while GPT runs. Resume only after responses or 20s timeout. This is the whole point of batching.</li><li>PIPELINE HEALTH CHECK: ping --new-session --sync --timeout 20s before triage. Broken pipeline = file BUG-AUTO + continue with codebase analysis fallback.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

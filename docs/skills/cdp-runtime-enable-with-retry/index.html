@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>CDP Runtime.enable with retry</h1>
       <p class="description">Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetries=3), exponential backoff 500ms??000ms??000ms. Final failure throws TimeoutException.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cdp</span><span class="chip">runtime</span><span class="chip">stability</span><span class="chip">retry</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>attempt &lt;= maxRetries (default 3) ??4 total tries</li><li>delay = 500 * (1 &lt;&lt; attempt): 500ms, 1000ms, 2000ms</li><li>Only retries on TimeoutException (not other errors)</li><li>Throw TimeoutException after all attempts exhausted</li><li>[AUDIT 2026-05-29] EnableRuntimeWithRetry signature drifted in CdpClient.cs. Method exists but pattern with exact default-arg signature &#x27;EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)&#x27; no longer matches. Refresh refs on next re-contribute to point to actual current signature.</li><li>Verified 2026-06-02: ev-runtime-enable-attempt0-grace.sh (resolve ts=2026-06-02T03:13:18.0576912Z)</li><li>[AUDIT 2026-06-03] source_refs broken: stale EnableRuntimeWithRetry/backoff patterns in CdpClient.cs.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>attempt &lt;= maxRetries (default 3) ??4 total tries</li><li>delay = 500 * (1 &lt;&lt; attempt): 500ms, 1000ms, 2000ms</li><li>Only retries on TimeoutException (not other errors)</li><li>Throw TimeoutException after all attempts exhausted</li><li>[AUDIT 2026-05-29] EnableRuntimeWithRetry signature drifted in CdpClient.cs. Method exists but pattern with exact default-arg signature &#x27;EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)&#x27; no longer matches. Refresh refs on next re-contribute to point to actual current signature.</li><li>Verified 2026-06-02: ev-runtime-enable-attempt0-grace.sh (resolve ts=2026-06-02T03:13:18.0576912Z)</li><li>[AUDIT 2026-06-03] source_refs broken: stale EnableRuntimeWithRetry/backoff patterns in CdpClient.cs.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

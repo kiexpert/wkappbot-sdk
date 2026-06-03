@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>막히면 삼두에 위임하라 (토큰 절약)</h1>
       <p class="description">구현 방법이 불확실하거나 버그 원인이 안 잡히면 삼두(GPT+Gemini+Claude)에 먼저 물어봐라. 삽질 30분보다 질문 1분이 낫다. Claude 혼자 추론하면 컨텍스트 낭비 -- 삼두에 위임하면 planning 토큰 대폭 절감.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">workflow</span><span class="chip">meta</span><span class="chip">triad</span><span class="chip">ask</span><span class="chip">decision</span><span class="chip">debate</span><span class="chip">token-saving</span><span class="chip">operator</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>wkappbot ask triad &quot;&lt;question in English&gt;&quot; [file.png]</li><li>질문은 반드시 영어로 -- 한글은 토큰 3~4배 낭비</li><li>코드/스크린샷 첨부 가능: wkappbot ask triad &quot;why does X fail?&quot; screenshot.png</li><li>결과 확인: 세 모델 답변 비교 후 공통된 방향 채택</li><li>중요 결론은 skill contribute 로 스킬화 -- 다음 Claude는 추론 없이 즉시 실행</li><li>★ 고난이도 설계 결정: wkappbot ask triad --debate 로 정반합 진행</li><li>정(thesis) -&gt; 반(antithesis) -&gt; 합(synthesis) 과정에서 반론과 합의 참고</li><li>단순 답변보다 훨씬 깊은 통찰 -- 설계 trade-off 명확히 드러남</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>wkappbot ask triad &quot;&lt;question in English&gt;&quot; [file.png]</li><li>질문은 반드시 영어로 -- 한글은 토큰 3~4배 낭비</li><li>코드/스크린샷 첨부 가능: wkappbot ask triad &quot;why does X fail?&quot; screenshot.png</li><li>결과 확인: 세 모델 답변 비교 후 공통된 방향 채택</li><li>중요 결론은 skill contribute 로 스킬화 -- 다음 Claude는 추론 없이 즉시 실행</li><li>★ 고난이도 설계 결정: wkappbot ask triad --debate 로 정반합 진행</li><li>정(thesis) -&gt; 반(antithesis) -&gt; 합(synthesis) 과정에서 반론과 합의 참고</li><li>단순 답변보다 훨씬 깊은 통찰 -- 설계 trade-off 명확히 드러남</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

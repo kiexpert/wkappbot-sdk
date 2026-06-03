@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y close safety: ambiguity + focus-node diagnostics</h1>
       <p class="description">Close action defaults: multi-match without narrower -&gt; abort with candidate list (like a11y find); after WM_CLOSE if target still alive at 500ms -&gt; dump UIA focused element so the blocker is visible</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">close</span><span class="chip">safety</span><span class="chip">diagnostics</span><span class="chip">focus</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Ambiguity guard: close detects grap matching &gt;1 windows with no #scope / hwnd: / --nth / --all -&gt; prints candidate list + returns exit 2; caller must narrow explicitly</li><li>Never hardcode critical-process list (Code/chrome/etc) as a bandaid -- user rejected this pattern; the narrower-required rule is the proper fix</li><li>LogCurrentFocusNode helper dumps UIA focused element (ControlType, Name, AutomationId, hwnd) on post-close liveness check -- surfaces save dialogs, IME composition, focus handoff bugs</li><li>Place focus-node logging at both UIA WindowPattern.Close (+500ms) and Win32 WM_CLOSE (+500ms) checkpoints for two-tier visibility</li><li>[DEV] Implementation: csharp/src/WKAppBot.CLI/Commands/A11yCommand.WindowActions.cs A11yClose + A11yCommand.cs close dispatch near targets loop</li><li>Verified 2026-04-22: test-a11y-close-all.sh (resolve ts=2026-04-17T09:12:39.3232214Z)</li><li>[v6.3+] close/minimize QuickMode: a11y close and minimize now set QuickMode=true on InputReadinessRequest, bypassing FocusStealer probe entirely. Rationale: destroying or hiding a window legitimately changes foreground -- never a false-positive focus steal. Previously generated FOCUS-STEAL false alarms in FocusSentinel at ~10-1134/hr. Fix: A11yCommand.cs InputReadinessRequest QuickMode = action is &quot;close&quot; or &quot;minimize&quot;.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Ambiguity guard: close detects grap matching &gt;1 windows with no #scope / hwnd: / --nth / --all -&gt; prints candidate list + returns exit 2; caller must narrow explicitly</li><li>Never hardcode critical-process list (Code/chrome/etc) as a bandaid -- user rejected this pattern; the narrower-required rule is the proper fix</li><li>LogCurrentFocusNode helper dumps UIA focused element (ControlType, Name, AutomationId, hwnd) on post-close liveness check -- surfaces save dialogs, IME composition, focus handoff bugs</li><li>Place focus-node logging at both UIA WindowPattern.Close (+500ms) and Win32 WM_CLOSE (+500ms) checkpoints for two-tier visibility</li><li>[DEV] Implementation: csharp/src/WKAppBot.CLI/Commands/A11yCommand.WindowActions.cs A11yClose + A11yCommand.cs close dispatch near targets loop</li><li>Verified 2026-04-22: test-a11y-close-all.sh (resolve ts=2026-04-17T09:12:39.3232214Z)</li><li>[v6.3+] close/minimize QuickMode: a11y close and minimize now set QuickMode=true on InputReadinessRequest, bypassing FocusStealer probe entirely. Rationale: destroying or hiding a window legitimately changes foreground -- never a false-positive focus steal. Previously generated FOCUS-STEAL false alarms in FocusSentinel at ~10-1134/hr. Fix: A11yCommand.cs InputReadinessRequest QuickMode = action is &quot;close&quot; or &quot;minimize&quot;.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

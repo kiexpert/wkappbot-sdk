@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Codex shell_command harness gap -- analysis and fix spec</h1>
       <p class="description">Codex shell_command tool flows through wkharness but bypasses all guards -- gap analysis and one-line fix.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">codex</span><span class="chip">shell_command</span><span class="chip">harness</span><span class="chip">guard</span><span class="chip">pace</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>FINDING: Every Codex shell_command reaches wkharness via config.toml PreToolUse matcher=&#x27;.*&#x27;. Infrastructure is in place.</li><li>GAP-1 harnessBody switch: shell_command hits &#x27;default { raw }&#x27; branch. _harnessInput becomes full JSON string, not the command. harness:block pattern &#x27;git push --force&#x27; does NOT match JSON-encoded content.</li><li>GAP-2 guards: toolName -in (Bash,PS) checks exclude shell_command. pace-guard, spec-gate, cd-noise-guard, skill-news-guard all pass silently for Codex.</li><li>GAP-3 file tools: apply_patch (1823 calls, 8.6%) already blocked by harness:block in CLAUDE.md. write_file/read_file rarely used.</li><li>FIX (one line): in wkharness-guards.ps1 switch(toolName) add case &#x27;shell_command&#x27; { cmd } between PS and default. Then _harnessInput = bullet shell_command(actual command text). All harness:block patterns fire for Codex identically to Claude.</li><li>EXTEND: change toolName -in (Bash,PS) to toolName -in (Bash,PS,shell_command) in all guards for full parity.</li><li>COVERAGE: 95pct+ of Codex tool calls under harness control after fix (shell_command 86.6% + apply_patch blocked 8.6%).</li><li>STATS 551 sessions: top cmds Get-Content 4638, git 2347, wkappbot 2089, Get-ChildItem 1962, rg 1694.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>FINDING: Every Codex shell_command reaches wkharness via config.toml PreToolUse matcher=&#x27;.*&#x27;. Infrastructure is in place.</li><li>GAP-1 harnessBody switch: shell_command hits &#x27;default { raw }&#x27; branch. _harnessInput becomes full JSON string, not the command. harness:block pattern &#x27;git push --force&#x27; does NOT match JSON-encoded content.</li><li>GAP-2 guards: toolName -in (Bash,PS) checks exclude shell_command. pace-guard, spec-gate, cd-noise-guard, skill-news-guard all pass silently for Codex.</li><li>GAP-3 file tools: apply_patch (1823 calls, 8.6%) already blocked by harness:block in CLAUDE.md. write_file/read_file rarely used.</li><li>FIX (one line): in wkharness-guards.ps1 switch(toolName) add case &#x27;shell_command&#x27; { cmd } between PS and default. Then _harnessInput = bullet shell_command(actual command text). All harness:block patterns fire for Codex identically to Claude.</li><li>EXTEND: change toolName -in (Bash,PS) to toolName -in (Bash,PS,shell_command) in all guards for full parity.</li><li>COVERAGE: 95pct+ of Codex tool calls under harness control after fix (shell_command 86.6% + apply_patch blocked 8.6%).</li><li>STATS 551 sessions: top cmds Get-Content 4638, git 2347, wkappbot 2089, Get-ChildItem 1962, rg 1694.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

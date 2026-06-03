@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>GitHub Fine-grained PAT permission edit via webbot</h1>
       <p class="description">Edit GH_PAT scopes (e.g. add secrets:write) without regenerating. Fine-grained PATs allow permission updates in-place — token value stays the same.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">github</span><span class="chip">pat</span><span class="chip">permissions</span><span class="chip">secrets</span><span class="chip">webbot</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. web open https://github.com/settings/personal-access-tokens?type=beta</li><li>2. a11y find token ID from list page</li><li>3. web open https://github.com/settings/personal-access-tokens/&lt;ID&gt;</li><li>4. JS click Edit button: document.querySelector(&#x27;button.js-toggle-grant-form&#x27;)?.click()</li><li>5. Set permission hidden input: document.querySelector(&#x27;input[name=&quot;integration[default_permissions][secrets]&quot;]&#x27;).value=&#x27;write&#x27; then dispatchEvent change</li><li>6. JS click Update button to save</li><li>7. Token value unchanged -- only scopes widened</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>1. web open https://github.com/settings/personal-access-tokens?type=beta</li><li>2. a11y find token ID from list page</li><li>3. web open https://github.com/settings/personal-access-tokens/&lt;ID&gt;</li><li>4. JS click Edit button: document.querySelector(&#x27;button.js-toggle-grant-form&#x27;)?.click()</li><li>5. Set permission hidden input: document.querySelector(&#x27;input[name=&quot;integration[default_permissions][secrets]&quot;]&#x27;).value=&#x27;write&#x27; then dispatchEvent change</li><li>6. JS click Update button to save</li><li>7. Token value unchanged -- only scopes widened</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

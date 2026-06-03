@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>ask command optimization smoke tests</h1>
       <p class="description">Smoke test script for ask optimization: dispatch latency, CDP port isolation, a11y eval block, cdp field in grap. Run: powershell -File scripts/test-ask-optimization.ps1 -Full</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">optimization</span><span class="chip">smoke</span><span class="chip">routing</span><span class="chip">triad</span><span class="chip">claude</span><span class="chip">gpt</span><span class="chip">gemini</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Run: powershell -File D:/GitHub/wkappbot-sdk/scripts/test-ask-optimization.ps1 -Full</li><li>BASIC mode: skill-search + ask-help routing only</li><li>FULL mode adds: CDP Port Isolation, Dispatch Latency (claude/gpt/gemini/triad), CDP Basic Tests (cdp open/find/read/eval-block), Agent routing</li><li>CDP Basic Tests: (1) cdp open grap contains cdp:{port} (2) a11y find cdp:{port} filters foreign Chromes (3) a11y read --eval-js works as eval replacement (4) a11y eval is BLOCKED</li><li>Thresholds: dispatch GOOD &lt;300ms WARN &gt;800ms BUG. Agent routing GOOD &lt;800ms</li><li>On fail: check [CDP:PORT] log via ask log file, check wkappbot-core.new.exe was hotswapped</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Run: powershell -File D:/GitHub/wkappbot-sdk/scripts/test-ask-optimization.ps1 -Full</li><li>BASIC mode: skill-search + ask-help routing only</li><li>FULL mode adds: CDP Port Isolation, Dispatch Latency (claude/gpt/gemini/triad), CDP Basic Tests (cdp open/find/read/eval-block), Agent routing</li><li>CDP Basic Tests: (1) cdp open grap contains cdp:{port} (2) a11y find cdp:{port} filters foreign Chromes (3) a11y read --eval-js works as eval replacement (4) a11y eval is BLOCKED</li><li>Thresholds: dispatch GOOD &lt;300ms WARN &gt;800ms BUG. Agent routing GOOD &lt;800ms</li><li>On fail: check [CDP:PORT] log via ask log file, check wkappbot-core.new.exe was hotswapped</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>CDP Command Guide T2 HowTo</h1>
       <p class="description">T2 domain tier. Full command reference: navigate, html, capture, eval-js, tabs, close, url, title. cdp-mon anomaly report fields.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../cdp-command-guide/">cdp-command-guide</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>cdp navigate GRAP URL -- waits for load. Reuses tab or opens new if host changed.</li><li>cdp html GRAP -- returns full outerHTML for scraping.</li><li>cdp capture GRAP -- saves PNG, prints path.</li><li>cdp url / cdp title GRAP -- current page URL or document title.</li><li>cdp tabs -- list all tabs. cdp close GRAP -- close current tab.</li><li>a11y read GRAP --eval-js &#x27;expr&#x27; -- eval JS in CDP context. Must include #node in grap. Bare window + --eval-js = exit 1.</li><li>cdp-mon ANOMALY REPORT: [CRIT] offscreen TGT-POS(x&lt;-100) / LAT=DEAD / JS-alert / MEM&gt;2GB. [WARN] sessions&gt;5 / tabs&gt;6 / drift&gt;200px / lat&gt;80ms. DIAGNOSTIC: powershell -File bin/wkcdp-mon.ps1 first on any anomaly.</li><li>PORT FORMULA: SHA256(git-root)[0:4] % 174 * 4 + 9300 aligned to 0xFFFC. Wrong port = &#x27;not in project CDP block&#x27; error.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>cdp navigate GRAP URL -- waits for load. Reuses tab or opens new if host changed.</li><li>cdp html GRAP -- returns full outerHTML for scraping.</li><li>cdp capture GRAP -- saves PNG, prints path.</li><li>cdp url / cdp title GRAP -- current page URL or document title.</li><li>cdp tabs -- list all tabs. cdp close GRAP -- close current tab.</li><li>a11y read GRAP --eval-js &#x27;expr&#x27; -- eval JS in CDP context. Must include #node in grap. Bare window + --eval-js = exit 1.</li><li>cdp-mon ANOMALY REPORT: [CRIT] offscreen TGT-POS(x&lt;-100) / LAT=DEAD / JS-alert / MEM&gt;2GB. [WARN] sessions&gt;5 / tabs&gt;6 / drift&gt;200px / lat&gt;80ms. DIAGNOSTIC: powershell -File bin/wkcdp-mon.ps1 first on any anomaly.</li><li>PORT FORMULA: SHA256(git-root)[0:4] % 174 * 4 + 9300 aligned to 0xFFFC. Wrong port = &#x27;not in project CDP block&#x27; error.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

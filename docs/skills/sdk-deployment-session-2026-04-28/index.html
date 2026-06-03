@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>SDK deployment session handoff (2026-04-28)</h1>
       <p class="description">Handoff: SDK public deployment session 2026-04-28. CI/CD pipeline, 188-test smoke suite, release automation, ECDSA license system, Launcher public-source fixes. v6.5.0-sdk released.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">sdk</span><span class="chip">handoff</span><span class="chip">deployment</span><span class="chip">ci</span><span class="chip">release</span><span class="chip">license</span><span class="chip">2026-04-28</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>REPO: ***/wkappbot-sdk (public). Dev binary: D:\GitHub\WKAppBot\bin\wkappbot-core.exe. SDK CWD: d:\GitHub\wkappbot-sdk|CI DONE: build-launcher.yml (build+25-test smoke), extended-smoke.yml (daily 02:00UTC 188-tests 7min), release.yml (tag-&gt;release --generate-notes)|SMOKE DONE: smoke-help.ps1 57 sections 3+ tests/cmd. CI=BasicOnly(25). Local=Extended(188). App-launch sections skip on CI via skipApp=isCI|BUILD DONE: build.cmd --download-only fetches Core from GitHub Release (gh CLI + PS fallback). Core=private binary, Launcher=public source AOT|RELEASE DONE: find-stable-release.ps1 -- artifacts-&gt;BasicOnly smoke-&gt;tag-&gt;gh release. v6.5.0-sdk live. release.yml for tag-triggered releases|LICENSE DONE: ECDSA P-256 offline JWT. gen-license.csx tool. Private key: D:\GitHub\WKAppBot\.env ***. Free=no file needed|LAUNCHER FIX: WKAPPBOT_DEBUG=1 gates relay debug. suggest+skill isCoreDirectCmd bypasses Eye pipe. Audit: no private paths, no API keys|DOCS: README clone=install+badges+links. docs/wkappbot-commands.md gen-command-ref.sh. Private skills in dev HQ: sdk-launcher-maintenance, sdk-release-playbook|PENDING: extended-smoke.yml daily trend monitoring. Core closed-source: swap build.yml core-build to gh release download (WKAPPBOT_CORE_REPO+PAT secrets). Launcher public release final audit|PENDING SUGGESTS in dev HQ: sdk-skill-verify-stale-ref, sdk-extended-ci-build-no-artifact-reuse, sdk-launcher-self-update-core|SUGGEST/SKILL RULE: always run D:\GitHub\WKAppBot\bin\wkappbot-core.exe from d:\GitHub\wkappbot-sdk CWD. Never cd to WKAppBot. See memory: feedback_suggest_from_sdk_folder.md</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>REPO: ***/wkappbot-sdk (public). Dev binary: D:\GitHub\WKAppBot\bin\wkappbot-core.exe. SDK CWD: d:\GitHub\wkappbot-sdk|CI DONE: build-launcher.yml (build+25-test smoke), extended-smoke.yml (daily 02:00UTC 188-tests 7min), release.yml (tag-&gt;release --generate-notes)|SMOKE DONE: smoke-help.ps1 57 sections 3+ tests/cmd. CI=BasicOnly(25). Local=Extended(188). App-launch sections skip on CI via skipApp=isCI|BUILD DONE: build.cmd --download-only fetches Core from GitHub Release (gh CLI + PS fallback). Core=private binary, Launcher=public source AOT|RELEASE DONE: find-stable-release.ps1 -- artifacts-&gt;BasicOnly smoke-&gt;tag-&gt;gh release. v6.5.0-sdk live. release.yml for tag-triggered releases|LICENSE DONE: ECDSA P-256 offline JWT. gen-license.csx tool. Private key: D:\GitHub\WKAppBot\.env ***. Free=no file needed|LAUNCHER FIX: WKAPPBOT_DEBUG=1 gates relay debug. suggest+skill isCoreDirectCmd bypasses Eye pipe. Audit: no private paths, no API keys|DOCS: README clone=install+badges+links. docs/wkappbot-commands.md gen-command-ref.sh. Private skills in dev HQ: sdk-launcher-maintenance, sdk-release-playbook|PENDING: extended-smoke.yml daily trend monitoring. Core closed-source: swap build.yml core-build to gh release download (WKAPPBOT_CORE_REPO+PAT secrets). Launcher public release final audit|PENDING SUGGESTS in dev HQ: sdk-skill-verify-stale-ref, sdk-extended-ci-build-no-artifact-reuse, sdk-launcher-self-update-core|SUGGEST/SKILL RULE: always run D:\GitHub\WKAppBot\bin\wkappbot-core.exe from d:\GitHub\wkappbot-sdk CWD. Never cd to WKAppBot. See memory: feedback_suggest_from_sdk_folder.md</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

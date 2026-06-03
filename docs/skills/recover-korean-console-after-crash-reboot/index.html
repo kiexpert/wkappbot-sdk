@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Recover Korean console after crash reboot</h1>
       <p class="description">When Korean/Hangul input fails only in console after system crash reboot or Kernel-Power 41, run scripts/recover-korean-console.ps1 before substantive work. It restarts TextInputHost/ctfmon and aligns PowerShell console encodings to UTF-8.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">korean</span><span class="chip">hangul</span><span class="chip">console</span><span class="chip">ime</span><span class="chip">ctfmon</span><span class="chip">TextInputHost</span><span class="chip">encoding</span><span class="chip">utf8</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Run powershell -ExecutionPolicy Bypass -File .\scripts\recover-korean-console.ps1 from repo root.</li><li>If ctfmon start reports 0xc0000142 but ctfmon is already running, treat it as usually sufficient.</li><li>If the already-open console still has stale IME state, open a new Windows Terminal tab before suggesting another reboot.</li><li>For repeated crash-boot symptoms, consider disabling Windows Fast Startup separately.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Run powershell -ExecutionPolicy Bypass -File .\scripts\recover-korean-console.ps1 from repo root.</li><li>If ctfmon start reports 0xc0000142 but ctfmon is already running, treat it as usually sufficient.</li><li>If the already-open console still has stale IME state, open a new Windows Terminal tab before suggesting another reboot.</li><li>For repeated crash-boot symptoms, consider disabling Windows Fast Startup separately.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

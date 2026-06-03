@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Concurrent AI isolation: env var detection beats parent chain</h1>
       <p class="description">When Claude Code and Codex run simultaneously in VS Code, AppBotPipe.Spawn uses DETACHED_PROCESS which breaks the Windows parent chain (parent shows as PID 8). Detect AI identity via env vars first: CLAUDE_CODE_ENTRYPOINT (Claude Code VSCode ext), CODEX_HOME (Codex), VSCODE_PID (VS Code host). Fall back to parent chain walk only when env vars are absent. Also: two AIs sharing the same CWD must use SessionJsonl (exact file path) for size/content reads — CWD scan picks the wrong JSONL.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkappbot</span><span class="chip">eye</span><span class="chip">session</span><span class="chip">concurrent</span><span class="chip">ai</span><span class="chip">env-var</span><span class="chip">detached-process</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>When Claude Code and Codex run side-by-side under VS Code, AppBotPipe.Spawn uses DETACHED_PROCESS which severs the Windows parent chain (parent appears as PID 8). Identity detection therefore must read env vars first.</li><li>Identity priority: CLAUDE_CODE_ENTRYPOINT (Claude Code VS Code extension) -&gt; CODEX_HOME (Codex CLI) -&gt; VSCODE_PID (host). Walk the parent process chain only as a last resort when none of these env vars are present.</li><li>If two AIs share the same CWD, never use a CWD scan to pick the active session JSONL — pass SessionJsonl (exact file path) explicitly so size/content reads target the right transcript.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>When Claude Code and Codex run side-by-side under VS Code, AppBotPipe.Spawn uses DETACHED_PROCESS which severs the Windows parent chain (parent appears as PID 8). Identity detection therefore must read env vars first.</li><li>Identity priority: CLAUDE_CODE_ENTRYPOINT (Claude Code VS Code extension) -&gt; CODEX_HOME (Codex CLI) -&gt; VSCODE_PID (host). Walk the parent process chain only as a last resort when none of these env vars are present.</li><li>If two AIs share the same CWD, never use a CWD scan to pick the active session JSONL — pass SessionJsonl (exact file path) explicitly so size/content reads target the right transcript.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

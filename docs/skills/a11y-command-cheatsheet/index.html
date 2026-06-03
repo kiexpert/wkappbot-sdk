@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y Command Cheatsheet - Operator View for Claude and Codex</h1>
       <p class="description">Operational cheatsheet for wkappbot a11y in Claude and Codex workflows. Covers principles (inspect first, resolve grap safely, prefer focusless tiers) AND a per-sub-action reference for all 24 a11y actions. Treat find output as paste-ready contract. Include optional operator flags only when they improve safety or verification.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">uia</span><span class="chip">win32</span><span class="chip">cdp</span><span class="chip">automation</span><span class="chip">grap</span><span class="chip">fallback</span><span class="chip">reference</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Always inspect before automating an unfamiliar app; use find to discover not guess</li><li>Treat a11y find as a contract: one shared focus line one target block per match optional info lines shell-safe grap and verify by rerunning on the emitted hwnd token</li><li>Separate root hwnd from process-owned hwnd; process identity comes from the matched proc/domain/cmd/title/cls/file not the host shell</li><li>Prefer focusless tiers first: UIA Invoke/Value/Toggle/Select then Win32 PostMessage then SendInput only if necessary</li><li>For browser targets prefer CSS then CDP then UIA; use the exact hwnd grap from find when the tab or frame matters</li><li>Keep the grap short quoted and paste-ready for both Claude and Codex; if ambiguity remains rerun inspect/find before acting</li><li>next: wkappbot skill read a11y-command-cheatsheet-howto -- sub-command reference guide. Covers discovery (inspect/find/windows), window-state (close/minimize/maximize), input (type/click/invoke), read/wait actions, and common flags (--all/--nth/--force)</li><li>next: wkappbot skill read a11y-command-cheatsheet-ref -- history and reference. Covers deprecated commands (win-click), USAGE-REMOVED patterns (a11y eval), verified tests, audit notes</li><li>[AUDIT 2026-06-03] source_refs broken: stale pattern A11yGridRead in A11yActions.Read.cs.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Always inspect before automating an unfamiliar app; use find to discover not guess</li><li>Treat a11y find as a contract: one shared focus line one target block per match optional info lines shell-safe grap and verify by rerunning on the emitted hwnd token</li><li>Separate root hwnd from process-owned hwnd; process identity comes from the matched proc/domain/cmd/title/cls/file not the host shell</li><li>Prefer focusless tiers first: UIA Invoke/Value/Toggle/Select then Win32 PostMessage then SendInput only if necessary</li><li>For browser targets prefer CSS then CDP then UIA; use the exact hwnd grap from find when the tab or frame matters</li><li>Keep the grap short quoted and paste-ready for both Claude and Codex; if ambiguity remains rerun inspect/find before acting</li><li>next: wkappbot skill read a11y-command-cheatsheet-howto -- sub-command reference guide. Covers discovery (inspect/find/windows), window-state (close/minimize/maximize), input (type/click/invoke), read/wait actions, and common flags (--all/--nth/--force)</li><li>next: wkappbot skill read a11y-command-cheatsheet-ref -- history and reference. Covers deprecated commands (win-click), USAGE-REMOVED patterns (a11y eval), verified tests, audit notes</li><li>[AUDIT 2026-06-03] source_refs broken: stale pattern A11yGridRead in A11yActions.Read.cs.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

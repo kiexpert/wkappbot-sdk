@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkwrap: AI-native .sh/.cmd wrapper auto-install</h1>
       <p class="description">Universal relay pattern for all wk*.ps1 tools. .sh for bash/Claude, .cmd for CMD/user, .ps1 for direct PS. wkwrap.sh --install auto-generates missing wrappers from wk*.ps1 scan.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PATTERN: each wkXXX.ps1 in WKAppBot/bin gets .sh (bash relay) + .cmd (CMD relay) counterparts auto-managed by wkwrap.sh/cmd.</li><li>RELAY: wkXXX.sh -&gt; powershell -File wkXXX.ps1 via wkwrap.sh. wkXXX.cmd -&gt; same via wkwrap.cmd. basename $0 detection.</li><li>INSTALL: wkwrap.sh --install scans wk*.ps1, creates missing .sh + .cmd. Run after adding new .ps1 tools.</li><li>STATUS: wkwrap.sh --status shows coverage table (.ps1 / .sh / .cmd per tool).</li><li>HARNESS GUIDANCE (MANDATORY): always refer users to .sh (bash) or .cmd (CMD) -- never .ps1 in harness error messages. PS1 is for direct expert use only.</li><li>MAINTENANCE: wkharness -Status calls wkwrap.sh --install automatically to keep wrappers up to date.</li><li>SPECIAL WRAPPERS (not relay): wkclaude.sh pre-bakes --print --model haiku. wkcodex.sh calls wkcodex.ps1 (harness symlink). These are NOT replaced by --install.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PATTERN: each wkXXX.ps1 in WKAppBot/bin gets .sh (bash relay) + .cmd (CMD relay) counterparts auto-managed by wkwrap.sh/cmd.</li><li>RELAY: wkXXX.sh -&gt; powershell -File wkXXX.ps1 via wkwrap.sh. wkXXX.cmd -&gt; same via wkwrap.cmd. basename $0 detection.</li><li>INSTALL: wkwrap.sh --install scans wk*.ps1, creates missing .sh + .cmd. Run after adding new .ps1 tools.</li><li>STATUS: wkwrap.sh --status shows coverage table (.ps1 / .sh / .cmd per tool).</li><li>HARNESS GUIDANCE (MANDATORY): always refer users to .sh (bash) or .cmd (CMD) -- never .ps1 in harness error messages. PS1 is for direct expert use only.</li><li>MAINTENANCE: wkharness -Status calls wkwrap.sh --install automatically to keep wrappers up to date.</li><li>SPECIAL WRAPPERS (not relay): wkclaude.sh pre-bakes --print --model haiku. wkcodex.sh calls wkcodex.ps1 (harness symlink). These are NOT replaced by --install.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Claude MD Harness Rules T3 Reference</h1>
       <p class="description">T3 ref. isEditOp history, lock-clear hygiene, global CLAUDE.md integration, Catch-22 fix.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../claude-md-harness-rules/">claude-md-harness-rules</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>GLOBAL CLAUDE.MD INTEGRATION: after CWD pass, also load ~/.claude/CLAUDE.md with skipEditCatchAll=true. Gate with -not env:WKHARNESS_SELFTEST so 72 self-test cases unaffected. CWD first, then edited-file repo, then global.</li><li>isEditOp CORRECTION (final 2026-05-27, commit 53feb82): discrimination done in harness:skill PATTERN, not guard code. Robust prefix (?:Edit\(</li><li>Write\(</li><li>Bash\(...)  covers Edit/Write tool + Bash appbot-edit/wkedit. wkcodex/wkclaude excluded (delegation wrappers).</li><li>LOCK-CLEAR CATCH-22 RESOLVED (commit 53feb82): wkappbot skill edit no longer arms lock. Post-hook verb-anchors source-edit detection and excludes skill catalog ops. Earlier clean-text-only hygiene obsolete.</li><li>Edit/Write tool bypass confirmed: Bash appbot-edit on .ps1 BLOCKS, Edit TOOL on same .ps1 PASSES. Cause: early exit-0 in wkharness-guards.ps1 ~line 1430 short-circuits Edit/Write before harness eval.</li><li>SELF-TEST: 72 deterministic cases in wkharness -Test. Gate global-load with env:WKHARNESS_SELFTEST to keep tests isolated from real user-level rules.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>GLOBAL CLAUDE.MD INTEGRATION: after CWD pass, also load ~/.claude/CLAUDE.md with skipEditCatchAll=true. Gate with -not env:WKHARNESS_SELFTEST so 72 self-test cases unaffected. CWD first, then edited-file repo, then global.</li><li>isEditOp CORRECTION (final 2026-05-27, commit 53feb82): discrimination done in harness:skill PATTERN, not guard code. Robust prefix (?:Edit\(</li><li>Write\(</li><li>Bash\(...)  covers Edit/Write tool + Bash appbot-edit/wkedit. wkcodex/wkclaude excluded (delegation wrappers).</li><li>LOCK-CLEAR CATCH-22 RESOLVED (commit 53feb82): wkappbot skill edit no longer arms lock. Post-hook verb-anchors source-edit detection and excludes skill catalog ops. Earlier clean-text-only hygiene obsolete.</li><li>Edit/Write tool bypass confirmed: Bash appbot-edit on .ps1 BLOCKS, Edit TOOL on same .ps1 PASSES. Cause: early exit-0 in wkharness-guards.ps1 ~line 1430 short-circuits Edit/Write before harness eval.</li><li>SELF-TEST: 72 deterministic cases in wkharness -Test. Gate global-load with env:WKHARNESS_SELFTEST to keep tests isolated from real user-level rules.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

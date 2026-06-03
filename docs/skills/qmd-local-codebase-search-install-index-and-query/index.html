@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>QMD Local Codebase Search — Install, Index, and Query</h1>
       <p class="description">QMD: BM25 + vector semantic + optional LLM reranking local search engine. Pre-indexes C# source, skill JSONs, and docs. Claude resolves qmd://collection/file.cs:42 references directly to file+line, cutting exploration tokens by 91%. MCP server exposes search as mcp__qmd__* tools.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">qmd</span><span class="chip">search</span><span class="chip">pre-index</span><span class="chip">token</span><span class="chip">optimization</span><span class="chip">mcp</span><span class="chip">vector</span><span class="chip">bm25</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[WHAT] QMD is a local search engine (BM25 + vector embeddings) that pre-indexes your codebase. Claude uses it to jump directly to the right file:line instead of globbing and grepping the entire repo.</li><li>[INSTALL] Install via bun: bun install -g @tobilu/qmd. On Windows, create a wrapper: D:/SDK/bin/qmd.cmd pointing to bun.exe + dist/cli/qmd.js %* . npm install also works but creates shell script wrappers that fail on Windows.</li><li>[COLLECTIONS] Add collections from the project root: qmd collection add wkappbot-src --mask **/*.cs , qmd collection add wkappbot-skills --mask **/*.skill.json , qmd collection add wkappbot-docs --mask **/*.md . Use --mask (not --glob) for glob patterns.</li><li>[CONTEXT] Add human descriptions to help Claude understand each collection: qmd context add &#x27;WKAppBot C# source...&#x27; -- qmd://wkappbot-src/ . This description appears in every search result.</li><li>[EMBED] Generate vector embeddings: qmd embed . Downloads 329MB embedding model on first run (embeddinggemma-300M-Q8_0.gguf). Subsequent runs are incremental. Run after adding new files.</li><li>[SEARCH-MODES] (1) qmd search TEXT -- BM25 keyword search. Fast, no extra models. Best for identifiers, function names, exact terms. (2) qmd vsearch TEXT -- vector semantic search. Best for concept queries. Needs embedding model. (3) qmd query TEXT -- hybrid + LLM expansion + reranking. Best quality but downloads 2GB extra models on first run. Avoid in daily use.</li><li>[MCP] Register in .mcp.json: add &#x27;qmd&#x27; server with command=bun.exe and args=[qmd.js, mcp]. Tools become available as mcp__qmd__* in Claude Code. Claude can call search/vsearch/get directly.</li><li>[CLAUDE-MD-RULE] Add to CLAUDE.md Token Efficiency section: &#x27;Use qmd search before reading files -- BM25+vector pre-index of all C# + skills + docs (MCP: qmd)&#x27;. This prevents blind globbing on every question.</li><li>[RESULTS] Result format: qmd://collection/path/file.cs:LINE -- score% -- code snippet. Pass the qmd:// URI to qmd get to see more context. Claude Code resolves these URIs to read exact file sections.</li><li>[DAILY-USE] For identifiers/function names: qmd search FunctionName . For concept queries: qmd vsearch &#x27;how does hot swap work&#x27; . For multi-collection: omit --collection (searches all). Re-index after bulk edits: qmd update.</li><li>[LIMITS] qmd search may return no results for natural language full sentences -- use vsearch instead. qmd query first run is slow (2GB model download). Windows path separator in collection mask must use forward slashes.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>[WHAT] QMD is a local search engine (BM25 +...</li><li>[INSTALL] Install via bun: bun install -g @t...</li><li>[COLLECTIONS] Add collections from the proje...</li><li>[CONTEXT] Add human descriptions to help Cla...</li><li>[EMBED] Generate vector embeddings: qmd embe...</li><li>[SEARCH-MODES] (1) qmd search TEXT -- BM25 k...</li><li>[MCP] Register in .mcp.json: add &#x27;qmd&#x27; serve...</li><li>[CLAUDE-MD-RULE] Add to CLAUDE.md Token Effi...</li><li>[RESULTS] Result format: qmd://collection/pa...</li><li>[DAILY-USE] For identifiers/function names:...</li><li>[LIMITS] qmd search may return no results fo...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'qmd-local-codebase-search-install-index-and-query';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

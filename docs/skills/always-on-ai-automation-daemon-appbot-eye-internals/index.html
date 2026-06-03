@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Always-On AI Automation Daemon -- AppBot Eye Internals</h1>
       <p class="description">Eye = always-on overlay + Slack daemon + MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) + 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp -&gt; defers if admin pipe busy -&gt; skips same failed stamp -&gt; spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">eye</span><span class="chip">mcp</span><span class="chip">hotswap</span><span class="chip">architecture</span><span class="chip">admin</span><span class="chip">daemon</span><span class="chip">fsw</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Eye = always-on overlay + Slack daemon + MCP broker (one process). FSW dirty-check: event ~0ms + 1s FileInfo safety net. Never kill Eye directly -- kills active sessions.</li><li>MCP workers run in DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: watches core.new.exe stamp, defers if admin pipe busy, skips same failed stamp, spawns new Eye.</li><li>Admin-capable mode: amber border, proxies via wkappbot_elevated named pipe. NEVER mix with normal Eye tick channel wkappbot_eye_ipc. next:always-on-ai-automation-daemon-appbot-eye-internals-ref for OOM Guardian + spawn-storm circuit breaker.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Eye = always-on overlay + Slack daemon + MCP broker (one process). FSW dirty-check: event ~0ms + 1s FileInfo safety net. Never kill Eye directly -- kills active sessions.</li><li>MCP workers run in DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: watches core.new.exe stamp, defers if admin pipe busy, skips same failed stamp, spawns new Eye.</li><li>Admin-capable mode: amber border, proxies via wkappbot_elevated named pipe. NEVER mix with normal Eye tick channel wkappbot_eye_ipc. next:always-on-ai-automation-daemon-appbot-eye-internals-ref for OOM Guardian + spawn-storm circuit breaker.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

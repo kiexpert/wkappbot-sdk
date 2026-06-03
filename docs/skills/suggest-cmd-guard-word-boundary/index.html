@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>suggest resolve CMD guard: word-boundary key extraction fix</h1>
       <p class="description">CMD guard extracts affected commands from suggest text using HasCmdToken helper that checks word boundary after match, preventing short CommandHelpMap keys (e.g. &#x27;com&#x27;) from false-positiving on longer words (&#x27;commands&#x27;, &#x27;--commit&#x27;) in suggest titles.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Use HasCmdToken(text, prefix, key) instead of text.Contains(prefix+key): checks char after match is non-alphanumeric</li><li>Example false-positive fixed: &#x27;a11y commands&#x27; no longer triggers key &#x27;com&#x27; because &#x27;commands&#x27;[3]=&#x27;m&#x27; is alphanumeric</li><li>Example false-positive fixed: &#x27;--commit&#x27; no longer triggers key &#x27;com&#x27;</li><li>Location: SuggestCommand.Resolve.cs, in &#x27;Non-merge: extract mentioned commands from suggest text&#x27; block</li><li>If new short CommandHelpMap keys are added, word-boundary is already enforced -- no additional change needed</li><li>Fix location: SuggestCommand.Resolve.cs -- resolve guard pre-load block at lines ~204-217 (v6.2.1 commit e3724001)</li><li>Verified 2026-04-24: test-suggest-list-cmd-guard-word-boundary.sh (resolve ts=2026-04-24T05:32:39)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Use HasCmdToken(text, prefix, key) instead of text.Contains(prefix+key): checks char after match is non-alphanumeric</li><li>Example false-positive fixed: &#x27;a11y commands&#x27; no longer triggers key &#x27;com&#x27; because &#x27;commands&#x27;[3]=&#x27;m&#x27; is alphanumeric</li><li>Example false-positive fixed: &#x27;--commit&#x27; no longer triggers key &#x27;com&#x27;</li><li>Location: SuggestCommand.Resolve.cs, in &#x27;Non-merge: extract mentioned commands from suggest text&#x27; block</li><li>If new short CommandHelpMap keys are added, word-boundary is already enforced -- no additional change needed</li><li>Fix location: SuggestCommand.Resolve.cs -- resolve guard pre-load block at lines ~204-217 (v6.2.1 commit e3724001)</li><li>Verified 2026-04-24: test-suggest-list-cmd-guard-word-boundary.sh (resolve ts=2026-04-24T05:32:39)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

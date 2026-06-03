@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>License pending invite: detect and guide user to accept</h1>
       <p class="description">When GitHub collaborator invite is pending (not yet accepted), GET /repos/invitations returns permission=none -- indistinguishable from never-invited. Fix: check invitations endpoint before falling back to Free tier. UX: show Eye callout + numbered console guide so paying users are not silently downgraded.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. Call GET /repos/{owner}/{repo}/invitations after permission=none check</li><li>Eye callout message: activation-pending users must NOT see silent Free tier -- always show numbered guide with github.com/invitations URL</li><li>Implementation deferred to license-auth sprint: wire GET /repos/invitations check into LicenseChecker before Free-tier fallback branch</li><li>After permission=none: call GET /repos/invitations, match invitee, show numbered guide: 1) check email invite 2) go github.com/invitations 3) accept WKAppBot repo 4) rerun wkappbot</li><li>Root cause: spec step 22 assumes permission reflects immediately after invite, but only activates after acceptance. indistinguishable from never-invited until accepted. Better UX than silent Free downgrade.</li><li>Business plan draft onboarding document: Customer who paid and gets invite but not yet accepted gets Free tier -- document in onboarding that invite must be accepted before license activates.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>1. Call GET /repos/{owner}/{repo}/invitations after permission=none check</li><li>Eye callout message: activation-pending users must NOT see silent Free tier -- always show numbered guide with github.com/invitations URL</li><li>Implementation deferred to license-auth sprint: wire GET /repos/invitations check into LicenseChecker before Free-tier fallback branch</li><li>After permission=none: call GET /repos/invitations, match invitee, show numbered guide: 1) check email invite 2) go github.com/invitations 3) accept WKAppBot repo 4) rerun wkappbot</li><li>Root cause: spec step 22 assumes permission reflects immediately after invite, but only activates after acceptance. indistinguishable from never-invited until accepted. Better UX than silent Free downgrade.</li><li>Business plan draft onboarding document: Customer who paid and gets invite but not yet accepted gets Free tier -- document in onboarding that invite must be accepted before license activates.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

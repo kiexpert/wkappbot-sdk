@@ -263,7 +263,7 @@ def render_skill_card(skill: dict[str, Any]) -> str:
 
     return f"""
       <a class="skill-link" href="{slug}/" data-search="{e(title + ' ' + desc + ' ' + app + ' ' + ' '.join(skill['tags']))}">
-      <article class="skill-card{premium_class}">
+      <article class="skill-card{premium_class}" data-skill-id="{e(skill['id'])}">
         <div class="card-top">
           <span class="app-badge">{app}</span>
           <span class="stars" aria-label="{skill['stars']} star rating">{render_stars(int(skill['stars']))}</span>
@@ -308,8 +308,19 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     if premium:
         pro_button_and_script = """  <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
   <script>
+    const SKILL_ID = '__SKILL_ID__';
     const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
     function unlockAll() {
+      injectFullSteps();
       const overlays = document.querySelectorAll('.unlock');
       const stepsLists = document.querySelectorAll('.steps.blurred');
       for (const overlay of overlays) {
@@ -353,6 +364,8 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
           }
         });
         if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
           unlockAll();
         } else if (response.status === 401) {
           showDeniedState('invalid');
@@ -381,6 +394,7 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     });
     checkGitHubAccess(localStorage.getItem('gh_token'));
   </script>"""
+        pro_button_and_script = pro_button_and_script.replace('__SKILL_ID__', e(skill_id))
 
     return f"""<!doctype html>
 <html lang="en">

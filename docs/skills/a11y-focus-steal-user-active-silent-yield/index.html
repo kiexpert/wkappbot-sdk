@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y focus-steal: user-active silent yield in RestoreFocusWithRetryAsync</h1>
       <p class="description">When RestoreFocusWithRetryAsync is fighting a focus steal (Chrome/Electron) but user is actively typing (&lt;1.5s idle), treat it as an intentional user switch and bail out silently -- no more ForceForegroundWindow loop, no AutoBugReport noise.</p>
       <div class="meta">user</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">focus-steal</span><span class="chip">user-active</span><span class="chip">sentinel</span><span class="chip">bailout</span><span class="chip">focusless-first</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Sentinel retries ForceForegroundWindow up to 5s (150ms * 33 attempts)</li><li>Inside loop: check NativeMethods.GetUserIdleMs()</li><li>If &lt;1500ms (user is typing/clicking) set userBailed=true and break</li><li>On userBailed return false immediately -- no IME restore no cursor restore no bug report</li><li>The user&#x27;s foreground choice wins; only file reports for true involuntary steals</li><li>Usage context: wkappbot a11y invoke / a11y find / a11y inspect / a11y windows / a11y hack paths all go through this sentinel; user-active yield prevents spam during intentional focus switches</li><li>Also covers ask gpt / ask claude / ask gemini / ask triad / ask-* CDP flows: prior sessions saw UIA focus steal (hwnd attach, SetForegroundWindow) during ChromeLauncher-&gt;CDP attach -- same sentinel bailout applies</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T05:52:09)</li><li>Verified 2026-04-21: test-focus-steal-user-active-silent-yield.cmd (resolve ts=2026-04-21T03:33)</li><li>Verified 2026-04-21: test-a11y-find-focus-steal-guard.sh (resolve ts=2026-04-21T18:24)</li><li>Verified 2026-04-22: test-a11y-find-focus-steal-close-guard.sh (resolve ts=2026-04-22T02:08)</li><li>Verified 2026-04-28: test-a11y-type-read-wm-gettext-elevated.cmd (resolve ts=2026-04-27T12:41)</li><li>Verified 2026-05-10: test-a11y-focusless-fl.sh (resolve ts=2026-05-01T18:22:09 a11y-screenshot)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Sentinel retries ForceForegroundWindow up to 5s (150ms * 33 attempts)</li><li>Inside loop: check NativeMethods.GetUserIdleMs()</li><li>If &lt;1500ms (user is typing/clicking) set userBailed=true and break</li><li>On userBailed return false immediately -- no IME restore no cursor restore no bug report</li><li>The user&#x27;s foreground choice wins; only file reports for true involuntary steals</li><li>Usage context: wkappbot a11y invoke / a11y find / a11y inspect / a11y windows / a11y hack paths all go through this sentinel; user-active yield prevents spam during intentional focus switches</li><li>Also covers ask gpt / ask claude / ask gemini / ask triad / ask-* CDP flows: prior sessions saw UIA focus steal (hwnd attach, SetForegroundWindow) during ChromeLauncher-&gt;CDP attach -- same sentinel bailout applies</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T05:52:09)</li><li>Verified 2026-04-21: test-focus-steal-user-active-silent-yield.cmd (resolve ts=2026-04-21T03:33)</li><li>Verified 2026-04-21: test-a11y-find-focus-steal-guard.sh (resolve ts=2026-04-21T18:24)</li><li>Verified 2026-04-22: test-a11y-find-focus-steal-close-guard.sh (resolve ts=2026-04-22T02:08)</li><li>Verified 2026-04-28: test-a11y-type-read-wm-gettext-elevated.cmd (resolve ts=2026-04-27T12:41)</li><li>Verified 2026-05-10: test-a11y-focusless-fl.sh (resolve ts=2026-05-01T18:22:09 a11y-screenshot)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

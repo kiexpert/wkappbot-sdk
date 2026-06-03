@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y command always-print resolved target full-path grap spec</h1>
       <p class="description">MANDATE for every a11y command processor (invoke click press inspect screenshot --target etc) in WKAppBot.CLI: must print the resolved target node full-path grap on stdout regardless of the input grap argument shape (literal wildcard or partial), and regardless of action success or failure exit code.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Folder: D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/ contains A11yCommand.cs and related action processors</li><li>MANDATE: every code path that resolves a target node via grap pattern matching must emit one line Console.WriteLine Ansi.TargetLine pound TARGET space resolved-leaf-grap on stdout BEFORE the action call (invoke click etc)</li><li>The resolved leaf grap is the AppendFocusPath result against the matched node Handle not the input argument that may be a wildcard or partial</li><li>Must fire even when --force is used and even when action fails or returns nonzero exit code</li><li>If multiple actions resolve nodes in a single command emit one TARGET line per resolved node</li><li>Verification yt_assistant log should show invoked equals plus full path grap after first successful skip-button match</li><li>Status 2026-05-30: UIA success path patched at A11yCommand.cs lines 1914-1935 (uncommitted, build PASS). CDP fallback path (TryWebViewCdpAction-&gt;CdpClick) still has 0 # TARGET prints. Next: extend patch to A11yCommand.Cdp.cs CDP methods.</li><li>IMPL STATUS 2026-05-30 ~18:00 KST: UIA-success path in csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs (~lines 1914-1935) patched but UNCOMMITTED in working tree (carries over from prior session). CDP fallback path (TryWebViewCdpAction in A11yCommand.Cdp.cs + CdpClick/CdpInvoke/CdpPress/CdpSendInput in Cdp.cs) still emits ZERO # TARGET — wildcard graps like #*skip-button* fall through to CDP silently. Re-dispatching Codex to patch the CDP path and commit BOTH UIA + CDP together. Exit criterion: grep -n &#x27;# TARGET&#x27; on the 3 files shows &gt;=4 hits in CDP files plus existing UIA hit.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Folder: D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/ contains A11yCommand.cs and related action processors</li><li>MANDATE: every code path that resolves a target node via grap pattern matching must emit one line Console.WriteLine Ansi.TargetLine pound TARGET space resolved-leaf-grap on stdout BEFORE the action call (invoke click etc)</li><li>The resolved leaf grap is the AppendFocusPath result against the matched node Handle not the input argument that may be a wildcard or partial</li><li>Must fire even when --force is used and even when action fails or returns nonzero exit code</li><li>If multiple actions resolve nodes in a single command emit one TARGET line per resolved node</li><li>Verification yt_assistant log should show invoked equals plus full path grap after first successful skip-button match</li><li>Status 2026-05-30: UIA success path patched at A11yCommand.cs lines 1914-1935 (uncommitted, build PASS). CDP fallback path (TryWebViewCdpAction-&gt;CdpClick) still has 0 # TARGET prints. Next: extend patch to A11yCommand.Cdp.cs CDP methods.</li><li>IMPL STATUS 2026-05-30 ~18:00 KST: UIA-success path in csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs (~lines 1914-1935) patched but UNCOMMITTED in working tree (carries over from prior session). CDP fallback path (TryWebViewCdpAction in A11yCommand.Cdp.cs + CdpClick/CdpInvoke/CdpPress/CdpSendInput in Cdp.cs) still emits ZERO # TARGET — wildcard graps like #*skip-button* fall through to CDP silently. Re-dispatching Codex to patch the CDP path and commit BOTH UIA + CDP together. Exit criterion: grep -n &#x27;# TARGET&#x27; on the 3 files shows &gt;=4 hits in CDP files plus existing UIA hit.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

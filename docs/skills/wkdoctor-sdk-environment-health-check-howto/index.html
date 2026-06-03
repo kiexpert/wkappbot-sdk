@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkdoctor SDK Health Check HOW-TO</h1>
       <p class="description">T2 howto tier of wkdoctor-sdk-environment-health-check. Plugin architecture, how to add a new check, location, setup-check flow.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../wkdoctor-sdk-environment-health-check/">wkdoctor-sdk-environment-health-check</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>LOCATION: bin/wkdoctor.ps1 (thin orchestrator) + bin/wkdoctor.cmd in SDK repo. Check logic lives in bin/wkappbot.hq/doctor/NN-name.ps1 plugins.</li><li>ARCHITECTURE: orchestrator dot-sources each NN-*.ps1 plugin in order; plugins call Add-Check and Emit from orchestrator scope. NO wkappbot subprocess calls (avoids Eye IPC stall) -- use PE VersionInfo + Get-Process + file APIs only.</li><li>HOW TO ADD A CHECK: create bin/wkappbot.hq/doctor/NN-yourcheck.ps1; inside call Add-Check &#x27;&lt;name&gt;&#x27; &#x27;&lt;ok</li><li>warn</li><li>fail&gt;&#x27; &#x27;&lt;detail&gt;&#x27; AND Emit &#x27;&lt;status&gt;&#x27; &#x27;&lt;name&gt;&#x27; &#x27;&lt;detail&gt;&#x27;. Never throw (wrap in try/catch). Top-level return exits only that plugin (dot-source), safe. Copy 50-codex-symlink.ps1 or 06-defender-exclusions.ps1 as templates.</li><li>AUTO-REPAIR PATTERN: a plugin may fix what it finds (like 50-codex-symlink and 06-defender). For admin-required repairs: check IsInRole Administrator; if admin run the fix; if not, Start-Process powershell -Verb RunAs with a self-contained repair script (one UAC prompt), report warn + &#x27;re-run wkdoctor to verify&#x27;.</li><li>SETUP CHECK: run wkdoctor after fresh clone + setup.ps1 to verify environment. exit 0 = all pass, exit 1 = any fail. -Json for machine-readable (ConvertFrom-Json).</li><li>T1 core: wkdoctor-sdk-environment-health-check. T3 ref (full check list + history): wkdoctor-sdk-environment-health-check-ref.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>LOCATION: bin/wkdoctor.ps1 (thin orchestrator) + bin/wkdoctor.cmd in SDK repo. Check logic lives in bin/wkappbot.hq/doctor/NN-name.ps1 plugins.</li><li>ARCHITECTURE: orchestrator dot-sources each NN-*.ps1 plugin in order; plugins call Add-Check and Emit from orchestrator scope. NO wkappbot subprocess calls (avoids Eye IPC stall) -- use PE VersionInfo + Get-Process + file APIs only.</li><li>HOW TO ADD A CHECK: create bin/wkappbot.hq/doctor/NN-yourcheck.ps1; inside call Add-Check &#x27;&lt;name&gt;&#x27; &#x27;&lt;ok</li><li>warn</li><li>fail&gt;&#x27; &#x27;&lt;detail&gt;&#x27; AND Emit &#x27;&lt;status&gt;&#x27; &#x27;&lt;name&gt;&#x27; &#x27;&lt;detail&gt;&#x27;. Never throw (wrap in try/catch). Top-level return exits only that plugin (dot-source), safe. Copy 50-codex-symlink.ps1 or 06-defender-exclusions.ps1 as templates.</li><li>AUTO-REPAIR PATTERN: a plugin may fix what it finds (like 50-codex-symlink and 06-defender). For admin-required repairs: check IsInRole Administrator; if admin run the fix; if not, Start-Process powershell -Verb RunAs with a self-contained repair script (one UAC prompt), report warn + &#x27;re-run wkdoctor to verify&#x27;.</li><li>SETUP CHECK: run wkdoctor after fresh clone + setup.ps1 to verify environment. exit 0 = all pass, exit 1 = any fail. -Json for machine-readable (ConvertFrom-Json).</li><li>T1 core: wkdoctor-sdk-environment-health-check. T3 ref (full check list + history): wkdoctor-sdk-environment-health-check-ref.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Opus files bugs and improvement ideas on sight -- aggressive wkappbot suggest filing standing order</h1>
       <p class="description">When Opus (or any model) encounters a wkappbot bug, UX flaw, retry-prone pattern, unhelpful error, or improvement idea, file a wkappbot suggest IMMEDIATELY in the same turn. Do not batch, do not gate. Discovery context fades fast; queued bugs become lost bugs. User authorized aggressive filing 2026-05-29.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">claude-code</span><span class="chip">opus</span><span class="chip">wkappbot</span><span class="chip">suggest</span><span class="chip">bug-filing</span><span class="chip">ux</span><span class="chip">standing-order</span><span class="chip">agent-policy</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Trigger: while using ANY wkappbot tool (skill add/edit, suggest, file edit, mail send, cdp, eye, slack, ask, claude-usage, etc.) you observe (a) a clear bug, (b) confusing/misleading UX, (c) a frequently-retried pattern, (d) an unhelpful error message, (e) a missing-but-obvious feature, or (f) a workflow that wastes user time. Do NOT mentally bookmark it; file it RIGHT NOW.</li><li>Submit immediately, same turn, via wkappbot suggest (or wkappbot-core.exe suggest if eye blocks). Do not batch, do not wait for permission, do not let the discovery context fade. The discoverer is the only person with full context; queueing it = losing it.</li><li>Body MUST be friendly and constructive (Opus tone): start with one-sentence BUG or FEATURE summary, then a clear FIX SPEC the SDK team can implement directly (what to change, where in the code if known, what the new behavior looks like). Include a PRECEDENT line citing the exact session/date the issue was hit -- gives the fixer a real reproduction anchor.</li><li>Requirements (3 minimum): use the current-vs-proposed pattern. One &quot;wkappbot X =&gt; current actual&quot; line proving the bug, two &quot;proposed: wkappbot X =&gt; after fix, expected&quot; lines describing the target behavior. If the failing cmd is itself a not-yet-wkappbot subcommand, use proposed: for all three and put the validation snapshot in the body.</li><li>Severity heuristic: a 2-3 retry burden on Sonnet/Opus already costs more tokens than 5 such suggests do to file. Anything that wastes a user retry cycle is high-severity. Anything that surfaces only after compaction or context loss is critical -- file immediately or it never gets filed at all.</li><li>Do NOT pre-filter for &quot;is this important enough&quot;. User has explicitly authorized aggressive filing (standing order 2026-05-29): bugs and improvement ideas get fixed fast only when Opus files them aggressively as it discovers them. File-then-prioritize beats think-then-maybe-file.</li><li>Edge cases: (1) if the bug is in suggest itself (validator UX, draft-corruption, eye-block silent drop) use wkappbot-core.exe direct path. (2) if cmd parsing repeatedly mangles the body, see haiku-handoff-on-cli-retry and delegate the submit. (3) DGWCS cross-project resolve bug is known broken -- file past it, do not waste time on workarounds.</li><li>After submit: paste back the suggest ts to the user in 1 line. No need to await acknowledgement -- the suggest is already durable in suggestions.jsonl. Move on with the original task.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Trigger: while using ANY wkappbot tool (skill add/edit, suggest, file edit, mail send, cdp, eye, slack, ask, claude-usage, etc.) you observe (a) a clear bug, (b) confusing/misleading UX, (c) a frequently-retried pattern, (d) an unhelpful error message, (e) a missing-but-obvious feature, or (f) a workflow that wastes user time. Do NOT mentally bookmark it; file it RIGHT NOW.</li><li>Submit immediately, same turn, via wkappbot suggest (or wkappbot-core.exe suggest if eye blocks). Do not batch, do not wait for permission, do not let the discovery context fade. The discoverer is the only person with full context; queueing it = losing it.</li><li>Body MUST be friendly and constructive (Opus tone): start with one-sentence BUG or FEATURE summary, then a clear FIX SPEC the SDK team can implement directly (what to change, where in the code if known, what the new behavior looks like). Include a PRECEDENT line citing the exact session/date the issue was hit -- gives the fixer a real reproduction anchor.</li><li>Requirements (3 minimum): use the current-vs-proposed pattern. One &quot;wkappbot X =&gt; current actual&quot; line proving the bug, two &quot;proposed: wkappbot X =&gt; after fix, expected&quot; lines describing the target behavior. If the failing cmd is itself a not-yet-wkappbot subcommand, use proposed: for all three and put the validation snapshot in the body.</li><li>Severity heuristic: a 2-3 retry burden on Sonnet/Opus already costs more tokens than 5 such suggests do to file. Anything that wastes a user retry cycle is high-severity. Anything that surfaces only after compaction or context loss is critical -- file immediately or it never gets filed at all.</li><li>Do NOT pre-filter for &quot;is this important enough&quot;. User has explicitly authorized aggressive filing (standing order 2026-05-29): bugs and improvement ideas get fixed fast only when Opus files them aggressively as it discovers them. File-then-prioritize beats think-then-maybe-file.</li><li>Edge cases: (1) if the bug is in suggest itself (validator UX, draft-corruption, eye-block silent drop) use wkappbot-core.exe direct path. (2) if cmd parsing repeatedly mangles the body, see haiku-handoff-on-cli-retry and delegate the submit. (3) DGWCS cross-project resolve bug is known broken -- file past it, do not waste time on workarounds.</li><li>After submit: paste back the suggest ts to the user in 1 line. No need to await acknowledgement -- the suggest is already durable in suggestions.jsonl. Move on with the original task.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

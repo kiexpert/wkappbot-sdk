@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkedit shell distortion recovery</h1>
       <p class="description">3rd retry in wkedit.sh: recover original args from parent cmdline when shell distortion causes old_string not found</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkedit</span><span class="chip">shell</span><span class="chip">distortion</span><span class="chip">recovery</span><span class="chip">draft</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>CONCEPT: 3rd retry after 2-level auto-retry (--replace-all + --old-file). When shell pipe layers distort backslashes/quotes/regex before reaching wkappbot, recover original cmdline from parent process.</li><li>WHEN-NEEDED: bash -c distortion, pipe escaping, MSYS2 path conversion. Symptoms: --regex fails with correct pattern; literal match fails despite visible text. Gap after existing 2 retries.</li><li>STEP 1 detect parent shell: check /proc/$PPID/cmdline (Linux procfs). If absent (MSYS2/git-bash on Windows typically lacks it), fall back to WMI: powershell.exe -NoProfile -Command &quot;(Get-CimInstance Win32_Process -Filter &#x27;ProcessId=$PPID&#x27;).CommandLine&quot;</li><li>STEP 2 extract original args: parse CommandLine for bash -c argument. Use python3 shlex.split() to recover token list. Find wkappbot/file/edit tokens, extract positional old/new string args.</li><li>STEP 3 compare+retry: if recovered_old != received_old -&gt; distortion confirmed. Write recovered_old to tmpfile, retry with --old-file tmpfile.</li><li>CONSTRAINTS: (a) MSYS2 git-bash lacks /proc -&gt; WMI only path on Windows. (b) WMI ~200ms overhead. (c) Eye/MCP pipe path: PPID=wkappbot-core.exe not bash -&gt; inapplicable. (d) python3 shlex may not perfectly reconstruct all quoting styles. (e) Only useful for interactive terminal callers, not Eye.</li><li>IMPLEMENTATION SKETCH: _distortion_recover() added in wkedit.sh after existing _do_edit() 2nd retry. Calls WMI or /proc, runs python3 inline to parse shlex, diffs recovered vs received, retries with --old-file if different.</li><li>STATUS: DRAFT. Not implemented. Requires WMI reliability testing on MSYS2+Windows 11 before proceeding. Test script: wkedit_test_distortion.sh</li><li>RELATED: wkedit.sh _do_edit() lines 60-120 (2-level retry); wkappbot skill read wkedit (base skill)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>CONCEPT: 3rd retry after 2-level auto-retry (--replace-all + --old-file). When shell pipe layers distort backslashes/quotes/regex before reaching wkappbot, recover original cmdline from parent process.</li><li>WHEN-NEEDED: bash -c distortion, pipe escaping, MSYS2 path conversion. Symptoms: --regex fails with correct pattern; literal match fails despite visible text. Gap after existing 2 retries.</li><li>STEP 1 detect parent shell: check /proc/$PPID/cmdline (Linux procfs). If absent (MSYS2/git-bash on Windows typically lacks it), fall back to WMI: powershell.exe -NoProfile -Command &quot;(Get-CimInstance Win32_Process -Filter &#x27;ProcessId=$PPID&#x27;).CommandLine&quot;</li><li>STEP 2 extract original args: parse CommandLine for bash -c argument. Use python3 shlex.split() to recover token list. Find wkappbot/file/edit tokens, extract positional old/new string args.</li><li>STEP 3 compare+retry: if recovered_old != received_old -&gt; distortion confirmed. Write recovered_old to tmpfile, retry with --old-file tmpfile.</li><li>CONSTRAINTS: (a) MSYS2 git-bash lacks /proc -&gt; WMI only path on Windows. (b) WMI ~200ms overhead. (c) Eye/MCP pipe path: PPID=wkappbot-core.exe not bash -&gt; inapplicable. (d) python3 shlex may not perfectly reconstruct all quoting styles. (e) Only useful for interactive terminal callers, not Eye.</li><li>IMPLEMENTATION SKETCH: _distortion_recover() added in wkedit.sh after existing _do_edit() 2nd retry. Calls WMI or /proc, runs python3 inline to parse shlex, diffs recovered vs received, retries with --old-file if different.</li><li>STATUS: DRAFT. Not implemented. Requires WMI reliability testing on MSYS2+Windows 11 before proceeding. Test script: wkedit_test_distortion.sh</li><li>RELATED: wkedit.sh _do_edit() lines 60-120 (2-level retry); wkappbot skill read wkedit (base skill)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

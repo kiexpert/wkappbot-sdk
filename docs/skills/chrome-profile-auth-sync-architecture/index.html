@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>chrome-profile-auth-sync-architecture</h1>
       <p class="description">WKAppBot Chrome profile auth sync: master-&gt;project copy on launch, project-&gt;master SQLite merge on exit. Use when sessions expire frequently or cookies not persisting across projects.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>ARCHITECTURE: Master profile at {DataDir}/chrome-profiles/master/, per-project at {DataDir}/chrome-profiles/{hash8(cwd)}/</li><li>ON LAUNCH (CopyFromMaster): copies Default/Login Data + Default/Cookies + root Local State (DPAPI key) from master to project. Skip-if-fresh: skips copy if project copy is newer than master. DPAPI Local State MUST travel with Cookies or decryption fails silently</li><li>ON EXIT (MergeBackToMaster): SQLite merge of persistent+unexpired cookies (is_persistent=1, expires_utc!=0, expires_utc&gt;now) and new Login Data rows from project back to master. Master Chrome must NOT be running during merge (SQLite corruption risk)</li><li>SESSION COOKIES NOT SYNCED: expires_utc==0 (session-only cookies) are excluded by design. Sites that use only session cookies will always re-auth on Chrome restart -- this is expected</li><li>TROUBLESHOOT auth expiring: 1) Check [CHROME:BOOTSTRAP:ERROR] in Eye log (DPAPI key mismatch) 2) Check MergeBackToMaster ran on last Chrome exit 3) Check master profile path exists: {DataDir}/chrome-profiles/master/Default/Cookies 4) Sites using session-only cookies cannot be persisted via this mechanism</li><li>KEY FILES: ChromeProfileSync.cs (launch copy), ChromeProfileSync.Sql.cs (merge logic), ChromeProfileSync.Watch.cs (FSW live merge driver), ChromeProfileSync.Merge.cs (Local State DPAPI merge)</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies from user&#x27;s regular Chrome into master profile. Steps: 1) Close personal Chrome first (SQLite lock). 2) Source: %LOCALAPPDATA%\Google\Chrome\User Data\Default\Cookies and Login Data. 3) Run MergeBackToMaster(personalChromeDefault, masterDefault) -- same SQLite merge logic, only persistent+unexpired cookies. 4) Copy Local State os_crypt key from personal Chrome to master if master has no DPAPI key yet. NOTE: personal Chrome uses same Windows user DPAPI key so encrypted_value decrypts correctly.</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies from user&#x27;s regular Chrome into master profile. Steps: 1) Close personal Chrome first (SQLite lock). 2) Source: %LOCALAPPDATA%\Google\Chrome\User Data\Default\Cookies and Login Data. 3) Run MergeBackToMaster(personalChromeDefault, masterDefault) -- same SQLite merge logic, only persistent+unexpired cookies. 4) Copy Local State os_crypt key from personal Chrome to master if master has no DPAPI key yet. NOTE: personal Chrome uses same Windows user DPAPI key so encrypted_value decrypts correctly.</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome import): Called once at first launch (guarded by {masterDir}/.bootstrapped sentinel). Code: ChromeLauncher.BootstrapMasterFromSystemChrome() -&gt; CopyIfNewer(systemChrome/Cookies, master/Cookies). BUG: CopyIfNewer does FULL FILE COPY when src.mtime &gt; dst.mtime -- replaces entire master SQLite with personal Chrome file, losing any valid wkappbot session cookies. Trigger: delete .bootstrapped sentinel to re-run.</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome import): Called once at first launch (guarded by {masterDir}/.bootstrapped sentinel). Code: ChromeLauncher.BootstrapMasterFromSystemChrome() -&gt; CopyIfNewer(systemChrome/Cookies, master/Cookies). BUG: CopyIfNewer does FULL FILE COPY when src.mtime &gt; dst.mtime -- replaces entire master SQLite with personal Chrome file, losing any valid wkappbot session cookies. Trigger: delete .bootstrapped sentinel to re-run.</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy with row-level SQLite merge in BootstrapMasterFromSystemChrome. Fix in ChromeLauncher.Profile.cs: instead of File.Copy(src,dst), call ChromeProfileSync.MergeBackToMaster(sysDefault_parent, masterDir) using last_access_utc comparison -- only UPSERT cookies where personal Chrome row has more recent last_access_utc than master row for same (host_key,name,path,source_scheme). This preserves valid master session cookies while importing fresher personal Chrome logins. Additional filter: only merge rows where encrypted_value is non-empty (skip blank/corrupted entries).</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy with row-level SQLite merge in BootstrapMasterFromSystemChrome. Fix in ChromeLauncher.Profile.cs: instead of File.Copy(src,dst), call ChromeProfileSync.MergeBackToMaster(sysDefault_parent, masterDir) using last_access_utc comparison -- only UPSERT cookies where personal Chrome row has more recent last_access_utc than master row for same (host_key,name,path,source_scheme). This preserves valid master session cookies while importing fresher personal Chrome logins. Additional filter: only merge rows where encrypted_value is non-empty (skip blank/corrupted entries).</li><li>2026-05-07 PROFILE RENAME: Chrome profile dirs renamed from chrome-profiles/{hash8cwd}/ to chrome-profiles/cdp={port}/ (e.g. cdp=9222). Port is embedded in folder name -- no separate registry needed. FindRunningChromePort now extracts port via ^cdp=(\d+)$ regex from user-data-dir leaf. Old {hash}/ dirs auto-migrated on next Chrome launch.</li><li>2026-05-07 PROFILE RENAME: Chrome profile dirs renamed from chrome-profiles/{hash8cwd}/ to chrome-profiles/cdp={port}/ (e.g. cdp=9222). Port is embedded in folder name -- no separate registry needed. FindRunningChromePort now extracts port via ^cdp=(\d+)$ regex from user-data-dir leaf. Old {hash}/ dirs auto-migrated on next Chrome launch.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>ARCHITECTURE: Master profile at {DataDir}/ch...</li><li>ON LAUNCH (CopyFromMaster): copies Default/L...</li><li>ON EXIT (MergeBackToMaster): SQLite merge of...</li><li>SESSION COOKIES NOT SYNCED: expires_utc==0 (...</li><li>TROUBLESHOOT auth expiring: 1) Check [CHROME...</li><li>KEY FILES: ChromeProfileSync.cs (launch copy...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'chrome-profile-auth-sync-architecture';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

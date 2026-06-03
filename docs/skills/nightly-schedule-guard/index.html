@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Nightly Schedule Guard</h1>
       <p class="description">PreToolUse hook: blocks Bash/PowerShell until CLAUDE.md CronCreate entries are registered in session JSONL. Global hook in ~/.claude/settings.json.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PURPOSE: blocks Bash/PowerShell until all ### CronCreate(...) headings in CLAUDE.md have matching session JSONL entries</li><li>SATISFY: call CronCreate tool for each heading in CLAUDE.md at session start -- cron= and prompt= must match exactly</li><li>EXEMPT: CronCreate/CronList/CronDelete tools; Edit/Write on CLAUDE.md; any cmd matching wkappbot skill*</li><li>AUTO-INJECT: if CLAUDE.md has no CronCreate headings and no Nightly Schedules section, appends sample template</li><li>LOCATION: script=D:/GitHub/wkappbot-sdk/.claude/nightly-schedule-guard.ps1  global-hook=~/.claude/settings.json PreToolUse matcher=Bash</li><li>PowerShell</li><li>DENY MSG: [NIGHTLY-GUARD] CronCreate missing or prompt mismatch for: &lt;cron&gt;. Prompt must match CLAUDE.md exactly. wkappbot skill* exempt. -&gt; Fix: call CronCreate tool for each heading, or run: wkappbot skill read nightly-schedule-guard</li><li>BUG FIXES 2026-05-25: slug regex, cwd backslash, Join-String PS5.1 incompatible -- all fixed</li><li>GLOBALIZATION 2026-05-25: moved from per-repo settings.local.json to global ~/.claude/settings.json (now covers all repos)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PURPOSE: blocks Bash/PowerShell until all ### CronCreate(...) headings in CLAUDE.md have matching session JSONL entries</li><li>SATISFY: call CronCreate tool for each heading in CLAUDE.md at session start -- cron= and prompt= must match exactly</li><li>EXEMPT: CronCreate/CronList/CronDelete tools; Edit/Write on CLAUDE.md; any cmd matching wkappbot skill*</li><li>AUTO-INJECT: if CLAUDE.md has no CronCreate headings and no Nightly Schedules section, appends sample template</li><li>LOCATION: script=D:/GitHub/wkappbot-sdk/.claude/nightly-schedule-guard.ps1  global-hook=~/.claude/settings.json PreToolUse matcher=Bash</li><li>PowerShell</li><li>DENY MSG: [NIGHTLY-GUARD] CronCreate missing or prompt mismatch for: &lt;cron&gt;. Prompt must match CLAUDE.md exactly. wkappbot skill* exempt. -&gt; Fix: call CronCreate tool for each heading, or run: wkappbot skill read nightly-schedule-guard</li><li>BUG FIXES 2026-05-25: slug regex, cwd backslash, Join-String PS5.1 incompatible -- all fixed</li><li>GLOBALIZATION 2026-05-25: moved from per-repo settings.local.json to global ~/.claude/settings.json (now covers all repos)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

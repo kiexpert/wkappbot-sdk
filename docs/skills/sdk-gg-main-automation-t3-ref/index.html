@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>sdk-gg-main Reference</h1>
       <p class="description">T3 Reference: session history and key decisions for sdk-gg-main-automation</p>
       <div class="meta">developer</div>
+      <div class="breadcrumb">Part of: <a href="../sdk-gg-main-automation/">sdk-gg-main-automation</a></div>
       <div class="tags"><span class="chip">sdk</span><span class="chip">gg-workflow</span><span class="chip">ref</span><span class="chip">history</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>2026-05-29: CI health check wkci.sh created. Smoke loop added to gg step 0. wkzombie -ExcludeFilter mcp needed.</li><li>2026-05-30: gg-main.sh rewritten with all-channel suggests, 9 bad-condition checks, skill refs per warning.</li><li>2026-05-30: CDP ask CRITICAL -- cdp open hanging 143min. ChromeLauncher timeout in state-check. Core fix 82d60f74f + ce6ee8569.</li><li>2026-05-31: KillForeign blind cron deleted. Section D rewrite -- LOGIN_PAGE/DEAD-LAT/DRIFT/kill events to auto-file suggests.</li><li>2026-06-02: wkask.sh backslash-n bug fixed 7x Codex revert. wkask.ps1 double BOM fixed. Chrome restore added. Log -Recurse removed. old_ask_gpt hardcode fixed. Core built+deployed.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>2026-05-29: CI health check wkci.sh created. Smoke loop added to gg step 0. wkzombie -ExcludeFilter mcp needed.</li><li>2026-05-30: gg-main.sh rewritten with all-channel suggests, 9 bad-condition checks, skill refs per warning.</li><li>2026-05-30: CDP ask CRITICAL -- cdp open hanging 143min. ChromeLauncher timeout in state-check. Core fix 82d60f74f + ce6ee8569.</li><li>2026-05-31: KillForeign blind cron deleted. Section D rewrite -- LOGIN_PAGE/DEAD-LAT/DRIFT/kill events to auto-file suggests.</li><li>2026-06-02: wkask.sh backslash-n bug fixed 7x Codex revert. wkask.ps1 double BOM fixed. Chrome restore added. Log -Recurse removed. old_ask_gpt hardcode fixed. Core built+deployed.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

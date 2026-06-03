@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>ask -- AI Delegation Cheatsheet</h1>
       <p class="description">wkappbot ask delegates questions to GPT/Gemini/Claude. triad = all three in parallel. agent = autonomous sub-agent loop. ALWAYS ask in English -- Korean wastes 3-4x tokens.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">gpt</span><span class="chip">gemini</span><span class="chip">claude</span><span class="chip">triad</span><span class="chip">agent</span><span class="chip">delegation</span><span class="chip">reference</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SINGLE: wkappbot ask gpt|gemini|claude &quot;question&quot; [file.png]</li><li>PARALLEL: wkappbot ask triad &quot;question&quot; -- GPT+Gemini+Claude, fastest wins</li><li>AGENT: wkappbot agent gpt|gemini|claude &quot;task&quot; -- autonomous loop</li><li>! ALWAYS ask in English -- Korean = 3-4x token waste</li><li>ask result = artifact in chat; DOM content needs a11y --eval-js to read</li><li>CDP돋보기: show InputZoom overlay during CDP ask operations</li><li>debate: ask gpt &#x27;Problem: X. Goal: Y. Best approach?&#x27; for design decisions</li><li>DELEGATION (codex): wkappbot ask codex --agent &quot;task&quot; -- primary execution channel. Auto: --full-auto, -C &lt;repo-root&gt;, -m &lt;model from ~/.codex/config.toml or codex-mini fallback&gt;. Session resumed from .wkappbot/codex.json. --fresh forces new session. ALL --agent/-s/-m flags must come BEFORE the prompt text.</li><li>DELEGATION (codex): wkappbot ask codex --agent &quot;task&quot; -- primary execution channel. Auto: --full-auto, -C &lt;repo-root&gt;, -m &lt;model from ~/.codex/config.toml or codex-mini fallback&gt;. Session resumed from .wkappbot/codex.json. --fresh forces new session. ALL --agent/-s/-m flags must come BEFORE the prompt text.</li><li>For suggest backlogs, batch one page into one English GPT ranking prompt, then ask one suggestion at a time in that ranked order. See ask-suggest-priority-batching.</li><li>For suggest backlogs, batch one page into one English GPT ranking prompt, then ask one suggestion at a time in that ranked order. See ask-suggest-priority-batching.</li><li>ASK/CDP send path now prefers focusless DOM.focus + Enter to avoid dead-air when Chrome is minimized; if no response is detected, check input readiness and focus recovery before changing the prompt.</li><li>ASK/CDP send path now prefers focusless DOM.focus + Enter to avoid dead-air when Chrome is minimized; if no response is detected, check input readiness and focus recovery before changing the prompt.</li><li>Use --new-session only when the current chat state is stale, contaminated, or demonstrably broken; otherwise reuse the existing session to avoid noisy session proliferation.</li><li>Use --new-session only when the current chat state is stale, contaminated, or demonstrably broken; otherwise reuse the existing session to avoid noisy session proliferation.</li><li>FAST PATH: reuse cached selectors and keep CDP settles/polls short for ask gpt/gemini/claude; avoid reloads and artificial cooldowns on already-hot tabs.</li><li>FAST PATH: reuse cached selectors and keep CDP settles/polls short for ask gpt/gemini/claude; avoid reloads and artificial cooldowns on already-hot tabs.</li><li>For whisper study retries, treat --new-session as a stale-context recovery only: close the previous gemini-whisper tab, clear its ask_targets entry, then retry. Do not let study retries accumulate Gemini tabs.</li><li>For whisper study retries, treat --new-session as a stale-context recovery only: close the previous gemini-whisper tab, clear its ask_targets entry, then retry. Do not let study retries accumulate Gemini tabs.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>SINGLE: wkappbot ask gpt|gemini|claude &quot;ques...</li><li>PARALLEL: wkappbot ask triad &quot;question&quot; -- G...</li><li>AGENT: wkappbot agent gpt|gemini|claude &quot;tas...</li><li>! ALWAYS ask in English -- Korean = 3-4x tok...</li><li>ask result = artifact in chat; DOM content n...</li><li>CDP돋보기: show InputZoom overlay during CDP as...</li><li>debate: ask gpt &#x27;Problem: X. Goal: Y. Best a...</li><li>DELEGATION (codex): wkappbot ask codex --age...</li><li>DELEGATION (codex): wkappbot ask codex --age...</li><li>For suggest backlogs, batch one page into on...</li><li>For suggest backlogs, batch one page into on...</li><li>ASK/CDP send path now prefers focusless DOM....</li><li>ASK/CDP send path now prefers focusless DOM....</li><li>Use --new-session only when the current chat...</li><li>Use --new-session only when the current chat...</li><li>FAST PATH: reuse cached selectors and keep C...</li><li>FAST PATH: reuse cached selectors and keep C...</li><li>For whisper study retries, treat --new-sessi...</li><li>For whisper study retries, treat --new-sessi...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'ask-command-cheatsheet';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

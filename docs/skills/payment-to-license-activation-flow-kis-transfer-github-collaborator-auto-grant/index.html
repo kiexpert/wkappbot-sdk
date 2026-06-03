@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Payment to License Activation Flow - KIS transfer + GitHub collaborator auto-grant</h1>
       <p class="description">End-to-end flow from KRW bank transfer to active license: KIS incoming transfer detection, GitHub ID parsing from memo, collaborator add, pending invite UX, acceptance, expiry, renewal.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">license</span><span class="chip">payment</span><span class="chip">github</span><span class="chip">collaborator</span><span class="chip">kis</span><span class="chip">subscription</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Pricing: 100,000 KRW = CDP tier (read permission), 500,000 KRW = Sudo tier (write permission); transfer to KIS account [YOUR_KIS_ACCOUNT].</li><li>Memo (depositor name field) MUST be the payer&#x27;s GitHub username verbatim; mismatched memo blocks auto-grant.</li><li>Detector: scripts/kis_payment_watcher.py polls KIS hourly, parses memo field, extracts github_id and amount, derives tier (100k=read, 500k=write).</li><li>Grant: detector calls &#x27;gh api repos/***/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read&#x27; (or write); tx_key recorded with expiry date in commit message.</li><li>Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right with &#x27;GitHub notification check&#x27; button (auto-dismiss 15s, non-blocking); CDP/Sudo features stay locked, Free features keep working.</li><li>Acceptance: user clicks GitHub notifications -&gt; View invitation -&gt; Accept; on next wkappbot startup license check returns tier and gated features unlock; toast clears.</li><li>Expiry: tracked in .github/licenses/{user} commit message (tier=cdp+sudo cdp=&lt;ISO8601&gt; sudo=&lt;ISO8601&gt;). Duration = floor(amount_usd * 30 / 100) days: USD100=30d, USD200=60d, USD363=108d. C# enforces expiry: sudoActive requires perm=write/admin + tierStr contains sudo + sudoExpiry &gt; now(). Revocation: remove collaborator OR let expiry date pass.</li><li>Renewal: pay again with same memo; new tx_key issued, permission re-granted, commit message updated with new expiry date.</li><li>Tier upgrade (CDP -&gt; Sudo): pay 500k with same memo; detector overwrites permission=read with permission=write, updates commit expiry.</li><li>Verification: &#x27;wkappbot license status&#x27; shows User/Tier/CDP/Sudo with expiry countdown. Command is Launcher-owned fast-exit -- never reaches Core.</li><li>License check architecture (LicenseStatus.cs): 2 API calls. Call 1: POST api.github.com/graphql -- {viewer{login} repository{viewerPermission}} -- returns login + perm in one shot, tamper-proof. Call 2: GET /repos/.../commits?path=.github/licenses/{user} -- parse tier=, cdp=, sudo= from trusted commit message (author must be in TrustedAuthors set).</li><li>Token auth: (1) GH_TOKEN/GITHUB_TOKEN env var, (2) hosts.yml oauth_token, (3) &#x27;gh auth token&#x27; keyring fallback. If all fail, prints login guidance and exits 1.</li><li>SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01, verify on future edits): (1) Cancel section used to say &#x27;at the 30-day mark&#x27; -- WRONG; expiry = floor(amount_usd*30/100) days, not always 30. Fixed to &#x27;at your expiry date (check with wkappbot license status)&#x27;. (2) Pending invite section used to say &#x27;click to accept&#x27; -- INACCURATE; actual toast shows GitHub notification check button + 15s auto-dismiss. Both fixed in SUBSCRIBE.md.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Pricing: 100,000 KRW = CDP tier (read permis...</li><li>Memo (depositor name field) MUST be the paye...</li><li>Detector: scripts/kis_payment_watcher.py pol...</li><li>Grant: detector calls &#x27;gh api repos/***/wkap...</li><li>Pending invite UX: wkappbot startup detects...</li><li>Acceptance: user clicks GitHub notifications...</li><li>Expiry: tracked in .github/licenses/{user} c...</li><li>Renewal: pay again with same memo; new tx_ke...</li><li>Tier upgrade (CDP -&gt; Sudo): pay 500k with sa...</li><li>Verification: &#x27;wkappbot license status&#x27; show...</li><li>License check architecture (LicenseStatus.cs...</li><li>Token auth: (1) GH_TOKEN/GITHUB_TOKEN env va...</li><li>SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01,...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

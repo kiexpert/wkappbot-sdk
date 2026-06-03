@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Control UI Without Stealing Focus -- 3-Tier Focusless Strategy</h1>
       <p class="description">UIA Invoke/Value/Toggle/Select = truly focusless. WM_CHAR = focusless typing via PostMessage. SendInput/Hotkey = must EnsureFocus first. Tier order: UIA pattern -&gt; Win32 PostMessage -&gt; SendInput. MFC CMaskEditEx: WM_CHAR only -- TranslateMessage auto-generates it, never use EM_SETTEXT or you get double input.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">focusless</span><span class="chip">uia</span><span class="chip">win32</span><span class="chip">input</span><span class="chip">mfc</span><span class="chip">focus</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Tier 1 (preferred, truly focusless): UIA Invoke / Value / Toggle / Select patterns — element pattern call, no message pump, no foreground change.</li><li>Tier 2 (focusless typing): Win32 PostMessage with WM_CHAR — bypasses focus-grab. Note for MFC CMaskEditEx, send WM_CHAR only; never EM_SETTEXT or you get double input because TranslateMessage already auto-generates WM_CHAR.</li><li>Tier 3 (last resort): SendInput / Hotkey — must call EnsureFocus first, so this path can steal focus from the user. Use only when patterns 1+2 unavailable.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Tier 1 (preferred, truly focusless): UIA Invoke / Value / Toggle / Select patterns — element pattern call, no message pump, no foreground change.</li><li>Tier 2 (focusless typing): Win32 PostMessage with WM_CHAR — bypasses focus-grab. Note for MFC CMaskEditEx, send WM_CHAR only; never EM_SETTEXT or you get double input because TranslateMessage already auto-generates WM_CHAR.</li><li>Tier 3 (last resort): SendInput / Hotkey — must call EnsureFocus first, so this path can steal focus from the user. Use only when patterns 1+2 unavailable.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

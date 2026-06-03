@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y close and trusted-click FocusSafe guard</h1>
       <p class="description">FocusSafe.ShouldYieldToActiveUser guard added before a11y close and trusted-click operations to prevent focus stealing when user is active (idleMs&lt;1500). Mirrors InspectionCommands guard pattern.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>A11yCommand.WindowActions.cs:221 -- guard before all 3 close tiers (UIA/WM_CLOSE/Kill)</li><li>AskCommands.Attachments.FileInput.cs:300 -- guard before trusted-click menu-item</li><li>AskCommands.Attachments.FileInput.cs:341 -- guard before trusted-click upload-btn</li><li>--force flag bypasses guard for explicit kill intent</li><li>Returns false/yields silently when user active; logs [A11Y:CLOSE] user active</li><li>Verified 2026-04-26: test-a11y-close-focussteal-guard.sh (resolve ts=2026-04-24T07:02:43.6860617Z)</li><li>Verified 2026-04-26: test-ask-trusted-click-focussteal-guard.sh (resolve ts=2026-04-24T07:09:06.2514013Z)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>A11yCommand.WindowActions.cs:221 -- guard before all 3 close tiers (UIA/WM_CLOSE/Kill)</li><li>AskCommands.Attachments.FileInput.cs:300 -- guard before trusted-click menu-item</li><li>AskCommands.Attachments.FileInput.cs:341 -- guard before trusted-click upload-btn</li><li>--force flag bypasses guard for explicit kill intent</li><li>Returns false/yields silently when user active; logs [A11Y:CLOSE] user active</li><li>Verified 2026-04-26: test-a11y-close-focussteal-guard.sh (resolve ts=2026-04-24T07:02:43.6860617Z)</li><li>Verified 2026-04-26: test-ask-trusted-click-focussteal-guard.sh (resolve ts=2026-04-24T07:09:06.2514013Z)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

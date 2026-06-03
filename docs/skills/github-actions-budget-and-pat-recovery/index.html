@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>GitHub Actions budget exhausted + GH_PAT recovery</h1>
       <p class="description">Two common silent CI failures: (1) budget exhausted runs fail under 10s, (2) GH_PAT missing causes sync 403. Both look like normal failures in run list.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">github</span><span class="chip">actions</span><span class="chip">budget</span><span class="chip">pat</span><span class="chip">ci</span><span class="chip">403</span><span class="chip">sync</span><span class="chip">billing</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SYMPTOM: runs fail in under 15s. Check gh run view --log-failed for billing or 403 clues.</li><li>BUDGET FIX: edit Actions row at github.com/settings/billing/budgets and raise limit. CDP read: wkappbot a11y read with eval-js document.body.innerText on billing tab.</li><li>GH_PAT MISSING: sync push logs blank GH_PAT then fatal 403. Check: gh secret list --repo ***/WKAppBot</li><li>PAT FIX: gh secret set GH_PAT --repo ***/WKAppBot --body TOKEN where TOKEN comes from gh auth token</li><li>RERUN: gh run rerun RUNID. Check result with gh run list.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>SYMPTOM: runs fail in under 15s. Check gh run view --log-failed for billing or 403 clues.</li><li>BUDGET FIX: edit Actions row at github.com/settings/billing/budgets and raise limit. CDP read: wkappbot a11y read with eval-js document.body.innerText on billing tab.</li><li>GH_PAT MISSING: sync push logs blank GH_PAT then fatal 403. Check: gh secret list --repo ***/WKAppBot</li><li>PAT FIX: gh secret set GH_PAT --repo ***/WKAppBot --body TOKEN where TOKEN comes from gh auth token</li><li>RERUN: gh run rerun RUNID. Check result with gh run list.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

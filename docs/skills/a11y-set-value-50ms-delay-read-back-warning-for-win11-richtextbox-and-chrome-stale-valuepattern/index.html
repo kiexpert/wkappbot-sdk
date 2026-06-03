@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y set-value: 50ms delay + read-back warning for Win11 RichTextBox and Chrome stale ValuePattern</h1>
       <p class="description">DoSetValue() now waits 50ms after ValuePattern.SetValue and reads back via ReadElementValue. If empty, logs stale-cache warning. Fixes silent expect/assert failures on Win11 RichEditD2DPT.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>ActionExecutor.cs DoSetValue: Thread.Sleep(50) after vp.Pattern.SetValue(text). ReadElementValue() checks Value then TextPattern then Name. If read-back empty and text non-empty: logs stale cache warning. a11y set-value affected command. Win11 Notepad RichEditD2DPT and Chrome input workaround.</li><li>If stale warning appears: try type_text instead (uses WM_CHAR/EM_REPLACESEL tiers which bypass UIA cache).</li><li>Root cause: Win11 RichEditD2DPT and Chrome accessibility bridge don&#x27;t sync ValuePattern.Value synchronously after SetValue COM call.</li><li>Verified 2026-04-21: test-set-value-readback.sh (resolve ts=2026-04-17T09:12)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>ActionExecutor.cs DoSetValue: Thread.Sleep(50) after vp.Pattern.SetValue(text). ReadElementValue() checks Value then TextPattern then Name. If read-back empty and text non-empty: logs stale cache warning. a11y set-value affected command. Win11 Notepad RichEditD2DPT and Chrome input workaround.</li><li>If stale warning appears: try type_text instead (uses WM_CHAR/EM_REPLACESEL tiers which bypass UIA cache).</li><li>Root cause: Win11 RichEditD2DPT and Chrome accessibility bridge don&#x27;t sync ValuePattern.Value synchronously after SetValue COM call.</li><li>Verified 2026-04-21: test-set-value-readback.sh (resolve ts=2026-04-17T09:12)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

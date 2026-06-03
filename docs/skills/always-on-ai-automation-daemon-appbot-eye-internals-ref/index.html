@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>AppBot Eye Internals T3 Reference</h1>
       <p class="description">T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../always-on-ai-automation-daemon-appbot-eye-internals/">always-on-ai-automation-daemon-appbot-eye-internals</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>OOM GUARDIAN (v7.3.189): 4GB kill+respawn. Circuit breaker: _consecutiveHealFails counter, after 5 = circuitOpen. 50MB log cap. Commit d9d00420d.</li><li>SPAWN-STORM CIRCUIT BREAKER: count&gt;50 consecutive spawns triggers abort. Prevents zombie cascade from FSW loop. Commit 43d289e90.</li><li>HOT-SWAP STAMP EXPIRY: Eye detects core.new.exe FileInfo stamp. Same failed stamp skipped until newer one appears. Defers if admin pipe busy. Guardian refreshes TryFindEyeHwnd after hot-swap (df3c519b3).</li><li>MCP WORKER ISOLATION: DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Workers isolated so UIA/a11y crash doesn&#x27;t kill Eye. Each worker communicates back via named pipe. Admin proxy: wkappbot_elevated (amber border). NEVER mix with wkappbot_eye_ipc.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>OOM GUARDIAN (v7.3.189): 4GB kill+respawn. Circuit breaker: _consecutiveHealFails counter, after 5 = circuitOpen. 50MB log cap. Commit d9d00420d.</li><li>SPAWN-STORM CIRCUIT BREAKER: count&gt;50 consecutive spawns triggers abort. Prevents zombie cascade from FSW loop. Commit 43d289e90.</li><li>HOT-SWAP STAMP EXPIRY: Eye detects core.new.exe FileInfo stamp. Same failed stamp skipped until newer one appears. Defers if admin pipe busy. Guardian refreshes TryFindEyeHwnd after hot-swap (df3c519b3).</li><li>MCP WORKER ISOLATION: DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Workers isolated so UIA/a11y crash doesn&#x27;t kill Eye. Each worker communicates back via named pipe. Admin proxy: wkappbot_elevated (amber border). NEVER mix with wkappbot_eye_ipc.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

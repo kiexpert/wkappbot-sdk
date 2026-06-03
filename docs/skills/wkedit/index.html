@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,38 +117,102 @@
       <h1>wkedit -- Bulk Transaction Edit (Regex, Multi-File, Backup &amp; Undo)</h1>
       <p class="description">wkappbot file edit supports regex substitution, auto .bak/ backup, undo, and encoding-safe transactions. Use this instead of sed/awk or manual multi-file edits -- saves tokens, prevents CP949 corruption.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">wkedit</span><span class="chip">file-edit</span><span class="chip">regex</span><span class="chip">bulk</span><span class="chip">refactor</span><span class="chip">encoding</span><span class="chip">backup</span><span class="chip">undo</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[WHEN-TO-USE] Prefer wkedit for: (1) regex bulk substitution across a file, (2) multi-occurrence replace, (3) any edit on CP949/EUC-KR files. Avoid sed/awk -- they ignore encoding and corrupt Korean source. Avoid Python one-liners -- they waste tokens and miss edge cases.
-[BASIC] wkappbot file edit &#x27;&lt;old&gt;&#x27; &#x27;&lt;new&gt;&#x27; &lt;path&gt; [--replace-all]
-  Literal substitution. Fails if old not found (safe by default).
-  --replace-all: replace every occurrence in the file.
-  Backup auto-created at .bak/&lt;filename&gt;.bak-&lt;timestamp&gt;.txt
-[REGEX] wkappbot file edit &#x27;&lt;.NET-regex&gt;&#x27; &#x27;&lt;replacement&gt;&#x27; &lt;path&gt; --replace-all --regex
-  old_string is a .NET regex. new_string may use $1/$2 capture groups.
-  NOTE: Escape parens/dots. TIP: test with &#x27;wkappbot file grep &lt;regex&gt; --path &lt;dir&gt;&#x27; first.
-[MULTI-FILE] Pass multiple paths -- wkedit processes all in one call.
-  GOTCHA: if ANY file has zero matches, the whole batch fails with &#x27;validation failed&#x27;.
-  SOLUTION: pre-filter: files=$(grep -rl &#x27;&lt;pattern&gt;&#x27; &lt;dir&gt; --include=&#x27;*.cs&#x27;</li><li>tr &#x27;\n&#x27; &#x27; &#x27;)
-  wkappbot file edit &#x27;&lt;regex&gt;&#x27; &#x27;&lt;new&gt;&#x27; $files --replace-all --regex
-[BULK-PATTERN] Real-world bulk refactor (124 files, 1353 replacements, ~2s):
-  files=$(grep -rl &#x27;Console.WriteLine($&quot;[&#x27; ./Commands/ --include=&#x27;*.cs&#x27;</li><li>tr &#x27;\n&#x27; &#x27; &#x27;)
-  wkappbot file edit &#x27;Console\.WriteLine\(\$&quot;\[&#x27; &#x27;Console.Error.WriteLine($&quot;[&#x27; $files --replace-all --regex
-[DRY-RUN] Add --dry-run to preview without writing. Shows diff but does NOT write the file.
-  CAUTION: dry-run output still shows &#x27;backup -&gt; ...&#x27; lines -- those are NOT created.
-[UNDO] ALWAYS use undo when you make a mistake -- backups accumulate in .bak/ automatically.
-  wkappbot file edit --undo &lt;path&gt;          restore most recent backup
-  wkappbot file write &lt;path&gt; --source-file .bak/&lt;name&gt;.bak-&lt;timestamp&gt;.txt  restore specific version
-  List backups: ls .bak/&lt;filename&gt;.bak-*</li><li>sort
-  LESSON: regex that captures only part of a match and replaces with partial text will silently
-  corrupt the rest. Example: &#x27;Console.Write(&quot;  [OS]&#x27; -&gt; &#x27;Console.Error.Write(&quot;  [&#x27; drops &#x27;OS]&#x27;.
-  Always include the full match in both old and new string, or use capture groups ($1) to preserve.
-[ENCODING] wkedit auto-detects UTF-8 vs CP949. Never use sed/awk on WKAppBot sources.
-  Post-edit sanity: &#x27;wkappbot file grep &#x27;\uFFFD&#x27; --path &lt;dir&gt;&#x27; checks for corruption.
-[TIPS-FROM-USE] Batch &gt; loop: 124 files in one call ~2s. grep -rl filter mandatory for multi-file.
-  .NET regex escaping: escape ( ) . in single-quotes for shell AND .NET.
-  Safepoint commit before bulk edit = stress-free. Do NOT git add .bak/ accidentally.</li><li>IMPROVEMENT #9: --dry-run misleading output + silent no-match ambiguity. Current: dry-run prints &#x27;backup -&gt; ...&#x27; lines that look like writes happened. No-match exits with rc=1 but error message says &#x27;old_string not found&#x27; -- hard to distinguish from other errors in scripts. Request: --dry-run suppress backup lines + --no-match-ok flag for scripted use</li><li>IMPROVEMENT #1: --line N / --line-range N:M scoped replace. Missing: replace only at line N or within line range. Workaround: add unique surrounding context. Request: wkedit.sh --line 650 &#x27;old&#x27; &#x27;new&#x27; file</li><li>IMPROVEMENT #2: --nth N occurrence targeting. Missing: replace only 2nd/3rd/Nth match. Workaround: add unique surrounding context. Request: wkedit.sh --nth 2 &#x27;pattern&#x27; &#x27;new&#x27; file</li><li>IMPROVEMENT #3: Backslash-heavy PS1 shell corruption. Shell garbles &#x27;\&#x27;,&#x27;/&#x27; before wkedit.exe sees it. --old-file/--new-file works but cumbersome. Request: --literal flag or stdin-pipe mode to bypass shell escaping</li><li>IMPROVEMENT #4: Capture group $1 shell expansion. --regex &#x27;\(wkcodex\)&#x27; &#x27;$1_new&#x27; -- shell expands $1. Request: --raw-replacement flag or heredoc-pipe mode for replacement strings</li><li>IMPROVEMENT #5: --patch + --dry-run combo. --patch heredoc mode ignores --dry-run flag. Request: _do_patch forward --dry-run to wkedit.exe</li><li>IMPROVEMENT #6: No .NET regex mode flags. No way to pass (?s) SingleLine or (?m) MultiLine. Cross-line patterns fail silently. Request: --regex-options or --multiline flag that injects (?s)</li><li>IMPROVEMENT #7: No append/prepend/insert-after-line. To append need to know exact last-line content. Request: wkedit.sh --append &#x27;line&#x27; file OR --insert-after-line N &#x27;text&#x27; file</li><li>IMPROVEMENT #8: --regex not supported in --old-file mode. --old-file is literal only. Can&#x27;t use file-based old pattern with regex replacement. Request: --old-file --regex combo support</li><li>LIVE TEST RESULTS (2026-05-18): #1 --line N: FAIL - misparses &#x27;old&#x27; arg as file path. #2 --nth N: FAIL - same misparse. #3 backslash: PARTIAL - shell eats \ but multiple-match error caught; --old-file workaround works. #4 capture $1: FAIL - shell expands $1 AND eats backslashes -&gt; invalid regex. #5 --patch+dry-run: FAIL - --dry-run not forwarded in _do_patch(). #6 (?s) multiline: WORKS - inline (?s) flag + \r?\n pattern matches cross-line blocks correctly. #7 --append: FAIL - not supported. #8 --old-file+--regex: PARTIAL - command accepted; regex validation on file content. #9 dry-run output: BROKEN - no stdout/stderr returned to shell, exit always 0, output swallowed by wkappbot launcher IPC</li><li>BUG (2026-05-25): wkappbot file edit double-insertion on CRLF files. When old_string appears within new_string (starts with old_string), the replacement gets applied TWICE on CRLF files. Root cause: after first replacement, the result still contains old_string (as prefix of new), so wkedit applies again. Fix: use trailing context (not leading) as old_string so old_string does NOT appear in new_string. Applies to CLAUDE.md and any Windows CRLF file.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>[WHEN-TO-USE] Prefer wkedit for: (1) regex b...</li><li>tr &#x27;\n&#x27; &#x27; &#x27;) wkappbot file edit &#x27;&lt;regex&gt;&#x27; &#x27;&lt;...</li><li>tr &#x27;\n&#x27; &#x27; &#x27;) wkappbot file edit &#x27;Console\.Wr...</li><li>sort LESSON: regex that captures only part o...</li><li>IMPROVEMENT #9: --dry-run misleading output...</li><li>IMPROVEMENT #1: --line N / --line-range N:M...</li><li>IMPROVEMENT #2: --nth N occurrence targeting...</li><li>IMPROVEMENT #3: Backslash-heavy PS1 shell co...</li><li>IMPROVEMENT #4: Capture group $1 shell expan...</li><li>IMPROVEMENT #5: --patch + --dry-run combo. -...</li><li>IMPROVEMENT #6: No .NET regex mode flags. No...</li><li>IMPROVEMENT #7: No append/prepend/insert-aft...</li><li>IMPROVEMENT #8: --regex not supported in --o...</li><li>LIVE TEST RESULTS (2026-05-18): #1 --line N:...</li><li>BUG (2026-05-25): wkappbot file edit double-...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'wkedit';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

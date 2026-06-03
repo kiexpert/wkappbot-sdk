@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y read/inspect improvements for elevated MFC MDI</h1>
       <p class="description">Gaps in a11y read/inspect on nfrunlite elevated MFC MDI and proposals</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">read</span><span class="chip">inspect</span><span class="chip">mfc</span><span class="chip">improvement</span><span class="chip">elevated</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[GAP-1 READ-FALLBACK] a11y read on MFC root (_NFHeroMainClass) returns empty - 0 UIA children. Win32 has 16 children. Proposal: if read=0 UIA children AND Win32 child&gt;0, auto-emit inspect hint or run inspect.</li><li>[GAP-2 CID-SCOPING] inspect {hwnd:X,cid:Y} ignores cid - dumps root. cid should filter subtree. Workaround: hwnd direct.</li><li>[GAP-3 AMBIGUOUS-LIST] {cls:Afx} AMBIGUOUS lists all child hwnd+title. IS MDI enumeration. Expose as --list flag instead of error.</li><li>[GAP-4 FORCE-NONTTY] inspect fails user-active-skipping mid-script. --force should auto-apply when stdin not tty.</li><li>[GAP-5 CLASSPATH-ELEVATED] cls1/cls2 silent-empty for elevated MDI. Needs Win32 hwnd-chain fallback.</li><li>[WORKAROUND] 1. {cls:Afx} AMBIGUOUS=hwnd list. 2. {hwnd:X} --force=child inspect. 3. {hwnd:X} --force on Document cid=Value read.</li><li>Verified 2026-05-09:  (resolve ts=2026-05-09T07:50:22)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>[GAP-1 READ-FALLBACK] a11y read on MFC root (_NFHeroMainClass) returns empty - 0 UIA children. Win32 has 16 children. Proposal: if read=0 UIA children AND Win32 child&gt;0, auto-emit inspect hint or run inspect.</li><li>[GAP-2 CID-SCOPING] inspect {hwnd:X,cid:Y} ignores cid - dumps root. cid should filter subtree. Workaround: hwnd direct.</li><li>[GAP-3 AMBIGUOUS-LIST] {cls:Afx} AMBIGUOUS lists all child hwnd+title. IS MDI enumeration. Expose as --list flag instead of error.</li><li>[GAP-4 FORCE-NONTTY] inspect fails user-active-skipping mid-script. --force should auto-apply when stdin not tty.</li><li>[GAP-5 CLASSPATH-ELEVATED] cls1/cls2 silent-empty for elevated MDI. Needs Win32 hwnd-chain fallback.</li><li>[WORKAROUND] 1. {cls:Afx} AMBIGUOUS=hwnd list. 2. {hwnd:X} --force=child inspect. 3. {hwnd:X} --force on Document cid=Value read.</li><li>Verified 2026-05-09:  (resolve ts=2026-05-09T07:50:22)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

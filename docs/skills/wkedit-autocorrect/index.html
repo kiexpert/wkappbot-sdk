@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkedit.sh Auto-Correction Design</h1>
       <p class="description">Design spec for wkedit.sh failure detection + arg correction + retry. Based on live test results 2026-05-18.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkedit</span><span class="chip">autocorrect</span><span class="chip">retry</span><span class="chip">shell</span><span class="chip">escaping</span><span class="chip">design</span><span class="chip">bash</span><span class="chip">wkappbot</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PROBLEM DIAGNOSIS (live tests 2026-05-18): wkedit.sh wraps wkappbot file edit. When bash processes args before wkappbot sees them, 5 failure classes emerge: (1) matches-multiple: --replace-all missing; (2) old_string-not-found: bash ate backslashes e.g. \ became \; (3) invalid-regex: shell expanded $1 or ate backslash in regex; (4) args-misparse: unsupported flags like --line N caused old arg to be read as file path; (5) regex-pattern-not-found: genuine no-match -- safe final failure, no retry.</li><li>CORRECTION DECISION MATRIX: matches-multiple -&gt; SAFE +--replace-all (warn user). old-string-not-found -&gt; SAFE --old-file tempfile retry (identical content, bypass shell). invalid-regex -&gt; UNSAFE (content already corrupted). args-misparse -&gt; PARTIAL (strip unknown flags, risky). regex-not-found -&gt; FINAL FAIL no retry.</li><li>DESIGN: single-retry in _do_edit(). Capture: err=$(wkedit.exe 2&gt;&amp;1); rc=$?. Parse err. Apply ONE correction only. Never chain. Always print [wkedit.sh] auto-retry: reason to stderr.</li><li>SAFETY RULES: (A) --replace-all: always warn user matches were multiple. (B) --old-file retry: note if backslash detected in arg. (C) invalid-regex: print corrupted pattern. (D) Never retry silently. (E) --dry-run flag preserved on retry.</li><li>UNANSWERED (triad unavailable): (Q1) Should --replace-all retry be opt-in via env flag WKEDIT_AUTO_REPLACE_ALL=1? (Q2) Pre-check byte count of arg vs printf to detect shell corruption before first call? (Q3) On double-fail: emit both error messages for diagnosis?</li><li>IMPL SKETCH in _do_edit(): after wkedit.exe call -- if rc!=0 then case err in matches-multiple -&gt; args+=(--replace-all); warn; retry. old-string-not-found -&gt; write args[0] to tmpA, args[1] to tmpB; rebuild args with --old-file tmpA --new-file tmpB; retry. esac. One retry only.</li><li>FINAL DESIGN (merged Opus+Codex): _do_edit() { local has_replace_all has_old_file has_new_file (scan args). run_once() inner fn { apply existing normalization; wkedit.exe args }. stderr=mktemp. if run_once fails: case1 matches-multiple AND !has_replace_all -&gt; run_once +--replace-all; warn user. case2 old_string-not-found AND !has_old_file AND args[0]!=&#x27;--*&#x27; AND argc&gt;=3 -&gt; printf args[0] to tmpA; run_once --old-file tmpA args[1] args[2:]; rm tmpA. case3 invalid-regex/regex-not-found/misparse -&gt; cat stderr; return rc (no retry). double-fail: cat original_stderr + retry_stderr; return retry_rc. WKEDIT_NO_AUTO=1 skips all retry logic. retire _do_edit_with_retry() concept -- keep single function.</li><li>implementation delegated to Codex 2026-05-18: modifying _do_edit() in wkedit.sh to add run_once() inner fn + retry logic for matches-multiple (+--replace-all) and old_string-not-found (--old-file tempfile bypass). WKEDIT_NO_AUTO=1 opt-out. Double-fail emits both errors.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PROBLEM DIAGNOSIS (live tests 2026-05-18): wkedit.sh wraps wkappbot file edit. When bash processes args before wkappbot sees them, 5 failure classes emerge: (1) matches-multiple: --replace-all missing; (2) old_string-not-found: bash ate backslashes e.g. \ became \; (3) invalid-regex: shell expanded $1 or ate backslash in regex; (4) args-misparse: unsupported flags like --line N caused old arg to be read as file path; (5) regex-pattern-not-found: genuine no-match -- safe final failure, no retry.</li><li>CORRECTION DECISION MATRIX: matches-multiple -&gt; SAFE +--replace-all (warn user). old-string-not-found -&gt; SAFE --old-file tempfile retry (identical content, bypass shell). invalid-regex -&gt; UNSAFE (content already corrupted). args-misparse -&gt; PARTIAL (strip unknown flags, risky). regex-not-found -&gt; FINAL FAIL no retry.</li><li>DESIGN: single-retry in _do_edit(). Capture: err=$(wkedit.exe 2&gt;&amp;1); rc=$?. Parse err. Apply ONE correction only. Never chain. Always print [wkedit.sh] auto-retry: reason to stderr.</li><li>SAFETY RULES: (A) --replace-all: always warn user matches were multiple. (B) --old-file retry: note if backslash detected in arg. (C) invalid-regex: print corrupted pattern. (D) Never retry silently. (E) --dry-run flag preserved on retry.</li><li>UNANSWERED (triad unavailable): (Q1) Should --replace-all retry be opt-in via env flag WKEDIT_AUTO_REPLACE_ALL=1? (Q2) Pre-check byte count of arg vs printf to detect shell corruption before first call? (Q3) On double-fail: emit both error messages for diagnosis?</li><li>IMPL SKETCH in _do_edit(): after wkedit.exe call -- if rc!=0 then case err in matches-multiple -&gt; args+=(--replace-all); warn; retry. old-string-not-found -&gt; write args[0] to tmpA, args[1] to tmpB; rebuild args with --old-file tmpA --new-file tmpB; retry. esac. One retry only.</li><li>FINAL DESIGN (merged Opus+Codex): _do_edit() { local has_replace_all has_old_file has_new_file (scan args). run_once() inner fn { apply existing normalization; wkedit.exe args }. stderr=mktemp. if run_once fails: case1 matches-multiple AND !has_replace_all -&gt; run_once +--replace-all; warn user. case2 old_string-not-found AND !has_old_file AND args[0]!=&#x27;--*&#x27; AND argc&gt;=3 -&gt; printf args[0] to tmpA; run_once --old-file tmpA args[1] args[2:]; rm tmpA. case3 invalid-regex/regex-not-found/misparse -&gt; cat stderr; return rc (no retry). double-fail: cat original_stderr + retry_stderr; return retry_rc. WKEDIT_NO_AUTO=1 skips all retry logic. retire _do_edit_with_retry() concept -- keep single function.</li><li>implementation delegated to Codex 2026-05-18: modifying _do_edit() in wkedit.sh to add run_once() inner fn + retry logic for matches-multiple (+--replace-all) and old_string-not-found (--old-file tempfile bypass). WKEDIT_NO_AUTO=1 opt-out. Double-fail emits both errors.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

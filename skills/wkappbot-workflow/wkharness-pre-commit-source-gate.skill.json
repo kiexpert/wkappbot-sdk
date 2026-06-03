@@ -1,0 +1,57 @@
+{
+  "id": "wkharness-pre-commit-source-gate",
+  "app": "wkappbot-workflow",
+  "title": "wkharness pre-commit hook blocks cheap AI source-file commits",
+  "title_ko": null,
+  "desc": "Git pre-commit hook that blocks source-file commits (ps1/py/cs/cpp/ts/js/go/rs/java/kt/swift/etc) when staged set contains changes AND an active Claude session JSONL exists with mtime under 90 seconds AND that session's last model is not Opus. Exemptions: WKHARNESS_INTERNAL_SPAWN=1, WKHARNESS_BYPASS=1, markdown-only commits, idle session over 90s, Opus session. Block message under 5 lines (action-first). Registered globally via core.hooksPath.",
+  "steps": [
+    "Architecture: global core.hooksPath points at ~/.codex/githooks; that global pre-commit invokes the canonical source-gate at D:/GitHub/personal-docs/.githooks/pre-commit for EVERY repo, then chains any repo-local .githooks/pre-commit. Source-gate logic lives at personal-docs/.githooks/pre-commit (repo-agnostic via git rev-parse).",
+    "Trigger: ALL THREE required. (a) staged files contain source extensions, (b) active session JSONL mtime under 90 seconds, (c) last model is NOT Opus.",
+    "Exemptions: WKHARNESS_INTERNAL_SPAWN=1, WKHARNESS_BYPASS=1, markdown-only commits, idle session 90s or older, Opus session.",
+    "Override env vars: WKHARNESS_BYPASS=1 (force allow), WKHARNESS_INTERNAL_SPAWN=1 (system spawn).",
+    "Block message: under 5 lines, action-first (use an opus agent or wkcodex for source edits).",
+    "CP949 hard-block dropped from the commit path 2026-05-29 (repo is UTF-8-canonical, was breaking CLAUDE.md emoji). cp949_save_guard.ps1 kept for explicit export use only.",
+    "Local-override self-heal: a repo whose local core.hooksPath points at its own .git/hooks (relative or absolute) shadows the global gate. session-init unsets that redundant value so the gate fires in all repos; real custom hook dirs like .husky are left untouched.",
+    "Verified 2026-05-29: cheap-model .ps1 commit BLOCKED exit 1 in personal-docs, wkappbot-sdk, WKAppBot, WkAutoQuant; markdown commits allowed.",
+    "BLOCK MESSAGE refined 2026-05-29 (commit 7a6b26f, addresses GAP 257 cheap-agent-stalls-after-block): the message is now forcefully actionable and <=5 lines, action-first. It tells the blocked cheap model: do NOT give up or abandon the work, hand the commit to Opus via the EXACT command Agent.cmd --model opus \"review the staged diff (git diff --cached) and commit it\"; framed so the agent understands Opus reviewing the diff is the safety net (no cheap-model regression lands) AND saves tokens (the cheap model did the work, Opus only reviews + lands). Deliberately NOT auto-spawning Opus from the hook (deny-then-cheap-flail lesson: a bare deny makes cheap models read tool-disabled and thrash; an actionable hand-off message is safer). If the message proves insufficient in practice, the next step is the gate synchronously handing the commit to an Opus subagent.",
+    "SUBAGENT MARK-AND-RESTORE (user 2026-05-30, fixes the native-Agent-tool gate gap that env-read misses). The PreToolUse(Agent) hook RECEIVES tool_input.model authoritatively -- the PARENT knows the spawned subagent tier at spawn time. So: on an Agent spawn with a CHEAP model (haiku/sonnet), write a mark ~/.claude/wkharness/subagent-active-<slug>.json = {model, ts, parentSession}; the pre-commit gate ALSO reads this mark (a fresh cheap-subagent mark in the cwd => the committer is the cheap subagent => BLOCK); PostToolUse(Agent) removes the mark (restore prior state). Rationale: the native Agent-TOOL path sets no env and shares the cwd slug with the Opus main session, so active-session.json reads the main (opus) and false-allows (live bug: Haiku subagent committed 39bdc1c). WKHARNESS_AGENT_MODEL env-read fixes only the Agent.cmd path; this mark fixes the native-tool path. Together = robust on both. CAVEATS: stack/refcount for nested+parallel subagents; TTL stale-mark cleanup in case PostToolUse is missed; only mark CHEAP models (opus subagent need not block).",
+    "CHEAP->OPUS DELEGATION (canary-proven 2026-05-30, end-to-end verified): when the gate blocks YOUR cheap (Haiku/Sonnet) source commit, do NOT give up -- delegate to Opus which reviews + lands it (token-smart: cheap did the work, Opus only lands so no cheap regression enters history). PROVEN PATTERN: run Agent.cmd --model opus with a prompt that contains (a) a 5-point SPEC block -- 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit-criterion -- and (b) 3 'wkappbot skill read <id>' refs, then the task. Heredoc form survives multiline/special chars: Agent.cmd --model opus << 'EOF' ... EOF. The SPEC satisfies spec-gate, the 3 refs satisfy agent-brief-guard, and Opus (paid tier) passes the source-gate so the commit lands. The stall-guard's cheap-tier message points here.",
+    "MODEL DETECTION READ-ORDER (fixed 2026-05-30, bundle-A): env WKHARNESS_AGENT_MODEL (1st, set by Agent.cmd for child processes) -> subagent-active-<slug>.json mark (2nd, written by PreToolUse(Agent) for cheap native-tool subagents, TTL 120s, overrides Opus main-session tracker) -> active-session-<slug>.json tracker (3rd, written by PreToolUse harness each call, TTL 90s, authoritative for main session) -> JSONL scan (4th, last resort). Prior bug: only tracker->JSONL existed (no env check). Symptom: spawning a Sonnet/Haiku Agent subagent wrote a subagent JSONL with cheap model; if the JSONL was newer than the main-session tracker, the gate read the wrong file and false-blocked the real Opus session.",
+    "REDESIGN 2026-06-02 (push-time gate): commit-time blocking caused deadlocks (update-gate <-> source-gate). NEW model: (1) pre-commit = allow-all (commits free). (2) pre-push = Opus-only gate: detect-model.sh classifies session; ALLOW *opus*|ROOT|empty, BLOCK cheap models -> route to Opus for reset --soft squash + push. NO env bypass (cheap model self-sets WKHARNESS_BYPASS = self-bypass flaw; a real human is ROOT and already passes). (3) commit-msg appends 'Model: <id>' trailer to every commit. Shared model detection extracted to .githooks/lib/detect-model.sh (DRY across pre-push + commit-msg). Global chain via ~/.codex/githooks/{pre-push,commit-msg}. Full file contents: memory/git-hooks-redesign-spec.md."
+  ],
+  "requirements": [
+    {
+      "cmd": "git commit -m test from cheap session with staged .ps1",
+      "expect": "contains ([HARNESS|BLOCKED|Use opus|cheap model)",
+      "prompt": null
+    },
+    {
+      "cmd": "git commit -m test from cheap session with staged .md only",
+      "expect": "exit 0",
+      "prompt": null
+    },
+    {
+      "cmd": "WKHARNESS_BYPASS=1 git commit -m test from cheap session with staged .ps1",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "claude-code",
+    "wkharness",
+    "git",
+    "pre-commit",
+    "cheap-model",
+    "source-files",
+    "gate",
+    "opus-handoff",
+    "policy"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T18:40:18.6033276Z",
+  "updated": "2026-06-02T22:46:33.0534627Z",
+  "version": "1.15"
+}

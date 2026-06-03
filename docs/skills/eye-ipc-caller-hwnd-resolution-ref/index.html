@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Eye IPC Caller HWND T3 Reference</h1>
       <p class="description">T3 ref. GAP history, GA_ROOTOWNER verified chain, multi-monitor debug, iconified caller design.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../eye-ipc-caller-hwnd-resolution/">eye-ipc-caller-hwnd-resolution</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>GAPS HISTORY: A=Zero hwnd stale CallerHwndForPlacement (Eye should reset when prefix absent). B=Static CallerHwndForPlacement survives hot-swap. C=Integrated terminal ConPTY host is IDE (ancestor walk finds IDE not terminal panel). Most fixed by 2026-05-24.</li><li>GA_ROOTOWNER VERIFIED CHAIN (2026-05-24, commit c631b2f3): wkappbot-core(14088)-&gt;claude(16500)-&gt;..-&gt;PCW(12600 Vis=True)-&gt;GA_ROOTOWNER-&gt;CASCADIA 0x606A2. All 4 test pairs confirmed. Vis=False PCW = AllocConsole = GA_ROOT==GA_ROOTOWNER==self (useless).</li><li>Multi-monitor debug: cdp-mon.ps1 [OFF-SCREEN] label uses old sign-based check (99.9% false positive on multi-monitor). True check: wkappbot.hq/runtime/cdp-state.jsonl caller_hwnd field + MonitorFromPoint API.</li><li>Iconified caller design: minimized terminal = background/batch run = Chrome should NOT move. Optional future: WINDOWPLACEMENT.rcNormalPosition for would-be restore position. Low priority.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>GAPS HISTORY: A=Zero hwnd stale CallerHwndForPlacement (Eye should reset when prefix absent). B=Static CallerHwndForPlacement survives hot-swap. C=Integrated terminal ConPTY host is IDE (ancestor walk finds IDE not terminal panel). Most fixed by 2026-05-24.</li><li>GA_ROOTOWNER VERIFIED CHAIN (2026-05-24, commit c631b2f3): wkappbot-core(14088)-&gt;claude(16500)-&gt;..-&gt;PCW(12600 Vis=True)-&gt;GA_ROOTOWNER-&gt;CASCADIA 0x606A2. All 4 test pairs confirmed. Vis=False PCW = AllocConsole = GA_ROOT==GA_ROOTOWNER==self (useless).</li><li>Multi-monitor debug: cdp-mon.ps1 [OFF-SCREEN] label uses old sign-based check (99.9% false positive on multi-monitor). True check: wkappbot.hq/runtime/cdp-state.jsonl caller_hwnd field + MonitorFromPoint API.</li><li>Iconified caller design: minimized terminal = background/batch run = Chrome should NOT move. Optional future: WINDOWPLACEMENT.rcNormalPosition for would-be restore position. Low priority.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

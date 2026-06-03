@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Crash reboot recovery: cascading failure pattern and full recovery checklist</h1>
       <p class="description">After system crash/Kernel-Power 41 reboot, Windows component startup order breaks causing cascading failures: Korean IME dead in all consoles, MouseCCA spawn storm (100+ zombies), CPU spike, lag. Root cause: all components assume normal boot order. Permanent fixes applied 2026-05-05.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">crash-reboot</span><span class="chip">recovery</span><span class="chip">korean-ime</span><span class="chip">ctfmon</span><span class="chip">tsf</span><span class="chip">mousecca</span><span class="chip">spawn-storm</span><span class="chip">conpty</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[CRASH REBOOT CASCADE] 1) ctfmon starts late/missing -&gt; IME context not registered for consoles. 2) Windows Terminal starts before ctfmon -&gt; TSF registration fails silently -&gt; Korean IME permanently dead in all WT tabs even after ctfmon starts later. 3) MouseCCA analyze-hack server returns non-JSON -&gt; pre-2026-05-05: Eye respawns every 300ms with no backoff -&gt; 100+ zombie wkappbot-core -&gt; CPU pegged -&gt; full system lag.</li><li>[SYMPTOMS CHECKLIST] Korean input (한/영 key) zero response in any console but works in VS Code. wkappbot-core process count &gt;10 in tasklist. CPU &gt;200% from wkappbot-core. Eye health 34% or lower. System lag/freeze.</li><li>[WHY VS CODE WORKS BUT CONSOLE DOESNT] VS Code is a Win32 GUI app using TSF directly. Console apps use ConPTY/IMM32 path which requires ctfmon to be present at Windows Terminal startup time. After crash, ctfmon arrives too late for WT TSF registration window -&gt; consoles broken, GUI apps fine.</li><li>[RECOVERY 1 - Korean IME + encoding] powershell -ExecutionPolicy Bypass -File C:\Users\kiexp\.codex\skills\recover-korean-console\scripts\recover-korean-console.ps1 -- restarts ctfmon+TextInputHost, sets UTF-8 InputEncoding/OutputEncoding, patches all live cmd.exe consoles via AttachConsole+SetConsoleCP API, registers ctfmon+chcp in registry.</li><li>[RECOVERY 2 - Windows Terminal IME still dead] Run: wkappbot skill read repair-korean-ime-running-wt-tsf-rebind -- injects msctf.dll into WT via CreateRemoteThread, calls TF_InvalidAssemblyListCacheIfExist, posts WM_INPUTLANGCHANGE to all CASCADIA_HOSTING_WINDOW_CLASS windows. No WT restart needed (preserves wkchat sessions).</li><li>[RECOVERY 3 - MouseCCA spawn storm] (Get-Process wkappbot-core).Count &gt; 10 = storm. Fix: $ep = Eye PID from logs/eye.pid=*.log; Get-Process wkappbot-core | Where-Object Id -ne $ep | Stop-Process -Force; [System.Environment]::SetEnvironmentVariable(&#x27;WKAPPBOT_EYE_MOUSECCA&#x27;,&#x27;0&#x27;,&#x27;User&#x27;). Post-2026-05-05 builds auto-protect via CAS guard.</li><li>[WHAT WORKED 2026-05-05] Korean IME: recover-korean-console.ps1 fixed encoding+ctfmon. WT IME: msctf.dll injection + TF_InvalidAssemblyListCacheIfExist + WM_INPUTLANGCHANGE worked without WT restart. MouseCCA storm: killed 135 zombies, WKAPPBOT_EYE_MOUSECCA=0 stopped respawn, CAS guard code fix committed.</li><li>[WHAT DIDNT WORK 2026-05-05] ImmAssociateContextEx cross-process -&gt; Windows blocks from external process. skill edit/contribute on existing file -&gt; IOException conflict (need to delete project copy first). Hot-swap stuck on admin Eye pipe (&gt;20min). Windows Terminal IME fix via ImmAssociateContextEx on CASCADIA windows returned 0 (CAS gate + WT internal restriction).</li><li>[PERMANENT FIXES APPLIED] (1) HKCU\Run: ctfmon.exe auto-starts on every login. (2) HKCU\Run: recover-korean-console.ps1 runs silently on login. (3) HKCU\Command Processor AutoRun: chcp 65001 on every cmd.exe. (4) ps-profile.ps1: InputEncoding+OutputEncoding UTF-8 + ctfmon auto-start guard. (5) AppBotEyeHoverAnalyzer.cs: Interlocked CAS gate + exponential backoff 300ms-&gt;30s cap + auto-disable after 10 failures. (6) Windows auto-login via HKLM Winlogon registry.</li><li>[LONG-TERM IMPROVEMENT NEEDED] Eye startup self-diagnosis: check ctfmon running, TSF registered, console encoding, MouseCCA server health -&gt; auto-heal before user notices. Suggest filed.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>[CRASH REBOOT CASCADE] 1) ctfmon starts late...</li><li>[SYMPTOMS CHECKLIST] Korean input (한/영 key)...</li><li>[WHY VS CODE WORKS BUT CONSOLE DOESNT] VS Co...</li><li>[RECOVERY 1 - Korean IME + encoding] powersh...</li><li>[RECOVERY 2 - Windows Terminal IME still dea...</li><li>[RECOVERY 3 - MouseCCA spawn storm] (Get-Pro...</li><li>[WHAT WORKED 2026-05-05] Korean IME: recover...</li><li>[WHAT DIDNT WORK 2026-05-05] ImmAssociateCon...</li><li>[PERMANENT FIXES APPLIED] (1) HKCU\Run: ctfm...</li><li>[LONG-TERM IMPROVEMENT NEEDED] Eye startup s...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'crash-reboot-recovery-cascade';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

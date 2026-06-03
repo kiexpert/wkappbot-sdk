@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Launcher --sudo probe: File.Exists check before ConnectAsync</h1>
       <p class="description">v6.0.1 fix for HANDSHAKE-MISS false positives on cold-start sudo. Launcher/Program.cs checks File.Exists(&#x27;\.\pipe\wkappbot_elevated&#x27;) BEFORE ConnectAsync. If pipe file is absent, admin Eye hasn&#x27;t been spawned yet (cold start) -- quiet fallthrough to Core which will handle UAC + SudoHandler.EnsureAdminForSudo. If pipe file EXISTS but ConnectAsync fails, real zombie -- that&#x27;s when we fire the HANDSHAKE MISS banner + bug-auto suggest. Previous fastFailMs=100 elapsed-based heuristic mis-classified every cold-start as handshake miss (merged 34x in 33h). Keeps v6.0 pipe separation: wkappbot_eye_ipc (normal Eye tick) and wkappbot_elevated (admin Eye cmd proxy) must never mix. Affects --all commands via --sudo flag.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">launcher</span><span class="chip">sudo</span><span class="chip">pipe-separation</span><span class="chip">handshake</span><span class="chip">v6.0.1</span><span class="chip">regression-fix</span><span class="chip">--all</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Launcher Program.cs --sudo branch calls File.Exists pipe path on wkappbot_elevated before any ConnectAsync.</li><li>Cold start (pipe file absent) -&gt; quiet log &#x27;admin Eye pipe not present -- Core will spawn (cold start, not a handshake miss)&#x27;, NO handshake miss banner.</li><li>Pipe present -&gt; do the 1500ms ConnectAsync; on failure re-check File.Exists. If pipe disappeared mid-probe (race), treat as cold start. If still present but ConnectAsync failed, real regression -&gt; ReportHandshakeMiss.</li><li>Affects wkappbot --all commands because --sudo can be appended to any of them (wkappbot &lt;anything&gt; --sudo routes through this probe).</li><li>Evidence: test-launcher-sudo-handshake-miss-cold-start.cmd greps source for pipeFileExists guard + disappeared-during-probe race handling, plus wkappbot.exe rebuild freshness.</li><li>Verified 2026-04-21: test-eye-sudo-handshake-miss-cold-start.cmd (resolve ts=2026-04-21T03:30)</li><li>[AUDIT 2026-05-29] Launcher/Program.cs split: pipeFileExists / &#x27;pipe disappeared during probe&#x27; refs moved into Launcher partials. SudoHandler.cs:35 ref still resolves. Update Launcher/Program.cs refs on next re-contribute.</li><li>[AUDIT 2026-05-30] pipeFileExists guard moved from Program.cs to Program.SudoProbe.cs:40 (and &#x27;pipe disappeared during probe&#x27; message at line 95). EnsureAdminForSudo refs still resolve. Update refs to Program.SudoProbe.cs in next contribute.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Launcher Program.cs --sudo branch calls File.Exists pipe path on wkappbot_elevated before any ConnectAsync.</li><li>Cold start (pipe file absent) -&gt; quiet log &#x27;admin Eye pipe not present -- Core will spawn (cold start, not a handshake miss)&#x27;, NO handshake miss banner.</li><li>Pipe present -&gt; do the 1500ms ConnectAsync; on failure re-check File.Exists. If pipe disappeared mid-probe (race), treat as cold start. If still present but ConnectAsync failed, real regression -&gt; ReportHandshakeMiss.</li><li>Affects wkappbot --all commands because --sudo can be appended to any of them (wkappbot &lt;anything&gt; --sudo routes through this probe).</li><li>Evidence: test-launcher-sudo-handshake-miss-cold-start.cmd greps source for pipeFileExists guard + disappeared-during-probe race handling, plus wkappbot.exe rebuild freshness.</li><li>Verified 2026-04-21: test-eye-sudo-handshake-miss-cold-start.cmd (resolve ts=2026-04-21T03:30)</li><li>[AUDIT 2026-05-29] Launcher/Program.cs split: pipeFileExists / &#x27;pipe disappeared during probe&#x27; refs moved into Launcher partials. SudoHandler.cs:35 ref still resolves. Update Launcher/Program.cs refs on next re-contribute.</li><li>[AUDIT 2026-05-30] pipeFileExists guard moved from Program.cs to Program.SudoProbe.cs:40 (and &#x27;pipe disappeared during probe&#x27; message at line 95). EnsureAdminForSudo refs still resolve. Update refs to Program.SudoProbe.cs in next contribute.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>A11y Eval Deprecated: AutoRegisterBug Guard on Use</h1>
       <p class="description">a11y eval action is REMOVED (hard-blocked). Returns false immediately with [REMOVED] banner + migration hint. MCP path auto-redirects to read --eval-js.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>a11y eval is deprecated. When called via CLI directly, prints [DEPRECATED] banner and AutoRegisterBug() fires a BUG-AUTO suggest entry to track callers.</li><li>MCP path FIXED 2026-05-07 (commit 59997c34): McpCommand.Helpers.BuildUnifiedArgs now redirects action==eval to [read, target, --eval-js, expression] BEFORE reaching DeprecatedEval. MCP wkappbot tool callers no longer trigger USAGE-DEPRECATED.</li><li>To migrate a direct CLI caller: replace a11y eval &lt;hwnd&gt; &lt;expr&gt; with a11y read &lt;grap&gt; --eval-js &lt;expr&gt;. The eval action evaluated JS-like expressions -- use --eval-js with explicit a11y action instead.</li><li>If BUG-AUTO USAGE-DEPRECATED reappears after the MCP fix, locate the remaining direct CLI caller via wkappbot file grep a11y-eval --type yaml --type sh.</li><li>Verified 2026-04-21: test-a11y-find-deprecated-eval-guard.sh (resolve ts=2026-04-20T11:45)</li><li>Verified 2026-04-26: test-a11y-eval-deprecated.sh (resolve ts=2026-04-23T11:08:32.8921534Z)</li><li>Verified 2026-05-07: test-mcp-a11y-eval-action-redirected-no-bug-auto.sh confirms MCP redirect at McpCommand.Helpers.cs:177-188.</li><li>BREAKING CHANGE 2026-05-07: a11y eval is now HARD-BLOCKED. DeprecatedEval() returns false immediately -- no JS execution. Callers see [REMOVED] error + migration hint. BUG-AUTO fires USAGE-REMOVED tag.</li><li>BREAKING CHANGE 2026-05-07: a11y eval is now HARD-BLOCKED. DeprecatedEval() returns false immediately -- no JS execution. Callers see [REMOVED] error + migration hint. BUG-AUTO fires USAGE-REMOVED tag.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>a11y eval is deprecated. When called via CLI directly, prints [DEPRECATED] banner and AutoRegisterBug() fires a BUG-AUTO suggest entry to track callers.</li><li>MCP path FIXED 2026-05-07 (commit 59997c34): McpCommand.Helpers.BuildUnifiedArgs now redirects action==eval to [read, target, --eval-js, expression] BEFORE reaching DeprecatedEval. MCP wkappbot tool callers no longer trigger USAGE-DEPRECATED.</li><li>To migrate a direct CLI caller: replace a11y eval &lt;hwnd&gt; &lt;expr&gt; with a11y read &lt;grap&gt; --eval-js &lt;expr&gt;. The eval action evaluated JS-like expressions -- use --eval-js with explicit a11y action instead.</li><li>If BUG-AUTO USAGE-DEPRECATED reappears after the MCP fix, locate the remaining direct CLI caller via wkappbot file grep a11y-eval --type yaml --type sh.</li><li>Verified 2026-04-21: test-a11y-find-deprecated-eval-guard.sh (resolve ts=2026-04-20T11:45)</li><li>Verified 2026-04-26: test-a11y-eval-deprecated.sh (resolve ts=2026-04-23T11:08:32.8921534Z)</li><li>Verified 2026-05-07: test-mcp-a11y-eval-action-redirected-no-bug-auto.sh confirms MCP redirect at McpCommand.Helpers.cs:177-188.</li><li>BREAKING CHANGE 2026-05-07: a11y eval is now HARD-BLOCKED. DeprecatedEval() returns false immediately -- no JS execution. Callers see [REMOVED] error + migration hint. BUG-AUTO fires USAGE-REMOVED tag.</li><li>BREAKING CHANGE 2026-05-07: a11y eval is now HARD-BLOCKED. DeprecatedEval() returns false immediately -- no JS execution. Callers see [REMOVED] error + migration hint. BUG-AUTO fires USAGE-REMOVED tag.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

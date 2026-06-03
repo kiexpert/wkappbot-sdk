@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>SDK Skill Browser HowTo</h1>
       <p class="description">T2 HowTo: step-by-step guide to set up, run, and maintain the skill browser marketing pipeline</p>
       <div class="meta">developer</div>
+      <div class="breadcrumb">Part of: <a href="../sdk-skill-browser-pipeline/">sdk-skill-browser-pipeline</a></div>
       <div class="tags"><span class="chip">sdk</span><span class="chip">skill-browser</span><span class="chip">howto</span><span class="chip">setup</span><span class="chip">gha</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>INITIAL SETUP: git clone wkappbot-sdk. pip install nothing needed (stdlib only). Ensure D:/GitHub/WKAppBot/bin/wkappbot.hq/skills/ exists (HQ skill catalog). Set GH_PAT env var for Pages status check and OAuth.</li><li>BUILD: python scripts/build-skill-page.py -- auto-finds HQ catalog, filters apps, masks secrets, writes docs/skills/index.html. Run after any skill changes to refresh.</li><li>GITHUB PAGES: Settings &gt; Pages &gt; Source: main branch /docs. URL: https://***.github.io/wkappbot-sdk/. Check: gh api repos/.../pages</li><li>grep status.</li><li>GHA TRIGGER FROM CORE: add .github/workflows/notify-sdk.yml to Core repo with repository_dispatch event skill-catalog-updated targeting ***/wkappbot-sdk. SDK workflow listens and rebuilds.</li><li>PRO SUBSCRIBER MGMT: gh api repos/***/wkappbot-harness/collaborators -X PUT -f permission=pull to add subscriber. Remove: gh api repos/.../collaborators/USERNAME -X DELETE. Payment flow via payment-to-license-activation skill.</li><li>LAYOUT CUSTOMIZATION: edit docs/skills/index.html JS section HERO_QUOTE to change reflection text. Edit CSS var --accent for brand color. Edit CATEGORY_MAP in skills-data.js for grouping.</li><li>HARNESS MONETIZATION: Free=view skill titles+preview. Pro=full steps+no blur. Enterprise=custom skill tree. Subscription = GitHub collaborator on wkappbot-harness private repo.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>INITIAL SETUP: git clone wkappbot-sdk. pip install nothing needed (stdlib only). Ensure D:/GitHub/WKAppBot/bin/wkappbot.hq/skills/ exists (HQ skill catalog). Set GH_PAT env var for Pages status check and OAuth.</li><li>BUILD: python scripts/build-skill-page.py -- auto-finds HQ catalog, filters apps, masks secrets, writes docs/skills/index.html. Run after any skill changes to refresh.</li><li>GITHUB PAGES: Settings &gt; Pages &gt; Source: main branch /docs. URL: https://***.github.io/wkappbot-sdk/. Check: gh api repos/.../pages</li><li>grep status.</li><li>GHA TRIGGER FROM CORE: add .github/workflows/notify-sdk.yml to Core repo with repository_dispatch event skill-catalog-updated targeting ***/wkappbot-sdk. SDK workflow listens and rebuilds.</li><li>PRO SUBSCRIBER MGMT: gh api repos/***/wkappbot-harness/collaborators -X PUT -f permission=pull to add subscriber. Remove: gh api repos/.../collaborators/USERNAME -X DELETE. Payment flow via payment-to-license-activation skill.</li><li>LAYOUT CUSTOMIZATION: edit docs/skills/index.html JS section HERO_QUOTE to change reflection text. Edit CSS var --accent for brand color. Edit CATEGORY_MAP in skills-data.js for grouping.</li><li>HARNESS MONETIZATION: Free=view skill titles+preview. Pro=full steps+no blur. Enterprise=custom skill tree. Subscription = GitHub collaborator on wkappbot-harness private repo.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

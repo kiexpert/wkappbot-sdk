@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y hack: --ocr opt-in + VisionWorker sentinel bridge (focusless)</h1>
       <p class="description">a11y hack used to run CCA + UIA + OCR + Gemini Vision always. Heavy runs (every invocation) would fire CDP tab activation from the Vision worker and steal foreground. Now OCR/Vision are opt-in via --ocr; default path is CCA + UIA only. When --ocr is passed, VisionWorker&#x27;s CDP call is bracketed with the main sentinel&#x27;s Checkpoint so theft is caught immediately, not at end of pipeline.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">hack</span><span class="chip">ocr</span><span class="chip">vision</span><span class="chip">cdp</span><span class="chip">focus-steal</span><span class="chip">sentinel</span><span class="chip">focusless-first</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Default: a11y hack returns CCA segments + UIA matches only; no OCR no Vision</li><li>Opt-in: a11y hack &lt;grap&gt; --ocr enables OcrWorker + VisionWorker fallback for blind regions</li><li>HackWorkerContext gains CheckpointFocus delegate set to focusSentinel.Checkpoint</li><li>VisionWorker wraps AskGemini call with ctx.CheckpointFocus?.Invoke() before and after -- theft detected at the seam</li><li>For text extraction without hack use a11y ocr &lt;grap&gt; or a11y grid-read &lt;grap&gt;</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Default: a11y hack returns CCA segments + UIA matches only; no OCR no Vision</li><li>Opt-in: a11y hack &lt;grap&gt; --ocr enables OcrWorker + VisionWorker fallback for blind regions</li><li>HackWorkerContext gains CheckpointFocus delegate set to focusSentinel.Checkpoint</li><li>VisionWorker wraps AskGemini call with ctx.CheckpointFocus?.Invoke() before and after -- theft detected at the seam</li><li>For text extraction without hack use a11y ocr &lt;grap&gt; or a11y grid-read &lt;grap&gt;</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,15 +117,102 @@
       <h1>a11y find - output format and process resolution</h1>
       <p class="description">How wkappbot a11y find resolves windows and process trees, and how to keep its output aligned with the current # FOCUS / # TARGET / # INFO contract. Useful when Claude or Codex is changing find behavior or debugging target ambiguity: proc is the identity, hwnd is the disambiguator, and root hwnd is only a search entry point. Include short operator flags only when they help verification or debugging.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">find</span><span class="chip">grap</span><span class="chip">architecture</span><span class="chip">codex</span><span class="chip">verify</span><span class="chip">shell-safe</span><span class="chip">review</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Keep the emitted output aligned with the current contract: one shared # FOCUS line, one # TARGET block per match, and optional indented # INFO lines.</li><li>Treat the grap as what was actually matched: proc/domain/cmd/title/cls/file are matchable fields; hwnd is for disambiguation, not identity.</li><li>Separate root hwnd from process-owned hwnd; when a process has no own window, resolve its effective host window through the parent chain.</li><li>Keep output shell-safe and markdown-friendly: quote the full grap expression, avoid extra noise, and preserve paste-ready tokens.</li><li>Prefer short operator flags like verify, review, and dry-run when they make the workflow safer or easier to audit.</li><li>Verify by rerunning a11y find on the emitted hwnd:0x... token and checking [OK].</li><li>Prefer process-first search logic for matching, but preserve focus context whenever interaction side effects could matter.</li><li>[v6.2+ SCORE OUTPUT] find [OK] includes score={field:score,...} for ALL fields. GlobCoverageScore formula: Σ(segment_len × occurrence_count) / field_len. Regex forms: re:pat (grap), /pat/ or ~pat~ (skill search, bash-safe). Regex score = literal-char-count / field_len (symbols penalized; exact match → 1.00). OR-array: best-match / n. Multi-hit boost: *chrome* in &#x27;Google Chrome - Chrome&#x27; (2x) → 0.55 vs 0.27. All forms normalized through same GlobCoverageScore function.</li><li>[v6.2+ MDI FALLBACK] Simple &#x27;a11y find *pattern*&#x27; now auto-scans MDI child windows when no top-level matches found. Covers HTS/MDI apps (Heroes4, nkrunlite) previously requiring explicit {proc:&#x27;nkrunlite&#x27;,title:&#x27;*foo*&#x27;} JSON5. Simple-pattern path FindWindows now includes MDI child enumeration fallback. Explicit JSON5 still faster when host proc is known.</li><li>[v6.2+ CMD FALLBACK NOISE FIX] IsSearcherProcess filter excludes bash/sh/cmd/powershell/pwsh/wkappbot* from cmd: fallback matching. Prevents generic wildcard patterns from returning VS Code as a result via bash process cmdline containing the pattern substring. cmd: secondary scan is now also skipped when top-level results already found.</li><li>[v6.2+ EXAMPLES] Concrete verified behaviors:
-  1) &#x27;wkappbot a11y find *panel-title-wildcard*&#x27; -&gt; finds MDI child window directly, [OK] with score={}, no proc:/JSON5 needed.
-  2) &#x27;wkappbot a11y find {proc:chrome,domain:chatgpt.com}&#x27; -&gt; [OK] Nms score={domain:1.00,proc:1.00,cls:1.00,title:...}, multi-field exact.
-  3) &#x27;wkappbot a11y find *Code*&#x27; (VS Code) -&gt; completes &lt;3s (was 50s), score shows proc:1.00; cmd: fallback does NOT return bash/wkappbot children.
-  4) &#x27;wkappbot a11y find *nkrunlite*&#x27; -&gt; &lt;5s (was ~50s), MFC UIA discovery skipped.
-When updating a11y find code, these four cases are the regression baseline.</li><li>[v6.3+ AMB OUTPUT] Multiple matches: [OK] replaced with [AMB:N] where N = total match count. Single unique match stays [OK]. [AMB:N] signals grap needs tightening -- use score={} output to pick a higher-scoring field to add for precision. Example: [AMB:3] score={domain:1.00,proc:1.00,cls:0.54,title:0.22} -&gt; add domain: or tighten title wildcard.</li><li>Verified 2026-04-24: test-a11y-find-grap-verify-miss.ps1 (resolve ts=2026-04-23T02:56:33)</li><li>[v6.3+ CLS PATH] cls ancestor path: simple pattern matches own class AND descendants. Path pattern cls:&#x27;A/B&#x27; matches window class A whose parent contains B. cls:&#x27;**/_NKHero*&#x27; finds any depth. Each segment is substring-matched. Score context: cls:&#x27;Afx:00DB0000/_NKH&#x27;:0.85 shows matched segment. Coverage score applies per path segment.</li><li>PARENT CHAIN FIELDS (2026-05-18): ppid:N (direct parent PID), ppids:N or ppids:[N1,N2,...] (any ancestor, scalar=same as [N]), ppids:&#x27;&#x27; (output ancestor chain). Example: wkappbot windows {proc:&#x27;bash&#x27;,ppids:[MY_CLAUDE_PID]} finds only bash shells from your session. ancestor:N field removed (replaced by ppids:N). (commits c92dc4621 -&gt; d3688cf7c)</li><li>USAGE NOTE (2026-05-18): ppids filter works correctly for processes found by PROC-mode scan. Console processes (bash shells) with no top-level HWND ARE found when proc: is specified (windowless scan), but console bash children of claude.exe with no visible window are NOT enumerated unless explicitly targeted by pid:. Use ppids:&#x27;&#x27; to reveal ancestor chain of matched processes. Example confirmed: {proc:&#x27;bash&#x27;,ppids:[PARENT_PID]} correctly includes/excludes by parent chain; {proc:&#x27;bash&#x27;,ppids:&#x27;&#x27;} shows ancestors: chain in output.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Keep the emitted output aligned with the cur...</li><li>Treat the grap as what was actually matched:...</li><li>Separate root hwnd from process-owned hwnd;...</li><li>Keep output shell-safe and markdown-friendly...</li><li>Prefer short operator flags like verify, rev...</li><li>Verify by rerunning a11y find on the emitted...</li><li>Prefer process-first search logic for matchi...</li><li>[v6.2+ SCORE OUTPUT] find [OK] includes scor...</li><li>[v6.2+ MDI FALLBACK] Simple &#x27;a11y find *patt...</li><li>[v6.2+ CMD FALLBACK NOISE FIX] IsSearcherPro...</li><li>[v6.2+ EXAMPLES] Concrete verified behaviors...</li><li>[v6.3+ AMB OUTPUT] Multiple matches: [OK] re...</li><li>Verified 2026-04-24: test-a11y-find-grap-ver...</li><li>[v6.3+ CLS PATH] cls ancestor path: simple p...</li><li>PARENT CHAIN FIELDS (2026-05-18): ppid:N (di...</li><li>USAGE NOTE (2026-05-18): ppids filter works...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-find';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Launcher NativeAOT build needs vswhere.exe in PATH</h1>
       <p class="description">RESOLVED in commit 65846b1: WKAppBot.Launcher.csproj now auto-prepends the VS Installer dir to the MSBuild process PATH before IlcCompile via a RoslynCodeTaskFactory inline task. Plain &#x27;dotnet publish&#x27; from bash/cmd works without manual PATH setup. Skill retained as a reference for the symptom (MSB3073 vswhere not recognized) and how the csproj-embedded fix works.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">developer</span><span class="chip">project</span><span class="chip">build</span><span class="chip">aot</span><span class="chip">native</span><span class="chip">vswhere</span><span class="chip">launcher</span><span class="chip">troubleshooting</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>RESOLVED (commit 65846b1) — manual PATH export no longer needed. csproj now self-heals.</li><li>SYMPTOM (if ever regressed): error MSB3073 &#x27;vswhere.exe&#x27; is not recognized ... command exited with code 123 during PublishAot native link.</li><li>ROOT CAUSE: ILCompiler&#x27;s native link target spawns vswhere.exe via &lt;Exec&gt; relying on PATH. vswhere lives at &#x27;C:\Program Files (x86)\Microsoft Visual Studio\Installer&#x27; which is absent from default shell PATH outside Developer PowerShell.</li><li>FIX IN csproj: UsingTask TaskFactory=RoslynCodeTaskFactory runs inline C# that calls Environment.SetEnvironmentVariable(PATH, installer-dir + &#x27;;&#x27; + currentPath). Triggered via Target BeforeTargets=CollectFrameworkReferences;PrepareForBuild;CoreCompile;IlcCompile and gated by PublishAot==true + Windows_NT.</li><li>WHY MULTIPLE BeforeTargets: the first vswhere lookup happens in a pre-ILC target; a single BeforeTargets=IlcCompile fires too late. Prepending PATH across multiple early hooks covers all invocations; the task is idempotent (skips when already present).</li><li>VERIFY: log shows &#x27;[AOT] prepended to PATH for vswhere: &lt;dir&gt;&#x27;. If you see the old MSB3073 error, check whether the inline task was removed or whether vswhere&#x27;s location moved (2 candidates probed: Program Files (x86) and Program Files).</li><li>CORE DOES NOT NEED THIS: WKAppBot.CLI.csproj is not PublishAot, so plain dotnet publish without vswhere works there.</li><li>DEPLOY PATH: Launcher publishes wkappbot.exe (~3.6MB single-file AOT) to repo/bin via DeployLauncher target.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>RESOLVED (commit 65846b1) — manual PATH export no longer needed. csproj now self-heals.</li><li>SYMPTOM (if ever regressed): error MSB3073 &#x27;vswhere.exe&#x27; is not recognized ... command exited with code 123 during PublishAot native link.</li><li>ROOT CAUSE: ILCompiler&#x27;s native link target spawns vswhere.exe via &lt;Exec&gt; relying on PATH. vswhere lives at &#x27;C:\Program Files (x86)\Microsoft Visual Studio\Installer&#x27; which is absent from default shell PATH outside Developer PowerShell.</li><li>FIX IN csproj: UsingTask TaskFactory=RoslynCodeTaskFactory runs inline C# that calls Environment.SetEnvironmentVariable(PATH, installer-dir + &#x27;;&#x27; + currentPath). Triggered via Target BeforeTargets=CollectFrameworkReferences;PrepareForBuild;CoreCompile;IlcCompile and gated by PublishAot==true + Windows_NT.</li><li>WHY MULTIPLE BeforeTargets: the first vswhere lookup happens in a pre-ILC target; a single BeforeTargets=IlcCompile fires too late. Prepending PATH across multiple early hooks covers all invocations; the task is idempotent (skips when already present).</li><li>VERIFY: log shows &#x27;[AOT] prepended to PATH for vswhere: &lt;dir&gt;&#x27;. If you see the old MSB3073 error, check whether the inline task was removed or whether vswhere&#x27;s location moved (2 candidates probed: Program Files (x86) and Program Files).</li><li>CORE DOES NOT NEED THIS: WKAppBot.CLI.csproj is not PublishAot, so plain dotnet publish without vswhere works there.</li><li>DEPLOY PATH: Launcher publishes wkappbot.exe (~3.6MB single-file AOT) to repo/bin via DeployLauncher target.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

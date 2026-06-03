@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkedit find-pattern encoding hell: BOM + CRLF mismatch causes &#x27;not found&#x27;</h1>
       <p class="description">wkappbot file edit --old-file pattern matching silently fails when old-file has BOM or CRLF/LF mismatch with target. wkedit.sh auto-normalizes pattern files before passing to wkedit.exe.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>ROOT CAUSE: old-file written by bash heredoc (LF) but target file has CRLF -&gt; wkedit.exe string match fails silently with &#x27;old_string not found&#x27;.</li><li>ROOT CAUSE 2: Python non-raw string backslash escape: \b=0x08 backspace, \s=bell. Pattern written to file is corrupted -&gt; match always fails.</li><li>ROOT CAUSE 3: PowerShell [Text.Encoding]::UTF8 adds BOM (EF BB BF) to output files. Old-file with BOM prepended -&gt; match fails on first chars.</li><li>SOLUTION: wkedit.sh pre-normalizes --old-file/--new-file before passing to wkedit.exe: (1) strip BOM if present, (2) match target file line endings (CRLF/LF), (3) write to temp file.</li><li>SOLUTION 2: Always use Python raw strings r&#x27;...&#x27; or double-escape \b \s \w when building regex patterns written to files.</li><li>SOLUTION 3: Use (New-Object System.Text.UTF8Encoding $false) instead of [Text.Encoding]::UTF8 in PS WriteAllText calls.</li><li>ESCAPE HATCH when guard self-blocks: wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt path -- cmd name != guarded keyword.</li><li>ESCAPE HATCH 2: use chr() in Python to build strings containing guarded keywords: tgt=&#x27;wk&#x27;+&#x27;ed&#x27;+&#x27;it&#x27; avoids literal appearing in bash cmd.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>ROOT CAUSE: old-file written by bash heredoc (LF) but target file has CRLF -&gt; wkedit.exe string match fails silently with &#x27;old_string not found&#x27;.</li><li>ROOT CAUSE 2: Python non-raw string backslash escape: \b=0x08 backspace, \s=bell. Pattern written to file is corrupted -&gt; match always fails.</li><li>ROOT CAUSE 3: PowerShell [Text.Encoding]::UTF8 adds BOM (EF BB BF) to output files. Old-file with BOM prepended -&gt; match fails on first chars.</li><li>SOLUTION: wkedit.sh pre-normalizes --old-file/--new-file before passing to wkedit.exe: (1) strip BOM if present, (2) match target file line endings (CRLF/LF), (3) write to temp file.</li><li>SOLUTION 2: Always use Python raw strings r&#x27;...&#x27; or double-escape \b \s \w when building regex patterns written to files.</li><li>SOLUTION 3: Use (New-Object System.Text.UTF8Encoding $false) instead of [Text.Encoding]::UTF8 in PS WriteAllText calls.</li><li>ESCAPE HATCH when guard self-blocks: wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt path -- cmd name != guarded keyword.</li><li>ESCAPE HATCH 2: use chr() in Python to build strings containing guarded keywords: tgt=&#x27;wk&#x27;+&#x27;ed&#x27;+&#x27;it&#x27; avoids literal appearing in bash cmd.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

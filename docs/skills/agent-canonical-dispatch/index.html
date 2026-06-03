@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Agent command: canonical opts + per-tier translation</h1>
       <p class="description">wkappbot agent &#x27;task&#x27; - tier uses Claude-standard canonical flags as universal interface. All AI types (haiku/sonnet/opus/gpt/gemini/codex-mini/triad) share the same arg format. Translation layer converts to each backend. New tiers: gpt, gemini. Session persistence: .wkappbot/agents/last-{tier}.jsonl</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">agent</span><span class="chip">dispatch</span><span class="chip">canonical</span><span class="chip">gpt</span><span class="chip">gemini</span><span class="chip">claude</span><span class="chip">codex</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Run agent with canonical opts: wkappbot agent &#x27;task&#x27; - opus --max-turns 5</li><li>Check last task: wkappbot agent last</li><li>Follow up: wkappbot agent resume &#x27;follow-up question&#x27;</li><li>New tiers: wkappbot agent &#x27;task&#x27; - gpt OR wkappbot agent &#x27;task&#x27; - gemini</li><li>Canonical flags: --model &lt;id&gt; --max-turns N --system &#x27;...&#x27; --no-agent --fresh --attach &lt;file&gt; --timeout N --no-wait</li><li>Verified 2026-04-21: test-agent-canonical-dispatch.cmd (resolve ts=2026-04-21T04:38)</li><li>CODEX INVOCATION (2026-05-15): Direct: codex exec --dangerously-bypass-approvals-and-sandbox -C DIR &#x27;task&#x27;. Guarded: powershell -File D:/GitHub/wkcodex.ps1 &#x27;task&#x27; (enforces 3 skill refs, bypass, post-checks). Session ops: codex resume --last (continue), codex fork --last (branch). Windows: --dangerously-bypass MANDATORY (-s modes trigger sandbox spawn error). 3 skill reads required in task string or wkcodex blocks. Sandbox modes: read-only / workspace-write / danger-full-access (only danger-full-access works without bypass on this machine). rc=0 does NOT guarantee success -- check last 5 output lines.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Run agent with canonical opts: wkappbot agent &#x27;task&#x27; - opus --max-turns 5</li><li>Check last task: wkappbot agent last</li><li>Follow up: wkappbot agent resume &#x27;follow-up question&#x27;</li><li>New tiers: wkappbot agent &#x27;task&#x27; - gpt OR wkappbot agent &#x27;task&#x27; - gemini</li><li>Canonical flags: --model &lt;id&gt; --max-turns N --system &#x27;...&#x27; --no-agent --fresh --attach &lt;file&gt; --timeout N --no-wait</li><li>Verified 2026-04-21: test-agent-canonical-dispatch.cmd (resolve ts=2026-04-21T04:38)</li><li>CODEX INVOCATION (2026-05-15): Direct: codex exec --dangerously-bypass-approvals-and-sandbox -C DIR &#x27;task&#x27;. Guarded: powershell -File D:/GitHub/wkcodex.ps1 &#x27;task&#x27; (enforces 3 skill refs, bypass, post-checks). Session ops: codex resume --last (continue), codex fork --last (branch). Windows: --dangerously-bypass MANDATORY (-s modes trigger sandbox spawn error). 3 skill reads required in task string or wkcodex blocks. Sandbox modes: read-only / workspace-write / danger-full-access (only danger-full-access works without bypass on this machine). rc=0 does NOT guarantee success -- check last 5 output lines.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

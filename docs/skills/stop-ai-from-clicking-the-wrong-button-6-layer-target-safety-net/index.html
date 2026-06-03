@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Stop AI From Clicking the Wrong Button -- 6-Layer Target Safety Net</h1>
       <p class="description">L1: ambiguous pattern matches multiple windows -&gt; list + hwnd auto-heal. L2: modal alert blocking -&gt; auto-find buttons inside. L3: FOCUSED/LEAF terminal node -&gt; suggest grab target. L4: Win32 child not found -&gt; list siblings (MFC/HTS). L5: no #scope on element action -&gt; root children + focus chain. L6: UIA scope element miss -&gt; list available elements.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ambiguity</span><span class="chip">uia</span><span class="chip">guard</span><span class="chip">safety</span><span class="chip">mfc</span><span class="chip">ai</span><span class="chip">target</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Layers 1-3 cover ambiguous targets: L1 ambiguous pattern matches multiple windows -&gt; list candidates and auto-heal by hwnd; L2 modal alert blocks the action -&gt; auto-find buttons inside the modal; L3 a FOCUSED/LEAF terminal node is detected -&gt; suggest grabbing the focused target.</li><li>Layers 4-6 cover scoping mistakes: L4 Win32 child not found -&gt; list siblings (helps MFC/HTS dialogs); L5 element action invoked without #scope -&gt; dump root children + focus chain so the user can pick; L6 UIA scope element miss -&gt; list elements available inside that scope.</li><li>Each layer fails &#x27;soft&#x27; with a structured suggestion instead of a click — the AI must read the suggestion and re-issue a precise grap before any action is taken.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Layers 1-3 cover ambiguous targets: L1 ambiguous pattern matches multiple windows -&gt; list candidates and auto-heal by hwnd; L2 modal alert blocks the action -&gt; auto-find buttons inside the modal; L3 a FOCUSED/LEAF terminal node is detected -&gt; suggest grabbing the focused target.</li><li>Layers 4-6 cover scoping mistakes: L4 Win32 child not found -&gt; list siblings (helps MFC/HTS dialogs); L5 element action invoked without #scope -&gt; dump root children + focus chain so the user can pick; L6 UIA scope element miss -&gt; list elements available inside that scope.</li><li>Each layer fails &#x27;soft&#x27; with a structured suggestion instead of a click — the AI must read the suggestion and re-issue a precise grap before any action is taken.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

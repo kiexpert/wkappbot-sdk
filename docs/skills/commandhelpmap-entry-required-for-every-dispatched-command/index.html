@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>CommandHelpMap entry required for every dispatched command</h1>
       <p class="description">Every command in WKAppBot.CLI requires a CommandHelpMap entry in csharp/src/WKAppBot.CLI/Commands/CommandHelp.cs. When a command is removed (e.g. d1eaaf2a removed schedule), keep help text for discoverability but scrub dispatch refs in AppBotProgramInfra/EyeCmdPipeServer/AppBotEyeTick/SuggestCommand.knownSubcmds/UsageCommand.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">help</span><span class="chip">CommandHelpMap</span><span class="chip">bug-auto</span><span class="chip">dispatch</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Search CommandHelpMap.cs for the key</li><li>If missing: add entry</li><li>If removed: keep help + scrub dispatch case-blocks</li><li>Build + publish wkappbot-core.exe</li><li>Verify: wkappbot &lt;cmd&gt; --help shows non-empty text</li><li>Top-level aliases such as close, kill, and window must also have CommandHelpMap entries when they are user-facing dispatch targets, even if they mirror a11y or taskkill help text.</li><li>Top-level aliases such as close, kill, and window must also have CommandHelpMap entries when they are user-facing dispatch targets, even if they mirror a11y or taskkill help text.</li><li>2026-05-20: wkask.ps1 wrong-tab response capture: domain-only grap &#x27;{domain:chatgpt.com,cdp:PORT}&#x27; picks wrong ChatGPT tab when multiple tabs exist. Fix: parse hwnd from cdp open output, use &#x27;{hwnd:0xXXXX,cdp:PORT}&#x27; for Invoke-WKCdpJs response reads. See suggest 2026-05-20T08:42.</li><li>Verified 2026-05-25: ev-exec-cmdhelp.sh (resolve ts=2026-05-25T15:50:27)</li><li>2026-05-26: --exec alias pattern: if a CommandHelpMap entry describes an alias (e.g. &#x27;--exec is an alias for exec&#x27;), the alias MUST also be registered as a dispatch entry in Program.Dispatch.cs with &#x27;or &quot;--exec&quot;&#x27; syntax, AND the CMD execution guard will require the alias to actually succeed in evidence scripts.</li><li>Verified 2026-05-25: ev-exec-commandhelp-entry.sh (resolve ts=2026-05-25T11:15:06)</li><li>[AUDIT 2026-05-29] CommandHelp.cs split: CommandHelpMap dictionary moved from CommandHelp.cs:235 to CommandHelp.Map.cs (and per-domain CommandHelp.Entries.*.cs partials). Update path on next re-contribute: search &#x27;CommandHelpMap = new&#x27; across csharp/src/WKAppBot.CLI/Commands/CommandHelp.Map.cs.</li><li>[AUDIT 2026-05-30] CommandHelp.cs split into CommandHelp.Map.cs + CommandHelp.Entries.*.cs partials -- &#x27;CommandHelpMap = new&#x27; literal now in CommandHelp.Map.cs (root CommandHelp.cs:235 holds test-runner output). Update refs to CommandHelp.Map.cs in next contribute.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Search CommandHelpMap.cs for the key</li><li>If missing: add entry</li><li>If removed: keep help + scrub dispatch case-...</li><li>Build + publish wkappbot-core.exe</li><li>Verify: wkappbot &lt;cmd&gt; --help shows non-empt...</li><li>Top-level aliases such as close, kill, and w...</li><li>Top-level aliases such as close, kill, and w...</li><li>2026-05-20: wkask.ps1 wrong-tab response cap...</li><li>Verified 2026-05-25: ev-exec-cmdhelp.sh (res...</li><li>2026-05-26: --exec alias pattern: if a Comma...</li><li>Verified 2026-05-25: ev-exec-commandhelp-ent...</li><li>[AUDIT 2026-05-29] CommandHelp.cs split: Com...</li><li>[AUDIT 2026-05-30] CommandHelp.cs split into...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'commandhelpmap-entry-required-for-every-dispatched-command';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

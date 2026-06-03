@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Suggest 2-of-2 Co-Resolve: Cross-Author Confirmation</h1>
       <p class="description">When wkappbot suggest resolve is called by a different channel than the suggest author, requires 2-of-2 confirmation before marking resolved. Prevents maintainer fake bulk-resolves.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>resolver_channel = AbbreviateCwd(CWD) compared case-insensitively to suggest.from</li><li>Cross-author 1st resolve: writes half_resolved_by/note/at/skill + half_resolved_evidence (script content inline) + half_resolved_evidence_ext to suggest entry, posts Slack thread asking author to confirm.</li><li>Cross-author second resolve (other party): completes 2/2, moves to history with both notes</li><li>Same-author self-resolve (full flow): requires --confirm --skill X --commit &lt;hash&gt; --class &lt;ClassName|skill-only&gt;. Commit message MUST contain keywords from suggest title (guard checks word-by-word). If no fix commit exists, use git commit --allow-empty -m &#x27;...&#x27; with title keywords embedded. --class skill-only for doc/skill-only changes.</li><li>--force reason: bypasses gate, posts override notice to Slack thread</li><li>--confirm flag: 2nd-party confirmation path. Skips ALL evidence file checks (goto SkipEvidenceChecks). Only requires --skill. Moves to BOTH resolver history (wkappbot.hq/) AND suggester history ({suggest.cwd}/.wkappbot/).</li><li>Verified 2026-04-26: test-suggest-resolve-coresolve.sh (resolve ts=2026-04-26T10:44:21.4731572Z)</li><li>AUTO-CONFIRM (Eye-side, runs at startup + hourly): suggest auto-confirm [--dry-run]. Pre-check binary built after half_resolved_at → run stored evidence script in this context → pass: --confirm → history. fail: stays HALF.</li><li>SUGGESTER CHECK (author-side, ID only): wkappbot suggest check &lt;ts&gt;. Shows: fixed-by + note + runs regression script → PASSED/FAILED. Offers &#x27;suggest check &lt;ts&gt; --confirm&#x27; or add-requirement. No evidence flags needed for original author.</li><li>DUAL HISTORY: on full resolve, appends to (1) {wkappbot.hq}/suggestions_history.jsonl (resolver/WKAppBot) AND (2) {suggest.cwd}/.wkappbot/suggestions_history.jsonl (suggester project). Each project owns its audit trail.</li><li>SUGGESTER GUARD (2026-05-01): when suggester (same channel as suggest.from) runs resolve WITHOUT --confirm: (A) if 1/2 already exists → ERROR + copy-pasteable &#x27;suggest check &lt;ts&gt; --confirm&#x27;, return 1. (B) if no half yet → INFO reminder that resolve is maintainer&#x27;s command + &#x27;suggest check &lt;ts&gt;&#x27;, proceeds anyway (same-author still allowed).</li><li>REQUIREMENT DESIGN RULES (learned 2026-05-09): (1) Never hardcode hwnd — session-specific, always stale next run. (2) Never test transient state (popup visible, specific dialog open) — will fail when popup gone. (3) Test behavior that is reproducible any time. (4) If bug is &#x27;cmd X fails&#x27;, requirement should test &#x27;workaround Y works&#x27; not &#x27;X now succeeds&#x27; — X won&#x27;t succeed until fix ships.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>resolver_channel = AbbreviateCwd(CWD) compar...</li><li>Cross-author 1st resolve: writes half_resolv...</li><li>Cross-author second resolve (other party): c...</li><li>Same-author self-resolve (full flow): requir...</li><li>--force reason: bypasses gate, posts overrid...</li><li>--confirm flag: 2nd-party confirmation path....</li><li>Verified 2026-04-26: test-suggest-resolve-co...</li><li>AUTO-CONFIRM (Eye-side, runs at startup + ho...</li><li>SUGGESTER CHECK (author-side, ID only): wkap...</li><li>DUAL HISTORY: on full resolve, appends to (1...</li><li>SUGGESTER GUARD (2026-05-01): when suggester...</li><li>REQUIREMENT DESIGN RULES (learned 2026-05-09...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'suggest-co-resolve-2of2';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

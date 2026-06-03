@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>WKAppBot Build Verify Workflow T3 Reference</h1>
       <p class="description">T3 reference tier. Chrome placement tolerance, skill sync rule, BUG-AUTO history.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../wkappbot-build-verify-workflow/">wkappbot-build-verify-workflow</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>CHROME PLACEMENT TOLERANCE: DeltaSizeThreshold &gt;= 30px (SDK Launcher PlacementValidate.cs). Core uses ***. 10 was too tight -- Chrome outer window 18px narrower due to frame drift.</li><li>DEPLOY ALL THREE detail: Copy-Item good.exe wkappbot-core.exe -Force; Copy-Item good.exe wkappbot-core.new.exe -Force; Copy-Item good.exe wkappbot-core.exe.bak -Force. FSW watches .new.exe for hot-swap.</li><li>2026-04-30: BUG-AUTOs #66 PUMP, #67 diagnostics, #76 stderr -- low severity, covered by build verify workflow.</li><li>Skill sync split-brain: MAINTAINER must resolve ALL conflicts immediately. wkappbot skill sync --resolve &lt;id&gt; for each. HQ copy always wins. Never leave pending -- downstream repos silently diverge.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>CHROME PLACEMENT TOLERANCE: DeltaSizeThreshold &gt;= 30px (SDK Launcher PlacementValidate.cs). Core uses ***. 10 was too tight -- Chrome outer window 18px narrower due to frame drift.</li><li>DEPLOY ALL THREE detail: Copy-Item good.exe wkappbot-core.exe -Force; Copy-Item good.exe wkappbot-core.new.exe -Force; Copy-Item good.exe wkappbot-core.exe.bak -Force. FSW watches .new.exe for hot-swap.</li><li>2026-04-30: BUG-AUTOs #66 PUMP, #67 diagnostics, #76 stderr -- low severity, covered by build verify workflow.</li><li>Skill sync split-brain: MAINTAINER must resolve ALL conflicts immediately. wkappbot skill sync --resolve &lt;id&gt; for each. HQ copy always wins. Never leave pending -- downstream repos silently diverge.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

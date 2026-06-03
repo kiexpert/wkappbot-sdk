@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>taskkill compat shim: a11y-first kill routing</h1>
       <p class="description">v1.6 STRICT POLICY: --force &lt;pid1,pid2,...&gt; is the ONLY way to kill anything via taskkill -- listed PIDs are killed exactly, others survive. All other invocations (/IM, /PID, bare *.exe) are CLASSIFY-ONLY: enumerate matches, print PROTECTED/ZOMBIE/UNKNOWN report, exit 1, kill nothing. v1.6: --force now also prints a PRESERVED block listing every matching PID in scope (from /IM filter, or the wkappbot family if no /IM was given) that was NOT in the --force list, with classification tag. Output ends with &#x27;Killed: N / Preserved: M&#x27; summary plus a copy-paste hint when surviving zombies remain. The --force-all flag has been REMOVED. Implementation: TaskkillCompatCommand.cs (TaskkillForcePids) + TaskkillCompatCommand.Classify.cs (TaskkillPrintForceReport). Help text: CommandHelp.cs taskkill entry.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">operator</span><span class="chip">taskkill</span><span class="chip">kill</span><span class="chip">a11y</span><span class="chip">grap</span><span class="chip">compat</span><span class="chip">shim</span><span class="chip">busybox</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Invoke via taskkill.exe (busybox symlink) OR wkappbot taskkill -- both routed through TaskkillCompatCommand.</li><li>/PID N maps to regex:^\[N\] (anchored PID prefix). /IM name maps to regex:^\[\d+\]name\.exe$ (exact, anchored image name).</li><li>Bare positional: digits -&gt; /PID, *.exe -&gt; /IM, else passed as grap pattern. Multiple targets dispatch one a11y kill per target.</li><li>/F is ignored (a11y kill is force by default). /T tree-kill is noted -- a11y kill already sweeps child processes. /FI filter triggers a warning with grap workaround.</li><li>For complex filters use grap directly: wkappbot a11y kill {proc:&#x27;...&#x27;,title:&#x27;...&#x27;} -- the shim covers taskkill&#x27;s classic subset only.</li><li>Run &#x27;wkappbot taskkill --help&#x27; to see the full help served from CommandHelpMap.</li><li>Verified 2026-04-21: test-taskkill-help.cmd (resolve ts=2026-04-20T04:06)</li><li>Verified 2026-05-03: callout window placement during &#x27;wkappbot taskkill&#x27; now validates monitor home via MonitorFromWindow(MONITOR_DEFAULTTONULL) in CalloutInputWindow.Ctor.cs SourceInitialized; orphan windows snap to primary monitor work-area+20,20 via SetWindowPos with SWP_NOACTIVATE. Resolves BUG-AUTO 2026-05-02T18:14:50.</li><li>v1.5 (2026-05-06): --force-all REMOVED. --force &lt;pids&gt; is the ONLY kill path. Default = classify-only + exit 1. PIDs not in --force list always survive. Verified via PowerShell: /IM exits 1 with full classification; --force 52600 kills exactly 52600 (76988 survives); --force-all returns exit 2 &#x27;unknown flag&#x27;.</li><li>v1.6 (2026-05-05): --force output now shows BOTH a KILLED block (--force list) AND a PRESERVED block (other matching PIDs in /IM scope, or wkappbot family if no /IM) with classification tags. Footer adds &#x27;Killed: N / Preserved: M&#x27; plus a hint to follow up on surviving zombies. Verified: --force 14588 /IM PING.EXE on 3 spawned PINGs printed [1 KILLED] + [2 PRESERVED UNKNOWN] + summary; --force *** with no /IM listed 12 wkappbot-family PIDs grouped Protected/Unknown/Zombie.</li><li>v1.7 (2026-05-06): taskkill classify and --force KILLED/PRESERVED per-PID lines now include image, parent PID/name, creation time as HH:mm:ss, reason, and cmdline truncated to 100 chars.</li><li>REQUESTED BEHAVIOR (suggest 2026-05-26): /IM should auto-kill non-protected processes immediately (matching Windows taskkill semantics). Protected processes printed separately with &#x27;--force &lt;pids&gt;&#x27; copy-paste hint. Extended per-process info: caller window, CPU%, memory MB, handle count, thread count shown alongside cmdline. Blank &#x27;&gt;&#x27; for zombie cmdlines = gap (cmdline inaccessible for true OS zombies, but last known should be cached). Current policy: CLASSIFY-ONLY for all non --force invocations (v1.6 STRICT).</li><li>v1.9 (2026-05-28): DEFAULT PATH now auto-kills ZOMBIE+UNKNOWN immediately (matches Windows taskkill semantics). PROTECTED sessions (Eye/wkchat/mcp/screensaver/agent/claude) listed separately with --force copy-paste hint. --force path unchanged. Implementation: TaskkillAutoKillNonProtected() in TaskkillCompatCommand.cs. --dry-run flag added: shows what WOULD be killed (same classification + report) without actually killing any process. Usage: wkappbot taskkill /IM wkappbot-core.exe --dry-run. Exit 0 on dry-run. Combined: wkappbot taskkill /IM wkappbot-core.exe --dry-run to preview, then run without --dry-run to execute.</li><li>SPEC v2.0 (2026-05-28): PROTECTED = process is an AI CLI OR has an AI CLI in its ancestor chain. AI CLIs: claude, codex, gemini, wkappbot, wkappbot-core, wkchat (process name match, case-insensitive). Walk depth=8 levels up the parent chain. If any ancestor name matches AI_CLI_NAMES -&gt; PROTECTED. This replaces cmdline token matching (e.g. &#x27;claude&#x27; in path). Result: bash spawned by Claude -&gt; PROTECTED (claude ancestor). Eye spawned by wkappbot -&gt; PROTECTED (wkappbot ancestor). Orphan bash (parent dead, no AI ancestor) -&gt; ZOMBIE. ClassifyOne new stage order: (1) empty cmdline -&gt; ZOMBIE, (2) known zombie pattern, (2.5) dead parent -&gt; ZOMBIE, (3-NEW) AI ancestor walk -&gt; PROTECTED, (4) a11y find dead parent -&gt; ZOMBIE, (5) UNKNOWN.</li><li>SPEC v2.1 CORRECTION (2026-05-28): PROTECTED = (1) process whose NAME is an AI CLI (claude/codex/gemini -- NOT wkappbot), OR (2) any ANCESTOR of an AI CLI process (the terminal/shell chain that spawned the AI). Processes SPAWNED BY AI (bash shells, wkappbot-core, etc.) are NOT automatically protected -- they fall through to ZOMBIE/UNKNOWN. Existing tokens for Eye/wkchat/mcp/screensaver stay (role-based). Remove broad &#x27;claude&#x27; cmdline token (was incorrectly protecting bash shells whose snapshot path contained &#x27;.claude&#x27;). Implementation: remove (&#x27;claude&#x27;,&#x27;claude session&#x27;) from _wkProtectedTokens; add _aiCliNames set; add ancestor walk stage before token check.</li><li>UNCLE-KILL LESSON (Opus 2026-05-29): GetDescendantProcessIds() in Helpers.cs already does ONE batch WMI query to build full parent-map, then BFS. USE THIS for uncle-kill check instead of per-PID InlineIsDescendant (which hangs on system PID 11940 via OpenProcess). Pattern: grandParentPid = SafeGetParentPid(SafeGetParentPid(currentPid)); uncleSet = GetDescendantProcessIds(grandParentPid); killable.Add if r.Pid in uncleSet. Single WMI scan = fast; per-PID walks = hang.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Invoke via taskkill.exe (busybox symlink) OR...</li><li>/PID N maps to regex:^\[N\] (anchored PID pr...</li><li>Bare positional: digits -&gt; /PID, *.exe -&gt; /I...</li><li>/F is ignored (a11y kill is force by default...</li><li>For complex filters use grap directly: wkapp...</li><li>Run &#x27;wkappbot taskkill --help&#x27; to see the fu...</li><li>Verified 2026-04-21: test-taskkill-help.cmd...</li><li>Verified 2026-05-03: callout window placemen...</li><li>v1.5 (2026-05-06): --force-all REMOVED. --fo...</li><li>v1.6 (2026-05-05): --force output now shows...</li><li>v1.7 (2026-05-06): taskkill classify and --f...</li><li>REQUESTED BEHAVIOR (suggest 2026-05-26): /IM...</li><li>v1.9 (2026-05-28): DEFAULT PATH now auto-kil...</li><li>SPEC v2.0 (2026-05-28): PROTECTED = process...</li><li>SPEC v2.1 CORRECTION (2026-05-28): PROTECTED...</li><li>UNCLE-KILL LESSON (Opus 2026-05-29): GetDesc...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'taskkill-compat-shim-a11y-first-kill-routing';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,9 +117,11 @@
       <h1>포커스리스 우선 원칙</h1>
       <p class="description">UIA Invoke/Value/Toggle/Select = 포커스 불필요. SendInput/Hotkey = EnsureFocus 필요. 포커스 탈취는 사용자 작업 방해 -- 항상 Focusless 먼저 시도.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">workflow</span><span class="chip">focusless</span><span class="chip">uia</span><span class="chip">input</span><span class="chip">principle</span><span class="chip">operator</span><span class="chip">a11y-focus</span><span class="chip">SmartSetWindowOrder</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Focusless 가능: UIA Invoke, SetValue, Toggle, Select, Scroll</li><li>Focus 필요: SendInput, Hotkey, WM_CHAR(일부), type --hotkey</li><li>PostMessage(WM_CHAR) = Focusless로 키 입력 가능 (MFC 유용)</li><li>CDP EvalAsync = 브라우저 내 JS 직접 실행 = Focusless</li><li>포커스 탈취 감지: FocusLaunchTracker -&gt; runtime/focus_launch.json 기록</li><li>WPF 오버레이: Spawn(showNoActivate:true) -&gt; SW_SHOWNOACTIVATE(4), 포커스 탈취 없음</li><li>[INVOKE-TIER-CHAIN] invoke/click fallback chain follows UIA accessibility standard.
+      <div class="steps-wrap">
+        <ol class="steps"><li>Focusless 가능: UIA Invoke, SetValue, Toggle, Select, Scroll</li><li>Focus 필요: SendInput, Hotkey, WM_CHAR(일부), type --hotkey</li><li>PostMessage(WM_CHAR) = Focusless로 키 입력 가능 (MFC 유용)</li><li>CDP EvalAsync = 브라우저 내 JS 직접 실행 = Focusless</li><li>포커스 탈취 감지: FocusLaunchTracker -&gt; runtime/focus_launch.json 기록</li><li>WPF 오버레이: Spawn(showNoActivate:true) -&gt; SW_SHOWNOACTIVATE(4), 포커스 탈취 없음</li><li>[INVOKE-TIER-CHAIN] invoke/click fallback chain follows UIA accessibility standard.
 invoke Tier 0  FLUTTERVIEW WM_LBUTTON          focusless, ~0ms
 invoke Tier 1  UIA InvokePattern               focusless (fg restored if stolen)
 invoke Tier 2  BM_CLICK (Win32 button msg)     focusless, no response detection
@@ -118,7 +135,10 @@ click Tier N   SendInput + focus restore       click lands, focus returns to cal
 
 PRINCIPLE: if caller wanted focus they would have used &#x27;a11y focus&#x27; first.
 Physical click is last resort -- only when no UIA pattern applies.</li><li>[v6.2+ ELECTRON/MFC UIA SKIP] a11y find/inspect/windows/ocr skip UIA traversal for Electron (Chrome_WidgetWin_1 class AND non-Chromium proc like VS Code) and MFC/Afx windows (nkrunlite, Heroes4). Electron UIA traversal caused 30s DLL unload deadlock; MFC has no meaningful UIA tree anyway. Result: read-only a11y commands run 1-5s instead of 50s. Does NOT affect actual automation -- UIA still used when explicitly targeting an element. Only the discovery-phase batch traversal is skipped.</li><li>[v6.8+ A11Y FOCUS TIER CHAIN] a11y focus = SmartSetWindowOrder + keyboard focus. SmartSetWindowOrder: child window (GetParent != null) -&gt; BringWindowToTop (front of siblings, focusless); root window -&gt; SetWindowPos behind-fg (Z-order rank 2, NOACTIVATE). A11yFocusElement full tier ladder: (-1) SmartSetWindowOrder on root ancestor, (0) CDP defA11yFocus() for Chrome, (1) UIA SetFocus, (2) Win32 SetFocus on element hwnd, (3) Win32 SetFocus on root hwnd fallback. NEVER SetForegroundWindow or SetActiveWindow -- zero keyboard-focus steal.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

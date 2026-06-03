@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Spam popup dismiss: WM_CLOSE patterns + OneDrive toast screenshot heuristic</h1>
       <p class="description">Two-tier spam dismissal. Tier1: WM_CLOSE by cls/title substring (HncUpdateTray=Coupang ads, OneDrive Win32). Tier2: OneDrive WinRT toast via screenshot blue-pixel heuristic then mouse-click X. Runs hourly in briefing bot.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">spam</span><span class="chip">popup</span><span class="chip">toast</span><span class="chip">OneDrive</span><span class="chip">Coupang</span><span class="chip">HncUpdateTray</span><span class="chip">WM_CLOSE</span><span class="chip">screenshot</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Tier1 WM_CLOSE: EnumWindows match (cls_substr,title_substr) pairs, PostMessage WM_CLOSE (non-elevated works for HncUpdateTray)</li><li>Tier2 toast: grab monitor bottom-right 520x232px, numpy R&lt;100 G&lt;150 B&gt;180 blue mask, click X at (right-35, top+18)</li><li>HncUpdateTray.exe shows Coupang ads as ToastForm WPF windows -- WM_CLOSE works</li><li>OneDrive WinRT toast has no HWND -- screenshot only</li><li>run_local_ai_news_collect.py main() calls _dismiss_spam_popups() first each cycle</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Tier1 WM_CLOSE: EnumWindows match (cls_substr,title_substr) pairs, PostMessage WM_CLOSE (non-elevated works for HncUpdateTray)</li><li>Tier2 toast: grab monitor bottom-right 520x232px, numpy R&lt;100 G&lt;150 B&gt;180 blue mask, click X at (right-35, top+18)</li><li>HncUpdateTray.exe shows Coupang ads as ToastForm WPF windows -- WM_CLOSE works</li><li>OneDrive WinRT toast has no HWND -- screenshot only</li><li>run_local_ai_news_collect.py main() calls _dismiss_spam_popups() first each cycle</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

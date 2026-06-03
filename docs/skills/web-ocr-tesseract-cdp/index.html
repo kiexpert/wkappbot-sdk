@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Browser-Side OCR via Tesseract.js CDP Injection (web ocr command)</h1>
       <p class="description">Run OCR entirely inside a Chrome tab using Tesseract.js injected via CDP Runtime.evaluate. No screenshot roundtrip to server -- Chrome renders and recognizes in one step. Supports element-level and full-page OCR, parallel multi-selector, Korean+English default.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Usage: wkappbot web ocr &lt;grap&gt; [--selector &lt;css&gt;] [--lang eng+kor]. grap identifies the Chrome tab. --selector targets a specific DOM element; omit for full page. --lang sets Tesseract language codes (default: eng+kor). Prints recognized text to stdout.</li><li>How it works: (1) CdpTesseract.EnsureLoadedAsync injects Tesseract.js from CDN (cdn.jsdelivr.net/npm/tesseract.js@5) via script tag if window.__wkTesseractReady sentinel absent. (2) Page.captureScreenshot with clip rect for element bbox (DPR-aware), or full viewport. (3) base64 PNG passed to Tesseract.recognize() in-browser. (4) result.data.text returned via Runtime.evaluate. Tesseract.js cached in tab after first load -- subsequent calls skip CDN fetch.</li><li>Parallel OCR: pass multiple --selector values or run Promise.all in JS. Browser handles concurrency natively. Example: wkappbot web run &lt;grap&gt; &quot;Promise.all([querySelector(&#x27;.a&#x27;), querySelector(&#x27;.b&#x27;)].map(el =&gt; Tesseract.recognize(el)))&quot;. Faster than sequential server-side OCR for multi-region tasks.</li><li>Canvas / WebGL OCR: use canvas.toDataURL(&#x27;image/png&#x27;) to get base64, then Tesseract.recognize(base64). Works on game UIs, chart libraries, any GPU-rendered content that would be black/blank in a screenshot from outside Chrome. Key advantage over wkappbot OCR command which captures the Win32 screen.</li><li>Limitations: (1) CDN required on first load per tab -- offline fallback NYI. (2) Background tab throttling may affect dynamic content accuracy. (3) Tesseract.js WASM loads ~10MB on first use. (4) For static text on native Win32 UI (not browser), use wkappbot a11y read or wkappbot ocr instead.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Usage: wkappbot web ocr &lt;grap&gt; [--selector &lt;css&gt;] [--lang eng+kor]. grap identifies the Chrome tab. --selector targets a specific DOM element; omit for full page. --lang sets Tesseract language codes (default: eng+kor). Prints recognized text to stdout.</li><li>How it works: (1) CdpTesseract.EnsureLoadedAsync injects Tesseract.js from CDN (cdn.jsdelivr.net/npm/tesseract.js@5) via script tag if window.__wkTesseractReady sentinel absent. (2) Page.captureScreenshot with clip rect for element bbox (DPR-aware), or full viewport. (3) base64 PNG passed to Tesseract.recognize() in-browser. (4) result.data.text returned via Runtime.evaluate. Tesseract.js cached in tab after first load -- subsequent calls skip CDN fetch.</li><li>Parallel OCR: pass multiple --selector values or run Promise.all in JS. Browser handles concurrency natively. Example: wkappbot web run &lt;grap&gt; &quot;Promise.all([querySelector(&#x27;.a&#x27;), querySelector(&#x27;.b&#x27;)].map(el =&gt; Tesseract.recognize(el)))&quot;. Faster than sequential server-side OCR for multi-region tasks.</li><li>Canvas / WebGL OCR: use canvas.toDataURL(&#x27;image/png&#x27;) to get base64, then Tesseract.recognize(base64). Works on game UIs, chart libraries, any GPU-rendered content that would be black/blank in a screenshot from outside Chrome. Key advantage over wkappbot OCR command which captures the Win32 screen.</li><li>Limitations: (1) CDN required on first load per tab -- offline fallback NYI. (2) Background tab throttling may affect dynamic content accuracy. (3) Tesseract.js WASM loads ~10MB on first use. (4) For static text on native Win32 UI (not browser), use wkappbot a11y read or wkappbot ocr instead.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

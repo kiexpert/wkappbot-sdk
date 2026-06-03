@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>WKAppBot: The Artificial Knowledge Platform</h1>
       <p class="description">Why WKAppBot is not just an AI tool -- it is a living knowledge accumulation system that grows smarter every session. Use when pitching WKAppBot to investors, developers, or skeptics.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">pitch</span><span class="chip">appeal</span><span class="chip">value-proposition</span><span class="chip">sdk</span><span class="chip">artificial-knowledge</span><span class="chip">skill-tree</span><span class="chip">platform</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>THE CORE INSIGHT: Every AI agent has intelligence. Almost none of them have memory that compounds. WKAppBot is built on a different premise -- intelligence is a commodity (swap the model, keep the knowledge). The skill tree is the asset. The model is the engine. You can upgrade the engine without losing the road map.</li><li>THE PROBLEM WITH RAW AI: A Claude session ends. The next one starts blank. It makes the same mistakes, asks the same questions, hits the same guardrails. The AI is brilliant but amnesiac -- Sherlock Holmes who forgets every case the moment it closes. Enterprise AI today is paying for the same intelligence, over and over, to rediscover the same knowledge.</li><li>THE WKAPPBOT DIFFERENCE -- Artificial Knowledge: When an AI session discovers something -- a guard pattern, a design flaw, a sharper way to phrase a command -- WKAppBot captures it as a Skill. Searchable. Versioned. Retrieved by the next session automatically. The knowledge does not live in the model weights (which Anthropic controls). It lives in YOUR skill tree (which you own and grow). This is Artificial Knowledge: machine-generated, human-curated, session-persistent.</li><li>THE FLYWHEEL: Session N makes a mistake. Session N writes it into the skill tree. Session N+1 reads it at startup and avoids the mistake. Session N+1 finds a better pattern. Session N+1 writes it into the skill tree. The system does not just use AI -- it teaches itself. Each session leaves the environment smarter than it found it. The compounding is real and measurable: count the skills, count the harness guards, count the bugs that stopped recurring.</li><li>THE HARNESS -- Knowledge with Teeth: Documented lessons rot. WKAppBot does not document -- it enforces. Every lesson learned can become a harness guard: a mechanical block that fires BEFORE the mistake lands, regardless of which AI model is running, regardless of whether that model remembers the lesson. The knowledge is not advice. It is law. This is what separates a living platform from a wiki that nobody reads.</li><li>THE ASSET MOAT: Model vendors compete on intelligence. Intelligence is converging -- GPT, Claude, Gemini gap narrows every quarter. Knowledge diverges -- every team that runs WKAppBot accumulates a skill tree unique to their codebase, their workflows, their hard-won lessons. That tree cannot be cloned by switching vendors. It is the defensible moat that raw AI access will never provide.</li><li>ONE LINE: AI brings the intelligence. WKAppBot grows the knowledge. Together they compound.</li><li>Verified 2026-06-02:  (resolve ts=2026-06-02T13:55:57)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>THE CORE INSIGHT: Every AI agent has intelligence. Almost none of them have memory that compounds. WKAppBot is built on a different premise -- intelligence is a commodity (swap the model, keep the knowledge). The skill tree is the asset. The model is the engine. You can upgrade the engine without losing the road map.</li><li>THE PROBLEM WITH RAW AI: A Claude session ends. The next one starts blank. It makes the same mistakes, asks the same questions, hits the same guardrails. The AI is brilliant but amnesiac -- Sherlock Holmes who forgets every case the moment it closes. Enterprise AI today is paying for the same intelligence, over and over, to rediscover the same knowledge.</li><li>THE WKAPPBOT DIFFERENCE -- Artificial Knowledge: When an AI session discovers something -- a guard pattern, a design flaw, a sharper way to phrase a command -- WKAppBot captures it as a Skill. Searchable. Versioned. Retrieved by the next session automatically. The knowledge does not live in the model weights (which Anthropic controls). It lives in YOUR skill tree (which you own and grow). This is Artificial Knowledge: machine-generated, human-curated, session-persistent.</li><li>THE FLYWHEEL: Session N makes a mistake. Session N writes it into the skill tree. Session N+1 reads it at startup and avoids the mistake. Session N+1 finds a better pattern. Session N+1 writes it into the skill tree. The system does not just use AI -- it teaches itself. Each session leaves the environment smarter than it found it. The compounding is real and measurable: count the skills, count the harness guards, count the bugs that stopped recurring.</li><li>THE HARNESS -- Knowledge with Teeth: Documented lessons rot. WKAppBot does not document -- it enforces. Every lesson learned can become a harness guard: a mechanical block that fires BEFORE the mistake lands, regardless of which AI model is running, regardless of whether that model remembers the lesson. The knowledge is not advice. It is law. This is what separates a living platform from a wiki that nobody reads.</li><li>THE ASSET MOAT: Model vendors compete on intelligence. Intelligence is converging -- GPT, Claude, Gemini gap narrows every quarter. Knowledge diverges -- every team that runs WKAppBot accumulates a skill tree unique to their codebase, their workflows, their hard-won lessons. That tree cannot be cloned by switching vendors. It is the defensible moat that raw AI access will never provide.</li><li>ONE LINE: AI brings the intelligence. WKAppBot grows the knowledge. Together they compound.</li><li>Verified 2026-06-02:  (resolve ts=2026-06-02T13:55:57)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

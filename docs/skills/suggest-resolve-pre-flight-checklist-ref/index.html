@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Suggest Resolve Pre-flight Checklist T3 Reference</h1>
       <p class="description">T3 reference tier. KEYWORD GUARD FAIL amend pattern, RIQUA items, verified test history.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../suggest-resolve-pre-flight-checklist/">suggest-resolve-pre-flight-checklist</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>KEYWORD GUARD FAIL -&gt; AMEND: git commit --amend to add bug title keywords. Pattern: &#x27;fix(X): desc -- key symptom words&#x27;. One commit satisfies keyword guard AND file-coupling guard. NEVER use unrelated commits as workaround.</li><li>RELATED SKILLS: suggest-workflow (resolve command), suggest-resolve-evidence-conventions (hidden-window limits, filename guard), ask-suggest-priority-batching (triage pipeline).</li><li>RIQUA [evidence filename]: script name must follow test-{cmd}-{subcmd}-description convention. Generic names rejected by filename guard.</li><li>Verified 2026-05-30: ev-launcher-eye-timeout-default.sh (resolve ts=2026-05-30T11:23:54)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>KEYWORD GUARD FAIL -&gt; AMEND: git commit --amend to add bug title keywords. Pattern: &#x27;fix(X): desc -- key symptom words&#x27;. One commit satisfies keyword guard AND file-coupling guard. NEVER use unrelated commits as workaround.</li><li>RELATED SKILLS: suggest-workflow (resolve command), suggest-resolve-evidence-conventions (hidden-window limits, filename guard), ask-suggest-priority-batching (triage pipeline).</li><li>RIQUA [evidence filename]: script name must follow test-{cmd}-{subcmd}-description convention. Generic names rejected by filename guard.</li><li>Verified 2026-05-30: ev-launcher-eye-timeout-default.sh (resolve ts=2026-05-30T11:23:54)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

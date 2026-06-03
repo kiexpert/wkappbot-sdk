@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>win-click --dismiss-blocker: auto-dismiss blocking popup dialogs</h1>
       <p class="description">When win-click reports physical click blocked by a dialog, --dismiss-blocker calls TryDismissBlocker on the blocking #32770 window, waits 400ms, then retries the original click.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Blocking scenario: physReport.ActiveBlocker != null means a popup/dialog is covering the target window and physical click cannot proceed.</li><li>With --dismiss-blocker: calls readiness.TryDismissBlocker(hWnd, blocker), then re-probes readiness after 400ms. If blocker persists, returns error with blocker title.</li><li>Without --dismiss-blocker (default): error message now includes hint &#x27;(use --dismiss-blocker to auto-dismiss)&#x27; instead of silent fail.</li><li>Verified 2026-04-22: test-win-click-dismiss-blocker.sh (resolve ts=2026-04-21T17:56:01.0957686Z)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Blocking scenario: physReport.ActiveBlocker != null means a popup/dialog is covering the target window and physical click cannot proceed.</li><li>With --dismiss-blocker: calls readiness.TryDismissBlocker(hWnd, blocker), then re-probes readiness after 400ms. If blocker persists, returns error with blocker title.</li><li>Without --dismiss-blocker (default): error message now includes hint &#x27;(use --dismiss-blocker to auto-dismiss)&#x27; instead of silent fail.</li><li>Verified 2026-04-22: test-win-click-dismiss-blocker.sh (resolve ts=2026-04-21T17:56:01.0957686Z)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

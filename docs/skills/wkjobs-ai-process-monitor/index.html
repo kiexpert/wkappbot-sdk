@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>wkjobs: AI process monitor</h1>
       <p class="description">Shows all AI processes in the console session with CPU%, memory, state, and spawned child commands</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core, wkappbot-eye, wka11y) sharing the current console session with CPU%, memory, thread count, idle/busy state, CWD, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids. AI_NAMES = claude, codex, wkappbot, wkappbot-core, wkappbot-core.new, wkappbot-eye, wka11y</li><li>FLAGS: -Tree (hierarchy view) | -Watch (live refresh, Ctrl+C to exit) | -All (include processes from all sessions) | -RefreshSec N (Watch interval seconds, default 2) | -Kill (kill zombie helper processes -- safe ones only; prompts unless -Force) | -Leaks (print confirmed leaked zombie pids + kill cmd; exits 1 if found -- useful for CI/health check scripts) | -Force (skip confirmation in -Kill mode) | -ZombieMin N (idle minutes threshold for zombie classification, default 30)</li><li>COLORS: claude=Cyan(idle)/Green(BUSY), codex=DarkYellow(idle)/Yellow(BUSY), wkappbot-core.new=DarkMagenta(idle)/Magenta(BUSY), wkappbot-core=DarkGray(idle)/Cyan(BUSY). BUSY=&gt;20% CPU, active 1-20%, idle&lt;1%. ZOMBIE HIGHLIGHT: idle process age&gt;=ZombieMin (30m default) colored DarkRed with [old] label; safe-to-kill ones (wkappbot helper cmds: skill/suggest/ask/file/windows/logcat) colored Red with [ZOMBIE] label. PROTECTED (never colored zombie): wkappbot-core.*, wkchat, claude, codex, eye, chat, guardian, mcp</li><li>SESSION MARKER: * prefix means process is in current console session. Without -All, only current session procs are shown</li><li>SPAWNED SECTION: child processes of AI pids, conhost filtered. Columns: PPID (which AI spawned it), name, PID, CPU%, MEM, state, command line</li><li>INTERNALS: Get-CimInstance Win32_Process for CommandLine+PPID, *** for CPU% snapshot, Get-Process for WorkingSet64+Threads+SessionId</li><li>NOTE: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error</li><li>WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD) are relative symlinks to wkwrap.sh in same dir. Run wkwrap.sh --install to add more. See also: wkappbot skill read wkwrap-ai-native-wrappers</li><li>SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkjobs.ps1 (edit there). scripts/wkjobs.ps1 is a symlink (mode 120000). wkjobs.sh relay uses local wkwrap.sh copy so wkfind.sh keeps SDK-specific wkfind.ps1.</li><li>PATH fix: prepend system dirs before codex exec to avoid PS shim shadowing system shell</li><li>COLUMNS: PID, NAME, CPU%, MEM(MB), THR(threads), STATE, AGE, CWD (current working directory via NtQueryInformationProcess+ReadProcessMemory -- native kernel read, works even when PowerShell CWD differs), CMD (args only, exe path stripped). TERMINAL column: Get-TerminalHost walks parent chain skipping wkappbot*/conhost/claude/codex to find the terminal or IDE hosting the AI process (e.g. WindowsTerminal(12345) [tab title])</li><li>MANUAL FALLBACK (when wkjobs hangs): Get-CimInstance Win32_Process | Where-Object { Name -match &#x27;wkappbot|claude|codex|wkchat&#x27; } -- shows CommandLine per process. Zombie shell chains (powershell/cmd 30+ min old stuck helpers): use wkappbot taskkill --force &lt;pids&gt; or PowerShell process termination. USER REQUEST pending: add --all flag to wkjobs.ps1 to display full command lines for all processes (like Win32_Process.CommandLine).</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li>FLAGS: -Tree (hierarchy view) | -Watch (live...</li><li>COLORS: claude=Cyan(idle)/Green(BUSY), codex...</li><li>SESSION MARKER: * prefix means process is in...</li><li>SPAWNED SECTION: child processes of AI pids,...</li><li>INTERNALS: Get-CimInstance Win32_Process for...</li><li>NOTE: loop variable is apid not pid -- Power...</li><li>WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD)...</li><li>SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkj...</li><li>PATH fix: prepend system dirs before codex e...</li><li>COLUMNS: PID, NAME, CPU%, MEM(MB), THR(threa...</li><li>MANUAL FALLBACK (when wkjobs hangs): Get-Cim...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'wkjobs-ai-process-monitor';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

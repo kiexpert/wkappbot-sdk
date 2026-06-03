@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y callout -- input staging popover</h1>
       <p class="description">a11y type callout -- input staging approval popover before typing. Shows text-to-type in retro green bubble, tail points to caret/text-end in target element. User presses O to approve; typing fires from callout (PendingAction delegate).</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[POSITIONING] Body placed UPPER-LEFT of target element. PendingElementRect (element full BoundingRect) sets left boundary -- body right edge must be strictly left of element left (48px gap). Tail tip priority: 1) caret via TextPattern2.GetCaretRange reflection 2) text-end via DocumentRange.GetBoundingRectangles last rect right edge 3) element left+20px fallback. Stored in PendingTargetRect. CalcCalloutGeometry() uses elementLeft for bodyX, tipX/tipY for tail -- the two rects are fully separated.</li><li>[APPROVAL FLOW] A11yCommand sets PendingAction=lambda before Probe(). WaitForUserYield shows callout (30s, O required). OnConfirm: Close() immediately via Dispatcher + background Task: 200ms + SetForegroundWindowRaw + idle gate (500ms/30s max) + action(). ActionExecuted=true blocks legacy type path. ReadinessAdapters forces timeoutSeconds=30 when PendingAction set.</li><li>[KEY FIELDS] PendingContent=text in body, PendingTargetRect=tip rect (caret/text-end), PendingElementRect=element full rect for body placement, PendingAction=Func&lt;bool&gt; on O-press, ActionExecuted=volatile bool. InspectTargetA11yNode -&gt; A11yNodeInfo(ElementRect, TipRect, DpiScale). Clear all after scope walk.</li><li>[AUTO-SCREENSHOT] On Loaded: TakeElementScreenshotAsync captures PendingElementRect+30px padding via GDI CopyFromScreen -&gt; Desktop/wkappbot-YYYYMMDD-HHmmss.png. Logged as [CALLOUT:SS]. Fallback: full primary monitor.</li><li>[DISPLAY] TextBlock+ScrollViewer (not TextBox -- no editable-placeholder). Retro green: bg #041004, text #00FF41, border #00DD33. 380x240px. Confirm=green circle+countdown (bottom-right). Deny=red X. Halo rings at tail tip. Chime C5-E5-G5-C6 on Loaded.</li><li>[POSITIONING v2] Body anchored 150px upper-left of current mouse cursor: bodyX = mouseX - 150 - BodyW, bodyY = mouseY - 150 - BodyH (DIP coords). Existing monitor-edge clamping (monL/monR + Margin) handles screen boundaries. Replaces element-left-edge placement that caused body to drift far left on wide elements (VS Code editor, HTS MDI windows). Cross-monitor and anti-overlap logic preserved.</li><li>Verified 2026-04-26: test-a11y-invoke-32770-ancestor-not-blocker.sh (resolve ts=2026-04-26T00:00:33.3498202Z)</li><li>Verified 2026-04-26: test-a11y-restore-focus-elevated-uipi-warn.sh (resolve ts=2026-04-26T00:00:47.6900087Z)</li><li>Verified 2026-04-26: test-a11y-invoke-blocker-grap-emit.sh (resolve ts=2026-04-26T06:08:33.5050192Z)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>[POSITIONING] Body placed UPPER-LEFT of target element. PendingElementRect (element full BoundingRect) sets left boundary -- body right edge must be strictly left of element left (48px gap). Tail tip priority: 1) caret via TextPattern2.GetCaretRange reflection 2) text-end via DocumentRange.GetBoundingRectangles last rect right edge 3) element left+20px fallback. Stored in PendingTargetRect. CalcCalloutGeometry() uses elementLeft for bodyX, tipX/tipY for tail -- the two rects are fully separated.</li><li>[APPROVAL FLOW] A11yCommand sets PendingAction=lambda before Probe(). WaitForUserYield shows callout (30s, O required). OnConfirm: Close() immediately via Dispatcher + background Task: 200ms + SetForegroundWindowRaw + idle gate (500ms/30s max) + action(). ActionExecuted=true blocks legacy type path. ReadinessAdapters forces timeoutSeconds=30 when PendingAction set.</li><li>[KEY FIELDS] PendingContent=text in body, PendingTargetRect=tip rect (caret/text-end), PendingElementRect=element full rect for body placement, PendingAction=Func&lt;bool&gt; on O-press, ActionExecuted=volatile bool. InspectTargetA11yNode -&gt; A11yNodeInfo(ElementRect, TipRect, DpiScale). Clear all after scope walk.</li><li>[AUTO-SCREENSHOT] On Loaded: TakeElementScreenshotAsync captures PendingElementRect+30px padding via GDI CopyFromScreen -&gt; Desktop/wkappbot-YYYYMMDD-HHmmss.png. Logged as [CALLOUT:SS]. Fallback: full primary monitor.</li><li>[DISPLAY] TextBlock+ScrollViewer (not TextBox -- no editable-placeholder). Retro green: bg #041004, text #00FF41, border #00DD33. 380x240px. Confirm=green circle+countdown (bottom-right). Deny=red X. Halo rings at tail tip. Chime C5-E5-G5-C6 on Loaded.</li><li>[POSITIONING v2] Body anchored 150px upper-left of current mouse cursor: bodyX = mouseX - 150 - BodyW, bodyY = mouseY - 150 - BodyH (DIP coords). Existing monitor-edge clamping (monL/monR + Margin) handles screen boundaries. Replaces element-left-edge placement that caused body to drift far left on wide elements (VS Code editor, HTS MDI windows). Cross-monitor and anti-overlap logic preserved.</li><li>Verified 2026-04-26: test-a11y-invoke-32770-ancestor-not-blocker.sh (resolve ts=2026-04-26T00:00:33.3498202Z)</li><li>Verified 2026-04-26: test-a11y-restore-focus-elevated-uipi-warn.sh (resolve ts=2026-04-26T00:00:47.6900087Z)</li><li>Verified 2026-04-26: test-a11y-invoke-blocker-grap-emit.sh (resolve ts=2026-04-26T06:08:33.5050192Z)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

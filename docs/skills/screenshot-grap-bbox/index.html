@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>screenshot: smart multi-grap compositing with painter&#x27;s algorithm</h1>
       <p class="description">Per-target PrintWindow+CopyFromScreen compositing, back-to-front Z-order, transparency mask outside targets. Ambiguous grap shows merged ranked find output. Grap required -- token-efficient auto-crop.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Grap args required (no-args = usage + exit 1). Auto-crops to exact target regions.</li><li>Each grap resolved via WindowFinder: MUST match EXACTLY 1 window. If ANY grap ambiguous (2+ matches): merged ranked output across ALL graps, sorted by Coverage*0.6 + (1/(1+zHops))*0.4, BEST/AMB tags with [grap:...] label, exit 2.</li><li>Phase 1 per target: TryPrintWindowOnly(PW_RENDERFULLCONTENT) -- focusless, works even if occluded by other windows</li><li>Phase 2 GPU-blank targets only: SuppressBlockingWindows alpha=0 (30ms settle), CaptureScreenRegion per target, restore. Root ancestors of child targets never suppressed.</li><li>Phase 3 compositing: OrderTargetsBackToFront via GW_HWNDPREV hop count (painter&#x27;s algorithm) -&gt; DrawImage back-to-front into union bbox</li><li>Masking: pixels outside ALL target rects -&gt; 0x00000000 (BGRA all zero, fully transparent)</li><li>a11y screenshot multi-node: grap resolves UIA elements (BoundingRectangle), groups by root window, processes windows front-to-back. Per window: suppress all windows above (SetLayeredWindowAttributes alpha=0, 30ms settle), PrintWindow/CaptureScreenRegion, crop to element BoundingRectangle, restore alpha. Composite all crops back-to-front into union bbox. Mask pixels outside ALL target rects. Falls back to full window if BoundingRectangle unavailable.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Grap args required (no-args = usage + exit 1). Auto-crops to exact target regions.</li><li>Each grap resolved via WindowFinder: MUST match EXACTLY 1 window. If ANY grap ambiguous (2+ matches): merged ranked output across ALL graps, sorted by Coverage*0.6 + (1/(1+zHops))*0.4, BEST/AMB tags with [grap:...] label, exit 2.</li><li>Phase 1 per target: TryPrintWindowOnly(PW_RENDERFULLCONTENT) -- focusless, works even if occluded by other windows</li><li>Phase 2 GPU-blank targets only: SuppressBlockingWindows alpha=0 (30ms settle), CaptureScreenRegion per target, restore. Root ancestors of child targets never suppressed.</li><li>Phase 3 compositing: OrderTargetsBackToFront via GW_HWNDPREV hop count (painter&#x27;s algorithm) -&gt; DrawImage back-to-front into union bbox</li><li>Masking: pixels outside ALL target rects -&gt; 0x00000000 (BGRA all zero, fully transparent)</li><li>a11y screenshot multi-node: grap resolves UIA elements (BoundingRectangle), groups by root window, processes windows front-to-back. Per window: suppress all windows above (SetLayeredWindowAttributes alpha=0, 30ms settle), PrintWindow/CaptureScreenRegion, crop to element BoundingRectangle, restore alpha. Composite all crops back-to-front into union bbox. Mask pixels outside ALL target rects. Falls back to full window if BoundingRectangle unavailable.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

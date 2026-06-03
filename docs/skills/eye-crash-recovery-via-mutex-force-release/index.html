@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Eye crash recovery via mutex force-release</h1>
       <p class="description">When Eye crashes and cannot restart due to AbandonedMutexException, force-release the 3 named mutexes via PowerShell .NET API, then restart Eye. Eye revival also auto-clears zombie Chrome processes it owned.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>DIAGNOSE STEP 1 — Symptom: wkappbot consoles dead, cdp/a11y commands hang. Check: tail D:/GitHub/WKAppBot/bin/wkappbot.hq/logs/eye-guardian.log | look for last tick timestamp. If stale &gt;60s, Eye+Guardian are both dead.</li><li>DIAGNOSE STEP 2 — Confirm AbandonedMutex: tail latest eye.pid=*.log (sort by mtime). Look for &#x27;AbandonedMutexException&#x27;. This means Eye held the mutex when it crashed and never released it — new Eye cannot start.</li><li>DIAGNOSE STEP 3 — Confirm mutex still locked: PowerShell OpenMutex test. foreach name in (Global\WKAppBotEyeAlive, Global\WKAppBotEyeGuardian, Global\WKAppBotEyeSpawn): h=OpenMutex(0x100000,false,name); err=GetLastError(). FOUND=alive, err=2=released, err=5=held-no-access.</li><li>DIAGNOSE STEP 4 — Find mutex names WITHOUT source: grep -n Mutex D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs -&gt; line 437: EyeAliveMutexName=Global\WKAppBotEyeAlive, line 479: EyeGuardian, line 732: EyeSpawn. If source unavailable: strings binary won&#x27;t work (.NET single-file publish) but OpenMutex trial-and-error works.</li><li>FIX STEP 1 — Force-release all 3 Eye mutexes via PowerShell .NET: Add-Type MutexKiller { ReleaseMutex: Mutex.OpenExisting(name).ReleaseMutex(); Close() }. Returns: released=ok, closed-only=released but unsynchronized (still ok), not-found=already clear. Run for EyeAlive+Guardian+Spawn.</li><li>FIX STEP 2 — Restart Eye: wkappbot-core.exe eye. Wait 3-5s. Verify: tail logs/eye.pid=NEWEST.log for EYE_TICK or EYE_LOOP entries. Verify mutex: OpenMutex(Global\WKAppBotEyeAlive) =&gt; FOUND means Eye is alive.</li><li>FIX STEP 3 — Console auto-recovery: wkappbot consoles reconnect automatically once Eye IPC pipe restarts. Eye holds WKAppBotEyeAlive mutex for its ENTIRE lifetime. Eye death = pipe death = console death. Eye revival = pipe revival = consoles reconnect.</li><li>CHROME ZOMBIE — When Eye dies, it abandons handles to Chrome child processes. These become zombies (Task Manager shows them, TerminateProcess returns ACCESS_DENIED). Fix: revive Eye first — Eye cleanup releases its Chrome handles automatically. If still stuck: wkappbot-core.exe taskkill --force &lt;pid1,pid2,...&gt; OR SeDebugPrivilege TerminateProcess via wkfix.ps1 -Kill &lt;pid&gt;.</li><li>CHROME ZOMBIE ROOT CAUSE — Eye mutex AbandonedMutex blocks Guardian from spawning new Eye. Guardian sees &#x27;already running (mutex not acquired in 3s)&#x27; and gives up. Solution: force-release mutex first, THEN restart Eye. Order matters.</li><li>HANDLE SCANNER — wkfix.ps1 -ScanHandles &lt;pid&gt;: uses NtQuerySystemInformation(***), 16-byte header (NumberOfHandles+Reserved), stride=40 bytes per entry (SHX struct: Object+PID+Handle+Access+BT+TypeIdx+Attrs+Rsv), DuplicateHandle to current process, NtQueryObject(1=ObjectNameInformation) with UNICODE_STRING at nb+0(len)+nb+16(data). Filter by name substring.</li><li>NUKE PATTERN — wkfix.ps1 -Nuke &lt;pid&gt;: enumerate all handles of target pid, DuplicateHandle with MUTEX_ALL_ACCESS(0x1F0001), call Win32 ReleaseMutex(dup) — succeeds only for Mutant type, skip others — then CloseHandle(dup), finally TerminateProcess with SeDebugPrivilege. One command to drain all mutexes + kill.</li><li>CHROME SINGLETON — Chrome uses a named kernel object: \BaseNamedObjects\!device!harddiskvolume3!program files!google!chrome!application (path with backslash replaced by !, drive letter via QueryDosDevice C: -&gt; \Device\HarddiskVolume3). NOT a Mutex (OpenMutex returns err=6=wrong type). NOT a FileMapping (same). TypeIdx=21 in this Windows version. Cannot be released by Mutex.OpenExisting. Kill Chrome process instead.</li><li>SHORTCUT — wkfix.ps1 at D:/GitHub/WKAppBot/bin/wkfix.ps1: -EyeStatus (check mutex state), -Eye (release+restart), -Chrome (SeDebugPrivilege kill all debug-port chromes), -Nuke &lt;pid&gt; (drain mutexes+kill), -Mutex &lt;name&gt; (single release), -All (Eye+Chrome full reset). No reboot needed if mutex force-release succeeds.</li><li>ROOT CAUSE SUMMARY — Three bugs filed as suggests 2026-05-07: (1) AbandonedMutex on crash: Eye should use try/finally to release mutex. (2) Guardian has no watchdog: if Guardian dies, Eye never restarts. (3) Eye not elevated: lacks SeDebugPrivilege so cannot kill/reap zombie Chrome children, causing zombie accumulation.</li><li>FIND-OWNER PATTERN: zombie PID TerminateProcess fails -&gt; do NOT hardcode Eye as culprit. Real owner = Win32_Process.ParentProcessId. Any wkappbot tool (wkchat, wkappbot-core, Eye, agents) could hold the handle.</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_pid -&gt; get PPID via WMI -&gt; Nuke(ppid): drain mutexes + TerminateProcess(SeDebugPrivilege) -&gt; parent death releases child handles -&gt; zombie gone. No full system handle scan needed.</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_pid -&gt; get PPID via WMI -&gt; Nuke(ppid): drain mutexes + TerminateProcess(SeDebugPrivilege) -&gt; parent death releases child handles -&gt; zombie gone. No full system handle scan needed.</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke drains Mutant handles before kill. -FindOwner closes handles held by OTHER processes (DUPLICATE_CLOSE_SOURCE). Task Manager cannot do either. Suggest filed 2026-05-07: wkappbot taskkill should auto-walk ParentProcessId on TerminateProcess failure.</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke drains Mutant handles before kill. -FindOwner closes handles held by OTHER processes (DUPLICATE_CLOSE_SOURCE). Task Manager cannot do either. Suggest filed 2026-05-07: wkappbot taskkill should auto-walk ParentProcessId on TerminateProcess failure.</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrome) -&gt; Nuke(PPID) -&gt; PPID releases chrome handle -&gt; chrome vanishes -&gt; search done. No recursion, no direct chrome kill needed. If chrome already gone before Nuke completes, that is also success.</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrome) -&gt; Nuke(PPID) -&gt; PPID releases chrome handle -&gt; chrome vanishes -&gt; search done. No recursion, no direct chrome kill needed. If chrome already gone before Nuke completes, that is also success.</li><li>CHROME KILL ORDER: (1) Direct KillPid first — if killed, re-query and continue. (2) Only if kill fails (ACCESS_DENIED/zombie) -&gt; Nuke(PPID). Nuke is fallback, not default. Re-query Chrome list every iteration — one PPID nuke may wipe multiple chromes at once.</li><li>CHROME KILL ORDER: (1) Direct KillPid first — if killed, re-query and continue. (2) Only if kill fails (ACCESS_DENIED/zombie) -&gt; Nuke(PPID). Nuke is fallback, not default. Re-query Chrome list every iteration — one PPID nuke may wipe multiple chromes at once.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>DIAGNOSE STEP 1 — Symptom: wkappbot consoles...</li><li>DIAGNOSE STEP 2 — Confirm AbandonedMutex: ta...</li><li>DIAGNOSE STEP 3 — Confirm mutex still locked...</li><li>DIAGNOSE STEP 4 — Find mutex names WITHOUT s...</li><li>FIX STEP 1 — Force-release all 3 Eye mutexes...</li><li>FIX STEP 2 — Restart Eye: wkappbot-core.exe...</li><li>FIX STEP 3 — Console auto-recovery: wkappbot...</li><li>CHROME ZOMBIE — When Eye dies, it abandons h...</li><li>CHROME ZOMBIE ROOT CAUSE — Eye mutex Abandon...</li><li>HANDLE SCANNER — wkfix.ps1 -ScanHandles &lt;pid...</li><li>NUKE PATTERN — wkfix.ps1 -Nuke &lt;pid&gt;: enumer...</li><li>CHROME SINGLETON — Chrome uses a named kerne...</li><li>SHORTCUT — wkfix.ps1 at D:/GitHub/WKAppBot/b...</li><li>ROOT CAUSE SUMMARY — Three bugs filed as sug...</li><li>FIND-OWNER PATTERN: zombie PID TerminateProc...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'eye-crash-recovery-via-mutex-force-release';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Cookbook: Install Input Protection on a New A11y Action (Beginner)</h1>
       <p class="description">Unified guide: why user-input protection exists, how FocusStealSentinel + ResolveA11yTarget work conceptually, and the step-by-step recipe for adding a new a11y action with full protection. Beginner-friendly copy-paste snippets plus a smoke-test checklist. Supersedes the older sentinel concept skill.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cookbook</span><span class="chip">beginner</span><span class="chip">focus-steal</span><span class="chip">sentinel</span><span class="chip">readiness</span><span class="chip">checklist</span><span class="chip">a11y-action</span><span class="chip">probe</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WHY THIS EXISTS. Every a11y action runs on behalf of the user but can accidentally grab the foreground window (SetForegroundWindow, UIA activation on Chromium/Electron, SendInput). If it does, the user loses their typing / dialog / mouse context. Two complementary tools solve this: (1) InputReadiness.Probe shows the magnifier and yields to active user input BEFORE the action fires; (2) FocusStealSentinel watches the foreground during the action and restores + self-reports if theft happened. Find is the only exempt action -- it is legitimate foreground exploration.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>WHY THIS EXISTS. Every a11y action runs on behalf of the user but can accidentally grab the foreground window (SetForegroundWindow, UIA activation on Chromium/Electron, SendInput). If it does, the user loses their typing / dialog / mouse context. Two complementary tools solve this: (1) InputReadiness.Probe shows the magnifier and yields to active user input BEFORE the action fires; (2) FocusStealSentinel watches the foreground during the action and restores + self-reports if theft happened. Find is the only exempt action -- it is legitimate foreground exploration.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

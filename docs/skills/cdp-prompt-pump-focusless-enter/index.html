@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>CDP Prompt Pump — Focusless Enter and ProseMirror Auto-Submit</h1>
       <p class="description">How the CDP prompt pump works, why ProseMirror ignores JS KeyboardEvent, and how SendPromptFocuslessAsync (DOM.focus + Input.dispatchKeyEvent) bypasses the focus-steal-guard for background Claude tabs.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cdp</span><span class="chip">pump</span><span class="chip">prosemirror</span><span class="chip">claude</span><span class="chip">triad</span><span class="chip">focusless</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Pump: ArmPromptPumpAsync sets 200ms setInterval, fires trySend after idleMs of stable content (default 1s = 5 ticks)</li><li>trySend order: form.requestSubmit then button.click then KeyboardEvent then CDP_SIGNAL flag</li><li>ProseMirror (Claude tiptap) ignores synthetic JS KeyboardEvent but dispatchEvent returns true so pump thinks KEY_ENTER succeeded — content stays</li><li>Fix: SendPromptFocuslessAsync uses CDP DOM.focus nodeId (bypasses Runtime.evaluate / focus-steal-guard) then Input.dispatchKeyEvent</li><li>InjectToSingle calls ArmPromptPumpAsync after AppendContentEditableAsync so each AI auto-submits independently</li><li>Moderator broadcast only goes to pending AIs not finished ones to avoid stranded text in editor</li><li>2026-05-06 WATCHDOG WINDOW: When slow prompts stay visible longer after submit, treat 30s total watchdog time as the failure threshold before registering [PUMP] AutoRegisterBug. The old 17s boundary was too aggressive for long drafts on throttled tabs.</li><li>2026-05-06 WATCHDOG WINDOW: When slow prompts stay visible longer after submit, treat 30s total watchdog time as the failure threshold before registering [PUMP] AutoRegisterBug. The old 17s boundary was too aggressive for long drafts on throttled tabs.</li><li>Verified 2026-05-07:  (resolve ts=2026-05-07T05:54:54)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Pump: ArmPromptPumpAsync sets 200ms setInterval, fires trySend after idleMs of stable content (default 1s = 5 ticks)</li><li>trySend order: form.requestSubmit then button.click then KeyboardEvent then CDP_SIGNAL flag</li><li>ProseMirror (Claude tiptap) ignores synthetic JS KeyboardEvent but dispatchEvent returns true so pump thinks KEY_ENTER succeeded — content stays</li><li>Fix: SendPromptFocuslessAsync uses CDP DOM.focus nodeId (bypasses Runtime.evaluate / focus-steal-guard) then Input.dispatchKeyEvent</li><li>InjectToSingle calls ArmPromptPumpAsync after AppendContentEditableAsync so each AI auto-submits independently</li><li>Moderator broadcast only goes to pending AIs not finished ones to avoid stranded text in editor</li><li>2026-05-06 WATCHDOG WINDOW: When slow prompts stay visible longer after submit, treat 30s total watchdog time as the failure threshold before registering [PUMP] AutoRegisterBug. The old 17s boundary was too aggressive for long drafts on throttled tabs.</li><li>2026-05-06 WATCHDOG WINDOW: When slow prompts stay visible longer after submit, treat 30s total watchdog time as the failure threshold before registering [PUMP] AutoRegisterBug. The old 17s boundary was too aggressive for long drafts on throttled tabs.</li><li>Verified 2026-05-07:  (resolve ts=2026-05-07T05:54:54)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

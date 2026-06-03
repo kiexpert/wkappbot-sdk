@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>suggest --requirement error messages: format example + launcher flag</h1>
       <p class="description">When --requirement has bad format or contains launcher flags, error messages now show correct format examples. CommandHelpMap suggest entry includes REQUIREMENTS section so --help always shows the format.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Missing =&gt; separator: error shows &#x27;Correct format: --requirement wkappbot &lt;cmd&gt; &lt;args&gt; =&gt; &lt;expected result&gt;&#x27;</li><li>Launcher flag (--sudo) in requirement cmd: error says &#x27;launcher flag, strip it&#x27; + shows corrected example</li><li>wkappbot suggest --help: REQUIREMENTS section shows format, NOTE about launcher flags</li><li>CommandHelpMap location: CommandHelp.cs ~line 291 suggest entry</li><li>SuggestCommand.cs requirement parsing: lines ~110-166</li><li>Verified 2026-04-24: test-suggest-error-format.sh (resolve ts=2026-04-23T08:56:25)</li><li>2026-05-02: screenshot command added to CommandHelpMap (commit 341be88f); fix(help) pattern ensures new commands added to map when BUG-AUTO fires for missing entry.</li><li>2026-05-02: screenshot command added to CommandHelpMap (commit 341be88f); fix(help) pattern ensures new commands added to map when BUG-AUTO fires for missing entry.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Missing =&gt; separator: error shows &#x27;Correct format: --requirement wkappbot &lt;cmd&gt; &lt;args&gt; =&gt; &lt;expected result&gt;&#x27;</li><li>Launcher flag (--sudo) in requirement cmd: error says &#x27;launcher flag, strip it&#x27; + shows corrected example</li><li>wkappbot suggest --help: REQUIREMENTS section shows format, NOTE about launcher flags</li><li>CommandHelpMap location: CommandHelp.cs ~line 291 suggest entry</li><li>SuggestCommand.cs requirement parsing: lines ~110-166</li><li>Verified 2026-04-24: test-suggest-error-format.sh (resolve ts=2026-04-23T08:56:25)</li><li>2026-05-02: screenshot command added to CommandHelpMap (commit 341be88f); fix(help) pattern ensures new commands added to map when BUG-AUTO fires for missing entry.</li><li>2026-05-02: screenshot command added to CommandHelpMap (commit 341be88f); fix(help) pattern ensures new commands added to map when BUG-AUTO fires for missing entry.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

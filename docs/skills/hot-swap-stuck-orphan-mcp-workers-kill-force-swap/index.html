@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,20 +117,102 @@
       <h1>Hot-Swap Operator Cheatsheet (--force-swap + manual + 3-layer architecture)</h1>
       <p class="description">Hot-swap operator reference. Covers force-swap (wkappbot --sudo --force-swap), manual orphan-kill + restage for stuck builds, and a 3-layer architecture recap (Eye FSW rename | Admin Eye self-respawn | MCP Launcher swap). Use when hot-swap misbehaves or when reasoning about which layer is responsible for a symptom.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">hotswap</span><span class="chip">mcp</span><span class="chip">orphan</span><span class="chip">file-lock</span><span class="chip">eye</span><span class="chip">swap</span><span class="chip">project</span><span class="chip">v6-force-swap</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Force-swap one-shot: wkappbot --sudo --force-swap eye tick (or any command).
-What it does: UAC elevates → TryAdminHotSwap(force=true):
-  - Skips 60s lag guard (--force bypasses the mtime delta check)
-  - Reads Eye PID from runtime/eye_ticks.jsonl (last &#x27;Tag&#x27;:&#x27;eye&#x27; entry)
-  - Kills orphan wkappbot-core pids (spares Eye, WhisperRing, wkchat sessions, self)
-  - Renames live wkappbot-core.exe → .old-&lt;ts&gt;.exe
-  - Copies wkappbot-core.new.exe → canonical wkappbot-core.exe
-  - Eye + WhisperRing are also terminated (with --force flag) so they respawn from fresh exe
-  - Watchdog VBS revives Eye within ~2min (2min chat blind window)
-When to use: normal auto-swap stale for 1h+ AND admin Eye itself running old code AND 2min blackout acceptable.
-Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserved.</li><li>Use --force-swap when: normal auto-swap sat on stale live-exe for an hour+ AND admin Eye itself is running old code AND a 2min Eye blackout is acceptable</li><li>Verify after --force-swap: ls -la bin/wkappbot-core.exe shows fresh mtime + wkappbot eye tick shows fresh pid and new behavior</li><li>Manual path symptom: wkappbot hotswap prints step1 rename to .old failed because another process holds the file lock</li><li>Manual diagnosis: powershell.exe -Command Get-Process wkappbot-core -ErrorAction SilentlyContinue shows multiple pids holding the exe; blank Path column = admin-protected orphan</li><li>Manual Eye pid find: wkappbot a11y windows locates the WK AppBot Eye pid and the WhisperRing pid; memo these -- never kill them manually</li><li>Manual orphan identification: any wkappbot-core pid that is NOT Eye and NOT WhisperRing is an orphan candidate; a11y find with pid filter confirms role</li><li>Manual kill: powershell.exe -Command Stop-Process -Id PID1,PID2 -Force (admin-protected orphans require admin shell)</li><li>Manual restage and swap: cp D:/SDK/bin/wkappbot-core.exe D:/SDK/bin/wkappbot-core.new.exe then wkappbot hotswap</li><li>Manual success check: a11y windows shows Eye proc name as wkappbot-core (not .old-...) and memory drops from 2400MB to 800MB</li><li>Orphan workers come from Eye restart loops; if StartTime is before Eye&#x27;s current boot time they are confirmed orphans</li><li>Why --force-swap exists: 2026-04-19 session hit admin orphans 51232/53024 pinning v5.x exe for 8h+; manual mv rename-then-copy worked but Eye stayed on v5.x admin; --force-swap bundles the full recycle so future sessions do not need manual surgery</li><li>Architecture Layer 1 - Eye rename-swap (AppBotEyeGlobalMode.cs TryRenameSwap): happy-path FSW on .new.exe arrival renames canonical exe to .old-ts then copies .new.exe to canonical. Gentle startup swap if .new.exe already exists at Eye boot. Admin-busy defer via ElevatedEyeServer.IsBusy. Same-mtime retry skipped via _lastFailedSwapStamp</li><li>Architecture Layer 2 - Admin Eye self-respawn (AppBotEyeCommands.cs isElevatedArg): elevated Eye spawns successor with its own admin token -- no UAC. Dual FSW: .new.exe arrival (early drain) + .exe swap (fast path). drainTriggered flag prevents double-spawn. Startup with .new.exe present triggers immediate drain</li><li>Architecture Layer 3 - MCP Launcher swap (McpProxy.cs HOT-SWAP): FSW on canonical exe path change (AFTER Eye rename). Launcher owns Core pipe lifecycle not the exe file. 6 steps: track inflight requests -&gt; detach stdin -&gt; spawn new Core -&gt; replay initialize+tools/list -&gt; stdout relay -&gt; drain old Core 60s. Admin-first: if admin alive defer swap until admin exits</li><li>Layer separation rule: Eye moves files. Launcher replaces Core pipe. MCP server (embedded in Eye) ships with Eye -- no separate hot-swap needed</li><li>Full gentle-swap flow: publish -&gt; .new.exe staged -&gt; Eye rename -&gt; Admin Eye self-respawn -&gt; Launcher Core swap. Each layer has independent fail-stamp skip so a single flaky layer does not block others permanently</li><li>[AUDIT 2026-05-29] Program.cs split: TryAdminHotSwap and &#x27;force-swap&#x27; moved out of WKAppBot.CLI/Program.cs into partial files. Refs still resolve at SudoHandler.cs:35, AppBotEyeGlobalMode.cs:1009, AppBotEyeCommands.cs:1362, McpProxy.cs:139. Update Program.cs refs path on next re-contribute.</li><li>[AUDIT 2026-05-30] TryAdminHotSwap moved to Program.Lifecycle.cs:46 (was Program.cs). &#x27;force-swap&#x27; literal no longer in Program.cs root -- now in Program.Lifecycle.cs invocation site. Update refs to Program.Lifecycle.cs in next contribute.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Force-swap one-shot: wkappbot --sudo --force...</li><li>Use --force-swap when: normal auto-swap sat...</li><li>Verify after --force-swap: ls -la bin/wkappb...</li><li>Manual path symptom: wkappbot hotswap prints...</li><li>Manual diagnosis: powershell.exe -Command Ge...</li><li>Manual Eye pid find: wkappbot a11y windows l...</li><li>Manual orphan identification: any wkappbot-c...</li><li>Manual kill: powershell.exe -Command Stop-Pr...</li><li>Manual restage and swap: cp D:/SDK/bin/wkapp...</li><li>Manual success check: a11y windows shows Eye...</li><li>Orphan workers come from Eye restart loops;...</li><li>Why --force-swap exists: 2026-04-19 session...</li><li>Architecture Layer 1 - Eye rename-swap (AppB...</li><li>Architecture Layer 2 - Admin Eye self-respaw...</li><li>Architecture Layer 3 - MCP Launcher swap (Mc...</li><li>Layer separation rule: Eye moves files. Laun...</li><li>Full gentle-swap flow: publish -&gt; .new.exe s...</li><li>[AUDIT 2026-05-29] Program.cs split: TryAdmi...</li><li>[AUDIT 2026-05-30] TryAdminHotSwap moved to...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'hot-swap-stuck-orphan-mcp-workers-kill-force-swap';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

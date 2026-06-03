@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Web AI Ask Infrastructure: Pump, CDP Worker, Editor Send Paths</h1>
       <p class="description">Architecture of the page-side JS pump worker and C# orchestration layer for sending prompts to web AI (Claude/GPT/Gemini). Covers editor types, send path hierarchy, CDP_SIGNAL, cross-prompt delivery, attachment lock, and watchdog.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">cdp</span><span class="chip">pump</span><span class="chip">cross-prompt</span><span class="chip">triad</span><span class="chip">editor</span><span class="chip">prosemirror</span><span class="chip">tiptap</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. [PUMP ARCHITECTURE] window.__wkAskPump = singleton JS object injected into each AI tab via CDP Runtime.evaluate. One setInterval(500ms) per editor selector. Hash-based change detection: content hash changes ??ticks=0 (reset); hash stable for 2 ticks (1s) ??trySend(). C# side: CdpPromptPump.cs (AppendAndQueueAsync ??ArmPromptPumpAsync ??CDP_SIGNAL poller). Key timing: trySend() fires ~1.5s after first stable content (first tick resets hash=0?뭜, second+third ticks count stable). FlushPromptPumpNowAsync() calls trySend() immediately, bypassing timer.</li><li>2. [trySend() SEND PATH HIERARCHY] 5-tier fallback in order: (1) form.requestSubmit() ??cleanest, works for standard forms; (2) send button click ??querySelector data-testid/aria-label/send-button/[type=submit]; (3) JS KeyboardEvent(Enter) dispatchEvent on editor ??works for tiptap/textarea, IGNORED by ProseMirror; (4) CDP_SIGNAL ??last resort: sets st.readyToSend=true and returns &#x27;CDP_SIGNAL&#x27;, C# polls and fires CDP Input.dispatchKeyEvent Enter. IMPORTANT: ProseMirror editors (Claude.ai, ChatGPT) reject JS keyboard events ??CDP_SIGNAL is always the active path for them.</li><li>3. [EDITOR TYPES BY AI] Claude.ai: div.tiptap.ProseMirror (contenteditable=true) ??ProseMirror. ChatGPT: #prompt-textarea (ProseMirror variant, contenteditable div). Gemini: div[contenteditable=true] in rich-textarea ??tiptap/ProseMirror-like but accepts JS KeyboardEvent in some versions. All are contenteditable divs, NOT textarea. GetTextLengthAsync reads el.innerText.length. CONSEQUENCE: form.requestSubmit() may not exist; JS KeyboardEvent is unreliable ??CDP_SIGNAL path is the reliable fallback for all ProseMirror editors.</li><li>4. [CDP_SIGNAL FLOW] When trySend() returns &#x27;CDP_SIGNAL&#x27;: (a) JS sets st.readyToSend=true; (b) C# CdpPromptPump.AppendAndQueueAsync spawns background Task that polls CheckPumpReadyAsync() every 300ms 횞 13 iterations (~4s window); (c) on detection, fires cdp.SendPromptAsync(editorSel) ??CDP Input.dispatchKeyEvent{key:Enter}; (d) CheckPumpReadyAsync atomically clears st.readyToSend=false. Race safety: after SendPromptAsync fires, editor content is cleared ??DebateRunner.SendPendingCrossPromptAsync (editorLen &gt; 10 check) returns false = no double-send.</li><li>5. [CROSS-PROMPT DELIVERY ??TWO PATHS] For triad/cross-prompts (e.g. Gemini?묬laude): PATH-A (primary): CDP_SIGNAL poller fires ~1.5s after arm ??SendPromptAsync; PATH-B (safety net): DebateRunner.SendPendingCrossPromptAsync() runs after AI response completes (line ~1029 AskCommands.DebateRunner.cs) ??checks editorLen &gt; 10 ??SendPromptAsync. In practice PATH-B fires later (AI response takes 10-30s+) and editor is already empty from PATH-A ??PATH-B is a no-op. Both paths are always running concurrently; no double-send because PATH-A empties editor before PATH-B checks. Log marker: &#x27;[CROSS:{ai}] Found pre-typed cross-prompt ({n} chars) ??sending&#x27;.</li><li>6. [ATTACHMENT TRANSACTION LOCK] When file attachment is needed before prompt: (1) BeginAttachmentLockAsync: sets C# PageState.Locked=true + JS st.locked=true ??pump stops auto-fire; (2) chunks arriving during lock go into PageState.QueuedChunks; (3) CompleteAttachmentLockAsync: appends queued chunks + unlock + FlushPromptPumpNowAsync (immediate trySend, bypasses timer); (4) AbortAttachmentLockAsync: unlock + optional queue clear. Purpose: ensure attachment uploads complete before prompt fires. File: AskCommands.CdpPromptPump.cs.</li><li>7. [PLACEHOLDER vs DRAFT BUG ??NON-CRITICAL] GetTextLengthAsync reads el.innerText.length. ProseMirror may render placeholder text as actual innerText (not just CSS ::before) on some versions ??pump/watchdog can misidentify placeholder as user draft. Symptom: DebateRunner logs &#x27;Found pre-typed cross-prompt&#x27; but content is placeholder. Fix direction: compare against data-placeholder attribute or check if el.classList contains a &#x27;is-empty&#x27;/&#x27;placeholder&#x27; class before acting. Status: tracked, non-critical since it only causes spurious Enter keypresses on empty-ish editors.</li><li>8. [SUBMIT WATCHDOG + TICK LOGGING] Watchdog (in AppendAndQueueAsync): two-phase check ??GetTextLengthAsync at t=3s (first), then at t=5s (second). If first&lt;=0 or second&lt;=0 ??already submitted ??OK. If second&lt;first ??submission in progress ??OK. If second&gt;=first ??editor still has content ??AutoRegisterBug(msg). Prevents silent pump failures. Tick logging: console.debug(&#x27;[PUMP] content changed/stable tick/trySend result&#x27;) per interval tick. C# logs: &#x27;[ASK:PUMP:{Name}] {scope} [{targetId}]: armed|arm-failed|CDP_SIGNAL?뭚iring CDP Enter&#x27;. Key file refs: CdpClient.AiHelpers.cs (ArmPromptPumpAsync, CheckPumpReadyAsync, FlushPromptPumpNowAsync), AskCommands.CdpPromptPump.cs (AppendAndQueueAsync, BeginAttachmentLockAsync, CompleteAttachmentLockAsync), AskCommands.DebateRunner.cs (SendPendingCrossPromptAsync ~line 1004).</li><li>2026-05-06 WATCHDOG TUNING: Long drafts can legitimately take longer to clear after focusless submit, so the submit watchdog now waits 30s total (10s + 10s + 10s) before firing [PUMP] AutoRegisterBug. Do not flag 17s as the hard boundary for slow tabs.</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask gpt / wkappbot ask claude / wkappbot ask gemini / wkappbot ask triad all dispatch via pure CDP through this pump. The ask outgoing path does NOT call FindAllPrompts -- that legacy Win32 scan is confined to the response-injection phase (AskCommands.Entry.cs) with a 9s AskInjectionTimeoutMs hard cap. Verified 2026-05-08: dispatch is fully focusless via CdpPromptPump.</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask gpt / wkappbot ask claude / wkappbot ask gemini / wkappbot ask triad all dispatch via pure CDP through this pump. The ask outgoing path does NOT call FindAllPrompts -- that legacy Win32 scan is confined to the response-injection phase (AskCommands.Entry.cs) with a 9s AskInjectionTimeoutMs hard cap. Verified 2026-05-08: dispatch is fully focusless via CdpPromptPump.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>1. [PUMP ARCHITECTURE] window.__wkAskPump =...</li><li>2. [trySend() SEND PATH HIERARCHY] 5-tier fa...</li><li>3. [EDITOR TYPES BY AI] Claude.ai: div.tipta...</li><li>4. [CDP_SIGNAL FLOW] When trySend() returns...</li><li>5. [CROSS-PROMPT DELIVERY ??TWO PATHS] For t...</li><li>6. [ATTACHMENT TRANSACTION LOCK] When file a...</li><li>7. [PLACEHOLDER vs DRAFT BUG ??NON-CRITICAL]...</li><li>8. [SUBMIT WATCHDOG + TICK LOGGING] Watchdog...</li><li>2026-05-06 WATCHDOG TUNING: Long drafts can...</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask g...</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask g...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

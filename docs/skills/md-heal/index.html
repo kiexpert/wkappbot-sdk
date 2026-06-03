@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>md-heal: detect and fix stale or drifted CLAUDE.md files</h1>
       <p class="description">Actionable checklist to heal project CLAUDE.md: scan for stale commands, check drift against README/AGENTS, validate gg section, sync with global CLAUDE.md, commit all fixes together.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">md-heal</span><span class="chip">heal</span><span class="chip">fix</span><span class="chip">update</span><span class="chip">sync</span><span class="chip">drift</span><span class="chip">stale</span><span class="chip">markdown</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WHEN TO RUN: (A) user says &#x27;md-heal&#x27;, &#x27;엠디힐&#x27;, &#x27;heal claude.md&#x27;, or &#x27;fix markdown&#x27;. (B) after a significant session where commands or architecture changed. (C) before a PR or release. (D) when a command in CLAUDE.md fails unexpectedly. Run proactively -- stale CLAUDE.md wastes tokens on every future session.</li><li>STEP 1 -- SCAN REPO ROOT MD FILES: list all *.md at repo root. Read CLAUDE.md. Also read README.md and AGENTS.md if they exist. Look for: (a) build commands that changed, (b) removed features still mentioned, (c) new tools not yet documented, (d) wrong file paths, (e) stale version numbers, (f) gg section that no longer works end-to-end.</li><li>STEP 2 -- DRIFT CHECK (shared subjects must agree): for every subject that appears in both CLAUDE.md and README.md (or AGENTS.md), verify the descriptions agree. Common drift points: build command, main entry point, architecture summary, key env vars, deployment steps. Fix any discrepancy in both files in the same commit.</li><li>STEP 3 -- GG SECTION VALIDATION: find &#x27;## gg Main Workflow&#x27; in project CLAUDE.md. Dry-run each step mentally: (1) does the skill id still exist? wkappbot skill read &lt;id&gt;. (2) does the shell command still work? (3) is the Agent() prompt still accurate? If any step is broken or stale, fix it now.</li><li>STEP 4 -- GLOBAL CLAUDE.MD SYNC: open ~/.claude/CLAUDE.md (symlink at D:/GitHub/CLAUDE.md). Check if project CLAUDE.md overrides or contradicts any global rule. If global rule was updated, ensure project CLAUDE.md reflects the change or explicitly overrides it. The project file WINS -- but it should acknowledge the global baseline.</li><li>STEP 5 -- FIX AND COMMIT: apply all fixes with Edit tool (project CLAUDE.md is a tracked file -- edit directly). If multiple *.md files changed, commit them together: git add *.md &amp;&amp; git commit. Commit message: &#x27;docs(claude): heal CLAUDE.md -- &lt;1-line summary of what changed&gt;&#x27;. Do NOT split md fixes across multiple commits.</li><li>CHECKLIST (copy-paste and tick off): [ ] build command verified working. [ ] architecture description accurate. [ ] gg section tested end-to-end. [ ] README/AGENTS drift fixed. [ ] stale commands/features removed. [ ] new patterns added. [ ] committed with all *.md in same commit.</li><li>ROLE MAP: project CLAUDE.md is Claude-facing project guidance; AGENTS.md is for Codex and other non-Claude agents; README.md is user-facing documentation. Keep each file in its lane and sync only overlapping subjects.</li><li>TOKEN OPTIMIZATION CHECK: if a workflow or command chain repeats across CLAUDE.md/README.md/AGENTS.md, keep only a short pointer in the MD and move the executable details into a skill. Prefer one canonical home per recurring flow to avoid drift and repeated session load.</li><li>TODO sync rule: any pending task list must stay in the repo CLAUDE.md under a Pending section. After completing a task, mark it [x] and commit immediately. Never track todos only in conversation -- CLAUDE.md is the canonical source.</li><li>TODO sync rule: any pending task list must stay in the repo CLAUDE.md under a Pending section. After completing a task, mark it [x] and commit immediately. Never track todos only in conversation -- CLAUDE.md is the canonical source.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>WHEN TO RUN: (A) user says &#x27;md-heal&#x27;, &#x27;엠디힐&#x27;,...</li><li>STEP 1 -- SCAN REPO ROOT MD FILES: list all...</li><li>STEP 2 -- DRIFT CHECK (shared subjects must...</li><li>STEP 3 -- GG SECTION VALIDATION: find &#x27;## gg...</li><li>STEP 4 -- GLOBAL CLAUDE.MD SYNC: open ~/.cla...</li><li>STEP 5 -- FIX AND COMMIT: apply all fixes wi...</li><li>CHECKLIST (copy-paste and tick off): [ ] bui...</li><li>ROLE MAP: project CLAUDE.md is Claude-facing...</li><li>TOKEN OPTIMIZATION CHECK: if a workflow or c...</li><li>TODO sync rule: any pending task list must s...</li><li>TODO sync rule: any pending task list must s...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'md-heal';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

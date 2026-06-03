@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,13 +117,18 @@
       <h1>skill search/news: coverage-based ranking + skill news command</h1>
       <p class="description">skill search ranks by SkillCoverageScore (sum of tok.Length/field.Length per match). skill news shows recently updated skills; accepts optional query for coverage-ranked filtering. Shared SkillCoverageScore() helper also used by PrintSkillHintOnError.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">skill</span><span class="chip">search</span><span class="chip">news</span><span class="chip">ranking</span><span class="chip">coverage</span><span class="chip">operator</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>wkappbot skill search &lt;keyword&gt;  -- returns all matches ranked by coverage score (cov=X.XX shown per result)
+      <div class="steps-wrap">
+        <ol class="steps"><li>wkappbot skill search &lt;keyword&gt;  -- returns all matches ranked by coverage score (cov=X.XX shown per result)
 wkappbot skill news [query] [--days N]  -- lists skills updated in last N days (default 7). With query: coverage-ranked. Without: sorted by LastActivity.
 Coverage score = sum over all (token, field) pairs where field.Contains(token): tok.Length / field.Length. Fields: id, title, desc, best-matching tag. Higher = token covers larger fraction of matched field.
 PrintSkillHintOnError (on non-zero exit) also uses SkillCoverageScore() -- same ranking for error-time skill hints (threshold &gt;= 0.3).</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27; matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27; matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

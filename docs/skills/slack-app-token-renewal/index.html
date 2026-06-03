@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Slack Socket Mode app_token renewal -- invalid_auth symptom and fix</h1>
       <p class="description">Eye Slack WebSocket drops with invalid_auth when the xapp-1 app-level token is revoked. Symptom: Eye log shows Slack reconnect failed invalid_auth, Slack=False msgs=0. Token in webhook.json must be regenerated at api.slack.com.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. api.slack.com/apps -&gt; WKAppBot -&gt; Basic Information -&gt; App-Level Tokens. 2. Delete old token, generate new one with connections:write scope. 3. Copy xapp-1-... token. 4. Update app_token in bin/wkappbot.hq/profiles/slack_exp/webhook.json. 5. Eye auto-reconnects within 5s. Verify: EYE_LOOP shows Slack=True.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>1. api.slack.com/apps -&gt; WKAppBot -&gt; Basic Information -&gt; App-Level Tokens. 2. Delete old token, generate new one with connections:write scope. 3. Copy xapp-1-... token. 4. Update app_token in bin/wkappbot.hq/profiles/slack_exp/webhook.json. 5. Eye auto-reconnects within 5s. Verify: EYE_LOOP shows Slack=True.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

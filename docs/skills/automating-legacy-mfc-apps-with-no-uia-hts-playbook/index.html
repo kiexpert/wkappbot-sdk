@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Automating Legacy MFC Apps With No UIA -- HTS Playbook</h1>
       <p class="description">MFC owner-drawn controls have almost no UIA patterns -&gt; Win32 PostMessage fallback required. CMaskEditEx: WM_CHAR only (never EM_SETTEXT/EM_SETSEL -- double input). GetSupportedPatterns() on MFC = COM corruption -- use TryGetCurrentPattern() per pattern. OCR triple cross-validation for price/candle data. FuzzyDigitMatch: Levenshtein ≤2 for bitmap OCR instability.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">hts</span><span class="chip">mfc</span><span class="chip">ocr</span><span class="chip">win32</span><span class="chip">uia</span><span class="chip">legacy</span><span class="chip">owner-drawn</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[v6.2+ DISCOVERY FAST-PATH] MFC/Afx windows (nkrunlite/Heroes4/HTS) have no meaningful UIA tree -- v6.2 SKIPS UIA batch traversal during discovery (a11y find/inspect/windows/ocr). Completes in 1-5s instead of 50s. Explicit targeting still uses UIA when ControlType exposes a pattern; only the discovery scan is bypassed. Side benefit: simple-pattern a11y find now auto-enumerates MDI child windows, so simple title wildcards resolve MDI panels without requiring {proc:&#x27;nkrunlite&#x27;,title:...} JSON5. Score output (e.g. score={domain:1.00,proc:0.86,cls:0.54,title:0.22}) on [OK] line shows field discrimination -- any 1.00 field not in your grap is a precision candidate.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>[v6.2+ DISCOVERY FAST-PATH] MFC/Afx windows (nkrunlite/Heroes4/HTS) have no meaningful UIA tree -- v6.2 SKIPS UIA batch traversal during discovery (a11y find/inspect/windows/ocr). Completes in 1-5s instead of 50s. Explicit targeting still uses UIA when ControlType exposes a pattern; only the discovery scan is bypassed. Side benefit: simple-pattern a11y find now auto-enumerates MDI child windows, so simple title wildcards resolve MDI panels without requiring {proc:&#x27;nkrunlite&#x27;,title:...} JSON5. Score output (e.g. score={domain:1.00,proc:0.86,cls:0.54,title:0.22}) on [OK] line shows field discrimination -- any 1.00 field not in your grap is a precision candidate.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

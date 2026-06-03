@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Core skips leading launcher flags (--sudo etc.) before computing subcommand</h1>
       <p class="description">Core&#x27;s DispatchCommand walks past pre-command flags (--sudo, --stderr, --only-eye, --only-core) when locating the subcommand verb. Fixes &#x27;Unknown command: --sudo&#x27; when user types wkappbot --sudo &lt;subcmd&gt;. --sudo preserved in restArgs for SudoHandler / ElevatedEyeProxy.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkappbot-core</span><span class="chip">launcher</span><span class="chip">sudo</span><span class="chip">dispatch</span><span class="chip">args</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. Symptom: wkappbot --sudo a11y invoke X -&gt; Unknown command: --sudo (also a11y read, win-click).</li><li>2. Cause: Program.Dispatch.cs computed command = args[0].ToLowerInvariant() without skipping --sudo.</li><li>3. Fix: Program.Args.cs adds IsPreCommandFlag() allowlist; Program.Dispatch.cs walks until non-flag.</li><li>4. --sudo retained in restArgs so downstream SudoHandler.EnsureAdminForSudo / ElevatedEyeProxy still routes elevation.</li><li>5. Verify: wkappbot --sudo a11y invoke / read / win-click all reach proper handlers post-fix.</li><li>BUG REPORT cmds: a11y invoke / a11y inspect / a11y read / win-click ALL routed correctly post-fix when --sudo prefixes the subcommand verb.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>1. Symptom: wkappbot --sudo a11y invoke X -&gt; Unknown command: --sudo (also a11y read, win-click).</li><li>2. Cause: Program.Dispatch.cs computed command = args[0].ToLowerInvariant() without skipping --sudo.</li><li>3. Fix: Program.Args.cs adds IsPreCommandFlag() allowlist; Program.Dispatch.cs walks until non-flag.</li><li>4. --sudo retained in restArgs so downstream SudoHandler.EnsureAdminForSudo / ElevatedEyeProxy still routes elevation.</li><li>5. Verify: wkappbot --sudo a11y invoke / read / win-click all reach proper handlers post-fix.</li><li>BUG REPORT cmds: a11y invoke / a11y inspect / a11y read / win-click ALL routed correctly post-fix when --sudo prefixes the subcommand verb.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Haiku Sandbox Problem Solving T3 Reference</h1>
       <p class="description">T3 ref. Real session examples (successes + failures), failure mode analysis, evolution notes.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../haiku-sandbox-problem-solving/">haiku-sandbox-problem-solving</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SUCCESS 2026-05-31 wkjobs: Haiku diagnosed  reserved-var collision (line 118) + / scope bug (lines 264-265) without touching original. Sonnet verified. Haiku applied fix. Clean commit 089b4d095.</li><li>SUCCESS 2026-05-31 EndMarker: Sonnet analyzed git grep output, identified EyeCmdPipeServer.Pipe.cs:278 catch{} swallowing EndMarker. Haiku applied 2-line fix + 200ms retry. No prototype needed (Sonnet certain). Commit 7ab1ae533.</li><li>FAILURE 2026-05-31 skill T1 split: Haiku sent to read fat suggest-workflow (36 steps) then split T1/T2/T3. Context overload -&gt; dropped all steps from T1 (empty). Fix: Sonnet writes T1 content from own context, Haiku only executes skill contribute CLI commands.</li><li>FAILURE MODE: &#x27;find and fix&#x27; brief = Haiku reads source + diagnoses + edits = triple context load = unreliable. Always split into 3 separate calls: (1) Haiku diagnose, (2) Sonnet judge, (3) Haiku/wkcodex apply.</li><li>EVOLUTION: pattern emerged from observing that Haiku succeeds on clean canvas (new file, specific task) and fails on open-ended exploration of existing complex code. Prototype = bounded problem space.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>SUCCESS 2026-05-31 wkjobs: Haiku diagnosed  reserved-var collision (line 118) + / scope bug (lines 264-265) without touching original. Sonnet verified. Haiku applied fix. Clean commit 089b4d095.</li><li>SUCCESS 2026-05-31 EndMarker: Sonnet analyzed git grep output, identified EyeCmdPipeServer.Pipe.cs:278 catch{} swallowing EndMarker. Haiku applied 2-line fix + 200ms retry. No prototype needed (Sonnet certain). Commit 7ab1ae533.</li><li>FAILURE 2026-05-31 skill T1 split: Haiku sent to read fat suggest-workflow (36 steps) then split T1/T2/T3. Context overload -&gt; dropped all steps from T1 (empty). Fix: Sonnet writes T1 content from own context, Haiku only executes skill contribute CLI commands.</li><li>FAILURE MODE: &#x27;find and fix&#x27; brief = Haiku reads source + diagnoses + edits = triple context load = unreliable. Always split into 3 separate calls: (1) Haiku diagnose, (2) Sonnet judge, (3) Haiku/wkcodex apply.</li><li>EVOLUTION: pattern emerged from observing that Haiku succeeds on clean canvas (new file, specific task) and fails on open-ended exploration of existing complex code. Prototype = bounded problem space.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

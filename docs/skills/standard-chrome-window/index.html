@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Standard Chrome Window: CDP tab to root browser window, multi-tab, iconified, placement</h1>
       <p class="description">Chrome-side parallel to standard-appbot-window. How to correctly identify and move the Chrome browser window for CDP placement. Covers tab vs window, multi-tab, non-active tab, iconified Chrome, and all edge cases. Read alongside standard-appbot-window.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Chrome tab != root window. Browser.getWindowForTarget({targetId}) returns root OS browser window. ALWAYS pass targetId explicitly -- default session may return wrong window in multi-tab.</li><li>SetWindowBoundsAsync: 2-step for minimized Chrome -- (1) setWindowBounds windowState=normal (2) WaitForWindowStateAsync until normal (3) set actual bounds. Chrome ignores setBounds while minimized.</li><li>DPI: Browser.setWindowBounds uses PHYSICAL pixels. PerMonitorV2 process shares coord space with Win32 GetWindowRect. No conversion needed. ClampBoundsToVisible is last-resort safety net.</li><li>Target class = Chrome_WidgetWin_1 (top-level, unowned GW_OWNER==0). NOT Chrome_BrowserWindow -- legacy/internal, unsafe for SetWindowPos.</li><li>DANCING = self-inflicted by repeated corrective SetWindowPos racing Chrome layout. Fix: place ONCE after window visible/idle via Browser.setWindowBounds. next:standard-chrome-window-howto for tab/multi-tab/minimize details. cluster:standard-chrome-window-ref for DPI audit + bug history.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Chrome tab != root window. Browser.getWindowForTarget({targetId}) returns root OS browser window. ALWAYS pass targetId explicitly -- default session may return wrong window in multi-tab.</li><li>SetWindowBoundsAsync: 2-step for minimized Chrome -- (1) setWindowBounds windowState=normal (2) WaitForWindowStateAsync until normal (3) set actual bounds. Chrome ignores setBounds while minimized.</li><li>DPI: Browser.setWindowBounds uses PHYSICAL pixels. PerMonitorV2 process shares coord space with Win32 GetWindowRect. No conversion needed. ClampBoundsToVisible is last-resort safety net.</li><li>Target class = Chrome_WidgetWin_1 (top-level, unowned GW_OWNER==0). NOT Chrome_BrowserWindow -- legacy/internal, unsafe for SetWindowPos.</li><li>DANCING = self-inflicted by repeated corrective SetWindowPos racing Chrome layout. Fix: place ONCE after window visible/idle via Browser.setWindowBounds. next:standard-chrome-window-howto for tab/multi-tab/minimize details. cluster:standard-chrome-window-ref for DPI audit + bug history.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

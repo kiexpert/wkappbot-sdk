@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>WKAppBot Build Verify Workflow T2 HowTo</h1>
       <p class="description">T2 domain tier. Refactor loop, partial-class pattern, common errors, smoke check commands.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../wkappbot-build-verify-workflow/">wkappbot-build-verify-workflow</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Refactor loop: (1) make change (2) wkappbot-pub\build.cmd (3) check last 3 lines for staged+skills installed (4) wkappbot --version to force swap (5) wkappbot &lt;affected-cmd&gt; smoke test (6) git add+commit ONLY after all green.</li><li>Partial-class split pattern: new file must have same namespace WKAppBot.CLI AND internal partial class Program. No extra using-statements beyond what extracted code needs.</li><li>CS0246 (type/namespace not found): new file created but not referenced, OR extracted method left dangling reference. Read error location and verify both sites.</li><li>Smoke check: wkappbot --version (expect base version). wkappbot exec list (expect built-in presets). wkappbot &lt;affected-command&gt; with minimal args.</li><li>Launcher auto-swap failing: see hot-swap-stuck-orphan-mcp-workers-kill-force-swap skill. Short: wkappbot --sudo --force-swap eye tick when admin orphan blocks.</li><li>After deploy: wkappbot skill sync to push local edits to HQ. Conflicts -&gt; wkappbot skill sync --resolve &lt;id&gt;. Never leave split-brain pending.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Refactor loop: (1) make change (2) wkappbot-pub\build.cmd (3) check last 3 lines for staged+skills installed (4) wkappbot --version to force swap (5) wkappbot &lt;affected-cmd&gt; smoke test (6) git add+commit ONLY after all green.</li><li>Partial-class split pattern: new file must have same namespace WKAppBot.CLI AND internal partial class Program. No extra using-statements beyond what extracted code needs.</li><li>CS0246 (type/namespace not found): new file created but not referenced, OR extracted method left dangling reference. Read error location and verify both sites.</li><li>Smoke check: wkappbot --version (expect base version). wkappbot exec list (expect built-in presets). wkappbot &lt;affected-command&gt; with minimal args.</li><li>Launcher auto-swap failing: see hot-swap-stuck-orphan-mcp-workers-kill-force-swap skill. Short: wkappbot --sudo --force-swap eye tick when admin orphan blocks.</li><li>After deploy: wkappbot skill sync to push local edits to HQ. Conflicts -&gt; wkappbot skill sync --resolve &lt;id&gt;. Never leave split-brain pending.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

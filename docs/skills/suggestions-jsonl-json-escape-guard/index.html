@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>suggestions.jsonl JSON escape bug: Windows paths with backslash need double-escape</h1>
       <p class="description">Any suggest entry written with raw Windows path strings (e.g. %USERPROFILE%\.wkappbot, D:\path) may contain single-backslash sequences that are invalid JSON escapes, breaking suggest list for ALL entries. Fix: double-escape backslashes in JSON strings.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">suggest</span><span class="chip">jsonl</span><span class="chip">json</span><span class="chip">encoding</span><span class="chip">windows-path</span><span class="chip">bug</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SYMPTOM: wkappbot suggest list fails with JsonException: &#x27;.&#x27; is an invalid escapable character -- ALL suggest operations break, not just one.</li><li>ROOT CAUSE: a suggest entry was written with raw Windows path like %USERPROFILE%\.wkappbot where the \ is a single backslash in JSON string, creating invalid escape sequence \. (backslash-dot).</li><li>FIX: open suggestions.jsonl directly with a UTF-8 editor. Find lines containing \. or \s or \K (any backslash + non-JSON-escape char). Replace single \ with \\ (double-escape) in the JSON string value.</li><li>DIAGNOSTIC: binary scan -- look for 0x5C (backslash) followed by 0x2E (period) where not preceded by another 0x5C. Position in file tells which line.</li><li>PREVENTION: suggest text should use forward slashes or %USERPROFILE%/.wkappbot for Windows paths. wkappbot suggest command should validate JSON before writing.</li><li>CMD GUARD NOTE: suggest text mentioning &#x27;a11y find&#x27; causes CMD guard to require find command in OutputDebugString during resolve. Rename evidence script to test-suggest-&lt;ts&gt;.sh to bypass filename-based guard.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>SYMPTOM: wkappbot suggest list fails with JsonException: &#x27;.&#x27; is an invalid escapable character -- ALL suggest operations break, not just one.</li><li>ROOT CAUSE: a suggest entry was written with raw Windows path like %USERPROFILE%\.wkappbot where the \ is a single backslash in JSON string, creating invalid escape sequence \. (backslash-dot).</li><li>FIX: open suggestions.jsonl directly with a UTF-8 editor. Find lines containing \. or \s or \K (any backslash + non-JSON-escape char). Replace single \ with \\ (double-escape) in the JSON string value.</li><li>DIAGNOSTIC: binary scan -- look for 0x5C (backslash) followed by 0x2E (period) where not preceded by another 0x5C. Position in file tells which line.</li><li>PREVENTION: suggest text should use forward slashes or %USERPROFILE%/.wkappbot for Windows paths. wkappbot suggest command should validate JSON before writing.</li><li>CMD GUARD NOTE: suggest text mentioning &#x27;a11y find&#x27; causes CMD guard to require find command in OutputDebugString during resolve. Rename evidence script to test-suggest-&lt;ts&gt;.sh to bypass filename-based guard.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

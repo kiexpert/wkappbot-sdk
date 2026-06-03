@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkchat session routing guard -- nested calls stay session-aware</h1>
       <p class="description">wkchat starts an interactive chat session. When the current or parent process already carries a chat session marker, descendant wkappbot calls stay in session-aware routing mode so nested launches do not re-enter interactive chat.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkchat</span><span class="chip">chat</span><span class="chip">session</span><span class="chip">launcher</span><span class="chip">routing</span><span class="chip">operator</span><span class="chip">reference</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Chat sessions set and inherit WKAPPBOT_CHAT_SESSION=1</li><li>Use wkappbot chat for interactive REPL only; nested commands inside the session must be treated as single-shot calls</li><li>If a child launch needs interactive chat behavior, clear the session marker in the parent shell before starting it</li><li>Verify the live behavior with wkappbot chat --help and wkappbot skill read wkchat-session-routing-guard</li><li>Keep the outer chat guard in the launcher; nested chat sessions still inherit WKAPPBOT_CHAT_SESSION=1 for child routing</li><li>When the session guard is active, Launcher keeps chat on the interactive stdio path and skips Eye routing</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Chat sessions set and inherit WKAPPBOT_CHAT_SESSION=1</li><li>Use wkappbot chat for interactive REPL only; nested commands inside the session must be treated as single-shot calls</li><li>If a child launch needs interactive chat behavior, clear the session marker in the parent shell before starting it</li><li>Verify the live behavior with wkappbot chat --help and wkappbot skill read wkchat-session-routing-guard</li><li>Keep the outer chat guard in the launcher; nested chat sessions still inherit WKAPPBOT_CHAT_SESSION=1 for child routing</li><li>When the session guard is active, Launcher keeps chat on the interactive stdio path and skips Eye routing</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

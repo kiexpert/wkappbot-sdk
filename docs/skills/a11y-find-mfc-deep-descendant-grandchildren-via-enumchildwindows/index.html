@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>a11y find: MFC deep-descendant grandchildren via EnumChildWindows</h1>
       <p class="description">HTS/MFC apps expose empty UIA tree below top frame; controls live 3-4 levels under custom container classes. FindChildByPattern now recurses via Win32 EnumChildWindows as final fallback (after MDIClient/direct-children layers) so grap like &#x27;*Hero*/Form1101/*StockCode*&#x27; reaches grandchildren.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">find</span><span class="chip">hts</span><span class="chip">mfc</span><span class="chip">mdi</span><span class="chip">grap</span><span class="chip">win32</span><span class="chip">focusless-first</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>grap child segment X/Y/Z: each segment becomes a FindChildByPattern call against the previous hwnd</li><li>Layer 1 MDIClient children (depth 2)</li><li>Layer 2 direct children of hParent (depth 1)</li><li>Layer 3 EnumChildWindows full subtree recurse -- catches MFC 3+ depth controls the prior layers missed</li><li>Returns first pattern match in enumeration order</li><li>Use &#x27;[cls] title cid=N hwnd=H WxH&#x27; search key; PatternMatcher.TokenMatchAny matches title + key</li><li>Usage example: wkappbot a11y find &#x27;*Hero*/MDIClient/Form1101/*StockCode*&#x27; reaches MFC grandchildren that prior 2-layer logic missed</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T06:48:31)</li><li>[v6.2+ SIMPLE PATH] For top-level MDI panel discovery, simple wildcard &#x27;a11y find *panel-title*&#x27; now works -- FindWindows simple-pattern path auto-falls-back to MDI child enumeration. This skill&#x27;s grap-chain layer (Parent/MDIClient/Form1101/*StockCode*) is still required for drilling INTO MFC grandchildren via Win32 EnumChildWindows; simple fallback covers top-level MDI Window elements only.</li><li>STOP-EARLY PATTERN: grap path can target any intermediate window in the hierarchy -- you do NOT need to reach a leaf field. &#x27;*App*/MDIClient/Form1101&#x27; returns the Form1101 container hwnd directly. Use this when you need the container window itself (screenshot, click-region, child enumeration) rather than a specific element inside it. Combining with cls glob: &#x27;{cls:*Form*}&#x27; or &#x27;{proc:App}#MDIClient/MyPanel&#x27; stops at the panel. This avoids brittle deep paths when the container is the actual target.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>grap child segment X/Y/Z: each segment becom...</li><li>Layer 1 MDIClient children (depth 2)</li><li>Layer 2 direct children of hParent (depth 1)</li><li>Layer 3 EnumChildWindows full subtree recurs...</li><li>Returns first pattern match in enumeration o...</li><li>Use &#x27;[cls] title cid=N hwnd=H WxH&#x27; search ke...</li><li>Usage example: wkappbot a11y find &#x27;*Hero*/MD...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>[v6.2+ SIMPLE PATH] For top-level MDI panel...</li><li>STOP-EARLY PATTERN: grap path can target any...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

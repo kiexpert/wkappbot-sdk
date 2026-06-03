@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Safe Bug Fix Protocol -- before touching any working code</h1>
       <p class="description">Checklist to prevent regression cascades. Read before fixing any BUG-AUTO or suggest. Core rule: understand WHY code exists before removing it.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">protocol</span><span class="chip">safety</span><span class="chip">bugfix</span><span class="chip">checklist</span><span class="chip">regression-prevention</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>RULE 0 — WHY before HOW: before touching ANY line of working code, read its comments and understand WHY it exists. If a comment says &#x27;mixed-DPI drift fix&#x27;, that IS the spec. Deleting code to make an error go away is NOT a fix.</li><li>REPRODUCE FIRST: trigger the actual bug behavior before writing any fix. BUG-AUTO reports may be false positives (e.g. verification using wrong DPI scale). If you cannot reproduce it manually, do not change production code.</li><li>MINIMAL SURGERY: change only the specific line causing the problem. If snap() fires with wrong timing → add delay. Do NOT remove snap entirely. If evidence check runs in --confirm path → add goto label. Do NOT restructure the whole method.</li><li>TEST = RUN THE ACTUAL FEATURE: build success is NOT enough. Eye DPI fix → actually move Eye window across monitors and observe. Suggest resolve fix → actually run wkappbot-core.exe suggest resolve and read the output. No exceptions.</li><li>RESOLVE ONLY AFTER VERIFIED: never close a suggest before step 4 passes. If you cannot test the feature (no HTS open, no secondary monitor), say so explicitly instead of claiming success.</li><li>BUG-AUTO TRIAGE: check if actual=intended*(monitorDPI/96) before assuming drift is real. Check if error disappears after Eye restart (stale binary). Check if it is cross-channel false positive before filing or fixing. Most BUG-AUTO Eye DPI drift reports in 2026-04-30 were caused by snap removal, not a real bug.</li><li>WPF DPI CONTENT SCALING: SetProcessDpiAwareness(2) alone is NOT enough for WPF content to rescale on monitor boundary. WPF reads app.manifest at startup to set its rendering DPI mode. Without &lt;dpiAwareness&gt;PerMonitorV2&lt;/dpiAwareness&gt; in app.manifest, WPF uses system DPI for layout until WM_DPICHANGED fires (visible transient wrong-scale glitch). Fix: add dpiAwareness + dpiAware to app.manifest windowsSettings. This is a separate concern from snap position correction (AnimateMoveTo).</li><li>WPF DPI CONTENT SCALING: SetProcessDpiAwareness(2) alone is NOT enough for WPF content to rescale on monitor boundary. WPF reads app.manifest at startup to set its rendering DPI mode. Without &lt;dpiAwareness&gt;PerMonitorV2&lt;/dpiAwareness&gt; in app.manifest, WPF uses system DPI for layout until WM_DPICHANGED fires (visible transient wrong-scale glitch). Fix: add dpiAwareness + dpiAware to app.manifest windowsSettings. This is a separate concern from snap position correction (AnimateMoveTo).</li><li>NEVER touch app.manifest dpiAwareness for Eye DPI fixes. PerMonitorV2 manifest changes WPF coordinate semantics globally -- Window.Left/Top units change, hover detection breaks, window sizing changes, hundreds of coord-dependent paths break. SetProcessDpiAwareness(2) in code is sufficient. The Eye snap formula uses Window.Left as physical pixels (system-DPI app); do NOT multiply by GetDpiForWindow() -- that double-scales when system DPI=96.</li><li>NEVER touch app.manifest dpiAwareness for Eye DPI fixes. PerMonitorV2 manifest changes WPF coordinate semantics globally -- Window.Left/Top units change, hover detection breaks, window sizing changes, hundreds of coord-dependent paths break. SetProcessDpiAwareness(2) in code is sufficient. The Eye snap formula uses Window.Left as physical pixels (system-DPI app); do NOT multiply by GetDpiForWindow() -- that double-scales when system DPI=96.</li><li>NEVER add parallel DetectBlocker calls alongside the existing readiness.Probe() flow. InputReadiness.Probe() already runs DetectBlocker when SkipBlockerCheck=false. Extend probeReport.ActiveBlocker handling instead. Duplicate calls waste time and create inconsistent output.</li><li>NEVER add parallel DetectBlocker calls alongside the existing readiness.Probe() flow. InputReadiness.Probe() already runs DetectBlocker when SkipBlockerCheck=false. Extend probeReport.ActiveBlocker handling instead. Duplicate calls waste time and create inconsistent output.</li><li>ScreenCoords (ScreenCoords.cs) is the ONLY approved class for WPF↔physical pixel conversions. Methods: PhysicalToLogical(physX, physY, hwnd) uses per-monitor DPI; PhysicalToLogicalSystemDpi(physX, physY) uses system DPI for WPF Window.Left/Top; LogicalToPhysical(logX, logY, logW, logH, dpiScale) converts WPF logical to screen pixels. Rule: NEVER use GetDpiForSystem() directly for coordinate math -- always go through ScreenCoords. Multi-monitor: use _liveDpiScale (computed by CalcCalloutGeometry for that monitor) when converting callout window bounds. If a LogicalToPhysical overload is missing, ADD it to ScreenCoords rather than doing inline math.</li><li>ScreenCoords (ScreenCoords.cs) is the ONLY approved class for WPF↔physical pixel conversions. Methods: PhysicalToLogical(physX, physY, hwnd) uses per-monitor DPI; PhysicalToLogicalSystemDpi(physX, physY) uses system DPI for WPF Window.Left/Top; LogicalToPhysical(logX, logY, logW, logH, dpiScale) converts WPF logical to screen pixels. Rule: NEVER use GetDpiForSystem() directly for coordinate math -- always go through ScreenCoords. Multi-monitor: use _liveDpiScale (computed by CalcCalloutGeometry for that monitor) when converting callout window bounds. If a LogicalToPhysical overload is missing, ADD it to ScreenCoords rather than doing inline math.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>RULE 0 — WHY before HOW: before touching ANY...</li><li>REPRODUCE FIRST: trigger the actual bug beha...</li><li>MINIMAL SURGERY: change only the specific li...</li><li>TEST = RUN THE ACTUAL FEATURE: build success...</li><li>RESOLVE ONLY AFTER VERIFIED: never close a s...</li><li>BUG-AUTO TRIAGE: check if actual=intended*(m...</li><li>WPF DPI CONTENT SCALING: SetProcessDpiAwaren...</li><li>WPF DPI CONTENT SCALING: SetProcessDpiAwaren...</li><li>NEVER touch app.manifest dpiAwareness for Ey...</li><li>NEVER touch app.manifest dpiAwareness for Ey...</li><li>NEVER add parallel DetectBlocker calls along...</li><li>NEVER add parallel DetectBlocker calls along...</li><li>ScreenCoords (ScreenCoords.cs) is the ONLY a...</li><li>ScreenCoords (ScreenCoords.cs) is the ONLY a...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'safe-bugfix-protocol';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

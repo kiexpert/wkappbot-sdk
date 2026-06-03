@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted</h1>
       <p class="description">ChatGPT renames #prompt-textarea / its testid faster than we can ship selector chain updates, which used to block all ask gpt commands at EDITOR-WAIT until user intervention. Fixed: after the 10s selector chain exhausts, WaitForChatGptEditorA11y performs a last-resort probe for any visible contenteditable/textbox/textarea, tags it with data-wkappbot-editor-rescue=1, and returns that selector so the ask flow continues. Diagnostic [ASK] EDITOR-DIAG dump still logged so suggest queue captures the new selector the next day.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">gpt</span><span class="chip">chatgpt</span><span class="chip">cdp</span><span class="chip">editor-wait</span><span class="chip">selector</span><span class="chip">rescue</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Primary chain (6 selectors) gets 10s total poll; returns as soon as one resolves</li><li>On exhaust: EDITOR-DIAG eval prints URL + title + counts of visible editables</li><li>Last-resort eval picks the first visible contenteditable/textbox/textarea (&gt;50x10 px) and tags it with data-wkappbot-editor-rescue=1</li><li>Returns &#x27;[data-wkappbot-editor-rescue=&quot;1&quot;]&#x27; so ask gpt / ask triad keeps running</li><li>Rescue path is non-destructive -- a data-* attribute is invisible to the page</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-17T04:54)</li><li>2026-05-09: stale ChatGPT session can cause ask gpt --sync to return only LAUNCH banner. Workaround: --new-session restores pipeline. Resolves suggest 2026-05-08T13:00:35.</li><li>Pipeline kill triage: ask gpt --sync ping returns only LAUNCH banner -&gt; no AI response within timeout -&gt; stale session. Recovery: --new-session.</li><li>Verified 2026-05-09: test-ask-gpt-sync-stale-session.ps1 (resolve ts=2026-05-08T13:00:35)</li><li>2026-05-09 fix(ask): WaitForEditorA11y readyState gate + 1.5s per-call timeout fixes ask gpt / ask gemini / ask claude CDP runtime.evaluate stale-context cluster (commit 59abeed3)</li><li>(removed)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Primary chain (6 selectors) gets 10s total p...</li><li>On exhaust: EDITOR-DIAG eval prints URL + ti...</li><li>Last-resort eval picks the first visible con...</li><li>Returns &#x27;[data-wkappbot-editor-rescue=&quot;1&quot;]&#x27;...</li><li>Rescue path is non-destructive -- a data-* a...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>2026-05-09: stale ChatGPT session can cause...</li><li>Pipeline kill triage: ask gpt --sync ping re...</li><li>Verified 2026-05-09: test-ask-gpt-sync-stale...</li><li>2026-05-09 fix(ask): WaitForEditorA11y ready...</li><li>(removed)</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'ask-gpt-editor-wait-tag-and-rescue-fallback';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

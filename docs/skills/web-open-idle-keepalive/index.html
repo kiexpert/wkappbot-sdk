@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>web open --keeplogin-Ns: login session keepalive</h1>
       <p class="description">Keeps web login session alive using Web Worker timer (not throttled in background tabs). Injects URL after 60s user idle. --keeplogin is the ONLY option name (--idle removed).</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>--keeplogin-Ns / --keeplogin N / --keeplogin Ns: only accepted forms</li><li>Injects JS Web Worker (blob URL) -- setInterval(1s) immune to background tab throttling</li><li>Main thread tracks user events (mousemove/click/keydown/scroll) → posts &#x27;activity&#x27; to Worker</li><li>CDP polls window._kaIdleMs each tick -- if &gt;= 60s → location.href=url injected</li><li>Output: # KEEPALIVE url=... interval=Ns idle-threshold=60s pid=...</li><li>On inject: # LOGIN-KEEPALIVE url=... idle=Xs ts=...</li><li>Blocks until Ctrl+C</li><li>Verified 2026-04-27: test-web-open-keeplogin-implemented.sh (resolve ts=2026-04-26T16:21)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>--keeplogin-Ns / --keeplogin N / --keeplogin Ns: only accepted forms</li><li>Injects JS Web Worker (blob URL) -- setInterval(1s) immune to background tab throttling</li><li>Main thread tracks user events (mousemove/click/keydown/scroll) → posts &#x27;activity&#x27; to Worker</li><li>CDP polls window._kaIdleMs each tick -- if &gt;= 60s → location.href=url injected</li><li>Output: # KEEPALIVE url=... interval=Ns idle-threshold=60s pid=...</li><li>On inject: # LOGIN-KEEPALIVE url=... idle=Xs ts=...</li><li>Blocks until Ctrl+C</li><li>Verified 2026-04-27: test-web-open-keeplogin-implemented.sh (resolve ts=2026-04-26T16:21)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

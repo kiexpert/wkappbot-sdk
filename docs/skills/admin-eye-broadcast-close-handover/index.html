@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,9 +117,11 @@
       <h1>Admin Eye 2-phase broadcast close for clean hand-over</h1>
       <p class="description">When a new admin Eye spawns, it evicts old admin Eye(s) via 2-phase &#x27;broadcast close&#x27; before claiming the wkappbot_elevated pipe. Phase 1 (graceful) signals Global\WKAppBotAdminEyeBroadcastClose named event; listening admins cancel their CTS and exit. Phase 2 (force kill) enumerates wkappbot-core processes and Process.Kill()s them when pipe still present — bootstrap path when old admin lacks the listener. Ensures clean gap (no admin Eye window present) before new takes over, eliminating named-pipe contention.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">project</span><span class="chip">admin</span><span class="chip">eye</span><span class="chip">ipc</span><span class="chip">named-pipe</span><span class="chip">recovery</span><span class="chip">broadcast</span><span class="chip">hand-over</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WHY THE PATTERN EXISTS
+      <div class="steps-wrap">
+        <ol class="steps"><li>WHY THE PATTERN EXISTS
 Admin Eye can fall into a state where it accepts pipe connections but hangs on request processing (Bug 1). Without active eviction, simply spawning a new admin Eye fails: the hung one still holds the pipe, new one contends, requests route to the dead one. Plain kill breaks the &#x27;NEVER kill Eye&#x27; rule for user Eye — but admin Eye is separate, has no mutex, and can be replaced.</li><li>PHASE 1 — GRACEFUL BROADCAST
 New admin calls AdminEyeBroadcastClose.FireBroadcast().
 Uses Global\WKAppBotAdminEyeBroadcastClose ManualResetEvent.
@@ -145,7 +162,10 @@ bin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh (T1–T10)
   T7 covers admin Eye round-trip; T7d budget 8s verifies fast-fail + recovery path total.
   If T7c/d fail repeatedly across sessions, root cause is inside admin Eye
   ExecuteCommand subprocess spawn — NOT the broadcast-close layer.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,130 +117,102 @@
       <h1>grap -- UI Element Address System (Window + UIA Scope + Web + ADB)</h1>
       <p class="description">GRAP = Grab Accessible Pattern -- JSON5-extended universal UI element address. {JSON5-window}#AbsTagPath: identifies any Win32/UIA/web/Android element. a11y find outputs verified &#x27;# TARGET &quot;grap&quot; [OK] Nms&#x27; for direct copy-paste targeting.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">grap</span><span class="chip">pattern</span><span class="chip">a11y</span><span class="chip">uia</span><span class="chip">scope</span><span class="chip">json5</span><span class="chip">wildcard</span><span class="chip">hwnd</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[WHAT-IS-GRAP] grap = UI address. Before &#x27;#&#x27; = which window. After &#x27;#&#x27; = which UIA element inside.
-Three-tier: Win32 window -&gt; UIA subtree -&gt; web content (CDP).
-a11y find &lt;grap&gt; outputs clean markdown sections to stdout -- paste-ready grap + ready-to-run command.
-NEW FORMAT (v5.13+):
-## FOCUS
-&quot;{hwnd:...,pid:...,proc:&#x27;...&#x27;}#absTagPath&quot;  &lt;- focused window (dim)
-
-## TARGET
-&quot;{hwnd:...,pid:...,proc:&#x27;chrome&#x27;,domain:&#x27;chatgpt.com&#x27;}#absTagPath&quot;  &lt;- paste-ready grap
-wkappbot a11y find &quot;...&quot;  &lt;- copy this line to re-run
-[OK] Nms  &lt;- verify mark on line AFTER command (no [[double brackets]])
-WindowTitle -&gt; stderr (noise-free stdout)
-MULTIPLE TARGETS: ## TARGETS N matches header + one ## TARGET block per window.</li><li>[WINDOW-PATTERNS] Before &#x27;#&#x27; -- addressing a top-level windoD:
-  Substring:   &#x27;ChatGPT&#x27;                    contains, case-insensitive
-  Wildcard:    &#x27;*Notepad*&#x27;                      * = any chars
-  OR(;):       &#x27;*Notepad*;*Calculator*&#x27;           matches either
-  JSON5:       {title:&#x27;Claude&#x27;,proc:&#x27;chrome&#x27;}  AND logic
-  HWND direct: {hwnd:0x010B084A}             instant lookup
-  HWND bracket:[0012061C]                    inspect/windows output format
-  Regex:       regex:^AppName                    prefix required</li><li>[JSON5-SPEC] JSON5-extended grap syntax -- official window address grammar.
-SYNTAX: {field:value, field:value, ...}  -- all fields AND&#x27;d
-  Single-quoted strings OK: {proc:&#x27;chrome&#x27;}
-  Unquoted keys OK:         {proc:&#x27;chrome&#x27;,domain:&#x27;claude.ai&#x27;}
-  Trailing comma OK:        {proc:&#x27;chrome&#x27;,}
-  Hex literals OK:          {hwnd:0x010B084A}
-FIELDS (all optional, combine freely):
-  hwnd:   0x010B084A    Win32 HWND -- instant exact lookup, session-scoped
-  pid:    19016         process ID -- session-scoped
-  proc:   &#x27;chrome&#x27;      process name (no .exe), case-insensitive
-  domain: &#x27;claude.ai&#x27;   browser domain via CDP -- most stable web identifier
-  title:  &#x27;Claude&#x27;      window title substring (30-char cap)
-  cls:    &#x27;Chrome_WidgetWin_1&#x27;  Win32 window class -- essential for MFC/old apps
-  cid:    100           Win32 control ID
-  url:    &#x27;https://...&#x27; browser URL substring via CDP
-OPERATORS:
-  AND (default):    {proc:&#x27;chrome&#x27;,domain:&#x27;chatgpt.com&#x27;}
-  Array OR:         {title:[&#x27;ChatGPT&#x27;,&#x27;Claude&#x27;]}  -- matches if title contains either
-  Glob in value:    {title:&#x27;*AppBot*&#x27;}             -- * and ? work in string values
-  Regex in value:   {title:/AppBot.*/}             -- /regex/ literal, full .NET regex
-  OR at top level:  use ;-syntax before &#x27;#&#x27;:  &#x27;*Notepad*;*Calculator*&#x27;
-COMPACT GRAP RULE (# TARGET verified output):
-  browser  -&gt; {hwnd,pid,proc,domain}         no cls/title/url
-  MFC/old  -&gt; {hwnd,pid,proc,cls}            cls essential; no accessibility tree = needs class
-  modern   -&gt; {hwnd,pid,proc}               proc sufficient
-  NEVER include title/url in stored graps -- volatile, session-specific</li><li>[SCOPE-CHAIN] After &#x27;#&#x27; -- UIA element drill-down. Each segment = one tree level:
-  &#x27;*App*#*Button*&#x27;        find Button anywhere under App
-  &#x27;*App*#Panel#*OK*&#x27;      Panel first, then OK inside
-  &#x27;*App*#&#x27;               empty scope = drill to keyboard-focused element
-  Depth: up to 25 levels. Match: Name first, AutomationId fallback (both substring).
-  Container-first: Pane/Group preferred over Button/Edit at same level.
-  Regex segment: &#x27;*App*#regex:btn_\d+&#x27;</li><li>[TAB-PORTAL] Browser tab switching built into scope chain:
-  &#x27;*Chrome*#ChatGPT#Send&#x27;
-  -&gt; (1) find TabItem &#x27;ChatGPT&#x27; -&gt; SelectionItem.Select() (focusless)
-  -&gt; (2) 600ms wait -&gt; jump to RootWebArea
-  -&gt; (3) find &#x27;Send&#x27; inside web content
-  Works on Chrome/Edge/Electron. Combine with JSON5:
-  &#x27;{domain:\&#x27;claude.ai\&#x27;}#.ProseMirror&#x27;  = JSON5 window + CSS scope in web</li><li>[WIN32-CHILD] &#x27;/&#x27; drills Win32 child windows (MFC/legacy multi-child-window apps):
-  &#x27;Parent/Child&#x27;              Win32 GetChildren, pattern match
-  &#x27;Parent/Child#UiaScope&#x27;     Win32 drill THEN UIA scope
-  &#x27;Window/&#x27;                   trailing / = focus-tunnel to focused child + element
-  Used for AppName/legacy apps where UIA tree is fragmented across child HWNDs.
-  Example: &#x27;AppName/MainPanel#InputField&#x27;</li><li>[ANDROID] adb:// prefix routes to Android UIA pipeline:
-  &#x27;adb://Fold5/*heromts*#해외잔고&#x27;          device / package / scope
-  &#x27;adb://*heromts*#해외잔고&#x27;              auto-detect device
-  &#x27;adb://Fold5:outer/*pkg*&#x27;            :outer = foldable outer display
-  Format: adb://[device[:display]]/[pkg-grap]#[scope#scope...]</li><li>[NODE-TAG] Element label format in CURSOR/TARGET sections:
-  &lt;Button&gt;              ControlType only
-  &lt;ButtonOK&gt;            ControlType + AutomationId
-  &lt;Button&#x27;확인&#x27;&gt;         ControlType + Name (single-quoted, no truncation)
-  &lt;Button2Email&gt;        ControlType + SiblingIndex + AutomationId
-  &lt;Group x7&gt;            7 consecutive unnamed Groups (run-length in CURSOR)
-  attrs: ltwh=x,y,w,h  actions=&quot;Invoke,...&quot;
-Use as scope: &lt;ButtonOK&gt; -&gt; #OK   &lt;Button&#x27;확인&#x27;&gt; -&gt; #*확인*</li><li>[ABS-TAG-PATH] Official absolute UIA tag path -- BuildAbsoluteTagPath output.
-Format: Type_aid / Type_Nth / Type -- compressed repeats use //
-  ***
-Type = first 3 chars of UIA ControlType:
-  Doc=Document  Gro=Group  Edi=Edit  But=Button  Pan=Pane  Win=Window
-  Tex=Text      Lst=List   Tab=Tab   Tre=Tree     Img=Image  Lnk=Hyperlink
-_aid  = AutomationId (truncated at first &#x27;-&#x27; for readability)
-_Nth  = sibling index fallback when no AutomationId
-//    = consecutive unnamed same-type nodes compressed (Gro/Gro/Gro -&gt; Gro//)
-Resolution: Type_aid -&gt; ByAutomationId(aid) fast; Type_Nth -&gt; sibling BFS; bare -&gt; name BFS
-VERIFIED: # TARGET line includes [OK] = FindByTitle(compactGrap) confirms correct hwnd</li><li>[FIND-OUTPUT] &#x27;a11y find &lt;grap&gt;&#x27; stdout format (v5.13+):
-
-## FOCUS                          (dim) -- focused window section
-&quot;{hwnd,pid,proc,...}#absTagPath&quot;  paste-ready grap (double-quoted)
-
-## TARGET                         (bold cyan) -- matched window section
-&quot;{hwnd,pid,proc,domain,...}#absTagPath&quot;  paste-ready grap with mandatory fields
-wkappbot a11y find &quot;...&quot;          COPY THIS LINE to re-run
-[OK] Nms                          verify mark on line AFTER command
-[stderr] WindowTitle              window title goes to stderr (not captured by pipes)
-
-MANDATORY GRAP FIELDS (BuildFindGrap order):
-  hwnd:        always first -- primary unambiguous identifier
-  pid:         immediately after hwnd (collision safety, same-proc windows)
-  proc:        process name always included
-  domain:      browser/web windows (most stable identifier)
-  file:        file:// browsing windows
-  cls:         legacy MFC/old apps (no accessibility tree)
-  &lt;matchedField&gt;: auto-injected when search matched via cmd/title/uia/etc.
-                  e.g. searching chatgpt.com may match VS Code via cmd -- cmd:&#x27;...&#x27; injected
-
-MULTIPLE TARGETS: ## TARGETS N matches (outer loop), one ## TARGET block per match.
-All [DIAG:*] [KNOWHOW:*] -&gt; stderr only. VERDICT suppressed.</li><li>[TIPS] Real-world patterns:
-# Paste &amp; go: copy quoted grap from # TARGET, strip outer quotes
-  wkappbot a11y click &#x27;{hwnd:0x010B084A,proc:\&#x27;chrome\&#x27;,domain:\&#x27;chatgpt.com\&#x27;}#Doc_RootWebArea/Gro_main/Edi_msg&#x27;
-# Find then use abs path for precise targeting
-  wkappbot a11y find &#x27;{domain:\&#x27;chatgpt.com\&#x27;}#*Message*&#x27;
-# Regex value match
-  wkappbot a11y find &#x27;{title:/^AppName.*/}&#x27;
-# Window-level only
-  wkappbot a11y find &#x27;{domain:\&#x27;chatgpt.com\&#x27;}&#x27;
-# Electron (VS Code) -- not browser CDP, use proc
-  &#x27;{title:\&#x27;WKAppBot\&#x27;,proc:\&#x27;Code\&#x27;}&#x27;
-# legacy app inner panel + UIA element
-  &#x27;AppName/MainPanel#InputField&#x27;
-# Wait for window
-  wkappbot a11y wait &#x27;*InstallComplete*&#x27; --condition visible --timeout 60
-# hack-hover: live abs path ticker
-  wkappbot a11y hack-hover &#x27;*targetApp*&#x27;</li><li>CWD FIELD (2026-05-02): {cwd:&#x27;D:/path&#x27;} finds the subordinate child process window (e.g. PseudoConsoleWindow of cmd inside WT tab). Add hwnd field empty string to show hwnd in output. WT insight: each WT tab has its OWN CASCADIA_HOSTING_WINDOW_CLASS top-level hwnd -- not shared. All tabs same WT pid but unique hwnd. GetForegroundWindow() in WT returns exact tab hwnd. Use {cwd:&#x27;...&#x27;} grap at schedule fire time for dynamic tab targeting instead of stale TargetHwnd. Chain: find(cwd) -&gt; PseudoConsoleWindow -&gt; GetAncestor -&gt; CASCADIA tab hwnd -&gt; inject.</li><li>[MDI-CHILD] (2026-05-02) MDI child windows are now included as segments in grap paths: {proc:app}#{mdi-child-title}#Node[aid=X]. The MDI child title sits between window grap and leaf node, using # (UIA scope) since MDI children are part of the UIA tree. Emitted automatically by win-click deprecation suggest line: &#x27;wkappbot --sudo win-click hwnd:0x... x y&#x27; now prints &#x27;[WIN-CLICK:SUGGEST] a11y click &lt;grap&gt;#&lt;node&gt;&#x27; with MDI child segment included when applicable. The suggested &#x27;a11y click &lt;grap&gt; --x N --y N&#x27; is paste-ready. Example: a11y click &quot;{proc:nfrunlite}#Chart#Button[aid=Buy]&quot; --x 100 --y 50.</li><li>[WIN-CLICK-DEPRECATED] (2026-05-02) win-click is deprecated and only emits a paste-ready a11y click suggestion. When migrating skills/scripts that previously used &#x27;wkappbot --sudo win-click hwnd:0x... cx cy&#x27;, replace with &#x27;wkappbot a11y click &lt;grap&gt; --x cx --y cy&#x27;. The new grap may include an MDI child segment (see [MDI-CHILD] step). Window-relative coords are still required -- subtract popup origin from screen coords as before.</li><li>STOP-EARLY PATH (MFC/legacy): grap child path &#x27;/A/B/C&#x27; can stop at ANY intermediate hwnd -- you do not need to reach a leaf element. Example: &#x27;*HeroApp*/MDIClient/Form1101&#x27; targets the Form1101 container window directly (for screenshot, click, or further child enumeration). Use when the container IS the target, not just a waypoint to a field. Combine with cls glob: &#x27;{proc:App}#MDIClient/*Panel*&#x27; -- each segment uses PatternMatcher so cls, title, cid all work as partial matches at every level.</li><li>OR COVERAGE-SUM MECHANICS (2026-05-18): ; OR is NOT first-match-wins. Each candidate window gets a SkillCoverageScore = sum(tok.Length/field.Length) across ALL patterns that match it. Same formula as skill search ranking. With multiple ; patterns, a window matching MORE patterns scores HIGHER. Use --all with invoke to fan-out to every match: &#x27;a11y invoke &quot;pat1;pat2;pat3&quot; --all&#x27; invokes ALL matched buttons in one call. Ideal for bulk popup dismiss.</li><li>SPECIAL CHAR QUOTING IN FIELD VALUES (2026-05-18): Field values containing # or other special chars MUST be single-quoted or the char is misinterpreted. cls:#32770 WRONG -- bare # is parsed as grap scope separator. cls:&#x27;#32770&#x27; CORRECT. Rule: always quote cls values for Win32 dialog classes (#32770, etc.) and any value with #/:/;.</li><li>SHELL PARSING BREAKS REGEX VALUES (2026-05-18): /regex/ field values like {title:/AppBot/} work in wkappbot JSON5 parser but bash/cmd shell truncates or corrupts the value before delivery. Workaround: use Python subprocess list args (no shell): subprocess.run([&#x27;wkappbot&#x27;,&#x27;a11y&#x27;,&#x27;find&#x27;,&#x27;{title:/pattern/}&#x27;]) -- bypasses shell entirely and delivers regex intact. Do NOT try to escape /regex/ in bash quotes -- unreliable across shells.</li><li>SHELL BRACE EXPANSION GOTCHA (2026-05-18): {proc:&#x27;x&#x27;,cls:&#x27;y&#x27;} WITHOUT outer quotes triggers bash brace expansion -- commas split it into separate tokens: proc:&#x27;x&#x27; and cls:&#x27;y&#x27;. Always wrap grap in double or single outer quotes. The /regex/ delivery issue blamed on &#x27;shell parsing&#x27; is actually this: missing outer quotes causing brace-split. With correct quoting, /regex/ values reach wkappbot intact. Actual /regex/ matching may still fail on elevated windows (UIA title not readable) -- separate issue.</li><li>CORRECTION on step 18 (2026-05-18): /regex/ shell parsing issue is actually bash brace expansion (step 19), not shell corruption of /. The Python subprocess workaround in step 18 is valid but the root cause explanation was wrong. /regex/ values DO reach wkappbot intact when outer quotes are present. The matching failure on elevated windows is a separate UIA accessibility issue unrelated to shell.</li><li>CORRECTION (2026-05-18, Codex review): Step 16 coverage-sum claim is UNVERIFIED. Testing Claude;WindowsTerminal vs WindowsTerminal;Claude showed pattern ORDER affects results, not multi-match count. ; OR is likely position-priority not coverage-sum-reranking. --all flag fan-out is confirmed correct. Step 18 overstated -- delete the &#x27;shell corrupts /&#x27; claim, root cause is brace expansion (step 19). Step 19/20 brace expansion is bash/zsh specific -- PowerShell and cmd do NOT do brace expansion so warning does not apply there. Risk: semicolons inside field VALUES like {title:&#x27;A;B&#x27;} may be re-split by wkappbot SplitGrap internally even with outer quotes.</li><li>OPUS SOURCE REVIEW (2026-05-18): ; OR actual mechanic confirmed from A11yCommand.cs:655-668 -- naive Split(&#x27;;&#x27;) then order-preserving accumulation deduped by hwnd. Per-pattern internal score = patLen/snippetLen (WindowFinder.cs:263,479-485) within each pattern only. SkillCoverageScore (SkillCommand.Helpers.cs:145) is the SKILL-SEARCH ranker, NOT used in window finding -- completely separate code path. Steps 16 coverage-sum claim is demonstrably false. Correct description: ; OR yields matches in pattern declaration ORDER, first pattern&#x27;s matches first. Step 17 justification wrong: GrapHelper.SplitGrap skips # inside {} depth tracking, so cls:#32770 parses identically to cls:&#x27;#32770&#x27; -- but quoting recommended for clarity/future-safety. Semicolon-inside-value split risk (Step 21) is REAL but lives in A11yCommand.cs:656 not SplitGrap -- {title:&#x27;A;B&#x27;} is shredded into {title:&#x27;A&#x27; and B&#x27;} (malformed). UIA element OR also first-match-wins (UiaLocator.cs:155-167 return on first hit) not coverage-summed.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>[WHAT-IS-GRAP] grap = UI address. Before &#x27;#&#x27;...</li><li>[WINDOW-PATTERNS] Before &#x27;#&#x27; -- addressing a...</li><li>[JSON5-SPEC] JSON5-extended grap syntax -- o...</li><li>[SCOPE-CHAIN] After &#x27;#&#x27; -- UIA element drill...</li><li>[TAB-PORTAL] Browser tab switching built int...</li><li>[WIN32-CHILD] &#x27;/&#x27; drills Win32 child windows...</li><li>[ANDROID] adb:// prefix routes to Android UI...</li><li>[NODE-TAG] Element label format in CURSOR/TA...</li><li>[ABS-TAG-PATH] Official absolute UIA tag pat...</li><li>[FIND-OUTPUT] &#x27;a11y find &lt;grap&gt;&#x27; stdout form...</li><li>[TIPS] Real-world patterns: # Paste &amp; go: co...</li><li>CWD FIELD (2026-05-02): {cwd:&#x27;D:/path&#x27;} find...</li><li>[MDI-CHILD] (2026-05-02) MDI child windows a...</li><li>[WIN-CLICK-DEPRECATED] (2026-05-02) win-clic...</li><li>STOP-EARLY PATH (MFC/legacy): grap child pat...</li><li>OR COVERAGE-SUM MECHANICS (2026-05-18): ; OR...</li><li>SPECIAL CHAR QUOTING IN FIELD VALUES (2026-0...</li><li>SHELL PARSING BREAKS REGEX VALUES (2026-05-1...</li><li>SHELL BRACE EXPANSION GOTCHA (2026-05-18): {...</li><li>CORRECTION on step 18 (2026-05-18): /regex/...</li><li>CORRECTION (2026-05-18, Codex review): Step...</li><li>OPUS SOURCE REVIEW (2026-05-18): ; OR actual...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'grap';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

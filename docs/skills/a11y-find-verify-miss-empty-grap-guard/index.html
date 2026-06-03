@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>A11y Ambiguity Guard: Skip Verify MISS for Empty {} Grap</h1>
       <p class="description">When BuildCompactWinGrap returns {} (WPF overlays, Eye window), PrintMultiWindowTargets skips AutoRegisterBug for verify MISS. hwnd: form works as fallback; {} is unfilterable so MISS is expected.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Root cause: WPF overlay windows (AppBotEye, WhisperRing, ScreenSaver) have no proc/title/domain that BuildCompactWinGrap can use for a portable pattern, so it returns {}. FindWindows({}) behavior is undefined/matches-all, causing verify MISS false-positive.</li><li>Fix in AmbiguityGuard.cs: if hitCompact is &#x27;{}&#x27; or &#x27;{ }&#x27;, skip the verify+heal path entirely. Use hwnd:0x... grap directly for these windows. The AutoRegisterBug suppression prevents noisy bug-auto suggests from Eye&#x27;s own UI windows.</li><li>If auto-find verify MISS appears for a real application window (not Eye/WPF overlay), investigate BuildCompactWinGrap return value. The guard only suppresses reports for the exact &#x27;{}&#x27; and &#x27;{ }&#x27; patterns.</li><li>Verified 2026-04-22: test-a11y-find-verify-miss-empty-grap.sh (resolve ts=2026-04-21T15:44)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Root cause: WPF overlay windows (AppBotEye, WhisperRing, ScreenSaver) have no proc/title/domain that BuildCompactWinGrap can use for a portable pattern, so it returns {}. FindWindows({}) behavior is undefined/matches-all, causing verify MISS false-positive.</li><li>Fix in AmbiguityGuard.cs: if hitCompact is &#x27;{}&#x27; or &#x27;{ }&#x27;, skip the verify+heal path entirely. Use hwnd:0x... grap directly for these windows. The AutoRegisterBug suppression prevents noisy bug-auto suggests from Eye&#x27;s own UI windows.</li><li>If auto-find verify MISS appears for a real application window (not Eye/WPF overlay), investigate BuildCompactWinGrap return value. The guard only suppresses reports for the exact &#x27;{}&#x27; and &#x27;{ }&#x27; patterns.</li><li>Verified 2026-04-22: test-a11y-find-verify-miss-empty-grap.sh (resolve ts=2026-04-21T15:44)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

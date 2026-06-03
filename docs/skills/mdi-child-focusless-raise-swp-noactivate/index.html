@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>MDI 자식창 포커스리스 Z순서 올리기</h1>
       <p class="description">BringWindowToTop steals focus before SetWindowPos(SWP_NOACTIVATE) can suppress it. Use SetWindowPos(HWND_TOP+SWP_NOACTIVATE) only -- raises MDI child in z-order without activating. Applies to a11y inspect/screenshot on elevated MDI apps.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">mdi</span><span class="chip">focusless</span><span class="chip">swp-noactivate</span><span class="chip">inspect</span><span class="chip">capture</span><span class="chip">z-order</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WRONG: BringWindowToTop(hwnd) then SetWindowPos(HWND_TOP+SWP_NOACTIVATE) -- BringWindowToTop activates the window first, defeating SWP_NOACTIVATE.</li><li>CORRECT: SetWindowPos(hwnd, HWND_TOP, 0,0,0,0, SWP_NOMOVE</li><li>SWP_NOSIZE</li><li>SWP_NOACTIVATE) alone raises z-order without focus steal.</li><li>CONTEXT: InspectionCommands.Capture.cs MDI child form capture -- form.Handle raised before PrintWindow capture. BringWindowToTop was removed in commit c0a53964.</li><li>VERIFY: wkappbot a11y inspect on elevated MDI app must not steal user focus. FocusStealSentinel must not fire during a11y inspect.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>WRONG: BringWindowToTop(hwnd) then SetWindowPos(HWND_TOP+SWP_NOACTIVATE) -- BringWindowToTop activates the window first, defeating SWP_NOACTIVATE.</li><li>CORRECT: SetWindowPos(hwnd, HWND_TOP, 0,0,0,0, SWP_NOMOVE</li><li>SWP_NOSIZE</li><li>SWP_NOACTIVATE) alone raises z-order without focus steal.</li><li>CONTEXT: InspectionCommands.Capture.cs MDI child form capture -- form.Handle raised before PrintWindow capture. BringWindowToTop was removed in commit c0a53964.</li><li>VERIFY: wkappbot a11y inspect on elevated MDI app must not steal user focus. FocusStealSentinel must not fire during a11y inspect.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

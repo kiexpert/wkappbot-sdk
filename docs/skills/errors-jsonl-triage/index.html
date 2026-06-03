@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>errors.jsonl Periodic Triage — Fix Frequent Errors Fast</h1>
       <p class="description">Read .wkappbot/hq/logs/errors.jsonl, aggregate by command pattern, file suggest for patterns &gt;=5 hits. Claude main duty at every gg cycle.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">errors</span><span class="chip">log</span><span class="chip">triage</span><span class="chip">gg</span><span class="chip">duty</span><span class="chip">jsonl</span><span class="chip">periodic</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>AFTER TRIAGE: clear resolved errors by rotating the file: Copy-Item .wkappbot\hq\logs\errors.jsonl .wkappbot\hq\logs\errors.jsonl.bak; &#x27;&#x27;&gt;&gt;.wkappbot\hq\logs\errors.jsonl (or wkappbot logcat --clear-errors if available).</li><li>LOG FILE: .wkappbot/hq/logs/errors.jsonl -- each line is JSON with ts, cmd, exit, log fields. All non-zero exit wkappbot commands append here automatically.</li><li>AGGREGATE (PowerShell): lines=Get-Content .wkappbot\hq\logs\errors.jsonl; ctr=@{}; foreach line: d=ConvertFrom-Json; cmd=d.cmd strip core exe prefix + normalize URLs/graps/big-nums; ctr[cmd]++. Sort by count desc, top 15.</li><li>TRIAGE RULE: skip eye --replace-pid (normal restart). Patterns &gt;=5 hits and not known-WAD = actionable. File wkappbot suggest for each actionable pattern.</li><li>KNOWN WAD (skip): eye --replace-pid N (daemon restart). eye alone (daemon init). mcp wkappbot_cli (MCP probe -- check if MCP server needs restart if count high).</li><li>ACTIONABLE PATTERNS: cdp tabs/navigate/open -- Chrome CDP port died; repair with wkappbot cdp open. win-click -- UIA target moved; check selector. cdp close/url/status -- stale grap after Chrome restart; run cdp open.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>AFTER TRIAGE: clear resolved errors by rotating the file: Copy-Item .wkappbot\hq\logs\errors.jsonl .wkappbot\hq\logs\errors.jsonl.bak; &#x27;&#x27;&gt;&gt;.wkappbot\hq\logs\errors.jsonl (or wkappbot logcat --clear-errors if available).</li><li>LOG FILE: .wkappbot/hq/logs/errors.jsonl -- each line is JSON with ts, cmd, exit, log fields. All non-zero exit wkappbot commands append here automatically.</li><li>AGGREGATE (PowerShell): lines=Get-Content .wkappbot\hq\logs\errors.jsonl; ctr=@{}; foreach line: d=ConvertFrom-Json; cmd=d.cmd strip core exe prefix + normalize URLs/graps/big-nums; ctr[cmd]++. Sort by count desc, top 15.</li><li>TRIAGE RULE: skip eye --replace-pid (normal restart). Patterns &gt;=5 hits and not known-WAD = actionable. File wkappbot suggest for each actionable pattern.</li><li>KNOWN WAD (skip): eye --replace-pid N (daemon restart). eye alone (daemon init). mcp wkappbot_cli (MCP probe -- check if MCP server needs restart if count high).</li><li>ACTIONABLE PATTERNS: cdp tabs/navigate/open -- Chrome CDP port died; repair with wkappbot cdp open. win-click -- UIA target moved; check selector. cdp close/url/status -- stale grap after Chrome restart; run cdp open.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

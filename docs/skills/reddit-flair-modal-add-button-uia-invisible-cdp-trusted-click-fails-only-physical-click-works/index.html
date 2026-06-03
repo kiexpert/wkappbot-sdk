@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>reddit flair modal Add button: UIA-invisible, CDP trusted click fails, only physical click works</h1>
       <p class="description">Reddit flair modal dialog buttons (Add, Cancel) are NOT exposed in UIA tree. Only the X-close button appears as UIA Button. a11y click falls back to WM_LBUTTON PostMessage which Chrome modal ignores. CDP eval-js querySelector click also fails (isTrusted=false). Only SendInput physical click works. Workaround: select radio via UIA (aid=post-flair-radio-input-N), then user clicks Add manually. X-button UIA pos offset to Add button: approx -3px X, +418px Y.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">reddit</span><span class="chip">chrome</span><span class="chip">modal</span><span class="chip">uia</span><span class="chip">flair</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. a11y find shows only X-close button (32x33px) as UIA Button in modal -- Add and Cancel buttons missing from UIA tree</li><li>2. a11y click grap fails -- fallback to WM_LBUTTON PostMessage which Chrome modal ignores (NeedsPhysicalClick)</li><li>3. CDP eval-js querySelector click fires but isTrusted=false -- React modal ignores it</li><li>4. Select flair radio via: wkappbot a11y invoke grap#Rad_post-flair-radio-input-1</li><li>5. User must physically click Add -- or use screen coords: X-button UIA pos + (0, +418) approx</li><li>6. Bug filed suggest ts=***.941499 -- fix = CDP Input.dispatchMouseEvent or --cdp-xy flag</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>1. a11y find shows only X-close button (32x33px) as UIA Button in modal -- Add and Cancel buttons missing from UIA tree</li><li>2. a11y click grap fails -- fallback to WM_LBUTTON PostMessage which Chrome modal ignores (NeedsPhysicalClick)</li><li>3. CDP eval-js querySelector click fires but isTrusted=false -- React modal ignores it</li><li>4. Select flair radio via: wkappbot a11y invoke grap#Rad_post-flair-radio-input-1</li><li>5. User must physically click Add -- or use screen coords: X-button UIA pos + (0, +418) approx</li><li>6. Bug filed suggest ts=***.941499 -- fix = CDP Input.dispatchMouseEvent or --cdp-xy flag</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

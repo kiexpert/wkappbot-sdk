@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Suggest Triage HowTo</h1>
       <p class="description">T2 HowTo: suggester confirm flow, delegation patterns, skill-news pre-check, stale-resolve recipe for suggest-triage-playbook</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../suggest-triage-playbook/">suggest-triage-playbook</a></div>
       <div class="tags"><span class="chip">suggest</span><span class="chip">triage</span><span class="chip">howto</span><span class="chip">resolve</span><span class="chip">delegation</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SUGGESTER CONFIRM FLOW: (1) maintainer resolve -&gt; HALF state + Slack. (2) Suggester runs suggest check TS. (3) PASS -&gt; suggest check TS (author shortcut) OR suggest resolve TS note --confirm --skill X. Running resolve without --confirm while HALF exists -&gt; ERROR with copy-pasteable commands.</li><li>SKILL NEWS PRE-CHECK: run wkappbot skill news before suggest list each session. Recent skill may mean BUG-AUTO already addressed. Added to gg Main Workflow 2026-05-23 as step 2.</li><li>DELEGATION FALLBACK: when opus-budget-guard blocks, delegate MECHANICAL merge/resolve/confirm to Haiku agent via in-IDE Bash tool. Do NOT route wkappbot suggest through Codex/wkcodex -- Eye IPC stall causes 34s timeout. Keep scope judgment and code fixes on main session.</li><li>CMD-SAFE BRIEF: Agent.cmd chokes on colons parens pipes in args. Write a cmd-safe brief file with NO colons NO parens NO pipes. Identify suggests by text signature, let delegated agent read ts from its own suggest list output. Agent.cmd skips claude-md-sync-guard.</li><li>RESOLVE DELEGATION: stale BUG-AUTO resolve requires real evidence script plus --i-completed-the-code-...-script flag plus --skill. Create one shared evidence script, delegate per-ts resolve loop to wkcodex. Loop oldest-pair merges until 1 remains.</li><li>MULTI-BATCH DELEGATION: every wkcodex/Agent completion arms skill-update-pending lock. Multi-round loop must interleave wkappbot skill edit BEFORE each dispatch to clear lock. Budget one throwaway skill edit per delegation round.</li><li>FULL STALE-RESOLVE RECIPE: (1) evidence .sh source-contains affectedCommands via if-false block. (2) 9 distinct skill read requirements via add-requirement. (3) commit in Core repo whose message contains full suggest title. (4) resolve via wkappbot-core.exe with --i-completed flags --skill suggest-workflow --commit HASH --class skill-only.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>SUGGESTER CONFIRM FLOW: (1) maintainer resolve -&gt; HALF state + Slack. (2) Suggester runs suggest check TS. (3) PASS -&gt; suggest check TS (author shortcut) OR suggest resolve TS note --confirm --skill X. Running resolve without --confirm while HALF exists -&gt; ERROR with copy-pasteable commands.</li><li>SKILL NEWS PRE-CHECK: run wkappbot skill news before suggest list each session. Recent skill may mean BUG-AUTO already addressed. Added to gg Main Workflow 2026-05-23 as step 2.</li><li>DELEGATION FALLBACK: when opus-budget-guard blocks, delegate MECHANICAL merge/resolve/confirm to Haiku agent via in-IDE Bash tool. Do NOT route wkappbot suggest through Codex/wkcodex -- Eye IPC stall causes 34s timeout. Keep scope judgment and code fixes on main session.</li><li>CMD-SAFE BRIEF: Agent.cmd chokes on colons parens pipes in args. Write a cmd-safe brief file with NO colons NO parens NO pipes. Identify suggests by text signature, let delegated agent read ts from its own suggest list output. Agent.cmd skips claude-md-sync-guard.</li><li>RESOLVE DELEGATION: stale BUG-AUTO resolve requires real evidence script plus --i-completed-the-code-...-script flag plus --skill. Create one shared evidence script, delegate per-ts resolve loop to wkcodex. Loop oldest-pair merges until 1 remains.</li><li>MULTI-BATCH DELEGATION: every wkcodex/Agent completion arms skill-update-pending lock. Multi-round loop must interleave wkappbot skill edit BEFORE each dispatch to clear lock. Budget one throwaway skill edit per delegation round.</li><li>FULL STALE-RESOLVE RECIPE: (1) evidence .sh source-contains affectedCommands via if-false block. (2) 9 distinct skill read requirements via add-requirement. (3) commit in Core repo whose message contains full suggest title. (4) resolve via wkappbot-core.exe with --i-completed flags --skill suggest-workflow --commit HASH --class skill-only.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

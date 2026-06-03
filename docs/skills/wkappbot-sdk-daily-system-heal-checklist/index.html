@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>wkappbot-sdk daily system heal checklist</h1>
       <p class="description">Daily midnight health check for wkappbot-sdk + cross-repo audit. Sections: (E) Eye ctx%, (C) CI SDK+Core, (S) briefing schedule, (G) git clean, (L) license, (P) suggest backlog, (R) release, (X) cross-repo: all-repo CI, GitHub Pages reachability, README media assets, releases, PayPal secrets. Script: D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">sdk</span><span class="chip">daily</span><span class="chip">heal</span><span class="chip">ci</span><span class="chip">schedule</span><span class="chip">suggest</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. Run: bash &#x27;D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh&#x27;</li><li>2. Read output -- each section has check or cross icon</li><li>C (CI heal loop): When any CI failures exist, enter a fix loop using Claude Code /loop or autonomous repeat until all non-infra failures are resolved. Rules: (1) NEVER ask the user -- make the best autonomous choice. (2) For each failing workflow: gh run view --log-failed to read error, identify root cause, fix code/workflow, commit with UTF8NoBOM message, push. (3) Loop: after each push wait ~60s then re-check gh run list. Repeat until all fixable failures pass. (4) Known infra-only failures to SKIP (not block): core-* binary missing (needs private CORE_REPO release), sponsor-license.yml sponsorship event (needs GitHub Sponsors account). (5) Track fixed vs skipped in a summary. (6) If stuck on same error after 2 attempts, file a suggest and move on.</li><li>4. Re-run heal script to verify all checks pass. If any check is still failing: do NOT stop -- make the best autonomous choice. For CI failures: enter fix loop (see step 3). For auth/interactive blockers: call ScheduleWakeup(60s) with same prompt for one-shot retry. NEVER wait silently for user input.</li><li>5. Workflow name audit (add to weekly check): run &#x27;Get-ChildItem .github/workflows/*.yml | ForEach-Object { (Get-Content .FullName | Select-String &quot; ^name:\)</li><li>6. Slack send heal summary. LOOP RULE: this entire checklist MUST run as a /loop until all non-infra issues are resolved. Use ScheduleWakeup(120s) after each push/fix to recheck. Known infra-skip (never loop on these): core-* binary missing (needs private CORE_REPO release), sponsor-license sponsorship event (needs GitHub Sponsors). Exit loop only when latest commit&#x27;s runs show no fixable failures.</li><li>7. Landing page consistency check (***.github.io/wkappbot-sdk/landing.html): (a) Use wkappbot a11y read to read pricing section -- compare with PRICING.md and SUBSCRIBE.md. Verify CDP price, Sudo price, and Trial tier match. (b) Check landing page link in README.md points to correct URL. (c) Check docs/public/landing.html matches latest pricing before release. Fix any price or content drift.</li><li>8. Repo root file audit: check root file count (target under 20 non-hidden files). Flag any: (a) build artifacts like *.log or build output txt, (b) accidental files with no extension or PS arg names, (c) zip/binary archives that belong in releases not root, (d) scripts that belong in scripts/, (e) media files that belong in docs/. Run: Get-ChildItem wkappbot-sdk root and count. File suggest for each, fix trivial ones immediately. Goal: README and standard GitHub files only at root.</li><li>9. POST-HEAL MONITORING LOOP (MANDATORY after all steps complete): Use /loop with ScheduleWakeup(300s) to run a side-effect and comprehensive check every 5 minutes. Each iteration checks: (a) gh run list -- any new CI failures since last check? (b) wkappbot process health -- zombie cores? (c) Eye alive? (d) Any new suggest auto-filed? Track a consecutive-clean counter. Rules: if any issue found: reset counter to 0, fix it, continue loop. If 3 consecutive iterations show NO new issues: declare heal complete, send Slack summary, stop loop. Counter resets on ANY finding. Exit condition: consecutiveClean &gt;= 3.</li><li>SECTION W (WEB): gh api repos/***/wkappbot-sdk/pages | grep status -- should be built not building. docs/index.html exists and is recent (git -C D:/GitHub/wkappbot-sdk log -1 -- docs/index.html). GHA build-skill-page last run succeeded (gh run list --repo ***/wkappbot-sdk --workflow build-skill-page.yml --limit 1). Site URL: https://***.github.io/wkappbot-sdk/</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>1. Run: bash &#x27;D:/GitHub/wkappbot-sdk/scripts...</li><li>2. Read output -- each section has check or...</li><li>C (CI heal loop): When any CI failures exist...</li><li>4. Re-run heal script to verify all checks p...</li><li>5. Workflow name audit (add to weekly check)...</li><li>6. Slack send heal summary. LOOP RULE: this...</li><li>7. Landing page consistency check (***.githu...</li><li>8. Repo root file audit: check root file cou...</li><li>9. POST-HEAL MONITORING LOOP (MANDATORY afte...</li><li>SECTION W (WEB): gh api repos/***/wkappbot-s...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'wkappbot-sdk-daily-system-heal-checklist';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

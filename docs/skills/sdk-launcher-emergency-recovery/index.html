@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>SDK Launcher Emergency Recovery (CronCreate + Full Build)</h1>
       <p class="description">Emergency recovery playbook for wkappbot binary: check nightly-guard, backup, full dotnet publish, verify deployment</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>NIGHTLY-GUARD UNLOCK: Check CronList tool output. If any job missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): create all 4 via CronCreate(cron, durable=true, recurring=true, prompt=&#x27;wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent&#x27;). This unblocks Bash/PS commands blocked by harness nightly-guard.</li><li>BINARY STATUS CHECK: Locate wkappbot.exe in D:/GitHub/WKAppBot/bin/ (main), D:/GitHub/WKAppBot/bin/wkappbot.hq/launcher-stage/ (fallback), D:/GitHub/wkappbot-sdk/bin/ (SDK deploy). Record: file size, last modified, version via file properties. Slow response suggests corrupted/incomplete binary.</li><li>SAFETY BACKUP: Create backup before rebuild: cp wkappbot.exe wkappbot.exe.bak.$(date +%s) in all three bin/ directories. Preserves fallback for rollback.</li><li>FULL DOTNET PUBLISH: Execute: dotnet publish D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --verbosity minimal. Monitor output for: (1) &#x27;Restoring/restored&#x27; = dependency check OK. (2) &#x27;Generating native code&#x27; = AOT compilation started (this is normal, takes 30-60s). (3) &#x27;wkappbot.dll&#x27; = intermediate build OK. (4) &#x27;[Launcher] deployed&#x27; = deployment completed to both SDK and Core bin/ paths.</li><li>DEPLOYMENT VERIFICATION: Expect output lines: &#x27;[Launcher] renamed: wkappbot.exe -&gt; wkappbot.old-TIMESTAMP.exe in D:/GitHub/wkappbot-sdk/bin&#x27; AND &#x27;[Launcher] deployed: wkappbot.exe -&gt; D:/GitHub/wkappbot-sdk/bin&#x27; AND same for D:/GitHub/WKAppBot/bin. Backup auto-renamed with timestamp. Two deploy confirmations = success.</li><li>RECOVERY TEST: Run wkappbot skill read on-load. Should complete in &lt;5s without timeout. If still slow: check Eye process (tasklist wkappbot-core.exe, wka11y.exe, Eye.exe). Run wkdoctor for environment health check. Check bin/ folder for residual .bak files blocking hot-swap.</li><li>BUILD ERROR RECOVERY: (A) net8.0-windows10.x target error = project uses net8.0-windows, not platform-specific target. Retry command as-is. (B) &#x27;assets file missing&#x27; = delete csharp/src/WKAppBot.Launcher/obj/ and retry. (C) vswhere.exe not found = project prepends VS Installer path automatically; run from plain cmd/bash (not Developer Command Prompt). (D) ILC.exe native linker timeout (&gt;90s) = system under load; close other apps and retry.</li><li>POST-RECOVERY DOCUMENTATION: Record in session memory or suggest comment: (1) Binary sizes before/after (confirm no silent truncation). (2) AOT compilation time (baseline for future performance). (3) Deployment timestamps and validation test results. (4) Any build warnings or error recovery steps taken. Example: &#x27;Emergency recovery 2026-05-27 18:22: CronCreate unlock, full rebuild 3m45s, deployed to WKAppBot/bin + SDK bin, validation PASS&#x27;.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>NIGHTLY-GUARD UNLOCK: Check CronList tool output. If any job missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): create all 4 via CronCreate(cron, durable=true, recurring=true, prompt=&#x27;wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent&#x27;). This unblocks Bash/PS commands blocked by harness nightly-guard.</li><li>BINARY STATUS CHECK: Locate wkappbot.exe in D:/GitHub/WKAppBot/bin/ (main), D:/GitHub/WKAppBot/bin/wkappbot.hq/launcher-stage/ (fallback), D:/GitHub/wkappbot-sdk/bin/ (SDK deploy). Record: file size, last modified, version via file properties. Slow response suggests corrupted/incomplete binary.</li><li>SAFETY BACKUP: Create backup before rebuild: cp wkappbot.exe wkappbot.exe.bak.$(date +%s) in all three bin/ directories. Preserves fallback for rollback.</li><li>FULL DOTNET PUBLISH: Execute: dotnet publish D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --verbosity minimal. Monitor output for: (1) &#x27;Restoring/restored&#x27; = dependency check OK. (2) &#x27;Generating native code&#x27; = AOT compilation started (this is normal, takes 30-60s). (3) &#x27;wkappbot.dll&#x27; = intermediate build OK. (4) &#x27;[Launcher] deployed&#x27; = deployment completed to both SDK and Core bin/ paths.</li><li>DEPLOYMENT VERIFICATION: Expect output lines: &#x27;[Launcher] renamed: wkappbot.exe -&gt; wkappbot.old-TIMESTAMP.exe in D:/GitHub/wkappbot-sdk/bin&#x27; AND &#x27;[Launcher] deployed: wkappbot.exe -&gt; D:/GitHub/wkappbot-sdk/bin&#x27; AND same for D:/GitHub/WKAppBot/bin. Backup auto-renamed with timestamp. Two deploy confirmations = success.</li><li>RECOVERY TEST: Run wkappbot skill read on-load. Should complete in &lt;5s without timeout. If still slow: check Eye process (tasklist wkappbot-core.exe, wka11y.exe, Eye.exe). Run wkdoctor for environment health check. Check bin/ folder for residual .bak files blocking hot-swap.</li><li>BUILD ERROR RECOVERY: (A) net8.0-windows10.x target error = project uses net8.0-windows, not platform-specific target. Retry command as-is. (B) &#x27;assets file missing&#x27; = delete csharp/src/WKAppBot.Launcher/obj/ and retry. (C) vswhere.exe not found = project prepends VS Installer path automatically; run from plain cmd/bash (not Developer Command Prompt). (D) ILC.exe native linker timeout (&gt;90s) = system under load; close other apps and retry.</li><li>POST-RECOVERY DOCUMENTATION: Record in session memory or suggest comment: (1) Binary sizes before/after (confirm no silent truncation). (2) AOT compilation time (baseline for future performance). (3) Deployment timestamps and validation test results. (4) Any build warnings or error recovery steps taken. Example: &#x27;Emergency recovery 2026-05-27 18:22: CronCreate unlock, full rebuild 3m45s, deployed to WKAppBot/bin + SDK bin, validation PASS&#x27;.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

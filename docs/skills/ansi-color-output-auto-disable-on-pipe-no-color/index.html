@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>ANSI Color Output: Auto-Disable on Pipe + NO_COLOR</h1>
       <p class="description">CLI tool ANSI color implementation: auto-disable on pipe/redirect + NO_COLOR env var support. Prevents garbage escape codes in logs/scripts.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ansi</span><span class="chip">color</span><span class="chip">cli</span><span class="chip">pipe</span><span class="chip">no-color</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Create Ansi.cs helper: static readonly bool IsEnabled = !Console.IsOutputRedirected &amp;&amp; Environment.GetEnvironmentVariable(&quot;NO_COLOR&quot;) == null;</li><li>Apply colors: Ansi.IsEnabled ? $&quot;\x1b[1;96m{text}\x1b[0m&quot; : text (always provide plain fallback)</li><li>Color palette: dim cyan \x1b[2;36m = headers, bold cyan \x1b[1;96m = key values, bold green \x1b[1;32m = OK, bold red \x1b[1;31m = MISS/error, yellow \x1b[33m = warnings</li><li>IsEnabled is static readonly -- evaluated once at startup, never changes mid-process</li><li>Test: redirect stdout to file and verify no escape codes appear in output</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Create Ansi.cs helper: static readonly bool IsEnabled = !Console.IsOutputRedirected &amp;&amp; Environment.GetEnvironmentVariable(&quot;NO_COLOR&quot;) == null;</li><li>Apply colors: Ansi.IsEnabled ? $&quot;\x1b[1;96m{text}\x1b[0m&quot; : text (always provide plain fallback)</li><li>Color palette: dim cyan \x1b[2;36m = headers, bold cyan \x1b[1;96m = key values, bold green \x1b[1;32m = OK, bold red \x1b[1;31m = MISS/error, yellow \x1b[33m = warnings</li><li>IsEnabled is static readonly -- evaluated once at startup, never changes mid-process</li><li>Test: redirect stdout to file and verify no escape codes appear in output</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

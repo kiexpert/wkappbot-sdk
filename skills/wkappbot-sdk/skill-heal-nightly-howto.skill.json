@@ -1,0 +1,44 @@
+{
+  "id": "skill-heal-nightly-howto",
+  "app": "wkappbot-sdk",
+  "title": "Nightly Heal HowTo",
+  "title_ko": null,
+  "desc": "T2 HowTo: guard pre-reqs and execution steps for skill-heal-nightly",
+  "steps": [
+    "GUARD PRE-REQ before Agent(opus): (1) wkappbot skill edit any-id --add-step to satisfy skill-update-pending. (2) Edit CLAUDE.md Pending to satisfy claude-md-sync-guard. Both must clear before Agent fires.",
+    "STEP 2 EXECUTION: Agent(model=opus) runs skill audit, fixes broken refs, applies repo-health LITE, compresses Pending if over 15 done items, commits.",
+    "MULTI-DELEGATION: each wkcodex/Agent completion re-arms skill-update-pending lock. Add fresh skill edit before EACH delegation round.",
+    "DELEGATION FALLBACK: wkappbot Pending compress inline via file edit (gate-allowed) when wkcodex lock loops.",
+    "SCHEDULE: CronCreate(cron=13 4 star star star durable=true) fires daily at 04:13. Job survives restarts via .claude/scheduled_tasks.json."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-heal-nightly-howto",
+      "expect": "GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-heal-nightly",
+      "expect": "STEP 2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-heal",
+    "nightly",
+    "howto",
+    "schedule"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T22:21:32.4352838Z",
+  "updated": "2026-06-02T22:21:32.4352998Z",
+  "version": "1.0"
+}

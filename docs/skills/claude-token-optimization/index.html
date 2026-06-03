@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Claude Token Optimization — Exploration, Context &amp; Search</h1>
       <p class="description">80-90% of tokens are spent on file exploration, not writing code. Techniques: (1) skill-search-first prevents redundant Glob/Grep. (2) .claudeignore + lean CLAUDE.md + session mgmt saves 30-40%. (3) PreToolUse hook enforces search discipline globally. (4) Codebase pre-indexing saves 90%+ of exploration tokens. (5) 3-agent team eliminates scope creep.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">token</span><span class="chip">optimization</span><span class="chip">claudeignore</span><span class="chip">claude.md</span><span class="chip">session</span><span class="chip">compact</span><span class="chip">pre-index</span><span class="chip">3-agent</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>[SKILL-SEARCH-FIRST] MANDATORY before any Glob/Grep/Read for knowledge lookup: run wkappbot skill search &lt;keyword&gt; first. Skills cover *** -- almost all WKAppBot knowhow lives in skills. Anti-pattern (FORBIDDEN): Glob/Grep without prior skill search = direct CLAUDE.md violation.</li><li>[PRETOOLUSE-HOOK] Enforce skill-search discipline globally via settings.json PreToolUse hook. In ~/.claude/settings.json add hook on Bash, Glob, Grep tools that prints: SKILL SEARCH FIRST: wkappbot skill search &lt;keyword&gt;. This fires even for unconfigured Claude sessions. JSON path: hooks[PreToolUse][].matcher=Bash or Glob or Grep, type=command.</li><li>[CLI-SKILL-HINT] PrintSkillSearchHint() embedded in WKAppBot CLI exploratory output. Added to: wkappbot windows (no filter), a11y find */ inspect * (wildcard). Prints &#x27;# SKILL SEARCH FIRST: wkappbot skill search &lt;keyword&gt;&#x27; before results. Any Claude session -- even unconfigured -- sees the reminder. Source: InspectionCommands.cs.</li><li>[CLAUDEIGNORE] Create .claudeignore in project root. Exclude: node_modules/, dist/, bin/, obj/, .bak/, .log, .out, .wkappbot/, .dotnet/. One-time setup, no maintenance needed.</li><li>[CLAUDEIGNORE-HQ] WKAppBot-specific .claudeignore for HQ runtime noise -- prevents large screenshot/log dirs entering context: bin/wkappbot.hq/experience/, bin/wkappbot.hq/logs/, bin/wkappbot.hq/runtime/, bin/wkappbot.hq/data/, bin/*.bak-*.exe, bin/*.old-*.exe, bin/*.new.exe. Add similar patterns for any project with large generated runtime directories.</li><li>[CLAUDE-MD-200] CLAUDE.md hard cap = 200 lines. Every conversation loads it in full. Over limit: use Opus agent to trim (Agent model=opus prompt=&#x27;trim CLAUDE.md to 200 lines, preserve all rules, move details to memory/ topic files&#x27;). Check with wkappbot claude-usage.</li><li>[SESSION] Use /compact when conversation grows long. Use /clear when switching to a completely new task. Check context with wkappbot claude-usage -- handoff at 8MB, urgent at 10MB.</li><li>[MCP] Only connect MCP servers you actively use. Each connected server adds tool definitions to every message. Disconnecting 3 unused servers gives immediate relief.</li><li>[QMD-MODES] Three search modes: (1) qmd search = BM25 keyword/identifier, fast, no extra models. (2) qmd vsearch = vector semantic, concept queries. (3) qmd query = hybrid+LLM expansion, downloads 2GB models first run. Use search for identifiers, vsearch for concepts, skip query in daily use.</li><li>[QMD-TIPS] Search without --collection searches all collections at once. Exact function names return precise file:line. Natural language works best with vsearch. Add qmd server to .mcp.json, available as mcp__qmd__* tools.</li><li>[3-AGENT] Split work into 3 roles: (1) Architect reads codebase, writes detailed brief. (2) Builder implements ONLY what brief specifies. (3) Reviewer validates output, returns specific failures to Builder.</li><li>[3-AGENT-WHY] Without role separation, Claude reads entire codebase for a login feature, adds untested CSS, writes unrequested tests. Builder never reads files the Architect did not specify.</li><li>[CLAUDE-MD-RULES] 5 rules to embed: (1) Never re-read a file already in context. (2) No speculative tool calls. (3) Parallelize independent tool calls. (4) Never repeat what user already explained. (5) Use qmd search before reading files.</li><li>[PRIORITY] Apply in order: skill-search-first + PreToolUse hook (zero cost, immediate). Then .claudeignore + lean CLAUDE.md (immediate, zero cost). Then qmd pre-indexing (5 min setup, 91% savings). Then 3-agent structure when project grows.</li><li>[IMPACT] Combined: same token budget handles 2-3x more work. For Claude Pro users with tight limits, this effectively doubles monthly task capacity.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>[SKILL-SEARCH-FIRST] MANDATORY before any Gl...</li><li>[PRETOOLUSE-HOOK] Enforce skill-search disci...</li><li>[CLI-SKILL-HINT] PrintSkillSearchHint() embe...</li><li>[CLAUDEIGNORE] Create .claudeignore in proje...</li><li>[CLAUDEIGNORE-HQ] WKAppBot-specific .claudei...</li><li>[CLAUDE-MD-200] CLAUDE.md hard cap = 200 lin...</li><li>[SESSION] Use /compact when conversation gro...</li><li>[MCP] Only connect MCP servers you actively...</li><li>[QMD-MODES] Three search modes: (1) qmd sear...</li><li>[QMD-TIPS] Search without --collection searc...</li><li>[3-AGENT] Split work into 3 roles: (1) Archi...</li><li>[3-AGENT-WHY] Without role separation, Claud...</li><li>[CLAUDE-MD-RULES] 5 rules to embed: (1) Neve...</li><li>[PRIORITY] Apply in order: skill-search-firs...</li><li>[IMPACT] Combined: same token budget handles...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'claude-token-optimization';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

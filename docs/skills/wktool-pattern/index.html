@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,29 +117,102 @@
       <h1>wktool pattern: token-efficient monitoring</h1>
       <p class="description">wk-tool scripts are QA-first tools: they detect bugs, validate state, and report anomalies cheaply so Claude never wastes tokens polling logs. MANDATORY before any ask/CDP work. Covers: wkask/wkcdp usage, QA script authoring (state-check→eval-js→auto-suggest), health check sequence, cookie/off-screen detection.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">wkask</span><span class="chip">wkcdp</span><span class="chip">token</span><span class="chip">efficiency</span><span class="chip">monitor</span><span class="chip">cdp</span><span class="chip">ask</span><span class="chip">health</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>HAIKU QUICK START (exact commands, copy-paste ready):
-MEMORY CHECK: Get-Process chrome,wkappbot-core | Measure-Object WorkingSet64 -Sum | Select Sum
-SESSION STATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1
-SESSION DETAIL: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1
-CLEANUP STALE: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean
-ASK HEALTH GPT: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt &#x27;say:ok&#x27; -Timeout 60
-ASK HEALTH GEMINI: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini &#x27;say:ok&#x27; -Timeout 90
-ASK FAST (2s): wkappbot ask groq &#x27;say:ok&#x27;
-NEVER poll log files in loops -- use these scripts which stream internally.</li><li>STANDARD HEALTH CHECK SEQUENCE (run in order):
-1. powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean
-2. wkappbot ask groq &#x27;say:ok&#x27; (fast 2-3s REST, no Chrome needed)
-3. powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt &#x27;say:ok&#x27; -Timeout 60 (Chrome CDP)
-4. powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini &#x27;say:ok&#x27; -Timeout 90
-All pass = healthy. If gpt/gemini slow (&gt;30s): run wkcdp clean + retry. groq always fast (2s) = good baseline.</li><li>WKASK SIGNALS: [WAIT]=editor-wait [SERVER]=turn-wait [CHUNK]=streaming [REPLY]=done [WARN]=timeout/stuck [COOKIE]=banner detected. At 9s no activity: warns off-screen Chrome. Post-ask: checks consent cookies.</li><li>WKCDP COMMANDS (exact paths):
-STATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1
-CLEAN STALE (kills idle sessions &gt;2h): powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean
-KILL PORT: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 kill 9740
-COOKIES CHECK: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 cookies
-DETAIL VIEW: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1
-wkcdp output: N session(s) WARN/CRIT flags. Run clean first, then re-check. CRIT=off-screen(false positive possible on left monitor), WARN=drift/age/dup-tabs.</li><li>QA SCRIPT PATTERN -- state-check first (cheapest): check TGT-POS from cdp-mon. Off-screen (x&lt;-100) = geometry bug = skip eval, auto-file suggest immediately. No Chrome invocation needed.</li><li>QA SCRIPT PATTERN -- minimized recovery: before eval-js, check if Chrome minimized. If yes: wkappbot a11y restore GRAP, wait 2s, then eval. Minimized Chrome does not render -- DOM checks return false negatives.</li><li>QA SCRIPT PATTERN -- eval-js (medium cost): wkappbot a11y eval-js &#x27;JS&#x27; --grap {proc:chrome,cdp:PORT}. Keep JS under 200 chars. Return null for not-found. Cross-validate with fast heuristic (file size, log keyword). Mismatch = update threshold.</li><li>QA SCRIPT PATTERN -- auto-suggest on confirmed bugs: wkappbot-core.exe suggest &#x27;BUG: description&#x27; with exact port, observed vs expected, repro command. 3 requirements using wkappbot commands only.</li><li>BUG EVIDENCE WORKFLOW: when filing suggest about ask/CDP failure, run wkask --raw to capture full log. Include [WARN]/[ERROR] lines in suggest text. wkcdp output is ready-made evidence for session anomalies.</li><li>EXTEND THE PATTERN: any recurring monitor task = new wk-tool script in D:/GitHub/WKAppBot/bin/. Name: wk&lt;domain&gt;.ps1. Add test subcommand that validates heuristic vs eval-js agreement. Claude orchestrates, scripts execute.</li><li>CDP-MON USAGE: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1 for detailed per-port view (PID, MB, age, TGT-POS, ACT-POS, drift, tabs, latency). Use when wkcdp output is not detailed enough. Key columns: TGT-POS (where Chrome should be), ACT-POS (where it actually is), DRIFT (delta). CRIT=off-screen, WARN=drift/age/dup-tabs. Note: off-screen detection uses MonitorFromPoint API (fixed 2026-05-14) -- negative coords are valid on left monitors.</li><li>CODEX BUILD WORKAROUND: when delegating a dotnet build to wkcodex, Codex tool router forces every command through the bin shell-shim which fails with a No-stdin-JSON error (PATH-shadow bug). Bypass by instructing Codex to run the build via C:/Windows/System32/cmd.exe /c with the absolute dotnet.exe path so no shim is invoked. Bug symptom: every command_execution exits 1 with No-stdin-JSON aggregated_output.</li><li>BUILD-VERIFY: WKAppBot core publish ends with [Launcher] wkappbot.exe deployed and zero &#x27;error CS&#x27; lines = green. Always run from a clean shell (no shim in PATH).</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>HAIKU QUICK START (exact commands, copy-past...</li><li>STANDARD HEALTH CHECK SEQUENCE (run in order...</li><li>WKASK SIGNALS: [WAIT]=editor-wait [SERVER]=t...</li><li>WKCDP COMMANDS (exact paths): STATUS: powers...</li><li>QA SCRIPT PATTERN -- state-check first (chea...</li><li>QA SCRIPT PATTERN -- minimized recovery: bef...</li><li>QA SCRIPT PATTERN -- eval-js (medium cost):...</li><li>QA SCRIPT PATTERN -- auto-suggest on confirm...</li><li>BUG EVIDENCE WORKFLOW: when filing suggest a...</li><li>EXTEND THE PATTERN: any recurring monitor ta...</li><li>CDP-MON USAGE: powershell -File D:/GitHub/WK...</li><li>CODEX BUILD WORKAROUND: when delegating a do...</li><li>BUILD-VERIFY: WKAppBot core publish ends wit...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'wktool-pattern';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>a11y Commands Reference</h1>
       <p class="description">Reference and history: deprecated commands, verified tests, USAGE-REMOVED patterns, audit notes.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../a11y-command-cheatsheet/">a11y-command-cheatsheet</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Deprecated: win-click (2026-05-02). &#x27;wkappbot --sudo win-click hwnd:0xABCD x y&#x27; now prints &#x27;[WIN-CLICK:SUGGEST] a11y click &quot;&lt;grap&gt;#&lt;node&gt;&quot;&#x27; + &#x27;[WIN-CLICK:DEPRECATED]&#x27; and exits with error 1. Migrate to: a11y click &lt;grap&gt; --x N --y N. MDI child windows are emitted in the suggested grap as {proc:app}#{mdi-child-title}#Node[aid=X]. The deprecation suggest is paste-ready; rerun the command using a11y click.</li><li>Verified 2026-05-19: ev-usage-deprecated-a11y-eval.sh (resolve ts=2026-05-02T11:51:30)</li><li>USAGE-REMOVED evidence pattern: do NOT call wkappbot a11y eval directly in evidence scripts -- it auto-files a new BUG-AUTO suggest each time. Instead verify deprecation via: (1) wkappbot file grep &#x27;USAGE-REMOVED.*eval&#x27; --type cs -- shows the guard in source code. (2) check existing BUG-AUTO logs. (3) wkappbot skill read a11y-command-cheatsheet</li><li>grep eval-js -- confirms migration path is documented. This avoids cascading BUG-AUTO noise from test harness.</li><li>Verified 2026-05-19: ev-screenshot-path-final.sh (resolve ts=2026-04-19T06:48:34)</li><li>--eval-js without #node: shows node list (read falls through), then returns error. evalJsBlockedNoNode flag pattern: set in foreach before read, check after foreach to print error + return 1.</li><li>[AUDIT 2026-05-29] A11yGridRead moved out of A11yActions.Read.cs (file no longer contains literal token). Other refs (A11yCommand.cs, AskCommands.Focus.cs) still resolve. Update on next re-contribute.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Deprecated: win-click (2026-05-02). &#x27;wkappbot --sudo win-click hwnd:0xABCD x y&#x27; now prints &#x27;[WIN-CLICK:SUGGEST] a11y click &quot;&lt;grap&gt;#&lt;node&gt;&quot;&#x27; + &#x27;[WIN-CLICK:DEPRECATED]&#x27; and exits with error 1. Migrate to: a11y click &lt;grap&gt; --x N --y N. MDI child windows are emitted in the suggested grap as {proc:app}#{mdi-child-title}#Node[aid=X]. The deprecation suggest is paste-ready; rerun the command using a11y click.</li><li>Verified 2026-05-19: ev-usage-deprecated-a11y-eval.sh (resolve ts=2026-05-02T11:51:30)</li><li>USAGE-REMOVED evidence pattern: do NOT call wkappbot a11y eval directly in evidence scripts -- it auto-files a new BUG-AUTO suggest each time. Instead verify deprecation via: (1) wkappbot file grep &#x27;USAGE-REMOVED.*eval&#x27; --type cs -- shows the guard in source code. (2) check existing BUG-AUTO logs. (3) wkappbot skill read a11y-command-cheatsheet</li><li>grep eval-js -- confirms migration path is documented. This avoids cascading BUG-AUTO noise from test harness.</li><li>Verified 2026-05-19: ev-screenshot-path-final.sh (resolve ts=2026-04-19T06:48:34)</li><li>--eval-js without #node: shows node list (read falls through), then returns error. evalJsBlockedNoNode flag pattern: set in foreach before read, check after foreach to print error + return 1.</li><li>[AUDIT 2026-05-29] A11yGridRead moved out of A11yActions.Read.cs (file no longer contains literal token). Other refs (A11yCommand.cs, AskCommands.Focus.cs) still resolve. Update on next re-contribute.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

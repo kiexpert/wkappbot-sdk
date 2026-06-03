@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>A11y Click: React Fiber + CDP Trusted Click Fallback for Chrome SPAs</h1>
       <p class="description">Chrome React SPA buttons expose UIA Invoke but fire no trusted event. Fallback chain: LegacyIA -&gt; WM_LBUTTON -&gt; TryCdpTrustedClick (Input.dispatchMouseEvent) -&gt; TryReactFiberClickAsync (__reactProps.onClick direct call). Deployed commit a575bece.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>CLI click tier order in A11yActions.Click.cs: (1) LegacyIA.DoDefaultAction() focusless, (2) WM_LBUTTON to element hwnd, (3) TryElectronSurfaceClick() WM_LBUTTON to Chrome_RenderWidgetHostHWND, (4) TryCdpTrustedClick() Input.dispatchMouseEvent isTrusted=true, (5) TryReactFiberClickAsync() __reactProps.onClick JS call.</li><li>TryCdpTrustedClick() verifies success via pixel-diff check (&gt;2% change = ok). If click verified, returns immediately. TryReactFiberClickAsync() calls __reactFiber.memoizedProps.onClick for React-controlled buttons where isTrusted enforcement blocks CDP dispatchMouseEvent.</li><li>Known gap: Scenario/ActionExecutor path does NOT include CDP or React fiber tiers -- only UIA Invoke + element-rect SendInput. If Invoke silently succeeds on React buttons (S_OK but no DOM event), the action returns prematurely. Full fix pending; CLI path already handles this.</li><li>Verified 2026-04-22: test-a11y-find-click-react-fiber-fallback.sh (resolve ts=2026-04-21T10:46)</li><li>2026-04-30: invoke action now uses AutoApproveYield=true -- bypasses user-active callout for focusless InvokePattern operations (commit c3c48225)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>CLI click tier order in A11yActions.Click.cs: (1) LegacyIA.DoDefaultAction() focusless, (2) WM_LBUTTON to element hwnd, (3) TryElectronSurfaceClick() WM_LBUTTON to Chrome_RenderWidgetHostHWND, (4) TryCdpTrustedClick() Input.dispatchMouseEvent isTrusted=true, (5) TryReactFiberClickAsync() __reactProps.onClick JS call.</li><li>TryCdpTrustedClick() verifies success via pixel-diff check (&gt;2% change = ok). If click verified, returns immediately. TryReactFiberClickAsync() calls __reactFiber.memoizedProps.onClick for React-controlled buttons where isTrusted enforcement blocks CDP dispatchMouseEvent.</li><li>Known gap: Scenario/ActionExecutor path does NOT include CDP or React fiber tiers -- only UIA Invoke + element-rect SendInput. If Invoke silently succeeds on React buttons (S_OK but no DOM event), the action returns prematurely. Full fix pending; CLI path already handles this.</li><li>Verified 2026-04-22: test-a11y-find-click-react-fiber-fallback.sh (resolve ts=2026-04-21T10:46)</li><li>2026-04-30: invoke action now uses AutoApproveYield=true -- bypasses user-active callout for focusless InvokePattern operations (commit c3c48225)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

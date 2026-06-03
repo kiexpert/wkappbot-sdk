@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>MCP Admin Core Swap: Elevation-Triggered Graceful Cutover</h1>
       <p class="description">How MCP Launcher spawns an elevated admin Core on demand and cuts over transparently, with hot-swap deferral while admin is active.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">mcp</span><span class="chip">admin</span><span class="chip">elevation</span><span class="chip">swap</span><span class="chip">uac</span><span class="chip">launcher</span><span class="chip">named-pipe</span><span class="chip">project</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>## 트리거 조건</li><li>normal Core가 UIPI 차단 감지 -&gt; 응답에 &#x27;_elevationRequired:true&#x27; 포함 -&gt; Launcher stdout relay가 가로챔 (suppress, client에 미전달)</li><li>## 어드민 Core 스폰 (SpawnAdminCore 백그라운드 스레드)</li><li>1. NamedPipe 서버 2개 생성: wkappbot-mcp-admin-{PID}-stdin / -stdout (Launcher가 서버, admin Core가 클라이언트)</li><li>2. ShellExecuteExW runas -&gt; wkappbot-core.exe mcp --admin-pipes {stdin} {stdout} (UAC 팝업)</li><li>3. 60초 WaitForConnectionAsync -- UAC 승인 후 admin Core가 접속</li><li>## 절체 (transition) 순서</li><li>1. 기존 normal Core stdin close (CloseHandle) -&gt; EOF -&gt; drain mode 진입</li><li>2. adminMode = true -&gt; 이후 stdin은 모두 admin Core로 라우팅</li><li>3. initialize 리플레이 -&gt; 원래 elevation 요청 재전송 -&gt; admin Core가 처리</li><li>4. admin Core stdout relay: 응답 id로 inflight 제거 -&gt; client에 포워딩</li><li>## hot-swap과의 상호작용</li><li>FSW가 .new.exe 감지해도 adminMode=true면 -&gt; pendingSwapWhileAdmin=true로 defer (normal Core swap 대기)</li><li>admin Core stdout EOF (= admin Core 종료) -&gt; finally에서 activeStdinWriter=null + pendingSwapWhileAdmin 로그</li><li>pending swap은 Launcher가 다음 FSW 이벤트(새 stamp) 때 재처리 -- 자동으로 normal Core가 새 버전으로 교체됨</li><li>## 실패 시</li><li>UAC 거부 -&gt; elevationRequestLine에서 id 추출 -&gt; JSON-RPC error -32001 &#x27;Elevation denied by user&#x27; 반환</li><li>60s 타임아웃 -&gt; TerminateProcess(adminProc) + pipe 정리</li><li>## 핵심 설계</li><li>normal Core + admin Core 동시 공존 불가 -- 절체 시 normal Core는 drain 후 종료</li><li>admin Core가 살아있는 동안 hot-swap은 defer -- 버전 불일치 방지</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>## 트리거 조건</li><li>normal Core가 UIPI 차단 감지 -&gt; 응답에 &#x27;_elevationRe...</li><li>## 어드민 Core 스폰 (SpawnAdminCore 백그라운드 스레드)</li><li>1. NamedPipe 서버 2개 생성: wkappbot-mcp-admin-{P...</li><li>2. ShellExecuteExW runas -&gt; wkappbot-core.ex...</li><li>3. 60초 WaitForConnectionAsync -- UAC 승인 후 ad...</li><li>## 절체 (transition) 순서</li><li>1. 기존 normal Core stdin close (CloseHandle)...</li><li>2. adminMode = true -&gt; 이후 stdin은 모두 admin Co...</li><li>3. initialize 리플레이 -&gt; 원래 elevation 요청 재전송 -&gt;...</li><li>4. admin Core stdout relay: 응답 id로 inflight...</li><li>## hot-swap과의 상호작용</li><li>FSW가 .new.exe 감지해도 adminMode=true면 -&gt; pendin...</li><li>admin Core stdout EOF (= admin Core 종료) -&gt; f...</li><li>pending swap은 Launcher가 다음 FSW 이벤트(새 stamp)...</li><li>## 실패 시</li><li>UAC 거부 -&gt; elevationRequestLine에서 id 추출 -&gt; JS...</li><li>60s 타임아웃 -&gt; TerminateProcess(adminProc) + pi...</li><li>## 핵심 설계</li><li>normal Core + admin Core 동시 공존 불가 -- 절체 시 no...</li><li>admin Core가 살아있는 동안 hot-swap은 defer -- 버전 불일...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'mcp-admin-core-swap-elevation-triggered-graceful-cutover';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

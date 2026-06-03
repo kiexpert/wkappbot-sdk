@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>ConPTY Enter-intercept two-phase decide-then-commit</h1>
       <p class="description">PseudoConsoleRunner&#x27;s Enter handler uses Func string Action? as a two-phase gate. Interceptor returns null for passthrough (cmd.exe runs the typed line normally so dir etc. keep working) or an Action to commit. Only on non-null does the runner send ESC (clears child line buffer AND visually erases typed text) then sleep 30ms (let VT erase bytes reach terminal before dispatch output) then invoke Action then send CR (child emits fresh prompt). Previous eager-ESC design erased the buffer before the decision and dropped every non-intercepted command.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">chat</span><span class="chip">conpty</span><span class="chip">interactive</span><span class="chip">windows</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Printable keys append to buffer + forward to child</li><li>Arrow Home End Tab Delete set complexEdit = skip intercept</li><li>Enter calls interceptor with buffer</li><li>null result = pass Enter through normally</li><li>Non-null Action = ESC + Thread.Sleep 30ms + Action + CR</li><li>backspace-backspace in the echo overwrites prompt&#x27;s trailing &gt; to save one row; CRLF at end forces column 0</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Printable keys append to buffer + forward to child</li><li>Arrow Home End Tab Delete set complexEdit = skip intercept</li><li>Enter calls interceptor with buffer</li><li>null result = pass Enter through normally</li><li>Non-null Action = ESC + Thread.Sleep 30ms + Action + CR</li><li>backspace-backspace in the echo overwrites prompt&#x27;s trailing &gt; to save one row; CRLF at end forces column 0</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

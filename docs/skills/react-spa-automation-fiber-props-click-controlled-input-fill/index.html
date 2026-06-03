@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>React SPA Automation: fiber props click + controlled input fill</h1>
       <p class="description">How to interact with React SPAs that block isTrusted=false synthetic events. Use __reactProps onClick/onChange directly from fiber, not dispatchEvent. Covers modal open, input fill, button click, and clipboard capture.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>1. React SPAs often check event.isTrusted in click handlers -- synthetic dispatchEvent calls are silently ignored. Use React fiber props instead.</li><li>2. Open a React button&#x27;s action: var propsKey = Object.keys(btn).find(k=&gt;k.startsWith(&#x27;__reactProps&#x27;)); btn[propsKey].onClick({type:&#x27;click&#x27;,bubbles:true,cancelable:true,preventDefault:()=&gt;{},stopPropagation:()=&gt;{}});</li><li>3. Fill a React controlled input: var nv=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,&#x27;value&#x27;); nv.set.call(inp,&#x27;value&#x27;); inp.dispatchEvent(new Event(&#x27;input&#x27;,{bubbles:true})); -- this updates DOM value AND triggers React onChange pipeline</li><li>4. If nativeInputValueSetter alone doesn&#x27;t update React state, also call the React onChange handler: var fiberKey=Object.keys(inp).find(k=&gt;k.startsWith(&#x27;__reactFiber&#x27;)); var props=inp[fiberKey].memoizedProps; props.onChange({target:{value:&#x27;text&#x27;},currentTarget:{value:&#x27;text&#x27;},type:&#x27;change&#x27;,bubbles:true});</li><li>5. IMPORTANT: document.querySelector(&#x27;input&#x27;) may return a hidden checkbox/offscreen input. Always check getBoundingClientRect() x/y. Use querySelectorAll(&#x27;input&#x27;)[N] to target the visible one (x&gt;0, y&gt;0).</li><li>6. To capture clipboard after copy button: hook BEFORE click in same eval: window.__key=null; var orig=navigator.clipboard.writeText.bind(navigator.clipboard); navigator.clipboard.writeText=function(t){window.__key=t; return orig(t);}; -- then click the copy element in the same eval call.</li><li>7. Some copy buttons open a native window.prompt dialog instead of clipboard API. In that case wkappbot a11y screenshot will show a dialog with the full value -- read it visually from the screenshot.</li><li>8. Distinguish copy vs delete buttons: inspect aria-label. Delete buttons have aria-label=&#x27;Delete API key&#x27;. Copy icons are SVG[aria-label=&#x27;copy icon&#x27;] inside a DIV (not a BUTTON). The parent DIV has the onClick in __reactProps.</li><li>9. To open modal: dispatch full mouse event sequence on the trigger button: [&#x27;pointerover&#x27;,&#x27;pointerenter&#x27;,&#x27;mouseover&#x27;,&#x27;mouseenter&#x27;,&#x27;pointermove&#x27;,&#x27;mousemove&#x27;,&#x27;pointerdown&#x27;,&#x27;mousedown&#x27;,&#x27;pointerup&#x27;,&#x27;mouseup&#x27;,&#x27;click&#x27;].forEach(type =&gt; { btn.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy,buttons:type.includes(&#x27;down&#x27;)?1:0})); });</li><li>10. After modal opens, the input is usually auto-focused (document.activeElement===input). Fill via nativeInputValueSetter + trigger onChange via fiber. Then call the submit button&#x27;s __reactProps.onClick.</li><li>11. For CDP CSS selector trusted click (wkappbot a11y click &#x27;hwnd:0xXXXX#button.classname&#x27;): use :first-of-type or :last-of-type to target specific buttons. This produces isTrusted=true events via CDP Input.dispatchMouseEvent.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>1. React SPAs often check event.isTrusted in...</li><li>2. Open a React button&#x27;s action: var propsKe...</li><li>3. Fill a React controlled input: var nv=Obj...</li><li>4. If nativeInputValueSetter alone doesn&#x27;t u...</li><li>5. IMPORTANT: document.querySelector(&#x27;input&#x27;...</li><li>6. To capture clipboard after copy button: h...</li><li>7. Some copy buttons open a native window.pr...</li><li>8. Distinguish copy vs delete buttons: inspe...</li><li>9. To open modal: dispatch full mouse event...</li><li>10. After modal opens, the input is usually...</li><li>11. For CDP CSS selector trusted click (wkap...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'react-spa-automation-fiber-props-click-controlled-input-fill';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>ask prompt pump: watchdog dismiss+resend recovery before BUG-AUTO</h1>
       <p class="description">AskCommands.CdpPromptPump watchdog fires when editor retains text 10s after submit -- cause is usually a promo popover (Claude CoWork, Gemini copyright) eating the click. Watchdog now runs DismissDialogAsync + SendPromptAsync re-fire before declaring stuck; only actual unrecoverable cases hit AutoRegisterBug.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">ask</span><span class="chip">chat</span><span class="chip">prompt-pump</span><span class="chip">watchdog</span><span class="chip">cowork</span><span class="chip">dismiss</span><span class="chip">recovery</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Pump arms watchdog after last append</li><li>T+7s: check editor text length; if &gt;0 editor still has content</li><li>Recovery call DismissDialogAsync -- closes CoWork promo banners, Gemini copyright dialogs, X-icon popovers</li><li>Re-fire SendPromptAsync</li><li>T+10s: recheck; if still stuck BUG-AUTO with &#x27;recovery failed&#x27; hint</li><li>Quiet when no popover (NONE return); self-heals when popover was the blocker</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T05:29)</li><li>Verified 2026-04-22: test-file-grep-pump-watchdog.sh (resolve ts=2026-04-20T06:28:51.1783280Z)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Pump arms watchdog after last append</li><li>T+7s: check editor text length; if &gt;0 editor still has content</li><li>Recovery call DismissDialogAsync -- closes CoWork promo banners, Gemini copyright dialogs, X-icon popovers</li><li>Re-fire SendPromptAsync</li><li>T+10s: recheck; if still stuck BUG-AUTO with &#x27;recovery failed&#x27; hint</li><li>Quiet when no popover (NONE return); self-heals when popover was the blocker</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T05:29)</li><li>Verified 2026-04-22: test-file-grep-pump-watchdog.sh (resolve ts=2026-04-20T06:28:51.1783280Z)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

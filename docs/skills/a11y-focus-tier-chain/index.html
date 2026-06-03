@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,85 +117,102 @@
       <h1>a11y focus: SmartSetWindowOrder + full tier chain (v6.8+)</h1>
       <p class="description">WKAppBot complete OS-level focus service spec. SmartSetWindowOrder is the single focusless Z-order primitive — called before all interactive write actions and focus commands. Zero keyboard-focus steal from user at all times.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">focus</span><span class="chip">SmartSetWindowOrder</span><span class="chip">BringWindowToTop</span><span class="chip">focusless</span><span class="chip">tier-chain</span><span class="chip">child-window</span><span class="chip">root-window</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>SMART WINDOW ORDER — SmartSetWindowOrder(hwnd) [A11yCommand.WindowActions.cs]
-WKAppBot&#x27;s single focusless Z-order primitive. Never steals keyboard focus.
-Full OS-level focus service in 6 steps:
-  (1) GetParent chain walk → find root ancestor (up to 32 levels, stops at IntPtr.Zero).
-  (2) Iconic root → ShowWindow(SW_SHOWNOACTIVATE=4) BEFORE any Z-order op.
-      SW_SHOWNOACTIVATE restores window state without activating/stealing focus.
-  (3) MDI/child window (root != hwnd) → BringWindowToTop(hwnd).
-      Z-order is parent-relative for child windows; BringWindowToTop brings to front of siblings.
-  (4) PlaceRootBehindForeground(root): strip WS_EX_TOPMOST via SetWindowPos(HWND_NOTOPMOST) if set,
-      then SetWindowPos(insertAfter=fg, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE) → root rank 2.
-      If no fg window, insertAfter=HWND_TOP. Stripping topmost is critical — without it, topmost
-      windows stay above ALL non-topmost windows regardless of rank-2 placement.
-  (5) Owner chain: GetWindow(root, GW_OWNER) walk up to 8 levels. Each owner: iconic→restore,
-      then PlaceRootBehindForeground. Owner chain uses GW_OWNER, NOT GetParent — popup/dialog
-      owners are linked via owner relationship, not parent-child.
-  (6) Result: target window (or its root) is at Z-order rank 2 behind user&#x27;s active window.
-      User&#x27;s foreground app remains rank 1 and keyboard focus is never transferred.</li><li>WINDOW-LEVEL FOCUS — A11yFocus(hwnd, tag) [A11yCommand.WindowActions.cs]
-Called when action=&#x27;focus&#x27; targets a window (not a UIA element).
-  (1) IsIconic(hwnd) → ShowWindow(hwnd, SW_RESTORE=9). Restore before Z-order.
-  (2) SmartSetWindowOrder(hwnd) — full 6-step OS focus service above.
-  (3) Log: &#x27;[A11Y] focus tag -- BringWindowToTop (child) + root behind-fg NOACTIVATE&#x27;
-           OR &#x27;[A11Y] focus tag -- SetWindowPos behind-fg NOACTIVATE (root)&#x27;
-Note: SW_RESTORE (9) used here (not SW_SHOWNOACTIVATE=4) because A11yFocus is the explicit
-focus command — restoring to normal state is expected. SmartSetWindowOrder handles owners/topmost.</li><li>ELEMENT-LEVEL FOCUS — A11yFocusElement(el, hwnd) [A11yActions.Focus.cs]
-Called when action=&#x27;focus&#x27; targets a UIA element. Full 5-tier cascade:
-  Tier -1 (PRE): FindRootWindow(hwnd) → SmartSetWindowOrder(root).
-      FindRootWindow: walks GetParent up to 32 levels to find root ancestor.
-      Ensures window is visible in correct Z-order before focus attempt.
-  Tier 0 (CDP): Chrome/CDP only. TryCdpFocus() calls SmartSetWindowOrder(hwnd) first,
-      then CDP element.focus() / defA11yFocus() JS helper (blur active, focus editor).
-      Returns &#x27;focused:&lt;selector&gt;&#x27; on success. Falls through on failure.
-  Tier 1 (UIA): el.Focus() via IUIAutomationElement::SetFocus. Focusless cross-thread.
-      Logs &#x27;[A11Y] focus -- UIA SetFocus -&gt; [ControlType] name&#x27;.
-  Tier 2 (Win32): GetElementHwnd(el) → Win32 SetFocus(elementHwnd).
-      Direct Win32 keyboard focus on the specific control hwnd.
-  Tier 3 (Win32 root fallback): if element hwnd missing AND UIA failed →
-      Win32 SetFocus(rootHwnd). Last resort.</li><li>WRITE ACTION PRE-FOCUS — A11yCommand.cs element dispatch [v6.8+]
-SmartSetWindowOrder(hwnd) is called BEFORE these 10 interactive write actions:
-  invoke, click, type, set-value, set-range, toggle, expand, collapse, select, scroll
-EXCLUDED (SmartSetWindowOrder NOT called):
-  read, find, inspect, screenshot, ocr, windows — read-only, no Z-order change needed
-  close, minimize, maximize, restore — Z-order change would interfere
-  highlight, focus — own handling (focus calls SmartSetWindowOrder internally)
-This ensures the target window is at correct Z-order (rank 2) before automation,
-without ever disrupting the user&#x27;s active window (rank 1 unchanged).</li><li>ZERO-STEAL RULES (absolute, no exceptions):
-  FORBIDDEN: SetForegroundWindow, SetActiveWindow, AttachThreadInput — all steal keyboard focus.
-  ALLOWED Z-order: SetWindowPos(SWP_NOACTIVATE), BringWindowToTop (child only), ShowWindow(SW_SHOWNOACTIVATE=4).
-  ALLOWED keyboard focus: UIA el.Focus(), Win32 SetFocus(elementHwnd) — these set input focus
-      on a specific control without changing the foreground window. Safe for automation.
-  SWP_NOACTIVATE ensures Z-order moves never trigger WM_ACTIVATE or WM_SETFOCUS on target.
-  BringWindowToTop on a child window is safe — Z-order is parent-relative, no desktop steal.
-  PlaceRootBehindForeground always places at rank 2 — user&#x27;s rank 1 window untouched.
-  ShowWindow(SW_SHOWNOACTIVATE) restores iconic windows without activating them.</li><li>OVERLAY GUARD + SOURCE FILES
-SuppressFullscreenOpaqueOverlays [A11yCommand.WindowActions.cs]: pre-check on every a11y command.
-  Samples 5 pixels (center + 4 quadrant centers) on every visible window &gt;= 80% work area.
-  avg brightness &lt; 80/765 → force alpha=0 (WS_EX_LAYERED) OR SW_MINIMIZE (non-layered).
-  Same HWND suppressed &gt;= 4 times → kill the process. Logs [OVERLAY-GUARD] to stderr.
-  Handles: NVIDIA GeForce Overlay, TextInputHost, and any unknown black fullscreen overlays.
-SOURCE FILES:
-  A11yCommand.WindowActions.cs — SmartSetWindowOrder, PlaceRootBehindForeground, A11yFocus, SuppressFullscreenOpaqueOverlays
-  A11yActions.Focus.cs — A11yFocusElement, FindRootWindow, TryCdpFocus
-  A11yCommand.cs:1907 — write action pre-focus injection (10 actions)</li><li>FOCUSLESS-FIRST PRINCIPLE (cross-ref: skill focusless-first-principle): UIA Invoke/SetValue/Toggle/Select/Scroll are inherently focusless — no window activation needed. SendInput and WM_CHAR (some) require keyboard focus. SmartSetWindowOrder (Z-order) is separate from keyboard focus — you can have correct Z-order (rank 2) without keyboard focus. The focus tier chain (Tier 0-3) sets keyboard focus on the element; SmartSetWindowOrder ensures the window is visible. Both are focusless from the USER&#x27;s perspective — the user&#x27;s active window (rank 1) is never disrupted.</li><li>COMMON PITFALLS:
-  DON&#x27;T use SetForegroundWindow — steals keyboard focus, triggers WM_ACTIVATE, disrupts user.
-  DON&#x27;T use BringWindowToTop on root windows — use PlaceRootBehindForeground instead.
-  DON&#x27;T skip topmost strip — if WS_EX_TOPMOST is set, rank-2 placement has no effect.
-  DON&#x27;T assume GetParent == owner — popup/dialog owners use GW_OWNER (GetWindow), not GetParent.
-  DON&#x27;T skip iconic check inside SmartSetWindowOrder — child BringWindowToTop on a minimized
-    parent creates a ghost MDI entry with no visible surface.
-  DO always pass SWP_NOACTIVATE with SetWindowPos Z-order changes.
-  DO call SmartSetWindowOrder before element focus tiers (Tier -1 in A11yFocusElement).</li><li>VERSION HISTORY:
-  v1.0 (2026-05-03): initial SmartSetWindowOrder — child BringWindowToTop, root rank-2
-  v1.1 (2026-05-03): MDI child focus also moves root to rank-2
-  v2.0 (2026-05-03): full OS-level service — iconic restore, topmost strip, GW_OWNER chain,
-    PlaceRootBehindForeground helper, SuppressFullscreenOpaqueOverlays overlay guard
-  v2.1 (2026-05-03): SmartSetWindowOrder injected before 10 interactive write actions
-    (invoke, click, type, set-value, set-range, toggle, expand, collapse, select, scroll)</li><li>FOCUS-STEAL bug investigation (2026-05-19): if a11y actions still steal focus despite zero-steal rules, audit for VIOLATIONS first — grep for SetForegroundWindow / SetActiveWindow / AttachThreadInput / SwitchToThisWindow in a11y action paths. Bandaid guard (GetLastInputInfo defer) is defense-in-depth only; the real fix is removing the forbidden API call or routing it through SmartSetWindowOrder. Investigation order: (1) wkfind for forbidden APIs in a11y; (2) git log on offending file to find when the violation was introduced; (3) replace with SmartSetWindowOrder + UIA/Win32 SetFocus; (4) optionally add user-activity guard as belt-and-suspenders.</li><li>FOCUS-STEAL fix dispatch (2026-05-19 18:40): delegated investigation to Opus subagent. Target: find zero-steal-rule violations (SetForegroundWindow / SetActiveWindow / AttachThreadInput / SwitchToThisWindow in a11y action paths) and replace with SmartSetWindowOrder + UIA/Win32 SetFocus. Defense-in-depth UserActivityGuard (GetLastInputInfo, ~500ms threshold) added only if a legitimate focus-theft path remains. 3 target suggests: 2026-04-19T16:20:57, 2026-04-19T06:23:53, 2026-04-18T19:10:34.</li><li>Verified 2026-05-19: ev-2026-05-19-1840-focus-steal-sentinel-user-active-stale.sh (resolve ts=2026-04-19T16:20:57)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>SMART WINDOW ORDER — SmartSetWindowOrder(hwn...</li><li>WINDOW-LEVEL FOCUS — A11yFocus(hwnd, tag) [A...</li><li>ELEMENT-LEVEL FOCUS — A11yFocusElement(el, h...</li><li>WRITE ACTION PRE-FOCUS — A11yCommand.cs elem...</li><li>ZERO-STEAL RULES (absolute, no exceptions):...</li><li>OVERLAY GUARD + SOURCE FILES SuppressFullscr...</li><li>FOCUSLESS-FIRST PRINCIPLE (cross-ref: skill...</li><li>COMMON PITFALLS: DON&#x27;T use SetForegroundWind...</li><li>VERSION HISTORY: v1.0 (2026-05-03): initial...</li><li>FOCUS-STEAL bug investigation (2026-05-19):...</li><li>FOCUS-STEAL fix dispatch (2026-05-19 18:40):...</li><li>Verified 2026-05-19: ev-2026-05-19-1840-focu...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-focus-tier-chain';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

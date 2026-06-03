@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>삼두 조언 -&gt; 스킬로 저장</h1>
       <p class="description">삼두(ask triad)에서 얻은 유용한 인사이트는 바로 스킬로 저장. 다음 세션도 같은 고민 반복 안 하게. 오답노트+성공기록 = 집단지성 누적.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">workflow</span><span class="chip">meta</span><span class="chip">skill</span><span class="chip">knowledge</span><span class="chip">operator</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>삼두 답변에서 핵심 결론 추출</li><li>wkappbot skill contribute --app &lt;앱&gt; --title &lt;제목&gt; --desc &lt;핵심요약&gt; --steps &lt;단계들&gt; --tags &lt;태그&gt;</li><li>source_refs 가 있으면 --refs 로 코드 앵커도 추가</li><li>wkappbot skill audit 으로 기존 스킬 drift 주기적 확인</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>삼두 답변에서 핵심 결론 추출</li><li>wkappbot skill contribute --app &lt;앱&gt; --title &lt;제목&gt; --desc &lt;핵심요약&gt; --steps &lt;단계들&gt; --tags &lt;태그&gt;</li><li>source_refs 가 있으면 --refs 로 코드 앵커도 추가</li><li>wkappbot skill audit 으로 기존 스킬 drift 주기적 확인</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>CP949 Save Guard</h1>
       <p class="description">AI-only pre-save gate that rejects text files containing characters not representable in CP949. Use before Codex, Claude, or AppBot writes or commits text files, and require AI edits to write only rule-compliant characters for the target file even when the source already contains unsafe characters. Do not apply it to manual human saves unless explicitly requested.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">encoding</span><span class="chip">cp949</span><span class="chip">save-guard</span><span class="chip">utf8</span><span class="chip">docs</span><span class="chip">source</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Run tools/cp949_save_guard.ps1 on the candidate text files before save/commit.</li><li>If the guard reports a line and code point, do not save that text as CP949; rewrite with ASCII-safe text or keep the file UTF-8-only.</li><li>Treat binary files as out of scope and focus on docs, source, profile, skill, and workflow text files.</li><li>Do not use this to police human editor saves unless the user explicitly asks for that mode.</li><li>If the source already contains characters outside the target rule set, preserve the original source separately and rewrite the edited output using only rule-compliant characters for the intended destination; do not carry unsafe characters forward just because they were present in the input.</li><li>If this gate fails on a candidate file, rewrite the text to ASCII-safe content or keep the file UTF-8-only, then rerun the guard before any save or commit.</li><li>Ignore a leading UTF-8 BOM (U+FEFF) when checking text, because it is an encoding marker rather than a CP949-unsafe content character.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>Run tools/cp949_save_guard.ps1 on the candidate text files before save/commit.</li><li>If the guard reports a line and code point, do not save that text as CP949; rewrite with ASCII-safe text or keep the file UTF-8-only.</li><li>Treat binary files as out of scope and focus on docs, source, profile, skill, and workflow text files.</li><li>Do not use this to police human editor saves unless the user explicitly asks for that mode.</li><li>If the source already contains characters outside the target rule set, preserve the original source separately and rewrite the edited output using only rule-compliant characters for the intended destination; do not carry unsafe characters forward just because they were present in the input.</li><li>If this gate fails on a candidate file, rewrite the text to ASCII-safe content or keep the file UTF-8-only, then rerun the guard before any save or commit.</li><li>Ignore a leading UTF-8 BOM (U+FEFF) when checking text, because it is an encoding marker rather than a CP949-unsafe content character.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

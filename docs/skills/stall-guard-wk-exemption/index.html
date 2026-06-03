@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>stall-guard-wk-exemption</h1>
       <p class="description">Stall-guard exemption rules for wk* AI tools: all wk* commands are exempt while pace is under limit, with per-tool budget checks.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">stall-guard</span><span class="chip">wk</span><span class="chip">exempt</span><span class="chip">pace</span><span class="chip">wkcodex</span><span class="chip">wkgpt</span><span class="chip">wkopus</span><span class="chip">wksonnet</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>EXEMPTION: all wk* tools (wkappbot/wkedit/wkclaude/wkopus/wksonnet/wkhaiku/wkcodex/wkgpt/wkgpt-mini/wkgroq/wkcerbras/wkask) skip stall-guard while pace not exceeded.</li><li>PER-TOOL CHECK: wkcodex/wkgpt/wkgpt-mini -&gt; Codex weekly budget &lt;80% (CodexBlockPct). All others -&gt; Claude totalExceeded==false.</li><li>ALSO EXEMPT (always): wkappbot skill read/search/list/edit/contribute (isSkillCmd check, no pace gate).</li><li>SOURCE: wkharness-guards.ps1 line ~859. Variables: isSkillCmd, isWkToolCmd, wkToolUnderPace.</li><li>CODEX CACHE: reads claude_codex_pace.json from TEMP with CacheTtlMin freshness check to avoid stale blocking after weekly reset.</li><li>LINE-REF UPDATE 2026-05-26: the per-tool budget check (wkToolUnderPace switch + isWkToolCmd) is at wkharness-guards.ps1 ~line 1012, NOT ~859 (step 4 ref went stale after the Fix2 hoisted-clear and Fix3 cross-repo inserts shifted lines). Locate by the &#x27;wkToolUnderPace = switch -Regex (cmd)&#x27; block: wkcodex/wkgpt read TEMP/claude_codex_pace.json and allow when pct &lt; CodexBlockPct (80); all other wk* allow when Claude totalExceeded is false.</li><li>HAIKU WK-ONLY-GATE EXEMPTION 2026-05-26: wk-only-gate (guards.ps1 ~540) now skips when isHaikuSession (last session model contains haiku). Previously it applied to ALL sessions incl Haiku subagents, blocking their non-wk commands (python/ls/etc) over-target -- which defeated the delegate-to-cheap-Haiku intent. Now Sonnet+Opus stay gated, Haiku exempt. isHaikuSession is set in wkharness.ps1 right beside isSonnetSession (last-model detection). selftest 72/72. commit 8cef9f5.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>EXEMPTION: all wk* tools (wkappbot/wkedit/wkclaude/wkopus/wksonnet/wkhaiku/wkcodex/wkgpt/wkgpt-mini/wkgroq/wkcerbras/wkask) skip stall-guard while pace not exceeded.</li><li>PER-TOOL CHECK: wkcodex/wkgpt/wkgpt-mini -&gt; Codex weekly budget &lt;80% (CodexBlockPct). All others -&gt; Claude totalExceeded==false.</li><li>ALSO EXEMPT (always): wkappbot skill read/search/list/edit/contribute (isSkillCmd check, no pace gate).</li><li>SOURCE: wkharness-guards.ps1 line ~859. Variables: isSkillCmd, isWkToolCmd, wkToolUnderPace.</li><li>CODEX CACHE: reads claude_codex_pace.json from TEMP with CacheTtlMin freshness check to avoid stale blocking after weekly reset.</li><li>LINE-REF UPDATE 2026-05-26: the per-tool budget check (wkToolUnderPace switch + isWkToolCmd) is at wkharness-guards.ps1 ~line 1012, NOT ~859 (step 4 ref went stale after the Fix2 hoisted-clear and Fix3 cross-repo inserts shifted lines). Locate by the &#x27;wkToolUnderPace = switch -Regex (cmd)&#x27; block: wkcodex/wkgpt read TEMP/claude_codex_pace.json and allow when pct &lt; CodexBlockPct (80); all other wk* allow when Claude totalExceeded is false.</li><li>HAIKU WK-ONLY-GATE EXEMPTION 2026-05-26: wk-only-gate (guards.ps1 ~540) now skips when isHaikuSession (last session model contains haiku). Previously it applied to ALL sessions incl Haiku subagents, blocking their non-wk commands (python/ls/etc) over-target -- which defeated the delegate-to-cheap-Haiku intent. Now Sonnet+Opus stay gated, Haiku exempt. isHaikuSession is set in wkharness.ps1 right beside isSonnetSession (last-model detection). selftest 72/72. commit 8cef9f5.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

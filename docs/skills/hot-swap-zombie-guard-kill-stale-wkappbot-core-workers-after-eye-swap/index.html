@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>hot-swap zombie guard: kill stale wkappbot-core workers after Eye swap</h1>
       <p class="description">After Eye hot-swap, old wkappbot-core MCP/analyze/slack-route workers are not killed by CoreSwapWatcher alone. A post-swap scan kills all wkappbot-core processes except self and new Eye.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>After new Eye process is ready, scan Process.GetProcessesByName(&#x27;wkappbot-core&#x27;) and kill all except self (Environment.ProcessId) and new Eye pid.</li><li>Log count of killed stale workers via Console.Error [EYE:HOT-SWAP].</li><li>PulseStep.Mark(&#x27;stale-cores-killed&#x27;) after the loop.</li><li>Verified 2026-04-23: experience/tests/eye/test-eye-tick-periodic-stale-core-reaper.sh (resolve ts=2026-04-23T03:46:09.4737710Z)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>After new Eye process is ready, scan Process.GetProcessesByName(&#x27;wkappbot-core&#x27;) and kill all except self (Environment.ProcessId) and new Eye pid.</li><li>Log count of killed stale workers via Console.Error [EYE:HOT-SWAP].</li><li>PulseStep.Mark(&#x27;stale-cores-killed&#x27;) after the loop.</li><li>Verified 2026-04-23: experience/tests/eye/test-eye-tick-periodic-stale-core-reaper.sh (resolve ts=2026-04-23T03:46:09.4737710Z)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

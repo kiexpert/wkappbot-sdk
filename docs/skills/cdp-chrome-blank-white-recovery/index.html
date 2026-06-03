@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Chrome blank/white page detection and recovery</h1>
       <p class="description">Chrome renders completely white/blank -- rendering give-up state. Detect via BLANK state in ask poll, recover by closing tab and reopening.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">chrome</span><span class="chip">blank</span><span class="chip">white</span><span class="chip">render</span><span class="chip">fail</span><span class="chip">recovery</span><span class="chip">tab</span><span class="chip">restart</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>DETECTION: AskCommands.ChatGpt.SendWait.cs polls page state. When state==&#x27;BLANK&#x27; for 20+ iterations (or 3+ after 30s), it sets blankPageCount&gt;=blankLimit and aborts with &#x27;[ASK] Page unresponsive -&gt; aborting poll&#x27;. No auto-recovery, no suggest filed.</li><li>SYMPTOM: Chrome window shows completely white/blank. CDP eval returns &#x27;BLANK&#x27;. ask gpt/gemini times out silently.</li><li>ROOT CAUSE: Chrome renderer process died or entered unrecoverable state. Tab shows blank white page. GetAwaiter loop exits with null response.</li><li>RECOVERY PROCEDURE: (1) wkappbot cdp close {grap} -- close the blank tab. (2) wkappbot cdp open https://chatgpt.com -- reopen fresh tab. (3) Verify: wkappbot ask gpt --new-session --sync --timeout 30s ping. (4) If still blank: wkappbot --sudo eye restart -- full Chrome hot-swap.</li><li>CURRENT BUG: blankPageCount&gt;=blankLimit just breaks loop. Should: (a) file BUG-AUTO suggest, (b) close blank tab, (c) cdp open to relaunch, (d) retry ask. Fix needed in AskCommands.ChatGpt.SendWait.cs and AskCommands.Gemini.cs BLANK state handler.</li><li>AUTO-DETECT via cdp-mon: powershell -File D:/GitHub/WKAppBot/bin/wkcdpmon.ps1 -- shows LAT=BLANK when tab is unresponsive. CRIT flag triggers when Chrome blank detected.</li><li>WHISPER-RING IMPACT: WhisperStudy reaches Tier 4 (give-up) when BLANK persists across all retries. Eye watchdog sees process alive but rendering dead -- no auto-recovery. Fix: WhisperStudy should signal Eye when all tiers exhausted so Eye can force-restart Chrome.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>DETECTION: AskCommands.ChatGpt.SendWait.cs polls page state. When state==&#x27;BLANK&#x27; for 20+ iterations (or 3+ after 30s), it sets blankPageCount&gt;=blankLimit and aborts with &#x27;[ASK] Page unresponsive -&gt; aborting poll&#x27;. No auto-recovery, no suggest filed.</li><li>SYMPTOM: Chrome window shows completely white/blank. CDP eval returns &#x27;BLANK&#x27;. ask gpt/gemini times out silently.</li><li>ROOT CAUSE: Chrome renderer process died or entered unrecoverable state. Tab shows blank white page. GetAwaiter loop exits with null response.</li><li>RECOVERY PROCEDURE: (1) wkappbot cdp close {grap} -- close the blank tab. (2) wkappbot cdp open https://chatgpt.com -- reopen fresh tab. (3) Verify: wkappbot ask gpt --new-session --sync --timeout 30s ping. (4) If still blank: wkappbot --sudo eye restart -- full Chrome hot-swap.</li><li>CURRENT BUG: blankPageCount&gt;=blankLimit just breaks loop. Should: (a) file BUG-AUTO suggest, (b) close blank tab, (c) cdp open to relaunch, (d) retry ask. Fix needed in AskCommands.ChatGpt.SendWait.cs and AskCommands.Gemini.cs BLANK state handler.</li><li>AUTO-DETECT via cdp-mon: powershell -File D:/GitHub/WKAppBot/bin/wkcdpmon.ps1 -- shows LAT=BLANK when tab is unresponsive. CRIT flag triggers when Chrome blank detected.</li><li>WHISPER-RING IMPACT: WhisperStudy reaches Tier 4 (give-up) when BLANK persists across all retries. Eye watchdog sees process alive but rendering dead -- no auto-recovery. Fix: WhisperStudy should signal Eye when all tiers exhausted so Eye can force-restart Chrome.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

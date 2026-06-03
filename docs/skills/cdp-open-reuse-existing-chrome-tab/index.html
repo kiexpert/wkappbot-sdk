@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>cdp open Reuses Existing Chrome and Opens URL as New Tab</h1>
       <p class="description">wkappbot cdp open &lt;url&gt; first checks for an alive Chrome registered to this project (via Window Property GetLaunchedPort, falling back to FindRunningChromePort over the per-project user-data-dir). When found, it skips ChromeLauncher.LaunchAsync entirely and lets ConnectCdp drive Target.createTarget into a NEW TAB on the existing instance. Only when no live registration is found does it fall through to a fresh Chrome launch. Prevents the *** storm reported 2026-05-05.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cdp</span><span class="chip">open</span><span class="chip">reuse</span><span class="chip">tab-creation</span><span class="chip">Target.createTarget</span><span class="chip">chrome-launcher</span><span class="chip">duplicate-window-fix</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>WebOpenCommand entry: set ChromeLauncher.DefaultUserDataDirBase=DataDir and ChromeLauncher.ProjectHash=ProjectRoot.Hash8() so registry lookups see the per-project bucket.</li><li>Reuse probe (priority order): 1) ChromeLauncher.GetLaunchedPort() reads Window Property WKAPPBOT_CDP_PORT_&lt;hash8&gt; on parent console/desktop HWND. 2) Fallback ChromeLauncher.FindRunningChromePort(userDataDir) does WMI/CDP scan tied to this project&#x27;s user-data-dir.</li><li>Each candidate port verified live via ChromeLauncher.IsPortActiveAsync; dead ports drop out. WMI/CDP fallback re-binds port via RegisterLaunchedPort so subsequent calls take the fast Window-Property path.</li><li>Reuse path: skip LaunchAsync. Print &#x27;Reusing Chrome on port N&#x27;. Then ConnectCdp(port, navigateUrl=url) calls GetOrCreateSandboxedTabAsync, which uses Target.createTarget when no host-matching tab exists -- new TAB on existing Chrome, not new process.</li><li>Launch path: only when both reuse probes return 0 (no live Chrome for this project). Falls through to ChromeLauncher.LaunchAsync(port, url) with SHA256-derived port (range 9300-9995, 4-port block per project CWD).</li><li>--new-window opt-out: skips reuse probe, forces new Chrome process. Reserved for isolated-process scenarios.</li><li>Port isolation: ports are SHA256-derived from git project root CWD. Each project gets a fixed 4-port block (e.g. 9300-9303). Never hardcode port numbers -- always use cdp open output.</li><li>ROOT CAUSE (2026-05-26): Chrome multiplication bug in FindRunningChromePortAny. When port file expired/missing, every cdp open call creates a new Chrome because the port-file guard (registered!=port) evaluates 0!=foundPort=true and skips all Chrome processes. Fix committed to Core: change guard to (registered&gt;0 &amp;&amp; registered!=port) - missing port file = recovery mode, accept any Chrome under ourBase prefix.</li><li>HARNESS BUILD PATTERN: wkappbot exec is the correct path to run dotnet/external tools when wk-only-gate blocks direct shell commands. Use: wkappbot exec &#x27;C:/Program Files/dotnet/dotnet&#x27; publish &lt;proj&gt; -c Release</li><li>MULTIPLICATION ROOT CAUSE + FIX (2026-05-26, Core 577dc035b + a18790a75): cdp open was launching a NEW Chrome on every call (viral multiplication, whole 4-port block consumed per project) because GetLaunchedPort in ChromeLauncher.PortRegistry.cs probed the Window Property (WKAPPBOT_CDP_PORT_hash8) on the CALLER HWND FIRST -- but that HWND is unstable across ConPTY / Windows Terminal tabs, so it missed every time and fell through to launch. The on-disk port file also had a 24h mtime expiry that ignored long-lived Chrome. FIX: reordered GetLaunchedPort to read the project-hash DISK port file FIRST (caller-HWND-independent, survives terminal/tab/CLI churn), validated live by IsPortActiveAsync (delete file if dead); Window Property demoted to an optional secondary fast-path; removed the 24h mtime expiry (liveness-checked instead). Lesson: any per-project reuse key MUST be HWND-independent; keying reuse to the caller window guarantees duplication under ConPTY/WT.</li><li>3. VERIFY SESSION HEALTH (before troubleshooting): wkcdp-mon shows [PORT] [PID] [MEM] [TGT-POS] [ACT-POS] [DRIFT] [LAT]. Check: (1) DRIFT=OK means position stable, (2) LAT=0/0/0 means responsive, (3) MEM &lt; 500M per session is healthy. If DRIFT shows d-###,### or LAT shows timeouts, Chrome window position may have drifted off-screen or session is hung. Use wkcdp-mon to diagnose before retrying cdp open.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>WebOpenCommand entry: set ChromeLauncher.Def...</li><li>Reuse probe (priority order): 1) ChromeLaunc...</li><li>Each candidate port verified live via Chrome...</li><li>Reuse path: skip LaunchAsync. Print &#x27;Reusing...</li><li>Launch path: only when both reuse probes ret...</li><li>--new-window opt-out: skips reuse probe, for...</li><li>Port isolation: ports are SHA256-derived fro...</li><li>ROOT CAUSE (2026-05-26): Chrome multiplicati...</li><li>HARNESS BUILD PATTERN: wkappbot exec is the...</li><li>MULTIPLICATION ROOT CAUSE + FIX (2026-05-26,...</li><li>3. VERIFY SESSION HEALTH (before troubleshoo...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'cdp-open-reuse-existing-chrome-tab';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

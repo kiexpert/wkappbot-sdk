@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Claude MD Harness Rules T2 HowTo</h1>
       <p class="description">T2 domain tier. Examples, body lines, template, scope, best practices, full harness:skill usage.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../claude-md-harness-rules/">claude-md-harness-rules</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>EXAMPLES: ## harness:safe CLAUDE\.md (allow Edit on CLAUDE.md). ## harness:block (?i)● Bash\(.*rm -rf (block). ## harness:warn (?i)● Bash\(.*sed -i (warn). ## harness:done (?i)completed.</li><li>BODY LINES: Plain text = shown as help. Line starting with ! = PowerShell command, output inserted. Example: !wkappbot skill read wk-ai-tools (shows skill content in block message).</li><li>TEMPLATE: no harness: sections in CLAUDE.md -&gt; ~/.claude/harness-template.md auto-appended. Default: safe CLAUDE.md, warn wkedit--line, block bash-pwsh, done skipped.</li><li>BEST PRACTICES: Use safe before block to whitelist exceptions. Anchor to &#x27;● Bash\(&#x27; or &#x27;● Edit\(&#x27; to avoid matching tool args. Keep regex simple (no lookahead). Test: wkharness -Test.</li><li>harness:skill FULL USAGE: ## harness:skill csharp.*MyCdpContext then 3 &#x27;wkappbot skill read &lt;id&gt;&#x27; lines. IDs must exist in catalog and be distinct. Catch-all (condition B) blocks unregistered source files and prints exact section to add. skill-update LOCK (code_changed.lock) separate: cleared by any skill edit/contribute, gates next delegation.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>EXAMPLES: ## harness:safe CLAUDE\.md (allow Edit on CLAUDE.md). ## harness:block (?i)● Bash\(.*rm -rf (block). ## harness:warn (?i)● Bash\(.*sed -i (warn). ## harness:done (?i)completed.</li><li>BODY LINES: Plain text = shown as help. Line starting with ! = PowerShell command, output inserted. Example: !wkappbot skill read wk-ai-tools (shows skill content in block message).</li><li>TEMPLATE: no harness: sections in CLAUDE.md -&gt; ~/.claude/harness-template.md auto-appended. Default: safe CLAUDE.md, warn wkedit--line, block bash-pwsh, done skipped.</li><li>BEST PRACTICES: Use safe before block to whitelist exceptions. Anchor to &#x27;● Bash\(&#x27; or &#x27;● Edit\(&#x27; to avoid matching tool args. Keep regex simple (no lookahead). Test: wkharness -Test.</li><li>harness:skill FULL USAGE: ## harness:skill csharp.*MyCdpContext then 3 &#x27;wkappbot skill read &lt;id&gt;&#x27; lines. IDs must exist in catalog and be distinct. Catch-all (condition B) blocks unregistered source files and prints exact section to add. skill-update LOCK (code_changed.lock) separate: cleared by any skill edit/contribute, gates next delegation.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

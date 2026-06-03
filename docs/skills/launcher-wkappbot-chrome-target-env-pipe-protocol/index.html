@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>Launcher WKAPPBOT_CHROME_TARGET env + pipe protocol</h1>
       <p class="description">Launcher publishes validated caller-offset Chrome placement target via WKAPPBOT_CHROME_TARGET env var AND forwards through Eye command pipe with __target prefix. Core reads same coords so SetWindowPos, post-launch stability loop, and per-command reposition all use Launcher-computed target. Without this Core falls back to ExpectedBounds (rightmost monitor anchor) and fights Launcher SetWindowPos producing wrong-monitor regression.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">launcher</span><span class="chip">chrome</span><span class="chip">placement</span><span class="chip">env-var</span><span class="chip">eye-pipe</span><span class="chip">cdp</span><span class="chip">multi-monitor</span><span class="chip">sdk</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PROBLEM: Launcher computes validated caller-offset target via TryMoveWebBotNearCaller then SetWindowPos. Core (separate process) re-derives target from caller HWND which can diverge -- Core ResolveCallerHwnd re-walks process tree and picks different ancestor with off-screen coords -- and falls back to ExpectedBounds (rightmost monitor 1740,20). Result: Chrome bounces between two positions per command.</li><li>PROTOCOL PART 1 ENV VAR: After [PLACEMENT:VALIDATE] log in MyCdpContext.Placement.cs TryMoveWebBotNearCaller, set Environment.SetEnvironmentVariable WKAPPBOT_CHROME_TARGET to x,y,w,h string with DefaultChromeW/H matching Core CdpClient.OuterWidthPx/OuterHeightPx constants. Log [PLACEMENT:ENV] WKAPPBOT_CHROME_TARGET=x,y,w,h.</li><li>PROTOCOL PART 2 PIPE FORWARD: In EyeCmdPipeClient.cs Send method, read WKAPPBOT_CHROME_TARGET env var and prepend __target:VALUE to JSON payload list (alongside __cwd and __hwnd prefixes). Eye-delegated commands forward this to Core which honors the same coords the Launcher SetWindowPos already applied.</li><li>WHY BOTH PATHS: Direct RunCoreDetachedNormal path uses env var inheritance. Eye-delegated path uses pipe prefix because Eye spawns Core in separate context that does not inherit Launcher env block reliably. Both deliver the same payload.</li><li>CORE-SIDE READER: Core ChromeLauncher.ComputePlacementNearCaller + CdpClient.SetWindowBoundsWaitStableAsync must check WKAPPBOT_CHROME_TARGET first before falling back to ExpectedBounds. The --window-position chrome.exe launch flag, post-launch stability loop, and any per-command reposition must all read SAME value.</li><li>FORMAT: comma-separated x,y,width,height (e.g. 100,200,1400,900). Width/height are DESIRED final OUTER size (Chrome process window outer rect including chrome frame).</li><li>FAILURE MODE: env var set wrapped in try/catch -- failure is non-fatal. Without env: Core falls back to ExpectedBounds and overrides Launcher placement. Diagnose via cdp-mon -- if TGT-POS pins to rightmost monitor anchor (1740,20) instead of following caller terminal then env var or pipe forward is missing.</li><li>VERIFICATION: After hot-swap, run wkappbot ask gpt ping from terminal at known position, check cdp-state.jsonl for [PLACEMENT:ENV] line, verify TGT-POS in cdp-mon matches env var coords. Should change per terminal CWD/position.</li><li>RELATED FILES: csharp/src/WKAppBot.Launcher/MyCdpContext.Placement.cs (env set) and csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.cs (pipe forward). Commit 65c617fe introduced the protocol on 2026-05-16.</li><li>PREFLIGHT FIX (2026-05-25): TryValidateAndCorrectPlacement now does a no-sleep preflight position read before the 5-attempt loop. If Chrome is already within threshold (attempts=0), Stage 2/3 watcher is also skipped. Result: cdp open on already-placed Chrome returns in &lt;200ms instead of 750ms+</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>PROBLEM: Launcher computes validated caller-...</li><li>PROTOCOL PART 1 ENV VAR: After [PLACEMENT:VA...</li><li>PROTOCOL PART 2 PIPE FORWARD: In EyeCmdPipeC...</li><li>WHY BOTH PATHS: Direct RunCoreDetachedNormal...</li><li>CORE-SIDE READER: Core ChromeLauncher.Comput...</li><li>FORMAT: comma-separated x,y,width,height (e....</li><li>FAILURE MODE: env var set wrapped in try/cat...</li><li>VERIFICATION: After hot-swap, run wkappbot a...</li><li>RELATED FILES: csharp/src/WKAppBot.Launcher/...</li><li>PREFLIGHT FIX (2026-05-25): TryValidateAndCo...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'launcher-wkappbot-chrome-target-env-pipe-protocol';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>wkappbot Beginner Onboarding - From Zero to First Automation</h1>
       <p class="description">Step-by-step onboarding: create GitHub account, install gh CLI, authenticate, download wkappbot, install, verify, check Free tier. Skill files correction: help text for windows command was describing it as listing all windows (incorrect). Correct default: no-arg filters by wkappbot keyword only. Docs saying it lists all windows are wrong.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">onboarding</span><span class="chip">beginner</span><span class="chip">install</span><span class="chip">setup</span><span class="chip">github</span><span class="chip">gh-cli</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Create a GitHub account at github.com/signup (required - license check uses gh CLI under the hood; without an account you cannot upgrade beyond Free).</li><li>Install gh CLI: Windows -&gt; &#x27;winget install --id GitHub.cli&#x27;; macOS -&gt; &#x27;brew install gh&#x27;; Linux -&gt; see cli.github.com/manual/installation.</li><li>Authenticate: run &#x27;gh auth login&#x27;, choose GitHub.com, HTTPS, &#x27;Login with a web browser&#x27;, complete the device-code flow in browser.</li><li>Download wkappbot: &#x27;gh release download --repo ***/wkappbot-sdk --pattern *.zip&#x27; (downloads the latest wkappbot-X.Y.Z.zip into the current directory).</li><li>Install: extract the zip into %USERPROFILE%\.wkappbot\bin (or any path), add that bin directory to PATH; alternatively run install.cmd from the extracted folder.</li><li>Verify install: open a fresh terminal and run &#x27;wkappbot --version&#x27; - it should print the version string and exit 0.</li><li>Check license: &#x27;wkappbot license status&#x27; - on a fresh install this shows tier=Free with no pending invites; all base features (a11y, inspect, run, scenario, skill, speak, file, logcat) are already usable.</li><li>Upgrade (optional): follow SUBSCRIBE.md - bank-transfer 100k KRW (CDP) or 500k KRW (Sudo) to KIS with your GitHub username as the memo, wait up to 1 hour, accept the GitHub collaborator invite at github.com/notifications, re-run &#x27;wkappbot license status&#x27; to confirm tier upgrade.</li><li>First automation: &#x27;wkappbot windows&#x27; or &#x27;wkappbot a11y windows&#x27; shows wkappbot-related windows (default filter: wkappbot*). Use &#x27;wkappbot windows *&#x27; or &#x27;wkappbot a11y find *&#x27; to list ALL visible top-level windows. Confirms the Win32/UIA pipeline is working end-to-end.</li><li>Correct default behavior: &#x27;wkappbot windows&#x27; (no args) = wkappbot* filter. Use &#x27;wkappbot windows *&#x27; to list all windows. Old docs said &#x27;lists all&#x27; which was incorrect.</li><li>[AUDIT 2026-06-03] source_refs broken: missing SUBSCRIBE.md, PRICING.md and README patterns Installation/Activate License.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Create a GitHub account at github.com/signup...</li><li>Install gh CLI: Windows -&gt; &#x27;winget install -...</li><li>Authenticate: run &#x27;gh auth login&#x27;, choose Gi...</li><li>Download wkappbot: &#x27;gh release download --re...</li><li>Install: extract the zip into %USERPROFILE%\...</li><li>Verify install: open a fresh terminal and ru...</li><li>Check license: &#x27;wkappbot license status&#x27; - o...</li><li>Upgrade (optional): follow SUBSCRIBE.md - ba...</li><li>First automation: &#x27;wkappbot windows&#x27; or &#x27;wka...</li><li>Correct default behavior: &#x27;wkappbot windows&#x27;...</li><li>[AUDIT 2026-06-03] source_refs broken: missi...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'wkappbot-beginner-onboarding-from-zero-to-first-automation';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

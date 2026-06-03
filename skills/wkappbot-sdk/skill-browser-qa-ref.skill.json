@@ -1,0 +1,50 @@
+{
+  "id": "skill-browser-qa-ref",
+  "app": "wkappbot-sdk",
+  "title": "Skill Browser QA Reference - Bug History",
+  "title_ko": null,
+  "desc": "T3 history tier for skill-browser-qa. Known bugs found and fixed during 2026-06-03 QA session, build script pitfalls, and SEO design decisions.",
+  "steps": [
+    "PARENT T1: wkappbot skill read skill-browser-qa",
+    "BUG 1 - JS double-brace leak (fixed 2026-06-03): pro_button_and_script was a plain Python string (not f-string) but written with {{ }} f-string escapes. Output HTML had literal {{ in JS functions (e.g. 'function unlockAll() {{'). JS still worked (extra nested block) but was wrong. Fix: use single { } in plain strings. Pattern: if a string is NOT an f-string, never use {{ }}.",
+    "BUG 2 - proUnlockButton on all pages (fixed 2026-06-03): button and script block were hardcoded in return template outside any conditional. Non-premium pages showed a lock button with nothing to unlock. Fix: wrap in if premium: block, emit as pro_button_and_script variable set to empty string for non-premium.",
+    "BUG 3 - GitHub OAuth button broken (fixed 2026-06-03): nav had Login with GitHub button using window.WKAPPBOT_GITHUB_CLIENT_ID which was never set anywhere. Click redirected to github.com/settings/applications/new (GitHub app registration page). Fix: removed entirely. PAT-based lock button (bottom right) is the only auth path.",
+    "BUG 4 - Multiple blocked agent attempts (2026-06-03): Edit calls directly on build-skill-page.py blocked by pace guard (Sonnet-hogging). Agent() blocked by claude-md-sync-guard (no Pending entry). Agent.cmd foreground blocked by -delegation guard. Root cause: skipped agent-dispatch-preflight checklist. See wkappbot skill read agent-dispatch-preflight.",
+    "SEO DECISION: detail pages must NOT embed full step text -- search engines crawl HTML including data-full attributes. Premium skills show 44-char preview_step() only. Full content delivered via CLI (wkappbot skill read ID). No data-full on detail pages.",
+    "PREMIUM CRITERIA: premium = (step_count >= 10) AND ('developer' in audience.lower()). Most wkappbot-* skills qualify. Check: len(skill['steps']) >= 10 in collect_skills()."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-browser-qa-ref",
+      "expect": "BUG 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-browser-qa",
+      "expect": "STATIC CHECKS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-browser-qa-howto",
+      "expect": "PARENT T1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-browser",
+    "qa",
+    "ref",
+    "t3",
+    "bugs",
+    "history",
+    "seo",
+    "2026-06-03"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T06:47:08.1334706Z",
+  "updated": "2026-06-03T06:47:08.1334816Z",
+  "version": "1.0"
+}

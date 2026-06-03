@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>CDP console.log forwarding to stderr via Runtime.consoleAPICalled</h1>
       <p class="description">Runtime.consoleAPICalled is NOT subscribed in Core CdpClient. console.log in --eval-js JS silently drops to nowhere. Fix: subscribe to Runtime.consoleAPICalled in EvalAsyncCore and write to stderr as [CDP:CONSOLE:LOG] msg.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cdp</span><span class="chip">eval-js</span><span class="chip">console</span><span class="chip">stderr</span><span class="chip">debug</span><span class="chip">runtime</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>ROOT CAUSE: CdpClient.Actions.cs EvalAsyncCore only parses exceptionDetails from Runtime.evaluate response. No subscription to Runtime.consoleAPICalled event anywhere in codebase (confirmed grep).</li><li>PREREQUISITE: Runtime.enable IS called (CdpClient.FocusGuard.cs:26) -- so console events would fire once subscribed.</li><li>FIX LOCATION: CdpClient.Actions.cs alongside EvalAsyncCore OR in the CDP connection setup where Runtime.enable is called.</li><li>FIX CODE: subscribe _eventHandlers[&quot;Runtime.consoleAPICalled&quot;] to capture type+args and write Console.Error.WriteLine(&quot;[CDP:CONSOLE:LOG] msg&quot;).</li><li>EXPECTED RESULT: wkappbot a11y read GRAP#Doc_RootWebArea --eval-js &quot;console.log(&#x27;test&#x27;)&quot; 2&gt;&amp;1 shows [CDP:CONSOLE:LOG] test on stderr.</li><li>USE CASE: YouTube ad-skipper can inject setInterval JS and verify execution via console.log output. Also enables general CDP JS debugging.</li><li>TESTING: after fix, confirm console.log/warn/error/info all appear on stderr with their type prefix.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>ROOT CAUSE: CdpClient.Actions.cs EvalAsyncCore only parses exceptionDetails from Runtime.evaluate response. No subscription to Runtime.consoleAPICalled event anywhere in codebase (confirmed grep).</li><li>PREREQUISITE: Runtime.enable IS called (CdpClient.FocusGuard.cs:26) -- so console events would fire once subscribed.</li><li>FIX LOCATION: CdpClient.Actions.cs alongside EvalAsyncCore OR in the CDP connection setup where Runtime.enable is called.</li><li>FIX CODE: subscribe _eventHandlers[&quot;Runtime.consoleAPICalled&quot;] to capture type+args and write Console.Error.WriteLine(&quot;[CDP:CONSOLE:LOG] msg&quot;).</li><li>EXPECTED RESULT: wkappbot a11y read GRAP#Doc_RootWebArea --eval-js &quot;console.log(&#x27;test&#x27;)&quot; 2&gt;&amp;1 shows [CDP:CONSOLE:LOG] test on stderr.</li><li>USE CASE: YouTube ad-skipper can inject setInterval JS and verify execution via console.log output. Also enables general CDP JS debugging.</li><li>TESTING: after fix, confirm console.log/warn/error/info all appear on stderr with their type prefix.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Elevated proxy subprocess timeout HasExited check</h1>
       <p class="description">Admin Eye proxy must distinguish &#x27;process hung&#x27; from &#x27;grandchild holds stdout pipe&#x27; after WaitForExitAsync 30s cancel</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>In .NET 8, Process.WaitForExitAsync with redirected stdout/stderr waits for BOTH process exit AND stream EOF</li><li>If child exits cleanly but grandchild (daemon) inherits stdout pipe, WaitForExitAsync stalls on stream-EOF half and fires 30s timeout with stdoutDone=False</li><li>Fix (ElevatedEyeProxy.cs ExecuteCommand): on OperationCanceledException, call proc.Refresh() + check proc.HasExited. If true, grace-drain streams 2s then return ExitCode=proc.ExitCode as success</li><li>Only when HasExited=false is it a true hang -- then kill tree + return -1 with timeout Error. Post-exit 3s drain path also no longer tags Error since grandchild holding pipe is a success case, not retry-worthy</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>In .NET 8, Process.WaitForExitAsync with redirected stdout/stderr waits for BOTH process exit AND stream EOF</li><li>If child exits cleanly but grandchild (daemon) inherits stdout pipe, WaitForExitAsync stalls on stream-EOF half and fires 30s timeout with stdoutDone=False</li><li>Fix (ElevatedEyeProxy.cs ExecuteCommand): on OperationCanceledException, call proc.Refresh() + check proc.HasExited. If true, grace-drain streams 2s then return ExitCode=proc.ExitCode as success</li><li>Only when HasExited=false is it a true hang -- then kill tree + return -1 with timeout Error. Post-exit 3s drain path also no longer tags Error since grandchild holding pipe is a success case, not retry-worthy</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

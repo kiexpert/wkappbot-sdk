@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>AI News Briefing — lunch and dinner automated digest</h1>
       <p class="description">Twice-daily (11:00, 18:00) AI news digest -- see ai-news-to-suggests for the full pipeline including Gemini filter and improvement workflow.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">news</span><span class="chip">briefing</span><span class="chip">automation</span><span class="chip">schedule</span><span class="chip">gemini</span><span class="chip">suggest</span><span class="chip">speak</span><span class="chip">slack</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>OVERVIEW: automated AI news digest at 11:00 (lunch) and 18:00 (dinner). Searches 5 keyword queries, filters via Gemini for WKAppBot relevance, registers top 3 as suggests, announces one-line summary via TTS, posts full briefing to Slack.</li><li>SEARCH KEYWORDS: &#x27;AI desktop automation 2026&#x27;, &#x27;Windows accessibility API AI&#x27;, &#x27;Claude computer use update&#x27;, &#x27;UI automation agent framework&#x27;, &#x27;LLM tool use MCP update&#x27;. Tunable — add domain-specific terms as WKAppBot evolves.</li><li>PIPELINE: (1) wkappbot web search &lt;keyword&gt; --limit 3 x5 queries → raw results. (2) wkappbot ask gemini &#x27;&lt;filter prompt&gt;&#x27; → top 3 relevant items with TITLE/URL/WHY/SUMMARY. (3) wkappbot suggest &#x27;[AI-NEWS] title: why&#x27; per item. (4) wkappbot speak &#x27;first summary&#x27; (TTS one-liner). (5) wkappbot slack send full briefing with all items.</li><li>SCHEDULE: wkappbot schedule add &#x27;bash .../ai-news-briefing.sh&#x27; --at 11:00 --repeat 24h (and same for 18:00). Eye must be running for schedule execution.</li><li>SCRIPT LOCATION: bin/wkappbot.hq/scripts/ai-news-briefing.sh</li><li>GEMINI FILTER PROMPT: instructs Gemini to output structured TITLE/URL/WHY/SUMMARY format, or NONE if nothing relevant. Keep prompt tight to avoid hallucinated URLs.</li><li>COST: 5 web searches + 1 Gemini call per run = ~10 API calls/day. Minimal token usage since search results are short and Gemini prompt is focused.</li><li>KNOWN ISSUE: Gemini ask can hang if rate-limited or network slow. Script needs --timeout on ask command to prevent indefinite wait. TODO: add 30s timeout to ask gemini call.</li><li>SUGGEST TAG: all news items tagged [AI-NEWS] in suggest text for easy filtering via &#x27;wkappbot suggest list&#x27; grep.</li><li>EXIT ADMIN SESSION: briefing runs as user (no --sudo needed). No admin Eye involvement.</li><li>SUGGEST DEDUPE AND SKILL HEALING: Before filing or resolving AI-NEWS suggests, compare against existing AI-NEWS skills and pending suggests for duplicate URLs/titles. When a news item reveals reusable workflow knowledge, update the related skill during the same pass before resolving.</li><li>Verified 2026-05-17:  (resolve ts=2026-05-15T09:07:44)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>OVERVIEW: automated AI news digest at 11:00...</li><li>SEARCH KEYWORDS: &#x27;AI desktop automation 2026...</li><li>PIPELINE: (1) wkappbot web search &lt;keyword&gt;...</li><li>SCHEDULE: wkappbot schedule add &#x27;bash .../ai...</li><li>SCRIPT LOCATION: bin/wkappbot.hq/scripts/ai-...</li><li>GEMINI FILTER PROMPT: instructs Gemini to ou...</li><li>COST: 5 web searches + 1 Gemini call per run...</li><li>KNOWN ISSUE: Gemini ask can hang if rate-lim...</li><li>SUGGEST TAG: all news items tagged [AI-NEWS]...</li><li>EXIT ADMIN SESSION: briefing runs as user (n...</li><li>SUGGEST DEDUPE AND SKILL HEALING: Before fil...</li><li>Verified 2026-05-17: (resolve ts=2026-05-15T...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'ai-news-briefing';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

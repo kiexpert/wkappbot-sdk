@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>speak --bg: interrupt via X / ESC / caller-exit</h1>
       <p class="description">speak --bg now supports mid-playback stop: X button on karaoke overlay, ESC key, Alt-F4, or --caller-pid process exit. stopSignal replaces Thread.Sleep so any trigger immediately cuts audio. --bg prints launched pid=N for scripting.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>speak --bg: spawns child process and prints &#x27;[SPEAK] launched pid=N caller=M&#x27; for scripting/grep</li><li>SpeakOverlayWindow: X button (closeBtn, top-right, Focusable=false) signals stop immediately</li><li>ESC key and window close (Alt-F4/Closing) also trigger RequestStop -- all paths are idempotent</li><li>stopSignal (ManualResetEventSlim) replaces Thread.Sleep: stopSignal.Wait(totalMs) + player.Stop() cuts audio</li><li>caller-exit watch: --caller-pid &lt;pid&gt; starts 500ms timer; when caller process exits, TTS stops automatically</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>speak --bg: spawns child process and prints &#x27;[SPEAK] launched pid=N caller=M&#x27; for scripting/grep</li><li>SpeakOverlayWindow: X button (closeBtn, top-right, Focusable=false) signals stop immediately</li><li>ESC key and window close (Alt-F4/Closing) also trigger RequestStop -- all paths are idempotent</li><li>stopSignal (ManualResetEventSlim) replaces Thread.Sleep: stopSignal.Wait(totalMs) + player.Stop() cuts audio</li><li>caller-exit watch: --caller-pid &lt;pid&gt; starts 500ms timer; when caller process exits, TTS stops automatically</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

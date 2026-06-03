@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Cookie consent strategy for AI web services: selective non-acceptance increases session capacity</h1>
       <p class="description">CONFIDENTIAL operator strategy: deliberately not auto-accepting cookie consent on AI service pages (ChatGPT, Gemini, etc.) increases session capacity by preventing provider quota tracking via persistent cookies.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">cookie</span><span class="chip">consent</span><span class="chip">chatgpt</span><span class="chip">gemini</span><span class="chip">strategy</span><span class="chip">session</span><span class="chip">usage</span><span class="chip">business</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>BUSINESS INSIGHT (CONFIDENTIAL): For AI web services (ChatGPT, Gemini, Claude.ai, etc.), deliberately NOT auto-accepting cookie consent banners can increase effective session capacity. Cookie acceptance persists tracking state that providers use to enforce per-user usage limits. Without persistent consent cookies, each session may be treated as fresh/anonymous by the quota system.</li><li>POLICY: wkappbot should NOT automatically click cookie consent banners on AI service pages. Let banners persist unless the user explicitly requests acceptance.</li><li>AFFECTED SERVICES: chatgpt.com, gemini.google.com, claude.ai, bing.com/chat, copilot.microsoft.com. May apply to other AI web frontends with usage quotas.</li><li>IMPLEMENTATION: The wkcdp cookie auto-approval flow should skip AI service domains. Add to a consent-skip list in ChromeLauncher or CDP cookie handler. Do NOT file a suggest/bug when consent cookies are missing on AI domains -- intentional by design.</li><li>OPERATOR ACTION: If ask pipeline hangs due to cookie banner on AI service -- do NOT auto-click Accept. Verify banner is not blocking editor input (z-order check). If blocking, dismiss via X/close only, not Accept. Let the banner remain as rejected/pending in cookie store.</li><li>EXCEPTION: Non-AI service pages (finance, news, e-commerce) may be auto-accepted as before. This strategy applies ONLY to AI quota-tracked services.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>BUSINESS INSIGHT (CONFIDENTIAL): For AI web services (ChatGPT, Gemini, Claude.ai, etc.), deliberately NOT auto-accepting cookie consent banners can increase effective session capacity. Cookie acceptance persists tracking state that providers use to enforce per-user usage limits. Without persistent consent cookies, each session may be treated as fresh/anonymous by the quota system.</li><li>POLICY: wkappbot should NOT automatically click cookie consent banners on AI service pages. Let banners persist unless the user explicitly requests acceptance.</li><li>AFFECTED SERVICES: chatgpt.com, gemini.google.com, claude.ai, bing.com/chat, copilot.microsoft.com. May apply to other AI web frontends with usage quotas.</li><li>IMPLEMENTATION: The wkcdp cookie auto-approval flow should skip AI service domains. Add to a consent-skip list in ChromeLauncher or CDP cookie handler. Do NOT file a suggest/bug when consent cookies are missing on AI domains -- intentional by design.</li><li>OPERATOR ACTION: If ask pipeline hangs due to cookie banner on AI service -- do NOT auto-click Accept. Verify banner is not blocking editor input (z-order check). If blocking, dismiss via X/close only, not Accept. Let the banner remain as rejected/pending in cookie store.</li><li>EXCEPTION: Non-AI service pages (finance, news, e-commerce) may be auto-accepted as before. This strategy applies ONLY to AI quota-tracked services.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

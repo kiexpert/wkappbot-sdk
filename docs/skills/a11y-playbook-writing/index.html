@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,102 @@
       <h1>a11y playbook writing</h1>
       <p class="description">Create and revise executable WKAppBot playbooks/scenarios for focusless desktop automation. Use when drafting or updating YAML scenarios, Notepad-style demos, save-dialog recovery flows, or any target-heavy automation that should prefer `a11y find`, paste-ready grap targets, UTF-8-safe files, and graceful close behavior over brittle clicks or taskkill.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">a11y</span><span class="chip">playbook</span><span class="chip">scenario</span><span class="chip">script</span><span class="chip">grap</span><span class="chip">notepad</span><span class="chip">focusless</span><span class="chip">utf8</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>Read the shared repo guidance first: AGENTS.md, CLAUDE.md, and README.md. Keep any new prose English-first and UTF-8 encoded; only UI-localized labels may stay localized when the target app requires them.</li><li>Reuse existing skills before inventing new flow: `wkappbot skill list`, then `wkappbot skill read a11y-find`, `grap-target`, and `control-ui-without-stealing-focus-3-tier-focusless-strategy`.</li><li>Write the playbook as a runnable scenario: `scenario`, `config`, `app`, `steps`, optional `teardown`. Prefer `prefer_focusless: true` and `focus_check: false` when the goal is background automation.</li><li>Discover exact targets with `a11y find` and copy the emitted `# TARGET` grap. Prefer node-tag / grap-path resolution over raw `name` matching for buttons and modal controls.</li><li>For Notepad close flows, prefer `window_close` first. If a save prompt appears, dismiss it by invoking the button found through the a11y node tag path. Keep `press_key` only as fallback, not as the primary path.</li><li>Avoid destructive process-kill shortcuts for Notepad. Use graceful close, prompt dismissal, and only narrow fallback logic when the UI path fails.</li><li>Prefer stable selectors in scenarios: `control_type`, `automation_id`, and `description` over fragile visible text. Use localized text only where the OS/app label itself is localized.</li><li>Validate the playbook after edits with the official binary on PATH: `wkappbot validate &lt;file&gt;` and, when relevant, `wkappbot run &lt;file&gt;`. If validation fails with log or lock issues, inspect runtime state before assuming the YAML is wrong.</li><li>After creating or updating the skill, verify it with `wkappbot skill read &lt;id&gt;` and keep the skill body short, imperative, and reusable.</li><li>Use wkappbot skill contribute / wkappbot skill edit for all skill changes; never hand-edit .skill.json files.</li><li>Screenshot action supports per-step window scoping and explicit output path: target.class_name is resolved through WindowFinder.FindByClassName (falls back to main window if not set), and params.path takes precedence over params.filename as the verbatim output path (intermediate dirs auto-created). Regression: scenarios/screenshot_path_classname_test.yaml.</li><li>Verified 2026-04-21: test-run-scenario-screenshot-path-classname.cmd (resolve ts=2026-04-19T06:48)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps blurred"><li>Read the shared repo guidance first: AGENTS....</li><li>Reuse existing skills before inventing new f...</li><li>Write the playbook as a runnable scenario: `...</li><li>Discover exact targets with `a11y find` and...</li><li>For Notepad close flows, prefer `window_clos...</li><li>Avoid destructive process-kill shortcuts for...</li><li>Prefer stable selectors in scenarios: `contr...</li><li>Validate the playbook after edits with the o...</li><li>After creating or updating the skill, verify...</li><li>Use wkappbot skill contribute / wkappbot ski...</li><li>Screenshot action supports per-step window s...</li><li>Verified 2026-04-21: test-run-scenario-scree...</li></ol>
+        <div class="unlock">Unlock with Pro</div>
+      </div>
     </article>
   </main>
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-playbook-writing';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

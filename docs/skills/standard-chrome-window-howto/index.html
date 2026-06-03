@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Standard Chrome Window T2 HowTo</h1>
       <p class="description">T2 domain tier. How-to: GetWindowForTarget, SetWindowBoundsAsync, multi-tab, non-active tab, minimized Chrome, coordinate clamping.</p>
       <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../standard-chrome-window/">standard-chrome-window</a></div>
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>GetWindowForTarget: cdp.GetWindowForTargetAsync(cdp.TargetId) returns {windowId, bounds}. Use windowId for all setBounds calls. Multi-tab: any targetId returns the ROOT browser window (all tabs share it).</li><li>Non-active tab: our CDP target may be in background. GetWindowForTarget with background tab targetId still returns correct root window. Tab does not need to be active.</li><li>Minimized Chrome: SetWindowBoundsAsync -- (1) setBounds windowState=normal (2) await WaitForWindowStateAsync(normal) (3) setBounds with actual target coords. Implemented in CdpClient.Window2.cs.</li><li>ClampBoundsToVisible: last-resort in SetWindowBoundsAsync. Calls ChromeLauncher.ClampBoundsToVisible before sending. Never use negative x as off-screen -- use MonitorFromPoint. Negative x valid on left monitor.</li><li>Chrome_WidgetWin_1 enumeration: GetWindowsByPid(chromePid).Where(w =&gt; *** AND GetWindow(GW_OWNER)==0 AND IsWindowVisible). First match = target for placement.</li><li>Coordinate verification: CDP:MOVE log coords should match cdp-mon ACT-POS. Discrepancy = DPI context mismatch. Check TrySetPerMonitorV2DpiAwareness called at Launcher Main() entry.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>GetWindowForTarget: cdp.GetWindowForTargetAsync(cdp.TargetId) returns {windowId, bounds}. Use windowId for all setBounds calls. Multi-tab: any targetId returns the ROOT browser window (all tabs share it).</li><li>Non-active tab: our CDP target may be in background. GetWindowForTarget with background tab targetId still returns correct root window. Tab does not need to be active.</li><li>Minimized Chrome: SetWindowBoundsAsync -- (1) setBounds windowState=normal (2) await WaitForWindowStateAsync(normal) (3) setBounds with actual target coords. Implemented in CdpClient.Window2.cs.</li><li>ClampBoundsToVisible: last-resort in SetWindowBoundsAsync. Calls ChromeLauncher.ClampBoundsToVisible before sending. Never use negative x as off-screen -- use MonitorFromPoint. Negative x valid on left monitor.</li><li>Chrome_WidgetWin_1 enumeration: GetWindowsByPid(chromePid).Where(w =&gt; *** AND GetWindow(GW_OWNER)==0 AND IsWindowVisible). First match = target for placement.</li><li>Coordinate verification: CDP:MOVE log coords should match cdp-mon ACT-POS. Discrepancy = DPI context mismatch. Check TrySetPerMonitorV2DpiAwareness called at Launcher Main() entry.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

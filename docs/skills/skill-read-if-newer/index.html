@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>skill read --if-newer: skip export if cached version is current</h1>
       <p class="description">wkappbot skill read &lt;id&gt; --if-newer skips re-exporting SKILL.md when cached version matches catalog. Efficient for AI agents to check updates without forcing full re-export.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"><span class="chip">skill</span><span class="chip">export</span><span class="chip">if-newer</span><span class="chip">cache</span><span class="chip">version</span><span class="chip">claude</span><span class="chip">codex</span><span class="chip">refresh</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>USAGE: wkappbot skill read &lt;id&gt; --if-newer -- skips write if cached SKILL.md version &gt;= catalog version</li><li>BEHAVIOR: cached v &gt;= catalog =&gt; [SKILL:EXPORT] up-to-date v{ver}. cached v &lt; catalog =&gt; normal export fires</li><li>SKILL.MD HEADER: every exported file starts with Refresh line showing --if-newer command and current version so AI always knows how to refresh</li><li>CALLER GATING: Claude parent =&gt; .claude/ paths only. Codex parent =&gt; .codex/ paths only. No cross-writes</li><li>WITHOUT FLAG: wkappbot skill read &lt;id&gt; always exports regardless of cache (force-refresh)</li><li>CODE: SkillCommand.AiExport.cs IsExportedSkillCurrent() parses Refresh line via regex v(\d+\.\d+). SkillCommand.cs parses --if-newer at skill read handler</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>USAGE: wkappbot skill read &lt;id&gt; --if-newer -- skips write if cached SKILL.md version &gt;= catalog version</li><li>BEHAVIOR: cached v &gt;= catalog =&gt; [SKILL:EXPORT] up-to-date v{ver}. cached v &lt; catalog =&gt; normal export fires</li><li>SKILL.MD HEADER: every exported file starts with Refresh line showing --if-newer command and current version so AI always knows how to refresh</li><li>CALLER GATING: Claude parent =&gt; .claude/ paths only. Codex parent =&gt; .codex/ paths only. No cross-writes</li><li>WITHOUT FLAG: wkappbot skill read &lt;id&gt; always exports regardless of cache (force-refresh)</li><li>CODE: SkillCommand.AiExport.cs IsExportedSkillCurrent() parses Refresh line via regex v(\d+\.\d+). SkillCommand.cs parses --if-newer at skill read handler</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Playbook actions: read (UIA text) + shell (external command)</h1>
       <p class="description">YAML playbook actions &#x27;read&#x27; and &#x27;shell&#x27;. &#x27;read&#x27; extracts text from a UIA/OCR target via UiaLocator.GetText and optionally stashes to a scenario variable. &#x27;shell&#x27; runs an external command with timeout, captures stdout/stderr, honors expected exit_code, and can store stdout as a variable. Both resolve ${vars} in params.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>action: read -- target: {automation_id/name/ control_type} params.store_as captures UiaLocator.GetText result into ${store_as} for later steps.</li><li>action: shell -- params.command required. params.args string, params.working_dir, params.timeout_sec (default 30), params.exit_code (default 0), params.store_as stores stdout.</li><li>Behavior: shell uses UseShellExecute=false + CreateNoWindow=true + UTF-8 stdout/stderr. read delegates to the same UiaLocator.GetText helper used by DoAssert.</li><li>Dispatch sites: csharp/src/WKAppBot.Core/Runner/ActionExecutor.cs (DoRead, DoShell); parser: csharp/src/WKAppBot.Core/Scenario/ScenarioParser.cs; params: csharp/src/WKAppBot.Core/Scenario/Models.cs (StoreAs, Command, Args, WorkingDir, TimeoutSec, ExitCode).</li><li>Reference scenario: scenarios/read_shell_test.yaml -- Calculator + cmd.exe -- 5/5 PASS.</li><li>Verified 2026-04-21: test-run-playbook-read-shell-actions.cmd (resolve ts=2026-04-21T06:03)</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>action: read -- target: {automation_id/name/ control_type} params.store_as captures UiaLocator.GetText result into ${store_as} for later steps.</li><li>action: shell -- params.command required. params.args string, params.working_dir, params.timeout_sec (default 30), params.exit_code (default 0), params.store_as stores stdout.</li><li>Behavior: shell uses UseShellExecute=false + CreateNoWindow=true + UTF-8 stdout/stderr. read delegates to the same UiaLocator.GetText helper used by DoAssert.</li><li>Dispatch sites: csharp/src/WKAppBot.Core/Runner/ActionExecutor.cs (DoRead, DoShell); parser: csharp/src/WKAppBot.Core/Scenario/ScenarioParser.cs; params: csharp/src/WKAppBot.Core/Scenario/Models.cs (StoreAs, Command, Args, WorkingDir, TimeoutSec, ExitCode).</li><li>Reference scenario: scenarios/read_shell_test.yaml -- Calculator + cmd.exe -- 5/5 PASS.</li><li>Verified 2026-04-21: test-run-playbook-read-shell-actions.cmd (resolve ts=2026-04-21T06:03)</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

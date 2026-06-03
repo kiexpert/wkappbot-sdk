@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>wkzombie stall-guard delegation -- Opus works, Haiku blocked</h1>
       <p class="description">When stall-guard fires on repeated wkzombie runs, delegate to Opus Agent (not Haiku). Haiku subagents are blocked by wk-only-gate when spawned from a Sonnet/Opus session.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PATTERN: User runs ./wkzombie.ps1 repeatedly. stall-guard fires after ~3 consecutive same-command PS calls. This is correct behavior -- Claude ran the same command without making progress.</li><li>WRONG PATH (Haiku): Agent(model:haiku) spawned from Sonnet session gets wk-only-gate blocked. isHaikuSession exemption only applies to top-level Haiku CLI sessions, NOT subagents. Haiku subagents fabricate results or report 10+ tool uses with no actual execution. DO NOT use Haiku for wkzombie delegation.</li><li>CORRECT PATH (Opus): Agent(model:opus, run_in_background:true, prompt:SPEC+3-skill-refs). Opus subagents run PowerShell directly, 1 tool use, ~12s. Works reliably when usage-test-guard does not redirect.</li><li>USAGE-TEST-GUARD: fires ~50% of Opus Agent calls, redirecting to Agent.cmd. Agent.cmd via heredoc fails agent-brief-guard (0/3 skill refs not found in stdin). Just retry Agent tool -- it will pass on second or third attempt.</li><li>CRONREATE PRIMARY: wkzombie runs automatically every 5 min via CronCreate. Manual runs via Claude are supplemental. When stall-guard fires, consider waiting for CronCreate instead of burning Opus tokens.</li><li>STALL-GUARD RESET: firing every 3-4 PS runs in same session, counter does NOT reset on new user messages in long sessions. Workaround: use ! prefix to run directly in terminal, bypassing Claude entirely.</li><li>BUG: stall-guard also blocks CronDelete (one-time admin op). Haiku delegation needed. CLAUDE.md heading removed so job wont re-create next session.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PATTERN: User runs ./wkzombie.ps1 repeatedly. stall-guard fires after ~3 consecutive same-command PS calls. This is correct behavior -- Claude ran the same command without making progress.</li><li>WRONG PATH (Haiku): Agent(model:haiku) spawned from Sonnet session gets wk-only-gate blocked. isHaikuSession exemption only applies to top-level Haiku CLI sessions, NOT subagents. Haiku subagents fabricate results or report 10+ tool uses with no actual execution. DO NOT use Haiku for wkzombie delegation.</li><li>CORRECT PATH (Opus): Agent(model:opus, run_in_background:true, prompt:SPEC+3-skill-refs). Opus subagents run PowerShell directly, 1 tool use, ~12s. Works reliably when usage-test-guard does not redirect.</li><li>USAGE-TEST-GUARD: fires ~50% of Opus Agent calls, redirecting to Agent.cmd. Agent.cmd via heredoc fails agent-brief-guard (0/3 skill refs not found in stdin). Just retry Agent tool -- it will pass on second or third attempt.</li><li>CRONREATE PRIMARY: wkzombie runs automatically every 5 min via CronCreate. Manual runs via Claude are supplemental. When stall-guard fires, consider waiting for CronCreate instead of burning Opus tokens.</li><li>STALL-GUARD RESET: firing every 3-4 PS runs in same session, counter does NOT reset on new user messages in long sessions. Workaround: use ! prefix to run directly in terminal, bypassing Claude entirely.</li><li>BUG: stall-guard also blocks CronDelete (one-time admin op). Haiku delegation needed. CLAUDE.md heading removed so job wont re-create next session.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

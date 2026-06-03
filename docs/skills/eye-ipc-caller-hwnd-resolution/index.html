@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Eye IPC caller HWND: ResolveCallerTerminalHwnd + __hwnd prefix</h1>
       <p class="description">Find the real launcher caller window when running through Eye IPC pipe. ResolveCallerTerminalHwnd cascade (CURRENT, EyeCmdPipeClient.WindowDetection.cs): env override -&gt; GA_ROOTOWNER pre-pass on Vis=True PseudoConsoleWindow -&gt; WT_SESSION-matched terminal -&gt; non-terminal ancestor fallback -&gt; Zero (skip). NO foreground P1/P3. Launcher sends single __hwnd only (no __conhwnd). Wire protocol, downstream consumers, GA_ROOTOWNER verification, and superseded steps noted in correction step.</p>
       <div class="meta">user/developer</div>
+      
       <div class="tags"></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>PROBLEM: GetForegroundWindow() in Eye context returns Eye window, not caller. Fix: Launcher prepends __hwnd:0xHHHH to pipe args. Eye sets CallerHwnd AsyncLocal from prefix.</li><li>__hwnd IPC: EyeCmdPipeClient.TryDelegate -&gt; ResolveCallerTerminalHwnd() -&gt; if hwnd!=Zero prepend __hwnd:0xHHHH to JSON args array. Eye strips prefix, validates IsWindow, sets CallerHwndForPlacement static + AsyncLocal.</li><li>GA_ROOTOWNER (flag=3) = THE correct API. GetAncestor(pcw, 3) on Vis=True PseudoConsoleWindow -&gt; CASCADIA tab. GA_ROOT (flag=2) returns self for ALL PCWs (WRONG). Verified on 4 PCW/CASCADIA pairs 2026-05-24.</li><li>Multi-monitor: negative x/y coords valid on left monitor. Never reject by sign. Use MonitorFromPoint(). Iconified caller terminal = walk returns Zero = placement skip (CORRECT -- user not watching). next:eye-ipc-caller-hwnd-resolution-ref for gap history, GA_ROOTOWNER verified chain, multi-monitor debug.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PROBLEM: GetForegroundWindow() in Eye context returns Eye window, not caller. Fix: Launcher prepends __hwnd:0xHHHH to pipe args. Eye sets CallerHwnd AsyncLocal from prefix.</li><li>__hwnd IPC: EyeCmdPipeClient.TryDelegate -&gt; ResolveCallerTerminalHwnd() -&gt; if hwnd!=Zero prepend __hwnd:0xHHHH to JSON args array. Eye strips prefix, validates IsWindow, sets CallerHwndForPlacement static + AsyncLocal.</li><li>GA_ROOTOWNER (flag=3) = THE correct API. GetAncestor(pcw, 3) on Vis=True PseudoConsoleWindow -&gt; CASCADIA tab. GA_ROOT (flag=2) returns self for ALL PCWs (WRONG). Verified on 4 PCW/CASCADIA pairs 2026-05-24.</li><li>Multi-monitor: negative x/y coords valid on left monitor. Never reject by sign. Use MonitorFromPoint(). Iconified caller terminal = walk returns Zero = placement skip (CORRECT -- user not watching). next:eye-ipc-caller-hwnd-resolution-ref for gap history, GA_ROOTOWNER verified chain, multi-monitor debug.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>

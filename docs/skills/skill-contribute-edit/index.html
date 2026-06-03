@@ -70,6 +70,9 @@
     h2 { margin: 34px 0 12px; font-size: 24px; }
     .description { color: var(--muted); font-size: 18px; margin: 0; }
     .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
     .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
     .chip {
       border: 1px solid var(--line);
@@ -79,13 +82,25 @@
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }
+    .steps-wrap { position: relative; margin-top: 12px; }
     .steps {
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }
+    .steps.blurred { filter: blur(5px); user-select: none; }
     .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
     @media (max-width: 640px) {
       .card-top { align-items: flex-start; flex-direction: column; }
     }
@@ -102,10 +117,15 @@
       <h1>Skill Authoring Rules + Contribute &amp; Edit Workflow</h1>
       <p class="description">T1 core tier. Decision rules for wkappbot skill contribute and edit: English-only rule, never-direct-edit-json safety, update-before-delegate order, Codex 64/1024 hard limits. Detail commands in skill-contribute-edit-howto; history/traps in skill-contribute-edit-ref.</p>
       <div class="meta">developer</div>
+      
       <div class="tags"><span class="chip">skill</span><span class="chip">contribute</span><span class="chip">edit</span><span class="chip">workflow</span><span class="chip">meta</span><span class="chip">reference</span><span class="chip">english-only</span><span class="chip">codex</span></div>
       <h2>Steps</h2>
-      <ol class="steps"><li>RULE: write ALL skill content (title, desc, steps, tags) in English only. Korean wastes 2 to 3 times the tokens and bloats context for every AI reading the skill.</li><li>SAFETY: NEVER directly edit .skill.json with Edit, Write, or wkedit tools. Always go through wkappbot skill contribute or wkappbot skill edit so the catalog stays registered, encoding stays UTF-8, and install state updates.</li><li>ORDER: update the skill BEFORE delegating. skill-update-pending guard fires when code changes without a matching skill update. Pattern: make code change, immediately wkappbot skill edit --add-step describing what changed and why, THEN spawn Agent or wkcodex. Reverse order causes repeated blocks and wastes tokens.</li><li>CODEX HARD LIMITS: ID name must be 64 chars or fewer AND desc must be 1024 chars or fewer. Either violation = Codex silently skips the skill entirely (startup warning only, no error). T2 suffix -howto adds 6 chars; T3 suffix -ref adds 4 chars. Reserve a 6-char budget when planning a -howto sibling.</li><li>NAVIGATION: command syntax and cross-repo flow live in skill-contribute-edit-howto. Shell traps, pipe-char workaround, verified-test history, maintainer sync live in skill-contribute-edit-ref. Consult those tiers when contribute fails or when you need a command beyond the four decision rules above.</li></ol>
+      <div class="steps-wrap">
+        <ol class="steps"><li>RULE: write ALL skill content (title, desc, steps, tags) in English only. Korean wastes 2 to 3 times the tokens and bloats context for every AI reading the skill.</li><li>SAFETY: NEVER directly edit .skill.json with Edit, Write, or wkedit tools. Always go through wkappbot skill contribute or wkappbot skill edit so the catalog stays registered, encoding stays UTF-8, and install state updates.</li><li>ORDER: update the skill BEFORE delegating. skill-update-pending guard fires when code changes without a matching skill update. Pattern: make code change, immediately wkappbot skill edit --add-step describing what changed and why, THEN spawn Agent or wkcodex. Reverse order causes repeated blocks and wastes tokens.</li><li>CODEX HARD LIMITS: ID name must be 64 chars or fewer AND desc must be 1024 chars or fewer. Either violation = Codex silently skips the skill entirely (startup warning only, no error). T2 suffix -howto adds 6 chars; T3 suffix -ref adds 4 chars. Reserve a 6-char budget when planning a -howto sibling.</li><li>NAVIGATION: command syntax and cross-repo flow live in skill-contribute-edit-howto. Shell traps, pipe-char workaround, verified-test history, maintainer sync live in skill-contribute-edit-ref. Consult those tiers when contribute fails or when you need a command beyond the four decision rules above.</li></ol>
+        
+      </div>
     </article>
   </main>
+  
 </body>
 </html>
