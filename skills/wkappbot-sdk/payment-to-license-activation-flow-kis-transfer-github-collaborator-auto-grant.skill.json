@@ -1,23 +1,23 @@
 {
   "id": "payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant",
   "app": "wkappbot-sdk",
-  "title": "Payment to License Activation Flow - KIS transfer \u002B GitHub collaborator auto-grant",
+  "title": "Payment to License Activation Flow",
   "title_ko": null,
   "desc": "End-to-end flow from KRW bank transfer to active license: KIS incoming transfer detection, GitHub ID parsing from memo, collaborator add, pending invite UX, acceptance, expiry, renewal.",
   "steps": [
     "Pricing: 100,000 KRW = CDP tier (read permission), 500,000 KRW = Sudo tier (write permission); transfer to KIS account [YOUR_KIS_ACCOUNT].",
-    "Memo (depositor name field) MUST be the payer\u0027s GitHub username verbatim; mismatched memo blocks auto-grant.",
+    "Memo (depositor name field) MUST be the payer's GitHub username verbatim; mismatched memo blocks auto-grant.",
     "Detector: scripts/kis_payment_watcher.py polls KIS hourly, parses memo field, extracts github_id and amount, derives tier (100k=read, 500k=write).",
-    "Grant: detector calls \u0027gh api repos/kiexpert/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read\u0027 (or write); tx_key recorded with expiry date in commit message.",
-    "Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right with \u0027GitHub notification check\u0027 button (auto-dismiss 15s, non-blocking); CDP/Sudo features stay locked, Free features keep working.",
-    "Acceptance: user clicks GitHub notifications -\u003E View invitation -\u003E Accept; on next wkappbot startup license check returns tier and gated features unlock; toast clears.",
-    "Expiry: tracked in .github/licenses/{user} commit message (tier=cdp\u002Bsudo cdp=\u003CISO8601\u003E sudo=\u003CISO8601\u003E). Duration = floor(amount_usd * 30 / 100) days: USD100=30d, USD200=60d, USD363=108d. C# enforces expiry: sudoActive requires perm=write/admin \u002B tierStr contains sudo \u002B sudoExpiry \u003E now(). Revocation: remove collaborator OR let expiry date pass.",
+    "Grant: detector calls 'gh api repos/kiexpert/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read' (or write); tx_key recorded with expiry date in commit message.",
+    "Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right with 'GitHub notification check' button (auto-dismiss 15s, non-blocking); CDP/Sudo features stay locked, Free features keep working.",
+    "Acceptance: user clicks GitHub notifications -> View invitation -> Accept; on next wkappbot startup license check returns tier and gated features unlock; toast clears.",
+    "Expiry: tracked in .github/licenses/{user} commit message (tier=cdp+sudo cdp=<ISO8601> sudo=<ISO8601>). Duration = floor(amount_usd * 30 / 100) days: USD100=30d, USD200=60d, USD363=108d. C# enforces expiry: sudoActive requires perm=write/admin + tierStr contains sudo + sudoExpiry > now(). Revocation: remove collaborator OR let expiry date pass.",
     "Renewal: pay again with same memo; new tx_key issued, permission re-granted, commit message updated with new expiry date.",
-    "Tier upgrade (CDP -\u003E Sudo): pay 500k with same memo; detector overwrites permission=read with permission=write, updates commit expiry.",
-    "Verification: \u0027wkappbot license status\u0027 shows User/Tier/CDP/Sudo with expiry countdown. Command is Launcher-owned fast-exit -- never reaches Core.",
-    "License check architecture (LicenseStatus.cs): 2 API calls. Call 1: POST api.github.com/graphql -- {viewer{login} repository{viewerPermission}} -- returns login \u002B perm in one shot, tamper-proof. Call 2: GET /repos/.../commits?path=.github/licenses/{user} -- parse tier=, cdp=, sudo= from trusted commit message (author must be in TrustedAuthors set).",
-    "Token auth: (1) GH_TOKEN/GITHUB_TOKEN env var, (2) hosts.yml oauth_token, (3) \u0027gh auth token\u0027 keyring fallback. If all fail, prints login guidance and exits 1.",
-    "SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01, verify on future edits): (1) Cancel section used to say \u0027at the 30-day mark\u0027 -- WRONG; expiry = floor(amount_usd*30/100) days, not always 30. Fixed to \u0027at your expiry date (check with wkappbot license status)\u0027. (2) Pending invite section used to say \u0027click to accept\u0027 -- INACCURATE; actual toast shows GitHub notification check button \u002B 15s auto-dismiss. Both fixed in SUBSCRIBE.md."
+    "Tier upgrade (CDP -> Sudo): pay 500k with same memo; detector overwrites permission=read with permission=write, updates commit expiry.",
+    "Verification: 'wkappbot license status' shows User/Tier/CDP/Sudo with expiry countdown. Command is Launcher-owned fast-exit -- never reaches Core.",
+    "License check architecture (LicenseStatus.cs): 2 API calls. Call 1: POST api.github.com/graphql -- {viewer{login} repository{viewerPermission}} -- returns login + perm in one shot, tamper-proof. Call 2: GET /repos/.../commits?path=.github/licenses/{user} -- parse tier=, cdp=, sudo= from trusted commit message (author must be in TrustedAuthors set).",
+    "Token auth: (1) GH_TOKEN/GITHUB_TOKEN env var, (2) hosts.yml oauth_token, (3) 'gh auth token' keyring fallback. If all fail, prints login guidance and exits 1.",
+    "SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01, verify on future edits): (1) Cancel section used to say 'at the 30-day mark' -- WRONG; expiry = floor(amount_usd*30/100) days, not always 30. Fixed to 'at your expiry date (check with wkappbot license status)'. (2) Pending invite section used to say 'click to accept' -- INACCURATE; actual toast shows GitHub notification check button + 15s auto-dismiss. Both fixed in SUBSCRIBE.md."
   ],
   "requirements": [
     {
@@ -47,33 +47,21 @@
   ],
   "source_refs": [
     {
-      "file": "scripts/kis_payment_watcher.py",
-      "line": null,
-      "pattern": "permission=read",
-      "note": null
-    },
-    {
-      "file": "scripts/kis_payment_watcher.py",
-      "line": null,
-      "pattern": "check_expirations",
-      "note": null
-    },
-    {
       "file": "SUBSCRIBE.md",
       "line": null,
-      "pattern": "Bank transfer",
+      "pattern": null,
       "note": null
     },
     {
       "file": "PRICING.md",
       "line": null,
-      "pattern": "How It Works",
+      "pattern": null,
       "note": null
     }
   ],
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-28T18:32:32.1139765Z",
-  "updated": "2026-05-01T09:48:12.5761741Z",
-  "version": "1.6"
+  "updated": "2026-06-03T19:54:21.7881188Z",
+  "version": "1.8"
 }

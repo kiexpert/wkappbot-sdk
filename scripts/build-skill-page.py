@@ -13,6 +13,7 @@ from typing import Any
 HQ_SKILL_DIRS = [
     Path("D:/GitHub/WKAppBot/bin/wkappbot.hq/skills"),
     Path("D:/SDK/bin/wkappbot.hq/skills"),
+    REPO_ROOT / "skills",  # GHA fallback: reads committed skills/ when local HQ unavailable
 ]
 REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
 OUTPUT = REPO_ROOT / "docs" / "skills" / "index.html"

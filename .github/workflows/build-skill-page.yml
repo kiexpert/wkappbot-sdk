@@ -4,26 +4,46 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'skills/**'
+      - 'scripts/build-skill-page.py'
+  workflow_dispatch:
+  schedule:
+    - cron: '7 */6 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  verify-pages-docs:
-    runs-on: windows-latest
+  build-and-deploy:
+    name: Build Skill Pages
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Verify committed Pages docs
-        shell: pwsh
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build skill pages
+        run: python scripts/build-skill-page.py
+      - name: Commit generated pages
         run: |
-          git status --short
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add docs/skills/
+          git diff --cached --quiet && echo 'No changes' || (git commit -m 'chore: auto-rebuild skill pages [skip ci]' && git push)
 
-          foreach ($path in @('docs/index.html', 'docs/skills/index.html')) {
-            if (Test-Path $path) {
-              Write-Host "Found $path"
-            } else {
-              Write-Warning "$path is missing. GitHub Pages deploys from committed docs/ content; run scripts/build-skill-page.py locally before committing when regenerating the skill browser."
-            }
-          }
+  verify:
+    name: Verify Pages Exist
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Verify docs
+        run: |
+          for path in docs/index.html docs/skills/index.html docs/skills/sitemap.xml; do
+            [ -f $path ] && echo OK
+          done
