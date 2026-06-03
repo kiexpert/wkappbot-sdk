@@ -46,6 +46,21 @@ if ($spawnStorm) {
     $msg = "INFINITE-SPAWN -- $detail`n  runaway cmdlines: $dupCmd`n  reap: wkappbot taskkill --force <pid,...>  OR  wkdoctor -EmergencyKill"
     Add-Check 'wkappbot spawn-storm' 'fail' "INFINITE-SPAWN: $detail"
     Emit 'fail' 'wkappbot spawn-storm' $msg
+    # AUTO bug-suggest to wkappbot-core (confirmed wkappbot bug per the MANDATORY report rule).
+    # Throttled once per 24h via a marker so repeated wkdoctor runs do not spam the queue.
+    try {
+        $_sugMark = Join-Path $wkHome 'spawn-storm-suggested.txt'
+        $_sugNow  = [int][double]::Parse((Get-Date -UFormat %s))
+        $_sugLast = if (Test-Path -LiteralPath $_sugMark) { try { [int]((Get-Content -LiteralPath $_sugMark -Raw).Trim()) } catch { 0 } } else { 0 }
+        if (($_sugNow - $_sugLast) -ge 86400) {
+            $_sugText = "BUG: wkappbot-core infinite-spawn -- $detail. eye guardian respawn appears to multiply mcp / whisper-ring children unbounded (keyboard-lag + RAM storm). Repro: run wkdoctor and observe the wkappbot-core count. Expected: a small bounded number. Detected runaway cmdlines: $dupCmd"
+            $_sugOk = $false
+            try { & wkappbot suggest $_sugText --requirement "wkdoctor => spawn-storm ok" --requirement "Get-Process wkappbot-core => count bounded" --requirement "wkappbot eye status => single guardian" 2>&1 | Out-Null; if ($LASTEXITCODE -eq 0) { $_sugOk = $true } } catch {}
+            if (-not $_sugOk) { try { & wkappbot-core.exe suggest $_sugText --requirement "wkdoctor => spawn-storm ok" --requirement "Get-Process wkappbot-core => count bounded" --requirement "wkappbot eye status => single guardian" 2>&1 | Out-Null } catch {} }
+            Set-Content -LiteralPath $_sugMark -Value $_sugNow -ErrorAction SilentlyContinue
+            Emit 'warn' 'wkappbot spawn-storm' 'auto-filed a wkappbot suggest BUG (throttled 24h)'
+        }
+    } catch {}
 } else {
     Add-Check 'wkappbot spawn-storm' 'ok' $detail
     Emit 'ok' 'wkappbot spawn-storm' $detail
