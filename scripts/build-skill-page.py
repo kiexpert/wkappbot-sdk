@@ -181,6 +181,14 @@ def skill_page_slug(skill_id: str) -> str:
     return slug or "skill"
 
 
+_TIER_SUFFIX = re.compile(r"(?:-t[23][-_](?:howto|ref)|[-_](?:howto|ref))$", re.I)
+
+
+def infer_parent_skill_id(skill_id: str) -> str | None:
+    m = _TIER_SUFFIX.search(skill_id)
+    return skill_id[: m.start()] if m else None
+
+
 def collect_skills() -> list[dict[str, Any]]:
     skills_by_id: dict[str, dict[str, Any]] = {}
 
@@ -278,8 +286,101 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     app = e(skill["app"])
     audience = e(skill["audience"])
     tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
+    premium = bool(skill.get("premium", False))
+    skill_id = skill.get("id", "")
+    parent_id = infer_parent_skill_id(skill_id)
+    parent_link = ""
+    if parent_id:
+        parent_slug = skill_page_slug(parent_id)
+        parent_link = f'<div class="breadcrumb">Part of: <a href="../{e(parent_slug)}/">{e(parent_id)}</a></div>'
+
     steps = skill["steps"] or ["This skill is available in the live WKAppBot catalog."]
-    step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
+    if premium:
+        step_items = "".join(f"<li>{e(preview_step(step))}</li>" for step in steps)
+        blur_class = " blurred"
+        overlay = '<div class="unlock">Unlock with Pro</div>'
+    else:
+        step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
+        blur_class = ""
+        overlay = ""
+
+    pro_button_and_script = ""
+    if premium:
+        pro_button_and_script = """  <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function unlockAll() {
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github+json'
+          }
+        });
+        if (response.status === 204) {
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>"""
 
     return f"""<!doctype html>
 <html lang="en">
@@ -353,6 +454,9 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     h2 {{ margin: 34px 0 12px; font-size: 24px; }}
     .description {{ color: var(--muted); font-size: 18px; margin: 0; }}
     .meta {{ margin-top: 14px; color: var(--accent-2); font-size: 13px; }}
+    .breadcrumb {{ margin-top: 8px; color: var(--muted); font-size: 12px; }}
+    .breadcrumb a {{ color: var(--accent-2); text-decoration: none; }}
+    .breadcrumb a:hover {{ text-decoration: underline; }}
     .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }}
     .chip {{
       border: 1px solid var(--line);
@@ -362,13 +466,25 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
       font-size: 12px;
       background: rgba(255,255,255,.04);
     }}
+    .steps-wrap {{ position: relative; margin-top: 12px; }}
     .steps {{
       margin: 0;
       padding-left: 24px;
       color: #d8e0ec;
       font-size: 15px;
     }}
+    .steps.blurred {{ filter: blur(5px); user-select: none; }}
     .steps li {{ margin: 0 0 12px; }}
+    .unlock {{
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }}
     @media (max-width: 640px) {{
       .card-top {{ align-items: flex-start; flex-direction: column; }}
     }}
@@ -385,11 +501,16 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
       <h1>{title}</h1>
       <p class="description">{desc}</p>
       <div class="meta">{audience}</div>
+      {parent_link}
       <div class="tags">{tags}</div>
       <h2>Steps</h2>
-      <ol class="steps">{step_items}</ol>
+      <div class="steps-wrap">
+        <ol class="steps{blur_class}">{step_items}</ol>
+        {overlay}
+      </div>
     </article>
   </main>
+  {pro_button_and_script}
 </body>
 </html>
 """
@@ -672,7 +793,6 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       <div class="nav-links">
         <a href="#skills">Browse</a>
         <a href="#pricing">Pricing</a>
-        <button id="githubLogin" class="nav-button" type="button">Login with GitHub</button>
       </div>
     </div>
   </nav>
@@ -738,7 +858,6 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     const search = document.getElementById('search');
     const cards = Array.from(document.querySelectorAll('.skill-link'));
     const resultCount = document.getElementById('resultCount');
-    const githubLogin = document.getElementById('githubLogin');
     const proUnlockButton = document.getElementById('proUnlockButton');
     const stepItems = Array.from(document.querySelectorAll('.steps li[data-full]'));
     const premiumCards = Array.from(document.querySelectorAll('.skill-card.premium'));
@@ -802,19 +921,6 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       }}
     }}
 
-    githubLogin.addEventListener('click', () => {{
-      const clientId = window.WKAPPBOT_GITHUB_CLIENT_ID || '';
-      if (!clientId) {{
-        window.location.href = 'https://github.com/settings/applications/new';
-        return;
-      }}
-      const oauth = new URL('https://github.com/login/oauth/authorize');
-      oauth.searchParams.set('client_id', clientId);
-      oauth.searchParams.set('scope', 'read:user');
-      oauth.searchParams.set('redirect_uri', window.location.href.split('#')[0]);
-      window.location.href = oauth.toString();
-    }});
-
     proUnlockButton.addEventListener('click', () => {{
       const existing = localStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
@@ -861,6 +967,13 @@ def main() -> int:
         skill_dir = SKILLS_OUTPUT_DIR / str(skill["slug"])
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "index.html").write_text(build_skill_detail_html(skill), encoding="utf-8")
+
+    # Generate skills-data-full.js with full skill data (id, slug, steps)
+    SKILLS_FULL_OUTPUT = SKILLS_OUTPUT_DIR / "skills-data-full.js"
+    data = [{"id": s["id"], "slug": s["slug"], "steps": s["steps"]} for s in skills]
+    content = "window.SKILLS_FULL=" + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";"
+    SKILLS_FULL_OUTPUT.write_text(content, encoding="utf-8")
+
     print(f"Generated {OUTPUT} with {len(skills)} skills and {len(skills)} detail pages")
     return 0 if len(skills) > 50 else 1
 
