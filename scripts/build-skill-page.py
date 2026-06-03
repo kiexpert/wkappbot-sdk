@@ -346,13 +346,13 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
         return;
       }
       try {
-        const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
           headers: {
             Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github+json'
+            Accept: 'application/vnd.github.raw'
           }
         });
-        if (response.status === 204) {
+        if (response.status === 200) {
           unlockAll();
         } else if (response.status === 401) {
           showDeniedState('invalid');
@@ -900,13 +900,13 @@ def build_html(skills: list[dict[str, Any]]) -> str:
         return;
       }}
       try {{
-        const response = await fetch('https://api.github.com/repos/kiexpert/wkappbot-harness/collaborators', {{
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {{
           headers: {{
             Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github+json'
+            Accept: 'application/vnd.github.raw'
           }}
         }});
-        if (response.status === 204) {{
+        if (response.status === 200) {{
           unlockAll();
         }} else if (response.status === 401) {{
           showDeniedState('invalid');
