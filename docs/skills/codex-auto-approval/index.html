@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Auto Approval | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-webbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>Codex Auto Approval</h1>
+      <p class="description">Reduce repeated Codex approval prompts by backing up and extending .codex rules with narrow allow-prefix patterns.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">codex</span><span class="chip">approval</span><span class="chip">rules</span><span class="chip">automation</span><span class="chip">safety</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Inspect .codex config and rules before changing anything.</li><li>Treat Codex approval_policy as host-controlled unless a documented local config key is confirmed; do not claim full global disable unless verified.</li><li>Back up default.rules before editing it.</li><li>Add only narrow prefix_rule allow patterns for repetitive trusted commands such as wkappbot, repo-local tools scripts, pip --user installs, Invoke-WebRequest, and winget search/install.</li><li>Do not add broad arbitrary-script approvals such as plain python, powershell, cmd, or destructive file operations.</li><li>Record what was added, when it was added, and the backup path so the rules can be reviewed or rolled back later.</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li><li>2026-05-06 appbot skill auto-accept update: add narrow default.rules prefix_rule allow entries for repeated wkappbot skill subcommands: read, search, edit, contribute, install, delete, sync. Cover both PATH bootstrap forms using Join-Path (Get-Location) &#x27;bin&#x27; and Join-Path D:\GitHub\WKAppBot &#x27;bin&#x27;. Backup example: C:\Users\kiexp\.codex\rules\default.rules.bak-skill-auto-***-111546.</li><li>2026-05-06 global-config auto-accept update: default.rules now includes narrow allow prefixes for checking Codex global config and approval rules: Get-Content config.toml, Get-Content default.rules, Select-String on config.toml/default.rules, Get-ChildItem config/rules backups, tomllib validation for config.toml, WKAPPBOT_AUTO_APPROVE_ALL set/get, and timestamped backups for config.toml/default.rules. Backup example: C:\Users\kiexp\.codex\rules\default.rules.bak-global-config-auto-***-111942.</li><li>2026-05-06 recent accepted patterns: keep narrow default.rules prefixes for absolute D:\GitHub\WKAppBot\bin\wkappbot.exe skill read/search/edit/contribute/install/sync and suggest list/show/resolve/add-requirement, plus exact evidence scripts and ordinary suggest-closing git add/commit flows. Do not add broad arbitrary PowerShell, Python, cmd, or destructive approvals.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wkappbot-sdk daily system heal checklist | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-sdk</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>wkappbot-sdk daily system heal checklist</h1>
+      <p class="description">Daily midnight health check for wkappbot-sdk + cross-repo audit. Sections: (E) Eye ctx%, (C) CI SDK+Core, (S) briefing schedule, (G) git clean, (L) license, (P) suggest backlog, (R) release, (X) cross-repo: all-repo CI, GitHub Pages reachability, README media assets, releases, PayPal secrets. Script: D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh.</p>
+      <div class="meta">developer</div>
+      <div class="tags"><span class="chip">sdk</span><span class="chip">daily</span><span class="chip">heal</span><span class="chip">ci</span><span class="chip">schedule</span><span class="chip">suggest</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>1. Run: bash &#x27;D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh&#x27;</li><li>2. Read output -- each section has check or cross icon</li><li>C (CI heal loop): When any CI failures exist, enter a fix loop using Claude Code /loop or autonomous repeat until all non-infra failures are resolved. Rules: (1) NEVER ask the user -- make the best autonomous choice. (2) For each failing workflow: gh run view --log-failed to read error, identify root cause, fix code/workflow, commit with UTF8NoBOM message, push. (3) Loop: after each push wait ~60s then re-check gh run list. Repeat until all fixable failures pass. (4) Known infra-only failures to SKIP (not block): core-* binary missing (needs private CORE_REPO release), sponsor-license.yml sponsorship event (needs GitHub Sponsors account). (5) Track fixed vs skipped in a summary. (6) If stuck on same error after 2 attempts, file a suggest and move on.</li><li>4. Re-run heal script to verify all checks pass. If any check is still failing: do NOT stop -- make the best autonomous choice. For CI failures: enter fix loop (see step 3). For auth/interactive blockers: call ScheduleWakeup(60s) with same prompt for one-shot retry. NEVER wait silently for user input.</li><li>5. Workflow name audit (add to weekly check): run &#x27;Get-ChildItem .github/workflows/*.yml | ForEach-Object { (Get-Content .FullName | Select-String &quot; ^name:\)</li><li>6. Slack send heal summary. LOOP RULE: this entire checklist MUST run as a /loop until all non-infra issues are resolved. Use ScheduleWakeup(120s) after each push/fix to recheck. Known infra-skip (never loop on these): core-* binary missing (needs private CORE_REPO release), sponsor-license sponsorship event (needs GitHub Sponsors). Exit loop only when latest commit&#x27;s runs show no fixable failures.</li><li>7. Landing page consistency check (***.github.io/wkappbot-sdk/landing.html): (a) Use wkappbot a11y read to read pricing section -- compare with PRICING.md and SUBSCRIBE.md. Verify CDP price, Sudo price, and Trial tier match. (b) Check landing page link in README.md points to correct URL. (c) Check docs/public/landing.html matches latest pricing before release. Fix any price or content drift.</li><li>8. Repo root file audit: check root file count (target under 20 non-hidden files). Flag any: (a) build artifacts like *.log or build output txt, (b) accidental files with no extension or PS arg names, (c) zip/binary archives that belong in releases not root, (d) scripts that belong in scripts/, (e) media files that belong in docs/. Run: Get-ChildItem wkappbot-sdk root and count. File suggest for each, fix trivial ones immediately. Goal: README and standard GitHub files only at root.</li><li>9. POST-HEAL MONITORING LOOP (MANDATORY after all steps complete): Use /loop with ScheduleWakeup(300s) to run a side-effect and comprehensive check every 5 minutes. Each iteration checks: (a) gh run list -- any new CI failures since last check? (b) wkappbot process health -- zombie cores? (c) Eye alive? (d) Any new suggest auto-filed? Track a consecutive-clean counter. Rules: if any issue found: reset counter to 0, fix it, continue loop. If 3 consecutive iterations show NO new issues: declare heal complete, send Slack summary, stop loop. Counter resets on ANY finding. Exit condition: consecutiveClean &gt;= 3.</li><li>SECTION W (WEB): gh api repos/***/wkappbot-sdk/pages | grep status -- should be built not building. docs/index.html exists and is recent (git -C D:/GitHub/wkappbot-sdk log -1 -- docs/index.html). GHA build-skill-page last run succeeded (gh run list --repo ***/wkappbot-sdk --workflow build-skill-page.yml --limit 1). Site URL: https://***.github.io/wkappbot-sdk/</li></ol>
+    </article>
+  </main>
+</body>
+</html>

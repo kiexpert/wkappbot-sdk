@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLAUDE.md Pending Section Sync Workflow | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>CLAUDE.md Pending Section Sync Workflow</h1>
+      <p class="description">Keep CLAUDE.md Pending in sync with actual work. CLAUDE.md is canonical -- if not there it does not exist.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">todo</span><span class="chip">pending</span><span class="chip">claudemd</span><span class="chip">sync</span><span class="chip">session-end</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>WHEN: session end, batch work complete, or user asks for todo sync.</li><li>STEP 1 git log: git log --oneline --since=last-sync to list all commits.</li><li>STEP 2 match to pending: for each [ ] item in CLAUDE.md, if commit covers it -&gt; mark [x].</li><li>STEP 3 add new items: new work not in list -&gt; [x] done or [ ] pending.</li><li>STEP 4 commit: git add CLAUDE.md &amp;&amp; git commit -m chore todo sync pending section.</li><li>CANONICAL RULE: CLAUDE.md is only source of truth. Never track todos in conversation only.</li><li>ENCODING RULE: CLAUDE.md has Korean -- use wkcodex.sh for edits not Edit/Write tool directly.</li><li>NEW ITEM FORMAT: - [x] short description, no dates (git log has dates).</li><li>SCOPE: only this repo items. Skip wkappbot core infra (belongs to wkappbot team).</li><li>CRLF NOTE (2026-05-25): CLAUDE.md uses CRLF line endings. wkappbot file edit multiline replacements on CRLF files cause double-insertion and whitespace stripping bugs. Use wkcodex.sh for CLAUDE.md Pending updates, or make only single-line replacements where old_string does NOT appear in new_string.</li><li>CRLF APPEND WORKAROUND: wkappbot file edit multiline replacements cause 4x double-insertion on CRLF files. Safe alternative for adding pending items: (1) wkappbot file write CLAUDE.md --append --text &#x27;- [ ] item&#x27; to add at file end, or (2) use --old-file/--new-file flags to avoid shell escaping. Old string must NOT appear in new string -- if it does, CRLF causes repeated replacement.</li><li>COMPRESS PATTERN (2026-05-26): when Pending [x] count exceeds 15, group old done items by topic (e.g. &#x27;harness/wrappers&#x27;, &#x27;wkdoctor&#x27;, &#x27;caller-hwnd/CASCADIA&#x27;, &#x27;CDP/Chrome&#x27;, &#x27;agent-leak-guard&#x27;, &#x27;nightly-schedule-guard&#x27;) into one-line topic summaries with key commit hashes preserved. Keep ALL [ ] open items verbatim and the most recent ~8 [x] verbatim. Delete exact-duplicate lines (CRLF appends often double-write). Delegate the rewrite to wkcodex.sh since CLAUDE.md is CRLF + Korean.</li><li>BATCH RESOLVE 2026-05-29: CommandHelpMap mail (ts=2026-05-28T19:37:17) + eye-replace (ts=2026-05-28T19:36:34) resolved via single evidence-rewrite + Pending bullet commit. Evidence scripts converted from set-e+dotnet-build-pipe antipattern to plain if-not-grep block per suggest-resolve-evidence-conventions step 25. Same commit appended IOException File.Copy overwrite=false bullet (ts=2026-05-28T19:50:08) to Pending.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

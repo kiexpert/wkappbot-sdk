@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex-Friendly Skill Template | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>Codex-Friendly Skill Template</h1>
+      <p class="description">A reusable template for writing wkappbot skills that are useful to both Claude and Codex. Use short, orthogonal options only when they improve safety, verification, or debugging.</p>
+      <div class="meta">developer</div>
+      <div class="tags"><span class="chip">skill</span><span class="chip">template</span><span class="chip">codex</span><span class="chip">claude</span><span class="chip">operator</span><span class="chip">verify</span><span class="chip">dry-run</span><span class="chip">review</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Write the skill in English only and keep the steps short, executable, and testable.</li><li>State the primary job in one sentence: what task the skill helps the agent do.</li><li>Classify the skill first using the Skill Audience Taxonomy: operator, developer, project, or user.</li><li>Add only the minimal operator options that actually help execution: verify, audit, dry-run, review, inspect, list, export, import, or install.</li><li>Prefer safety and reproducibility over cleverness: every option should reduce ambiguity, not increase it.</li><li>Include one explicit verification step whenever the skill changes state or affects output.</li><li>If the skill affects target selection or automation, state the output contract first and the search/execute flow second.</li><li>If both Claude and Codex will use the skill, write the steps so they work for either one without tool-specific jargon unless it is necessary.</li><li>HARD LIMITS (Codex skips silently on violation): ID &lt;= 64 chars, Description &lt;= 1024 chars. Verify before contribute: echo -n &#x27;id&#x27; | wc -c. Budget 58 chars in base slug if 3-tier split planned (-howto suffix = +6).</li></ol>
+    </article>
+  </main>
+</body>
+</html>

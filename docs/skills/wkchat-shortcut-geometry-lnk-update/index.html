@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wkchat .lnk shortcut window geometry update -- write WindowOrigin into NT_CONSOLE_PROPS | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>wkchat .lnk shortcut window geometry update -- write WindowOrigin into NT_CONSOLE_PROPS</h1>
+      <p class="description">On wkchat exit (and after window move/resize), locate the .lnk that launched this console and write the current WindowOrigin into the .lnk&#x27;s NT_CONSOLE_PROPS ExtraData block via IShellLinkW + IShellLinkDataList COM. Result: next double-click on the .lnk reopens the console at the same on-screen position even though .lnk does not store arbitrary RECTs.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">wkchat</span><span class="chip">shortcut</span><span class="chip">lnk</span><span class="chip">NT_CONSOLE_PROPS</span><span class="chip">IShellLink</span><span class="chip">IShellLinkDataList</span><span class="chip">GetStartupInfoW</span><span class="chip">lpTitle</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>[DISCOVERY - PRIMARY] GetStartupInfoW.lpTitle. When Explorer launches a console via .lnk it sets STARTUPINFO.lpTitle to the FULL .lnk path (not the executable name). Read it once at chat startup with P/Invoke STARTUPINFOW_Title struct, validate the path ends with .lnk and exists. Stored in _launchingShortcutPath -- used for all subsequent geometry writebacks. Source: ChatCommand.ShortcutGeometry.cs:58 GetStartupInfoW + :87 si.lpTitle.</li><li>[DISCOVERY - FALLBACK] When lpTitle is null/empty (e.g. launched from cmd.exe, not Explorer): scan Desktop + Start Menu folders (CSIDL_DESKTOP, CSIDL_STARTMENU, CSIDL_COMMON_STARTMENU) for any .lnk whose IShellLink Target resolves to wkappbot-core.exe AND WorkingDirectory matches Environment.CurrentDirectory. Walks recursively via EnumerateFiles. Source: ChatCommand.ShortcutGeometry.Search.cs (added commit 011d025b 2026-05-05).</li><li>[NT_CONSOLE_PROPS BLOCK] Signature 0xA0000002, attached as IShellLinkDataList ExtraData on .lnk files that target a console. Layout matches the public CONSOLE_FE_PROPS / NT_CONSOLE_PROPS structures (cbSize, dwSignature, wFillAttribute, wPopupFillAttribute, dwScreenBufferSize, dwWindowSize, dwWindowOriginX/Y, ...). Total Marshal.SizeOf MUST equal cbSize so AddDataBlock accepts the write.</li><li>[READ EXISTING] var dataList = (IShellLinkDataList)link; hr = dataList.CopyDataBlock(NT_CONSOLE_PROPS_SIG_INT, out blockPtr). If found, Marshal.PtrToStructure&lt;NT_CONSOLE_PROPS&gt;(blockPtr) and modify dwWindowOriginX/Y. If absent, NewDefaultConsoleProps() seeds a sensible default block.</li><li>[WRITE BACK] dataList.RemoveDataBlock(NT_CONSOLE_PROPS_SIG_INT) first (you cannot Update an existing block, only Remove+Add). Marshal.StructureToPtr the modified struct, AddDataBlock, then IPersistFile.Save(path, fRemember=true).</li><li>[COORDINATE UNIT] dwWindowOriginX/Y in NT_CONSOLE_PROPS is documented as character cells (column,row), NOT pixels. We compute approximate cell coords from the live window pixel rect / current font cell size at save time. Cross-monitor differences in DPI accepted as best-effort.</li><li>[SIGNATURE QUIRK] 0xA0000002 fits in 32 bits either way. We expose two constants -- NT_CONSOLE_PROPS_SIG_INT (signed int for IShellLinkDataList COM signatures, marshaled as DWORD/int) and NT_CONSOLE_PROPS_SIG_UINT (uint for the struct dwSignature field). Mixing them silently fails CopyDataBlock with E_FAIL.</li><li>[WHEN INVOKED] (1) After SaveParentWindowGeo on WT WM_MOVESIZEEND, (2) on AppDomain.ProcessExit/CancelKeyPress final flush. Both routes call the same UpdateLnkGeometry(path, x, y) helper. Failures logged to stderr but never block chat continuation -- shortcut geometry is a quality-of-life feature.</li><li>[AUDIT 2026-05-30] 4 empty FILE-MISSING refs in source_refs -- stub entries with no path. Needs next contribute pass to populate real paths to ShellLinkW IShellLinkDataList sites.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

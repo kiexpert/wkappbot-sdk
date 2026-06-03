@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ask Health Check (wkask) | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>Ask Health Check (wkask)</h1>
+      <p class="description">End-to-end CDP ask pipeline health check via wkask.ps1. Run after hot-swap, Chrome accumulation, or before triad sessions.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">ask</span><span class="chip">health</span><span class="chip">cdp</span><span class="chip">gpt</span><span class="chip">gemini</span><span class="chip">triad</span><span class="chip">wkask</span><span class="chip">monitor</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt &#x27;say: PONG&#x27; -Timeout 60. Pass = PONG received in colour stream. Fail = timeout or Chrome stuck.</li><li>Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini &#x27;say: PONG&#x27; -Timeout 90. Common failure: off-screen Chrome -- check cdp-mon.ps1 for CRIT position drift.</li><li>Run: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 triad &#x27;say: PONG&#x27; -Timeout 120. GPT+Gemini+Claude all must respond.</li><li>On failure: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1 -- look for CRIT flags (off-screen TGT-POS, LAT=DEAD, &gt;5 sessions). Kill stale Chrome PIDs then retry.</li><li>Stale session cleanup: Stop-Process -Id PID -Force for each stale PID shown by cdp-mon. Retry wkask after cleanup.</li><li>Chrome restart loop (Runtime.enable timeout in log): wkappbot --sudo eye restart to force hot-swap and fresh Chrome session.</li><li>Success baseline: gpt&lt;60s, gemini&lt;90s, triad&lt;120s. Consistent timeouts = Chrome or network issue, not wkappbot code.</li><li>When to run: after hot-swap deploy, after Chrome accumulation (cdp-mon shows &gt;5), after network change, before triad sessions.</li><li>ask gpt --new-session cold tab init was fixed in 608c5e13e: WaitForChatGptEditorA11y now takes timeoutSec param, bounded to max(8,min(15,budget/2)); post-persona wait uses remaining budget not hardcoded 15s. If --new-session hangs: check for forced newTab=true in EnsureCdpConnection, verify timeout budget propagation.</li><li>POST-REBOOT RECOVERY: After system reboot, ChatGPT Chrome session expires -- ask gpt will show auth.openai.com/log-in-or-create-account. While waiting for user to re-login: (1) switch all triage asks to gemini -- wkappbot ask gemini --sync --timeout 20s ping verifies gemini works without login. (2) cdp clean command does NOT exist -- use wkappbot cdp open https://chatgpt.com to reopen session. (3) After reboot, kill zombie Chrome on project port before cdp open: Stop-Process -Id (netstat -ano | findstr :9980 | ...) -Force, then delete *.lock *-journal files from Chrome profile dir.</li><li>CHATGPT SESSION PERSISTENCE (long-term fix): Store __Secure-next-auth.session-token in D:\GitHub\.env as CHATGPT_SESSION_TOKEN. On cdp open https://chatgpt.com: inject via CDP Network.setCookies before navigation. After navigation: if URL still contains auth.openai.com, log &#x27;GPT token expired -- falling back to gemini&#x27; and set gpt_available=false. ask gpt then transparently falls back to ask gemini. Token extraction: open Chrome dev tools on chatgpt.com &gt; Application &gt; Cookies &gt; __Secure-next-auth.session-token. This is the correct architectural fix for post-reboot session loss.</li><li>Verified 2026-05-18: ***.sh (resolve ts=2026-05-18T14:04:08)</li><li>Verified 2026-05-19: ***.sh (resolve ts=2026-05-19T02:57:37.6306815Z)</li><li>wkclaude.sh BASH PARSING: wkclaude.sh uses bash eval which breaks on parentheses and special chars. Use Agent tool instead for complex prompts.</li><li>2026-05-20: wkask.ps1 hwnd-specific grap fix -- after cdp open, parse hwnd:0xXXXX from output, use &#x27;{hwnd:0xXXXX,cdp:PORT}&#x27; for Invoke-WKCdpJs response reads. Prevents wrong-tab selection when multiple ChatGPT tabs exist.</li><li>wkask fix approach: parse hwnd from cdp open output, use hwnd-specific grap for Invoke-WKCdpJs</li><li>FINAL: wkask hwnd-grap fix committed. Use hwnd-specific grap after cdp open to prevent wrong-tab selection.</li><li>STALE SESSION TRAP (2026-05-20): ask gpt WITHOUT --new-session accumulates conversation history (A10+) and takes 4min+ to return PONG. ALWAYS use --new-session for health checks. Symptom: [REPLY: A10] in output = session has 10 accumulated turns.</li><li>HANDSHAKE-LOSS PATTERN (2026-05-23): after cdp open repair + eye restart, AppBot bootstrap/host-handshake may be missing -- model returns generic &#x27;No tool execution environment&#x27; text. Fix: 1e913c121 broken-pipe cancellation prevents orphaned commands. If PONG still fails after repair, run cdp open chatgpt.com + wait 5s for injection, then retry ping.</li><li>Verified 2026-05-23: ev-ask-gpt-pong.sh (resolve ts=2026-05-23T06:39:20)</li><li>NOTE: __conhwnd: IPC prefix bug found 2026-05-25 -- SDK Launcher sends __conhwnd: between __hwnd: and __target: but EyeCmdPipeServer.Pipe.cs while-loop only strips __cwd:/__hwnd:/__target:. Unstripped __conhwnd: becomes args[0] =&gt; &#x27;Unknown command&#x27; =&gt; ask pipeline broken. Fix: add ConHwndPrefix const + strip in while-loop. Filed BUG suggest.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

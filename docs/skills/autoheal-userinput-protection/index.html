@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoHeal - User Input Protection: Focusless-First + Focus Theft Recovery | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>AutoHeal - User Input Protection: Focusless-First + Focus Theft Recovery</h1>
+      <p class="description">[RULE] Skill content MUST be in English -- Korean uses 2-3x tokens. PHILOSOPHY: focusless-first is the PRIMARY goal. Recovery is safety net only. SELF-IMPROVING: bugs auto-report via suggest, triad dialectic resolves gaps, skill accumulates knowhow. LIVING DOCUMENT: check suggest list periodically.</p>
+      <div class="meta">user</div>
+      <div class="tags"><span class="chip">focus</span><span class="chip">ask</span><span class="chip">cdp</span><span class="chip">autoheal</span><span class="chip">userinput</span><span class="chip">focus-theft</span><span class="chip">focusless-first</span><span class="chip">inputreadiness</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>0. [RULE] ALL skill steps/desc/tags must be English only -- token efficiency.</li><li>1. [PHILOSOPHY] Focusless-first: every CDP action should never need OS foreground. Recovery = safety net. Priority: (1) focusless design, (2) recovery as backstop.</li><li>2. [MANDATORY] Restore trigger = end of each ask/CDP action only. Watchdog = monitor+notify only.</li><li>3. [MANDATORY] ALL restore paths go through InputReadiness.Probe(SkipBlocker/Knowhow/Zoom=true, AutoApproveYield=true).</li><li>4. [FOCUSLESS PATTERN] WARNING: Emulation.setFocusEmulationEnabled(true) is Blink-renderer only -- does NOT prevent OS SetForegroundWindow from Page.bringToFront (path: WebContents::Activate-&gt;BrowserFrameViewWin-&gt;SetForegroundWindow). Role: auxiliary only (satisfies page-internal JS focus events). SW_SHOWMINNOACTIVE(8) is still the primary OS-level prevention. Pattern: (a) visibilityState=visible-&gt;skip, (b) SW(8), (c) WaitForWindowStateAsync(minimized, 1000ms), (d) EmulateActiveTabAsync(), (e) CDP call, (f) RestoreChromeNoActivate SW(4), (g) WaitForWindowStateAsync(normal, 1000ms). Degraded: timeout on (c)/(g) -&gt; proceed CDP-only. Chrome M119-121: setWebLifecycleState(active) may intermittently reset visibilityState to hidden. M122+ stable.</li><li>5. [DEVICE INSERTION = SELF-REPORTING] Insert AutoBugReport at every theft detection point. OnFocusTheft classifies UNGUARDED vs RACE and files suggest automatically.</li><li>6. [SELF-IMPROVING LOOP] Bug detected -&gt; suggest filed -&gt; wkappbot ask triad (share skill + analysis) OR targeted single-AI (ask gemini/claude/gpt) for domain-specific questions -&gt; triad dialectic -&gt; code fix -&gt; skill update -&gt; suggest resolve with evidence. Single-AI useful for: Chrome internals (claude for Blink specifics), JS engine behavior, security model.</li><li>7. [OPERATIONAL] Logs: runtime/cdp-focus-risk.jsonl, runtime/cdp-minimize-watchdog.jsonl. Periodic: wkappbot suggest list -&gt; review CDP theft reports -&gt; ask triad if unclear -&gt; fix -&gt; resolve.</li><li>8. [INVESTIGATION] When theft: (a) which action, (b) CDP method, (c) IsFocusStealingMethod()?, (d) SW=8?, (e) WaitForWindowState not delay?, (f) OnFocusTheft restores?</li><li>9. [DONE] SW(6)-&gt;SW(8). BringToFrontAsync WaitForWindowStateAsync. OnFocusTheft ForceForeground+RestoreRetry+AutoBugReport. InputReadiness.Probe. AutoBugReport 5s timeout. EnsureWindowReady ForceForeground. AskGemini prevFg re-capture. DismissDialogAsync consent. EmulateActiveTabAsync in EnsureCdpReadyAsync. InjectFocusLockScriptAsync+SetFocusLockAsync(true/false) around CDP input. Claude+GPT prevFg re-capture + StartFocusWatchdog. PUMP BUG-1/2/3 fixed: ProseMirror empty guard (br-only check), isSending deadlock prevention (5s timeout), stale ticks reset on re-arm (lastHash=null sentinel).</li><li>10. [TODO] Scope prevFg per-CDP-run in triad parallel mode (Gap-D). Use AsyncLocal&lt;IntPtr&gt; or per-tab parameter to avoid collision when Gemini/GPT/Claude send concurrently.</li><li>11. [JS FOCUS-LOCK] InjectFocusLockScriptAsync() + SetFocusLockAsync(true/false). CRITICAL: do NOT hard-block all focus() -- contenteditable IME (Korean/Japanese) needs focus() for document.activeElement to stay valid during CDP Input.dispatchKeyEvent. Safe pattern: allow focus() only when document.activeElement is body/null (IME recovery case), block all others. window.focus() fully blocked when locked. runImmediately=true covers already-open sandbox tabs. Web Workers: no window/HTMLElement -&gt; unaffected. Isolated Worlds (extensions): not covered.</li><li>12. [CONFIRMED BY TRIAD v1.17] (A) setFocusEmulationEnabled is Blink-only; Page.bringToFront always calls SetForegroundWindow regardless -- only solution is not calling bringToFront. (B) Hard focus-lock breaks Korean IME on contenteditable -- fixed to redirect pattern (IME recovery allowed). (C) runImmediately=true covers existing iframes; Web Workers immune. (D) Lifecycle events (window switch, dialog popup) = largest remaining attack surface. (E) ask-flow parity: not all CDP actions have uniform prevFg+watchdog coverage.</li><li>13. [TODO] Lifecycle event coverage: window-switch, dialog popup, SPA navigation can steal focus after RestoreChromeNoActivate completes. Need post-restore focus watchdog extension or async-reflow guard.</li><li>14. [TODO] Multi-tab prevFg collision in triad mode: AsyncLocal&lt;IntPtr&gt; scoping per concurrent ask-run.</li><li>15. [TIPS: TRIAD USAGE PATTERNS] (1) Full triad ?뺣컲?? wkappbot ask triad &quot;&lt;question&gt;&quot; -- all 3 AIs answer in parallel, then debate. Best for: architectural decisions, broad gap analysis, design review. Share full skill content for context. (2) Follow-up ?뺣컲?? send another triad question on the SAME slack thread (--msg &lt;ts&gt;) after reviewing first round answers. Best for: drilling deeper into unresolved points, validating proposed fixes, testing new code. (3) Targeted single-AI: wkappbot ask claude/gemini/gpt &quot;&lt;question&gt;&quot; -- one AI only. Best for: domain-specific questions (claude for Chrome/Blink internals, gemini for practical patterns, gpt for structured analysis/security). Faster + cheaper than full triad. TIP: Always include project context (C# not Python, Chrome version, specific method names) to avoid Gemini tool-call headscratch. TIP: After triad, send slack reply with summary + your own opinion -- forces synthesis and creates audit trail.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a11y Sub-Actions How-To | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>a11y Sub-Actions How-To</h1>
+      <p class="description">How-to reference for a11y sub-actions: discovery, window-state, input, read, wait, common flags.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>AMBIGUOUS GRAP AUTO-RESOLUTION: action commands (type/click/invoke/...) given an ambiguous grap auto-switch to a11y find first (L1 TargetAmbiguityGuard). [OK] Nms in errors.jsonl fields = find step resolved grap; exit:1 = action after resolution failed. Two independent outcomes recorded together.</li><li>Discovery sub-actions (read-only safe): inspect (UIA dump) find (copy-paste TARGET line) windows (enumerate top-level) screenshot (PNG of window) ocr (Tesseract on pixels)</li><li>Window-state sub-actions: close (WM_CLOSE focusless) minimize maximize restore focus move resize. Use focus sparingly -- it steals foreground. Use a11y invoke on Close-button control instead of a11y close when close button lives in a nested scope</li><li>Invoke/select sub-actions: click (best-tier auto) invoke (pure UIA no focus) toggle expand collapse select scroll. invoke is the safest verb for buttons exposing InvokePattern</li><li>Input sub-actions: type (SendKeys + focus) type --hotkey (Hotkey for modifiers e.g. ctrl c) set-value (ValuePattern focusless) set-range (RangeValuePattern focusless)</li><li>Read sub-actions: read (UIA Name+Value+HelpText concat) clipboard-read clipboard-write. MFC owner-drawn grids have no UIA cells -- use a11y grid-read clipboard bridge (see a11y-grid-read skill)</li><li>Wait sub-action with conditions: wait --condition enabled visible invisible text. Poll-based. Useful between state-change actions to avoid races. Optional --not --timeout N flags</li><li>Common flags across actions: --all (fan-out to every match) --nth N (disambiguate hits) --force (bypass ambiguity guard) --timeout N (per-op cap) --eval-js (CDP targets) --speak (TTS on success)</li><li>--ocr opt-in: hack and inspect default to CCA+UIA only. --ocr enables Tesseract + Gemini Vision. Saves CPU and avoids CDP focus steal from VisionWorker</li><li>kill sub-action: a11y kill &lt;pattern&gt;[/&lt;ancestor&gt;] kills matching process tree. Ancestor constraint prevents mass-kill. CRITICAL on Win11: never taskkill Notepad -- session restore resurrects all closed tabs; use a11y close instead</li><li>Error expectations: action can exit:1 even after grap resolved. Check errors.jsonl fields [OK] for resolution step separately from action step</li><li>Action ladder per tier: (1) UIA pattern Invoke/Value/Toggle/Select focusless (2) Win32 PostMessage WM_COMMAND/WM_SETTEXT focusless (3) SendInput keystroke with EnsureFocus -- requires foreground. Most HTS MFC controls skip tier 1 and land on tier 2 directly</li><li>BLOCKED_CDP_OVERLAY detection: when a11y inspect fails to find input on Chrome, TryReportCdpOverlayBlocker runs CDP z-index eval (&gt;=100 fixed/absolute covering &gt;=5% viewport). Outputs # BLOCKED_CDP_OVERLAY with overlay text+buttons on stdout. a11y invoke has AutoApproveYield=true -- focusless UIA Invoke/BM_CLICK bypass user-active callout</li><li>Blocker detection (all a11y actions): emit # BLOCKED {grap}#*dismissBtn* title=... [ELEVATED:needs --sudo] on stdout when probeReport.ActiveBlocker != null. Followed by InspectBlockerContent() = a11y inspect on blocker hwnd. Action exits with fail -- dismiss blocker first, then retry</li><li>Auto-inspect fallback (2026-05-02): when a11y action (click/type/invoke/etc.) is called with only a window grap (no #node), the command automatically runs &#x27;a11y inspect &lt;grap&gt;&#x27; first, then exits with error showing copy-paste grap paths. Bypass: add --i-really-want-to-act-on-this-window-directly to act on window directly without inspection</li></ol>
+    </article>
+  </main>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a11y playbook writing | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>a11y playbook writing</h1>
+      <p class="description">Create and revise executable WKAppBot playbooks/scenarios for focusless desktop automation. Use when drafting or updating YAML scenarios, Notepad-style demos, save-dialog recovery flows, or any target-heavy automation that should prefer `a11y find`, paste-ready grap targets, UTF-8-safe files, and graceful close behavior over brittle clicks or taskkill.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">a11y</span><span class="chip">playbook</span><span class="chip">scenario</span><span class="chip">script</span><span class="chip">grap</span><span class="chip">notepad</span><span class="chip">focusless</span><span class="chip">utf8</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Read the shared repo guidance first: AGENTS.md, CLAUDE.md, and README.md. Keep any new prose English-first and UTF-8 encoded; only UI-localized labels may stay localized when the target app requires them.</li><li>Reuse existing skills before inventing new flow: `wkappbot skill list`, then `wkappbot skill read a11y-find`, `grap-target`, and `control-ui-without-stealing-focus-3-tier-focusless-strategy`.</li><li>Write the playbook as a runnable scenario: `scenario`, `config`, `app`, `steps`, optional `teardown`. Prefer `prefer_focusless: true` and `focus_check: false` when the goal is background automation.</li><li>Discover exact targets with `a11y find` and copy the emitted `# TARGET` grap. Prefer node-tag / grap-path resolution over raw `name` matching for buttons and modal controls.</li><li>For Notepad close flows, prefer `window_close` first. If a save prompt appears, dismiss it by invoking the button found through the a11y node tag path. Keep `press_key` only as fallback, not as the primary path.</li><li>Avoid destructive process-kill shortcuts for Notepad. Use graceful close, prompt dismissal, and only narrow fallback logic when the UI path fails.</li><li>Prefer stable selectors in scenarios: `control_type`, `automation_id`, and `description` over fragile visible text. Use localized text only where the OS/app label itself is localized.</li><li>Validate the playbook after edits with the official binary on PATH: `wkappbot validate &lt;file&gt;` and, when relevant, `wkappbot run &lt;file&gt;`. If validation fails with log or lock issues, inspect runtime state before assuming the YAML is wrong.</li><li>After creating or updating the skill, verify it with `wkappbot skill read &lt;id&gt;` and keep the skill body short, imperative, and reusable.</li><li>Use wkappbot skill contribute / wkappbot skill edit for all skill changes; never hand-edit .skill.json files.</li><li>Screenshot action supports per-step window scoping and explicit output path: target.class_name is resolved through WindowFinder.FindByClassName (falls back to main window if not set), and params.path takes precedence over params.filename as the verbatim output path (intermediate dirs auto-created). Regression: scenarios/screenshot_path_classname_test.yaml.</li><li>Verified 2026-04-21: test-run-scenario-screenshot-path-classname.cmd (resolve ts=2026-04-19T06:48)</li></ol>
+    </article>
+  </main>
+</body>
+</html>

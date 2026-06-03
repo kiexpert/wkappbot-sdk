@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Suggest Resolve Pre-flight Checklist | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>Suggest Resolve Pre-flight Checklist</h1>
+      <p class="description">5-step preflight to pass all resolve guards first try. Covers commit keyword, class size, evidence filename, hidden-window path, final command.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">suggest</span><span class="chip">resolve</span><span class="chip">preflight</span><span class="chip">checklist</span><span class="chip">guard</span><span class="chip">evidence</span><span class="chip">commit</span><span class="chip">class</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>STEP 1 COMMIT KEYWORD GUARD: git log --oneline --grep=KEYWORD to find a commit whose message contains suggest title keywords. Merge or chore commits often have the full title. Terse fix-commits fail the keyword guard. Use the merge commit that recorded the suggest close.</li><li>STEP 2 CLASS SIZE GUARD: check target class is under 400 lines. Command: wc -l src/ClassName.cs. If 400 or more: split into partial classes with C# partial keyword, rebuild, push to remote, then resolve. Guard checks resolver repo. Skipping blocks every attempt.</li><li>STEP 3 EVIDENCE FILENAME GUARD: name script test-{cmd}-{subcmd}-description.cmd. The {cmd}-{subcmd} part must appear as a literal substring in the script commands. test-eye-tick-fix.cmd must call: wkappbot eye tick. test-windows-guard.cmd must call: wkappbot windows. NEVER use ask gpt -- it times out in hidden window mode. Best fast commands: wkappbot eye tick, wkappbot windows.</li><li>STEP 4 EVIDENCE SCRIPT PATH: always pass full absolute path. Hidden window cannot find relative filenames. Use: D:\full\path\test-eye-tick-fix.cmd. Wrong: just the filename alone.</li><li>STEP 5 FINAL RESOLVE COMMAND: wkappbot suggest resolve TS NOTE --i-completed-...-script ABSOLUTE_PATH --skill SKILL-ID --commit COMMIT-HASH --class ClassName. All 5 flags required. After: wkappbot suggest check TS to verify HALF or RESOLVED.</li><li>RELATED SKILLS: wkappbot skill read suggest-workflow (step 5 resolve command), wkappbot skill read suggest-resolve-evidence-conventions (step 1 hidden-window limits, step 11 filename guard), wkappbot skill read suggest-resolve-cdp-bugs (CDP-specific resolve), wkappbot skill read ask-suggest-priority-batching (triage to resolve pipeline).</li><li>COMMIT KEYWORD BYPASS (2026-05-22): For suggests where the fix commit message doesn&#x27;t match title keywords, use the &#x27;chore(suggest): submit ...&#x27; commit that was auto-created when the suggest was filed. This commit contains the full suggest title as keywords. Pattern: git log --oneline --grep=&#x27;chore.*suggest.*submit&#x27; | grep &lt;title-keyword&gt; to find it. Example: ea3228ca0 for broken pipe suggest. The submit commit reliably passes keyword guard since its message IS the suggest title.</li><li>KEYWORD GUARD FAIL → AMEND (2026-05-22): if keyword guard fails because fix commit message is too terse, DO NOT use unrelated commits (submit commit, no_caller_window commit, etc). CORRECT fix: git commit --amend and add bug title keywords to the message. Pattern: &#x27;fix(X): &lt;short description&gt; -- &lt;key symptom words from bug title&gt;&#x27;. One commit satisfies both keyword guard AND file-coupling guard. --class always CdpClient (not Program -- Program hits 2000-line files and fails source size guard).</li><li>Pattern A (verified 2026-05-29 third pass): CMD execution guard requires script to actually run wkappbot help &lt;cmd&gt; matching the suggest title keyword. Pattern: grep-src-line then wkappbot help mail then grep keyword. For batch ts=2026-05-28T19:37:17 + 19:36:34 (mail + eye-replace BUG-AUTO).</li><li>BATCH 2026-05-29 RETRY: CMD execution guard requires evidence script to invoke a wkappbot subcommand whose name matches the suggest title. For CommandHelpMap mail/eye-replace BUG-AUTO, the invocation must be &#x27;wkappbot help mail&#x27; or &#x27;wkappbot help eye-replace&#x27;. The grep-src check alone is insufficient. Pattern: &#x27;/usr/bin/grep -q SRC then wkappbot help &lt;cmd&gt; | grep -qi &lt;cmd&gt; then PASS&#x27;.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

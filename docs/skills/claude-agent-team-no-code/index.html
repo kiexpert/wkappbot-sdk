@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Build a Claude Agent Team — No SDK, No Coding (WKAppBot Way) | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>Build a Claude Agent Team — No SDK, No Coding (WKAppBot Way)</h1>
+      <p class="description">Create a multi-agent analysis team (orchestrator + sub-agents) using only Claude chat. Anthropic official format: YAML frontmatter + markdown system prompt. In WKAppBot: skills/ replace MD files, ask triad replaces parallel Codebase execution, Eye handles scheduling.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">agent</span><span class="chip">orchestrator</span><span class="chip">sub-agent</span><span class="chip">claude</span><span class="chip">multi-agent</span><span class="chip">no-code</span><span class="chip">scheduling</span><span class="chip">analysis</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>OVERVIEW: No SDK or coding needed. Describe the agent team in Claude chat and ask it to follow the Anthropic official agent guide format. Claude generates ready-to-deploy markdown files -- in WKAppBot these become skill files in skills/.</li><li>FORMAT: Each agent = one markdown (.md) file with YAML frontmatter (name, description, tools, model) + system prompt body. In WKAppBot: use wkappbot skill contribute to register each sub-agent as a skill with its role, rules, and output format.</li><li>KEY FLAG: Add &#x27;proactively_uses: true&#x27; in the description field -- Claude auto-invokes appropriate sub-agents without explicit instruction. WKAppBot equivalent: skill audience=operator makes skills auto-loaded into Claude context; Claude picks relevant ones without being told.</li><li>ORCHESTRATOR PATTERN: One lead agent (orchestrator) + N sub-agents each owning one domain (company overview, financials, industry trend, risk). WKAppBot: CLAUDE.md is the orchestrator; each skill is a sub-agent persona. One skill per domain, not one giant prompt.</li><li>PARALLEL EXECUTION: wkappbot ask triad runs GPT + Gemini + Claude simultaneously on the same question -- each AI is a sub-agent. Results debate in Slack thread, then synthesize. Far faster than sequential single-AI loop.</li><li>DEPLOY: No folder setup or zip needed. wkappbot skill contribute registers the agent. wkappbot skill read &lt;id&gt; loads its context. Claude reads relevant skills automatically at session start via CLAUDE.md skill index.</li><li>PROMPT EXAMPLE (stock analysis): &#x27;wkappbot ask triad &quot;Defense stocks surging on Iran conflict. Analyze top 3 Korean + top 3 US defense stocks: fundamentals, valuation, risk. Output: ranked buy recommendation.&quot;&#x27; -- triad = three analysts in parallel.</li><li>SCHEDULE: wkappbot schedule + Eye daemon. Example: every Monday 08:30 KST, Eye triggers &#x27;wkappbot ask triad &quot;Weekly defense stock scan: ...&#x27;&quot; and posts result to Slack. No desktop app needs to stay open -- Eye runs as background service.</li><li>EDIT/TUNE: To refine a sub-agent, wkappbot skill edit &lt;id&gt; --desc or --add-step. No file download, no zip, no folder juggling. Version auto-bumped on every edit.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

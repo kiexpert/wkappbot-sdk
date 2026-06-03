@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>claude-kill-guard-hook | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>claude-kill-guard-hook</h1>
+      <p class="description">Claude Code PreToolUse hook: block PowerShell Stop-Process targeting wkappbot processes; companion audit-log traces all tool calls</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>WHAT IT BLOCKS: Stop-Process or Kill-Process (PowerShell) targeting wkappbot-core|wkchat|wkappbot.exe|wka11y. taskkill is excluded -- wkappbot handles it via its own popup shim.</li><li>3 DETECTION LAYERS: (1) Name-based: cmd matches wkappbot process name directly -&gt; instant block. (2) PID-based: Stop-Process -Id &lt;N&gt; -&gt; runtime Get-Process -Id lookup, block if the PID belongs to a wkappbot process. (3) Bypass pattern: cmd contains wkappbot name AND Stop-Process -Id anywhere -&gt; block immediately without lookup.</li><li>SCRIPT: C:/Users/kiexp/.claude/hooks/kill-guard.ps1. Returns {continue:false, stopReason} to Claude Code. No output = allow.</li><li>HOOK ORDER MATTERS: kill-guard is the FIRST hook in PreToolUse array (matcher=PowerShell, synchronous). audit-log.ps1 is THIRD (no matcher, async). When kill-guard returns continue:false, Claude Code halts -- audit-log never runs. Blocked commands do NOT appear in ai-audit.log.</li><li>GOTCHA - $pid IS RESERVED: PowerShell built-in variable. Using foreach ($pid in ...) throws WriteError. Use $p or $pidVal instead.</li><li>GOTCHA - INNER STRING MATCH: kill-guard reads the raw command string. If Claude embeds wkappbot-core + Stop-Process in a test payload string variable, the outer command itself gets blocked too. Tested and confirmed via system-reminder PreToolUse:PowerShell hook stopped continuation.</li><li>AUDIT GAP: to log blocked attempts, either (a) move audit-log before kill-guard in the array, or (b) add logging inside kill-guard.ps1 before the exit. Trade-off: (a) logs before block, so kill attempt is recorded but also executed if audit-log somehow fails.</li><li>SETTINGS: ~/.claude/settings.json PreToolUse array order: [1] kill-guard matcher=PowerShell timeout=5, [2] skill-search-reminder matcher=Bash|Glob|Grep, [3] audit-log no-matcher async.</li><li>ACTIVATE: /hooks menu or session restart to reload settings watcher.</li><li>RIQUA [taskkill popup]: wkappbot taskkill /IM wkappbot-core.exe is documented as showing a callout popup for protected processes, but in practice no popup appears. Actual behavior: classify-only + exit 1 for non-force invocations. --force &lt;pids&gt; is the only actual kill path. The claim &#x27;taskkill handled by wkappbot popup shim&#x27; in this skill is UNVERIFIED -- treat taskkill the same as Stop-Process until confirmed.</li><li>CORRECTION: popup mechanism is wkappbot a11y kill (not taskkill). a11y kill routes through the callout system and shows a popup for protected processes. wkappbot taskkill is classify-only by default (exit 1, no kill, no popup). The kill-guard should still block Stop-Process -- a11y kill already has its own guard built in.</li><li>ACCURATE taskkill behavior: wkappbot taskkill /IM &lt;name&gt; = classify-only + exit 1, NEVER kills. Kill requires explicit --force &lt;pid1,pid2,...&gt;. PROTECTED PIDs survive even if included in --force. So taskkill alone cannot kill wkappbot processes -- no popup, no kill, just a warning list. kill-guard blocks Stop-Process as the only remaining direct-kill vector.</li><li>RIQUA [--force on PROTECTED]: classify output says &#x27;DO NOT include in --force&#x27; but actual behavior when PROTECTED PID is passed to --force is unverified without source review. May silently skip, may kill anyway, may error. Check TaskkillCompatCommand.cs before relying on PROTECTED as a hard guarantee.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

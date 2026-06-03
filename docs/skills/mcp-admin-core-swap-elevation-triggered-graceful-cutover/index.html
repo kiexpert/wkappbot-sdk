@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MCP Admin Core Swap: Elevation-Triggered Graceful Cutover | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>MCP Admin Core Swap: Elevation-Triggered Graceful Cutover</h1>
+      <p class="description">How MCP Launcher spawns an elevated admin Core on demand and cuts over transparently, with hot-swap deferral while admin is active.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">mcp</span><span class="chip">admin</span><span class="chip">elevation</span><span class="chip">swap</span><span class="chip">uac</span><span class="chip">launcher</span><span class="chip">named-pipe</span><span class="chip">project</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>## 트리거 조건</li><li>normal Core가 UIPI 차단 감지 -&gt; 응답에 &#x27;_elevationRequired:true&#x27; 포함 -&gt; Launcher stdout relay가 가로챔 (suppress, client에 미전달)</li><li>## 어드민 Core 스폰 (SpawnAdminCore 백그라운드 스레드)</li><li>1. NamedPipe 서버 2개 생성: wkappbot-mcp-admin-{PID}-stdin / -stdout (Launcher가 서버, admin Core가 클라이언트)</li><li>2. ShellExecuteExW runas -&gt; wkappbot-core.exe mcp --admin-pipes {stdin} {stdout} (UAC 팝업)</li><li>3. 60초 WaitForConnectionAsync -- UAC 승인 후 admin Core가 접속</li><li>## 절체 (transition) 순서</li><li>1. 기존 normal Core stdin close (CloseHandle) -&gt; EOF -&gt; drain mode 진입</li><li>2. adminMode = true -&gt; 이후 stdin은 모두 admin Core로 라우팅</li><li>3. initialize 리플레이 -&gt; 원래 elevation 요청 재전송 -&gt; admin Core가 처리</li><li>4. admin Core stdout relay: 응답 id로 inflight 제거 -&gt; client에 포워딩</li><li>## hot-swap과의 상호작용</li><li>FSW가 .new.exe 감지해도 adminMode=true면 -&gt; pendingSwapWhileAdmin=true로 defer (normal Core swap 대기)</li><li>admin Core stdout EOF (= admin Core 종료) -&gt; finally에서 activeStdinWriter=null + pendingSwapWhileAdmin 로그</li><li>pending swap은 Launcher가 다음 FSW 이벤트(새 stamp) 때 재처리 -- 자동으로 normal Core가 새 버전으로 교체됨</li><li>## 실패 시</li><li>UAC 거부 -&gt; elevationRequestLine에서 id 추출 -&gt; JSON-RPC error -32001 &#x27;Elevation denied by user&#x27; 반환</li><li>60s 타임아웃 -&gt; TerminateProcess(adminProc) + pipe 정리</li><li>## 핵심 설계</li><li>normal Core + admin Core 동시 공존 불가 -- 절체 시 normal Core는 drain 후 종료</li><li>admin Core가 살아있는 동안 hot-swap은 defer -- 버전 불일치 방지</li></ol>
+    </article>
+  </main>
+</body>
+</html>

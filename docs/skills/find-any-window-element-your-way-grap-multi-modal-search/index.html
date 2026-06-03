@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Find Any Window Element Your Way -- grap Multi-Modal Search | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="1 star rating">&#9733;&#9734;&#9734;</span>
+      </div>
+      <h1>Find Any Window Element Your Way -- grap Multi-Modal Search</h1>
+      <p class="description">grap = glob/regex/OR/UIA-scope/JSON5 multi-field AND. Wildcards: *Button*. OR: *notepad*;*calc*. UIA scope: app#panel. Tab portal: Chrome#ChatGPT#model. JSON5: {title:&#x27;Claude&#x27;,domain:&#x27;claude.ai&#x27;}. hwnd: *hwnd=001A0F2C*. adb: adb://device/*screen*#balance. Combine: *order*#account = grap inside UIA scope.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">grap</span><span class="chip">search</span><span class="chip">pattern</span><span class="chip">uia</span><span class="chip">scope</span><span class="chip">json5</span><span class="chip">project</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>grap is a multi-modal pattern: glob wildcards (*Button*), OR via semicolon (*notepad*;*calc*), UIA scope via #panel (app#realtime-account), tab portal (Chrome#ChatGPT#model), JSON5 ({title:&#x27;Claude&#x27;,domain:&#x27;claude.ai&#x27;}), and direct hwnd:0xNNN.</li><li>Combine forms with AND semantics: *order*#account means a window matching &#x27;*order*&#x27; globally then narrowed to UIA element &#x27;account&#x27; inside it. Multi-field JSON5 acts as AND across keys (proc + domain + title).</li><li>Adb scheme adb://device/*screen*#balance routes the same syntax to an Android device tree. The &#x27;a11y find&#x27; command prints &#x27;# TARGET hwnd:0x...&#x27; as the first line for copy-paste reuse.</li><li>OR INTERNALS + --all PATTERN (2026-05-18): ; OR uses coverage-sum ranking (same SkillCoverageScore as skill search). A window matching MORE of your ; patterns scores HIGHER -- not just first-match. Combine with --all for true fan-out: &#x27;wkappbot a11y invoke &quot;A;B;C&quot; --all&#x27; invokes every matched button across all windows in one call. Verified: {proc:&#x27;nkrunlite&#x27;}#*[0156]*;{proc:&#x27;nkrunlite&#x27;}#*[0150]* returns 11 TARGETS. One-shot multi-popup dismiss pattern: join all target patterns with ; then invoke --all.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

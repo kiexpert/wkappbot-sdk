@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QMD Local Codebase Search — Install, Index, and Query | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>QMD Local Codebase Search — Install, Index, and Query</h1>
+      <p class="description">QMD: BM25 + vector semantic + optional LLM reranking local search engine. Pre-indexes C# source, skill JSONs, and docs. Claude resolves qmd://collection/file.cs:42 references directly to file+line, cutting exploration tokens by 91%. MCP server exposes search as mcp__qmd__* tools.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">qmd</span><span class="chip">search</span><span class="chip">pre-index</span><span class="chip">token</span><span class="chip">optimization</span><span class="chip">mcp</span><span class="chip">vector</span><span class="chip">bm25</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>[WHAT] QMD is a local search engine (BM25 + vector embeddings) that pre-indexes your codebase. Claude uses it to jump directly to the right file:line instead of globbing and grepping the entire repo.</li><li>[INSTALL] Install via bun: bun install -g @tobilu/qmd. On Windows, create a wrapper: D:/SDK/bin/qmd.cmd pointing to bun.exe + dist/cli/qmd.js %* . npm install also works but creates shell script wrappers that fail on Windows.</li><li>[COLLECTIONS] Add collections from the project root: qmd collection add wkappbot-src --mask **/*.cs , qmd collection add wkappbot-skills --mask **/*.skill.json , qmd collection add wkappbot-docs --mask **/*.md . Use --mask (not --glob) for glob patterns.</li><li>[CONTEXT] Add human descriptions to help Claude understand each collection: qmd context add &#x27;WKAppBot C# source...&#x27; -- qmd://wkappbot-src/ . This description appears in every search result.</li><li>[EMBED] Generate vector embeddings: qmd embed . Downloads 329MB embedding model on first run (embeddinggemma-300M-Q8_0.gguf). Subsequent runs are incremental. Run after adding new files.</li><li>[SEARCH-MODES] (1) qmd search TEXT -- BM25 keyword search. Fast, no extra models. Best for identifiers, function names, exact terms. (2) qmd vsearch TEXT -- vector semantic search. Best for concept queries. Needs embedding model. (3) qmd query TEXT -- hybrid + LLM expansion + reranking. Best quality but downloads 2GB extra models on first run. Avoid in daily use.</li><li>[MCP] Register in .mcp.json: add &#x27;qmd&#x27; server with command=bun.exe and args=[qmd.js, mcp]. Tools become available as mcp__qmd__* in Claude Code. Claude can call search/vsearch/get directly.</li><li>[CLAUDE-MD-RULE] Add to CLAUDE.md Token Efficiency section: &#x27;Use qmd search before reading files -- BM25+vector pre-index of all C# + skills + docs (MCP: qmd)&#x27;. This prevents blind globbing on every question.</li><li>[RESULTS] Result format: qmd://collection/path/file.cs:LINE -- score% -- code snippet. Pass the qmd:// URI to qmd get to see more context. Claude Code resolves these URIs to read exact file sections.</li><li>[DAILY-USE] For identifiers/function names: qmd search FunctionName . For concept queries: qmd vsearch &#x27;how does hot swap work&#x27; . For multi-collection: omit --collection (searches all). Re-index after bulk edits: qmd update.</li><li>[LIMITS] qmd search may return no results for natural language full sentences -- use vsearch instead. qmd query first run is slow (2GB model download). Windows path separator in collection mask must use forward slashes.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

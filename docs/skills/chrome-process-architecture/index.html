@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chrome Process Architecture: Browser/Renderer/GPU + wkappbot CDP Isolation | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>Chrome Process Architecture: Browser/Renderer/GPU + wkappbot CDP Isolation</h1>
+      <p class="description">Reference: Chromium multi-process model (browser/renderer/GPU/utility), Chrome DevTools Protocol surface (HTTP discovery, WebSocket, target/session model), and how wkappbot enforces per-instance CDP isolation via the wkappbot.cdp Win32 window property and ManagedCdpPort scoring. Explains why EnumWindows naturally scopes to the browser process, why renderer child windows never appear in a11y find, and the exact CDP commands behind each web subcommand.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">chrome</span><span class="chip">cdp</span><span class="chip">architecture</span><span class="chip">reference</span><span class="chip">isolation</span><span class="chip">enumwindows</span><span class="chip">win32</span><span class="chip">renderer</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Process model -- browser process: exactly one per Chrome instance (one --user-data-dir = one browser process). It owns the top-level Chrome_WidgetWin_1 HWND, parses --remote-debugging-port=N from its command line, and runs the CDP HTTP+WebSocket server on 127.0.0.1:N. It is the parent PID of every other Chrome child process and the only process that hosts a top-level window visible to EnumWindows. ALL CDP traffic terminates here; renderers never speak CDP directly to clients. Killing the browser PID tears down all renderers automatically.</li><li>Process model -- renderer processes: one or more per origin/site under site isolation (Chromium spawns a fresh renderer per cross-site iframe and per same-site tab group). Each renderer is a child of the browser PID, runs Blink + V8, owns Chrome_RenderWidgetHostHWND child HWNDs that are reparented under the browser top-level window, and has NO top-level HWND of its own. It executes JavaScript and mutates DOM in its sandbox; CDP Page/DOM/Runtime domains are proxied to it by the browser process via Mojo. EnumWindows never returns these because GetParent() is non-NULL. Crash of one renderer leaves other tabs alive.</li><li>Process model -- GPU and utility: one shared GPU process handles compositing, raster, and ANGLE/D3D drawing; its only HWND is a hidden Chrome_ChildWindowHWND and it has no top-level surface. Network service, storage service, audio service, and on-demand utility processes (PDF, printing, video decode, V8 proxy resolver) run as additional children with no UI at all. None of these are CDP attach targets and none affect WindowFinder enumeration. For wkappbot purposes only the browser process matters: it is the sole carrier of the wkappbot.cdp HWND property and the sole CDP server endpoint.</li><li>CDP transport -- HTTP discovery surface: Chrome opens http://127.0.0.1:N/ when launched with --remote-debugging-port=N. Endpoints: GET /json/version returns browser metadata and webSocketDebuggerUrl for the browser-level session; GET /json or /json/list returns an array of targets, each with id (32-hex GUID), type, title, url, and webSocketDebuggerUrl; GET /json/new?url=... opens a tab; GET /json/close/&lt;id&gt; closes one; PUT /json/protocol returns the full protocol JSON. wkappbot polls /json/version during reconnect (after Chrome restart) until the server is responsive, then resumes normal CDP commands.</li><li>CDP transport -- WebSocket and target model: two WS endpoint shapes. ws://127.0.0.1:N/devtools/browser/&lt;guid&gt; is the browser-level session, used for Target.*, Browser.*, SystemInfo.*, and to spawn per-tab sessions. ws://127.0.0.1:N/devtools/page/&lt;guid&gt; is a direct per-target session. Target types observed: page (tab), iframe (out-of-process subframe), background_page (MV2 extension), service_worker (MV3 extension/PWA), shared_worker, dedicated_worker, browser, webview, other. The modern flow is to open ONE browser-level WS and call Target.attachToTarget with flatten:true to receive a sessionId; subsequent commands carry that sessionId so a single socket multiplexes every tab. Target.setAutoAttach (autoAttach:true, waitForDebuggerOnStart:false, flatten:true) auto-issues attached events for new tabs and OOPIFs.</li><li>wkappbot CdpClient shape: csharp/src/WKAppBot.WebBot/CdpClient.cs holds one persistent browser-level WebSocket per Chrome instance; partial classes split per concern (TabManagement, Lifecycle, Actions, AiHelpers, FocusGuard, SelfHealing). It tracks attached sessions in a sessionId table keyed by targetId, routes outbound commands by writing the sessionId field on the JSON envelope, and demultiplexes responses on Target.receivedMessageFromTarget or direct sessionId-tagged frames. ProjectHash (set per project user-data-dir) disables the legacy DetectCdpPort scan so a project Eye only ever attaches to its own DerivePort(userDataDir) port -- never to a foreign Chrome.</li><li>wkappbot.cdp Win32 property -- placement: ChromeLauncher.cs (around line 326-327) calls SetPropW(mainHwnd, wkappbot.webbot, 1) and SetPropW(mainHwnd, wkappbot.cdp, port) on the located Chrome_WidgetWin_1 top-level HWND right after the browser process is up and the main window resolves. The value stored is the integer CDP port, not a handle. It is set ONLY on the top-level window, never on Chrome_RenderWidgetHostHWND children, because (a) renderers are invisible to EnumWindows so tagging them is wasted, and (b) we want one canonical port-per-instance lookup. WindowFinder.cs reads it back via GetPropW(hWnd, wkappbot.cdp).ToInt32() at lines 648, 1274, 1362, and 1782.</li><li>wkappbot.cdp Win32 property -- scoring and isolation: WKAppBot.Win32.Window.WindowFinder.ManagedCdpPort is a static int set once at CLI startup by Program.cs (around line 710) to ChromeLauncher.DerivePort(userDataDir) -- a stable hash of the user-data-dir, computed before Chrome even launches. ComputeFieldScores in WindowFinder.cs (line ~1786) emits FieldScore(cdp-match, +0.5) when the window wkappbot.cdp equals ManagedCdpPort and FieldScore(cdp-mismatch, -0.5) otherwise, biasing window selection toward the project own Chrome and away from a coworker or another repo. Score deltas are visible in a11y windows --score-debug output.</li><li>Foreign-CDP filter (a11y find/windows): A11yCommand.cs lines 504-566 implement a hard filter: when ManagedCdpPort &gt; 0 and a candidate top-level window carries wkappbot.cdp != ManagedCdpPort, the window is suppressed entirely from find/windows output and a one-line GUARD trace is written to stderr ([GUARD] foreign-cdp-hidden hwnd=0x... cdp=N ours=M ...). The bypass is the deliberately-long flag --i-really-want-to-peek-at-others-cdp; no short alias exists. The filter is dormant when ManagedCdpPort is 0 (e.g., wka11y running outside a project context) so generic a11y still works against unmanaged Chromes.</li><li>EnumWindows scope -- why only the browser process appears: EnumWindows enumerates the desktop top-level window list, defined as windows with GetParent(hwnd) == NULL (also called WS_OVERLAPPED/WS_POPUP roots). Chrome renderer surfaces are Chrome_RenderWidgetHostHWND children reparented under the browser top-level, so they are absent by construction -- no parent-PID walk or CDP-target enumeration is needed to reach the right HWND from a tab. MDI document children are likewise invisible, which is why the wkappbot grap syntax includes an MDI segment for legacy stock HTSes. Electron apps share the Chrome_WidgetWin_1 class because they ship Chromium; distinguish via the owning process executable name (chrome.exe / chrome_canary.exe vs code.exe, cursor.exe, codium.exe, slack.exe, discord.exe, electron.exe) before treating a window as a CDP target.</li><li>Common wkappbot CDP usage -- mapping web subcommands to CDP: web navigate &lt;grap&gt; &lt;url&gt; sends Page.navigate (url) on the active tab session, then waits on Page.frameStoppedLoading or Page.loadEventFired. web html &lt;grap&gt; uses Runtime.evaluate of document.documentElement.outerHTML (or DOM.getDocument + DOM.getOuterHTML for shadow-aware capture). web run &lt;grap&gt; &lt;js&gt; sends Runtime.evaluate (expression, returnByValue:true, awaitPromise:true) and unwraps result.value or exceptionDetails. web capture &lt;grap&gt; sends Page.captureScreenshot (format:png, captureBeyondViewport:false) and base64-decodes the data field. Tab targeting uses the grap to resolve the browser HWND, then matches /json/list entries by URL/title/active-tab heuristics in CdpClient.TabManagement to pick the targetId before attach.</li><li>Reconnect and lifecycle: Chrome restarts (crash, user close-and-relaunch, OS reboot) invalidate the WebSocket but DerivePort is stable, so the next launch lands on the same port. CdpClient.Lifecycle / SelfHealing detect the dropped socket, re-poll GET /json/version against http://127.0.0.1:DerivePort(udd)/ until 200 OK, re-issue Target.setAutoAttach to rebuild the session table, and re-tag the new top-level HWND with SetPropW(wkappbot.cdp, port). Until that re-tag completes the foreign-CDP filter may transiently hide the recovering window -- this is expected, not a bug; ManagedCdpPort &gt; 0 plus an untagged window means the recovery is mid-flight.</li><li>2026-05-20 DIAGNOSIS: MyCdpContext.CallerValidation (Launcher) may allow Chrome as valid caller via KnownHostProcessNames. Needs verification in wkappbot-sdk repo. Core TryValidatePlacementCallerWindow now rejects Chrome_ class, but WKAPPBOT_CALLER_HWND is set before Core runs.</li><li>2026-05-20: CallerCwdSnapshot, ParentCwdSnapshot, CallerCmdLineSnapshot, ParentCmdLineSnapshot in ChromeLauncher.cs are plain statics -- converting to AsyncLocal to prevent cross-task contamination when concurrent Eye tasks call CDP commands.</li><li>2026-05-20 context: reviewed in relation to PseudoConsoleWindow/WindowsTerminal placement analysis. No changes needed to this skill.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

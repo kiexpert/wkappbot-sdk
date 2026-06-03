@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WKAppBot build + verify workflow (for AI code agents) | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>WKAppBot build + verify workflow (for AI code agents)</h1>
+      <p class="description">How to build and verify WKAppBot after code changes. Required reading for Codex / Haiku / any AI CLI delegated to refactor or edit wkappbot source. Covers the single publish command, green-build signature, hot-swap staging output, and failure diagnosis.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">wkappbot</span><span class="chip">build</span><span class="chip">verify</span><span class="chip">publish</span><span class="chip">dotnet</span><span class="chip">ai-delegation</span><span class="chip">operator</span><span class="chip">cheatsheet</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Single build command (Release mode, all projects): C:/Program Files/dotnet/dotnet publish D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --verbosity minimal</li><li>Working directory: anywhere, but D:/GitHub/WKAppBot is canonical. Must use the quoted Program Files path on Windows; plain dotnet may hit an older SDK</li><li>Green-build signature (last 3 lines of output): wkappbot-core.new.exe staged for hot-swap AND skills installed to HQ. Exit code 0. Presence of warning CS8604 or similar nullable warnings is fine -- only CS-prefixed errors block</li><li>Typical red-build signatures: error CS0xxx (compile error), error MSB (msbuild error), FileNotFoundException on copy. Show the error line; do not retry blindly</li><li>Timeout budget: 180-300 seconds on warm build (incremental), up to 420 seconds on cold. Use timeout 300000 ms when calling via Bash tool</li><li>After successful build the canonical wkappbot-core.exe is NOT yet updated. The launcher rename-swap happens on next wkappbot invocation (hot-swap layer 3). Running wkappbot --version triggers the swap</li><li>Launcher auto-swap failing? See hot-swap operator cheatsheet (hot-swap-stuck-orphan-mcp-workers-kill-force-swap). Short answer: wkappbot --sudo --force-swap eye tick when admin orphan blocks</li><li>For a quick smoke check post-build: wkappbot --version should print the expected base version (currently 6.0.x). wkappbot exec list should list built-in presets including codex notepad calc</li><li>Refactor verification loop: 1. make change 2. dotnet publish 3. check last 3 lines for staged + skills installed 4. wkappbot --version to force swap 5. wkappbot &lt;affected-command&gt; smoke test 6. git add + commit ONLY after steps 2-5 all green</li><li>Common refactor-breaking error: CS0246 (type or namespace not found) usually means a new file was created but not referenced OR an extracted method left a dangling reference. Read the error location and verify both sites</li><li>Project structure (relevant for where to place new partials): csharp/src/WKAppBot.CLI/Commands/ for CLI command handlers. csharp/src/WKAppBot.Win32/ for Win32 P/Invoke + UIA. csharp/src/WKAppBot.WebBot/ for CDP. csharp/src/WKAppBot.Vision/ for Tesseract + OCR. csharp/src/WKAppBot.Core/ for ScenarioRunner and ActionExecutor</li><li>Partial-class pattern (for splits): new file must have namespace WKAppBot.CLI (or matching namespace) AND internal partial class Program (or matching container). No using-statement changes beyond what the extracted code actually uses</li><li>2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP, #67 diagnostics, #76 stderr) - low severity, covered by build verify</li><li>2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP, #67 diagnostics, #76 stderr) - low severity, covered by build verify</li><li>After deploy: run &#x27;wkappbot skill sync&#x27; to push local skill edits to HQ. If split-brain conflicts appear, the WKAppBot MAINTAINER must resolve all immediately: &#x27;wkappbot skill sync --resolve &lt;id&gt;&#x27;. Never leave conflicts pending -- downstream repos silently diverge.</li><li>DEPLOY ALL THREE (MANDATORY): when manually copying wkappbot-core.exe to bin/, always copy to wkappbot-core.exe AND wkappbot-core.new.exe AND wkappbot-core.exe.bak simultaneously. Eye FSW watches .new.exe and will hot-swap it back -- if .new.exe has an old/broken version, it reverts your fix. Single-file copy is insufficient. Pattern: Copy-Item good.exe bin/wkappbot-core.exe -Force; Copy-Item good.exe bin/wkappbot-core.new.exe -Force; Copy-Item good.exe bin/wkappbot-core.exe.bak -Force</li><li>CHROME PLACEMENT TOLERANCE: DeltaSizeThreshold in SDK Launcher PlacementValidate.cs must stay &gt;= 30 (10 was too tight -- Chrome outer window is 18px narrower than SetWindowPos target due to window frame drift). Core uses ChromeLauncher.***; Launcher mirrors it at 30.</li><li>TWO-TREE ARCHITECTURE (MANDATORY, discovered 2026-05-18): This repo has TWO separate source trees -- (A) csharp/ = private internal source (v7.3.X) → deploys to bin/wkappbot-core.exe. (B) sdk/ = git submodule (***/wkappbot-sdk, v6.0.X) → deploys to sdk/bin/wkappbot-core.exe. These are DIFFERENT binaries at DIFFERENT paths. The user runs bin/wkappbot-core.exe. sdk/bin/ is the public SDK binary. NEVER confuse them.</li><li>CORRECT BUILD COMMAND for private csharp/ → bin/ deploy (MANDATORY): dotnet publish D:\GitHub\WKAppBot\csharp\src\WKAppBot.CLI\WKAppBot.CLI.csproj -c Release -r win-x64 --self-contained true. The DeployToSdkBin target in the csproj auto-copies wkappbot-core.exe to bin/ (or stages .new.exe for hot-swap if Eye has the file locked). Version: v7.3.X where X = git rev-list count since WKAppBotBaseVersion=7.3 was set in csharp/Directory.Build.props.</li><li>WRONG BUILD for private fixes (FORBIDDEN): sdk\build.cmd builds the SDK submodule (sdk/csharp/, v6.0) and deploys to sdk/bin/ NOT to bin/. Fixes committed to csharp/ will NOT be deployed if you run sdk\build.cmd. Symptom: wkappbot --version stays at old patch number even after build says [Deploy] updated. Root cause confirmed: sdk/csharp/src/WKAppBot.CLI/ RepoBin = sdk/bin/, not bin/. Discovered 2026-05-18 when 3 Opus agents ran sdk\build.cmd and fixes were undeployed for multiple cycles.</li><li>BUILD VERIFICATION AFTER FIX (MANDATORY): after dotnet publish on csharp/, verify ALL of: (1) ls -la bin/wkappbot-core.exe shows TODAY&#x27;s timestamp (2) wkappbot --version shows v7.3.X where X is HIGHER than before your commit (3) wkappbot --version output does NOT come from the sdk/bin/ path. If version did not increment, you likely built from the wrong tree. Also correct step 7: base version is 7.3.X (NOT 6.0.x -- that was the SDK).</li><li>HQ PATH LESSON (2026-05-18): suggest add-requirement writes to different HQ than suggest resolve (DataDir vs WkHq.GetHqDir()). Fixed in v7.3.74 -- all 15 CRUD sites now use WkHq.GetHqDir(). Before v7.3.74, add-requirement wrote to runtime temp HQ (AppData) while resolve read project HQ (bin/wkappbot.hq/). Requirements added via add-requirement were invisible to resolve. Verify fix: after add-requirement, check bin/wkappbot.hq/suggestions.jsonl for the new requirement field.</li><li>BUILD BREAK PATTERN (2026-05-22): A11yActions.Click.cs and A11yActions.Invoke.cs were deleted by f7f496191 (FOCUSLESS-HOMEWORK merge) without updating call sites. A11yClick/A11yInvoke CS0103. Fix: git checkout f7f496191~1 -- csharp/src/WKAppBot.CLI/Commands/A11yActions.Click.cs A11yActions.Invoke.cs to restore. Then build confirms 0 errors. Lesson: when merging large suggest refactors, always run dotnet build immediately after and before next commit.</li><li>Verified 2026-05-22: test-build-a11y-click-invoke-restore.sh (resolve ts=2026-05-22T02:26:41)</li><li>Eye OOM pattern (2026-05-22): CDP ReconnectAsync + heal loop with no circuit-breaker causes unbounded retry. Fix pattern: add _consecutiveHealFails counter; after N failures stop retrying (circuit open); reset on successful connect. Max backoff 60s. Files: CdpClient.cs (ReconnectAsync delays[]), CdpClient.ReconnectHeal.cs (heal attempts).</li><li>Eye Guardian memory threshold (2026-05-23): Guardian polls Eye PID every --poll-ms. Add WorkingSet check: if Eye WorkingSet &gt; 4GB, log [EYE-GUARDIAN] OOM detected (XGB), kill Eye PID, respawn. Key files: AppBotEyeCommands.cs (guardian args + poll loop) + AppBotEyeGlobalMode.cs (line 200 _prevWorkingSetMB). Guardian is separate process watching Eye PID via --eye-pid or similar arg.</li><li>Guardian log rotation (2026-05-23): when Guardian kills Eye for OOM, also rotate eye.pid=N.log -- rename to eye.pid=N.log.old-YYYYMMDD. Also add log size cap in guardian poll: if log file &gt; 50MB, truncate/rotate immediately before OOM crash happens. Files: AppBotEyeCommands.cs guardian OOM handler + existing log rotation at line 1281 AppBotEyeGlobalMode.cs.</li><li>skill read Claude Code export (2026-05-23): new feature -- after skill read, detect parent process (claude-code = node.exe ancestor), then write .claude/skills/&lt;id&gt;/SKILL.md (paths frontmatter from skill tags) + ~/.claude/projects/&lt;slug&gt;/memory/skill_&lt;id&gt;.md (index entry). Implementation file: SkillCommand.ClaudeExport.cs (partial class). Slug formula: cwd.Replace(&#x27;:&#x27;,&#x27;-&#x27;).Replace(&#x27;\&#x27;,&#x27;-&#x27;).Replace(&#x27;//&#x27;,&#x27;-&#x27;). Paths heuristic: skill tags like &#x27;cdp&#x27; -&gt; csharp/**/*Cdp*.cs, &#x27;placement&#x27; -&gt; csharp/**/*Placement*.cs.</li><li>MANDATORY after ANY Core source edit: (1) publish: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release -r win-x64 --sc true -o bin/ -- verify 0 Error(s) + staged-for-hot-swap in output. (2) swap: wkappbot --version shows new version. (3) smoke: wkappbot cdp open &lt;affected-url&gt;. (4) commit only after all 3 pass. Build alone does NOT deploy.</li><li>2026-05-26: CDP Chrome multiplication fix - ChromeLauncher.ProcessDiscovery.cs FindRunningChromePortAny port-file guard changed from (registered!=port) to (registered&gt;0 &amp;&amp; registered!=port). Build: dotnet clean + dotnet publish WKAppBot.CLI.csproj -c Release</li><li>BUILD VIA HARNESS: use wkappbot exec to run dotnet through the harness (direct dotnet is blocked by wk-only-gate). Example: wkappbot exec &#x27;C:/Program Files/dotnet/dotnet&#x27; publish &#x27;D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj&#x27; -c Release --verbosity minimal</li></ol>
+    </article>
+  </main>
+</body>
+</html>

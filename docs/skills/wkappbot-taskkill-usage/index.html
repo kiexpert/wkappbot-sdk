@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wkappbot taskkill: classify and kill wkappbot processes | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>wkappbot taskkill: classify and kill wkappbot processes</h1>
+      <p class="description">taskkill CLASSIFY: shows full cmdline per process (2 lines). Zombie Eye cleanup after long uptime.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>CLASSIFY (callout popup, no actual kill): wkappbot taskkill /IM wkappbot-core.exe
+Each match = 2 lines:
+  Line1: PID {id} {image} [{ctime}] reason PROTECTED/ZOMBIE/UNKNOWN
+  Line2:       &gt; full command line (not truncated)
+Force-kill: wkappbot taskkill --force 1234,5678</li><li>Zombie Eye cleanup (100+ procs after 24h):
+High CPU = old Eye daemon. Kill all but newest:
+  Get-Process wkappbot-core</li><li>--force PID: CDP port guard (--remote-debugging-port) is now bypassed when --force + explicit PID list are both provided (Core fix 9e62e69e7). Chrome CDP sessions are killable via --force without --arg workaround.</li><li>PENDING behavior improvement (suggest filed 2026-05-26): /IM should auto-kill non-protected (ZOMBIE/UNKNOWN) processes immediately like Windows taskkill; PROTECTED shown separately with &#x27;--force &lt;pids&gt;&#x27; hint. Per-process info should include: PID, caller window, CPU%, memory, handle count, thread count (in addition to existing cmdline). Currently /IM = classify-only, blank &gt; for zombie cmdlines.</li><li>TEST A verified 2026-05-26: wkappbot taskkill --force 17076 killed live CDP Chrome (--remote-debugging-port=9982) via WM_CLOSE gracefully after Core fix 9e62e69e7. Build clean+publish succeeded on retry (CS0009 transient artifact fixed by dotnet clean first).</li><li>CMDLINE FILTER (wkzombie proprietary, 2026-05-28): zombie-watchdog.ps1 supports -CmdlineFilter &lt;string&gt; to restrict kills to processes whose cmdline contains the pattern (wildcard *filter* match via Get-CimInstance Win32_Process). Equivalent to Windows taskkill /FI &#x27;COMMANDLINE contains X&#x27; but applied to wkappbot-core only. Usage: ./wkzombie.ps1 -MaxAge 45 -CmdlineFilter eye -- kills only eye-port zombies. ./wkzombie.ps1 -MaxAge 45 -CmdlineFilter 9740 -- kills only port-9740 workers. No filter = kill all stale workers (default). Singleton: each new instance auto-kills previous via TEMP/wkzombie.pid.</li><li>SMART TASKKILL NOTE: wktaskkill.ps1 deleted 2026-05-28 as redundant. Core v1.9 auto-kills ZOMBIE+UNKNOWN directly. Use: wkappbot taskkill /IM wkappbot-core.exe (classifies all). wkappbot taskkill --force PID1,PID2 for explicit zombie kill. --dry-run to preview.</li><li>ZOMBIE AUTO-KILL (Core v1.9, 2026-05-28): wkappbot taskkill /IM wkappbot-core.exe classifies all processes. ZOMBIE shown with hint wkappbot taskkill --force PIDs. UNKNOWN defaults to PROTECTED by design (never auto-kill). --dry-run shows classification without killing.</li><li>QUICK REFERENCE -- which tool to use (read this first): (A) wkappbot taskkill /IM wkappbot-core.exe = CLASSIFY ONLY, no kill, shows PROTECTED/ZOMBIE/UNKNOWN. (B) wkappbot taskkill --force &lt;pids&gt; = KILL specific PIDs immediately, no questions. (C) ./wktaskkill.ps1 /IM wkappbot-core.exe = SMART: classify + auto-kill ZOMBIE only (UNKNOWN stays protected). (D) ./wkzombie.ps1 -MaxAge 45 = AGE-BASED: kill wkappbot-core processes older than 45s regardless of type. RULES: ZOMBIE=safe to kill. UNKNOWN=same as PROTECTED, never auto-kill (Core design, cannot change). PROTECTED=active session, never kill.</li><li>CORRECTION (2026-05-28, source v1.9 verified): wkappbot taskkill /IM wkappbot-core.exe DOES auto-kill ZOMBIE+UNKNOWN immediately. DEFAULT PATH is TaskkillAutoKillNonProtected (v1.9). PROTECTED sessions (Eye/wkchat/mcp/screensaver/agent/claude) are NEVER killed. Only --force &lt;pids&gt; is needed to override protection. The old &#x27;classify-only, no kill&#x27; behavior was v1.5 (REMOVED). The file header comment and TaskkillUsage() help text are STALE (v1.5 docs, v1.9 code) -- file suggest to Core to update docs. wktaskkill.ps1 SDK wrapper = REDUNDANT, delete it.</li><li>WMI HANG BUG (2026-05-28): IsDescendantOfAiProcess in TaskkillCompatCommand.Helpers.cs calls GetParentProcessId which uses ManagementObjectSearcher WMI. WMI hangs on PID 11940 (unknown system process in ancestor chain). Symptom: wkappbot taskkill /IM bash.exe hangs with no output when bash processes are UNKNOWN (not PROTECTED). Root cause: removing &#x27;claude&#x27; from _wkProtectedTokens makes bash=UNKNOWN, then IsDescendantOfAiProcess runs WMI for each bash PID. Fix needed: replace GetParentProcessId WMI call with SafeGetParentPid (NativeMethods.GetParentProcessId, uses NtQueryInformationProcess instead of WMI).</li><li>FindCallingAiProcessPid PID-11940 HANG ROOT CAUSE (2026-05-28): NativeAPI (SafeGetParentPid) is faster than WMI, so FindCallingAiProcessPid reaches deeper in the ancestor chain. At depth 5-6 it reaches PID 11940 &#x27;?&#x27; (end of chain after explorer). Then Process.GetProcessById(11940) hangs. WMI GetParentProcessId is SLOWER so it naturally stops at cmd(74840) before reaching 11940 -- cmd is an AI process (IsAiProcess returns true for cmd), so the loop exits early. Fix: add pid&lt;=4 early-exit check AND timeout on Process.GetProcessById in FindCallingAiProcessPid. Committed: 6e90967d2 (reverted NativeAPI to WMI).</li><li>PARTIAL FIX DEPLOYED (commit 493a5b25a): (1) claude token removed from _wkProtectedTokens - bash no longer matched as claude session. (2) AI CLI image-name check added before token loop: image.Equals claude/codex/gemini -&gt; PROTECTED. (3) SafeGetProcessMetrics: Task.Run 100ms timeout. TODO: same Task.Run needed in SafeGetProcessName and SafeGetCreationTime to prevent hang on zombie bash PIDs. Until fully fixed, wkappbot taskkill /IM bash.exe still hangs due to those two functions.</li><li>ALL HANGS FIXED (commits af807931e + c29bbd1b2): Every Process.GetProcessById call in TaskkillCompatCommand now wrapped with System.Threading.Tasks.Task.Run 100ms timeout: SafeGetProcessMetrics, SafeGetProcessName, SafeGetCreationTime, PidAlive (Classify.cs) and FindCallingAiProcessPid (Helpers.cs). Also GetProcessCommandLine in TaskkillClassifyPids loop wrapped. Any zombie bash PID that hangs Process.GetProcessById now times out in 100ms and returns safe default. Build pending.</li><li>CORRECTION (Opus verified 2026-05-28): wkappbot taskkill /IM bash.exe does NOT auto-kill UNKNOWN bash. Reason: IsDescendantOfAiProcess() check restricts kills to processes in the calling AI&#x27;s descendant tree. Accumulated bash shells from OTHER sessions or background tasks are NOT descendants -&gt; protected by ancestry -&gt; show as [PROTECTED] even if UNKNOWN. Result: Killed:0 / Protected:N for accumulated bash. To actually kill them: wkappbot taskkill --force &lt;pid1,pid2,...&gt; with specific orphan PIDs (ppid=gone). Implication: skill step 10 &#x27;v1.9 auto-kills ZOMBIE+UNKNOWN&#x27; is only partially true -- only kills descendants of calling AI.</li><li>SPEC: Uncle-process kill for singleton cleanup (2026-05-29). PROBLEM: wkappbot taskkill /IM wkappbot-core.exe cannot kill sibling processes like YouTube-watcher wkappbot-core workers (a11y invoke youtube). These are &#x27;uncle&#x27; processes -- spawned by the same grandparent (claude.exe.old) as the calling wkappbot, but via a different parent path. Current IsDescendantOfAiProcess only finds direct descendants of bash (aiProcessPid), missing uncles. FIX NEEDED: in TaskkillAutoKillNonProtected, also allow killing processes whose ancestor includes the same grandparent as the calling process (SafeGetParentPid of SafeGetParentPid of current process = grandparent). Use NativeAPI SafeGetParentPid only (no WMI, no Task.Run deadlock). Simple loop: walk up from target max 8 steps, check if any ancestor == grandParentPid. If yes, killable. Use LongRunning Task or inline NativeAPI walk to avoid thread pool deadlock. Files: TaskkillCompatCommand.cs TaskkillCompatCommand.Helpers.cs</li><li>UNCLE-KILL SPEC FINAL (2026-05-29, learned from 2 failed attempts): Problem: InlineIsDescendant ancestor walk hangs when it reaches PID 11940 (mystery system process, OpenProcess hangs). Solution approach: DO NOT walk ancestors of target processes inline. Instead: (1) pre-build parent map for ALL wkappbot-family processes using GetDescendantProcessIds (already exists in Helpers.cs - does single WMI batch), (2) check if target is in pre-built descendant set of grandParentPid. This avoids per-PID OpenProcess calls during the hot classify loop. Key: GetDescendantProcessIds builds parentMap via ONE WMI batch query, then BFS -- much faster than N individual SafeGetParentPid calls. Implementation: in TaskkillAutoKillNonProtected, call GetDescendantProcessIds(grandParentPid) ONCE to get uncle set, then check r.Pid against that set. No nested Task.Run, no per-PID OpenProcess hang.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

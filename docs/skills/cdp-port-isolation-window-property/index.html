@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CDP Port Isolation via Window Property per wkappbot Instance | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-webbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>CDP Port Isolation via Window Property per wkappbot Instance</h1>
+      <p class="description">Each wkappbot instance binds its launched CDP port to a Window Property keyed by ProjectRoot.Hash8 on the parent console (or desktop) HWND so sibling instances cannot steal each other&#x27;s Chrome via host or port scans. Strict CWD-hash isolation: ProjectRoot honors AsyncLocal CallerCwdOverride from EyeCmdPipeServer (so Eye serving sibling repos uses the actual caller&#x27;s hash, not the cached first-call hash), and FindRunningChromePort matches userDataDir by exact path equality on both the WMI cmdline parse and the /json/version udd field. No more substring-contains matches; no more &#x27;trust derived port if udd absent&#x27; fallback.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">cdp</span><span class="chip">isolation</span><span class="chip">multi-instance</span><span class="chip">window-property</span><span class="chip">chrome</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>On Chrome launch or detected reuse: ChromeLauncher.RegisterLaunchedPort(port) writes prop WKAPPBOT_CDP_PORT_&lt;hash8&gt; on GetConsoleWindow (fallback GetDesktopWindow).</li><li>FindBestPortForHostAsync consults GetLaunchedPort first: only matches this instance&#x27;s port; returns -1 when nothing registered so caller takes the launch path instead of stealing a sibling&#x27;s Chrome.</li><li>FindFirstFreePortAsync returns the registered port directly when present (no scan race with siblings).</li><li>EnsureCdpConnection (AskCommands.Entry.Cdp) sets DefaultUserDataDirBase + ProjectHash BEFORE any port discovery so the registry lookup sees the correct per-project bucket.</li><li>ConnectCdp (WebCommands) prefers GetLaunchedPort over the caller&#x27;s default 9222 to survive cross-instance sibling registrations on the same machine.</li><li>ProjectRoot.Find/Hash8 honor AsyncLocal CallerCwdOverride: when EyeCmdPipeServer dispatches an in-process command (CallerCwd.Value set), it also sets ProjectRoot.CallerCwdOverride.Value so the per-call hash is re-derived from the actual caller&#x27;s CWD. The static _root/_hash8 cache is bypassed entirely on Eye-routed calls, fixing the long-running-Eye leak where every cross-repo command silently used the first caller&#x27;s hash.</li><li>FindRunningChromePort and KillStaleChromesAsync use CmdLineUserDataDirEquals: parses --user-data-dir=PATH from the chrome.exe cmdline and compares the canonicalized full path with strict equality. No substring contains-checks.</li><li>FindRunningChromePortByCdpScan returns 0 when the probed Chrome&#x27;s /json/version response lacks a userDataDir field. The previous &#x27;trust derived port&#x27; fallback for older Chromium is removed -- it could claim a sibling Chrome whenever our derived port collided.</li><li>Last-resort recovery (2026-05-25): when all CDP HTTP probes return 0 but a chrome.exe for our udd is still process-alive (renderer crash / brief hang), scan processes by cmdline udd via FindChromeProcessByUserDataDir (process-only, no HTTP), verify by ConnectAsync + Target.createTarget, reuse on success, and only kill the zombie when tab creation also fails -- prevents duplicate Chrome spawn alongside the live one.</li><li>BUG FIX (2026-05-26): FindRunningChromePortAny port-file guard was causing Chrome multiplication. When disk port file is missing/expired (ReadPortFile returns 0), the guard  evaluated  = true, skipping ALL Chromes. Fix: change to . Missing file = recovery mode; trust ourBase prefix check for isolation. Committed to Core ChromeLauncher.ProcessDiscovery.cs</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split into ~30 partials. RegisterLaunchedPort moved to ChromeLauncher.PortRegistry.cs:20, FindBestPortForHostAsync to ChromeLauncher.Ports.cs:41. ProjectRoot.CallerCwdOverride ref in EyeCmdPipeServer.cs needs update -- pipe server was split, check EyeCmdPipeServer.Dispatch.cs. CmdLineUserDataDirEquals + FindRunningChromePortByCdpScan moved out of Profile.cs -- check ProcessDiscovery.cs. Update refs on next re-contribute.</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split into 30 partial classes. RegisterLaunchedPort moved to PortRegistry.cs, FindBestPortForHostAsync to Ports.cs. ProjectRoot.CallerCwdOverride moved to EyeCmdPipeServer.Dispatch.cs. CmdLineUserDataDirEquals and FindRunningChromePortByCdpScan moved to ProcessDiscovery.cs. Refresh refs next re-contribute.</li><li>[AUDIT 2026-06-03] source_refs broken: multiple stale ChromeLauncher/Profile/EyeCmdPipeServer source_ref patterns.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

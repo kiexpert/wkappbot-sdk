@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Ad Auto-Skipper | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-sdk</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>YouTube Ad Auto-Skipper</h1>
+      <p class="description">Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overlay close, and ad-showing DOM class. Reloads on unskippable ads.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
+ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
+Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
+Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
+Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
+Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
+Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
+Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.</li><li>Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)</li><li>UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;</li><li>COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.</li><li>KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.</li><li>NO-CDP MODE (2026-05-25): wkappbot a11y works without CDP for Edge. Use {proc:&#x27;msedge&#x27;} grap (no cdp port needed). WinEventHook via ctypes (no pywin32) for efficient change detection. Hot-swap via os.execv on mtime change. JS reload fallback via address bar settext+invoke on Chrome_OmniboxView.</li><li>NO-CDP GRAP LESSONS (2026-05-25 live investigation): (1) SHORT FORM FAILS: #But_skip-button alone returns &#x27;UIA scope not found&#x27;. Must root path from Gro_movie_player. (2) :N SUFFIXES ARE DYNAMIC: inspect shows skip-button:19 then skip-button:1p on next ad -- these are tree traversal indices, NOT stable AutomationIds. (3) CORRECT PATTERN: a11y inspect Gro_movie_player first -&gt; grep for skip-button line -&gt; extract Gro_X:N/Gro_Y:N/But_Z:N path -&gt; a11y invoke that full path. This is the &#x27;inspect-parse-invoke&#x27; pattern. (4) NEVER PUT hwnd/pid IN GRAP: use domain: or proc: only. hwnd changes every Edge session. (5) REQUIREMENT per user: dynamic UIA info (hwnd, :N indices) must NOT be hardcoded in selectors -- always re-inspect to get current path.</li><li>AD STATE DETECTION (2026-05-25): When ad is playing but skip button not yet available, skip-ad Group still exists but has ltwh=0,0,0,0 and NO Button skip-button child. When skip becomes available: skip-ad has real ltwh (e.g. -2101,165,165,55) AND Button skip-button child appears. Script logic: check if skip-button child exists before invoking. If skip-ad ltwh=0,0,0,0 -&gt; wait and retry (ad countdown not done yet). Non-skippable ads: skip-ad Group may remain 0,0,0,0 for entire ad duration.</li><li>URL-REDIRECT SKIP STRATEGY (user idea 2026-05-25): When non-skippable ad plays (skip-ad ltwh=0,0,0,0 for &gt;15s), navigate to same URL with &amp;t=0.1 appended. Repeat once more (double-reload). YouTube ad server skips ad on 2nd hit of same session. Implementation without CDP: (1) a11y find Edge address bar -&gt; set-value to current_url + &#x27;&amp;t=0.1&#x27; -&gt; invoke (press Enter). Or use keyboard Ctrl+L -&gt; type URL -&gt; Enter via wkappbot. Current URL readable from window title (has video ID) or from a11y address bar value.</li><li>PLAYBACK-POSITION JUMP: Ad detected + skip unavailable -&gt; read UIA Button text (pattern: &#x27;X min Y sec / Z min W sec&#x27;) from movie_player to get current seconds -&gt; navigate to same URL + &amp;t=Xs. URL from Edge address bar a11y value. Set new URL via address bar set-value + invoke (no CDP). Resume from exact playback position user was at.</li><li>ADDRESS BAR HOOK (smart activation): Instead of polling _youtube_in_edge() every 5s, set WinEventHook on Edge address bar (omnibox). EVENT_OBJECT_VALUECHANGE or EVENT_OBJECT_NAMECHANGE fires on URL change. Callback: parse new URL -&gt; if youtube.com activate ad watch, else idle. Find omnibox hwnd via a11y find {proc:msedge} --text &#x27;*omnibox*&#x27; or cls:OmniboxViewViews. Hook only that hwnd pid. Zero polling overhead when not on YouTube.</li><li>TITLE-CHANGE HOOK (correct smart activation): Address bar is Chrome-rendered (unreliable). Instead, hook EVENT_OBJECT_NAMECHANGE on Edge main window (Chrome_WidgetWin_1) -- this is a native Win32 title, fires on every navigation. In callback: GetWindowTextW(hwnd) -&gt; check &#x27;youtube&#x27; in title -&gt; update _yt_active flag immediately. No 5s polling needed. If youtube detected -&gt; set _event_flag to trigger ad check. Eliminates _youtube_in_edge() entirely.</li><li>v1.4 URL redirect: when _find_skip_path() detects ltwh=0,0,0,0 on skip-ad node, return sentinel LTWH_ZERO (not None). try_skip() calls _navigate_skip() on LTWH_ZERO: Ctrl+L focus address bar, Ctrl+C copy URL, append ?t=0.1 or &amp;t=0.1 via clipboard, Ctrl+A+V+Enter to navigate. Functions: _find_edge_youtube_hwnd() via EnumWindows title match, _get_clipboard()/_set_clipboard() via CF_UNICODETEXT ctypes, _keybd(vk,flags) via keybd_event. REDIRECT_COOLDOWN=15s guard prevents rapid-fire. Skip-already-has-t= guard avoids infinite loop.</li><li>NAMING: call this process &#x27;YouTube watcher&#x27; (유튭와쳐 in Korean) -- NOT &#x27;daemon&#x27; (데몬). User finds &#x27;daemon&#x27; confusing. In Korean responses, always say 유튭와쳐.</li><li>v1.5 mouse-burst: WH_MOUSE_LL global mouse hook (SetWindowsHookExW id=14). On WM_LBUTTONUP (0x0202), sets _mouse_active_until=now+20s and fires _event_flag. Main loop polls every MOUSE_BURST_POLL=1.0s during burst window instead of POLL_S=5s. Hook installed alongside WinEventHook; both unhooked in finally. _make_mouse_cb() returns _MouseHookProc callback, stored as module-level _mouse_cb to prevent GC.</li><li>v1.6 fix: WH_MOUSE_LL must run in a dedicated daemon thread with its own GetMessageW loop. Installing in the main thread causes mouse freeze because the main thread blocks inside try_skip() (8s timeout) without pumping messages. Fix: _mouse_hook_thread_fn() calls SetWindowsHookExW then loops on GetMessageW -- hook fires immediately. Main thread no longer needs to install/unhook the mouse hook.</li><li>v1.6 simple-poll: removed WH_MOUSE_LL entirely (caused mouse freeze). Changed POLL_S=5 to POLL_S=1 for YouTube-active state. No mouse hook, no burst logic. Poll every 1s when yt active, 60s when idle. Skip detection latency: max 1s.</li><li>v1.6 event-driven: removed WH_MOUSE_LL global mouse hook (caused system-wide mouse freeze). Now uses existing WinEventHook SHOW(0x8002)+STATECHANGE(0x800A) events with 2s cooldown to trigger skip checks.</li><li>RENAME (2026-05-26): yt_ad_skipper.py renamed to yt_assistant.py. gg Step 0 liveness check uses: pythonw.exe scripts/yt_assistant.py. Startup failure (process-exited-early) pending diagnosis -- check log at wavevault/auto_study/yt_watcher.log or stderr. Process is hidden (pythonw) so verify via Task Manager or Get-CimInstance.</li><li>v1.42 2026-05-27: yt CLEARED (Edge-shrink culprit was the Windows SCREENSAVER, not yt). Re-enabled with newest-instance-wins takeover via kill_previous_instances() that uses psutil to kill other yt_assistant python/pythonw on startup, skips self and parent pid, logs [TAKEOVER]. Hot-swap logs [HOTSWAP] before os.execv re-exec. LAUNCHER BUG: wk_yt.sh WMI Get-CimInstance liveness check run from Git-Bash returns false-empty (WMI CommandLine is null for a non-elevated caller) so the dedup misses the live instance and the every-30min cron kills the healthy daemon each tick (churn); the new instance still survives ~20min until the next tick. FIX next session: replace with a psutil-based check (add a yt_assistant --alive mode and gate launch on it). Also removed the wk_yt.sh foreground python.exe fallback that orphaned a visible console and raced the takeover.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

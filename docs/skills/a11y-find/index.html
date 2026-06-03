@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>a11y find - output format and process resolution | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>a11y find - output format and process resolution</h1>
+      <p class="description">How wkappbot a11y find resolves windows and process trees, and how to keep its output aligned with the current # FOCUS / # TARGET / # INFO contract. Useful when Claude or Codex is changing find behavior or debugging target ambiguity: proc is the identity, hwnd is the disambiguator, and root hwnd is only a search entry point. Include short operator flags only when they help verification or debugging.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">a11y</span><span class="chip">find</span><span class="chip">grap</span><span class="chip">architecture</span><span class="chip">codex</span><span class="chip">verify</span><span class="chip">shell-safe</span><span class="chip">review</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Keep the emitted output aligned with the current contract: one shared # FOCUS line, one # TARGET block per match, and optional indented # INFO lines.</li><li>Treat the grap as what was actually matched: proc/domain/cmd/title/cls/file are matchable fields; hwnd is for disambiguation, not identity.</li><li>Separate root hwnd from process-owned hwnd; when a process has no own window, resolve its effective host window through the parent chain.</li><li>Keep output shell-safe and markdown-friendly: quote the full grap expression, avoid extra noise, and preserve paste-ready tokens.</li><li>Prefer short operator flags like verify, review, and dry-run when they make the workflow safer or easier to audit.</li><li>Verify by rerunning a11y find on the emitted hwnd:0x... token and checking [OK].</li><li>Prefer process-first search logic for matching, but preserve focus context whenever interaction side effects could matter.</li><li>[v6.2+ SCORE OUTPUT] find [OK] includes score={field:score,...} for ALL fields. GlobCoverageScore formula: Σ(segment_len × occurrence_count) / field_len. Regex forms: re:pat (grap), /pat/ or ~pat~ (skill search, bash-safe). Regex score = literal-char-count / field_len (symbols penalized; exact match → 1.00). OR-array: best-match / n. Multi-hit boost: *chrome* in &#x27;Google Chrome - Chrome&#x27; (2x) → 0.55 vs 0.27. All forms normalized through same GlobCoverageScore function.</li><li>[v6.2+ MDI FALLBACK] Simple &#x27;a11y find *pattern*&#x27; now auto-scans MDI child windows when no top-level matches found. Covers HTS/MDI apps (Heroes4, nkrunlite) previously requiring explicit {proc:&#x27;nkrunlite&#x27;,title:&#x27;*foo*&#x27;} JSON5. Simple-pattern path FindWindows now includes MDI child enumeration fallback. Explicit JSON5 still faster when host proc is known.</li><li>[v6.2+ CMD FALLBACK NOISE FIX] IsSearcherProcess filter excludes bash/sh/cmd/powershell/pwsh/wkappbot* from cmd: fallback matching. Prevents generic wildcard patterns from returning VS Code as a result via bash process cmdline containing the pattern substring. cmd: secondary scan is now also skipped when top-level results already found.</li><li>[v6.2+ EXAMPLES] Concrete verified behaviors:
+  1) &#x27;wkappbot a11y find *panel-title-wildcard*&#x27; -&gt; finds MDI child window directly, [OK] with score={}, no proc:/JSON5 needed.
+  2) &#x27;wkappbot a11y find {proc:chrome,domain:chatgpt.com}&#x27; -&gt; [OK] Nms score={domain:1.00,proc:1.00,cls:1.00,title:...}, multi-field exact.
+  3) &#x27;wkappbot a11y find *Code*&#x27; (VS Code) -&gt; completes &lt;3s (was 50s), score shows proc:1.00; cmd: fallback does NOT return bash/wkappbot children.
+  4) &#x27;wkappbot a11y find *nkrunlite*&#x27; -&gt; &lt;5s (was ~50s), MFC UIA discovery skipped.
+When updating a11y find code, these four cases are the regression baseline.</li><li>[v6.3+ AMB OUTPUT] Multiple matches: [OK] replaced with [AMB:N] where N = total match count. Single unique match stays [OK]. [AMB:N] signals grap needs tightening -- use score={} output to pick a higher-scoring field to add for precision. Example: [AMB:3] score={domain:1.00,proc:1.00,cls:0.54,title:0.22} -&gt; add domain: or tighten title wildcard.</li><li>Verified 2026-04-24: test-a11y-find-grap-verify-miss.ps1 (resolve ts=2026-04-23T02:56:33)</li><li>[v6.3+ CLS PATH] cls ancestor path: simple pattern matches own class AND descendants. Path pattern cls:&#x27;A/B&#x27; matches window class A whose parent contains B. cls:&#x27;**/_NKHero*&#x27; finds any depth. Each segment is substring-matched. Score context: cls:&#x27;Afx:00DB0000/_NKH&#x27;:0.85 shows matched segment. Coverage score applies per path segment.</li><li>PARENT CHAIN FIELDS (2026-05-18): ppid:N (direct parent PID), ppids:N or ppids:[N1,N2,...] (any ancestor, scalar=same as [N]), ppids:&#x27;&#x27; (output ancestor chain). Example: wkappbot windows {proc:&#x27;bash&#x27;,ppids:[MY_CLAUDE_PID]} finds only bash shells from your session. ancestor:N field removed (replaced by ppids:N). (commits c92dc4621 -&gt; d3688cf7c)</li><li>USAGE NOTE (2026-05-18): ppids filter works correctly for processes found by PROC-mode scan. Console processes (bash shells) with no top-level HWND ARE found when proc: is specified (windowless scan), but console bash children of claude.exe with no visible window are NOT enumerated unless explicitly targeted by pid:. Use ppids:&#x27;&#x27; to reveal ancestor chain of matched processes. Example confirmed: {proc:&#x27;bash&#x27;,ppids:[PARENT_PID]} correctly includes/excludes by parent chain; {proc:&#x27;bash&#x27;,ppids:&#x27;&#x27;} shows ancestors: chain in output.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

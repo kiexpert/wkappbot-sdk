@@ -16,6 +16,7 @@ HQ_SKILL_DIRS = [
 ]
 REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
 OUTPUT = REPO_ROOT / "docs" / "skills" / "index.html"
+SKILLS_OUTPUT_DIR = OUTPUT.parent
 ENV_FILE = Path("D:/GitHub/.env")
 STEP_PREVIEW_LIMIT = 44
 
@@ -175,6 +176,11 @@ def preview_step(value: str) -> str:
     return compact[:STEP_PREVIEW_LIMIT].rstrip() + "..."
 
 
+def skill_page_slug(skill_id: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", skill_id.strip()).strip(".-")
+    return slug or "skill"
+
+
 def collect_skills() -> list[dict[str, Any]]:
     skills_by_id: dict[str, dict[str, Any]] = {}
 
@@ -204,6 +210,7 @@ def collect_skills() -> list[dict[str, Any]]:
                 skill_id,
                 {
                     "id": mask_sensitive(skill_id),
+                    "slug": skill_page_slug(skill_id),
                     "title": title,
                     "desc": desc,
                     "steps": [mask_sensitive(step) for step in steps],
@@ -235,6 +242,7 @@ def render_skill_card(skill: dict[str, Any]) -> str:
     desc = e(truncate(str(skill["desc"] or "No description yet.")))
     app = e(skill["app"])
     audience = e(skill["audience"])
+    slug = e(skill["slug"])
     tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
     steps = skill["steps"][:5] or ["This skill is available in the live WKAppBot catalog."]
     step_items = "".join(
@@ -246,7 +254,8 @@ def render_skill_card(skill: dict[str, Any]) -> str:
     overlay = '<div class="unlock">Unlock with Pro</div>' if premium else ""
 
     return f"""
-      <article class="skill-card{premium_class}" data-search="{e(title + ' ' + desc + ' ' + app + ' ' + ' '.join(skill['tags']))}">
+      <a class="skill-link" href="{slug}/" data-search="{e(title + ' ' + desc + ' ' + app + ' ' + ' '.join(skill['tags']))}">
+      <article class="skill-card{premium_class}">
         <div class="card-top">
           <span class="app-badge">{app}</span>
           <span class="stars" aria-label="{skill['stars']} star rating">{render_stars(int(skill['stars']))}</span>
@@ -259,7 +268,131 @@ def render_skill_card(skill: dict[str, Any]) -> str:
           <ol class="steps">{step_items}</ol>
           {overlay}
         </div>
-      </article>"""
+      </article>
+      </a>"""
+
+
+def build_skill_detail_html(skill: dict[str, Any]) -> str:
+    title = e(skill["title"])
+    desc = e(skill["desc"] or "No description yet.")
+    app = e(skill["app"])
+    audience = e(skill["audience"])
+    tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
+    steps = skill["steps"] or ["This skill is available in the live WKAppBot catalog."]
+    step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{title} | WKAppBot Skill</title>
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }}
+    a {{ color: inherit; }}
+    .shell {{ width: min(920px, calc(100% - 32px)); margin: 0 auto; }}
+    .detail-page {{ padding: 36px 0 72px; }}
+    .back-link {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }}
+    .back-link:hover {{ text-decoration: underline; }}
+    .skill-detail {{
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }}
+    .card-top {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; }}
+    .app-badge {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .stars {{ color: var(--warn); font-size: 14px; white-space: nowrap; }}
+    h1 {{
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }}
+    h2 {{ margin: 34px 0 12px; font-size: 24px; }}
+    .description {{ color: var(--muted); font-size: 18px; margin: 0; }}
+    .meta {{ margin-top: 14px; color: var(--accent-2); font-size: 13px; }}
+    .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }}
+    .chip {{
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }}
+    .steps {{
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }}
+    .steps li {{ margin: 0 0 12px; }}
+    @media (max-width: 640px) {{
+      .card-top {{ align-items: flex-start; flex-direction: column; }}
+    }}
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">{app}</span>
+        <span class="stars" aria-label="{skill['stars']} star rating">{render_stars(int(skill['stars']))}</span>
+      </div>
+      <h1>{title}</h1>
+      <p class="description">{desc}</p>
+      <div class="meta">{audience}</div>
+      <div class="tags">{tags}</div>
+      <h2>Steps</h2>
+      <ol class="steps">{step_items}</ol>
+    </article>
+  </main>
+</body>
+</html>
+"""
 
 
 def build_html(skills: list[dict[str, Any]]) -> str:
@@ -389,6 +522,16 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
       gap: 16px;
       padding: 28px 0 70px;
+    }}
+    .skill-link {{
+      color: inherit;
+      display: block;
+      text-decoration: none;
+    }}
+    .skill-link:focus-visible {{
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+      border-radius: 8px;
     }}
     .skill-card {{
       min-height: 360px;
@@ -593,7 +736,7 @@ def build_html(skills: list[dict[str, Any]]) -> str:
 
   <script>
     const search = document.getElementById('search');
-    const cards = Array.from(document.querySelectorAll('.skill-card'));
+    const cards = Array.from(document.querySelectorAll('.skill-link'));
     const resultCount = document.getElementById('resultCount');
     const githubLogin = document.getElementById('githubLogin');
     const proUnlockButton = document.getElementById('proUnlockButton');
@@ -712,9 +855,13 @@ def build_html(skills: list[dict[str, Any]]) -> str:
 
 def main() -> int:
     skills = collect_skills()
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    SKILLS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(build_html(skills), encoding="utf-8")
-    print(f"Generated {OUTPUT} with {len(skills)} skills")
+    for skill in skills:
+        skill_dir = SKILLS_OUTPUT_DIR / str(skill["slug"])
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "index.html").write_text(build_skill_detail_html(skill), encoding="utf-8")
+    print(f"Generated {OUTPUT} with {len(skills)} skills and {len(skills)} detail pages")
     return 0 if len(skills) > 50 else 1
 
 

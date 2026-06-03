@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral</h1>
+      <p class="description">Named pipe server (wkappbot_elevated) inside admin Eye. Handles admin commands, defers hot-swap while busy, and self-respawns on binary update using own elevated token -- no UAC.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">eye</span><span class="chip">admin</span><span class="chip">pipe</span><span class="chip">hot-swap</span><span class="chip">elevated</span><span class="chip">named-pipe</span><span class="chip">self-respawn</span><span class="chip">fsw</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>1. NamedPipeServerStreamAcl.Create AuthUser=ReadWrite Admin=FullControl</li><li>2. WaitForConnectionAsync -&gt; Task.Run HandleClient -&gt; Interlocked _activeClients counter</li><li>3. HandleClient: ReadAsync EyeProxyRequest -&gt; ExecuteCommand -&gt; WriteAsync response</li><li>4. IsBusy guard: hot-swap deferred while _activeClients &gt; 0</li><li>5. __eye_tick__ special: returns cached Eye loop state without subprocess</li><li>6. StopAcceptingAndWaitForDrain: 30s drain cap</li><li>## Self-respawn on binary update (AppBotEyeCommands.cs)</li><li>Dual FSW 감시: .new.exe 등장(조기 drain) + .exe 직교체(fast-path) 동시</li><li>.new.exe path: IsBusy drain -&gt; .new.exe 소멸 대기(swap 확인) -&gt; spawn successor</li><li>.exe path: drain 중이면 자연 완료, 아니면 즉시 spawn</li><li>Process.Start(UseShellExecute=false, &#x27;eye --elevated&#x27;) -- 부모 elevated 토큰 상속, UAC 없음</li><li>drainTriggered flag: 두 FSW 동시 발화 시 중복 spawn 방지</li><li>startup 시 .new.exe 이미 있으면 즉시 drain 시작</li><li>SUDO STABILITY FIX (2026-05-01, commits 4af2b2bc + 4ebb597c): Root cause of 15-commit instability loop — SudoHandler.SpawnAndAwaitAdmin and LaunchElevatedEye ran as TWO SEPARATE spawn paths with no shared mutex, so concurrent --sudo callers each showed their own UAC dialog, each spawned admin Eye, and both raced to bind wkappbot_elevated_&lt;hash&gt; pipe. Every prior fix patched symptoms (cooldown timers, kill-on-cancel, infinite-poll) not the cause. Fix 1: SudoHandler collapsed into thin wrapper delegating to LaunchElevatedEye only — single mutex-protected path, 220 lines of duplicate spawn logic deleted. Fix 2: Mutex replaced with Named Semaphore (System.Threading.Semaphore) — Mutex is OS-thread-affine, ReleaseMutex from different async thread-pool thread throws ApplicationException and mutex stays held forever. Semaphore has no thread affinity. Fix 3: [ThreadStatic] _launchInProgress re-entrancy guard — same-thread re-entry now returns immediately instead of running duplicate spawn. Fix 4: proc.Kill(entireProcessTree:true) added on pipe-timeout path to prevent orphan admin Eye when UAC approved but pipe never came up.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

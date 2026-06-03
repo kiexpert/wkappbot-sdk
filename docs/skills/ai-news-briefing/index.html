@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI News Briefing — lunch and dinner automated digest | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>AI News Briefing — lunch and dinner automated digest</h1>
+      <p class="description">Twice-daily (11:00, 18:00) AI news digest -- see ai-news-to-suggests for the full pipeline including Gemini filter and improvement workflow.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">news</span><span class="chip">briefing</span><span class="chip">automation</span><span class="chip">schedule</span><span class="chip">gemini</span><span class="chip">suggest</span><span class="chip">speak</span><span class="chip">slack</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>OVERVIEW: automated AI news digest at 11:00 (lunch) and 18:00 (dinner). Searches 5 keyword queries, filters via Gemini for WKAppBot relevance, registers top 3 as suggests, announces one-line summary via TTS, posts full briefing to Slack.</li><li>SEARCH KEYWORDS: &#x27;AI desktop automation 2026&#x27;, &#x27;Windows accessibility API AI&#x27;, &#x27;Claude computer use update&#x27;, &#x27;UI automation agent framework&#x27;, &#x27;LLM tool use MCP update&#x27;. Tunable — add domain-specific terms as WKAppBot evolves.</li><li>PIPELINE: (1) wkappbot web search &lt;keyword&gt; --limit 3 x5 queries → raw results. (2) wkappbot ask gemini &#x27;&lt;filter prompt&gt;&#x27; → top 3 relevant items with TITLE/URL/WHY/SUMMARY. (3) wkappbot suggest &#x27;[AI-NEWS] title: why&#x27; per item. (4) wkappbot speak &#x27;first summary&#x27; (TTS one-liner). (5) wkappbot slack send full briefing with all items.</li><li>SCHEDULE: wkappbot schedule add &#x27;bash .../ai-news-briefing.sh&#x27; --at 11:00 --repeat 24h (and same for 18:00). Eye must be running for schedule execution.</li><li>SCRIPT LOCATION: bin/wkappbot.hq/scripts/ai-news-briefing.sh</li><li>GEMINI FILTER PROMPT: instructs Gemini to output structured TITLE/URL/WHY/SUMMARY format, or NONE if nothing relevant. Keep prompt tight to avoid hallucinated URLs.</li><li>COST: 5 web searches + 1 Gemini call per run = ~10 API calls/day. Minimal token usage since search results are short and Gemini prompt is focused.</li><li>KNOWN ISSUE: Gemini ask can hang if rate-limited or network slow. Script needs --timeout on ask command to prevent indefinite wait. TODO: add 30s timeout to ask gemini call.</li><li>SUGGEST TAG: all news items tagged [AI-NEWS] in suggest text for easy filtering via &#x27;wkappbot suggest list&#x27; grep.</li><li>EXIT ADMIN SESSION: briefing runs as user (no --sudo needed). No admin Eye involvement.</li><li>SUGGEST DEDUPE AND SKILL HEALING: Before filing or resolving AI-NEWS suggests, compare against existing AI-NEWS skills and pending suggests for duplicate URLs/titles. When a news item reveals reusable workflow knowledge, update the related skill during the same pass before resolving.</li><li>Verified 2026-05-17:  (resolve ts=2026-05-15T09:07:44)</li></ol>
+    </article>
+  </main>
+</body>
+</html>

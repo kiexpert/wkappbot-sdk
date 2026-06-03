@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>screensaver close: kill all running screensaver processes | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>screensaver close: kill all running screensaver processes</h1>
+      <p class="description">wkappbot screensaver close finds every wkappbot-core process whose command line contains &#x27;screensaver&#x27; and sends WM_CLOSE (or Kill if windowless). Eye will respawn screensaver when idle conditions are met again.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">screensaver</span><span class="chip">close</span><span class="chip">overlay</span><span class="chip">wkappbot-core</span><span class="chip">process-management</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Command: wkappbot screensaver close</li><li>Dispatch: Program.cs &#x27;screensaver&#x27; case checks restArgs[0] == &#x27;close&#x27; -&gt; ScreenSaverCloseCommand(). No args -&gt; ScreenSaverStandaloneCommand() (existing behavior unchanged).</li><li>Close logic: GetProcessesByName(&#x27;wkappbot-core&#x27;) -&gt; GetProcessCommandLine -&gt; Contains(&#x27;screensaver&#x27;) -&gt; PostMessageW(WM_CLOSE) if main window exists, else p.Kill(). Reports count closed.</li><li>Eye respawn: Eye (AppBotEyeGlobalMode.cs) auto-respawns screensaver when humanIdleMs &gt;= 10000ms. Closing via this command is equivalent to user becoming active -- Eye will restart it next idle cycle.</li><li>Use case: force-close stuck screensaver overlay, test screensaver lifecycle, or dismiss before automation that requires clean screen state.</li><li>2026-05-20: Pass 3 fixed — WKAPPBOT_WORKER=1 processes have empty cmd-line, so use HWND class name (HwndWrapper[*;ScreenSaver;*]) as primary detection. byWindow=True kills even empty-cmd processes. GetClassNameW_SS local DllImport added.</li><li>2026-05-20: WKAPPBOT_NO_SCREENSAVER=1 now disables Eye initial screensaver spawn, idle respawn, and standalone screensaver launch; screensaver close remains available for wiping stale fullscreen overlays.</li><li>Pass 6 (2026-05-20): Progman stuck on secondary monitor — SHELLDLL_DefView.Left &lt; -100 = Win11 multi-monitor race, primary has no WorkerW. Fix: kill explorer + 1500ms + restart explorer. Ref: black-desktop-progman-stuck.</li><li>BUG FIX (2026-05-20, c562c3ce4): Pass 2/4/5 now skip explorer.exe (Progman, WorkerW, Shell_TrayWnd). Previously Pass 2 wiped Progman because it spans both monitors (6400x2679) and avgY=0. This moved Progman to (-32000,-32000) destroying the desktop. Explorer guard added in all three passes.</li><li>TODO: Screensaver topmost not maintained during lifecycle — _lastTopmostUtc defined but no periodic refresh loop. UiThread initial Topmost=true may be lost after z-order changes from other topmost windows. Need periodic re-topmost every ~1s while _isVisible.</li><li>DAMAGE 2026-05-20: Pass 2 WipeWindow accidentally moved Progman, ChatGPT Chrome, Edge browser to (-32000,-32000) because SampleWindowAvgBrightness returns 0 for windows that don&#x27;t support PrintWindow. Fix: add exclusion list — skip consent.exe, chrome, msedge, non-wkappbot apps unless confirmed black. Also: never call SetWindowPos(-32000,-32000) in WipeWindow without verifying the target is actually a screensaver/overlay window.</li><li>PROTECTION: WipeBlockingOverlays 30s loop sends WM_CLOSE only to _knownBlockerProcs (NVIDIA ***). All other large windows (Edge, Chrome, VS Code, etc) are hidden only -- SetLayeredWindowAttributes+ShowWindow+SetWindowPos -- NOT closed. Fix committed 2026-05-27.</li><li>ROOT CAUSE 2026-05-27: WipeBlockingOverlays() had size-check for non-knownBlockers but still fell through to SetWindowPos(-32000,-32000,1,1)+ShowWindow(0) -- Edge shrunk to 1x1 every 30s. Fix: if (!knownBlocker) return true immediately. [SS:WIPE] logs go to Console.Error (stderr), NOT captured in eye.diag log.</li><li>DETECTION PRINCIPLE (2026-06-03): False positive is always more dangerous than false negative. Closing an innocent window (Edge, Chrome, user work) causes real damage -- lost data, broken workflow. Missing a real black overlay just means a slightly longer black screen. Therefore: when uncertain, do NOTHING. Only act on perfect certainty. RGB(0,0,0) exact pixel check is the correct gate -- not avgY&lt;30 (too loose, hits dark-theme apps), not topmost check (wrong concept entirely), not size heuristic. If the detection logic would ever close a legitimate app window, the logic itself is the bug. Remove it rather than tune it.</li><li>Verified 2026-06-02:  (resolve ts=2026-06-02T17:28:51)</li></ol>
+    </article>
+  </main>
+</body>
+</html>

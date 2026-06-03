@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cdp open Reuses Existing Chrome and Opens URL as New Tab | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-webbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>cdp open Reuses Existing Chrome and Opens URL as New Tab</h1>
+      <p class="description">wkappbot cdp open &lt;url&gt; first checks for an alive Chrome registered to this project (via Window Property GetLaunchedPort, falling back to FindRunningChromePort over the per-project user-data-dir). When found, it skips ChromeLauncher.LaunchAsync entirely and lets ConnectCdp drive Target.createTarget into a NEW TAB on the existing instance. Only when no live registration is found does it fall through to a fresh Chrome launch. Prevents the *** storm reported 2026-05-05.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">cdp</span><span class="chip">open</span><span class="chip">reuse</span><span class="chip">tab-creation</span><span class="chip">Target.createTarget</span><span class="chip">chrome-launcher</span><span class="chip">duplicate-window-fix</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>WebOpenCommand entry: set ChromeLauncher.DefaultUserDataDirBase=DataDir and ChromeLauncher.ProjectHash=ProjectRoot.Hash8() so registry lookups see the per-project bucket.</li><li>Reuse probe (priority order): 1) ChromeLauncher.GetLaunchedPort() reads Window Property WKAPPBOT_CDP_PORT_&lt;hash8&gt; on parent console/desktop HWND. 2) Fallback ChromeLauncher.FindRunningChromePort(userDataDir) does WMI/CDP scan tied to this project&#x27;s user-data-dir.</li><li>Each candidate port verified live via ChromeLauncher.IsPortActiveAsync; dead ports drop out. WMI/CDP fallback re-binds port via RegisterLaunchedPort so subsequent calls take the fast Window-Property path.</li><li>Reuse path: skip LaunchAsync. Print &#x27;Reusing Chrome on port N&#x27;. Then ConnectCdp(port, navigateUrl=url) calls GetOrCreateSandboxedTabAsync, which uses Target.createTarget when no host-matching tab exists -- new TAB on existing Chrome, not new process.</li><li>Launch path: only when both reuse probes return 0 (no live Chrome for this project). Falls through to ChromeLauncher.LaunchAsync(port, url) with SHA256-derived port (range 9300-9995, 4-port block per project CWD).</li><li>--new-window opt-out: skips reuse probe, forces new Chrome process. Reserved for isolated-process scenarios.</li><li>Port isolation: ports are SHA256-derived from git project root CWD. Each project gets a fixed 4-port block (e.g. 9300-9303). Never hardcode port numbers -- always use cdp open output.</li><li>ROOT CAUSE (2026-05-26): Chrome multiplication bug in FindRunningChromePortAny. When port file expired/missing, every cdp open call creates a new Chrome because the port-file guard (registered!=port) evaluates 0!=foundPort=true and skips all Chrome processes. Fix committed to Core: change guard to (registered&gt;0 &amp;&amp; registered!=port) - missing port file = recovery mode, accept any Chrome under ourBase prefix.</li><li>HARNESS BUILD PATTERN: wkappbot exec is the correct path to run dotnet/external tools when wk-only-gate blocks direct shell commands. Use: wkappbot exec &#x27;C:/Program Files/dotnet/dotnet&#x27; publish &lt;proj&gt; -c Release</li><li>MULTIPLICATION ROOT CAUSE + FIX (2026-05-26, Core 577dc035b + a18790a75): cdp open was launching a NEW Chrome on every call (viral multiplication, whole 4-port block consumed per project) because GetLaunchedPort in ChromeLauncher.PortRegistry.cs probed the Window Property (WKAPPBOT_CDP_PORT_hash8) on the CALLER HWND FIRST -- but that HWND is unstable across ConPTY / Windows Terminal tabs, so it missed every time and fell through to launch. The on-disk port file also had a 24h mtime expiry that ignored long-lived Chrome. FIX: reordered GetLaunchedPort to read the project-hash DISK port file FIRST (caller-HWND-independent, survives terminal/tab/CLI churn), validated live by IsPortActiveAsync (delete file if dead); Window Property demoted to an optional secondary fast-path; removed the 24h mtime expiry (liveness-checked instead). Lesson: any per-project reuse key MUST be HWND-independent; keying reuse to the caller window guarantees duplication under ConPTY/WT.</li><li>3. VERIFY SESSION HEALTH (before troubleshooting): wkcdp-mon shows [PORT] [PID] [MEM] [TGT-POS] [ACT-POS] [DRIFT] [LAT]. Check: (1) DRIFT=OK means position stable, (2) LAT=0/0/0 means responsive, (3) MEM &lt; 500M per session is healthy. If DRIFT shows d-###,### or LAT shows timeouts, Chrome window position may have drifted off-screen or session is hung. Use wkcdp-mon to diagnose before retrying cdp open.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

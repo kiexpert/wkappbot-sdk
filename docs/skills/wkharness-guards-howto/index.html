@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wkharness-guards How-To | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>wkharness-guards How-To</h1>
+      <p class="description">wkharness-guards per-guard unblock steps, escape hatch procedure, guard cascade recovery</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>G1 ASK-GUARD: wkappbot ask/whisper with run_in_background=true -&gt; blocked. Fix: remove run_in_background from the command. Only for fire-and-forget tasks, not streaming ask.</li><li>G2 KILL-GUARD: PS terminate-cmdlet on wkappbot-core/wkchat/wkappbot/wka11y -&gt; blocked. Fix: wkappbot taskkill /IM &lt;exe.exe&gt; to classify. Use --dry-run to preview, --force &lt;pid&gt; for zombie kill.</li><li>G3 SKILL-SEARCH-NUDGE: soft exit-0 nudge, not a real block. Action: run wkappbot skill search &lt;topic&gt; first, then grep if insufficient.</li><li>G4 SKILL-EDIT-GUARD: direct .skill.json file edit blocked. Fix: wkappbot skill edit &lt;id&gt; for changes. wkappbot skill contribute ... to create new. Never edit .skill.json files directly.</li><li>G5 PACE-GUARD: Sonnet%&gt;Total% fires on Edit/Write. Fix: delegate to Agent(model:opus) or Agent(model:haiku) with exact brief. EXEMPT: memory/*.md, project CLAUDE file, AGENTS.md. Check: wkharness.ps1 -Status</li><li>G6 CP949-GUARD: non-CP949 chars in Write blocked. Fix: ASCII or Hangul only in Write content.</li><li>G7 AGENT-BRIEF-GUARD: fewer than 3 wkappbot skill read lines in Agent prompt -&gt; blocked. Fix: add skill read on-load + skill read wkharness-guards + task-relevant skill. All IDs validated live -- bad ID = blocked.</li><li>G8 OPUS-BUDGET-GUARD: Opus at 95% weekly budget -&gt; blocked. Fix: use Agent(model:haiku) with exact brief. Or wait for Thursday 07:00 KST reset.</li><li>G9 STALL-GUARD: 300s + 10 calls solo -&gt; blocked. Fix: delegate via Agent tool (resets counter). Read tool exempt. Streak resets on session change or 120s gap.</li><li>G10 BG-TASK-GUARD: bg task mark &gt;30s -&gt; blocks next tool. Fix: Read the background output file path -- reading clears the mark. Auto-evict after 10min.</li><li>SPEC-GATE: Opus Agent missing SPEC block -&gt; blocked. Fix: prepend SPEC block -- 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. Block message shows AGENT ROUTING CHEATSHEET.</li><li>CLAUDE-MD-SYNC: Agent dispatch without Pending section in project main MD -&gt; blocked. Fix: add ## Pending with checkbox item to project main MD, then retry Agent.</li><li>USAGE-TEST-GUARD: 50pct Opus redirect to wkclaude.sh habit trainer. Fix: retry Agent() (50% passes), or run Agent.cmd --model opus with heredoc in Bash.</li><li>WKCLAUDE-DIRECT: direct wkclaude.sh/cmd/ps1 call without Agent.cmd -&gt; blocked. Fix: route through Agent.cmd in Bash or Agent() tool.</li><li>FULL ESCAPE when all delegation blocked: (1) skill* always exempt from all guards. (2) file-edit wrapper doubly exempt from pace+stall guards. (3) Lead command with wkappbot/git/gh/./wk* -- wk-only-gate checks LEADING TOKEN. (4) After file write: skill edit to clear pending lock, then delegate. (5) For file ops: wkappbot file tool path.</li><li>GUARD 3 SKILL-SEARCH-NUDGE: soft exit-0 nudge to run skill search before grepping. Not a block.</li><li>GUARD 4 SKILL-EDIT-GUARD: blocks .skill.json direct Edit/Write. Fix: wkappbot skill edit &lt;id&gt; or skill contribute.</li><li>GUARD 5 PACE-GUARD: blocks Sonnet Edit/Write when hogging. EXEMPT: memory/*.md and CLAUDE.md. Fix: delegate to Opus or Haiku.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

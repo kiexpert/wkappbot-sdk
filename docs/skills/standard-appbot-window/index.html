@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Standard AppBot Window: definition, detection, IPC forwarding, placement | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>Standard AppBot Window: definition, detection, IPC forwarding, placement</h1>
+      <p class="description">Complete reference for the Standard AppBot Window concept. Covers what it is, how to detect it via ancestor walk only, IPC forwarding, hidden ConPTY handling, multi-tab terminals, iconified callers, Chrome placement, and all downstream consumers. Read this before touching any callerHwnd code.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>FOREGROUND IS IRRELEVANT. Never use GetForegroundWindow(). Only P2 ancestor walk: 8-level from wkappbot.exe PID, EnumWindows per ancestor PID, first IsWindow + non-zero GetWindowRect. No class filter, no IsWindowVisible.</li><li>Detection order: (0) WKAPPBOT_CALLER_HWND env override (1) GA_ROOTOWNER pre-pass on ConPTY -&gt; CASCADIA (2) wtMatch via WT_SESSION env (isBig&gt;=200x100) (3) non-terminal isBig ancestor (IDE: VS Code/Cursor) (4) Zero = skip.</li><li>Zero returned = placement SKIP. Chrome stays at last valid position. Never fall back to foreground. Never move Chrome to screen center on zero.</li><li>__hwnd IPC: one field only. EyeCmdPipeClient prepends __hwnd:0xHHHH to JSON args before pipe send. Eye server strips it, sets CallerHwnd AsyncLocal. Never use __conhwnd or two fields.</li><li>NEVER: GetForegroundWindow for caller, IsWindowVisible filter in P2, Chrome in KnownHostProcessNames, negative coord as off-screen signal, two IPC fields. next:standard-appbot-window-howto for FindRectProviderHwnd + IPC details. cluster:standard-appbot-window-ref for GAP fixes + DPI audit.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

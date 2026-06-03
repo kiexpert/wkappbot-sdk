@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>React SPA Automation: fiber props click + controlled input fill | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>React SPA Automation: fiber props click + controlled input fill</h1>
+      <p class="description">How to interact with React SPAs that block isTrusted=false synthetic events. Use __reactProps onClick/onChange directly from fiber, not dispatchEvent. Covers modal open, input fill, button click, and clipboard capture.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>1. React SPAs often check event.isTrusted in click handlers -- synthetic dispatchEvent calls are silently ignored. Use React fiber props instead.</li><li>2. Open a React button&#x27;s action: var propsKey = Object.keys(btn).find(k=&gt;k.startsWith(&#x27;__reactProps&#x27;)); btn[propsKey].onClick({type:&#x27;click&#x27;,bubbles:true,cancelable:true,preventDefault:()=&gt;{},stopPropagation:()=&gt;{}});</li><li>3. Fill a React controlled input: var nv=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,&#x27;value&#x27;); nv.set.call(inp,&#x27;value&#x27;); inp.dispatchEvent(new Event(&#x27;input&#x27;,{bubbles:true})); -- this updates DOM value AND triggers React onChange pipeline</li><li>4. If nativeInputValueSetter alone doesn&#x27;t update React state, also call the React onChange handler: var fiberKey=Object.keys(inp).find(k=&gt;k.startsWith(&#x27;__reactFiber&#x27;)); var props=inp[fiberKey].memoizedProps; props.onChange({target:{value:&#x27;text&#x27;},currentTarget:{value:&#x27;text&#x27;},type:&#x27;change&#x27;,bubbles:true});</li><li>5. IMPORTANT: document.querySelector(&#x27;input&#x27;) may return a hidden checkbox/offscreen input. Always check getBoundingClientRect() x/y. Use querySelectorAll(&#x27;input&#x27;)[N] to target the visible one (x&gt;0, y&gt;0).</li><li>6. To capture clipboard after copy button: hook BEFORE click in same eval: window.__key=null; var orig=navigator.clipboard.writeText.bind(navigator.clipboard); navigator.clipboard.writeText=function(t){window.__key=t; return orig(t);}; -- then click the copy element in the same eval call.</li><li>7. Some copy buttons open a native window.prompt dialog instead of clipboard API. In that case wkappbot a11y screenshot will show a dialog with the full value -- read it visually from the screenshot.</li><li>8. Distinguish copy vs delete buttons: inspect aria-label. Delete buttons have aria-label=&#x27;Delete API key&#x27;. Copy icons are SVG[aria-label=&#x27;copy icon&#x27;] inside a DIV (not a BUTTON). The parent DIV has the onClick in __reactProps.</li><li>9. To open modal: dispatch full mouse event sequence on the trigger button: [&#x27;pointerover&#x27;,&#x27;pointerenter&#x27;,&#x27;mouseover&#x27;,&#x27;mouseenter&#x27;,&#x27;pointermove&#x27;,&#x27;mousemove&#x27;,&#x27;pointerdown&#x27;,&#x27;mousedown&#x27;,&#x27;pointerup&#x27;,&#x27;mouseup&#x27;,&#x27;click&#x27;].forEach(type =&gt; { btn.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,view:window,clientX:cx,clientY:cy,buttons:type.includes(&#x27;down&#x27;)?1:0})); });</li><li>10. After modal opens, the input is usually auto-focused (document.activeElement===input). Fill via nativeInputValueSetter + trigger onChange via fiber. Then call the submit button&#x27;s __reactProps.onClick.</li><li>11. For CDP CSS selector trusted click (wkappbot a11y click &#x27;hwnd:0xXXXX#button.classname&#x27;): use :first-of-type or :last-of-type to target specific buttons. This produces isTrusted=true events via CDP Input.dispatchMouseEvent.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

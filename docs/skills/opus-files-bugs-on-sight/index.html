@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opus files bugs and improvement ideas on sight -- aggressive wkappbot suggest filing standing order | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>Opus files bugs and improvement ideas on sight -- aggressive wkappbot suggest filing standing order</h1>
+      <p class="description">When Opus (or any model) encounters a wkappbot bug, UX flaw, retry-prone pattern, unhelpful error, or improvement idea, file a wkappbot suggest IMMEDIATELY in the same turn. Do not batch, do not gate. Discovery context fades fast; queued bugs become lost bugs. User authorized aggressive filing 2026-05-29.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">claude-code</span><span class="chip">opus</span><span class="chip">wkappbot</span><span class="chip">suggest</span><span class="chip">bug-filing</span><span class="chip">ux</span><span class="chip">standing-order</span><span class="chip">agent-policy</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>Trigger: while using ANY wkappbot tool (skill add/edit, suggest, file edit, mail send, cdp, eye, slack, ask, claude-usage, etc.) you observe (a) a clear bug, (b) confusing/misleading UX, (c) a frequently-retried pattern, (d) an unhelpful error message, (e) a missing-but-obvious feature, or (f) a workflow that wastes user time. Do NOT mentally bookmark it; file it RIGHT NOW.</li><li>Submit immediately, same turn, via wkappbot suggest (or wkappbot-core.exe suggest if eye blocks). Do not batch, do not wait for permission, do not let the discovery context fade. The discoverer is the only person with full context; queueing it = losing it.</li><li>Body MUST be friendly and constructive (Opus tone): start with one-sentence BUG or FEATURE summary, then a clear FIX SPEC the SDK team can implement directly (what to change, where in the code if known, what the new behavior looks like). Include a PRECEDENT line citing the exact session/date the issue was hit -- gives the fixer a real reproduction anchor.</li><li>Requirements (3 minimum): use the current-vs-proposed pattern. One &quot;wkappbot X =&gt; current actual&quot; line proving the bug, two &quot;proposed: wkappbot X =&gt; after fix, expected&quot; lines describing the target behavior. If the failing cmd is itself a not-yet-wkappbot subcommand, use proposed: for all three and put the validation snapshot in the body.</li><li>Severity heuristic: a 2-3 retry burden on Sonnet/Opus already costs more tokens than 5 such suggests do to file. Anything that wastes a user retry cycle is high-severity. Anything that surfaces only after compaction or context loss is critical -- file immediately or it never gets filed at all.</li><li>Do NOT pre-filter for &quot;is this important enough&quot;. User has explicitly authorized aggressive filing (standing order 2026-05-29): bugs and improvement ideas get fixed fast only when Opus files them aggressively as it discovers them. File-then-prioritize beats think-then-maybe-file.</li><li>Edge cases: (1) if the bug is in suggest itself (validator UX, draft-corruption, eye-block silent drop) use wkappbot-core.exe direct path. (2) if cmd parsing repeatedly mangles the body, see haiku-handoff-on-cli-retry and delegate the submit. (3) DGWCS cross-project resolve bug is known broken -- file past it, do not waste time on workarounds.</li><li>After submit: paste back the suggest ts to the user in 1 line. No need to await acknowledgement -- the suggest is already durable in suggestions.jsonl. Move on with the original task.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

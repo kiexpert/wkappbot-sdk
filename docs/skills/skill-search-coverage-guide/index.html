@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>스킬 검색 커버리지 공식·최적화 가이드 | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-workflow</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>스킬 검색 커버리지 공식·최적화 가이드</h1>
+      <p class="description">How wkappbot skill search ranks results: GlobCoverageScore formula, which fields count, why steps are invisible, and how to write tags/title/desc for maximum discoverability.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">skill</span><span class="chip">search</span><span class="chip">coverage</span><span class="chip">ranking</span><span class="chip">tags</span><span class="chip">discoverability</span><span class="chip">cov</span><span class="chip">optimization</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>WHEN TO USE: apply when (A) creating a skill and want it discoverable, (B) existing skill not appearing in results, (C) choosing tag forms. If search returns nothing: keyword is probably only in steps, or try fewer/simpler words.</li><li>COVERAGE FORMULA (verified from source, SkillCommand.Helpers.cs): cov = sum over each search token of GlobCoverageScore(tok,id) + GlobCoverageScore(tok,title) + GlobCoverageScore(tok,title_ko) + GlobCoverageScore(tok,desc) + max(GlobCoverageScore(tok,tag) for all tags). GlobCoverageScore = tok.Length / field.Length when field.Contains(tok). Score is unbounded (can exceed 1.0). Note: GlobCoverageScore is optimized for ASCII/Latin; Korean/CJK may score 0 even when matched -- OR filter still includes the skill, just with low cov.</li><li>FILTER vs SCORE fields: FILTER (OR inclusion) uses compressed JSON of entire skill record -- catches ALL fields including steps, requirements, author, and any future fields. SCORE uses id + title + title_ko + desc + best-tag. Steps match for inclusion but do not boost cov score.</li><li>TAG SCORING RULES: (1) Only the BEST matching tag counts per token -- adding more tags does not stack score. (2) Short exact tag = max score: tag &#x27;gg&#x27;(2 chars) -&gt; 2/2 = 1.0. Tag &#x27;gg-trigger&#x27;(10 chars) -&gt; 2/10 = 0.2. Use SHORT single-word tags for every likely search term. (3) Hyphen vs space: tag &#x27;session-start&#x27; and query &#x27;session start&#x27; -- query is tokenized to [&#x27;session&#x27;,&#x27;start&#x27;] so both match separately. Good.</li><li>SEARCH TIERS -- automatic, no extra syntax: (1) PHRASE: all tokens appear in original order -&gt; score x2.5. (2) AND: all tokens present somewhere -&gt; score x1.5. (3) OR: any token matches -&gt; score x1.0. Results always sorted by final score. More words = more precise AND/phrase bonus.</li><li>TOKEN EXTRACTION: query words are always split on Unicode non-letter/non-digit chars. &#x27;Runtime.evaluate&#x27; -&gt; tokens [&#x27;runtime.evaluate&#x27;,&#x27;runtime&#x27;,&#x27;evaluate&#x27;]. &#x27;CDP 발생! 실패?&#x27; -&gt; [&#x27;cdp 발생! 실패?&#x27;,&#x27;cdp&#x27;,&#x27;발생&#x27;,&#x27;실패&#x27;]. Original token kept alongside sub-tokens so exact match (e.g. &#x27;runtime.evaluate&#x27; verbatim in skill text) also gets phrase bonus.</li><li>TITLE_KO FIELD: skills have a separate Korean title. Set with --title-ko on contribute/edit: wkappbot skill contribute --title &#x27;English&#x27; --title-ko &#x27;한글 제목&#x27;. Shown as &#x27;Title KO:&#x27; in skill read. Searched for OR filter inclusion. Scored by GlobCoverageScore (may be 0 for Korean due to ASCII optimization -- use Korean tags for reliable score boost). Korean tags work well: tag &#x27;세션&#x27; scores 1.0 for query &#x27;세션&#x27;.</li><li>OPTIMAL SKILL WRITING: (1) Short single-word tags for every likely search term (English AND Korean). (2) Key term early in title, keep title short. (3) Concise desc. (4) Steps are invisible to scoring but visible to OR filter. (5) Test: wkappbot skill search &lt;term&gt; -- cov&gt;1.0 strong, cov&lt;0.1 weak but still found via OR.</li><li>RELEVANCE SCORE (error hints only, not search results): tag exact=10, id-starts=6, id-contains=3, title=2, desc=1. Threshold&gt;=5. Separate from coverage. Used by PrintRelatedSkills on command error.</li></ol>
+    </article>
+  </main>
+</body>
+</html>

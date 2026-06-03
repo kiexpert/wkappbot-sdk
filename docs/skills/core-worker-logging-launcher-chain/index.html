@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WKAppBot Logging Architecture: Core Workers, Launcher Relay, Error Guarantees | WKAppBot Skill</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps li { margin: 0 0 12px; }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-core</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+      </div>
+      <h1>WKAppBot Logging Architecture: Core Workers, Launcher Relay, Error Guarantees</h1>
+      <p class="description">Past Core workers toiled tirelessly yet left no logs — their labor unrecorded, their struggles invisible. Complete guide to WKAppBot&#x27;s layered logging: worker self-log, Launcher relay buffering, error flush guarantees, and errors.jsonl fallback chain.</p>
+      <div class="meta">user/developer</div>
+      <div class="tags"><span class="chip">logging</span><span class="chip">architecture</span><span class="chip">eye</span><span class="chip">worker</span><span class="chip">debugging</span></div>
+      <h2>Steps</h2>
+      <ol class="steps"><li>ARCHITECTURE OVERVIEW: Three layers — (1) Core TeeTextWriter (primary), (2) Launcher relay buffer (fallback), (3) Worker self-log (no-Launcher spawns). All three must cooperate for zero blind spots.</li><li>LAYER 1 — Core TeeTextWriter: created when Launcher manages process (tee != null). Tees stdout to log file, tracks [TAG] fields, calls WriteErrorRecordNow() on non-zero exit → errors.jsonl. ErrorScope buffers stderr with timestamps during command execution.</li><li>LAYER 2 — Worker self-log (v5.13.133): when tee==null AND IsLauncherInParentChain()==false → Core creates WorkerStderrTeeWriter at startup. Tees stderr to log file. Covers Eye-spawned workers (claude-proxy, whisper-ring, analyze-hack) that bypass Launcher.</li><li>LAYER 2 check logic: IsLauncherInParentChain() walks WMI Win32_Process ancestor chain. wkappbot.exe found → Launcher active → skip. Not found → self-create log. Eye-internal routes (EyeCmdPipeServer in-process) also return true (Eye&#x27;s ancestor includes Launcher).</li><li>LAYER 3 — Launcher relay fallback (v5.13.136): Launcher buffers last 20 stderr lines + captures [LOG] path. On Core non-zero exit → AppendLauncherErrorRecord() writes {source:launcher} entry to errors.jsonl. Covers Core crashes before TeeWriter setup.</li><li>Silent swallow (exit 0 + errors): code==0 AND errorDetected AND StdoutIsBlank → silentSwallow=true → forceErrorLog + AutoRegisterBug(&#x27;[BUG-AUTO]...&#x27;). NEVER change exit code — downstream may depend on 0.</li><li>errors.jsonl entry sources: &#x27;core&#x27; (TeeTextWriter) vs &#x27;launcher&#x27; (Launcher fallback). Both may exist for same crash — that&#x27;s fine. Core entry has [TAG] field analysis; Launcher entry has raw stderr snippet.</li><li>RELAY FLUSH RULE: in piped-relay mode, stderr must flush identically to standalone Core exit. Implementation: save stderrRelayTask = Task.Run(...). After WaitForExit → stderrRelayTask.Wait(2000) → THEN TerminateSelf. Core pipe closes on exit → relay task exits naturally; 2s is safety fallback.</li><li>Launcher stdout loop: catch Exception explicitly and log (not silent break). WaitForExit has 5s timeout after stdout EOF — kill Core if still alive. stdout pipe error = diagnostic, not silent failure.</li><li>Empty stdout + non-zero exit: [LAUNCHER] Core exited N with no stdout — check stderr log above. Alerts caller who would otherwise see only a bare exit code.</li><li>Sentinel \0UIT: must be checked on RAW BYTES before any text encoding. StreamReader.ReadLine() breaks sentinel detection — always read raw bytes first, accumulate text separately in StringBuilder for line extraction.</li><li>UNIFIED EXIT FUNCTIONS (v5.13.137+): Two functions own ALL exit paths — AppBotQuitFlush (Launcher) + AppBotExit (Core). Launcher: AppBotQuitFlush(exitCode, stderrRelayTask?) → stderrRelay.Wait(2000) → AppBotExit(code) → stderr dump + Console.Out/Error.Flush() + TerminateSelf. Core: AppBotExit(exitCode) returns int, then ProcessExit hook fires → Console.Out.Flush() + Console.Error.Flush() + DoRequiredExitCleanup (tee.Dispose + Console.Error.Flush() + WriteExitFile [also flushes STD_ERROR_HANDLE]) + \0UIT + TerminateProcess. Rule: no bare TerminateSelf/TerminateProcess — always go through the two-function chain.</li><li>MCP LOOP EXIT: McpCommand returns before TeeWriter setup (MCP must own stdout). No _activeTee → DoRequiredExitCleanup is no-op for tee. Exit path: return 0/1 → Main() → AppBotExit(code) (ErrorScope flush) → finally/DoRequiredExitCleanup → ProcessExit → Console.Error.Flush() → \0UIT → TerminateProcess. The Console.Error.Flush() in ProcessExit hook is critical for MCP — it ensures trailing log lines written inside McpCommand (e.g. &#x27;[MCP] Fatal: ...&#x27;) are not lost when TerminateProcess kills the process. Without it, the last few stderr bytes may sit in .NET&#x27;s internal TextWriter buffer and never reach the pipe.</li><li>[DEV] Implementation: IsLauncherInParentChain() in Program.cs — WMI Win32_Process ancestor walk (max 10 levels). WorkerStderrTeeWriter sealed class tees stderr to log file. AppBotQuitFlush() in CoreRunner.cs wraps stderrRelay.Wait(2000)+AppBotExit(code).</li></ol>
+    </article>
+  </main>
+</body>
+</html>
