@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>파일명이 곧 스케줄 -- pending_prompts 패턴 | WKAppBot Skill</title>
+  <title>파일명이 곧 스케줄 -- pending_prompts 패턴 | WKAppBot Skills</title>
+  <meta name="description" content="Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.">
+  <meta property="og:title" content="파일명이 곧 스케줄 -- pending_prompts 패턴 | WKAppBot Skills">
+  <meta property="og:description" content="Zero-memory scheduler: filename encodes trigger time + repeat + countdown. No DB, no daemon, no in-memory state. Survives process restart/reinstall automatically. The file IS the schedule.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/file-as-scheduler-pending-prompts-pattern/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>INSIGHT: Store deferred prompts as files in...</li><li>FILENAME SCHEMA: prompt_{triggerUtc|NOW}_{gu...</li><li>TOD/DAYS GATE: tod=HHMM-HHMM (local time) +...</li><li>TIME GATE: string.Compare(trigger, nowTag) &lt;...</li><li>MANAGEMENT: wkappbot schedule pending list [...</li><li>EXAMPLES: prompt_NOW_abc12345.json (session-...</li><li>TIME GATE: string.Compare(trigger, nowTag) &lt;...</li><li>LIFECYCLE: rename on delivery → update trigg...</li><li>ATOMIC CLAIM (race-free): File.Move(f, f+&#x27;.p...</li><li>DRAIN TRIGGERS: (1) OnCommandArrived: any wk...</li><li>SESSION-MISS: no target session → re-append...</li><li>DURABILITY: wkappbot uninstalled → files sur...</li><li>BEAUTY: cnt=5 recurring = 5 files created on...</li><li>2026-05-02: BUG-AUTO auto-queue -- SuggestCo...</li><li>2026-05-02: BUG-AUTO auto-queue -- SuggestCo...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

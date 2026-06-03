@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral | WKAppBot Skill</title>
+  <title>Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral | WKAppBot Skills</title>
+  <meta name="description" content="Named pipe server (wkappbot_elevated) inside admin Eye. Handles admin commands, defers hot-swap while busy, and self-respawns on binary update using own elevated token -- no UAC.">
+  <meta property="og:title" content="Admin Eye Pipe Server -- Self-Respawn + Hot-Swap Deferral | WKAppBot Skills">
+  <meta property="og:description" content="Named pipe server (wkappbot_elevated) inside admin Eye. Handles admin commands, defers hot-swap while busy, and self-respawns on binary update using own elevated token -- no UAC.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/elevated-eye-admin-pipe-server/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>1. NamedPipeServerStreamAcl.Create AuthUser=...</li><li>2. WaitForConnectionAsync -&gt; Task.Run Handle...</li><li>3. HandleClient: ReadAsync EyeProxyRequest -...</li><li>4. IsBusy guard: hot-swap deferred while _ac...</li><li>5. __eye_tick__ special: returns cached Eye...</li><li>6. StopAcceptingAndWaitForDrain: 30s drain c...</li><li>## Self-respawn on binary update (AppBotEyeC...</li><li>Dual FSW 감시: .new.exe 등장(조기 drain) + .exe 직교...</li><li>.new.exe path: IsBusy drain -&gt; .new.exe 소멸 대...</li><li>.exe path: drain 중이면 자연 완료, 아니면 즉시 spawn</li><li>Process.Start(UseShellExecute=false, &#x27;eye --...</li><li>drainTriggered flag: 두 FSW 동시 발화 시 중복 spawn...</li><li>startup 시 .new.exe 이미 있으면 즉시 drain 시작</li><li>SUDO STABILITY FIX (2026-05-01, commits 4af2...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

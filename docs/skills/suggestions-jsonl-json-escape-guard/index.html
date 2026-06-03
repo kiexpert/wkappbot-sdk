@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>suggestions.jsonl JSON escape bug: Windows paths with backslash need double-escape | WKAppBot Skill</title>
+  <title>suggestions.jsonl JSON escape bug: Windows paths with backslash need double-escape | WKAppBot Skills</title>
+  <meta name="description" content="Any suggest entry written with raw Windows path strings (e.g. %USERPROFILE%\.wkappbot, D:\path) may contain single-backslash sequences that are invalid JSON escapes, breaking suggest list for ALL ent...">
+  <meta property="og:title" content="suggestions.jsonl JSON escape bug: Windows paths with backslash need double-escape | WKAppBot Skills">
+  <meta property="og:description" content="Any suggest entry written with raw Windows path strings (e.g. %USERPROFILE%\.wkappbot, D:\path) may contain single-backslash sequences that are invalid JSON escapes, breaking suggest list for ALL ent...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/suggestions-jsonl-json-escape-guard/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;

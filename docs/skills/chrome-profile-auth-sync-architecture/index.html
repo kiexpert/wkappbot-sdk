@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>chrome-profile-auth-sync-architecture | WKAppBot Skill</title>
+  <title>chrome-profile-auth-sync-architecture | WKAppBot Skills</title>
+  <meta name="description" content="WKAppBot Chrome profile auth sync: master-&gt;project copy on launch, project-&gt;master SQLite merge on exit. Use when sessions expire frequently or cookies not persisting across projects.">
+  <meta property="og:title" content="chrome-profile-auth-sync-architecture | WKAppBot Skills">
+  <meta property="og:description" content="WKAppBot Chrome profile auth sync: master-&gt;project copy on launch, project-&gt;master SQLite merge on exit. Use when sessions expire frequently or cookies not persisting across projects.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/chrome-profile-auth-sync-architecture/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>ARCHITECTURE: Master profile at {DataDir}/ch...</li><li>ON LAUNCH (CopyFromMaster): copies Default/L...</li><li>ON EXIT (MergeBackToMaster): SQLite merge of...</li><li>SESSION COOKIES NOT SYNCED: expires_utc==0 (...</li><li>TROUBLESHOOT auth expiring: 1) Check [CHROME...</li><li>KEY FILES: ChromeProfileSync.cs (launch copy...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

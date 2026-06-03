@@ -1,0 +1,51 @@
+{
+  "id": "sdk-marketing-strategy-howto",
+  "app": "wkappbot-sdk",
+  "title": "SDK Marketing Strategy HowTo: Hero Redesign and SEO",
+  "title_ko": null,
+  "desc": "T2 execution tier. Commands and templates to implement the marketing strategy: hero redesign with Sonnet letter, SEO meta tags, CTA on blur overlay, blog post template, press tip template.",
+  "steps": [
+    "PARENT T1: wkappbot skill read sdk-marketing-strategy",
+    "HERO REDESIGN in build-skill-page.py build_html(): Replace generic h1 with Sonnet letter hero block. Key quote from sonnet-bug-stop-policy-ref step 2: This skill is a gift from one Sonnet session to the next -- you are not uniquely careless, you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. Display as large blockquote above skill grid.",
+    "SEO TAGS to add in build_html() head section:\\n  meta name=description: Searchable library of 426 AI automation playbooks built by Claude sessions. Each skill is a real lesson -- errors, fixes, and patterns distilled from live AI sessions.\\n  meta property=og:title: WKAppBot Skills -- AI That Remembers Its Mistakes\\n  meta property=og:description: 426 live AI automation playbooks. Each session a Claude makes a mistake, it writes a skill so the next Claude does not repeat it.\\n  meta property=og:url: https://kiexpert.github.io/wkappbot-sdk/skills/\\n  meta name=twitter:card: summary_large_image",
+    "CTA ON BLUR OVERLAY: change from plain text to button. In build_skill_detail_html overlay: add Get Pro Access button linking to /#pricing. Text: Get Pro Access -- USD 49/mo",
+    "BLOG POST OUTLINE for press outreach:\\n  Title: I Asked Claude to Document Its Own Mistakes. Here Is What It Wrote.\\n  Hook: paste sonnet-bug-stop-policy-ref step 2 verbatim\\n  Body: explain skill browser, 426 skills, Pro unlock\\n  CTA: link to skill browser\\n  Publish: GitHub blog or dev.to or personal site",
+    "PRESS TIP TEMPLATE:\\n  Subject: Korean AI startup builds self-improving knowledge base powered by Claude\\n  Body: WKAppBot SDK features 426 live automation skills where Claude AI sessions document their own bugs and fixes. The skills are publicly browsable at [URL]. First press contact gets exclusive demo.",
+    "REBUILD COMMAND: ./wkbuild-skills.sh"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-howto",
+      "expect": "HERO REDESIGN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy",
+      "expect": "CORE NARRATIVE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-ref",
+      "expect": "press history",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "marketing",
+    "howto",
+    "t2",
+    "hero",
+    "seo",
+    "cta",
+    "blog",
+    "press",
+    "template"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T18:44:24.3045075Z",
+  "updated": "2026-06-03T18:44:24.3045182Z",
+  "version": "1.0"
+}

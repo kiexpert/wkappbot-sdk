@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Launcher --sudo probe: File.Exists check before ConnectAsync | WKAppBot Skill</title>
+  <title>Launcher --sudo probe: File.Exists check before ConnectAsync | WKAppBot Skills</title>
+  <meta name="description" content="v6.0.1 fix for HANDSHAKE-MISS false positives on cold-start sudo. Launcher/Program.cs checks File.Exists(&#x27;\.\pipe\wkappbot_elevated&#x27;) BEFORE ConnectAsync. If pipe file is absent, admin Eye hasn&#x27;t bee...">
+  <meta property="og:title" content="Launcher --sudo probe: File.Exists check before ConnectAsync | WKAppBot Skills">
+  <meta property="og:description" content="v6.0.1 fix for HANDSHAKE-MISS false positives on cold-start sudo. Launcher/Program.cs checks File.Exists(&#x27;\.\pipe\wkappbot_elevated&#x27;) BEFORE ConnectAsync. If pipe file is absent, admin Eye hasn&#x27;t bee...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/launcher-sudo-cold-start-pipe-file-exists-guard/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;

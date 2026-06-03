@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>a11y find: MFC deep-descendant grandchildren via EnumChildWindows | WKAppBot Skill</title>
+  <title>a11y find: MFC deep-descendant grandchildren via EnumChildWindows | WKAppBot Skills</title>
+  <meta name="description" content="HTS/MFC apps expose empty UIA tree below top frame; controls live 3-4 levels under custom container classes. FindChildByPattern now recurses via Win32 EnumChildWindows as final fallback (after MDICli...">
+  <meta property="og:title" content="a11y find: MFC deep-descendant grandchildren via EnumChildWindows | WKAppBot Skills">
+  <meta property="og:description" content="HTS/MFC apps expose empty UIA tree below top frame; controls live 3-4 levels under custom container classes. FindChildByPattern now recurses via Win32 EnumChildWindows as final fallback (after MDICli...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>grap child segment X/Y/Z: each segment becom...</li><li>Layer 1 MDIClient children (depth 2)</li><li>Layer 2 direct children of hParent (depth 1)</li><li>Layer 3 EnumChildWindows full subtree recurs...</li><li>Returns first pattern match in enumeration o...</li><li>Use &#x27;[cls] title cid=N hwnd=H WxH&#x27; search ke...</li><li>Usage example: wkappbot a11y find &#x27;*Hero*/MD...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>[v6.2+ SIMPLE PATH] For top-level MDI panel...</li><li>STOP-EARLY PATTERN: grap path can target any...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

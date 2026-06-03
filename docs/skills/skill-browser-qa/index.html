@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Skill Browser Page QA Checklist | WKAppBot Skill</title>
+  <title>Skill Browser Page QA Checklist | WKAppBot Skills</title>
+  <meta name="description" content="Full QA checklist for docs/skills/ static site: static file checks + localhost runtime verification. Covers Pro gate, SEO safety, T1 parent links, OAuth button, PAT unlock flow, cookie states.">
+  <meta property="og:title" content="Skill Browser Page QA Checklist | WKAppBot Skills">
+  <meta property="og:description" content="Full QA checklist for docs/skills/ static site: static file checks + localhost runtime verification. Covers Pro gate, SEO safety, T1 parent links, OAuth button, PAT unlock flow, cookie states.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/skill-browser-qa/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>STATIC CHECKS (no server needed): (1) grep &#x27;...</li><li>BUILD VERIFY: python scripts/build-skill-pag...</li><li>RUNTIME SETUP: python -m http.server 8888 --...</li><li>RUNTIME CHECK 1 - no cookie: open detail pag...</li><li>RUNTIME CHECK 2 - invalid PAT: click lock bu...</li><li>RUNTIME CHECK 3 - valid PAT (collaborator):...</li><li>RUNTIME CHECK 4 - PAT persists: reload page...</li><li>RUNTIME CHECK 5 - 404 behavior: navigate to...</li><li>RUNTIME CHECK 6 - back link: from detail pag...</li><li>KNOWN BUGS HISTORY: (1) {{ double-brace bug:...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

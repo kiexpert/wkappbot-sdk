@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>taskkill compat shim: a11y-first kill routing | WKAppBot Skill</title>
+  <title>taskkill compat shim: a11y-first kill routing | WKAppBot Skills</title>
+  <meta name="description" content="v1.6 STRICT POLICY: --force &lt;pid1,pid2,...&gt; is the ONLY way to kill anything via taskkill -- listed PIDs are killed exactly, others survive. All other invocations (/IM, /PID, bare *.exe) are CLASSIFY...">
+  <meta property="og:title" content="taskkill compat shim: a11y-first kill routing | WKAppBot Skills">
+  <meta property="og:description" content="v1.6 STRICT POLICY: --force &lt;pid1,pid2,...&gt; is the ONLY way to kill anything via taskkill -- listed PIDs are killed exactly, others survive. All other invocations (/IM, /PID, bare *.exe) are CLASSIFY...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/taskkill-compat-shim-a11y-first-kill-routing/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Invoke via taskkill.exe (busybox symlink) OR...</li><li>/PID N maps to regex:^\[N\] (anchored PID pr...</li><li>Bare positional: digits -&gt; /PID, *.exe -&gt; /I...</li><li>/F is ignored (a11y kill is force by default...</li><li>For complex filters use grap directly: wkapp...</li><li>Run &#x27;wkappbot taskkill --help&#x27; to see the fu...</li><li>Verified 2026-04-21: test-taskkill-help.cmd...</li><li>Verified 2026-05-03: callout window placemen...</li><li>v1.5 (2026-05-06): --force-all REMOVED. --fo...</li><li>v1.6 (2026-05-05): --force output now shows...</li><li>v1.7 (2026-05-06): taskkill classify and --f...</li><li>REQUESTED BEHAVIOR (suggest 2026-05-26): /IM...</li><li>v1.9 (2026-05-28): DEFAULT PATH now auto-kil...</li><li>SPEC v2.0 (2026-05-28): PROTECTED = process...</li><li>SPEC v2.1 CORRECTION (2026-05-28): PROTECTED...</li><li>UNCLE-KILL LESSON (Opus 2026-05-29): GetDesc...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

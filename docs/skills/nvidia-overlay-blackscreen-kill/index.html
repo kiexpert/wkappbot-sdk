@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NVIDIA Overlay blackscreen kill | WKAppBot Skill</title>
+  <title>NVIDIA Overlay blackscreen kill | WKAppBot Skills</title>
+  <meta name="description" content="NVIDIA Overlay (GeForce Experience Share) periodically creates fullscreen black windows causing desktop blackout and taskbar animation. Kill the process (nvsphelper64/nvcontainer), not just the HWND.">
+  <meta property="og:title" content="NVIDIA Overlay blackscreen kill | WKAppBot Skills">
+  <meta property="og:description" content="NVIDIA Overlay (GeForce Experience Share) periodically creates fullscreen black windows causing desktop blackout and taskbar animation. Kill the process (nvsphelper64/nvcontainer), not just the HWND.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/nvidia-overlay-blackscreen-kill/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>SYMPTOM: desktop periodically goes black, ta...</li><li>DETECT: wkappbot screensaver close logs [SCR...</li><li>Where CPU -gt 50</li><li>KILL SESSION: Get-Process NVIDIA Overlay -EA...</li><li>Stop-Process -Force. Get-Process nvcontainer</li><li>Sort CPU -Desc</li><li>Select -First 2</li><li>Stop-Process -Force</li><li>PERMANENT FIX: GeForce Experience -&gt; Setting...</li><li>INTEGRATED: screensaver close (v7.3.193+) au...</li><li>WKAPPBOT_NO_SCREENSAVER=1 disables periodic...</li><li>SCREENSAVER SELF-WIPE: ScreenSaverOverlay.Li...</li><li>BUG FIX 2026-05-27: WipeBlockingOverlays() w...</li><li>DETECTION FIX 2026-05-27: WipeBlockingOverla...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

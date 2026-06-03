@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Payment to License Activation Flow - KIS transfer + GitHub collaborator auto-grant | WKAppBot Skill</title>
+  <title>Payment to License Activation Flow - KIS transfer + GitHub collaborator auto-grant | WKAppBot Skills</title>
+  <meta name="description" content="End-to-end flow from KRW bank transfer to active license: KIS incoming transfer detection, GitHub ID parsing from memo, collaborator add, pending invite UX, acceptance, expiry, renewal.">
+  <meta property="og:title" content="Payment to License Activation Flow - KIS transfer + GitHub collaborator auto-grant | WKAppBot Skills">
+  <meta property="og:description" content="End-to-end flow from KRW bank transfer to active license: KIS incoming transfer detection, GitHub ID parsing from memo, collaborator add, pending invite UX, acceptance, expiry, renewal.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Pricing: 100,000 KRW = CDP tier (read permis...</li><li>Memo (depositor name field) MUST be the paye...</li><li>Detector: scripts/kis_payment_watcher.py pol...</li><li>Grant: detector calls &#x27;gh api repos/***/wkap...</li><li>Pending invite UX: wkappbot startup detects...</li><li>Acceptance: user clicks GitHub notifications...</li><li>Expiry: tracked in .github/licenses/{user} c...</li><li>Renewal: pay again with same memo; new tx_ke...</li><li>Tier upgrade (CDP -&gt; Sudo): pay 500k with sa...</li><li>Verification: &#x27;wkappbot license status&#x27; show...</li><li>License check architecture (LicenseStatus.cs...</li><li>Token auth: (1) GH_TOKEN/GITHUB_TOKEN env va...</li><li>SUBSCRIBE.md KNOWN ISSUES (fixed 2026-05-01,...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WKAppBot build + verify workflow (for AI code agents) | WKAppBot Skill</title>
+  <title>WKAppBot build + verify workflow (for AI code agents) | WKAppBot Skills</title>
+  <meta name="description" content="How to build and verify WKAppBot after code changes. Required reading for Codex / Haiku / any AI CLI delegated to refactor or edit wkappbot source. Covers the single publish command, green-build sign...">
+  <meta property="og:title" content="WKAppBot build + verify workflow (for AI code agents) | WKAppBot Skills">
+  <meta property="og:description" content="How to build and verify WKAppBot after code changes. Required reading for Codex / Haiku / any AI CLI delegated to refactor or edit wkappbot source. Covers the single publish command, green-build sign...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-build-verify-workflow/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Single build command (Release mode, all proj...</li><li>Working directory: anywhere, but D:/GitHub/W...</li><li>Green-build signature (last 3 lines of outpu...</li><li>Typical red-build signatures: error CS0xxx (...</li><li>Timeout budget: 180-300 seconds on warm buil...</li><li>After successful build the canonical wkappbo...</li><li>Launcher auto-swap failing? See hot-swap ope...</li><li>For a quick smoke check post-build: wkappbot...</li><li>Refactor verification loop: 1. make change 2...</li><li>Common refactor-breaking error: CS0246 (type...</li><li>Project structure (relevant for where to pla...</li><li>Partial-class pattern (for splits): new file...</li><li>2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP...</li><li>2026-04-30: Acknowledged BUG-AUTOs (#66 PUMP...</li><li>After deploy: run &#x27;wkappbot skill sync&#x27; to p...</li><li>DEPLOY ALL THREE (MANDATORY): when manually...</li><li>CHROME PLACEMENT TOLERANCE: DeltaSizeThresho...</li><li>TWO-TREE ARCHITECTURE (MANDATORY, discovered...</li><li>CORRECT BUILD COMMAND for private csharp/ →...</li><li>WRONG BUILD for private fixes (FORBIDDEN): s...</li><li>BUILD VERIFICATION AFTER FIX (MANDATORY): af...</li><li>HQ PATH LESSON (2026-05-18): suggest add-req...</li><li>BUILD BREAK PATTERN (2026-05-22): A11yAction...</li><li>Verified 2026-05-22: test-build-a11y-click-i...</li><li>Eye OOM pattern (2026-05-22): CDP ReconnectA...</li><li>Eye Guardian memory threshold (2026-05-23):...</li><li>Guardian log rotation (2026-05-23): when Gua...</li><li>skill read Claude Code export (2026-05-23):...</li><li>MANDATORY after ANY Core source edit: (1) pu...</li><li>2026-05-26: CDP Chrome multiplication fix -...</li><li>BUILD VIA HARNESS: use wkappbot exec to run...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

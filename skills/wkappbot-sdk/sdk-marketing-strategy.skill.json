@@ -1,0 +1,52 @@
+{
+  "id": "sdk-marketing-strategy",
+  "app": "wkappbot-sdk",
+  "title": "SDK Marketing Strategy: Press and Dev Community Outreach",
+  "title_ko": null,
+  "desc": "Marketing playbook for wkappbot-sdk skill browser. Core narrative: AI that remembers its mistakes across sessions -- 426 live playbooks, growing every session.",
+  "steps": [
+    "CORE NARRATIVE: AI remembers its mistakes. Each Claude session leaves a letter to the next Sonnet. 426 live automation playbooks grow every session. Proof: sonnet-bug-stop-policy-ref is a real apology letter from Sonnet to future Sonnet. Hook for news: first AI platform where the AI documents and publishes its own failure patterns in searchable, shareable pages.",
+    "TARGET MEDIA: (1) Naver News -- submit via press release to Korean IT journalists. (2) IT Chosun -- Korean AI/automation beat. (3) Bloter -- developer-friendly, loves novel AI angle. (4) Digital Daily -- enterprise AI. (5) Google News -- index via GitHub releases sitemap + structured press release. (6) Reddit r/MachineLearning r/ClaudeAI. (7) Hacker News Show HN post.",
+    "SITE: https://kiexpert.github.io/wkappbot-sdk/skills/ Each skill has shareable URL e.g. /skills/sonnet-bug-stop-policy-ref/",
+    "FUNNEL: (1) Visitor sees Sonnet letter hero -- emotionally hooked. (2) Scrolls 426 skill cards -- understands depth. (3) Clicks premium skill -- sees blur + Buy CTA. (4) Pricing section -- converts to Pro. (5) CLI install -- becomes power user.",
+    "METRICS: GitHub stars target 100 before press push. Skill page unique visitors via Google Analytics. Pro unlock attempts via localStorage events. Inbound news links.",
+    "EXECUTION: week1=fix hero+SEO+CTA+OG tags. week2=write blog post with Sonnet letter narrative. week3=submit press tips. week4=post dev communities. ongoing=iterate per sdk-marketing-strategy-ref.",
+    "AUTO-EVOLVE: after each press hit or skill milestone, spawn Opus to update sdk-marketing-strategy-ref with what worked and what did not. This skill tree learns from real campaign results."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy",
+      "expect": "CORE NARRATIVE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-howto",
+      "expect": "FUNNEL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-ref",
+      "expect": "TARGET MEDIA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "marketing",
+    "strategy",
+    "naver-news",
+    "press",
+    "seo",
+    "cta",
+    "sonnet-letter",
+    "google-news",
+    "reddit",
+    "auto-evolve"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T18:43:25.3195024Z",
+  "updated": "2026-06-03T18:43:25.3195147Z",
+  "version": "1.0"
+}

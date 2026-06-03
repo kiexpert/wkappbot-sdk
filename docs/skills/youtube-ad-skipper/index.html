@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YouTube Ad Auto-Skipper | WKAppBot Skill</title>
+  <title>YouTube Ad Auto-Skipper | WKAppBot Skills</title>
+  <meta name="description" content="Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overlay close, and ad-showing DOM class. Reloads on unskippable ads.">
+  <meta property="og:title" content="YouTube Ad Auto-Skipper | WKAppBot Skills">
+  <meta property="og:description" content="Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overlay close, and ad-showing DOM class. Reloads on unskippable ads.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/youtube-ad-skipper/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -112,7 +118,7 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot-sdk</span>
-        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
       </div>
       <h1>YouTube Ad Auto-Skipper</h1>
       <p class="description">Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overlay close, and ad-showing DOM class. Reloads on unskippable ads.</p>
@@ -121,98 +127,18 @@
       <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps blurred"><li>Run: powershell -File test/youtube-ad-skippe...</li><li>Added &#x27;ending&#x27; detection (video in last 2s)...</li><li>UNIFIED AD DETECTION: var isAd = document.do...</li><li>COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li>KEY FINDING (2026-05-23): mid-roll ads at t=...</li><li>NO-CDP MODE (2026-05-25): wkappbot a11y work...</li><li>NO-CDP GRAP LESSONS (2026-05-25 live investi...</li><li>AD STATE DETECTION (2026-05-25): When ad is...</li><li>URL-REDIRECT SKIP STRATEGY (user idea 2026-0...</li><li>PLAYBACK-POSITION JUMP: Ad detected + skip u...</li><li>ADDRESS BAR HOOK (smart activation): Instead...</li><li>TITLE-CHANGE HOOK (correct smart activation)...</li><li>v1.4 URL redirect: when _find_skip_path() de...</li><li>NAMING: call this process &#x27;YouTube watcher&#x27;...</li><li>v1.5 mouse-burst: WH_MOUSE_LL global mouse h...</li><li>v1.6 fix: WH_MOUSE_LL must run in a dedicate...</li><li>v1.6 simple-poll: removed WH_MOUSE_LL entire...</li><li>v1.6 event-driven: removed WH_MOUSE_LL globa...</li><li>RENAME (2026-05-26): yt_ad_skipper.py rename...</li><li>v1.42 2026-05-27: yt CLEARED (Edge-shrink cu...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <ol class="steps"><li>Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
+ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
+Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
+Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
+Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
+Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
+Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
+Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.</li><li>Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)</li><li>UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;</li><li>COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.</li><li>KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.</li></ol>
+        
       </div>
     </article>
   </main>
-    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
-  <script>
-    const SKILL_ID = 'youtube-ad-skipper';
-    const proUnlockButton = document.getElementById('proUnlockButton');
-    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-    function injectFullSteps() {
-      if (!window.SKILLS_FULL) return;
-      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
-      if (!d || !d.steps) return;
-      const ol = document.querySelector('ol.steps');
-      if (!ol) return;
-      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
-    }
-    function unlockAll() {
-      injectFullSteps();
-      const overlays = document.querySelectorAll('.unlock');
-      const stepsLists = document.querySelectorAll('.steps.blurred');
-      for (const overlay of overlays) {
-        overlay.remove();
-      }
-      for (const list of stepsLists) {
-        list.classList.remove('blurred');
-      }
-      proUnlockButton.style.display = 'none';
-      const msg = document.createElement('p');
-      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
-      msg.textContent = 'Pro access verified';
-      document.querySelector('.skill-detail').appendChild(msg);
-    }
-    window.unlockAll = unlockAll;
-    function showIdleState() {
-      proUnlockButton.classList.remove('unlocked', 'denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
-      proUnlockButton.title = 'Enter PAT to unlock Pro';
-      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
-    }
-    function showDeniedState(reason) {
-      proUnlockButton.classList.add('denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
-      const label = reason === 'invalid'
-        ? 'PAT invalid or expired — click to re-enter'
-        : 'PAT lacks collaborator access — click to re-enter';
-      proUnlockButton.title = label;
-      proUnlockButton.setAttribute('aria-label', label);
-    }
-    async function checkGitHubAccess(token) {
-      if (!token) {
-        showIdleState();
-        return;
-      }
-      try {
-        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
-          headers: {
-            Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github.raw'
-          }
-        });
-        if (response.status === 200) {
-          const js = await response.text();
-          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
-          unlockAll();
-        } else if (response.status === 401) {
-          showDeniedState('invalid');
-        } else if (response.status === 403 || response.status === 404) {
-          showDeniedState('noaccess');
-        } else {
-          showIdleState();
-        }
-      } catch (error) {
-        console.warn('GitHub access check failed', error);
-        showIdleState();
-      }
-    }
-    proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
-      const token = window.prompt('Enter GitHub Personal Access Token', existing);
-      if (token === null) return;
-      const trimmed = token.trim();
-      if (!trimmed) {
-        localStorage.removeItem('gh_token');
-        showIdleState();
-        return;
-      }
-      localStorage.setItem('gh_token', trimmed);
-      checkGitHubAccess(trimmed);
-    });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
-  </script>
+  
 </body>
 </html>

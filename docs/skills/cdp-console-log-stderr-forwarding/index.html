@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CDP console.log forwarding to stderr via Runtime.consoleAPICalled | WKAppBot Skill</title>
+  <title>CDP console.log forwarding to stderr via Runtime.consoleAPICalled | WKAppBot Skills</title>
+  <meta name="description" content="Runtime.consoleAPICalled is NOT subscribed in Core CdpClient. console.log in --eval-js JS silently drops to nowhere. Fix: subscribe to Runtime.consoleAPICalled in EvalAsyncCore and write to stderr as...">
+  <meta property="og:title" content="CDP console.log forwarding to stderr via Runtime.consoleAPICalled | WKAppBot Skills">
+  <meta property="og:description" content="Runtime.consoleAPICalled is NOT subscribed in Core CdpClient. console.log in --eval-js JS silently drops to nowhere. Fix: subscribe to Runtime.consoleAPICalled in EvalAsyncCore and write to stderr as...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/cdp-console-log-stderr-forwarding/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;

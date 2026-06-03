@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>레포 건강검진: 이슈·빈섹션·미답댓글 일괄 점검 | WKAppBot Skill</title>
+  <title>레포 건강검진: 이슈·빈섹션·미답댓글 일괄 점검 | WKAppBot Skills</title>
+  <meta name="description" content="Periodic repo health check covering GitHub issues (close Daily reports, triage real bugs), unanswered issue comments, empty CLAUDE.md sections (Gotchas/Skills stubs), and launch checklist progress co...">
+  <meta property="og:title" content="레포 건강검진: 이슈·빈섹션·미답댓글 일괄 점검 | WKAppBot Skills">
+  <meta property="og:description" content="Periodic repo health check covering GitHub issues (close Daily reports, triage real bugs), unanswered issue comments, empty CLAUDE.md sections (Gotchas/Skills stubs), and launch checklist progress co...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/repo-health-doctor/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>WHEN TO RUN -- two modes: [LITE] run any tim...</li><li>[FULL] GitHub issues: gh issue list --state...</li><li>grep -i &lt;keyword&gt;. If fixed -&gt; close with ve...</li><li>[FULL] Unanswered issue comments: for each o...</li><li>[LITE] CLAUDE.md empty sections: Read projec...</li><li>[FULL] Launch checklist (if issue #1 exists)...</li><li>[FULL] CHANGELOG completeness: git log --one...</li><li>[LITE] README.md sync: version number, featu...</li><li>[LITE] AGENTS.md / CLAUDE.md parity: both mu...</li><li>[LITE] Skill source_refs audit: wkappbot ski...</li><li>[LITE] gg section smoke test: actually run &#x27;...</li><li>[LITE] Command Grounding -- gg dry-run valid...</li><li>[FULL] CI health: gh run list --limit 5 -- a...</li><li>[FULL] Resolved suggests cleanup: wkappbot s...</li><li>[FULL] User-facing text audit: grep -r &#x27;TODO...</li><li>FIXME\</li><li>HACK\</li><li>TEMP\b\</li><li>\[DBG\]&#x27; csharp/src/ --include=*.cs. Also wk...</li><li>check every listed command exists and works....</li><li>[LITE] Cross-model format check: scan CLAUDE...</li><li>HEAL NOTE (2026-05-26): SECURITY.md supporte...</li><li>Nightly healing script executing -- auditing...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

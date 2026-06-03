@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ElevatedEyeProxy: 32 Parallel Acceptors Prevent HANDSHAKE-MISS Burst | WKAppBot Skill</title>
+  <title>ElevatedEyeProxy: 32 Parallel Acceptors Prevent HANDSHAKE-MISS Burst | WKAppBot Skills</title>
+  <meta name="description" content="ListenAsync spawns 32 concurrent AcceptLoop workers each owning a NamedPipeServerStream. Burst of parallel --sudo ConnectAsync calls are accepted immediately instead of serializing through one listen...">
+  <meta property="og:title" content="ElevatedEyeProxy: 32 Parallel Acceptors Prevent HANDSHAKE-MISS Burst | WKAppBot Skills">
+  <meta property="og:description" content="ListenAsync spawns 32 concurrent AcceptLoop workers each owning a NamedPipeServerStream. Burst of parallel --sudo ConnectAsync calls are accepted immediately instead of serializing through one listen...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/eye-tick-elevated-pipe-parallel-accept/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;

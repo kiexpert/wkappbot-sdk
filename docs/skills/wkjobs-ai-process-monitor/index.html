@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>wkjobs: AI process monitor | WKAppBot Skill</title>
+  <title>wkjobs: AI process monitor | WKAppBot Skills</title>
+  <meta name="description" content="Shows all AI processes in the console session with CPU%, memory, state, and spawned child commands">
+  <meta property="og:title" content="wkjobs: AI process monitor | WKAppBot Skills">
+  <meta property="og:description" content="Shows all AI processes in the console session with CPU%, memory, state, and spawned child commands">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wkjobs-ai-process-monitor/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -121,8 +127,8 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps blurred"><li>PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li>FLAGS: -Tree (hierarchy view) | -Watch (live...</li><li>COLORS: claude=Cyan(idle)/Green(BUSY), codex...</li><li>SESSION MARKER: * prefix means process is in...</li><li>SPAWNED SECTION: child processes of AI pids,...</li><li>INTERNALS: Get-CimInstance Win32_Process for...</li><li>NOTE: loop variable is apid not pid -- Power...</li><li>WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD)...</li><li>SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkj...</li><li>PATH fix: prepend system dirs before codex e...</li><li>COLUMNS: PID, NAME, CPU%, MEM(MB), THR(threa...</li><li>MANUAL FALLBACK (when wkjobs hangs): Get-Cim...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <ol class="steps blurred"><li>PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li>LOCATION: D:\GitHub\wkappbot-sdk\scripts\wkj...</li><li>FLAGS: -Tree (hierarchy view)</li><li>-Watch (live refresh, Ctrl+C to exit)</li><li>-All (include all sessions)</li><li>-RefreshSec N (Watch interval, default 2)</li><li>COLORS: claude=Cyan(idle) or Green(BUSY), co...</li><li>SESSION MARKER: * prefix means process is in...</li><li>SPAWNED SECTION: child processes of AI pids,...</li><li>INTERNALS: Get-CimInstance Win32_Process for...</li><li>NOTE: loop variable is apid not pid -- Power...</li><li>WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD)...</li><li>SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkj...</li><li>PATH fix: prepend system dirs before codex e...</li><li>RECURSIVE ANCESTOR WALK (2026-05-25): spawne...</li><li>VERIFY: syntax-check edits by tokenizing the...</li><li>EDIT-VIA-WKEDIT note: wkedit re-applies inde...</li><li>LEAKS MODE OUTPUT FORMAT (2026-05-25): -Leak...</li><li>bash/sh detection: Test-HasAiAncestor depth-...</li></ol>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

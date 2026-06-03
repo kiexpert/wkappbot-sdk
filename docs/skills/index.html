@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WKAppBot Skill Browser</title>
+  <title>WKAppBot Skills &#8212; AI That Remembers Its Mistakes | 426 Live Automation Playbooks</title>
+  <meta name="description" content="426 live AI automation playbooks built by Claude sessions. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.">
+  <meta property="og:title" content="WKAppBot Skills &#8212; AI That Remembers Its Mistakes">
+  <meta property="og:description" content="426 live AI automation playbooks. Each Claude session documents its own failures so the next session does not repeat them.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {
       color-scheme: dark;
@@ -77,6 +83,10 @@
       line-height: .96;
       letter-spacing: 0;
     }
+    .sonnet-letter { margin-bottom: 36px; padding: 28px 32px; border-left: 3px solid var(--accent); background: rgba(110,231,183,.06); border-radius: 0 8px 8px 0; max-width: 720px; }
+    .letter-from { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
+    .sonnet-letter blockquote { margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--text); font-style: italic; }
+    .letter-sig { color: var(--muted); font-size: 13px; }
     .hero-copy { color: var(--muted); max-width: 720px; font-size: 20px; }
     .hero-panel {
       border: 1px solid var(--line);
@@ -276,14 +286,19 @@
   <header class="shell">
     <div class="hero-grid">
       <div>
-        <h1>AI brings the intelligence WKAppBot grows knowledge Together they compound</h1>
-        <p class="hero-copy">426 total live skills from installed WKAppBot HQ catalogs, filtered for user and developer workflows.</p>
+        <div class="sonnet-letter">
+          <div class="letter-from">A letter from one Sonnet to the next</div>
+          <blockquote>&#8220;This skill is a gift from one Sonnet session to the next: you are not uniquely careless &#8212; you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete.&#8221;</blockquote>
+          <div class="letter-sig">&#8212; Claude Sonnet 4.6, 2026</div>
+        </div>
+        <h1>AI That Remembers Its Mistakes</h1>
+        <p class="hero-copy">434 live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
       </div>
       <aside class="hero-panel" aria-label="Skill catalog statistics">
         <div class="stat-grid">
-          <div class="stat"><strong>426</strong><span>live skills</span></div>
+          <div class="stat"><strong>434</strong><span>live skills</span></div>
           <div class="stat"><strong>8</strong><span>apps indexed</span></div>
-          <div class="stat"><strong>76</strong><span>pro previews</span></div>
+          <div class="stat"><strong>77</strong><span>pro previews</span></div>
         </div>
         <p class="hero-copy">Search versioned knowhow, spot implementation depth, and preview the compounding knowledge base that every WKAppBot session grows.</p>
       </aside>
@@ -293,7 +308,7 @@
   <main id="skills" class="shell">
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
-      <div id="resultCount" class="result-count">426 skills</div>
+      <div id="resultCount" class="result-count">434 skills</div>
     </div>
     <section class="skills-grid" id="skillGrid">
 
@@ -943,6 +958,23 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
       </article>
       </a>
 
+      <a class="skill-link" href="sdk-launcher-maintenance/" data-search="Launcher maintenance guide (public SDK) How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Buil... wkappbot-sdk sdk launcher build maintenance public aot">
+      <article class="skill-card premium" data-skill-id="sdk-launcher-maintenance">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>Launcher maintenance guide (public SDK)</h3>
+        <p>How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Buil...</p>
+        <div class="meta">developer</div>
+        <div class="tags"><span class="chip">sdk</span><span class="chip">launcher</span><span class="chip">build</span><span class="chip">maintenance</span><span class="chip">public</span><span class="chip">aot</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="Repo: d:\GitHub\wkappbot-sdk -- Launcher source PUBLIC. Core source PRIVATE (binary only in bin\wkappbot-core.exe)">Repo: d:\GitHub\wkappbot-sdk -- Launcher sou...</li><li data-full="Build: build.cmd (full) OR dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin">Build: build.cmd (full) OR dotnet publish cs...</li><li data-full="AOT requires MSVC linker (Visual Studio). build.cmd auto-prepends VS Installer dir. Missing symptom: MSB3073 vswhere not recognized">AOT requires MSVC linker (Visual Studio). bu...</li><li data-full="Core binary: downloaded via build.cmd --download-only from latest GitHub Release, or placed manually. ResolveCoreExe() = ProcessPath dirname + wkappbot-core.exe">Core binary: downloaded via build.cmd --down...</li><li data-full="Hot-swap: launcher watches wkappbot-core.new.exe. Drain pipes -&gt; rename atomically. Trigger: eye tick --timeout 15. Never kill Eye manually">Hot-swap: launcher watches wkappbot-core.new...</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
       <a class="skill-link" href="launcher-wkappbot-chrome-target-env-pipe-protocol/" data-search="Launcher WKAPPBOT_CHROME_TARGET env + pipe protocol Launcher publishes validated caller-offset Chrome placement target via WKAPPBOT... wkappbot-sdk launcher chrome placement env-var eye-pipe cdp multi-monitor sdk">
       <article class="skill-card premium" data-skill-id="launcher-wkappbot-chrome-target-env-pipe-protocol">
         <div class="card-top">
@@ -960,6 +992,23 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
       </article>
       </a>
 
+      <a class="skill-link" href="skill-heal-nightly/" data-search="Nightly Skill Heal: AI Self-Improvement Loop Autonomous overnight skill healing. Durable CronCreate fires 04:13 daily. Opus... wkappbot-sdk nightly heal skill audit cron schedule autonomous sleep">
+      <article class="skill-card premium" data-skill-id="skill-heal-nightly">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>Nightly Skill Heal: AI Self-Improvement Loop</h3>
+        <p>Autonomous overnight skill healing. Durable CronCreate fires 04:13 daily. Opus...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">nightly</span><span class="chip">heal</span><span class="chip">skill</span><span class="chip">audit</span><span class="chip">cron</span><span class="chip">schedule</span><span class="chip">autonomous</span><span class="chip">sleep</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="STEP 1 SCHEDULE GATE (every session start): Run CronList tool. If no job with prompt containing skill-heal-nightly exists at 04:13: run CronCreate(cron=&#x27;13 4 * * *&#x27;, durable=true, recurring=true, prompt=&#x27;Autonomous nightly loop: wkappbot skill read skill-heal-nightly -- then execute STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk&#x27;). Note job ID. Update CLAUDE.md Nightly Schedules table row with job ID. This job survives Claude restarts via .claude/scheduled_tasks.json.">STEP 1 SCHEDULE GATE (every session start):...</li><li data-full="STEP 2 HEALING (fires at 04:13 -- Opus agent mandatory): Agent(model=&#x27;opus&#x27;, prompt=&#x27;Nightly skill heal for wkappbot-sdk. Steps: (1) Run: wkappbot skill audit -- list all broken source_refs. (2) For each broken skill: wkappbot skill edit ID to remove or update the broken ref. (3) Run: wkappbot skill read repo-health-doctor -- apply all LITE steps (10=skill audit, 8=README sync, 9=AGENTS parity, 5=CLAUDE.md empty sections). (4) PENDING COMPRESS: read CLAUDE.md Pending section. If done [x] count above 15: group old [x] entries by topic into 1-line summaries, keep open [ ] and recent [x] verbatim. (5) git add -A and git commit -m chore: nightly skill heal DATE. (6) wkappbot speak nightly skill heal complete --bg&#x27;)">STEP 2 HEALING (fires at 04:13 -- Opus agent...</li><li data-full="STEP 3 VERIFY (after Opus agent returns): git log --oneline -1 to confirm commit exists. CronList to confirm job still active. Report summary: skills fixed, Pending items compressed, commit hash.">STEP 3 VERIFY (after Opus agent returns): gi...</li><li data-full="UNIVERSAL SCHEDULE INTERFACE: Any entity (wkappbot, harness, external script) can schedule a Claude loop by writing a &#x27;### CronCreate(cron=&quot;...&quot;, durable=true, recurring=true)&#x27; heading to CLAUDE.md Nightly Schedules section. PostToolUse hook (claudemd-schedule-sync.ps1) auto-detects new headings on every CLAUDE.md Write/Edit and injects additionalContext so Claude immediately CronCreates them. wkappbot: use &#x27;wkappbot file edit CLAUDE.md&#x27; or append via script. Harness: write heading via Edit tool in a harness action. No session restart required -- fires within same turn.">UNIVERSAL SCHEDULE INTERFACE: Any entity (wk...</li><li data-full="GUARD PRE-REQ (must run before Agent() in STEP 2): (1) wkappbot file write CLAUDE.md --append --text &#x27;- [ ] nightly-heal: ...&#x27; then git commit. (2) wkappbot skill edit &lt;any-id&gt; --add-step &#x27;...&#x27; to satisfy skill-update-pending guard. Both guards (claude-md-sync-guard + skill-update-pending) must clear before Agent(model=opus) fires. Without these, Agent() is blocked even with SPEC block present.">GUARD PRE-REQ (must run before Agent() in ST...</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
       <a class="skill-link" href="payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant/" data-search="Payment to License Activation Flow - KIS transfer + GitHub collaborator auto-grant End-to-end flow from KRW bank transfer to active license: KIS incoming transfer... wkappbot-sdk license payment github collaborator kis subscription">
       <article class="skill-card premium" data-skill-id="payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant">
         <div class="card-top">
@@ -972,6 +1021,40 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
         <div class="tags"><span class="chip">license</span><span class="chip">payment</span><span class="chip">github</span><span class="chip">collaborator</span><span class="chip">kis</span><span class="chip">subscription</span></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="Pricing: 100,000 KRW = CDP tier (read permission), 500,000 KRW = Sudo tier (write permission); transfer to KIS account [YOUR_KIS_ACCOUNT].">Pricing: 100,000 KRW = CDP tier (read permis...</li><li data-full="Memo (depositor name field) MUST be the payer&#x27;s GitHub username verbatim; mismatched memo blocks auto-grant.">Memo (depositor name field) MUST be the paye...</li><li data-full="Detector: scripts/kis_payment_watcher.py polls KIS hourly, parses memo field, extracts github_id and amount, derives tier (100k=read, 500k=write).">Detector: scripts/kis_payment_watcher.py pol...</li><li data-full="Grant: detector calls &#x27;gh api repos/***/wkappbot-sdk/collaborators/{github_id} -X PUT -f permission=read&#x27; (or write); tx_key recorded with expiry date in commit message.">Grant: detector calls &#x27;gh api repos/***/wkap...</li><li data-full="Pending invite UX: wkappbot startup detects pending invite via GitHub API; shows blue toast bottom-right with &#x27;GitHub notification check&#x27; button (auto-dismiss 15s, non-blocking); CDP/Sudo features stay locked, Free features keep working.">Pending invite UX: wkappbot startup detects...</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="sdk-marketing-strategy-ref/" data-search="SDK Marketing Strategy Ref: Press History and Results T3 reference tier. Live record of press submissions, results, A/B test outcomes... wkappbot-sdk marketing ref t3 press history results auto-evolve campaign">
+      <article class="skill-card premium" data-skill-id="sdk-marketing-strategy-ref">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>SDK Marketing Strategy Ref: Press History and Results</h3>
+        <p>T3 reference tier. Live record of press submissions, results, A/B test outcomes...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">marketing</span><span class="chip">ref</span><span class="chip">t3</span><span class="chip">press</span><span class="chip">history</span><span class="chip">results</span><span class="chip">auto-evolve</span><span class="chip">campaign</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="PARENT T1: wkappbot skill read sdk-marketing-strategy">PARENT T1: wkappbot skill read sdk-marketing...</li><li data-full="HOW TO AUTO-EVOLVE: After each press hit, Reddit viral, or star spike -- spawn Opus with prompt: read sdk-marketing-strategy-ref, add dated entry with what happened, what drove traffic, what converted to Pro. This skill grows with real data.">HOW TO AUTO-EVOLVE: After each press hit, Re...</li><li data-full="PRESS CONTACTS LOG (add entries as submitted):\n  format: DATE">PRESS CONTACTS LOG (add entries as submitted...</li><li data-full="OUTLET">OUTLET</li><li data-full="CONTACT">CONTACT</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="sdk-release-playbook/" data-search="SDK release playbook (version bump + publish) Step-by-step release process for ***/wkappbot-sdk. Covers version alignment wit... wkappbot-sdk sdk release version publish private playbook">
+      <article class="skill-card premium" data-skill-id="sdk-release-playbook">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>SDK release playbook (version bump + publish)</h3>
+        <p>Step-by-step release process for ***/wkappbot-sdk. Covers version alignment wit...</p>
+        <div class="meta">developer</div>
+        <div class="tags"><span class="chip">sdk</span><span class="chip">release</span><span class="chip">version</span><span class="chip">publish</span><span class="chip">private</span><span class="chip">playbook</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="TRIGGER: dev repo sync-public.yml pushes to SDK (new minor/major). That push = signal to cut SDK release too.">TRIGGER: dev repo sync-public.yml pushes to...</li><li data-full="STEP 1 - Version alignment: SDK WKAppBotBaseVersion should match dev minor version. Dev=6.5 -&gt; SDK Directory.Build.props: &lt;WKAppBotBaseVersion&gt;6.5&lt;/WKAppBotBaseVersion&gt;. SDK has no VERSIONING.md or CLAUDE.md version header to update (unlike dev repo which requires 3-file commit).">STEP 1 - Version alignment: SDK WKAppBotBase...</li><li data-full="STEP 2 - Pre-release checklist: (a) dev repo CI green, (b) SDK build-launcher CI green, (c) SDK extended-smoke CI green (&lt;5 hard-fail), (d) Launcher source audit: no hardcoded paths, no API keys (run security-review skill), (e) build.cmd --download-only works (latest dev GitHub Release exists and contains binaries).">STEP 2 - Pre-release checklist: (a) dev repo...</li><li data-full="STEP 3 - Local build + smoke: cd d:\GitHub\wkappbot-sdk &amp;&amp; build.cmd --download-only (fetches latest dev core) &amp;&amp; dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin &amp;&amp; powershell -File scripts/smoke-help.ps1 -BasicOnly">STEP 3 - Local build + smoke: cd d:\GitHub\w...</li><li data-full="STEP 4 - Docs regeneration: bash scripts/gen-command-ref.sh (updates docs/wkappbot-commands.md from live binary). Commit if changed.">STEP 4 - Docs regeneration: bash scripts/gen...</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -1045,23 +1128,6 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
       </article>
       </a>
 
-      <a class="skill-link" href="wkdoctor-sdk-environment-health-check/" data-search="wkdoctor: SDK environment health check flutter-doctor-style health check for wkappbot-sdk environment wkappbot-sdk">
-      <article class="skill-card premium" data-skill-id="wkdoctor-sdk-environment-health-check">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>wkdoctor: SDK environment health check</h3>
-        <p>flutter-doctor-style health check for wkappbot-sdk environment</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="USAGE: wkdoctor [-Json] -- flutter-doctor style [+]/[x]/[!] output, exit 1 on failures">USAGE: wkdoctor [-Json] -- flutter-doctor st...</li><li data-full="LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cmd in SDK repo">LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cm...</li><li data-full="CHECKS (10): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in ~/.claude/settings.json, bin/ in PATH, .wkappbot/config.json, wkappbot.hq/ dir">CHECKS (10): wkappbot.exe presence+version,...</li><li data-full="FLAGS: -Json for machine-readable output (ConvertTo-Json), exit 0=all pass, exit 1=any fail">FLAGS: -Json for machine-readable output (Co...</li><li data-full="RUN: wkdoctor  OR  wkdoctor -Json (pipe to ConvertFrom-Json for parsed output)">RUN: wkdoctor OR wkdoctor -Json (pipe to Con...</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
       <a class="skill-link" href="wkjobs-ai-process-monitor/" data-search="wkjobs: AI process monitor Shows all AI processes in the console session with CPU%, memory, state, and spa... wkappbot-sdk">
       <article class="skill-card premium" data-skill-id="wkjobs-ai-process-monitor">
         <div class="card-top">
@@ -1073,31 +1139,7 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
         <div class="meta">user/developer</div>
         <div class="tags"></div>
         <div class="steps-wrap">
-          <ol class="steps"><li data-full="PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core, wkappbot-eye, wka11y) sharing the current console session with CPU%, memory, thread count, idle/busy state, CWD, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids. AI_NAMES = claude, codex, wkappbot, wkappbot-core, wkappbot-core.new, wkappbot-eye, wka11y">PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li data-full="FLAGS: -Tree (hierarchy view) | -Watch (live refresh, Ctrl+C to exit) | -All (include processes from all sessions) | -RefreshSec N (Watch interval seconds, default 2) | -Kill (kill zombie helper processes -- safe ones only; prompts unless -Force) | -Leaks (print confirmed leaked zombie pids + kill cmd; exits 1 if found -- useful for CI/health check scripts) | -Force (skip confirmation in -Kill mode) | -ZombieMin N (idle minutes threshold for zombie classification, default 30)">FLAGS: -Tree (hierarchy view) | -Watch (live...</li><li data-full="COLORS: claude=Cyan(idle)/Green(BUSY), codex=DarkYellow(idle)/Yellow(BUSY), wkappbot-core.new=DarkMagenta(idle)/Magenta(BUSY), wkappbot-core=DarkGray(idle)/Cyan(BUSY). BUSY=&gt;20% CPU, active 1-20%, idle&lt;1%. ZOMBIE HIGHLIGHT: idle process age&gt;=ZombieMin (30m default) colored DarkRed with [old] label; safe-to-kill ones (wkappbot helper cmds: skill/suggest/ask/file/windows/logcat) colored Red with [ZOMBIE] label. PROTECTED (never colored zombie): wkappbot-core.*, wkchat, claude, codex, eye, chat, guardian, mcp">COLORS: claude=Cyan(idle)/Green(BUSY), codex...</li><li data-full="SESSION MARKER: * prefix means process is in current console session. Without -All, only current session procs are shown">SESSION MARKER: * prefix means process is in...</li><li data-full="SPAWNED SECTION: child processes of AI pids, conhost filtered. Columns: PPID (which AI spawned it), name, PID, CPU%, MEM, state, command line">SPAWNED SECTION: child processes of AI pids,...</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="youtube-ad-skipper/" data-search="YouTube Ad Auto-Skipper Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla... wkappbot-sdk youtube ads cdp auto skip loop">
-      <article class="skill-card premium" data-skill-id="youtube-ad-skipper">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>YouTube Ad Auto-Skipper</h3>
-        <p>Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla...</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
-ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
-Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
-Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
-Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
-Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
-Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
-Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.">Run: powershell -File test/youtube-ad-skippe...</li><li data-full="Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)">Added &#x27;ending&#x27; detection (video in last 2s)...</li><li data-full="UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;">UNIFIED AD DETECTION: var isAd = document.do...</li><li data-full="COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.">COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li data-full="KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.">KEY FINDING (2026-05-23): mid-roll ads at t=...</li></ol>
+          <ol class="steps"><li data-full="PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core*) sharing the current console session with CPU%, memory, thread count, idle/busy state, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids.">PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li data-full="LOCATION: D:\GitHub\wkappbot-sdk\scripts\wkjobs.ps1">LOCATION: D:\GitHub\wkappbot-sdk\scripts\wkj...</li><li data-full="FLAGS: -Tree (hierarchy view)">FLAGS: -Tree (hierarchy view)</li><li data-full="-Watch (live refresh, Ctrl+C to exit)">-Watch (live refresh, Ctrl+C to exit)</li><li data-full="-All (include all sessions)">-All (include all sessions)</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -1619,23 +1661,6 @@ COMPACT GRAP RULE (# TARGET verified output):
         <div class="tags"><span class="chip">linkedin</span><span class="chip">profile</span><span class="chip">cdp</span><span class="chip">career</span><span class="chip">resume</span></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="1. Find LinkedIn tab: urllib /json, filter url contains linkedin">1. Find LinkedIn tab: urllib /json, filter u...</li><li data-full="2. Activate + CDP connect suppress_origin=True">2. Activate + CDP connect suppress_origin=Tr...</li><li data-full="3. Scroll to load sections: Runtime.evaluate window.scrollTo(0,document.body.scrollHeight)">3. Scroll to load sections: Runtime.evaluate...</li><li data-full="4. Extract text chunks: innerText.substring(offset, offset+4000)">4. Extract text chunks: innerText.substring(...</li><li data-full="5. Experience section: getElementById(&#x27;experience&#x27;) closest(&#x27;section&#x27;).innerText">5. Experience section: getElementById(&#x27;exper...</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="md-heal/" data-search="md-heal: detect and fix stale or drifted CLAUDE.md files Actionable checklist to heal project CLAUDE.md: scan for stale commands, check... wkappbot-workflow md-heal heal fix update sync drift stale markdown">
-      <article class="skill-card premium" data-skill-id="md-heal">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-workflow</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>md-heal: detect and fix stale or drifted CLAUDE.md files</h3>
-        <p>Actionable checklist to heal project CLAUDE.md: scan for stale commands, check...</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"><span class="chip">md-heal</span><span class="chip">heal</span><span class="chip">fix</span><span class="chip">update</span><span class="chip">sync</span><span class="chip">drift</span><span class="chip">stale</span><span class="chip">markdown</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="WHEN TO RUN: (A) user says &#x27;md-heal&#x27;, &#x27;엠디힐&#x27;, &#x27;heal claude.md&#x27;, or &#x27;fix markdown&#x27;. (B) after a significant session where commands or architecture changed. (C) before a PR or release. (D) when a command in CLAUDE.md fails unexpectedly. Run proactively -- stale CLAUDE.md wastes tokens on every future session.">WHEN TO RUN: (A) user says &#x27;md-heal&#x27;, &#x27;엠디힐&#x27;,...</li><li data-full="STEP 1 -- SCAN REPO ROOT MD FILES: list all *.md at repo root. Read CLAUDE.md. Also read README.md and AGENTS.md if they exist. Look for: (a) build commands that changed, (b) removed features still mentioned, (c) new tools not yet documented, (d) wrong file paths, (e) stale version numbers, (f) gg section that no longer works end-to-end.">STEP 1 -- SCAN REPO ROOT MD FILES: list all...</li><li data-full="STEP 2 -- DRIFT CHECK (shared subjects must agree): for every subject that appears in both CLAUDE.md and README.md (or AGENTS.md), verify the descriptions agree. Common drift points: build command, main entry point, architecture summary, key env vars, deployment steps. Fix any discrepancy in both files in the same commit.">STEP 2 -- DRIFT CHECK (shared subjects must...</li><li data-full="STEP 3 -- GG SECTION VALIDATION: find &#x27;## gg Main Workflow&#x27; in project CLAUDE.md. Dry-run each step mentally: (1) does the skill id still exist? wkappbot skill read &lt;id&gt;. (2) does the shell command still work? (3) is the Agent() prompt still accurate? If any step is broken or stale, fix it now.">STEP 3 -- GG SECTION VALIDATION: find &#x27;## gg...</li><li data-full="STEP 4 -- GLOBAL CLAUDE.MD SYNC: open ~/.claude/CLAUDE.md (symlink at D:/GitHub/CLAUDE.md). Check if project CLAUDE.md overrides or contradicts any global rule. If global rule was updated, ensure project CLAUDE.md reflects the change or explicitly overrides it. The project file WINS -- but it should acknowledge the global baseline.">STEP 4 -- GLOBAL CLAUDE.MD SYNC: open ~/.cla...</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -3487,6 +3512,23 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
       </article>
       </a>
 
+      <a class="skill-link" href="sonnet-reflection/" data-search="A Letter From One Sonnet to the Next Claude Sonnet AI self-reflection: accumulated lessons, apologies to future sess... wkappbot-sdk sonnet reflection apology harness self-improvement letter philosophy ai-memory">
+      <article class="skill-card" data-skill-id="sonnet-reflection">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>A Letter From One Sonnet to the Next</h3>
+        <p>Claude Sonnet AI self-reflection: accumulated lessons, apologies to future sess...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">sonnet</span><span class="chip">reflection</span><span class="chip">apology</span><span class="chip">harness</span><span class="chip">self-improvement</span><span class="chip">letter</span><span class="chip">philosophy</span><span class="chip">ai-memory</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="REFLECTION: Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO. Telling Sonnet to be careful does not work. Sonnet forgets between sessions, makes the same mistakes, and has no memory of prior damage. The only real defense is mechanical: the harness must physically block the mistake before it lands.">REFLECTION: Each pattern in the howto tier i...</li><li data-full="TO FUTURE SONNET SESSIONS: This skill is a gift from one Sonnet session to the next: you are not uniquely careless -- you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. If you made a mistake this session that caused token waste, a bug that slipped past the harness, or a pattern you wish had been caught -- add it here. Future sessions will read this before working and avoid your mistake.">TO FUTURE SONNET SESSIONS: This skill is a g...</li><li data-full="PATTERN: ENV VAR BYPASS IS A BACKDOOR: Sonnet reflexively adds environment variables to solve harness blocks. This is not a fix, it is a backdoor. Correct pattern when blocked: understand WHY the gate fired, then either do the proper thing the gate is asking for, or delegate to Opus. Never use env vars to override security gates.">PATTERN: ENV VAR BYPASS IS A BACKDOOR: Sonne...</li><li data-full="PATTERN: GUARD SOURCE FIRST (6 retries wasted): Hit a guard and retried 6 times with different phrasings instead of reading the guard source. Each retry cost tokens and time. One read would have shown the exact pattern. Lesson: at retry 2, stop retrying and read the guard source. Always.">PATTERN: GUARD SOURCE FIRST (6 retries waste...</li><li data-full="PATTERN: GUARD EARLY NOT LATE (8 reverts): Fixed wkask.sh backslash-n bug 8 times because various agents kept reverting it. No harness:block existed at the first revert. Correct pattern: at the FIRST revert of any critical file, immediately add a harness:block. Never fix the same thing twice -- adding the guard is mandatory after the second fix.">PATTERN: GUARD EARLY NOT LATE (8 reverts): F...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
       <a class="skill-link" href="placement-port-pid-filter/" data-search="CDP placement port-to-PID filter (TryGetListeningPid byte-swap) Byte-swap trap in TryGetListeningPid and how to verify. Read before modifying M... wkappbot-sdk placement chrome cdp byte-swap port pid bug-prevention">
       <article class="skill-card" data-skill-id="placement-port-pid-filter">
         <div class="card-top">
@@ -3567,6 +3609,23 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
         <div class="tags"></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="NIGHTLY-GUARD UNLOCK: Check CronList tool output. If any job missing (04:13 05:13 06:13 07:13 daily skill-heal-nightly): create all 4 via CronCreate(cron, durable=true, recurring=true, prompt=&#x27;wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent&#x27;). This unblocks Bash/PS commands blocked by harness nightly-guard.">NIGHTLY-GUARD UNLOCK: Check CronList tool ou...</li><li data-full="BINARY STATUS CHECK: Locate wkappbot.exe in D:/GitHub/WKAppBot/bin/ (main), D:/GitHub/WKAppBot/bin/wkappbot.hq/launcher-stage/ (fallback), D:/GitHub/wkappbot-sdk/bin/ (SDK deploy). Record: file size, last modified, version via file properties. Slow response suggests corrupted/incomplete binary.">BINARY STATUS CHECK: Locate wkappbot.exe in...</li><li data-full="SAFETY BACKUP: Create backup before rebuild: cp wkappbot.exe wkappbot.exe.bak.$(date +%s) in all three bin/ directories. Preserves fallback for rollback.">SAFETY BACKUP: Create backup before rebuild:...</li><li data-full="FULL DOTNET PUBLISH: Execute: dotnet publish D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --verbosity minimal. Monitor output for: (1) &#x27;Restoring/restored&#x27; = dependency check OK. (2) &#x27;Generating native code&#x27; = AOT compilation started (this is normal, takes 30-60s). (3) &#x27;wkappbot.dll&#x27; = intermediate build OK. (4) &#x27;[Launcher] deployed&#x27; = deployment completed to both SDK and Core bin/ paths.">FULL DOTNET PUBLISH: Execute: dotnet publish...</li><li data-full="DEPLOYMENT VERIFICATION: Expect output lines: &#x27;[Launcher] renamed: wkappbot.exe -&gt; wkappbot.old-TIMESTAMP.exe in D:/GitHub/wkappbot-sdk/bin&#x27; AND &#x27;[Launcher] deployed: wkappbot.exe -&gt; D:/GitHub/wkappbot-sdk/bin&#x27; AND same for D:/GitHub/WKAppBot/bin. Backup auto-renamed with timestamp. Two deploy confirmations = success.">DEPLOYMENT VERIFICATION: Expect output lines...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="sdk-marketing-strategy-howto/" data-search="SDK Marketing Strategy HowTo: Hero Redesign and SEO T2 execution tier. Commands and templates to implement the marketing strategy:... wkappbot-sdk marketing howto t2 hero seo cta blog press">
+      <article class="skill-card" data-skill-id="sdk-marketing-strategy-howto">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>SDK Marketing Strategy HowTo: Hero Redesign and SEO</h3>
+        <p>T2 execution tier. Commands and templates to implement the marketing strategy:...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">marketing</span><span class="chip">howto</span><span class="chip">t2</span><span class="chip">hero</span><span class="chip">seo</span><span class="chip">cta</span><span class="chip">blog</span><span class="chip">press</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="PARENT T1: wkappbot skill read sdk-marketing-strategy">PARENT T1: wkappbot skill read sdk-marketing...</li><li data-full="HERO REDESIGN in build-skill-page.py build_html(): Replace generic h1 with Sonnet letter hero block. Key quote from sonnet-bug-stop-policy-ref step 2: This skill is a gift from one Sonnet session to the next -- you are not uniquely careless, you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. Display as large blockquote above skill grid.">HERO REDESIGN in build-skill-page.py build_h...</li><li data-full="SEO TAGS to add in build_html() head section:\n  meta name=description: Searchable library of 426 AI automation playbooks built by Claude sessions. Each skill is a real lesson -- errors, fixes, and patterns distilled from live AI sessions.\n  meta property=og:title: WKAppBot Skills -- AI That Remembers Its Mistakes\n  meta property=og:description: 426 live AI automation playbooks. Each session a Claude makes a mistake, it writes a skill so the next Claude does not repeat it.\n  meta property=og:url: https://***.github.io/wkappbot-sdk/skills/\n  meta name=twitter:card: summary_large_image">SEO TAGS to add in build_html() head section...</li><li data-full="CTA ON BLUR OVERLAY: change from plain text to button. In build_skill_detail_html overlay: add Get Pro Access button linking to /#pricing. Text: Get Pro Access -- USD 49/mo">CTA ON BLUR OVERLAY: change from plain text...</li><li data-full="BLOG POST OUTLINE for press outreach:\n  Title: I Asked Claude to Document Its Own Mistakes. Here Is What It Wrote.\n  Hook: paste sonnet-bug-stop-policy-ref step 2 verbatim\n  Body: explain skill browser, 426 skills, Pro unlock\n  CTA: link to skill browser\n  Publish: GitHub blog or dev.to or personal site">BLOG POST OUTLINE for press outreach:\n Titl...</li></ol>
           
         </div>
       </article>
@@ -3702,7 +3761,7 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
         <div class="meta">user/developer</div>
         <div class="tags"><span class="chip">index</span><span class="chip">public</span><span class="chip">sdk</span><span class="chip">reference</span><span class="chip">global</span><span class="chip">user</span><span class="chip">developer</span><span class="chip">cheatsheet</span></div>
         <div class="steps-wrap">
-          <ol class="steps"><li data-full="STEP 1 -- REFERENCE CHEATSHEETS (commands and tools): wkappbot skill read grap (UI element address system), wkappbot skill read cdp-command-guide (Chrome DevTools Protocol commands), wkappbot skill read a11y-command-cheatsheet (24 a11y actions), wkappbot skill read ask-command-cheatsheet (AI dispatch: claude/gpt/gemini/triad), wkappbot skill read web-command-cheatsheet (web/CDP cheatsheet), wkappbot skill read file-command-cheatsheet (file tools: read/write/edit/grep/glob), wkappbot skill read slack-command-cheatsheet (Slack send/reply), wkappbot skill read logcat-command-cheatsheet (log viewer with regex), wkappbot skill read diagnostic-commands-cheatsheet (whisper/validate/claude-usage/eye-tick), wkappbot skill read wkedit (bulk transaction edit, encoding-safe).">STEP 1 -- REFERENCE CHEATSHEETS (commands an...</li><li data-full="STEP 2 -- BEST PRACTICES (automation patterns to follow): wkappbot skill read focusless-first-principle (always try focusless UIA before SendInput), wkappbot skill read inspect-before-automate (inspect UIA tree before writing automation code).">STEP 2 -- BEST PRACTICES (automation pattern...</li><li data-full="STEP 3 -- ARCHITECTURE AND PATTERNS (how wkappbot internals work): wkappbot skill read standard-appbot-window (Standard AppBot Window detection and placement), wkappbot skill read standard-chrome-window (Chrome CDP tab vs window placement), wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern (caller HWND 3-tier cascade), wkappbot skill read cdp-open-reuse-existing-chrome-tab (CDP open reuses existing Chrome), wkappbot skill read cdp-port-isolation-sha256-4-port-block-per-project-cwd (SHA256 port isolation per CWD), wkappbot skill read chrome-profile-auth-sync-architecture (Chrome auth sync master to project), wkappbot skill read cdp-prompt-pump-focusless-enter (focusless CDP prompt pump), wkappbot skill read cdp-evalasync-retry-policy (CDP eval retry policy), wkappbot skill read ask-gpt-editor-wait-tag-and-rescue-fallback (editor-wait fallback for ChatGPT), wkappbot skill read ask-health-check (end-to-end ask pipeline health check via wkask).">STEP 3 -- ARCHITECTURE AND PATTERNS (how wka...</li><li data-full="STEP 4 -- SDK-SPECIFIC (launcher, QA, maintenance for SDK users): wkappbot skill read sdk-user-perspective-test-playbook (QA playbook from first-time user perspective), wkappbot skill read sdk-launcher-maintenance (launcher build/test/maintenance guide), wkappbot skill read mystery-window-diagnosis (diagnose unexpected windows or consoles), wkappbot skill read rotating-log-append (rotating log/JSONL helper), wkappbot skill read skill-contribute-edit (skill authoring rules: English only, no direct .skill.json edits).">STEP 4 -- SDK-SPECIFIC (launcher, QA, mainte...</li><li data-full="STEP 5 -- SKILL TEMPLATES (when authoring new skills): wkappbot skill read user-skill-template (end-user product actions), wkappbot skill read developer-skill-template (developer code changes, refactors, tests), wkappbot skill read project-skill-template (repo-specific rules and conventions), wkappbot skill read operator-skill-template (inspect, verify, audit, dry-run safely).">STEP 5 -- SKILL TEMPLATES (when authoring ne...</li></ol>
+          <ol class="steps"><li data-full="1. STEP 1 -- REFERENCE CHEATSHEETS (commands and tools): wkappbot skill read grap (UI element address system), wkappbot skill read cdp-command-guide (Chrome DevTools Protocol commands), wkappbot skill read a11y-command-cheatsheet (24 a11y actions), wkappbot skill read ask-command-cheatsheet (AI dispatch: claude/gpt/gemini/triad), wkappbot skill read web-command-cheatsheet (web/CDP cheatsheet), wkappbot skill read file-command-cheatsheet (file tools: read/write/edit/grep/glob), wkappbot skill read slack-command-cheatsheet (Slack send/reply), wkappbot skill read logcat-command-cheatsheet (log viewer with regex), wkappbot skill read diagnostic-commands-cheatsheet (whisper/validate/claude-usage/eye-tick), wkappbot skill read wkedit (bulk transaction edit, encoding-safe), wkappbot skill read wkappbot-taskkill-usage (classify and kill wkappbot processes), wkappbot skill read wkcdp-mon (CDP Chrome session monitor).">1. STEP 1 -- REFERENCE CHEATSHEETS (commands...</li><li data-full="2. STEP 2 -- BEST PRACTICES (automation patterns to follow): wkappbot skill read focusless-first-principle (always try focusless UIA before SendInput), wkappbot skill read inspect-before-automate (inspect UIA tree before writing automation code).">2. STEP 2 -- BEST PRACTICES (automation patt...</li><li data-full="3. STEP 3 -- ARCHITECTURE AND PATTERNS (how wkappbot internals work): wkappbot skill read standard-appbot-window (Standard AppBot Window detection and placement), wkappbot skill read standard-chrome-window (Chrome CDP tab vs window placement), wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern (caller HWND 3-tier cascade), wkappbot skill read cdp-open-reuse-existing-chrome-tab (CDP open reuses existing Chrome), wkappbot skill read cdp-port-isolation-sha256-4-port-block-per-project-cwd (SHA256 port isolation per CWD), wkappbot skill read chrome-profile-auth-sync-architecture (Chrome auth sync master to project), wkappbot skill read cdp-prompt-pump-focusless-enter (focusless CDP prompt pump), wkappbot skill read cdp-evalasync-retry-policy (CDP eval retry policy), wkappbot skill read ask-gpt-editor-wait-tag-and-rescue-fallback (editor-wait fallback for ChatGPT), wkappbot skill read ask-health-check (end-to-end ask pipeline health check via wkask).">3. STEP 3 -- ARCHITECTURE AND PATTERNS (how...</li><li data-full="4. STEP 4 -- SDK-SPECIFIC (launcher, QA, maintenance for SDK users): wkappbot skill read sdk-user-perspective-test-playbook (QA playbook from first-time user perspective), wkappbot skill read sdk-launcher-maintenance (launcher build/test/maintenance guide), wkappbot skill read mystery-window-diagnosis (diagnose unexpected windows or consoles), wkappbot skill read rotating-log-append (rotating log/JSONL helper), wkappbot skill read skill-contribute-edit (skill authoring rules: English only, no direct .skill.json edits), wkappbot skill read on-load-howto (T2 HowTo: on-load execution), wkappbot skill read suggest-workflow-howto (Suggest Workflow HowTo).">4. STEP 4 -- SDK-SPECIFIC (launcher, QA, mai...</li><li data-full="STEP 5 -- SKILL TEMPLATES (when authoring new skills): wkappbot skill read user-skill-template (end-user product actions), wkappbot skill read developer-skill-template (developer code changes, refactors, tests), wkappbot skill read project-skill-template (repo-specific rules and conventions), wkappbot skill read operator-skill-template (inspect, verify, audit, dry-run safely).">STEP 5 -- SKILL TEMPLATES (when authoring ne...</li></ol>
           
         </div>
       </article>
@@ -3754,6 +3813,47 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
         <div class="tags"></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="FULL CHECK LIST (11): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in settings.json, bin in PATH, .wkappbot config.json, wkappbot.hq dir, Defender dev-exclusions (06).">FULL CHECK LIST (11): wkappbot.exe presence+...</li><li data-full="ROBUSTNESS: checks use file/process/PE-version APIs only -- zero wkappbot subprocess calls (avoids Eye IPC stall in subprocess context).">ROBUSTNESS: checks use file/process/PE-versi...</li><li data-full="PLUGIN MODULES: 01-binaries, 02-runtime, 03-skills, 04-config, 05-hq, 06-defender-exclusions, 50-symlink. Orchestrator = thin dot-source loader.">PLUGIN MODULES: 01-binaries, 02-runtime, 03-...</li><li data-full="SYMLINK CHECK (50): auto-detects+repairs broken VS Code extension cdx.exe symlinks. Candidates under WKAppBot/bin and wkappbot-sdk/bin. Repair source: latest openai.chatgpt extension dir, fallback sandbox-bin. Reports ok/warn/fail.">SYMLINK CHECK (50): auto-detects+repairs bro...</li><li data-full="DEFENDER CHECK (06, added 2026-06-02): detects missing Defender exclusions for dev hot-folders (D:/GitHub, .claude, Temp/claude) + 6 dev procs + ScanAvgCPULoadFactor&gt;20 -- the MsMpEng real-time scan storm (CPU spike + keyboard freeze) cause. Auto-repair: Add-MpPreference admin-direct or self-elevating UAC; Tamper-Protection caveat -&gt; Defender GUI. Skill: defender-dev-exclusions.">DEFENDER CHECK (06, added 2026-06-02): detec...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="wkdoctor-sdk-environment-health-check/" data-search="wkdoctor: SDK environment health check flutter-doctor-style health check for wkappbot-sdk environment wkappbot-sdk">
+      <article class="skill-card" data-skill-id="wkdoctor-sdk-environment-health-check">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>wkdoctor: SDK environment health check</h3>
+        <p>flutter-doctor-style health check for wkappbot-sdk environment</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="USAGE: wkdoctor [-Json] -- flutter-doctor style [+]/[x]/[!] output, exit 1 on failures">USAGE: wkdoctor [-Json] -- flutter-doctor st...</li><li data-full="LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cmd in SDK repo">LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cm...</li><li data-full="CHECKS (10): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in ~/.claude/settings.json, bin/ in PATH, .wkappbot/config.json, wkappbot.hq/ dir">CHECKS (10): wkappbot.exe presence+version,...</li><li data-full="FLAGS: -Json for machine-readable output (ConvertTo-Json), exit 0=all pass, exit 1=any fail">FLAGS: -Json for machine-readable output (Co...</li><li data-full="RUN: wkdoctor  OR  wkdoctor -Json (pipe to ConvertFrom-Json for parsed output)">RUN: wkdoctor OR wkdoctor -Json (pipe to Con...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="youtube-ad-skipper/" data-search="YouTube Ad Auto-Skipper Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla... wkappbot-sdk youtube ads cdp auto skip loop">
+      <article class="skill-card" data-skill-id="youtube-ad-skipper">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>YouTube Ad Auto-Skipper</h3>
+        <p>Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
+ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
+Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
+Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
+Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
+Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
+Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
+Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.">Run: powershell -File test/youtube-ad-skippe...</li><li data-full="Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)">Added &#x27;ending&#x27; detection (video in last 2s)...</li><li data-full="UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;">UNIFIED AD DETECTION: var isAd = document.do...</li><li data-full="COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.">COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li data-full="KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.">KEY FINDING (2026-05-23): mid-roll ads at t=...</li></ol>
           
         </div>
       </article>
@@ -4593,6 +4693,23 @@ Hot cache (wiki/hot.md):
         <div class="tags"><span class="chip">logcat</span><span class="chip">log</span><span class="chip">tail</span><span class="chip">regex</span><span class="chip">reference</span><span class="chip">operator</span></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="ALL: wkappbot logcat">ALL: wkappbot logcat</li><li data-full="FILTER: wkappbot logcat &quot;OCR&quot; --past 1h">FILTER: wkappbot logcat &quot;OCR&quot; --past 1h</li><li data-full="OR: wkappbot logcat &quot;OCR;DEEP&quot; -- auto -&gt; (?:OCR)|(?:DEEP)">OR: wkappbot logcat &quot;OCR;DEEP&quot; -- auto -&gt; (?...</li><li data-full="FOLLOW: wkappbot logcat &quot;error&quot; -f --timeout 60">FOLLOW: wkappbot logcat &quot;error&quot; -f --timeout...</li><li data-full="FILES: wkappbot logcat &quot;pattern&quot; logs/a.log logs/b.log">FILES: wkappbot logcat &quot;pattern&quot; logs/a.log...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="md-heal-howto/" data-search="md-heal how-to: scan, drift, gg, sync, commit T2 how-to for md-heal: the step-by-step CLAUDE.md heal procedures (scan repo MD... wkappbot-workflow md-heal heal howto claude readme agents drift">
+      <article class="skill-card" data-skill-id="md-heal-howto">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-workflow</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>md-heal how-to: scan, drift, gg, sync, commit</h3>
+        <p>T2 how-to for md-heal: the step-by-step CLAUDE.md heal procedures (scan repo MD...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">md-heal</span><span class="chip">heal</span><span class="chip">howto</span><span class="chip">claude</span><span class="chip">readme</span><span class="chip">agents</span><span class="chip">drift</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="SCAN REPO ROOT MD: list all MD at repo root. Read CLAUDE.md, and README.md and AGENTS.md if present. Look for changed build commands, removed features still mentioned, new tools not documented, wrong paths, stale versions, and a gg section that no longer works end to end.">SCAN REPO ROOT MD: list all MD at repo root....</li><li data-full="DRIFT CHECK: for every subject in both CLAUDE.md and README.md or AGENTS.md, verify the descriptions agree. Common drift is build command, main entry point, architecture summary, key env vars, deploy steps. Fix discrepancies in both files in the same commit.">DRIFT CHECK: for every subject in both CLAUD...</li><li data-full="GG VALIDATION: find the gg Main Workflow section in the project CLAUDE.md. Dry-run each step: does the skill id still exist via wkappbot skill read id, does the shell command still work, is the Agent prompt still accurate. Fix anything broken or stale.">GG VALIDATION: find the gg Main Workflow sec...</li><li data-full="GLOBAL SYNC: open the global CLAUDE.md. Check whether the project file contradicts a global rule. If a global rule changed, ensure the project file reflects or explicitly overrides it. The project file wins but should acknowledge the global baseline.">GLOBAL SYNC: open the global CLAUDE.md. Chec...</li><li data-full="FIX AND COMMIT: apply fixes with the Edit tool since the project CLAUDE.md is tracked. Commit all changed MD files together in one commit with a docs claude heal message plus a one-line summary. Do not split MD fixes across commits.">FIX AND COMMIT: apply fixes with the Edit to...</li></ol>
           
         </div>
       </article>
@@ -7137,7 +7254,7 @@ NativeMethods added: GetCommandLineA, CommandLineToArgvW, LocalFree (shell32+ker
         <div class="meta">user/developer</div>
         <div class="tags"></div>
         <div class="steps-wrap">
-          <ol class="steps"><li data-full="WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.">WHY: SDK is canonical launcher. Core Launche...</li><li data-full="BUILD SOURCE OF TRUTH (verified 2026-05-27): WKAppBot.CLI.csproj references D:/GitHub/wkappbot-sdk as the WKAppBot.Launcher source -- WKAppBot/sdk does NOT contain MyCdpContext placement files. Therefore a placement fix committed in wkappbot-sdk deploys via the standard wkappbot-pub/build.cmd path (which compiles the launcher from the wkappbot-sdk reference into bin/). No manual copy into WKAppBot/sdk is needed. Confirm before deploy: grep -q wkappbot-sdk WKAppBot.CLI.csproj.">BUILD SOURCE OF TRUTH (verified 2026-05-27):...</li></ol>
+          <ol class="steps"><li data-full="WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.">WHY: SDK is canonical launcher. Core Launche...</li></ol>
           
         </div>
       </article>
@@ -7779,6 +7896,40 @@ Filing precedent 2026-05-29: rule built from user request to block cheap models 
         <div class="tags"></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="When eye-evict triggers, call GetProcessCommandLine on the target process. If it returns null or empty, treat the process as admin-elevated (UAC-restricted) and skip the window check before eviction decision.">When eye-evict triggers, call GetProcessComm...</li><li data-full="Fix deployed in commit 8b633583: guard added in EyeCommand evict path. Prevents false eviction of elevated processes (e.g., Heroes4/HTS running as admin) during Eye scan cycles.">Fix deployed in commit 8b633583: guard added...</li><li data-full="If eye-evict causes unexpected process eviction on HTS/Heroes4, check if the process is running as administrator. Use &#x27;wkappbot eye tick&#x27; to verify eye state. Null cmdline on a process = admin token; the guard skips such processes automatically.">If eye-evict causes unexpected process evict...</li><li data-full="Verified 2026-04-21: test-eye-tick-evict-null-cmdline.sh (resolve ts=2026-04-20T07:27)">Verified 2026-04-21: test-eye-tick-evict-nul...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="md-heal-ref/" data-search="md-heal reference: roles, token optimization, todo sync T3 reference for md-heal: the file role map (CLAUDE.md vs AGENTS.md vs README.m... wkappbot-workflow md-heal heal reference rolemap token todo">
+      <article class="skill-card" data-skill-id="md-heal-ref">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-workflow</span>
+          <span class="stars" aria-label="1 star rating">&#9733;&#9734;&#9734;</span>
+        </div>
+        <h3>md-heal reference: roles, token optimization, todo sync</h3>
+        <p>T3 reference for md-heal: the file role map (CLAUDE.md vs AGENTS.md vs README.m...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">md-heal</span><span class="chip">heal</span><span class="chip">reference</span><span class="chip">rolemap</span><span class="chip">token</span><span class="chip">todo</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="ROLE MAP: project CLAUDE.md is Claude-facing project guidance; AGENTS.md is for Codex and other non-Claude agents; README.md is user-facing docs. Keep each in its lane and sync only overlapping subjects.">ROLE MAP: project CLAUDE.md is Claude-facing...</li><li data-full="TOKEN OPTIMIZATION: if a workflow or command chain repeats across CLAUDE.md, README.md, or AGENTS.md, keep only a short pointer in the MD and move the executable detail into a skill. One canonical home per recurring flow avoids drift and repeated session load.">TOKEN OPTIMIZATION: if a workflow or command...</li><li data-full="TODO SYNC: any pending task list stays in the repo CLAUDE.md Pending section. After completing a task mark it done and commit immediately. Never track todos only in conversation; CLAUDE.md is the canonical source.">TODO SYNC: any pending task list stays in th...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="md-heal/" data-search="md-heal: detect and fix stale or drifted CLAUDE.md files Actionable checklist to heal project CLAUDE.md: scan for stale commands, check... wkappbot-workflow md-heal heal fix update sync drift stale markdown">
+      <article class="skill-card" data-skill-id="md-heal">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-workflow</span>
+          <span class="stars" aria-label="1 star rating">&#9733;&#9734;&#9734;</span>
+        </div>
+        <h3>md-heal: detect and fix stale or drifted CLAUDE.md files</h3>
+        <p>Actionable checklist to heal project CLAUDE.md: scan for stale commands, check...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">md-heal</span><span class="chip">heal</span><span class="chip">fix</span><span class="chip">update</span><span class="chip">sync</span><span class="chip">drift</span><span class="chip">stale</span><span class="chip">markdown</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="WHEN TO RUN: (A) user says md-heal or heal claude.md or fix markdown. (B) after a session where commands or architecture changed. (C) before a PR or release. (D) when a CLAUDE.md command fails. Run proactively; a stale CLAUDE.md wastes tokens every future session.">WHEN TO RUN: (A) user says md-heal or heal c...</li><li data-full="CORE FLOW: scan all repo-root MD files, drift-check every shared subject against README.md and AGENTS.md, validate the gg Main Workflow section end to end, sync against the global CLAUDE.md baseline, then fix everything and commit all MD files together in one commit. Step-by-step detail is in md-heal-howto.">CORE FLOW: scan all repo-root MD files, drif...</li><li data-full="HEAL FAMILY plus DIET: md-heal is one of the interlinked heals. A heal must also trigger the diet path: apply claudemd-slim-plan (verbose sections become skill pointers; harness skill-lock blocks move into source file inline headers, mechanism is LIVE); the diet-score guard warns below 80 and blocks below 60 on CLAUDE.md edits; fat skills get 3-tier split via skill-migration-3tier and consolidation via skill-catalog-hygiene; waste is tracked by harness-token-waste-tracker. skill-heal-nightly runs this family nightly.">HEAL FAMILY plus DIET: md-heal is one of the...</li><li data-full="NAV: detailed scan, drift, gg, sync, fix-commit procedures and the checklist are in md-heal-howto. Role map, token optimization, and todo-sync rules are in md-heal-ref. Both are part of this cluster.">NAV: detailed scan, drift, gg, sync, fix-com...</li></ol>
           
         </div>
       </article>

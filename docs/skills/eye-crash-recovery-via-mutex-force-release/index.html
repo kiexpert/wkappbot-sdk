@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Eye crash recovery via mutex force-release | WKAppBot Skill</title>
+  <title>Eye crash recovery via mutex force-release | WKAppBot Skills</title>
+  <meta name="description" content="When Eye crashes and cannot restart due to AbandonedMutexException, force-release the 3 named mutexes via PowerShell .NET API, then restart Eye. Eye revival also auto-clears zombie Chrome processes i...">
+  <meta property="og:title" content="Eye crash recovery via mutex force-release | WKAppBot Skills">
+  <meta property="og:description" content="When Eye crashes and cannot restart due to AbandonedMutexException, force-release the 3 named mutexes via PowerShell .NET API, then restart Eye. Eye revival also auto-clears zombie Chrome processes i...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/eye-crash-recovery-via-mutex-force-release/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>DIAGNOSE STEP 1 — Symptom: wkappbot consoles...</li><li>DIAGNOSE STEP 2 — Confirm AbandonedMutex: ta...</li><li>DIAGNOSE STEP 3 — Confirm mutex still locked...</li><li>DIAGNOSE STEP 4 — Find mutex names WITHOUT s...</li><li>FIX STEP 1 — Force-release all 3 Eye mutexes...</li><li>FIX STEP 2 — Restart Eye: wkappbot-core.exe...</li><li>FIX STEP 3 — Console auto-recovery: wkappbot...</li><li>CHROME ZOMBIE — When Eye dies, it abandons h...</li><li>CHROME ZOMBIE ROOT CAUSE — Eye mutex Abandon...</li><li>HANDLE SCANNER — wkfix.ps1 -ScanHandles &lt;pid...</li><li>NUKE PATTERN — wkfix.ps1 -Nuke &lt;pid&gt;: enumer...</li><li>CHROME SINGLETON — Chrome uses a named kerne...</li><li>SHORTCUT — wkfix.ps1 at D:/GitHub/WKAppBot/b...</li><li>ROOT CAUSE SUMMARY — Three bugs filed as sug...</li><li>FIND-OWNER PATTERN: zombie PID TerminateProc...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

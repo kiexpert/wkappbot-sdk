@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted | WKAppBot Skill</title>
+  <title>ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted | WKAppBot Skills</title>
+  <meta name="description" content="ChatGPT renames #prompt-textarea / its testid faster than we can ship selector chain updates, which used to block all ask gpt commands at EDITOR-WAIT until user intervention. Fixed: after the 10s sel...">
+  <meta property="og:title" content="ask gpt editor-wait: last-resort tag-and-rescue when selector chain exhausted | WKAppBot Skills">
+  <meta property="og:description" content="ChatGPT renames #prompt-textarea / its testid faster than we can ship selector chain updates, which used to block all ask gpt commands at EDITOR-WAIT until user intervention. Fixed: after the 10s sel...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/ask-gpt-editor-wait-tag-and-rescue-fallback/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Primary chain (6 selectors) gets 10s total p...</li><li>On exhaust: EDITOR-DIAG eval prints URL + ti...</li><li>Last-resort eval picks the first visible con...</li><li>Returns &#x27;[data-wkappbot-editor-rescue=&quot;1&quot;]&#x27;...</li><li>Rescue path is non-destructive -- a data-* a...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>2026-05-09: stale ChatGPT session can cause...</li><li>Pipeline kill triage: ask gpt --sync ping re...</li><li>Verified 2026-05-09: test-ask-gpt-sync-stale...</li><li>2026-05-09 fix(ask): WaitForEditorA11y ready...</li><li>(removed)</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>wkharness agent bulletin (shared live steering channel for background agents) | WKAppBot Skill</title>
+  <title>wkharness agent bulletin (shared live steering channel for background agents) | WKAppBot Skills</title>
+  <meta name="description" content="Design for a shared append-only bulletin file that all running background agents reference live, force-fed by a PostToolUse hook (per-agent seq cursor plus @all and @agent addressing). Live counterpa...">
+  <meta property="og:title" content="wkharness agent bulletin (shared live steering channel for background agents) | WKAppBot Skills">
+  <meta property="og:description" content="Design for a shared append-only bulletin file that all running background agents reference live, force-fed by a PostToolUse hook (per-agent seq cursor plus @all and @agent addressing). Live counterpa...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Problem: Bash-launched Agent.cmd background...</li><li>Solution: one shared append-only bulletin fi...</li><li>Delivery is harness-enforced, not model-poll...</li><li>Per-reader cursor: one file, N cursors. The...</li><li>Addressing: each line carries a target token...</li><li>Append-only and atomic: writers only append,...</li><li>Size cap and rotation: cap the bulletin and...</li><li>Use cases: orchestrator persistence nudges (...</li><li>Build phases: P0 single shared file plus man...</li><li>Relation to existing infra: builds on the wk...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ask-*/triad CDP focus-steal coverage via sentinel user-active yield | WKAppBot Skill</title>
+  <title>ask-*/triad CDP focus-steal coverage via sentinel user-active yield | WKAppBot Skills</title>
+  <meta name="description" content="ask gpt / ask claude / ask gemini / ask triad all route through ChromeLauncher + CDP attach which used to steal foreground focus (UIA hwnd attach, SetForegroundWindow). Combined mitigations this sess...">
+  <meta property="og:title" content="ask-*/triad CDP focus-steal coverage via sentinel user-active yield | WKAppBot Skills">
+  <meta property="og:description" content="ask gpt / ask claude / ask gemini / ask triad all route through ChromeLauncher + CDP attach which used to steal foreground focus (UIA hwnd attach, SetForegroundWindow). Combined mitigations this sess...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/ask-cdp-uia-focus-steal-coverage-via-sentinel/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>ask gpt path: ChromeLauncher spawn minimized...</li><li>ask claude path: same as gpt but claude.ai t...</li><li>ask gemini path: same Chrome CDP with Gemini...</li><li>ask triad: parallel fan-out to gpt+claude+ge...</li><li>Sentinel bails silently if user-idle &lt;1.5s m...</li><li>VisionWorker CheckpointFocus bracket catches...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>2026-04-30: CDP transient guard applied (com...</li><li>2026-04-30: CDP transient guard applied (com...</li><li>If ask logs show Chrome minimized before tab...</li><li>If ask logs show Chrome minimized before tab...</li><li>Default send path uses SendPromptFocuslessAs...</li><li>Default send path uses SendPromptFocuslessAs...</li><li>ClearEditorAsync now prefers DOM.focus + Ctr...</li><li>ClearEditorAsync now prefers DOM.focus + Ctr...</li><li>Prefer reusing the existing ask session by d...</li><li>Prefer reusing the existing ask session by d...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-05-30] &#x27;AppBotPipe.Start&#x27; moved...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

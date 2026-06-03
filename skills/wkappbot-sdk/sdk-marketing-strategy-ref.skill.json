@@ -1,0 +1,69 @@
+{
+  "id": "sdk-marketing-strategy-ref",
+  "app": "wkappbot-sdk",
+  "title": "SDK Marketing Strategy Ref: Press History and Results",
+  "title_ko": null,
+  "desc": "T3 reference tier. Live record of press submissions, results, A/B test outcomes. Auto-updated after each campaign milestone. Opus reads this to plan next iteration.",
+  "steps": [
+    "PARENT T1: wkappbot skill read sdk-marketing-strategy",
+    "HOW TO AUTO-EVOLVE: After each press hit, Reddit viral, or star spike -- spawn Opus with prompt: read sdk-marketing-strategy-ref, add dated entry with what happened, what drove traffic, what converted to Pro. This skill grows with real data.",
+    "PRESS CONTACTS LOG (add entries as submitted):\\n  format: DATE ",
+    " OUTLET ",
+    " CONTACT ",
+    " STATUS ",
+    " RESULT\\n  example: 2026-06-04 ",
+    " IT Chosun ",
+    " tip@itchosun.com ",
+    " SUBMITTED ",
+    " pending",
+    "CAMPAIGN RESULTS LOG (add after each push):\\n  format: DATE ",
+    " CHANNEL ",
+    " ACTION ",
+    " VISITORS ",
+    " STARS ",
+    " PRO_CONVERTS\\n  example: 2026-06-04 ",
+    " Reddit r/ClaudeAI ",
+    " Show HN post ",
+    " 0 ",
+    " 0 ",
+    " 0",
+    "A/B TEST HISTORY:\\n  Hero variants tested and results\\n  CTA button text variants and CTR\\n  Pricing page conversion rates",
+    "WHAT WORKED (update after results):\\n  The Sonnet letter narrative -- emotional hook\\n  Individual skill shareable URLs\\n  Premium blur with visible CTA",
+    "WHAT DID NOT WORK (update after results):\\n  Generic title WKAppBot Skill Browser\\n  Technical description without narrative hook\\n  No pricing visible on detail pages",
+    "NEXT ACTIONS (Opus updates this after each campaign):\\n  Current: hero redesign + SEO tags + CTA (week 1)\\n  Planned: blog post submission (week 2)\\n  Planned: press tip submission (week 3)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-ref",
+      "expect": "press history",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy",
+      "expect": "CORE NARRATIVE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-marketing-strategy-howto",
+      "expect": "HOW TO AUTO-EVOLVE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "marketing",
+    "ref",
+    "t3",
+    "press",
+    "history",
+    "results",
+    "auto-evolve",
+    "campaign"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T18:44:56.0573898Z",
+  "updated": "2026-06-03T18:44:56.0574056Z",
+  "version": "1.0"
+}

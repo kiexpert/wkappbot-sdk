@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hot-Swap Operator Cheatsheet (--force-swap + manual + 3-layer architecture) | WKAppBot Skill</title>
+  <title>Hot-Swap Operator Cheatsheet (--force-swap + manual + 3-layer architecture) | WKAppBot Skills</title>
+  <meta name="description" content="Hot-swap operator reference. Covers force-swap (wkappbot --sudo --force-swap), manual orphan-kill + restage for stuck builds, and a 3-layer architecture recap (Eye FSW rename | Admin Eye self-respawn...">
+  <meta property="og:title" content="Hot-Swap Operator Cheatsheet (--force-swap + manual + 3-layer architecture) | WKAppBot Skills">
+  <meta property="og:description" content="Hot-swap operator reference. Covers force-swap (wkappbot --sudo --force-swap), manual orphan-kill + restage for stuck builds, and a 3-layer architecture recap (Eye FSW rename | Admin Eye self-respawn...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/hot-swap-stuck-orphan-mcp-workers-kill-force-swap/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Force-swap one-shot: wkappbot --sudo --force...</li><li>Use --force-swap when: normal auto-swap sat...</li><li>Verify after --force-swap: ls -la bin/wkappb...</li><li>Manual path symptom: wkappbot hotswap prints...</li><li>Manual diagnosis: powershell.exe -Command Ge...</li><li>Manual Eye pid find: wkappbot a11y windows l...</li><li>Manual orphan identification: any wkappbot-c...</li><li>Manual kill: powershell.exe -Command Stop-Pr...</li><li>Manual restage and swap: cp D:/SDK/bin/wkapp...</li><li>Manual success check: a11y windows shows Eye...</li><li>Orphan workers come from Eye restart loops;...</li><li>Why --force-swap exists: 2026-04-19 session...</li><li>Architecture Layer 1 - Eye rename-swap (AppB...</li><li>Architecture Layer 2 - Admin Eye self-respaw...</li><li>Architecture Layer 3 - MCP Launcher swap (Mc...</li><li>Layer separation rule: Eye moves files. Laun...</li><li>Full gentle-swap flow: publish -&gt; .new.exe s...</li><li>[AUDIT 2026-05-29] Program.cs split: TryAdmi...</li><li>[AUDIT 2026-05-30] TryAdminHotSwap moved to...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

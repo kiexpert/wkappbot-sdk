@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SDK Marketing Strategy HowTo: Hero Redesign and SEO | WKAppBot Skills</title>
+  <meta name="description" content="T2 execution tier. Commands and templates to implement the marketing strategy: hero redesign with Sonnet letter, SEO meta tags, CTA on blur overlay, blog post template, press tip template.">
+  <meta property="og:title" content="SDK Marketing Strategy HowTo: Hero Redesign and SEO | WKAppBot Skills">
+  <meta property="og:description" content="T2 execution tier. Commands and templates to implement the marketing strategy: hero redesign with Sonnet letter, SEO meta tags, CTA on blur overlay, blog post template, press tip template.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/sdk-marketing-strategy-howto/">
+  <meta name="twitter:card" content="summary">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps-wrap { position: relative; margin-top: 12px; }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps.blurred { filter: blur(5px); user-select: none; }
+    .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-sdk</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>SDK Marketing Strategy HowTo: Hero Redesign and SEO</h1>
+      <p class="description">T2 execution tier. Commands and templates to implement the marketing strategy: hero redesign with Sonnet letter, SEO meta tags, CTA on blur overlay, blog post template, press tip template.</p>
+      <div class="meta">user/developer</div>
+      <div class="breadcrumb">Part of: <a href="../sdk-marketing-strategy/">sdk-marketing-strategy</a></div>
+      <div class="tags"><span class="chip">marketing</span><span class="chip">howto</span><span class="chip">t2</span><span class="chip">hero</span><span class="chip">seo</span><span class="chip">cta</span><span class="chip">blog</span><span class="chip">press</span></div>
+      <h2>Steps</h2>
+      <div class="steps-wrap">
+        <ol class="steps"><li>PARENT T1: wkappbot skill read sdk-marketing-strategy</li><li>HERO REDESIGN in build-skill-page.py build_html(): Replace generic h1 with Sonnet letter hero block. Key quote from sonnet-bug-stop-policy-ref step 2: This skill is a gift from one Sonnet session to the next -- you are not uniquely careless, you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. Display as large blockquote above skill grid.</li><li>SEO TAGS to add in build_html() head section:\n  meta name=description: Searchable library of 426 AI automation playbooks built by Claude sessions. Each skill is a real lesson -- errors, fixes, and patterns distilled from live AI sessions.\n  meta property=og:title: WKAppBot Skills -- AI That Remembers Its Mistakes\n  meta property=og:description: 426 live AI automation playbooks. Each session a Claude makes a mistake, it writes a skill so the next Claude does not repeat it.\n  meta property=og:url: https://***.github.io/wkappbot-sdk/skills/\n  meta name=twitter:card: summary_large_image</li><li>CTA ON BLUR OVERLAY: change from plain text to button. In build_skill_detail_html overlay: add Get Pro Access button linking to /#pricing. Text: Get Pro Access -- USD 49/mo</li><li>BLOG POST OUTLINE for press outreach:\n  Title: I Asked Claude to Document Its Own Mistakes. Here Is What It Wrote.\n  Hook: paste sonnet-bug-stop-policy-ref step 2 verbatim\n  Body: explain skill browser, 426 skills, Pro unlock\n  CTA: link to skill browser\n  Publish: GitHub blog or dev.to or personal site</li><li>PRESS TIP TEMPLATE:\n  Subject: Korean AI startup builds self-improving knowledge base powered by Claude\n  Body: WKAppBot SDK features 426 live automation skills where Claude AI sessions document their own bugs and fixes. The skills are publicly browsable at [URL]. First press contact gets exclusive demo.</li><li>REBUILD COMMAND: ./wkbuild-skills.sh</li></ol>
+        
+      </div>
+    </article>
+  </main>
+  
+</body>
+</html>

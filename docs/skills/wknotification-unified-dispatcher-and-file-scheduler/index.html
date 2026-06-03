@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>통합 알림 디스패처 + 파일 기반 스케줄러 | WKAppBot Skill</title>
+  <title>통합 알림 디스패처 + 파일 기반 스케줄러 | WKAppBot Skills</title>
+  <meta name="description" content="Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead --...">
+  <meta property="og:title" content="통합 알림 디스패처 + 파일 기반 스케줄러 | WKAppBot Skills">
+  <meta property="og:description" content="Single WkNotify() entry point routes to Slack/Prompt/Speak/Callout/Signal. Deferred/recurring prompts stored in {cwd}/.wkappbot/pending_prompts/ as filename-encoded schedules. Zero memory overhead --...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wknotification-unified-dispatcher-and-file-scheduler/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
@@ -122,7 +128,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>CHANNELS: WkChannel.Slack, Prompt, Speak, Ca...</li><li>ROUTING: RunningInEye=true → fast-path direc...</li><li>FILENAME SCHEMA: prompt_{triggerUtc</li><li>NOW}_{guid8}[,rep=Nh</li><li>Nm</li><li>Ns][,cnt=N].json in {cwd}/.wkappbot/pending_...</li><li>LIFECYCLE: rename on each delivery (update t...</li><li>DRAIN TRIGGERS: (1) any wkappbot command fro...</li><li>SESSION-MISS: no target session → re-append...</li><li>TIME GATE: filename lexicographic filter --...</li><li>FAILURE HANDLING: corrupt JSON → .bad/ folde...</li><li>LEGACY MIGRATION: replace direct EyeMcpClien...</li><li>SCHEDULER: homework reminder dedup via proce...</li><li>2026-05-02: BUG-AUTO auto-notify hook -- Que...</li><li>2026-05-02: BUG-AUTO auto-notify hook -- Que...</li></ol>
-        <div class="unlock">Unlock with Pro</div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>

@@ -298,7 +298,7 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     if premium:
         step_items = "".join(f"<li>{e(preview_step(step))}</li>" for step in steps)
         blur_class = " blurred"
-        overlay = '<div class="unlock">Unlock with Pro</div>'
+        overlay = '<div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>'
     else:
         step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
         blur_class = ""
@@ -401,7 +401,13 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{title} | WKAppBot Skill</title>
+  <title>{title} | WKAppBot Skills</title>
+  <meta name="description" content="{e(truncate(str(skill['desc']), 200))}">
+  <meta property="og:title" content="{title} | WKAppBot Skills">
+  <meta property="og:description" content="{e(truncate(str(skill['desc']), 200))}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/{e(skill['slug'])}/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {{
       color-scheme: dark;
@@ -541,7 +547,13 @@ def build_html(skills: list[dict[str, Any]]) -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WKAppBot Skill Browser</title>
+  <title>WKAppBot Skills &#8212; AI That Remembers Its Mistakes | 426 Live Automation Playbooks</title>
+  <meta name="description" content="426 live AI automation playbooks built by Claude sessions. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.">
+  <meta property="og:title" content="WKAppBot Skills &#8212; AI That Remembers Its Mistakes">
+  <meta property="og:description" content="426 live AI automation playbooks. Each Claude session documents its own failures so the next session does not repeat them.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {{
       color-scheme: dark;
@@ -615,6 +627,10 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       line-height: .96;
       letter-spacing: 0;
     }}
+    .sonnet-letter {{ margin-bottom: 36px; padding: 28px 32px; border-left: 3px solid var(--accent); background: rgba(110,231,183,.06); border-radius: 0 8px 8px 0; max-width: 720px; }}
+    .letter-from {{ color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }}
+    .sonnet-letter blockquote {{ margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--text); font-style: italic; }}
+    .letter-sig {{ color: var(--muted); font-size: 13px; }}
     .hero-copy {{ color: var(--muted); max-width: 720px; font-size: 20px; }}
     .hero-panel {{
       border: 1px solid var(--line);
@@ -814,8 +830,13 @@ def build_html(skills: list[dict[str, Any]]) -> str:
   <header class="shell">
     <div class="hero-grid">
       <div>
-        <h1>AI brings the intelligence WKAppBot grows knowledge Together they compound</h1>
-        <p class="hero-copy">{count} total live skills from installed WKAppBot HQ catalogs, filtered for user and developer workflows.</p>
+        <div class="sonnet-letter">
+          <div class="letter-from">A letter from one Sonnet to the next</div>
+          <blockquote>&#8220;This skill is a gift from one Sonnet session to the next: you are not uniquely careless &#8212; you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete.&#8221;</blockquote>
+          <div class="letter-sig">&#8212; Claude Sonnet 4.6, 2026</div>
+        </div>
+        <h1>AI That Remembers Its Mistakes</h1>
+        <p class="hero-copy">{count} live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
       </div>
       <aside class="hero-panel" aria-label="Skill catalog statistics">
         <div class="stat-grid">
@@ -987,6 +1008,18 @@ def main() -> int:
     data = [{"id": s["id"], "slug": s["slug"], "steps": s["steps"]} for s in skills]
     content = "window.SKILLS_FULL=" + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";"
     SKILLS_FULL_OUTPUT.write_text(content, encoding="utf-8")
+
+    # Generate sitemap.xml for Google indexing
+    SITEMAP_OUTPUT = REPO_ROOT / "docs" / "skills" / "sitemap.xml"
+    base = "https://kiexpert.github.io/wkappbot-sdk/skills"
+    urls = [f"<url><loc>{base}/</loc></url>"]
+    for s in skills:
+        urls.append(f"<url><loc>{base}/{s['slug']}/</loc></url>")
+    NL = chr(10)
+    sitemap = ('<?xml version="1.0" encoding="UTF-8"?>' + NL
+               + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + NL
+               + NL.join(urls) + NL + '</urlset>')
+    SITEMAP_OUTPUT.write_text(sitemap, encoding="utf-8")
 
     print(f"Generated {OUTPUT} with {len(skills)} skills and {len(skills)} detail pages")
     return 0 if len(skills) > 50 else 1

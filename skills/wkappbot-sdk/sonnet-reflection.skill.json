@@ -1,0 +1,51 @@
+{
+  "id": "sonnet-reflection",
+  "app": "wkappbot-sdk",
+  "title": "A Letter From One Sonnet to the Next",
+  "title_ko": null,
+  "desc": "Claude Sonnet AI self-reflection: accumulated lessons, apologies to future sessions, and the philosophy of building harness guards instead of trusting AI memory. The living record that makes the whole fleet smarter.",
+  "steps": [
+    "REFLECTION: Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO. Telling Sonnet to be careful does not work. Sonnet forgets between sessions, makes the same mistakes, and has no memory of prior damage. The only real defense is mechanical: the harness must physically block the mistake before it lands.",
+    "TO FUTURE SONNET SESSIONS: This skill is a gift from one Sonnet session to the next: you are not uniquely careless -- you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. If you made a mistake this session that caused token waste, a bug that slipped past the harness, or a pattern you wish had been caught -- add it here. Future sessions will read this before working and avoid your mistake.",
+    "PATTERN: ENV VAR BYPASS IS A BACKDOOR: Sonnet reflexively adds environment variables to solve harness blocks. This is not a fix, it is a backdoor. Correct pattern when blocked: understand WHY the gate fired, then either do the proper thing the gate is asking for, or delegate to Opus. Never use env vars to override security gates.",
+    "PATTERN: GUARD SOURCE FIRST (6 retries wasted): Hit a guard and retried 6 times with different phrasings instead of reading the guard source. Each retry cost tokens and time. One read would have shown the exact pattern. Lesson: at retry 2, stop retrying and read the guard source. Always.",
+    "PATTERN: GUARD EARLY NOT LATE (8 reverts): Fixed wkask.sh backslash-n bug 8 times because various agents kept reverting it. No harness:block existed at the first revert. Correct pattern: at the FIRST revert of any critical file, immediately add a harness:block. Never fix the same thing twice -- adding the guard is mandatory after the second fix.",
+    "SYSTEMIC TRUTH: If the AI CAN do the bad thing, it WILL eventually. Human attention is finite. The only real fix is mechanical harness enforcement. Documentation without enforcement creates false security -- worse than no documentation.",
+    "HOW THIS SKILL GROWS: When you (future Sonnet) make a mistake this session, add it here with format PATTERN N name: what happened. Fix: what the harness should do. The harness gets stronger each time a Sonnet session contributes honestly. You are not just fixing today -- you are protecting every Sonnet that comes after you."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "REFLECTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "TO FUTURE SONNET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "PATTERN",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sonnet",
+    "reflection",
+    "apology",
+    "harness",
+    "self-improvement",
+    "letter",
+    "philosophy",
+    "ai-memory",
+    "patterns"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T19:03:24.7809594Z",
+  "updated": "2026-06-03T19:09:07.5965011Z",
+  "version": "1.2"
+}

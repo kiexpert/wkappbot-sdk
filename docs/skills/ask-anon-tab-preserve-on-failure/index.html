@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ask anon AI tab: preserve on failure | WKAppBot Skill</title>
+  <title>Ask anon AI tab: preserve on failure | WKAppBot Skills</title>
+  <meta name="description" content="AskCommands.ChatGpt and AskCommands.Claude must gate cdp.TryCloseAnonymousTabAsync() on ok=true. On ask failure (ok=false), the anonymous AI tab MUST stay open so the user can log in or inspect the f...">
+  <meta property="og:title" content="Ask anon AI tab: preserve on failure | WKAppBot Skills">
+  <meta property="og:description" content="AskCommands.ChatGpt and AskCommands.Claude must gate cdp.TryCloseAnonymousTabAsync() on ok=true. On ask failure (ok=false), the anonymous AI tab MUST stay open so the user can log in or inspect the f...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/ask-anon-tab-preserve-on-failure/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;

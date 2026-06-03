@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>a11y type/invoke: parent window falsely detected as blocker on elevated dialogs | WKAppBot Skill</title>
+  <title>a11y type/invoke: parent window falsely detected as blocker on elevated dialogs | WKAppBot Skills</title>
+  <meta name="description" content="When a11y type reports blocker persists and aborts, check if the blocker IS the parent of the target. Parent windows are containers, not obstructions. Fix: use --sudo. IsAncestorWindow check fires an...">
+  <meta property="og:title" content="a11y type/invoke: parent window falsely detected as blocker on elevated dialogs | WKAppBot Skills">
+  <meta property="og:description" content="When a11y type reports blocker persists and aborts, check if the blocker IS the parent of the target. Parent windows are containers, not obstructions. Fix: use --sudo. IsAncestorWindow check fires an...">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/a11y-ancestor-blocker-bypass/">
+  <meta name="twitter:card" content="summary">
   <style>
     :root {
       color-scheme: dark;
