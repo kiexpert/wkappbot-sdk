@@ -1,0 +1,52 @@
+{
+  "id": "skill-browser-launch-checklist",
+  "app": "wkappbot-sdk",
+  "title": "Skill Browser Launch Checklist: Pre-Live QA",
+  "title_ko": null,
+  "desc": "Complete pre-launch checklist for wkappbot skill browser. Run before each release. Covers: build integrity, auth flow, SEO, performance, mobile, and deployment gaps.",
+  "steps": [
+    "BUILD INTEGRITY: run ./wkbuild-skills.sh -- verify N skills and N detail pages. Check: SKILL_ID per detail page, injectFullSteps present, data-skill-id on index cards, no githubLogin button, Part of: on T2/T3 pages, og:title on index + detail, sitemap.xml exists.",
+    "AUTH FLOW (CRITICAL): skills-data-full.js must exist in PRIVATE wkappbot-harness repo at main branch root. Build generates docs/skills/skills-data-full.js locally but the LIVE auth fetches from raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js. Deploy step: copy docs/skills/skills-data-full.js to wkappbot-harness repo and push.",
+    "RACE CONDITION GUARD: checkGitHubAccess is called on page load AND when PAT button is clicked. Both paths call unlockAll() which calls injectFullSteps(). injectFullSteps checks if window.SKILLS_FULL exists before running -- safe. But the script tag inject is async: eval(js) fires synchronously so window.SKILLS_FULL IS set before unlockAll() is called. No race condition.",
+    "CORS CHECK: raw.githubusercontent.com returns Access-Control-Allow-Origin: * for public files. For private repo files with valid token, it also allows CORS. Test: fetch from browser console with valid PAT -- should get 200 and JS content.",
+    "PERFORMANCE: docs/skills/skills-data-full.js is ~600KB. On mobile 3G (~1Mbps) this is ~5 seconds. Mitigation options: (1) gzip on GitHub Pages (auto-enabled, ~70% reduction to ~180KB = 1.5s). (2) per-skill endpoint (future). For now: acceptable for Pro subscribers who explicitly unlock.",
+    "MOBILE CHECK: index.html has viewport meta. detail pages have viewport meta. Responsive CSS uses clamp() and @media max-width 640px. Test on iPhone screen width 375px.",
+    "404 BEHAVIOR: GitHub Pages returns 404 for unknown paths. Custom 404.html not configured. Acceptable for MVP -- add later if needed.",
+    "PRICING LINKS: CTA button on blur overlay links to ../#pricing. Verify pricing section exists on index.html (it does -- pricing div with 3 price cards).",
+    "KNOWN DEPLOYMENT GAP: skills-data-full.js in wkappbot-harness private repo must be kept in sync with each wkbuild-skills.sh run. Currently manual step -- automate with GHA cross-repo dispatch in future."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-browser-launch-checklist",
+      "expect": "BUILD INTEGRITY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-browser-launch-checklist",
+      "expect": "AUTH FLOW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-browser-launch-checklist",
+      "expect": "KNOWN DEPLOYMENT GAP",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "launch",
+    "checklist",
+    "qa",
+    "pre-release",
+    "auth",
+    "performance",
+    "deployment",
+    "cors"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T19:17:19.8979102Z",
+  "updated": "2026-06-03T19:17:19.8979243Z",
+  "version": "1.0"
+}

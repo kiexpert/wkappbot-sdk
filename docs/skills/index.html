@@ -292,13 +292,13 @@
           <div class="letter-sig">&#8212; Claude Sonnet 4.6, 2026</div>
         </div>
         <h1>AI That Remembers Its Mistakes</h1>
-        <p class="hero-copy">434 live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
+        <p class="hero-copy">432 live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
       </div>
       <aside class="hero-panel" aria-label="Skill catalog statistics">
         <div class="stat-grid">
-          <div class="stat"><strong>434</strong><span>live skills</span></div>
+          <div class="stat"><strong>432</strong><span>live skills</span></div>
           <div class="stat"><strong>8</strong><span>apps indexed</span></div>
-          <div class="stat"><strong>77</strong><span>pro previews</span></div>
+          <div class="stat"><strong>76</strong><span>pro previews</span></div>
         </div>
         <p class="hero-copy">Search versioned knowhow, spot implementation depth, and preview the compounding knowledge base that every WKAppBot session grows.</p>
       </aside>
@@ -308,7 +308,7 @@
   <main id="skills" class="shell">
     <div class="toolbar">
       <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
-      <div id="resultCount" class="result-count">434 skills</div>
+      <div id="resultCount" class="result-count">432 skills</div>
     </div>
     <section class="skills-grid" id="skillGrid">
 
@@ -958,23 +958,6 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
       </article>
       </a>
 
-      <a class="skill-link" href="sdk-launcher-maintenance/" data-search="Launcher maintenance guide (public SDK) How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Buil... wkappbot-sdk sdk launcher build maintenance public aot">
-      <article class="skill-card premium" data-skill-id="sdk-launcher-maintenance">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>Launcher maintenance guide (public SDK)</h3>
-        <p>How to build, test, and maintain WKAppBot.Launcher in the public SDK repo. Buil...</p>
-        <div class="meta">developer</div>
-        <div class="tags"><span class="chip">sdk</span><span class="chip">launcher</span><span class="chip">build</span><span class="chip">maintenance</span><span class="chip">public</span><span class="chip">aot</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="Repo: d:\GitHub\wkappbot-sdk -- Launcher source PUBLIC. Core source PRIVATE (binary only in bin\wkappbot-core.exe)">Repo: d:\GitHub\wkappbot-sdk -- Launcher sou...</li><li data-full="Build: build.cmd (full) OR dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin">Build: build.cmd (full) OR dotnet publish cs...</li><li data-full="AOT requires MSVC linker (Visual Studio). build.cmd auto-prepends VS Installer dir. Missing symptom: MSB3073 vswhere not recognized">AOT requires MSVC linker (Visual Studio). bu...</li><li data-full="Core binary: downloaded via build.cmd --download-only from latest GitHub Release, or placed manually. ResolveCoreExe() = ProcessPath dirname + wkappbot-core.exe">Core binary: downloaded via build.cmd --down...</li><li data-full="Hot-swap: launcher watches wkappbot-core.new.exe. Drain pipes -&gt; rename atomically. Trigger: eye tick --timeout 15. Never kill Eye manually">Hot-swap: launcher watches wkappbot-core.new...</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
       <a class="skill-link" href="launcher-wkappbot-chrome-target-env-pipe-protocol/" data-search="Launcher WKAPPBOT_CHROME_TARGET env + pipe protocol Launcher publishes validated caller-offset Chrome placement target via WKAPPBOT... wkappbot-sdk launcher chrome placement env-var eye-pipe cdp multi-monitor sdk">
       <article class="skill-card premium" data-skill-id="launcher-wkappbot-chrome-target-env-pipe-protocol">
         <div class="card-top">
@@ -987,23 +970,6 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
         <div class="tags"><span class="chip">launcher</span><span class="chip">chrome</span><span class="chip">placement</span><span class="chip">env-var</span><span class="chip">eye-pipe</span><span class="chip">cdp</span><span class="chip">multi-monitor</span><span class="chip">sdk</span></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="PROBLEM: Launcher computes validated caller-offset target via TryMoveWebBotNearCaller then SetWindowPos. Core (separate process) re-derives target from caller HWND which can diverge -- Core ResolveCallerHwnd re-walks process tree and picks different ancestor with off-screen coords -- and falls back to ExpectedBounds (rightmost monitor 1740,20). Result: Chrome bounces between two positions per command.">PROBLEM: Launcher computes validated caller-...</li><li data-full="PROTOCOL PART 1 ENV VAR: After [PLACEMENT:VALIDATE] log in MyCdpContext.Placement.cs TryMoveWebBotNearCaller, set Environment.SetEnvironmentVariable WKAPPBOT_CHROME_TARGET to x,y,w,h string with DefaultChromeW/H matching Core CdpClient.OuterWidthPx/OuterHeightPx constants. Log [PLACEMENT:ENV] WKAPPBOT_CHROME_TARGET=x,y,w,h.">PROTOCOL PART 1 ENV VAR: After [PLACEMENT:VA...</li><li data-full="PROTOCOL PART 2 PIPE FORWARD: In EyeCmdPipeClient.cs Send method, read WKAPPBOT_CHROME_TARGET env var and prepend __target:VALUE to JSON payload list (alongside __cwd and __hwnd prefixes). Eye-delegated commands forward this to Core which honors the same coords the Launcher SetWindowPos already applied.">PROTOCOL PART 2 PIPE FORWARD: In EyeCmdPipeC...</li><li data-full="WHY BOTH PATHS: Direct RunCoreDetachedNormal path uses env var inheritance. Eye-delegated path uses pipe prefix because Eye spawns Core in separate context that does not inherit Launcher env block reliably. Both deliver the same payload.">WHY BOTH PATHS: Direct RunCoreDetachedNormal...</li><li data-full="CORE-SIDE READER: Core ChromeLauncher.ComputePlacementNearCaller + CdpClient.SetWindowBoundsWaitStableAsync must check WKAPPBOT_CHROME_TARGET first before falling back to ExpectedBounds. The --window-position chrome.exe launch flag, post-launch stability loop, and any per-command reposition must all read SAME value.">CORE-SIDE READER: Core ChromeLauncher.Comput...</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="skill-heal-nightly/" data-search="Nightly Skill Heal: AI Self-Improvement Loop Autonomous overnight skill healing. Durable CronCreate fires 04:13 daily. Opus... wkappbot-sdk nightly heal skill audit cron schedule autonomous sleep">
-      <article class="skill-card premium" data-skill-id="skill-heal-nightly">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>Nightly Skill Heal: AI Self-Improvement Loop</h3>
-        <p>Autonomous overnight skill healing. Durable CronCreate fires 04:13 daily. Opus...</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"><span class="chip">nightly</span><span class="chip">heal</span><span class="chip">skill</span><span class="chip">audit</span><span class="chip">cron</span><span class="chip">schedule</span><span class="chip">autonomous</span><span class="chip">sleep</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="STEP 1 SCHEDULE GATE (every session start): Run CronList tool. If no job with prompt containing skill-heal-nightly exists at 04:13: run CronCreate(cron=&#x27;13 4 * * *&#x27;, durable=true, recurring=true, prompt=&#x27;Autonomous nightly loop: wkappbot skill read skill-heal-nightly -- then execute STEP 2 HEALING as Opus subagent. CWD=D:/GitHub/wkappbot-sdk&#x27;). Note job ID. Update CLAUDE.md Nightly Schedules table row with job ID. This job survives Claude restarts via .claude/scheduled_tasks.json.">STEP 1 SCHEDULE GATE (every session start):...</li><li data-full="STEP 2 HEALING (fires at 04:13 -- Opus agent mandatory): Agent(model=&#x27;opus&#x27;, prompt=&#x27;Nightly skill heal for wkappbot-sdk. Steps: (1) Run: wkappbot skill audit -- list all broken source_refs. (2) For each broken skill: wkappbot skill edit ID to remove or update the broken ref. (3) Run: wkappbot skill read repo-health-doctor -- apply all LITE steps (10=skill audit, 8=README sync, 9=AGENTS parity, 5=CLAUDE.md empty sections). (4) PENDING COMPRESS: read CLAUDE.md Pending section. If done [x] count above 15: group old [x] entries by topic into 1-line summaries, keep open [ ] and recent [x] verbatim. (5) git add -A and git commit -m chore: nightly skill heal DATE. (6) wkappbot speak nightly skill heal complete --bg&#x27;)">STEP 2 HEALING (fires at 04:13 -- Opus agent...</li><li data-full="STEP 3 VERIFY (after Opus agent returns): git log --oneline -1 to confirm commit exists. CronList to confirm job still active. Report summary: skills fixed, Pending items compressed, commit hash.">STEP 3 VERIFY (after Opus agent returns): gi...</li><li data-full="UNIVERSAL SCHEDULE INTERFACE: Any entity (wkappbot, harness, external script) can schedule a Claude loop by writing a &#x27;### CronCreate(cron=&quot;...&quot;, durable=true, recurring=true)&#x27; heading to CLAUDE.md Nightly Schedules section. PostToolUse hook (claudemd-schedule-sync.ps1) auto-detects new headings on every CLAUDE.md Write/Edit and injects additionalContext so Claude immediately CronCreates them. wkappbot: use &#x27;wkappbot file edit CLAUDE.md&#x27; or append via script. Harness: write heading via Edit tool in a harness action. No session restart required -- fires within same turn.">UNIVERSAL SCHEDULE INTERFACE: Any entity (wk...</li><li data-full="GUARD PRE-REQ (must run before Agent() in STEP 2): (1) wkappbot file write CLAUDE.md --append --text &#x27;- [ ] nightly-heal: ...&#x27; then git commit. (2) wkappbot skill edit &lt;any-id&gt; --add-step &#x27;...&#x27; to satisfy skill-update-pending guard. Both guards (claude-md-sync-guard + skill-update-pending) must clear before Agent(model=opus) fires. Without these, Agent() is blocked even with SPEC block present.">GUARD PRE-REQ (must run before Agent() in ST...</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -1038,23 +1004,6 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
         <div class="tags"><span class="chip">marketing</span><span class="chip">ref</span><span class="chip">t3</span><span class="chip">press</span><span class="chip">history</span><span class="chip">results</span><span class="chip">auto-evolve</span><span class="chip">campaign</span></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="PARENT T1: wkappbot skill read sdk-marketing-strategy">PARENT T1: wkappbot skill read sdk-marketing...</li><li data-full="HOW TO AUTO-EVOLVE: After each press hit, Reddit viral, or star spike -- spawn Opus with prompt: read sdk-marketing-strategy-ref, add dated entry with what happened, what drove traffic, what converted to Pro. This skill grows with real data.">HOW TO AUTO-EVOLVE: After each press hit, Re...</li><li data-full="PRESS CONTACTS LOG (add entries as submitted):\n  format: DATE">PRESS CONTACTS LOG (add entries as submitted...</li><li data-full="OUTLET">OUTLET</li><li data-full="CONTACT">CONTACT</li></ol>
-          <div class="unlock">Unlock with Pro</div>
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="sdk-release-playbook/" data-search="SDK release playbook (version bump + publish) Step-by-step release process for ***/wkappbot-sdk. Covers version alignment wit... wkappbot-sdk sdk release version publish private playbook">
-      <article class="skill-card premium" data-skill-id="sdk-release-playbook">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
-        </div>
-        <h3>SDK release playbook (version bump + publish)</h3>
-        <p>Step-by-step release process for ***/wkappbot-sdk. Covers version alignment wit...</p>
-        <div class="meta">developer</div>
-        <div class="tags"><span class="chip">sdk</span><span class="chip">release</span><span class="chip">version</span><span class="chip">publish</span><span class="chip">private</span><span class="chip">playbook</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="TRIGGER: dev repo sync-public.yml pushes to SDK (new minor/major). That push = signal to cut SDK release too.">TRIGGER: dev repo sync-public.yml pushes to...</li><li data-full="STEP 1 - Version alignment: SDK WKAppBotBaseVersion should match dev minor version. Dev=6.5 -&gt; SDK Directory.Build.props: &lt;WKAppBotBaseVersion&gt;6.5&lt;/WKAppBotBaseVersion&gt;. SDK has no VERSIONING.md or CLAUDE.md version header to update (unlike dev repo which requires 3-file commit).">STEP 1 - Version alignment: SDK WKAppBotBase...</li><li data-full="STEP 2 - Pre-release checklist: (a) dev repo CI green, (b) SDK build-launcher CI green, (c) SDK extended-smoke CI green (&lt;5 hard-fail), (d) Launcher source audit: no hardcoded paths, no API keys (run security-review skill), (e) build.cmd --download-only works (latest dev GitHub Release exists and contains binaries).">STEP 2 - Pre-release checklist: (a) dev repo...</li><li data-full="STEP 3 - Local build + smoke: cd d:\GitHub\wkappbot-sdk &amp;&amp; build.cmd --download-only (fetches latest dev core) &amp;&amp; dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release -p:SkipDeployLauncher=true -o bin &amp;&amp; powershell -File scripts/smoke-help.ps1 -BasicOnly">STEP 3 - Local build + smoke: cd d:\GitHub\w...</li><li data-full="STEP 4 - Docs regeneration: bash scripts/gen-command-ref.sh (updates docs/wkappbot-commands.md from live binary). Commit if changed.">STEP 4 - Docs regeneration: bash scripts/gen...</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -1128,6 +1077,23 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
       </article>
       </a>
 
+      <a class="skill-link" href="wkdoctor-sdk-environment-health-check/" data-search="wkdoctor: SDK environment health check flutter-doctor-style health check for wkappbot-sdk environment wkappbot-sdk">
+      <article class="skill-card premium" data-skill-id="wkdoctor-sdk-environment-health-check">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>wkdoctor: SDK environment health check</h3>
+        <p>flutter-doctor-style health check for wkappbot-sdk environment</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="USAGE: wkdoctor [-Json] -- flutter-doctor style [+]/[x]/[!] output, exit 1 on failures">USAGE: wkdoctor [-Json] -- flutter-doctor st...</li><li data-full="LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cmd in SDK repo">LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cm...</li><li data-full="CHECKS (10): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in ~/.claude/settings.json, bin/ in PATH, .wkappbot/config.json, wkappbot.hq/ dir">CHECKS (10): wkappbot.exe presence+version,...</li><li data-full="FLAGS: -Json for machine-readable output (ConvertTo-Json), exit 0=all pass, exit 1=any fail">FLAGS: -Json for machine-readable output (Co...</li><li data-full="RUN: wkdoctor  OR  wkdoctor -Json (pipe to ConvertFrom-Json for parsed output)">RUN: wkdoctor OR wkdoctor -Json (pipe to Con...</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
       <a class="skill-link" href="wkjobs-ai-process-monitor/" data-search="wkjobs: AI process monitor Shows all AI processes in the console session with CPU%, memory, state, and spa... wkappbot-sdk">
       <article class="skill-card premium" data-skill-id="wkjobs-ai-process-monitor">
         <div class="card-top">
@@ -1139,7 +1105,31 @@ Without --force: same flow but 60s lag guard active and Eye/WhisperRing preserve
         <div class="meta">user/developer</div>
         <div class="tags"></div>
         <div class="steps-wrap">
-          <ol class="steps"><li data-full="PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core*) sharing the current console session with CPU%, memory, thread count, idle/busy state, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids.">PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li data-full="LOCATION: D:\GitHub\wkappbot-sdk\scripts\wkjobs.ps1">LOCATION: D:\GitHub\wkappbot-sdk\scripts\wkj...</li><li data-full="FLAGS: -Tree (hierarchy view)">FLAGS: -Tree (hierarchy view)</li><li data-full="-Watch (live refresh, Ctrl+C to exit)">-Watch (live refresh, Ctrl+C to exit)</li><li data-full="-All (include all sessions)">-All (include all sessions)</li></ol>
+          <ol class="steps"><li data-full="PURPOSE: wkjobs.ps1 shows all AI processes (claude, codex, wkappbot, wkappbot-core, wkappbot-eye, wka11y) sharing the current console session with CPU%, memory, thread count, idle/busy state, CWD, and full command lines. A separate SPAWNED section shows non-AI child processes directly launched by those AI pids. AI_NAMES = claude, codex, wkappbot, wkappbot-core, wkappbot-core.new, wkappbot-eye, wka11y">PURPOSE: wkjobs.ps1 shows all AI processes (...</li><li data-full="FLAGS: -Tree (hierarchy view) | -Watch (live refresh, Ctrl+C to exit) | -All (include processes from all sessions) | -RefreshSec N (Watch interval seconds, default 2) | -Kill (kill zombie helper processes -- safe ones only; prompts unless -Force) | -Leaks (print confirmed leaked zombie pids + kill cmd; exits 1 if found -- useful for CI/health check scripts) | -Force (skip confirmation in -Kill mode) | -ZombieMin N (idle minutes threshold for zombie classification, default 30)">FLAGS: -Tree (hierarchy view) | -Watch (live...</li><li data-full="COLORS: claude=Cyan(idle)/Green(BUSY), codex=DarkYellow(idle)/Yellow(BUSY), wkappbot-core.new=DarkMagenta(idle)/Magenta(BUSY), wkappbot-core=DarkGray(idle)/Cyan(BUSY). BUSY=&gt;20% CPU, active 1-20%, idle&lt;1%. ZOMBIE HIGHLIGHT: idle process age&gt;=ZombieMin (30m default) colored DarkRed with [old] label; safe-to-kill ones (wkappbot helper cmds: skill/suggest/ask/file/windows/logcat) colored Red with [ZOMBIE] label. PROTECTED (never colored zombie): wkappbot-core.*, wkchat, claude, codex, eye, chat, guardian, mcp">COLORS: claude=Cyan(idle)/Green(BUSY), codex...</li><li data-full="SESSION MARKER: * prefix means process is in current console session. Without -All, only current session procs are shown">SESSION MARKER: * prefix means process is in...</li><li data-full="SPAWNED SECTION: child processes of AI pids, conhost filtered. Columns: PPID (which AI spawned it), name, PID, CPU%, MEM, state, command line">SPAWNED SECTION: child processes of AI pids,...</li></ol>
+          <div class="unlock">Unlock with Pro</div>
+        </div>
+      </article>
+      </a>
+
+      <a class="skill-link" href="youtube-ad-skipper/" data-search="YouTube Ad Auto-Skipper Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla... wkappbot-sdk youtube ads cdp auto skip loop">
+      <article class="skill-card premium" data-skill-id="youtube-ad-skipper">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        </div>
+        <h3>YouTube Ad Auto-Skipper</h3>
+        <p>Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
+ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
+Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
+Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
+Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
+Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
+Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
+Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.">Run: powershell -File test/youtube-ad-skippe...</li><li data-full="Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)">Added &#x27;ending&#x27; detection (video in last 2s)...</li><li data-full="UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;">UNIFIED AD DETECTION: var isAd = document.do...</li><li data-full="COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.">COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li data-full="KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.">KEY FINDING (2026-05-23): mid-roll ads at t=...</li></ol>
           <div class="unlock">Unlock with Pro</div>
         </div>
       </article>
@@ -3733,6 +3723,23 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
       </article>
       </a>
 
+      <a class="skill-link" href="skill-browser-launch-checklist/" data-search="Skill Browser Launch Checklist: Pre-Live QA Complete pre-launch checklist for wkappbot skill browser. Run before each relea... wkappbot-sdk launch checklist qa pre-release auth performance deployment cors">
+      <article class="skill-card" data-skill-id="skill-browser-launch-checklist">
+        <div class="card-top">
+          <span class="app-badge">wkappbot-sdk</span>
+          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        </div>
+        <h3>Skill Browser Launch Checklist: Pre-Live QA</h3>
+        <p>Complete pre-launch checklist for wkappbot skill browser. Run before each relea...</p>
+        <div class="meta">user/developer</div>
+        <div class="tags"><span class="chip">launch</span><span class="chip">checklist</span><span class="chip">qa</span><span class="chip">pre-release</span><span class="chip">auth</span><span class="chip">performance</span><span class="chip">deployment</span><span class="chip">cors</span></div>
+        <div class="steps-wrap">
+          <ol class="steps"><li data-full="BUILD INTEGRITY: run ./wkbuild-skills.sh -- verify N skills and N detail pages. Check: SKILL_ID per detail page, injectFullSteps present, data-skill-id on index cards, no githubLogin button, Part of: on T2/T3 pages, og:title on index + detail, sitemap.xml exists.">BUILD INTEGRITY: run ./wkbuild-skills.sh --...</li><li data-full="AUTH FLOW (CRITICAL): skills-data-full.js must exist in PRIVATE wkappbot-harness repo at main branch root. Build generates docs/skills/skills-data-full.js locally but the LIVE auth fetches from raw.githubusercontent.com/***/wkappbot-harness/main/skills-data-full.js. Deploy step: copy docs/skills/skills-data-full.js to wkappbot-harness repo and push.">AUTH FLOW (CRITICAL): skills-data-full.js mu...</li><li data-full="RACE CONDITION GUARD: checkGitHubAccess is called on page load AND when PAT button is clicked. Both paths call unlockAll() which calls injectFullSteps(). injectFullSteps checks if window.SKILLS_FULL exists before running -- safe. But the script tag inject is async: eval(js) fires synchronously so window.SKILLS_FULL IS set before unlockAll() is called. No race condition.">RACE CONDITION GUARD: checkGitHubAccess is c...</li><li data-full="CORS CHECK: raw.githubusercontent.com returns Access-Control-Allow-Origin: * for public files. For private repo files with valid token, it also allows CORS. Test: fetch from browser console with valid PAT -- should get 200 and JS content.">CORS CHECK: raw.githubusercontent.com return...</li><li data-full="PERFORMANCE: docs/skills/skills-data-full.js is ~600KB. On mobile 3G (~1Mbps) this is ~5 seconds. Mitigation options: (1) gzip on GitHub Pages (auto-enabled, ~70% reduction to ~180KB = 1.5s). (2) per-skill endpoint (future). For now: acceptable for Pro subscribers who explicitly unlock.">PERFORMANCE: docs/skills/skills-data-full.js...</li></ol>
+          
+        </div>
+      </article>
+      </a>
+
       <a class="skill-link" href="skill-browser-qa-ref/" data-search="Skill Browser QA Reference - Bug History T3 history tier for skill-browser-qa. Known bugs found and fixed during 2026-06... wkappbot-sdk skill-browser qa ref t3 bugs history seo 2026-06-03">
       <article class="skill-card" data-skill-id="skill-browser-qa-ref">
         <div class="card-top">
@@ -3813,47 +3820,6 @@ Pipe handler always returns, admin Eye keeps servicing new requests.">SUBPROCESS
         <div class="tags"></div>
         <div class="steps-wrap">
           <ol class="steps"><li data-full="FULL CHECK LIST (11): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in settings.json, bin in PATH, .wkappbot config.json, wkappbot.hq dir, Defender dev-exclusions (06).">FULL CHECK LIST (11): wkappbot.exe presence+...</li><li data-full="ROBUSTNESS: checks use file/process/PE-version APIs only -- zero wkappbot subprocess calls (avoids Eye IPC stall in subprocess context).">ROBUSTNESS: checks use file/process/PE-versi...</li><li data-full="PLUGIN MODULES: 01-binaries, 02-runtime, 03-skills, 04-config, 05-hq, 06-defender-exclusions, 50-symlink. Orchestrator = thin dot-source loader.">PLUGIN MODULES: 01-binaries, 02-runtime, 03-...</li><li data-full="SYMLINK CHECK (50): auto-detects+repairs broken VS Code extension cdx.exe symlinks. Candidates under WKAppBot/bin and wkappbot-sdk/bin. Repair source: latest openai.chatgpt extension dir, fallback sandbox-bin. Reports ok/warn/fail.">SYMLINK CHECK (50): auto-detects+repairs bro...</li><li data-full="DEFENDER CHECK (06, added 2026-06-02): detects missing Defender exclusions for dev hot-folders (D:/GitHub, .claude, Temp/claude) + 6 dev procs + ScanAvgCPULoadFactor&gt;20 -- the MsMpEng real-time scan storm (CPU spike + keyboard freeze) cause. Auto-repair: Add-MpPreference admin-direct or self-elevating UAC; Tamper-Protection caveat -&gt; Defender GUI. Skill: defender-dev-exclusions.">DEFENDER CHECK (06, added 2026-06-02): detec...</li></ol>
-          
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="wkdoctor-sdk-environment-health-check/" data-search="wkdoctor: SDK environment health check flutter-doctor-style health check for wkappbot-sdk environment wkappbot-sdk">
-      <article class="skill-card" data-skill-id="wkdoctor-sdk-environment-health-check">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
-        </div>
-        <h3>wkdoctor: SDK environment health check</h3>
-        <p>flutter-doctor-style health check for wkappbot-sdk environment</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="USAGE: wkdoctor [-Json] -- flutter-doctor style [+]/[x]/[!] output, exit 1 on failures">USAGE: wkdoctor [-Json] -- flutter-doctor st...</li><li data-full="LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cmd in SDK repo">LOCATION: bin/wkdoctor.ps1 + bin/wkdoctor.cm...</li><li data-full="CHECKS (10): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in ~/.claude/settings.json, bin/ in PATH, .wkappbot/config.json, wkappbot.hq/ dir">CHECKS (10): wkappbot.exe presence+version,...</li><li data-full="FLAGS: -Json for machine-readable output (ConvertTo-Json), exit 0=all pass, exit 1=any fail">FLAGS: -Json for machine-readable output (Co...</li><li data-full="RUN: wkdoctor  OR  wkdoctor -Json (pipe to ConvertFrom-Json for parsed output)">RUN: wkdoctor OR wkdoctor -Json (pipe to Con...</li></ol>
-          
-        </div>
-      </article>
-      </a>
-
-      <a class="skill-link" href="youtube-ad-skipper/" data-search="YouTube Ad Auto-Skipper Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla... wkappbot-sdk youtube ads cdp auto skip loop">
-      <article class="skill-card" data-skill-id="youtube-ad-skipper">
-        <div class="card-top">
-          <span class="app-badge">wkappbot-sdk</span>
-          <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
-        </div>
-        <h3>YouTube Ad Auto-Skipper</h3>
-        <p>Auto-skip/close YouTube ads in a loop via CDP a11y. Detects skip button, overla...</p>
-        <div class="meta">user/developer</div>
-        <div class="tags"><span class="chip">youtube</span><span class="chip">ads</span><span class="chip">cdp</span><span class="chip">auto</span><span class="chip">skip</span><span class="chip">loop</span></div>
-        <div class="steps-wrap">
-          <ol class="steps"><li data-full="Run: powershell -File test/youtube-ad-skipper.ps1 [-Url &lt;yt-url&gt;] [-RunMinutes &lt;N&gt;] [-PollSeconds &lt;N&gt;]
-ROOT CAUSE for JS-click failure: YouTube checks event.isTrusted on the skip button; element.click() and CDP-dispatched mouse events both fail. Only OS-level UIA InvokePattern is treated as trusted. Use wkappbot a11y invoke (which calls IUIAutomationInvokePattern.Invoke under the hood).
-Skip button UIA grap: {proc:&#x27;chrome&#x27;,cdp:PORT,domain:&#x27;www.youtube.com&#x27;}#*skip-button*  (matches AutomationId &#x27;skip-button:&lt;N&gt;&#x27;; do NOT use &#x27;*Skip Ad*&#x27; -- that string is not present in the UIA tree)
-Detection: lightweight eval-js polling reads classList + offsetHeight (no DOM mutation, no isTrusted concern). State JSON: {ad,skip,overlay}.
-Action: when ad+skip are both visible, run &#x27;wkappbot a11y invoke &lt;grap&gt;#*skip-button* --timeout 8 --force&#x27;. Success = &#x27;[STATE CHANGE DETECTED]&#x27; or &#x27;REMOVED&#x27; line in output (the &#x27;skip-ad&#x27; Group disappears from UIA tree).
-Overlay close: &#x27;#*overlay-close*&#x27; wildcard for ytp-ad-overlay-close-button.
-Timeout discipline: keep --timeout &gt;= 8s. The original 3s default was too tight on cold UIA tree; original suggest report (&#x27;LAUNCHER timeout 3s&#x27;) was a timeout issue, not a path issue.
-Fixed 2026-05-21: switched from JS .click() (blocked by isTrusted) to UIA invoke (trusted). Verified on Rick Astley video with mid-roll ad: invoke caused state change + adShowing flipped false.">Run: powershell -File test/youtube-ad-skippe...</li><li data-full="Added &#x27;ending&#x27; detection (video in last 2s) + preemptive mute before next ad fires (2026-05-21)">Added &#x27;ending&#x27; detection (video in last 2s)...</li><li data-full="UNIFIED AD DETECTION: var isAd = document.documentElement.classList.contains(&#x27;ad-showing&#x27;) || !!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;); covers both mid-roll (ad-showing) and end-roll (overlay-layout). Reload strategy: location.href = &#x27;?v=&#x27;+vid+&#x27;&amp;t=&#x27;+(currentTime+0.1)+&#x27;&amp;end=&#x27;+(dur-0.1)+&#x27;&amp;_clipped=1&#x27;">UNIFIED AD DETECTION: var isAd = document.do...</li><li data-full="COMPLETE STRATEGY (2026-05-23): (1) End-roll detected (ytp-ad-player-overlay-layout) -&gt; reload t=dur-1 end=dur-0.1 + pauseVideo() -- no ad, paused state. (2) Mid/pre-roll (ad-showing) -&gt; reload currentTime+0.1s -- jumps past ad cue point. (3) Premium banner -&gt; invoke #dismiss-button. (4) Clip playback (clip= param) -&gt; skip all processing. (5) Infinite end-roll loop prevention: &amp;end=dur-0.1 is the key param.">COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li data-full="KEY FINDING (2026-05-23): mid-roll ads at t=451/1843 showed overlay=true but ad-showing=FALSE. Both detection methods needed: var isAd=document.documentElement.classList.contains(&#x27;ad-showing&#x27;)||!!document.querySelector(&#x27;.ytp-ad-player-overlay-layout&#x27;). Skip first via invoke, fallback to reload.">KEY FINDING (2026-05-23): mid-roll ads at t=...</li></ol>
           
         </div>
       </article>
@@ -7254,7 +7220,7 @@ NativeMethods added: GetCommandLineA, CommandLineToArgvW, LocalFree (shell32+ker
         <div class="meta">user/developer</div>
         <div class="tags"></div>
         <div class="steps-wrap">
-          <ol class="steps"><li data-full="WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.">WHY: SDK is canonical launcher. Core Launche...</li></ol>
+          <ol class="steps"><li data-full="WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.">WHY: SDK is canonical launcher. Core Launche...</li><li data-full="BUILD SOURCE OF TRUTH (verified 2026-05-27): WKAppBot.CLI.csproj references D:/GitHub/wkappbot-sdk as the WKAppBot.Launcher source -- WKAppBot/sdk does NOT contain MyCdpContext placement files. Therefore a placement fix committed in wkappbot-sdk deploys via the standard wkappbot-pub/build.cmd path (which compiles the launcher from the wkappbot-sdk reference into bin/). No manual copy into WKAppBot/sdk is needed. Confirm before deploy: grep -q wkappbot-sdk WKAppBot.CLI.csproj.">BUILD SOURCE OF TRUTH (verified 2026-05-27):...</li></ol>
           
         </div>
       </article>

@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cross-repo launcher build | WKAppBot Skills</title>
-  <meta name="description" content="Core CLI uses SDK WKAppBot.Launcher as single source of truth">
-  <meta property="og:title" content="Cross-repo launcher build | WKAppBot Skills">
-  <meta property="og:description" content="Core CLI uses SDK WKAppBot.Launcher as single source of truth">
+  <title>Skill Browser Launch Checklist: Pre-Live QA | WKAppBot Skills</title>
+  <meta name="description" content="Complete pre-launch checklist for wkappbot skill browser. Run before each release. Covers: build integrity, auth flow, SEO, performance, mobile, and deployment gaps.">
+  <meta property="og:title" content="Skill Browser Launch Checklist: Pre-Live QA | WKAppBot Skills">
+  <meta property="og:description" content="Complete pre-launch checklist for wkappbot skill browser. Run before each release. Covers: build integrity, auth flow, SEO, performance, mobile, and deployment gaps.">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/cross-repo-launcher-build/">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/skill-browser-launch-checklist/">
   <meta name="twitter:card" content="summary">
   <style>
     :root {
@@ -118,16 +118,16 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot-sdk</span>
-        <span class="stars" aria-label="1 star rating">&#9733;&#9734;&#9734;</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
       </div>
-      <h1>Cross-repo launcher build</h1>
-      <p class="description">Core CLI uses SDK WKAppBot.Launcher as single source of truth</p>
+      <h1>Skill Browser Launch Checklist: Pre-Live QA</h1>
+      <p class="description">Complete pre-launch checklist for wkappbot skill browser. Run before each release. Covers: build integrity, auth flow, SEO, performance, mobile, and deployment gaps.</p>
       <div class="meta">user/developer</div>
       
-      <div class="tags"></div>
+      <div class="tags"><span class="chip">launch</span><span class="chip">checklist</span><span class="chip">qa</span><span class="chip">pre-release</span><span class="chip">auth</span><span class="chip">performance</span><span class="chip">deployment</span><span class="chip">cors</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.</li><li>BUILD SOURCE OF TRUTH (verified 2026-05-27): WKAppBot.CLI.csproj references D:/GitHub/wkappbot-sdk as the WKAppBot.Launcher source -- WKAppBot/sdk does NOT contain MyCdpContext placement files. Therefore a placement fix committed in wkappbot-sdk deploys via the standard wkappbot-pub/build.cmd path (which compiles the launcher from the wkappbot-sdk reference into bin/). No manual copy into WKAppBot/sdk is needed. Confirm before deploy: grep -q wkappbot-sdk WKAppBot.CLI.csproj.</li></ol>
+        <ol class="steps"><li>BUILD INTEGRITY: run ./wkbuild-skills.sh -- verify N skills and N detail pages. Check: SKILL_ID per detail page, injectFullSteps present, data-skill-id on index cards, no githubLogin button, Part of: on T2/T3 pages, og:title on index + detail, sitemap.xml exists.</li><li>AUTH FLOW (CRITICAL): skills-data-full.js must exist in PRIVATE wkappbot-harness repo at main branch root. Build generates docs/skills/skills-data-full.js locally but the LIVE auth fetches from raw.githubusercontent.com/***/wkappbot-harness/main/skills-data-full.js. Deploy step: copy docs/skills/skills-data-full.js to wkappbot-harness repo and push.</li><li>RACE CONDITION GUARD: checkGitHubAccess is called on page load AND when PAT button is clicked. Both paths call unlockAll() which calls injectFullSteps(). injectFullSteps checks if window.SKILLS_FULL exists before running -- safe. But the script tag inject is async: eval(js) fires synchronously so window.SKILLS_FULL IS set before unlockAll() is called. No race condition.</li><li>CORS CHECK: raw.githubusercontent.com returns Access-Control-Allow-Origin: * for public files. For private repo files with valid token, it also allows CORS. Test: fetch from browser console with valid PAT -- should get 200 and JS content.</li><li>PERFORMANCE: docs/skills/skills-data-full.js is ~600KB. On mobile 3G (~1Mbps) this is ~5 seconds. Mitigation options: (1) gzip on GitHub Pages (auto-enabled, ~70% reduction to ~180KB = 1.5s). (2) per-skill endpoint (future). For now: acceptable for Pro subscribers who explicitly unlock.</li><li>MOBILE CHECK: index.html has viewport meta. detail pages have viewport meta. Responsive CSS uses clamp() and @media max-width 640px. Test on iPhone screen width 375px.</li><li>404 BEHAVIOR: GitHub Pages returns 404 for unknown paths. Custom 404.html not configured. Acceptable for MVP -- add later if needed.</li><li>PRICING LINKS: CTA button on blur overlay links to ../#pricing. Verify pricing section exists on index.html (it does -- pricing div with 3 price cards).</li><li>KNOWN DEPLOYMENT GAP: skills-data-full.js in wkappbot-harness private repo must be kept in sync with each wkbuild-skills.sh run. Currently manual step -- automate with GHA cross-repo dispatch in future.</li></ol>
         
       </div>
     </article>
