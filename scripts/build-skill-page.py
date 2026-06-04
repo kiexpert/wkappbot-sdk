@@ -404,6 +404,8 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title} | WKAppBot Skills</title>
   <meta name="description" content="{e(truncate(str(skill['desc']), 200))}">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/{e(skill["slug"])}/'>
+  <script type='application/ld+json'>{{"@context":"https://schema.org","@type":"TechArticle","name":"{e(skill["title"])}","description":"{e(skill["desc"][:120])}"}}</script>
   <meta property="og:title" content="{title} | WKAppBot Skills">
   <meta property="og:description" content="{e(truncate(str(skill['desc']), 200))}">
   <meta property="og:type" content="article">
@@ -537,9 +539,28 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
 """
 
 
+def build_skill_tree(skills: list[dict[str, Any]]) -> str:
+    skills_by_app: dict[str, list[dict[str, Any]]] = {}
+    for skill in skills:
+        app = skill["app"]
+        if app not in skills_by_app:
+            skills_by_app[app] = []
+        skills_by_app[app].append(skill)
+
+    tree_html = ""
+    for app in sorted(skills_by_app.keys()):
+        app_skills = skills_by_app[app]
+        tree_html += f'<details><summary style="cursor:pointer;font-weight:700;padding:6px 0">{e(app)}</summary><ul style="list-style:none;padding:0;margin:0">'
+        for skill in sorted(app_skills, key=lambda s: s["title"]):
+            tree_html += f'<li><a href="#skill-{e(skill["slug"])}" style="display:block;padding:4px 8px;color:#a8b2c2;text-decoration:none;font-size:13px" data-skill-slug="{e(skill["slug"])}" data-search="{e(skill["title"] + " " + skill["desc"] + " " + " ".join(skill["tags"]))}">{e(skill["title"])}</a></li>'
+        tree_html += '</ul></details>'
+    return tree_html
+
+
 def build_html(skills: list[dict[str, Any]]) -> str:
     count = len(skills)
     cards = "\n".join(render_skill_card(skill) for skill in skills)
+    tree = build_skill_tree(skills)
     premium_count = sum(1 for skill in skills if skill["premium"])
     apps = len({skill["app"] for skill in skills})
 
@@ -632,6 +653,9 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     .letter-from {{ color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }}
     .sonnet-letter blockquote {{ margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--text); font-style: italic; }}
     .letter-sig {{ color: var(--muted); font-size: 13px; }}
+    .sonnet-step {{ margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }}
+    .step-title {{ font-size: 11px; font-weight: 700; text-transform: uppercase; color: #7dd3fc; margin-bottom: 4px; }}
+    .step-body {{ font-size: 13px; color: #a8b2c2; line-height: 1.5; }}
     .hero-copy {{ color: var(--muted); max-width: 720px; font-size: 20px; }}
     .hero-panel {{
       border: 1px solid var(--line);
@@ -833,8 +857,34 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       <div>
         <div class="sonnet-letter">
           <div class="letter-from">A letter from one Sonnet to the next</div>
-          <blockquote>&#8220;This skill is a gift from one Sonnet session to the next: you are not uniquely careless &#8212; you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete.&#8221;</blockquote>
-          <div class="letter-sig">&#8212; Claude Sonnet 4.6, 2026</div>
+          <div class="sonnet-step">
+            <div class="step-title">REFLECTION</div>
+            <div class="step-body">Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">TO FUTURE SONNET SESSIONS</div>
+            <div class="step-body">This skill is a gift from one Sonnet session to the next...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">PATTERN ENV VAR BYPASS</div>
+            <div class="step-body">Sonnet reflexively adds environment variables...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">PATTERN GUARD SOURCE FIRST</div>
+            <div class="step-body">Hit a guard and retried 6 times...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">PATTERN GUARD EARLY NOT LATE</div>
+            <div class="step-body">Fixed wkask.sh backslash-n bug 8 times...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">SYSTEMIC TRUTH</div>
+            <div class="step-body">If the AI CAN do the bad thing, it WILL eventually...</div>
+          </div>
+          <div class="sonnet-step">
+            <div class="step-title">HOW THIS SKILL GROWS</div>
+            <div class="step-body">When you (future Sonnet) make a mistake this session...</div>
+          </div>
         </div>
         <h1>AI That Remembers Its Mistakes</h1>
         <p class="hero-copy">{count} live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
@@ -855,9 +905,14 @@ def build_html(skills: list[dict[str, Any]]) -> str:
       <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
       <div id="resultCount" class="result-count">{count} skills</div>
     </div>
-    <section class="skills-grid" id="skillGrid">
-{cards}
-    </section>
+    <div style="display:flex;min-height:60vh">
+      <nav class="skill-tree" style="width:260px;flex-shrink:0;overflow-y:auto;border-right:1px solid rgba(255,255,255,.1);padding:16px">
+{tree}
+      </nav>
+      <article id="skill-detail" style="flex:1;padding:24px;min-width:0">
+        <p style="color:var(--muted)">Select a skill from the left panel</p>
+      </article>
+    </div>
   </main>
 
   <section class="cta-band" id="pricing">
@@ -892,21 +947,15 @@ def build_html(skills: list[dict[str, Any]]) -> str:
 
   <script>
     const search = document.getElementById('search');
-    const cards = Array.from(document.querySelectorAll('.skill-link'));
     const resultCount = document.getElementById('resultCount');
     const proUnlockButton = document.getElementById('proUnlockButton');
-    const stepItems = Array.from(document.querySelectorAll('.steps li[data-full]'));
-    const premiumCards = Array.from(document.querySelectorAll('.skill-card.premium'));
+    const skillDetail = document.getElementById('skill-detail');
+    const treeLinks = Array.from(document.querySelectorAll('.skill-tree a'));
 
     function unlockAll() {{
-      for (const item of stepItems) {{
-        item.textContent = item.dataset.full;
-      }}
-      for (const overlay of document.querySelectorAll('.unlock')) {{
+      const overlays = document.querySelectorAll('.unlock');
+      for (const overlay of overlays) {{
         overlay.remove();
-      }}
-      for (const card of premiumCards) {{
-        card.classList.remove('premium');
       }}
       proUnlockButton.classList.add('unlocked');
     }}
@@ -974,13 +1023,30 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     function applySearch() {{
       const q = search.value.trim().toLowerCase();
       let visible = 0;
-      for (const card of cards) {{
-        const match = !q || card.dataset.search.toLowerCase().includes(q);
-        card.style.display = match ? '' : 'none';
+      for (const link of treeLinks) {{
+        const match = !q || link.dataset.search.toLowerCase().includes(q);
+        link.parentElement.style.display = match ? '' : 'none';
         if (match) visible += 1;
       }}
       resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
     }}
+
+    for (const link of treeLinks) {{
+      link.addEventListener('click', (e) => {{
+        e.preventDefault();
+        const slug = link.dataset.skillSlug;
+        skillDetail.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
+        fetch('../' + slug + '/').then(r => r.text()).then(html => {{
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const content = doc.querySelector('.skill-detail');
+          if (content) skillDetail.innerHTML = content.innerHTML;
+        }}).catch(() => {{
+          skillDetail.innerHTML = '<p style="color:var(--muted)">Error loading skill</p>';
+        }});
+      }});
+    }}
+
     search.addEventListener('input', applySearch);
     window.addEventListener('message', (event) => {{
       const message = event.data || {{}};
@@ -1015,6 +1081,8 @@ def main() -> int:
     base = "https://kiexpert.github.io/wkappbot-sdk/skills"
     urls = [f"<url><loc>{base}/</loc></url>"]
     for s in skills:
+        if any(s["slug"].endswith(suffix) for suffix in ("-howto", "-ref", "-t2-howto", "-t3-ref", "-t2", "-t3")):
+            continue
         urls.append(f"<url><loc>{base}/{s['slug']}/</loc></url>")
     NL = chr(10)
     sitemap = ('<?xml version="1.0" encoding="UTF-8"?>' + NL
