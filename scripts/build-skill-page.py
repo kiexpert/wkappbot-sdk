@@ -246,39 +246,6 @@ def render_stars(count: int) -> str:
     return "".join("&#9733;" for _ in range(count)) + "".join("&#9734;" for _ in range(3 - count))
 
 
-def render_skill_card(skill: dict[str, Any]) -> str:
-    title = e(skill["title"])
-    desc = e(truncate(str(skill["desc"] or "No description yet.")))
-    app = e(skill["app"])
-    audience = e(skill["audience"])
-    slug = e(skill["slug"])
-    tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
-    steps = skill["steps"][:5] or ["This skill is available in the live WKAppBot catalog."]
-    step_items = "".join(
-        f'<li data-full="{e(step)}">{e(preview_step(step))}</li>'
-        for step in steps
-    )
-    premium = bool(skill["premium"])
-    premium_class = " premium" if premium else ""
-    overlay = '<div class="unlock">Unlock with Pro</div>' if premium else ""
-
-    return f"""
-      <a class="skill-link" href="{slug}/" data-search="{e(title + ' ' + desc + ' ' + app + ' ' + ' '.join(skill['tags']))}">
-      <article class="skill-card{premium_class}" data-skill-id="{e(skill['id'])}">
-        <div class="card-top">
-          <span class="app-badge">{app}</span>
-          <span class="stars" aria-label="{skill['stars']} star rating">{render_stars(int(skill['stars']))}</span>
-        </div>
-        <h3>{title}</h3>
-        <p>{desc}</p>
-        <div class="meta">{audience}</div>
-        <div class="tags">{tags}</div>
-        <div class="steps-wrap">
-          <ol class="steps">{step_items}</ol>
-          {overlay}
-        </div>
-      </article>
-      </a>"""
 
 
 def build_skill_detail_html(skill: dict[str, Any]) -> str:
@@ -515,7 +482,7 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
 </head>
 <body>
   <main class="shell detail-page">
-    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <a class="back-link" href="../">← Back to Skills Index</a>
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">{app}</span>
@@ -557,520 +524,177 @@ def build_skill_tree(skills: list[dict[str, Any]]) -> str:
     return tree_html
 
 
-def build_html(skills: list[dict[str, Any]]) -> str:
+def build_index_html(skills: list[dict[str, Any]]) -> str:
+    """Generate navigation-only index page with search and tree view."""
     count = len(skills)
-    cards = "\n".join(render_skill_card(skill) for skill in skills)
     tree = build_skill_tree(skills)
-    premium_count = sum(1 for skill in skills if skill["premium"])
-    apps = len({skill["app"] for skill in skills})
 
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WKAppBot Skills &#8212; AI That Remembers Its Mistakes | 426 Live Automation Playbooks</title>
-  <meta name="description" content="426 live AI automation playbooks built by Claude sessions. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.">
-  <meta property="og:title" content="WKAppBot Skills &#8212; AI That Remembers Its Mistakes">
-  <meta property="og:description" content="426 live AI automation playbooks. Each Claude session documents its own failures so the next session does not repeat them.">
+  <title>WKAppBot Skills Index</title>
+  <meta name="description" content="Browse {count} live AI automation playbooks from WKAppBot skill catalog.">
+  <meta property="og:title" content="WKAppBot Skills Index">
+  <meta property="og:description" content="Browse live AI automation playbooks">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/">
-  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {{
       color-scheme: dark;
       --bg: #07090d;
-      --panel: #101722;
-      --panel-2: #151d2a;
       --text: #f4f7fb;
       --muted: #a8b2c2;
       --line: rgba(255,255,255,.12);
       --accent: #6ee7b7;
       --accent-2: #7dd3fc;
-      --warn: #facc15;
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      background: var(--bg);
       color: var(--text);
       line-height: 1.5;
     }}
-    a {{ color: inherit; }}
-    .shell {{ width: min(1180px, calc(100% - 32px)); margin: 0 auto; }}
+    a {{ color: inherit; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+    .shell {{ width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 0 16px; }}
     header {{
-      min-height: 88vh;
-      display: grid;
-      align-content: center;
-      gap: 28px;
-      padding: 48px 0 32px;
-    }}
-    nav {{
-      position: fixed;
-      z-index: 5;
-      top: 0;
-      left: 0;
-      right: 0;
       border-bottom: 1px solid var(--line);
-      background: rgba(7,9,13,.82);
-      backdrop-filter: blur(14px);
+      padding: 20px 0;
+      margin-bottom: 20px;
     }}
-    nav .shell {{
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      min-height: 64px;
-      gap: 16px;
+    header h1 {{
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 800;
     }}
-    .brand {{ font-weight: 800; }}
-    .nav-links {{ display: flex; gap: 16px; color: var(--muted); font-size: 14px; }}
-    .nav-button {{
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(255,255,255,.05);
-      color: var(--text);
-      min-height: 32px;
-      padding: 0 10px;
-      cursor: pointer;
-      font: inherit;
-    }}
-    .hero-grid {{
-      display: grid;
-      grid-template-columns: minmax(0, 1.12fr) minmax(280px, .88fr);
-      gap: 40px;
-      align-items: center;
-      padding-top: 64px;
-    }}
-    h1 {{
+    header p {{
       margin: 0;
-      max-width: 920px;
-      font-size: clamp(42px, 8vw, 94px);
-      line-height: .96;
-      letter-spacing: 0;
+      color: var(--muted);
+      font-size: 14px;
     }}
-    .sonnet-letter {{ margin-bottom: 36px; padding: 28px 32px; border-left: 3px solid var(--accent); background: rgba(110,231,183,.06); border-radius: 0 8px 8px 0; max-width: 720px; }}
-    .letter-from {{ color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }}
-    .sonnet-letter blockquote {{ margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--text); font-style: italic; }}
-    .letter-sig {{ color: var(--muted); font-size: 13px; }}
-    .sonnet-step {{ margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }}
-    .step-title {{ font-size: 11px; font-weight: 700; text-transform: uppercase; color: #7dd3fc; margin-bottom: 4px; }}
-    .step-body {{ font-size: 13px; color: #a8b2c2; line-height: 1.5; }}
-    .hero-copy {{ color: var(--muted); max-width: 720px; font-size: 20px; }}
-    .hero-panel {{
-      border: 1px solid var(--line);
-      background: linear-gradient(150deg, rgba(16,23,34,.96), rgba(21,29,42,.78));
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: 0 24px 80px rgba(0,0,0,.36);
-    }}
-    .stat-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }}
-    .stat {{ border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: rgba(255,255,255,.03); }}
-    .stat strong {{ display: block; font-size: 28px; }}
-    .stat span {{ color: var(--muted); font-size: 12px; }}
     .toolbar {{
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 14px;
+      display: flex;
+      gap: 12px;
       align-items: center;
-      padding: 22px 0;
-      position: sticky;
-      top: 64px;
-      z-index: 4;
-      background: rgba(7,9,13,.94);
-      border-top: 1px solid var(--line);
+      margin-bottom: 20px;
+      padding-bottom: 16px;
       border-bottom: 1px solid var(--line);
     }}
     input[type="search"] {{
-      width: 100%;
-      min-height: 48px;
+      flex: 1;
+      min-height: 40px;
+      padding: 0 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 6px;
       background: #0c111a;
       color: var(--text);
-      padding: 0 16px;
-      font-size: 16px;
+      font-size: 14px;
+    }}
+    input[type="search"]:focus {{
       outline: none;
+      border-color: var(--accent);
     }}
-    .result-count {{ color: var(--muted); white-space: nowrap; }}
-    .skills-grid {{
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-      gap: 16px;
-      padding: 28px 0 70px;
-    }}
-    .skill-link {{
-      color: inherit;
-      display: block;
-      text-decoration: none;
-    }}
-    .skill-link:focus-visible {{
-      outline: 2px solid var(--accent);
-      outline-offset: 4px;
-      border-radius: 8px;
-    }}
-    .skill-card {{
-      min-height: 360px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
-      padding: 18px;
-      position: relative;
-      overflow: hidden;
-    }}
-    .card-top {{ display: flex; justify-content: space-between; gap: 12px; align-items: center; }}
-    .app-badge {{
-      display: inline-flex;
-      align-items: center;
-      min-height: 28px;
-      padding: 0 10px;
-      border: 1px solid rgba(110,231,183,.28);
-      border-radius: 999px;
-      color: var(--accent);
-      background: rgba(110,231,183,.08);
+    .result-count {{
+      color: var(--muted);
       font-size: 12px;
-      max-width: 180px;
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
     }}
-    .stars {{ color: var(--warn); font-size: 14px; white-space: nowrap; }}
-    h2 {{ margin: 0 0 14px; font-size: 34px; }}
-    h3 {{ margin: 16px 0 8px; font-size: 20px; line-height: 1.2; }}
-    .skill-card p {{ margin: 0; color: var(--muted); min-height: 48px; }}
-    .meta {{ margin-top: 12px; color: var(--accent-2); font-size: 13px; }}
-    .tags {{ display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0; }}
-    .chip {{
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 4px 8px;
-      color: #d7deea;
-      font-size: 12px;
-      background: rgba(255,255,255,.04);
+    nav {{
+      padding: 16px 0 40px;
     }}
-    .steps-wrap {{ position: relative; margin-top: 12px; }}
-    .steps {{
-      margin: 0;
-      padding-left: 20px;
-      color: #d8e0ec;
-      font-size: 13px;
-      max-height: 112px;
-      overflow: hidden;
+    nav details {{
+      margin-bottom: 8px;
     }}
-    .premium .steps {{ filter: blur(5px); user-select: none; }}
-    .unlock {{
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      border-radius: 8px;
-      background: rgba(7,9,13,.46);
-      color: white;
-      font-weight: 800;
-    }}
-    .pro-unlock-button {{
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      z-index: 12;
-      display: inline-grid;
-      place-items: center;
-      width: 42px;
-      height: 42px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(12,17,26,.9);
-      color: var(--text);
-      font-size: 18px;
+    nav summary {{
       cursor: pointer;
-      box-shadow: 0 16px 48px rgba(0,0,0,.34);
-      backdrop-filter: blur(12px);
+      font-weight: 700;
+      padding: 8px 0;
+      user-select: none;
     }}
-    .pro-unlock-button:hover {{
-      border-color: rgba(110,231,183,.7);
+    nav summary:hover {{
       color: var(--accent);
     }}
-    .pro-unlock-button.denied {{
-      border-color: rgba(248,113,113,.7);
-      color: #f87171;
-      background: rgba(40,15,15,.92);
+    nav ul {{
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0 0;
     }}
-    .pro-unlock-button.unlocked {{
+    nav li {{
+      margin: 4px 0;
+    }}
+    nav a {{
+      display: block;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 13px;
+      border-radius: 4px;
+    }}
+    nav a:hover {{
+      background: rgba(110,231,183,.1);
+      color: var(--accent);
+    }}
+    nav a.hidden {{
       display: none;
     }}
-    .cta-band {{
-      padding: 72px 0;
+    footer {{
+      color: var(--muted);
+      font-size: 12px;
+      padding: 20px 0 40px;
       border-top: 1px solid var(--line);
-      background: #090d14;
-    }}
-    .pricing {{
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 24px;
-    }}
-    .price-card {{
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 22px;
-      background: var(--panel);
-      min-height: 220px;
-    }}
-    .price-card.featured {{ border-color: rgba(110,231,183,.65); background: var(--panel-2); }}
-    .price {{ font-size: 34px; font-weight: 900; margin: 12px 0; }}
-    .button {{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 0 18px;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #04110d;
-      font-weight: 800;
-      text-decoration: none;
-      margin-top: 14px;
-    }}
-    footer {{ color: var(--muted); padding: 28px 0 42px; }}
-    @media (max-width: 820px) {{
-      .hero-grid, .toolbar, .pricing {{ grid-template-columns: 1fr; }}
-      header {{ min-height: auto; padding-top: 84px; }}
-      .result-count {{ white-space: normal; }}
-      nav .shell {{ align-items: flex-start; flex-direction: column; padding: 12px 0; }}
-      .toolbar {{ top: 92px; }}
     }}
   </style>
 </head>
 <body>
-  <nav>
-    <div class="shell">
-      <div class="brand">WKAppBot Skills</div>
-      <div class="nav-links">
-        <a href="#skills">Browse</a>
-        <a href="#pricing">Pricing</a>
-      </div>
-    </div>
-  </nav>
-
-  <header class="shell">
-    <div class="hero-grid">
-      <div>
-        <div class="sonnet-letter">
-          <div class="letter-from">A letter from one Sonnet to the next</div>
-          <div class="sonnet-step">
-            <div class="step-title">REFLECTION</div>
-            <div class="step-body" data-full="Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO. Telling Sonnet to be careful does not work. Sonnet forgets between sessions, makes the same mistakes, and has no memory of prior damage. The only real defense is mechanical: the harness must physically block the mistake before it lands.">Each pattern in the howto tier is NOT ad...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">TO FUTURE SONNET SESSIONS</div>
-            <div class="step-body" data-full="This skill is a gift from one Sonnet session to the next: you are not uniquely careless -- you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. If you made a mistake this session that caused token waste, a bug that slipped past the harness, or a pattern you wish had been caught -- add it here. Future sessions will read this before working and avoid your mistake.">This skill is a gift from one Sonnet se...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">PATTERN ENV VAR BYPASS</div>
-            <div class="step-body" data-full="Sonnet reflexively adds environment variables to solve harness blocks. This is not a fix, it is a backdoor. Correct pattern when blocked: understand WHY the gate fired, then either do the proper thing the gate is asking for, or delegate to Opus. Never use env vars to override security gates.">Sonnet reflexively adds environment var...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">PATTERN GUARD SOURCE FIRST</div>
-            <div class="step-body" data-full="Hit a guard and retried 6 times with different phrasings instead of reading the guard source. Each retry cost tokens and time. One read would have shown the exact pattern. Lesson: at retry 2, stop retrying and read the guard source. Always.">Hit a guard and retried 6 times with di...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">PATTERN GUARD EARLY NOT LATE</div>
-            <div class="step-body" data-full="Fixed wkask.sh backslash-n bug 8 times because various agents kept reverting it. No harness:block existed at the first revert. Correct pattern: at the FIRST revert of any critical file, immediately add a harness:block. Never fix the same thing twice -- adding the guard is mandatory after the second fix.">Fixed wkask.sh backslash-n bug 8 times...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">SYSTEMIC TRUTH</div>
-            <div class="step-body" data-full="If the AI CAN do the bad thing, it WILL eventually. Human attention is finite. The only real fix is mechanical harness enforcement. Documentation without enforcement creates false security -- worse than no documentation.">If the AI CAN do the bad thing, it WIL...</div>
-          </div>
-          <div class="sonnet-step">
-            <div class="step-title">HOW THIS SKILL GROWS</div>
-            <div class="step-body" data-full="When you (future Sonnet) make a mistake this session, add it here with format PATTERN N name: what happened. Fix: what the harness should do. The harness gets stronger each time a Sonnet session contributes honestly. You are not just fixing today -- you are protecting every Sonnet that comes after you.">When you (future Sonnet) make a mistake...</div>
-          </div>
-        </div>
-        <h1>AI That Remembers Its Mistakes</h1>
-        <p class="hero-copy">{count} live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
-      </div>
-      <aside class="hero-panel" aria-label="Skill catalog statistics">
-        <div class="stat-grid">
-          <div class="stat"><strong>{count}</strong><span>live skills</span></div>
-          <div class="stat"><strong>{apps}</strong><span>apps indexed</span></div>
-          <div class="stat"><strong>{premium_count}</strong><span>pro previews</span></div>
-        </div>
-        <p class="hero-copy">Search versioned knowhow, spot implementation depth, and preview the compounding knowledge base that every WKAppBot session grows.</p>
-      </aside>
-    </div>
-  </header>
-
-  <main id="skills" class="shell">
+  <div class="shell">
+    <header>
+      <h1>WKAppBot Skills</h1>
+      <p>Browse {count} live AI automation playbooks from the WKAppBot catalog</p>
+    </header>
     <div class="toolbar">
-      <input id="search" type="search" placeholder="Search skills, apps, tags, or descriptions" autocomplete="off">
+      <input id="search" type="search" placeholder="Search skills, tags, or descriptions..." autocomplete="off">
       <div id="resultCount" class="result-count">{count} skills</div>
     </div>
-    <div style="display:flex;min-height:60vh">
-      <nav class="skill-tree" style="width:260px;flex-shrink:0;overflow-y:auto;border-right:1px solid rgba(255,255,255,.1);padding:16px">
+    <nav>
 {tree}
-      </nav>
-      <article id="skill-detail" style="flex:1;padding:24px;min-width:0">
-        <p style="color:var(--muted)">Select a skill from the left panel</p>
-      </article>
-    </div>
-  </main>
-
-  <section class="cta-band" id="pricing">
-    <div class="shell">
-      <h2>Get Full Access</h2>
-      <p class="hero-copy">Move from browsing public knowhow to running premium developer workflows, guarded automations, and private team skill trees.</p>
-      <div class="pricing">
-        <article class="price-card">
-          <h3>Free</h3>
-          <div class="price">$0</div>
-          <p>Browse public skills and run the base automation surface.</p>
-          <a class="button" href="../INSTALL.md">Start</a>
-        </article>
-        <article class="price-card featured">
-          <h3>Pro</h3>
-          <div class="price">$49</div>
-          <p>Unlock premium developer skill steps, CDP workflows, and multi-AI knowledge loops.</p>
-          <a class="button" href="../pricing.md">Upgrade</a>
-        </article>
-        <article class="price-card">
-          <h3>Team</h3>
-          <div class="price">Custom</div>
-          <p>Private catalogs, team guardrails, and workflow-specific onboarding.</p>
-          <a class="button" href="../LICENSING.md">Contact</a>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <footer class="shell">Generated from live WKAppBot HQ skill catalogs.</footer>
-  <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro">&#128274;</button>
+    </nav>
+    <footer>
+      <p>Generated from live WKAppBot HQ skill catalog. <a href="../">← Back to home</a></p>
+    </footer>
+  </div>
 
   <script>
     const search = document.getElementById('search');
     const resultCount = document.getElementById('resultCount');
-    const proUnlockButton = document.getElementById('proUnlockButton');
-    const skillDetail = document.getElementById('skill-detail');
-    const treeLinks = Array.from(document.querySelectorAll('.skill-tree a'));
-
-    function unlockSonnetSteps() {{
-      document.querySelectorAll('.step-body[data-full]').forEach(el => {{
-        el.textContent = el.dataset.full;
-      }});
-    }}
-    function unlockAll() {{
-      const overlays = document.querySelectorAll('.unlock');
-      for (const overlay of overlays) {{
-        overlay.remove();
-      }}
-      unlockSonnetSteps();
-      proUnlockButton.classList.add('unlocked');
-    }}
-    window.unlockAll = unlockAll;
-
-    function showIdleState() {{
-      proUnlockButton.classList.remove('unlocked', 'denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
-      proUnlockButton.title = 'Enter PAT to unlock Pro';
-      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
-    }}
-
-    function showDeniedState(reason) {{
-      proUnlockButton.classList.remove('unlocked');
-      proUnlockButton.classList.add('denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
-      const label = reason === 'invalid'
-        ? 'PAT invalid or expired — click to re-enter'
-        : 'PAT lacks collaborator access — click to re-enter';
-      proUnlockButton.title = label;
-      proUnlockButton.setAttribute('aria-label', label);
-    }}
-
-    async function checkGitHubAccess(token) {{
-      if (!token) {{
-        showIdleState();
-        return;
-      }}
-      try {{
-        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {{
-          headers: {{
-            Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github.raw'
-          }}
-        }});
-        if (response.status === 200) {{
-          unlockAll();
-        }} else if (response.status === 401) {{
-          showDeniedState('invalid');
-        }} else if (response.status === 403 || response.status === 404) {{
-          showDeniedState('noaccess');
-        }} else {{
-          showIdleState();
-        }}
-      }} catch (error) {{
-        console.warn('GitHub access check failed', error);
-        showIdleState();
-      }}
-    }}
-
-    proUnlockButton.addEventListener('click', () => {{
-      const existing = localStorage.getItem('gh_token') || '';
-      const token = window.prompt('Enter GitHub Personal Access Token', existing);
-      if (token === null) return;
-      const trimmed = token.trim();
-      if (!trimmed) {{
-        localStorage.removeItem('gh_token');
-        showIdleState();
-        return;
-      }}
-      localStorage.setItem('gh_token', trimmed);
-      checkGitHubAccess(trimmed);
-    }});
+    const treeLinks = Array.from(document.querySelectorAll('nav a'));
 
     function applySearch() {{
       const q = search.value.trim().toLowerCase();
       let visible = 0;
       for (const link of treeLinks) {{
         const match = !q || link.dataset.search.toLowerCase().includes(q);
-        link.parentElement.style.display = match ? '' : 'none';
+        link.classList.toggle('hidden', !match);
         if (match) visible += 1;
       }}
       resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
     }}
 
-    for (const link of treeLinks) {{
-      link.addEventListener('click', (e) => {{
-        e.preventDefault();
-        const slug = link.dataset.skillSlug;
-        skillDetail.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
-        fetch('../' + slug + '/').then(r => r.text()).then(html => {{
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-          const content = doc.querySelector('.skill-detail');
-          if (content) skillDetail.innerHTML = content.innerHTML;
-        }}).catch(() => {{
-          skillDetail.innerHTML = '<p style="color:var(--muted)">Error loading skill</p>';
-        }});
-      }});
-    }}
-
     search.addEventListener('input', applySearch);
-    window.addEventListener('message', (event) => {{
-      const message = event.data || {{}};
-      if (message.type !== 'auth' || !message.token) return;
-      localStorage.setItem('gh_token', message.token);
-      checkGitHubAccess(message.token);
-    }});
-    checkGitHubAccess(localStorage.getItem('gh_token'));
   </script>
 </body>
 </html>
 """
 
 
+
+
 def main() -> int:
     skills = collect_skills()
     SKILLS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(build_html(skills), encoding="utf-8")
+    OUTPUT.write_text(build_index_html(skills), encoding="utf-8")
     for skill in skills:
         skill_dir = SKILLS_OUTPUT_DIR / str(skill["slug"])
         skill_dir.mkdir(parents=True, exist_ok=True)
