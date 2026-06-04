@@ -193,6 +193,34 @@
       loadFromHash();
     });
 
+    // SEO-safe deep-linking: intercept links within iframe and update parent history
+    document.getElementById('content').addEventListener('load', function() {
+      try {
+        var iframeDoc = this.contentDocument || this.contentWindow.document;
+        if (iframeDoc) {
+          // Find all skill page links in iframe
+          var iframeLinks = iframeDoc.querySelectorAll('a[href*=".html"]');
+          iframeLinks.forEach(function(link) {
+            var href = link.getAttribute('href');
+            // Only intercept relative links (within same domain)
+            if (href && !href.startsWith('http') && !href.startsWith('//')) {
+              link.addEventListener('click', function(e) {
+                e.preventDefault();
+                // Resolve URL relative to iframe location
+                var baseUrl = document.getElementById('content').src;
+                var resolvedUrl = new URL(href, new URL(baseUrl, window.location)).pathname;
+                // Update iframe and push state for bookmarking
+                document.getElementById('content').src = resolvedUrl;
+                history.pushState(null, '', '#' + resolvedUrl);
+              });
+            }
+          });
+        }
+      } catch (e) {
+        // Cross-origin iframe: skip interception (CORS restriction)
+      }
+    });
+
     // Initialize on page load
     loadFromHash();
   </script>
