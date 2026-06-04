@@ -248,7 +248,31 @@ def render_stars(count: int) -> str:
 
 
 
+def build_nav_tree(all_skills: list[dict[str, Any]]) -> str:
+    """Generate compact navigation tree HTML grouped by app."""
+    if not all_skills:
+        return ""
+    skills_by_app: dict[str, list[dict[str, Any]]] = {}
+    for skill in all_skills:
+        app = skill["app"]
+        if app not in skills_by_app:
+            skills_by_app[app] = []
+        skills_by_app[app].append(skill)
+
+    nav_html = ""
+    for app in sorted(skills_by_app.keys()):
+        app_slug = skill_page_slug(app)
+        app_skills = sorted(skills_by_app[app], key=lambda s: s["title"])
+        nav_html += f'<details class="nav-app" open><summary>{e(app)}</summary><ul>'
+        for s in app_skills:
+            skill_slug = skill_page_slug(s["id"])
+            nav_html += f'<li><a href="../../{app_slug}/{skill_slug}.html">{e(s["title"])}</a></li>'
+        nav_html += '</ul></details>'
+    return nav_html
+
+
 def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx: int = 0) -> str:
+    nav_tree_html = build_nav_tree(all_skills) if all_skills else ""
     title = e(skill["title"])
     desc = e(skill["desc"] or "No description yet.")
     app = e(skill["app"])
@@ -523,12 +547,146 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
       color: white;
       font-weight: 800;
     }}
+    .skill-footer {{
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }}
+    .skill-nav {{
+      margin: 12px 0;
+      font-size: 14px;
+    }}
+    .skill-nav a {{
+      color: var(--accent-2);
+      text-decoration: none;
+    }}
+    .skill-nav a:hover {{
+      text-decoration: underline;
+    }}
+    .related {{
+      margin: 8px 0;
+      font-size: 14px;
+    }}
+    .related a {{
+      color: var(--accent-2);
+      text-decoration: none;
+    }}
+    .related a:hover {{
+      text-decoration: underline;
+    }}
+    #sidebar-toggle {{
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 100;
+      padding: 6px 12px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #333;
+      font-weight: 600;
+    }}
+    #sidebar-toggle:hover {{
+      background: #e8e8e8;
+    }}
+    #sidebar {{
+      position: fixed;
+      top: 0;
+      left: -300px;
+      width: 280px;
+      height: 100vh;
+      background: #fff;
+      border-right: 1px solid #eee;
+      overflow-y: auto;
+      padding: 16px;
+      transition: left .2s;
+      z-index: 200;
+      box-shadow: 2px 0 8px rgba(0,0,0,.1);
+    }}
+    #sidebar.open {{
+      left: 0;
+    }}
+    body.sidebar-open {{
+      margin-left: 280px;
+    }}
+    #nav-search {{
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+    }}
+    #sidebar-close {{
+      float: right;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #333;
+    }}
+    #sidebar-close:hover {{
+      color: #000;
+    }}
+    .nav-app {{
+      margin-bottom: 8px;
+    }}
+    .nav-app summary {{
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 4px 0;
+      color: #666;
+    }}
+    .nav-app summary:hover {{
+      color: #333;
+    }}
+    .nav-app ul {{
+      list-style: none;
+      padding: 0 0 0 12px;
+      margin: 4px 0;
+    }}
+    .nav-app li a {{
+      display: block;
+      padding: 3px 4px;
+      font-size: 13px;
+      color: #333;
+      text-decoration: none;
+    }}
+    .nav-app li a:hover {{
+      color: #0070f3;
+    }}
+    .nav-app li a.current {{
+      color: #0070f3;
+      font-weight: 600;
+    }}
     @media (max-width: 640px) {{
       .card-top {{ align-items: flex-start; flex-direction: column; }}
+      #sidebar {{
+        width: 100%;
+        left: -100%;
+      }}
+      #sidebar-toggle {{
+        top: 8px;
+        left: 8px;
+      }}
     }}
   </style>
 </head>
 <body>
+  <div id="sidebar" class="sidebar">
+    <button id="sidebar-close" onclick="toggleSidebar()">✕</button>
+    <input id="nav-search" type="search" placeholder="Search skills..." oninput="filterNav(this.value)">
+    <nav id="nav-tree">
+      {nav_tree_html}
+    </nav>
+  </div>
+  <button id="sidebar-toggle" onclick="toggleSidebar()">☰ Browse Skills</button>
   <main class="shell detail-page">
     <a class="back-link" href="../">← Back to {app}</a>
     <article class="skill-detail">
@@ -546,9 +704,39 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
         <ol class="steps{blur_class}">{step_items}</ol>
         {overlay}
       </div>
+      <footer class="skill-footer">
+        {related_links_html}
+        <p style="color:var(--muted);font-size:12px;margin-top:24px;margin-bottom:0;">Generated from live WKAppBot HQ skill catalog.</p>
+      </footer>
     </article>
   </main>
   {pro_button_and_script}
+  <script>
+    function toggleSidebar(){{
+      var s=document.getElementById('sidebar');
+      var open=s.classList.toggle('open');
+      document.body.classList.toggle('sidebar-open',open);
+      localStorage.setItem('sb_open',open?'1':'0');
+    }}
+    function filterNav(q){{
+      q=q.toLowerCase();
+      document.querySelectorAll('#nav-tree li').forEach(function(li){{
+        var a=li.querySelector('a');
+        var show=!q||a.textContent.toLowerCase().includes(q);
+        li.style.display=show?'':'none';
+      }});
+    }}
+    (function(){{
+      if(localStorage.getItem('sb_open')==='1'){{
+        document.getElementById('sidebar').classList.add('open');
+        document.body.classList.add('sidebar-open');
+      }}
+      var cur=location.pathname.split('/').pop();
+      document.querySelectorAll('#nav-tree a').forEach(function(a){{
+        if(a.href.endsWith(cur))a.classList.add('current');
+      }});
+    }})();
+  </script>
 </body>
 </html>
 """
@@ -807,9 +995,9 @@ def main() -> int:
         (app_dir / "index.html").write_text(build_app_index(app_name, app_skills), encoding="utf-8")
 
         # Build individual skill pages
-        for skill in app_skills:
+        for i, skill in enumerate(app_skills):
             skill_slug = skill_page_slug(skill["id"])
-            (app_dir / f"{skill_slug}.html").write_text(build_skill_detail_html(skill), encoding="utf-8")
+            (app_dir / f"{skill_slug}.html").write_text(build_skill_detail_html(skill, skills, i), encoding="utf-8")
 
     # Generate skills-data-full.js with full skill data (id, slug, steps)
     SKILLS_FULL_OUTPUT = SKILLS_OUTPUT_DIR / "skills-data-full.js"
