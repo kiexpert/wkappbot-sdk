@@ -77,9 +77,10 @@ if ($DefenderFix) {
     exit 0
 }
 
-# --emergency-kill: iterative hysteresis reaper.
-# Trigger=60% RAM, recover=50% RAM. Safe pool only: orphaned codex/python/node + WmiPrvSE.
+# --emergency-kill: priority-order greedy reaper with harness:keep protection + kill-audit.
+# Trigger=60% RAM (set in guards.ps1 hook), recover=30% RAM.
 # NEVER kills claude.exe / wkappbot-core / wkchat / wka11y / user apps.
+# harness:keep <regex> in project config protects matched processes (warn <85% RAM; override >=85%).
 if ($EmergencyKill) {
     function Get-RamPct {
         try {
@@ -88,50 +89,118 @@ if ($EmergencyKill) {
         } catch { return 0 }
     }
 
+    function Get-EkCmdLine {
+        param([int]$Pid)
+        try {
+            $cl = (Get-CimInstance Win32_Process -Filter "ProcessId=$Pid" -ErrorAction Stop).CommandLine
+            if ($null -ne $cl) { $cl } else { '' }
+        } catch { '' }
+    }
+
+    function Get-EkAncestry {
+        param([int]$Pid)
+        $chain = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $seen  = [System.Collections.Generic.HashSet[int]]::new()
+        $cur   = $Pid
+        while ($cur -gt 0 -and $seen.Add($cur)) {
+            try {
+                $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$cur" -ErrorAction Stop
+                $chain.Add([PSCustomObject]@{ pid = $ci.ProcessId; name = $ci.Name; cmdline = $ci.CommandLine })
+                $cur = [int]$ci.ParentProcessId
+            } catch { break }
+        }
+        return @($chain)
+    }
+
+    function Get-HarnessKeepPatterns {
+        $patterns = [System.Collections.Generic.List[string]]::new()
+        $cn = 'CLAUDE' + '.md'
+        foreach ($f in @((Join-Path $PWD $cn), (Join-Path $env:USERPROFILE ".claude\$cn"))) {
+            if (Test-Path $f) {
+                Get-Content $f | ForEach-Object {
+                    if ($_ -match '^## harness:keep (.+)$') { $patterns.Add($Matches[1].Trim()) }
+                }
+            }
+        }
+        return @($patterns)
+    }
+
     function Build-SafePool {
         $pool = [System.Collections.Generic.List[PSCustomObject]]::new()
         foreach ($img in @('codex', 'python', 'pythonw', 'node')) {
             try {
                 Get-Process $img -ErrorAction SilentlyContinue | ForEach-Object {
                     $p = $_
-                    $parentName = try { (Get-Process -Id (
-                        (Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction Stop).ParentProcessId
-                        ) -ErrorAction Stop).Name.ToLower() } catch { '' }
-                    if ($parentName -notin @('claude', 'wkappbot-core', 'wkchat', 'wka11y')) {
-                        $pool.Add([PSCustomObject]@{ Id = $p.Id; Name = $p.Name; WS = $p.WorkingSet64 })
-                    }
+                    try {
+                        $ppid = [int](Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction Stop).ParentProcessId
+                        $parentName = try { (Get-Process -Id $ppid -ErrorAction Stop).Name.ToLower() } catch { '' }
+                        if ($parentName -notin @('claude', 'wkappbot-core', 'wkchat', 'wka11y')) {
+                            $tier = if ($parentName -eq '') { 1 } else { 3 }
+                            $pool.Add([PSCustomObject]@{ Id = $p.Id; Name = $p.Name; WS = $p.WorkingSet64; Tier = $tier })
+                        }
+                    } catch {}
                 }
             } catch {}
         }
         try {
             Get-Process WmiPrvSE -ErrorAction SilentlyContinue | ForEach-Object {
-                $pool.Add([PSCustomObject]@{ Id = $_.Id; Name = $_.Name; WS = $_.WorkingSet64 })
+                $pool.Add([PSCustomObject]@{ Id = $_.Id; Name = $_.Name; WS = $_.WorkingSet64; Tier = 2 })
             }
         } catch {}
-        return @($pool | Sort-Object WS -Descending)
+        return @($pool | Sort-Object -Property Tier, @{ Expression = 'WS'; Descending = $true })
     }
 
-    $killed = 0
+    $keepPatterns = Get-HarnessKeepPatterns
+    $auditDir  = Join-Path $env:USERPROFILE '.claude\wkharness'
+    $auditPath = Join-Path $auditDir 'emergency-kill-audit.jsonl'
+    if (-not (Test-Path $auditDir)) { New-Item -ItemType Directory -Path $auditDir -Force | Out-Null }
+
+    $killed  = 0
     $hogInfo = 'unknown'
-    $pool = Build-SafePool
+    $pool    = Build-SafePool
     foreach ($proc in $pool) {
         $ram = Get-RamPct
-        if ($ram -lt 50) { break }
+        if ($ram -le 30) { break }
+        $cmdline = Get-EkCmdLine $proc.Id
+        $kept = $false
+        foreach ($pat in $keepPatterns) {
+            if ($proc.Name -match $pat -or $cmdline -match $pat) { $kept = $true; break }
+        }
+        if ($kept -and $ram -lt 85) {
+            $wsMb = [int]($proc.WS / 1MB)
+            Write-Host "[ek] KEPT $($proc.Name) pid=$($proc.Id) ws=${wsMb}MB ram=$ram% -- harness:keep match (warn only)" -ForegroundColor Cyan
+            continue
+        }
+        $ancestry = Get-EkAncestry $proc.Id
         try {
             & wkappbot taskkill --force $proc.Id 2>&1 | Out-Null
             $killed++
-            $wsMb = [int]($proc.WS / 1MB)
-            Write-Host "[ek] killed $($proc.Name) pid=$($proc.Id) ws=${wsMb}MB ram=$ram%" -ForegroundColor Yellow
+            $wsMb    = [int]($proc.WS / 1MB)
+            $shortCmd = if ($cmdline.Length -gt 80) { $cmdline.Substring(0, 80) + '...' } else { $cmdline }
+            $reason  = if ($kept) { 'keep-override-ge85pct' } else { 'safe-pool-reap' }
+            Write-Host "[ek] killed $($proc.Name) pid=$($proc.Id) ws=${wsMb}MB ram=$ram% cmd=[$shortCmd]" -ForegroundColor Yellow
+            $auditEntry = [PSCustomObject]@{
+                ts           = [datetime]::UtcNow.ToString('o')
+                pid          = $proc.Id
+                name         = $proc.Name
+                ws_mb        = $wsMb
+                ram_pct      = $ram
+                reason       = $reason
+                full_cmdline = $cmdline
+                ancestry     = $ancestry
+            }
+            $auditLine = $auditEntry | ConvertTo-Json -Compress -Depth 4
+            Add-Content -Path $auditPath -Value $auditLine -Encoding UTF8
         } catch {}
     }
     $finalRam = Get-RamPct
-    if ($finalRam -ge 50) {
+    if ($finalRam -gt 30) {
         try {
             $top = Get-Process | Where-Object { $_.Name -notmatch '^(Idle|System)$' } |
                    Sort-Object WorkingSet64 -Descending | Select-Object -First 1
             if ($top) { $hogInfo = "$($top.Name) pid=$($top.Id) $([int]($top.WorkingSet64/1MB))MB" }
         } catch {}
-        Write-Host "[ek] pool exhausted -- RAM $finalRam% top hog: $hogInfo" -ForegroundColor Red
+        Write-Host "[ek] pool exhausted -- RAM $finalRam% top hog: $hogInfo -- root cure: wkdoctor -DefenderFix" -ForegroundColor Red
     }
     $ekColor = if ($killed -gt 0) { 'Yellow' } else { 'Green' }
     Write-Host "[emergency-kill] done killed=$killed finalRam=$finalRam%" -ForegroundColor $ekColor
