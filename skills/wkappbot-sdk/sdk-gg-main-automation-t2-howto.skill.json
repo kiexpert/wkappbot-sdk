@@ -12,7 +12,8 @@
     "CDP 1s QA RULE: wkcdp-mon.sh LAT avg over 1000ms = bug immediately. All CDP ops under 100ms, hard cap under 1s. State-change detection failure is root cause when over 1s.",
     "AUTO-APPROVE RULE: gg step 0 smoke loop improvements are PRE-AUTHORIZED. Never ask user to confirm gg script improvements. Implement+commit+report immediately.",
     "HAIKU NO-DELEGATION PATTERN: Haiku agents tend to sub-delegate instead of running commands directly. Prevention: add to prompt -- FORBIDDEN: Agent(), Agent.cmd, wkcodex, any delegation tool. MUST run commands yourself via Bash tool. One command at a time. If this instruction is missing, Haiku will recurse and return nothing useful.",
-    "usage-test-guard DEADLOCK PATTERN: usage-test-guard (50% random) blocks Agent() and demands Agent.cmd. But Agent.cmd foreground is blocked by -delegation guard. These two guards deadlock. Solution: retry Agent() calls -- usage-test-guard fires only 50% of the time, so retry passes ~50% chance each attempt. Do NOT try Agent.cmd as escape; it always blocks foreground."
+    "usage-test-guard DEADLOCK PATTERN: usage-test-guard (50% random) blocks Agent() and demands Agent.cmd. But Agent.cmd foreground is blocked by -delegation guard. These two guards deadlock. Solution: retry Agent() calls -- usage-test-guard fires only 50% of the time, so retry passes ~50% chance each attempt. Do NOT try Agent.cmd as escape; it always blocks foreground.",
+    "CLAUDE.md DIET PATTERN: diet-score gate (score<60) is cleared by removing Core-only harness:skill blocks. The 6 blocks for ChromeLauncher/CallerPlacement/CallerHwnd/PlacementValidate/Stage23/EyeCmdPipe match Core-repo .cs paths that don't exist in SDK. Remove them to drop ~30 lines and clear the gate. MyCdpContext and generic csharp/**/*.cs blocks stay (do match SDK files)."
   ],
   "requirements": [
     {
@@ -44,6 +45,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-02T12:16:38.5805371Z",
-  "updated": "2026-06-04T04:58:13.6949682Z",
-  "version": "1.3"
+  "updated": "2026-06-04T06:59:18.5017831Z",
+  "version": "1.5"
 }
