@@ -297,7 +297,7 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
             if s_id != skill_id and infer_parent_skill_id(s_id) == parent_id and parent_id:
                 sibling_slug = skill_page_slug(s_id)
                 sibling_title = e(s.get("title", ""))
-                sibling_links.append(f'<a href="../{sibling_slug}.html">{sibling_title}</a>')
+                sibling_links.append(f'<a href="./{sibling_slug}.html">{sibling_title}</a>')
 
         # Find prev/next skills within same app
         app_skills = [s for s in all_skills if s.get("app") == skill["app"]]
@@ -312,12 +312,12 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
                     prev_skill = app_skills_sorted[i - 1]
                     prev_slug = skill_page_slug(prev_skill.get("id", ""))
                     prev_title = e(prev_skill.get("title", ""))
-                    prev_html = f'<a href="../{prev_slug}.html">← {prev_title}</a>'
+                    prev_html = f'<a href="./{prev_slug}.html">← {prev_title}</a>'
                 if i < len(app_skills_sorted) - 1:
                     next_skill = app_skills_sorted[i + 1]
                     next_slug = skill_page_slug(next_skill.get("id", ""))
                     next_title = e(next_skill.get("title", ""))
-                    next_html = f'<a href="../{next_slug}.html">{next_title} →</a>'
+                    next_html = f'<a href="./{next_slug}.html">{next_title} →</a>'
 
                 if prev_html or next_html:
                     separator = " | " if (prev_html and next_html) else ""
