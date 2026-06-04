@@ -475,6 +475,7 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] 2026-06-05 온로드 suggest triage: Rank 1 __conhwnd merge executed, Rank 2 WebSocket stale-resolve pending evidence, Rank 3 sdk-find-stable Core scope investigation started
 - [x] GitHub release v7.5.1-sdk: Skill Browser v2 + ChromeHealthCheck filter fix (https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.5.1-sdk)
 - [x] nightly-heal 2026-06-04: skill audit clean (all broken refs cross-repo Core/other-app = expected, 0 SDK-owned broken refs); version parity OK (README/VERSIONING/CHANGELOG/CLAUDE all v7.5.0); Pending already compressed (2 [x], 54 [ ]) -- no further compress needed
+- [x] nightly-heal 2026-06-05: skill audit clean (4 ok / 59 stale all cross-repo Core/webbot/workflow/autoquant = expected, 0 SDK-owned broken refs); Pending 12 [x]/56 [ ] -- below 15-threshold, no compress; CHANGELOG drift noted (CHANGELOG=7.5.0-sdk vs released v7.5.1-sdk) -- defer to next release commit; repo-health LITE OK
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
 - [x] push skill-browser refactor to origin/main (Opus squash+push)
