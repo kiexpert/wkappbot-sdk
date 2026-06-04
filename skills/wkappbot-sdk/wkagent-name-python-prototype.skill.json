@@ -1,0 +1,50 @@
+{
+  "id": "wkagent-name-python-prototype",
+  "app": "wkappbot-sdk",
+  "title": "wkagent-name Python Prototype: 10x Speed Improvement",
+  "title_ko": null,
+  "desc": "Python reimplementation of wkagent-name.ps1 using ctypes Win32 API. Target <300ms vs 2900ms PowerShell. File: D:/GitHub/wkappbot-sdk/wkagent-name.py",
+  "steps": [
+    "MOTIVATION: wkagent-name.cmd takes 2.9s because PowerShell runtime startup is ~1.5-2s. Python with ctypes calls Win32 directly with no runtime overhead. Target: <300ms (~10x faster).",
+    "KEY APIS USED: CreateToolhelp32Snapshot + Process32First/Next for parent chain map. NtQueryInformationProcess via PEB walk for cmdlines. OpenProcess + ReadProcessMemory for PEB traversal. These are the same APIs PowerShell CimInstance uses internally, minus the .NET + WMI overhead.",
+    "RESOLUTION ORDER (same as PS1): (1) env WKHARNESS_AGENT_MODEL. (2) Walk parent chain checking --model flag in each cmdline. (3) Read ~/.claude/wkharness/active-session-<slug>.json with ts field (NOT timestamp). (4) Return ROOT if nothing found.",
+    "KNOWN BUG FIXED: original Haiku prototype used c_char_p * 260 for szExeFile -- wrong (pointer not array). Correct: ctypes.c_char * 260. Also active-session field is ts not timestamp.",
+    "OPTIMIZATION TODO: get_process_name() calls CreateToolhelp32Snapshot per PID -- should reuse parent_chain map from get_parent_chain() call. One snapshot read covers all processes.",
+    "OUTPUT FORMAT (same as PS1): stdout = model name only. stderr = pid + truncated cmdline + elapsed ms.",
+    "KNOWN ISSUE: PEB offset for RTL_USER_PROCESS_PARAMETERS is 0x20 on x64 (pointer to RTL struct), CommandLine is at +0x70 within that struct. These offsets are Windows version-specific. WMIC fallback used when NtQueryInformationProcess fails.",
+    "TESTING: run python wkagent-name.py and compare output to wkagent-name.cmd -- both should output same model name."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkagent-name-python-prototype",
+      "expect": "MOTIVATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool",
+      "expect": "resolution order",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool-howto",
+      "expect": "testing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkagent-name",
+    "python",
+    "performance",
+    "ctypes",
+    "win32",
+    "prototype",
+    "speed"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-04T02:37:49.8187594Z",
+  "updated": "2026-06-04T02:37:49.8187729Z",
+  "version": "1.0"
+}

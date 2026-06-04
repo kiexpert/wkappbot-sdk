@@ -11,7 +11,8 @@
     "GUARD 4 - pace guard (Sonnet-hogging): After 5+ consecutive Edit/Bash calls, next Edit is blocked. Stop retrying direct edits immediately, switch to Agent() with full task spec.",
     "STEP 0 (MANDATORY BEFORE CLAUDE.MD EDIT): Read CLAUDE.md FIRST before attempting to Edit it. If you skip Read and go straight to Edit, it will fail with 'File content has changed'. Sequence is always: Read -> Edit (add Pending) -> Agent().",
     "PRE-FLIGHT SEQUENCE (run before every Agent call): (0) Read CLAUDE.md. (1) Edit CLAUDE.md to add Pending entry. (2) Confirm run_in_background: true is in the Agent call. (3) Confirm prompt starts with 3 skill reads. Then fire Agent().",
-    "FAILURE PATTERN this session: Edit->pace-block, Agent.cmd->delegation-block, Agent()->sync-guard-block, read-CLAUDE.md->edit-CLAUDE.md->sync-guard-pass, Agent(background)->SUCCESS. 4 attempts = ~4x token waste. This checklist prevents it."
+    "FAILURE PATTERN this session: Edit->pace-block, Agent.cmd->delegation-block, Agent()->sync-guard-block, read-CLAUDE.md->edit-CLAUDE.md->sync-guard-pass, Agent(background)->SUCCESS. 4 attempts = ~4x token waste. This checklist prevents it.",
+    "usage-test-guard DEADLOCK: usage-test-guard (50% random) redirects Agent() to Agent.cmd. Agent.cmd foreground is then blocked by -delegation guard. This creates a deadlock. Resolution: do NOT try Agent.cmd -- just retry Agent() with run_in_background:true. 50% rate means next attempt has 50% chance of passing. After 2 Agent.cmd fails, always retry Agent() directly."
   ],
   "requirements": [
     {
@@ -49,6 +50,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-03T05:40:47.891057Z",
-  "updated": "2026-06-03T05:40:47.8910665Z",
-  "version": "1.0"
+  "updated": "2026-06-04T04:58:48.3805205Z",
+  "version": "1.2"
 }

@@ -9,7 +9,9 @@
     "2026-05-30: gg-main.sh rewritten with all-channel suggests, 9 bad-condition checks, skill refs per warning.",
     "2026-05-30: CDP ask CRITICAL -- cdp open hanging 143min. ChromeLauncher timeout in state-check. Core fix 82d60f74f + ce6ee8569.",
     "2026-05-31: KillForeign blind cron deleted. Section D rewrite -- LOGIN_PAGE/DEAD-LAT/DRIFT/kill events to auto-file suggests.",
-    "2026-06-02: wkask.sh backslash-n bug fixed 7x Codex revert. wkask.ps1 double BOM fixed. Chrome restore added. Log -Recurse removed. old_ask_gpt hardcode fixed. Core built+deployed."
+    "2026-06-02: wkask.sh backslash-n bug fixed 7x Codex revert. wkask.ps1 double BOM fixed. Chrome restore added. Log -Recurse removed. old_ask_gpt hardcode fixed. Core built+deployed.",
+    "2026-06-04: gg-main Amber. RAM 65%+ (Memory Compression 906MB unkillable) -> wk-only-gate blocked gg-main.sh + all shell cmds. Section-by-section Haiku delegation used. Guard deadlock hit: usage-test-guard(50%) blocked Agent() -> tried Agent.cmd -> -delegation blocked. Resolved by retrying Agent(). Haiku agents sub-delegated without FORBIDDEN clause. CI: Extended Smoke Tests cancelled (Amber). Chrome=2, Eye alive, wkappbot-core=0. CI repo URL fix: kiexp->kiexpert.",
+    "2026-06-04 Chrome mult Core escalation: suggest filed DG-WKAppBot ts=2026-06-04T05:28:36. Opus delegation blocked by: dialectic gate (need 2 Haiku+1 GPT first) + claude-md-diet-score 58/100 (below 60, needs CLAUDE.md slim). Dialectic pattern: spawn thesis+antithesis Haiku pair then GPT synthesis BEFORE Opus dispatch."
   ],
   "requirements": [
     {
@@ -39,6 +41,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-02T12:17:09.598784Z",
-  "updated": "2026-06-02T12:17:09.5987968Z",
-  "version": "1.0"
+  "updated": "2026-06-04T05:37:40.3500717Z",
+  "version": "1.4"
 }

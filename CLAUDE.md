@@ -483,10 +483,18 @@ wkappbot skill read sdk-skill-browser-pipeline  # Usage: skill browser build pro
 wkappbot skill read skill-migration-3tier  # Impl: tier suffix detection for parent skills
 wkappbot skill read sdk-public-skill-index  # Task: public skill curation and premium gating
 
+## harness:skill wkagent-name.py
+wkappbot skill read wkagent-name-tool           # Usage: agent model detection
+wkappbot skill read wkharness-guards            # Impl: ctypes Windows API patterns
+wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
+
 ## Pending
 
 <!-- compressed 2026-06-04 nightly-heal: all resolved [x] items folded into the single DONE-ARCHIVE line below; raw history in git -->
 - [x] DONE-ARCHIVE (compressed 2026-06-04, all prior [x] clusters): v7.5.0-sdk release + 3x nightly-heal 2026-05-30..06-04 (wkask.sh/ps1 fixes, wkcdp-mon MonitorFromPoint, wkzombie safe-skip, CDP cdp-open 143min->30s Core 82d60f74f, Chrome multiplication SDK auto-cleanup MyCdpContext.ChromeHealthCheck, gg-main-enhanced, doc bump v7.4->v7.5, gh release); skill-browser + 3tier cluster (wkask log fixes, wksplit-cs, sdk-gg-main-automation/suggest-triage/wkharness/cdp-command 3tier splits, docs/skills restructure + self-heal scripts, PAT pro unlock b26ad540, 3-state auth b057a503, 423 skill pages built); wkjobs/taskkill suite + Codex harness/wrappers + caller-HWND resolution + a11y WT terminal + wkdoctor 10-checks; test-auth.html probe page (05b47480); gg triage 2026-06-04 (wkask.sh merges, Chrome 16->2 auto-cleanup verified); payment-skill ref heal (SUBSCRIBE.md Korean anchor + drop missing kis_payment_watcher.py refs, v1.8). Commit hashes in git log.
+- [x] gg-main health check 2026-06-04: Amber — Chrome mult CRIT (16→2 auto-cleanup, Core guard regression), Extended Smoke cancelled, suggest 2긴급+7중요
+- [ ] [CRIT] Chrome multiplication 재발 2026-06-04: Opus 에이전트 Core 재배포 중. suggest DG-WKAppBot 제출됨 (ts=2026-06-04T05:28:36)
+- [x] on-load suggest triage 2026-06-04: 7 SDK items triaged. wkask.sh MERGE×2=real bug (Codex deny-rule needed); stale BUG-AUTO×2=dismiss-stale 대기; [47] skill sync CONFLICTS UX=MED; [50] pre-push AI block=MED; [213/214] pre-commit false-block=already fixed (resolve pending Eye stable)
 - [ ] push pending: pre-push hook AI 차단 (suggest 제출됨)
 - [x] nightly-heal 2026-06-04: skill audit clean (all broken refs cross-repo Core/other-app = expected, 0 SDK-owned broken refs); version parity OK (README/VERSIONING/CHANGELOG/CLAUDE all v7.5.0); Pending already compressed (2 [x], 54 [ ]) -- no further compress needed
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
