@@ -90,22 +90,24 @@ if ($EmergencyKill) {
     }
 
     function Get-EkCmdLine {
-        param([int]$Pid)
+        param([int]$ProcId)
         try {
-            $cl = (Get-CimInstance Win32_Process -Filter "ProcessId=$Pid" -ErrorAction Stop).CommandLine
-            if ($null -ne $cl) { $cl } else { '' }
-        } catch { '' }
+            $cl = (Get-CimInstance Win32_Process -Filter "ProcessId=$ProcId" -ErrorAction Stop).CommandLine
+            if ($null -ne $cl -and $cl -ne '') { return $cl }
+        } catch {}
+        try { $p = Get-Process -Id $ProcId -ErrorAction Stop; if ($p.Path) { return $p.Path } } catch {}
+        return ''
     }
 
     function Get-EkAncestry {
-        param([int]$Pid)
+        param([int]$ProcId)
         $chain = [System.Collections.Generic.List[PSCustomObject]]::new()
         $seen  = [System.Collections.Generic.HashSet[int]]::new()
-        $cur   = $Pid
+        $cur   = $ProcId
         while ($cur -gt 0 -and $seen.Add($cur)) {
             try {
                 $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$cur" -ErrorAction Stop
-                $chain.Add([PSCustomObject]@{ pid = $ci.ProcessId; name = $ci.Name; cmdline = $ci.CommandLine })
+                $chain.Add([PSCustomObject]@{ pid = $ci.ProcessId; name = $ci.Name; cmdline = if ($ci.CommandLine) { $ci.CommandLine } else { '' } })
                 $cur = [int]$ci.ParentProcessId
             } catch { break }
         }
@@ -126,28 +128,52 @@ if ($EmergencyKill) {
     }
 
     function Build-SafePool {
-        $pool = [System.Collections.Generic.List[PSCustomObject]]::new()
+        param([hashtable]$ProcMap, [datetime]$NowDt)
+        $pool    = [System.Collections.Generic.List[PSCustomObject]]::new()
+        $aiNames = @('claude','agent','codex','wkappbot','wkappbot-core')
         foreach ($img in @('codex', 'python', 'pythonw', 'node')) {
             try {
                 Get-Process $img -ErrorAction SilentlyContinue | ForEach-Object {
-                    $p = $_
-                    try {
-                        $ppid = [int](Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" -ErrorAction Stop).ParentProcessId
-                        $parentName = try { (Get-Process -Id $ppid -ErrorAction Stop).Name.ToLower() } catch { '' }
-                        if ($parentName -notin @('claude', 'wkappbot-core', 'wkchat', 'wka11y')) {
-                            $tier = if ($parentName -eq '') { 1 } else { 3 }
-                            $pool.Add([PSCustomObject]@{ Id = $p.Id; Name = $p.Name; WS = $p.WorkingSet64; Tier = $tier })
+                    $p    = $_
+                    $pid_ = [int]$p.Id
+                    $parentName = ''
+                    if ($ProcMap.ContainsKey($pid_)) {
+                        $ppid = $ProcMap[$pid_].parentpid
+                        if ($ppid -gt 0 -and $ProcMap.ContainsKey($ppid)) {
+                            $parentName = $ProcMap[$ppid].name.ToLower() -replace '\.exe$',''
                         }
-                    } catch {}
+                    }
+                    if ($parentName -in @('claude','wkappbot-core','wkchat','wka11y')) { return }
+                    $tier = if ($parentName -eq '') { 1 } else { 3 }
+                    # AI-recency: recently-started with AI ancestor -> lowest reap priority (Tier=99)
+                    $startTime = if ($ProcMap.ContainsKey($pid_)) { $ProcMap[$pid_].startTime } else { $null }
+                    if ($null -ne $startTime -and ($NowDt - $startTime).TotalMinutes -lt 60) {
+                        $vis2 = [System.Collections.Generic.HashSet[int]]::new()
+                        $cur2 = $pid_
+                        for ($d2 = 0; $d2 -lt 8; $d2++) {
+                            if ($cur2 -le 0 -or -not $vis2.Add($cur2) -or -not $ProcMap.ContainsKey($cur2)) { break }
+                            $ancName = $ProcMap[$cur2].name.ToLower() -replace '\.exe$',''
+                            if ($ancName -in $aiNames) { $tier = 99; break }
+                            $cur2 = $ProcMap[$cur2].parentpid
+                        }
+                    }
+                    $pool.Add([PSCustomObject]@{ Id = $p.Id; Name = $p.Name; WS = $p.WorkingSet64; CPU = [double]$p.CPU; Tier = $tier })
                 }
             } catch {}
         }
         try {
             Get-Process WmiPrvSE -ErrorAction SilentlyContinue | ForEach-Object {
-                $pool.Add([PSCustomObject]@{ Id = $_.Id; Name = $_.Name; WS = $_.WorkingSet64; Tier = 2 })
+                $pool.Add([PSCustomObject]@{ Id = $_.Id; Name = $_.Name; WS = $_.WorkingSet64; CPU = [double]$_.CPU; Tier = 2 })
             }
         } catch {}
-        return @($pool | Sort-Object -Property Tier, @{ Expression = 'WS'; Descending = $true })
+        $maxWS  = ($pool | Measure-Object -Property WS  -Maximum).Maximum
+        $maxCpu = ($pool | Measure-Object -Property CPU -Maximum).Maximum
+        if (-not $maxWS  -or $maxWS  -eq 0) { $maxWS  = 1 }
+        if (-not $maxCpu -or $maxCpu -eq 0) { $maxCpu = 1 }
+        foreach ($item in $pool) {
+            $item | Add-Member -NotePropertyName Score -NotePropertyValue (($item.WS / $maxWS) + ($item.CPU / $maxCpu))
+        }
+        return @($pool | Sort-Object -Property Tier, @{ Expression = 'Score'; Descending = $true })
     }
 
     $keepPatterns = Get-HarnessKeepPatterns
@@ -157,11 +183,20 @@ if ($EmergencyKill) {
 
     $killed  = 0
     $hogInfo = 'unknown'
-    $pool    = Build-SafePool
+    $nowDt   = [datetime]::Now
+    $procMap = @{}
+    try {
+        Get-CimInstance Win32_Process -ErrorAction Stop | ForEach-Object {
+            $st = $null
+            try { $st = [Management.ManagementDateTimeConverter]::ToDateTime($_.CreationDate) } catch {}
+            $procMap[[int]$_.ProcessId] = @{ name = $_.Name; cmdline = (if ($_.CommandLine) { $_.CommandLine } else { '' }); parentpid = [int]$_.ParentProcessId; startTime = $st }
+        }
+    } catch {}
+    $pool    = Build-SafePool -ProcMap $procMap -NowDt $nowDt
     foreach ($proc in $pool) {
         $ram = Get-RamPct
         if ($ram -le 30) { break }
-        $cmdline = Get-EkCmdLine $proc.Id
+        $cmdline = if ($procMap.ContainsKey([int]$proc.Id)) { $procMap[[int]$proc.Id].cmdline } else { '' }
         $kept = $false
         foreach ($pat in $keepPatterns) {
             if ($proc.Name -match $pat -or $cmdline -match $pat) { $kept = $true; break }
@@ -171,7 +206,18 @@ if ($EmergencyKill) {
             Write-Host "[ek] KEPT $($proc.Name) pid=$($proc.Id) ws=${wsMb}MB ram=$ram% -- harness:keep match (warn only)" -ForegroundColor Cyan
             continue
         }
-        $ancestry = Get-EkAncestry $proc.Id
+        $ancestry = @(& {
+            $anc = [System.Collections.Generic.List[PSCustomObject]]::new()
+            $vis = [System.Collections.Generic.HashSet[int]]::new()
+            $cur = [int]$proc.Id
+            for ($d = 0; $d -lt 8; $d++) {
+                if ($cur -le 0 -or -not $vis.Add($cur) -or -not $procMap.ContainsKey($cur)) { break }
+                $e = $procMap[$cur]
+                $anc.Add([PSCustomObject]@{ pid = $cur; name = $e.name; cmdline = $e.cmdline })
+                $cur = $e.parentpid
+            }
+            $anc
+        })
         try {
             & wkappbot taskkill --force $proc.Id 2>&1 | Out-Null
             $killed++
