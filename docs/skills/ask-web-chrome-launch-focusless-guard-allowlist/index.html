@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ask/web Chrome launch: AppBotPipe focusless guard allowlist | WKAppBot Skills</title>
   <meta name="description" content="ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft). AppBotPipe.StartTracked&#x27;s focusless guard used to block every Verb-less UseShe...">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/ask-web-chrome-launch-focusless-guard-allowlist/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"ask/web Chrome launch: AppBotPipe focusless guard allowlist","description":"ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft)."}</script>
   <meta property="og:title" content="ask/web Chrome launch: AppBotPipe focusless guard allowlist | WKAppBot Skills">
   <meta property="og:description" content="ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft). AppBotPipe.StartTracked&#x27;s focusless guard used to block every Verb-less UseShe...">
   <meta property="og:type" content="article">
@@ -118,7 +120,7 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot-core</span>
-        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
       </div>
       <h1>ask/web Chrome launch: AppBotPipe focusless guard allowlist</h1>
       <p class="description">ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft). AppBotPipe.StartTracked&#x27;s focusless guard used to block every Verb-less UseShellExecute, killing Chrome startup and breaking ask/web/triad paths. Guard now allowlists WindowStyle=Minimized/Hidden since they&#x27;re inherently non-focus-stealing.</p>
@@ -127,11 +129,98 @@
       <div class="tags"><span class="chip">ask</span><span class="chip">web</span><span class="chip">chrome</span><span class="chip">cdp</span><span class="chip">focusless-first</span><span class="chip">appbotpipe</span><span class="chip">guard</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>AppBotPipe.StartTracked blocks UseShellExecute=true unless Verb=runas OR WindowStyle is Minimized/Hidden</li><li>ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized + --window-size/--window-position so Chrome starts minimized at known bounds</li><li>Focus stays on user&#x27;s current app; CDP port 9222 comes up; ask/web/triad work without Chrome stealing foreground</li><li>If Chrome fails to launch again check the AppBotPipe guard logs for &#x27;focusless violation&#x27; message</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync now retries once after KillChromeOnPortAsync + KillStaleChromesAsync + 500ms profile-lock release on transient &#x27;Chrome process exited&#x27; / &#x27;CDP endpoint not ready&#x27; errors. Catches the BUG-AUTO cluster where a stale profile lock or slow renderer boot would propagate as InvalidOperationException up to ask/web callers.</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync now retries once after KillChromeOnPortAsync + KillStaleChromesAsync + 500ms profile-lock release on transient &#x27;Chrome process exited&#x27; / &#x27;CDP endpoint not ready&#x27; errors. Catches the BUG-AUTO cluster where a stale profile lock or slow renderer boot would propagate as InvalidOperationException up to ask/web callers.</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split into ~30 partial classes. AppBotPipe.Start ref now in ChromeLauncher.LaunchCore.cs / LaunchPreparation.cs.</li><li>[AUDIT 2026-05-30] &#x27;AppBotPipe.Start&#x27; moved out of root ChromeLauncher.cs (now in ChromeLauncher.LaunchCore.cs / ChromeLauncher.LaunchWait.cs). AppBotPipe.cs:357 WindowStyle=Minimized guard intact -- behavior unchanged.</li></ol>
-        
+        <ol class="steps blurred"><li>AppBotPipe.StartTracked blocks UseShellExecu...</li><li>ChromeLauncher uses UseShellExecute=true+Win...</li><li>Focus stays on user&#x27;s current app; CDP port...</li><li>If Chrome fails to launch again check the Ap...</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync...</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-06-03] source_refs broken: stale...</li><li>[AUDIT 2026-06-04] AppBotPipe.Start ref brok...</li><li>[AUDIT 2026-06-04] ChromeLauncher.cs partial...</li></ol>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>
-  
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'ask-web-chrome-launch-focusless-guard-allowlist';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

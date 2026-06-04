@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>a11y Command Cheatsheet - Operator View for Claude and Codex | WKAppBot Skills</title>
   <meta name="description" content="Operational cheatsheet for wkappbot a11y in Claude and Codex workflows. Covers principles (inspect first, resolve grap safely, prefer focusless tiers) AND a per-sub-action reference for all 24 a11y a...">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/a11y-command-cheatsheet/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"a11y Command Cheatsheet - Operator View for Claude and Codex","description":"Operational cheatsheet for wkappbot a11y in Claude and Codex workflows. Covers principles (inspect first, resolve grap s"}</script>
   <meta property="og:title" content="a11y Command Cheatsheet - Operator View for Claude and Codex | WKAppBot Skills">
   <meta property="og:description" content="Operational cheatsheet for wkappbot a11y in Claude and Codex workflows. Covers principles (inspect first, resolve grap safely, prefer focusless tiers) AND a per-sub-action reference for all 24 a11y a...">
   <meta property="og:type" content="article">
@@ -118,7 +120,7 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot-workflow</span>
-        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
       </div>
       <h1>a11y Command Cheatsheet - Operator View for Claude and Codex</h1>
       <p class="description">Operational cheatsheet for wkappbot a11y in Claude and Codex workflows. Covers principles (inspect first, resolve grap safely, prefer focusless tiers) AND a per-sub-action reference for all 24 a11y actions. Treat find output as paste-ready contract. Include optional operator flags only when they improve safety or verification.</p>
@@ -127,11 +129,98 @@
       <div class="tags"><span class="chip">a11y</span><span class="chip">uia</span><span class="chip">win32</span><span class="chip">cdp</span><span class="chip">automation</span><span class="chip">grap</span><span class="chip">fallback</span><span class="chip">reference</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Always inspect before automating an unfamiliar app; use find to discover not guess</li><li>Treat a11y find as a contract: one shared focus line one target block per match optional info lines shell-safe grap and verify by rerunning on the emitted hwnd token</li><li>Separate root hwnd from process-owned hwnd; process identity comes from the matched proc/domain/cmd/title/cls/file not the host shell</li><li>Prefer focusless tiers first: UIA Invoke/Value/Toggle/Select then Win32 PostMessage then SendInput only if necessary</li><li>For browser targets prefer CSS then CDP then UIA; use the exact hwnd grap from find when the tab or frame matters</li><li>Keep the grap short quoted and paste-ready for both Claude and Codex; if ambiguity remains rerun inspect/find before acting</li><li>next: wkappbot skill read a11y-command-cheatsheet-howto -- sub-command reference guide. Covers discovery (inspect/find/windows), window-state (close/minimize/maximize), input (type/click/invoke), read/wait actions, and common flags (--all/--nth/--force)</li><li>next: wkappbot skill read a11y-command-cheatsheet-ref -- history and reference. Covers deprecated commands (win-click), USAGE-REMOVED patterns (a11y eval), verified tests, audit notes</li><li>[AUDIT 2026-06-03] source_refs broken: stale pattern A11yGridRead in A11yActions.Read.cs.</li></ol>
-        
+        <ol class="steps blurred"><li>Always inspect before automating an unfamili...</li><li>Treat a11y find as a contract: one shared fo...</li><li>Separate root hwnd from process-owned hwnd;...</li><li>Prefer focusless tiers first: UIA Invoke/Val...</li><li>For browser targets prefer CSS then CDP then...</li><li>Keep the grap short quoted and paste-ready f...</li><li>next: wkappbot skill read a11y-command-cheat...</li><li>next: wkappbot skill read a11y-command-cheat...</li><li>[AUDIT 2026-06-03] source_refs broken: stale...</li><li>[AUDIT 2026-06-04] A11yActions.Read.cs: &#x27;A11...</li></ol>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>
   </main>
-  
+    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
+  <script>
+    const SKILL_ID = 'a11y-command-cheatsheet';
+    const proUnlockButton = document.getElementById('proUnlockButton');
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function injectFullSteps() {
+      if (!window.SKILLS_FULL) return;
+      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
+      if (!d || !d.steps) return;
+      const ol = document.querySelector('ol.steps');
+      if (!ol) return;
+      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
+    }
+    function unlockAll() {
+      injectFullSteps();
+      const overlays = document.querySelectorAll('.unlock');
+      const stepsLists = document.querySelectorAll('.steps.blurred');
+      for (const overlay of overlays) {
+        overlay.remove();
+      }
+      for (const list of stepsLists) {
+        list.classList.remove('blurred');
+      }
+      proUnlockButton.style.display = 'none';
+      const msg = document.createElement('p');
+      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
+      msg.textContent = 'Pro access verified';
+      document.querySelector('.skill-detail').appendChild(msg);
+    }
+    window.unlockAll = unlockAll;
+    function showIdleState() {
+      proUnlockButton.classList.remove('unlocked', 'denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
+      proUnlockButton.title = 'Enter PAT to unlock Pro';
+      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
+    }
+    function showDeniedState(reason) {
+      proUnlockButton.classList.add('denied');
+      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
+      const label = reason === 'invalid'
+        ? 'PAT invalid or expired — click to re-enter'
+        : 'PAT lacks collaborator access — click to re-enter';
+      proUnlockButton.title = label;
+      proUnlockButton.setAttribute('aria-label', label);
+    }
+    async function checkGitHubAccess(token) {
+      if (!token) {
+        showIdleState();
+        return;
+      }
+      try {
+        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github.raw'
+          }
+        });
+        if (response.status === 200) {
+          const js = await response.text();
+          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
+          unlockAll();
+        } else if (response.status === 401) {
+          showDeniedState('invalid');
+        } else if (response.status === 403 || response.status === 404) {
+          showDeniedState('noaccess');
+        } else {
+          showIdleState();
+        }
+      } catch (error) {
+        console.warn('GitHub access check failed', error);
+        showIdleState();
+      }
+    }
+    proUnlockButton.addEventListener('click', () => {
+      const existing = localStorage.getItem('gh_token') || '';
+      const token = window.prompt('Enter GitHub Personal Access Token', existing);
+      if (token === null) return;
+      const trimmed = token.trim();
+      if (!trimmed) {
+        localStorage.removeItem('gh_token');
+        showIdleState();
+        return;
+      }
+      localStorage.setItem('gh_token', trimmed);
+      checkGitHubAccess(trimmed);
+    });
+    checkGitHubAccess(localStorage.getItem('gh_token'));
+  </script>
 </body>
 </html>

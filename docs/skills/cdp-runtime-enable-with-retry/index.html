@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CDP Runtime.enable with retry | WKAppBot Skills</title>
   <meta name="description" content="Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetries=3), exponential backoff 500ms??000ms??000ms. Final failure throws TimeoutExce...">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/cdp-runtime-enable-with-retry/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"CDP Runtime.enable with retry","description":"Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetrie"}</script>
   <meta property="og:title" content="CDP Runtime.enable with retry | WKAppBot Skills">
   <meta property="og:description" content="Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetries=3), exponential backoff 500ms??000ms??000ms. Final failure throws TimeoutExce...">
   <meta property="og:type" content="article">
@@ -127,7 +129,7 @@
       <div class="tags"><span class="chip">cdp</span><span class="chip">runtime</span><span class="chip">stability</span><span class="chip">retry</span><span class="chip">project</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>attempt &lt;= maxRetries (default 3) ??4 total tries</li><li>delay = 500 * (1 &lt;&lt; attempt): 500ms, 1000ms, 2000ms</li><li>Only retries on TimeoutException (not other errors)</li><li>Throw TimeoutException after all attempts exhausted</li><li>[AUDIT 2026-05-29] EnableRuntimeWithRetry signature drifted in CdpClient.cs. Method exists but pattern with exact default-arg signature &#x27;EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)&#x27; no longer matches. Refresh refs on next re-contribute to point to actual current signature.</li><li>Verified 2026-06-02: ev-runtime-enable-attempt0-grace.sh (resolve ts=2026-06-02T03:13:18.0576912Z)</li><li>[AUDIT 2026-06-03] source_refs broken: stale EnableRuntimeWithRetry/backoff patterns in CdpClient.cs.</li></ol>
+        <ol class="steps"><li>attempt &lt;= maxRetries (default 3) ??4 total tries</li><li>delay = 500 * (1 &lt;&lt; attempt): 500ms, 1000ms, 2000ms</li><li>Only retries on TimeoutException (not other errors)</li><li>Throw TimeoutException after all attempts exhausted</li><li>[AUDIT 2026-05-29] EnableRuntimeWithRetry signature drifted in CdpClient.cs. Method exists but pattern with exact default-arg signature &#x27;EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)&#x27; no longer matches. Refresh refs on next re-contribute to point to actual current signature.</li><li>Verified 2026-06-02: ev-runtime-enable-attempt0-grace.sh (resolve ts=2026-06-02T03:13:18.0576912Z)</li><li>[AUDIT 2026-06-03] source_refs broken: stale EnableRuntimeWithRetry/backoff patterns in CdpClient.cs.</li><li>[AUDIT 2026-06-04] CdpClient.cs refactored -- &#x27;EnableRuntimeWithRetry(int maxRetries=3,...)&#x27; signature and &#x27;baseDelayMs * (1&lt;&lt;attempt)&#x27; backoff literal patterns drifted; method may have been renamed or extracted to partial.</li></ol>
         
       </div>
     </article>

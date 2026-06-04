@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CDP Port Isolation via Window Property per wkappbot Instance | WKAppBot Skills</title>
   <meta name="description" content="Each wkappbot instance binds its launched CDP port to a Window Property keyed by ProjectRoot.Hash8 on the parent console (or desktop) HWND so sibling instances cannot steal each other&#x27;s Chrome via ho...">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/cdp-port-isolation-window-property/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"CDP Port Isolation via Window Property per wkappbot Instance","description":"Each wkappbot instance binds its launched CDP port to a Window Property keyed by ProjectRoot.Hash8 on the parent console"}</script>
   <meta property="og:title" content="CDP Port Isolation via Window Property per wkappbot Instance | WKAppBot Skills">
   <meta property="og:description" content="Each wkappbot instance binds its launched CDP port to a Window Property keyed by ProjectRoot.Hash8 on the parent console (or desktop) HWND so sibling instances cannot steal each other&#x27;s Chrome via ho...">
   <meta property="og:type" content="article">
@@ -127,7 +129,7 @@
       <div class="tags"><span class="chip">cdp</span><span class="chip">isolation</span><span class="chip">multi-instance</span><span class="chip">window-property</span><span class="chip">chrome</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps blurred"><li>On Chrome launch or detected reuse: ChromeLa...</li><li>FindBestPortForHostAsync consults GetLaunche...</li><li>FindFirstFreePortAsync returns the registere...</li><li>EnsureCdpConnection (AskCommands.Entry.Cdp)...</li><li>ConnectCdp (WebCommands) prefers GetLaunched...</li><li>ProjectRoot.Find/Hash8 honor AsyncLocal Call...</li><li>FindRunningChromePort and KillStaleChromesAs...</li><li>FindRunningChromePortByCdpScan returns 0 whe...</li><li>Last-resort recovery (2026-05-25): when all...</li><li>BUG FIX (2026-05-26): FindRunningChromePortA...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-06-03] source_refs broken: multi...</li></ol>
+        <ol class="steps blurred"><li>On Chrome launch or detected reuse: ChromeLa...</li><li>FindBestPortForHostAsync consults GetLaunche...</li><li>FindFirstFreePortAsync returns the registere...</li><li>EnsureCdpConnection (AskCommands.Entry.Cdp)...</li><li>ConnectCdp (WebCommands) prefers GetLaunched...</li><li>ProjectRoot.Find/Hash8 honor AsyncLocal Call...</li><li>FindRunningChromePort and KillStaleChromesAs...</li><li>FindRunningChromePortByCdpScan returns 0 whe...</li><li>Last-resort recovery (2026-05-25): when all...</li><li>BUG FIX (2026-05-26): FindRunningChromePortA...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-06-03] source_refs broken: multi...</li><li>[AUDIT 2026-06-04] ChromeLauncher.cs split i...</li></ol>
         <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
     </article>

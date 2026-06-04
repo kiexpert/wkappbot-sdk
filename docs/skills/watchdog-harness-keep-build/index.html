@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>watchdog-harness-keep-build | WKAppBot Skills</title>
+  <meta name="description" content="BUILD-PLAN: Add harness:keep reap-protect + kill-audit to wkdoctor.ps1 EmergencyKill (lines 83-139). Apply in a fresh low-pace session via Haiku agent.">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/watchdog-harness-keep-build/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"watchdog-harness-keep-build","description":"BUILD-PLAN: Add harness:keep reap-protect + kill-audit to wkdoctor.ps1 EmergencyKill (lines 83-139). Apply in a fresh lo"}</script>
+  <meta property="og:title" content="watchdog-harness-keep-build | WKAppBot Skills">
+  <meta property="og:description" content="BUILD-PLAN: Add harness:keep reap-protect + kill-audit to wkdoctor.ps1 EmergencyKill (lines 83-139). Apply in a fresh low-pace session via Haiku agent.">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/watchdog-harness-keep-build/">
+  <meta name="twitter:card" content="summary">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07090d;
+      --panel: #101722;
+      --panel-2: #151d2a;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
+      --accent-2: #7dd3fc;
+      --warn: #facc15;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, rgba(125,211,252,.18), transparent 32rem), var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    a { color: inherit; }
+    .shell { width: min(920px, calc(100% - 32px)); margin: 0 auto; }
+    .detail-page { padding: 36px 0 72px; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      margin-bottom: 34px;
+      color: var(--accent-2);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .skill-detail {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(21,29,42,.92), rgba(12,17,26,.96));
+      padding: clamp(22px, 4vw, 40px);
+    }
+    .card-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .app-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(110,231,183,.28);
+      border-radius: 999px;
+      color: var(--accent);
+      background: rgba(110,231,183,.08);
+      font-size: 12px;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stars { color: var(--warn); font-size: 14px; white-space: nowrap; }
+    h1 {
+      margin: 22px 0 12px;
+      font-size: clamp(36px, 7vw, 70px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+    h2 { margin: 34px 0 12px; font-size: 24px; }
+    .description { color: var(--muted); font-size: 18px; margin: 0; }
+    .meta { margin-top: 14px; color: var(--accent-2); font-size: 13px; }
+    .breadcrumb { margin-top: 8px; color: var(--muted); font-size: 12px; }
+    .breadcrumb a { color: var(--accent-2); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0 0; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: #d7deea;
+      font-size: 12px;
+      background: rgba(255,255,255,.04);
+    }
+    .steps-wrap { position: relative; margin-top: 12px; }
+    .steps {
+      margin: 0;
+      padding-left: 24px;
+      color: #d8e0ec;
+      font-size: 15px;
+    }
+    .steps.blurred { filter: blur(5px); user-select: none; }
+    .steps li { margin: 0 0 12px; }
+    .unlock {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(7,9,13,.46);
+      color: white;
+      font-weight: 800;
+    }
+    @media (max-width: 640px) {
+      .card-top { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell detail-page">
+    <a class="back-link" href="../index.html">Back to skill browser</a>
+    <article class="skill-detail">
+      <div class="card-top">
+        <span class="app-badge">wkappbot-sdk</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
+      </div>
+      <h1>watchdog-harness-keep-build</h1>
+      <p class="description">BUILD-PLAN: Add harness:keep reap-protect + kill-audit to wkdoctor.ps1 EmergencyKill (lines 83-139). Apply in a fresh low-pace session via Haiku agent.</p>
+      <div class="meta">user/developer</div>
+      
+      <div class="tags"></div>
+      <h2>Steps</h2>
+      <div class="steps-wrap">
+        <ol class="steps"><li>SCOPE: Target = D:/GitHub/wkappbot-sdk/bin/wkdoctor.ps1 lines 83-139 (EmergencyKill block). Guard invocation point = wkharness-guards.ps1:789 via wkdoctor.cmd. This plan adds 3 new helper functions (Get-EkCmdLine, Get-EkAncestry, Get-HarnessKeepPatterns), initializes 3 vars (keepPatterns/auditDir/auditPath) before the kill loop, modifies the loop body to honor harness:keep patterns, and writes kill-audit entries to JSONL. All edits are INSIDE the if (EmergencyKill) block. Prerequisite skill reads: wkdoctor-sdk-environment-health-check + wkharness-guards + claude-md-harness-rules.</li><li>NEW FUNCTION Get-EkCmdLine: Insert as a new function after the closing brace of Get-RamPct (after line 89). Signature: function Get-EkCmdLine { param([int]Pid) }. Body: try { (Get-CimInstance Win32_Process -Filter ProcessId=Pid -ErrorAction Stop).CommandLine } catch { return empty-string }. Returns the full CommandLine string for the given PID via CIM Win32_Process.CommandLine, or empty string on any CIM error. Reuses the same CIM query pattern already used in Build-SafePool at line 98.</li><li>NEW FUNCTION Get-EkAncestry: Insert after Get-EkCmdLine closing brace. Signature: function Get-EkAncestry { param([int]Pid) }. Init chain as List[PSCustomObject] and seen as HashSet[int]. Set cur=Pid. Loop: while cur-gt-0 and seen.Add(cur) -- query CIM Win32_Process for ProcessId=cur; if found append PSCustomObject(pid=ProcessId,name=Name,cmdline=CommandLine) to chain and set cur=ParentProcessId; break on CIM error. Return @(chain). Produces an array of {pid,name,cmdline} from target process up to root, using the same parent-chain walk as wkharness-agent-name.ps1.</li><li>NEW FUNCTION Get-HarnessKeepPatterns: Insert after Get-EkAncestry closing brace. No params. Init patterns as List[string]. For each file path in (Join-Path PWD CLAUDE.md) and (Join-Path env:USERPROFILE .claude CLAUDE.md): if Test-Path file then Get-Content, foreach line match regex ^## harness:keep (.+) at line start, Add Matches[1].Trim() to list. Return @(patterns). Implements the same CLAUDE.md rule loader as the other harness directives (safe/block/warn/skill). See skill claude-md-harness-rules for rule syntax.</li><li>INIT VARS: After the Build-SafePool return @() line (line 112) and before the dollar-killed=0 line (line 114), insert: keepPatterns = Get-HarnessKeepPatterns; auditDir = Join-Path env:USERPROFILE .claude/wkharness; auditPath = Join-Path auditDir emergency-kill-audit.jsonl; if not Test-Path auditDir then New-Item -ItemType Directory -Path auditDir -Force then pipe to Out-Null.</li><li>MODIFY KILL LOOP BODY: Replace the inner try-catch block (lines 120-125 OLD) inside foreach (proc in pool). NEW body order: (1) cmdline = Get-EkCmdLine proc.Id. (2) kept=false; foreach pat in keepPatterns: if proc.Name -match pat OR cmdline -match pat then set kept=true and break. (3) If kept AND ram-lt-85: Write-Host [ek] KEPT proc.Name pid=N ws=MB ram=% harness:keep match warn-only in Cyan; then continue (skip kill). (4) ancestry = Get-EkAncestry proc.Id. (5) try block: call wkappbot taskkill force proc.Id pipe to Out-Null; killed++; wsMb=int(proc.WS/1MB); shortCmd = cmdline clamped at 80 chars with ellipsis; Write-Host [ek] killed proc.Name pid=N ws=MB ram=% cmd=[shortCmd] in Yellow; serialize auditLine as PSCustomObject{ts,pid,name,ws_mb,ram_pct,reason,full_cmdline,ancestry} via ConvertTo-Json -Compress -Depth 4; Add-Content auditPath auditLine -Encoding UTF8. reason field = keep-override-ge85pct when kept is true else safe-pool-reap. (6) catch {}.</li><li>SELFTEST PLAN: Verify the 3 helpers and the keep-guard branch without touching live processes. (a) Call Get-EkCmdLine with PID of current process (dollar-pid): assert non-empty string returned. (b) Call Get-EkAncestry with current PID: assert returned array has at least 1 item and each item has pid/name/cmdline properties. (c) Write a temp file Temp-CLAUDE.md with single line &#x27;## harness:keep keeptest-marker&#x27;, temporarily set PWD to Temp, call Get-HarnessKeepPatterns: assert &#x27;keeptest-marker&#x27; appears in result. (d) Build a synthetic pool PSObject with Name=keeptest-marker and WS=1MB; simulate ram=70 (lt 85); run the new loop body logic: assert kept=true, assert Write-Host KEPT fires, assert continue path prevents kill. (e) After real edit lands in a live session, run wkdoctor -EmergencyKill from a temp CWD and verify emergency-kill-audit.jsonl exists at USERPROFILE/.claude/wkharness/ (0 entries is fine if RAM is below threshold).</li><li>VERIFY SYNTAX: After applying all edits, run the PowerShell Parser check inline: assign errors as array of ParseError; call [System.Management.Automation.Language.Parser]::ParseFile with path D:/GitHub/wkappbot-sdk/bin/wkdoctor.ps1 and ref-null/ref-errors args; if errors.Count equals 0 print SYNTAX OK else print SYNTAX ERRORS colon count. Expected output: SYNTAX OK. Do NOT commit until SYNTAX OK is confirmed. Mirrors the existing selftest pattern in wkharness-status.ps1.</li><li>BOUNDARY-CHATTER HYSTERESIS (user 2026-06-04): also add deadband so the emergency-kill stops re-firing on every tool call at the 60 percent line. Per memory/watchdog-harness-keep-spec.md: keep TRIGGER at 60 percent, but after a fire that exhausts the safe pool apply a COOLDOWN (no re-fire for N seconds) plus a higher RE-ARM threshold (only re-fire if RAM climbs above about 67 percent). Reap only as low as the SAFE pool allows (do NOT chase a fixed 30 percent target -- Memory Compression and chrome are not safely killable). When the safe pool is exhausted and RAM is still high, WARN that reaping cannot fix it and point to the Defender dev-folder exclusions (the root cure). Track the last-fire timestamp + re-arm mark in the guards.ps1 hook trigger (operational ts like the pace cache).</li></ol>
+        
+      </div>
+    </article>
+  </main>
+  
+</body>
+</html>

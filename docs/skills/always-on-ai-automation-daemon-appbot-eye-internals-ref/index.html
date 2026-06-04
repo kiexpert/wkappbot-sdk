@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AppBot Eye Internals T3 Reference | WKAppBot Skills</title>
   <meta name="description" content="T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details.">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/always-on-ai-automation-daemon-appbot-eye-internals-ref/'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"AppBot Eye Internals T3 Reference","description":"T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details."}</script>
   <meta property="og:title" content="AppBot Eye Internals T3 Reference | WKAppBot Skills">
   <meta property="og:description" content="T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details.">
   <meta property="og:type" content="article">
@@ -118,7 +120,7 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot</span>
-        <span class="stars" aria-label="1 star rating">&#9733;&#9734;&#9734;</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
       </div>
       <h1>AppBot Eye Internals T3 Reference</h1>
       <p class="description">T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details.</p>
@@ -127,7 +129,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>OOM GUARDIAN (v7.3.189): 4GB kill+respawn. Circuit breaker: _consecutiveHealFails counter, after 5 = circuitOpen. 50MB log cap. Commit d9d00420d.</li><li>SPAWN-STORM CIRCUIT BREAKER: count&gt;50 consecutive spawns triggers abort. Prevents zombie cascade from FSW loop. Commit 43d289e90.</li><li>HOT-SWAP STAMP EXPIRY: Eye detects core.new.exe FileInfo stamp. Same failed stamp skipped until newer one appears. Defers if admin pipe busy. Guardian refreshes TryFindEyeHwnd after hot-swap (df3c519b3).</li><li>MCP WORKER ISOLATION: DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Workers isolated so UIA/a11y crash doesn&#x27;t kill Eye. Each worker communicates back via named pipe. Admin proxy: wkappbot_elevated (amber border). NEVER mix with wkappbot_eye_ipc.</li></ol>
+        <ol class="steps"><li>OOM GUARDIAN (v7.3.189): 4GB kill+respawn. Circuit breaker: _consecutiveHealFails counter, after 5 = circuitOpen. 50MB log cap. Commit d9d00420d.</li><li>SPAWN-STORM CIRCUIT BREAKER: count&gt;50 consecutive spawns triggers abort. Prevents zombie cascade from FSW loop. Commit 43d289e90.</li><li>HOT-SWAP STAMP EXPIRY: Eye detects core.new.exe FileInfo stamp. Same failed stamp skipped until newer one appears. Defers if admin pipe busy. Guardian refreshes TryFindEyeHwnd after hot-swap (df3c519b3).</li><li>MCP WORKER ISOLATION: DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Workers isolated so UIA/a11y crash doesn&#x27;t kill Eye. Each worker communicates back via named pipe. Admin proxy: wkappbot_elevated (amber border). NEVER mix with wkappbot_eye_ipc.</li><li>T2 HOWTO CONTENT (until T2 created): 1-FIND: a11y find does NOT work (WindowStyle=None hides from UIA). Use eye tick to confirm alive, inspect {proc:wkappbot-core} --list --force for hwnd list. 2-POSITION: rightEdge=X+W+20, proposedLeft=rightEdge-330. Fallback primaryScreenW-330,10. Fix: cdp open https://chatgpt.com. 3-OPACITY: starts 0, fades 0.85 on ContentRendered. No CDP data = stays transparent. 4-SCREENSAVER LINK: spawned idle&gt;=10s, must auto-close on user input (9-layer kill), alive at negative = BUG. 5-ADMIN vs NORMAL: eye_ipc=blue/normal, wkappbot_elevated=amber/admin, never mix.</li></ol>
         
       </div>
     </article>
