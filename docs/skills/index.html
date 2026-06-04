@@ -29,21 +29,37 @@
     }
     a { color: inherit; text-decoration: none; }
     a:hover { text-decoration: underline; }
-    .shell { width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 0 16px; }
+    .container {
+      display: flex;
+      height: 100vh;
+      flex-direction: column;
+    }
     header {
       border-bottom: 1px solid var(--line);
-      padding: 40px 0;
-      margin-bottom: 40px;
+      padding: 24px 32px;
+      background: rgba(16,23,34,.3);
+      flex-shrink: 0;
+    }
+    header nav {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 12px;
     }
     header h1 {
-      margin: 0 0 8px;
-      font-size: 32px;
+      margin: 0;
+      font-size: 24px;
       font-weight: 800;
     }
-    header p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 16px;
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 280px;
+      border-right: 1px solid var(--line);
+      overflow-y: auto;
+      padding: 16px;
     }
     .app-list {
       list-style: none;
@@ -51,46 +67,134 @@
       margin: 0;
     }
     .app-item {
-      margin: 16px 0;
-      padding: 20px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: rgba(16,23,34,.5);
+      margin: 8px 0;
+      padding: 12px;
+      border-radius: 6px;
+      background: rgba(110,231,183,.1);
+      border: 1px solid rgba(110,231,183,.2);
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .app-item h2 {
-      margin: 0 0 6px;
-      font-size: 18px;
-      font-weight: 700;
+    .app-item:hover {
+      background: rgba(110,231,183,.15);
+      border-color: rgba(110,231,183,.4);
+    }
+    .app-item.active {
+      background: rgba(110,231,183,.2);
+      border-color: var(--accent);
     }
     .app-item a {
       color: var(--accent);
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
     }
     .app-item p {
       margin: 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 12px;
+    }
+    .iframe-container {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    #content {
+      border: none;
+      flex: 1;
+      width: 100%;
     }
     footer {
       color: var(--muted);
       font-size: 12px;
-      padding: 40px 0;
+      padding: 16px 32px;
       border-top: 1px solid var(--line);
+      flex-shrink: 0;
+    }
+    @media (max-width: 800px) {
+      .main-content {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        max-height: 200px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="shell">
+  <div class="container">
     <header>
       <nav><a href="../">WKAppBot</a> / Skills</nav>
-      <h1>WKAppBot Skills</h1>
-      <p>AI automation playbooks organized by application. 442 skills total.</p>
+      <h1>WKAppBot Skills Browser</h1>
     </header>
-    <ul class="app-list">
-<li class="app-item"><h2><a href="wkappbot/">wkappbot</a></h2><p>62 skills</p></li><li class="app-item"><h2><a href="wkappbot-core/">wkappbot-core</a></h2><p>175 skills</p></li><li class="app-item"><h2><a href="wkappbot-debug/">wkappbot-debug</a></h2><p>1 skills</p></li><li class="app-item"><h2><a href="wkappbot-sdk/">wkappbot-sdk</a></h2><p>48 skills</p></li><li class="app-item"><h2><a href="wkappbot-test/">wkappbot-test</a></h2><p>3 skills</p></li><li class="app-item"><h2><a href="wkappbot-webbot/">wkappbot-webbot</a></h2><p>20 skills</p></li><li class="app-item"><h2><a href="wkappbot-win32/">wkappbot-win32</a></h2><p>2 skills</p></li><li class="app-item"><h2><a href="wkappbot-workflow/">wkappbot-workflow</a></h2><p>131 skills</p></li>
-    </ul>
+    <div class="main-content">
+      <div class="sidebar">
+        <ul class="app-list" id="appList">
+          <li class="app-item"><a href="wkappbot/">wkappbot</a><p>62 skills</p></li>
+          <li class="app-item"><a href="wkappbot-core/">wkappbot-core</a><p>175 skills</p></li>
+          <li class="app-item"><a href="wkappbot-debug/">wkappbot-debug</a><p>1 skills</p></li>
+          <li class="app-item"><a href="wkappbot-sdk/">wkappbot-sdk</a><p>48 skills</p></li>
+          <li class="app-item"><a href="wkappbot-test/">wkappbot-test</a><p>3 skills</p></li>
+          <li class="app-item"><a href="wkappbot-webbot/">wkappbot-webbot</a><p>20 skills</p></li>
+          <li class="app-item"><a href="wkappbot-win32/">wkappbot-win32</a><p>2 skills</p></li>
+          <li class="app-item"><a href="wkappbot-workflow/">wkappbot-workflow</a><p>131 skills</p></li>
+        </ul>
+      </div>
+      <div class="iframe-container">
+        <iframe id="content" src="wkappbot/"></iframe>
+      </div>
+    </div>
     <footer>
       <p>Generated from live WKAppBot HQ skill catalog. <a href="../">← Back to home</a></p>
     </footer>
   </div>
+
+  <script>
+    // Load initial state from hash
+    function loadFromHash() {
+      var hash = window.location.hash.slice(1);
+      if (hash) {
+        document.getElementById('content').src = hash;
+        updateActiveLink(hash);
+      }
+    }
+
+    // Update active nav link
+    function updateActiveLink(href) {
+      var links = document.querySelectorAll('#appList a');
+      links.forEach(function(link) {
+        var itemPath = link.getAttribute('href');
+        if (href.startsWith(itemPath)) {
+          link.closest('.app-item').classList.add('active');
+        } else {
+          link.closest('.app-item').classList.remove('active');
+        }
+      });
+    }
+
+    // Handle nav link clicks
+    document.getElementById('appList').addEventListener('click', function(e) {
+      var link = e.target.closest('a');
+      if (link) {
+        e.preventDefault();
+        var href = link.getAttribute('href');
+        history.pushState(null, '', '#' + href);
+        document.getElementById('content').src = href;
+        updateActiveLink(href);
+      }
+    });
+
+    // Handle browser back/forward
+    window.addEventListener('popstate', function() {
+      loadFromHash();
+    });
+
+    // Initialize on page load
+    loadFromHash();
+  </script>
 </body>
 </html>
