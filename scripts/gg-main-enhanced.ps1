@@ -245,7 +245,7 @@ if ($CRITICAL_ALERTS.Count -gt 0 -or $WARNINGS.Count -gt 0) {
     $age = (Get-Date) - $_.StartTime
     if ($age.TotalSeconds -gt 30) {
       try {
-        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        wkappbot taskkill --force $_.Id 2>$null
         $zombie_killed++
         Write-Host "  [KILL] Killed wkappbot-core PID $($_.Id) (age: $([math]::Round($age.TotalSeconds))s)" -ForegroundColor Gray
       } catch {}
@@ -258,7 +258,7 @@ if ($CRITICAL_ALERTS.Count -gt 0 -or $WARNINGS.Count -gt 0) {
     $keep_count = [math]::Min(2, $chrome_list.Count)
     $chrome_list | Select-Object -Skip $keep_count | ForEach-Object {
       try {
-        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        wkappbot taskkill --force $_.Id 2>$null
         $zombie_killed++
         Write-Host "  [KILL] Killed duplicate chrome PID $($_.Id)" -ForegroundColor Gray
       } catch {}
