@@ -1,7 +1,7 @@
 #!/bin/bash
 # gg-main.sh: SDK Product Manager Comprehensive Health Check
 # Purpose: Detect ALL known bad conditions, report each with the related skill ID.
-# Sections: E Eye  Z Chrome/Zombie  B CDP/Ask  P Suggest  C CI  D CDP-anomaly  V Version  R Release  G CLAUDE.md  H Skill-audit  A Summary
+# Sections: E Eye  Z Chrome/Zombie  B CDP/Ask  P Suggest  C CI  O Dev-Build  S GitHub-Status  D CDP-anomaly  V Version  R Release  G CLAUDE.md  H Skill-audit  A Summary
 # Exit: 0 = green (no issues), 1 = amber (WARN), 2 = critical (CRITICAL)
 # Run: bash scripts/gg-main.sh
 
@@ -205,6 +205,48 @@ if command -v gh >/dev/null 2>&1; then
   fi
 else
   echo "  [SKIP] gh not available"
+fi
+echo ""
+
+# ============================================================================
+# SECTION O: Dev Repo Build Status
+# ============================================================================
+echo "==[ O ] DEV-BUILD (dev repo status) =="
+if command -v gh >/dev/null 2>&1; then
+  DEV_STATUS=$(gh run list --limit 1 --repo kiexpert/wkappbot --json conclusion --jq '.[0].conclusion' 2>/dev/null || echo "unknown")
+  if [ "$DEV_STATUS" = "failure" ]; then
+    note_crit "dev repo latest build FAILED -- check CI logs" \
+      "wkappbot-build-verify-workflow" \
+      "gh run list --repo kiexpert/wkappbot"
+  elif [ "$DEV_STATUS" = "success" ]; then
+    echo "  dev repo build green"
+  elif [ "$DEV_STATUS" != "unknown" ]; then
+    note_warn "dev repo build status: $DEV_STATUS (non-standard)" \
+      "wkappbot-build-verify-workflow" \
+      "Verify gh auth + repo access"
+  else
+    echo "  dev repo status unknown (gh unavailable)"
+  fi
+else
+  echo "  [SKIP] gh not available"
+fi
+echo ""
+
+# ============================================================================
+# SECTION S: GitHub Service Status
+# ============================================================================
+echo "==[ S ] GITHUB-STATUS (GitHub service health) =="
+GH_STATUS=$(curl -s --max-time 5 https://www.githubstatus.com/api/v2/status.json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['status']['indicator'])" 2>/dev/null || echo "unknown")
+if [ "$GH_STATUS" = "none" ]; then
+  echo "  GitHub all systems operational"
+elif [ "$GH_STATUS" = "unknown" ]; then
+  note_warn "GitHub status check failed (offline or no python3)" \
+    "sdk-gg-main-automation" \
+    "Check network; visit https://www.githubstatus.com"
+else
+  note_crit "GitHub incident detected -- status=$GH_STATUS" \
+    "sdk-gg-main-automation" \
+    "Visit https://www.githubstatus.com for details"
 fi
 echo ""
 
