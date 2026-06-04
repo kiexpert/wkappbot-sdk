@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import Any
 
 
+REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
 HQ_SKILL_DIRS = [
     Path("D:/GitHub/WKAppBot/bin/wkappbot.hq/skills"),
     Path("D:/SDK/bin/wkappbot.hq/skills"),
     REPO_ROOT / "skills",  # GHA fallback: reads committed skills/ when local HQ unavailable
 ]
-REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
 OUTPUT = REPO_ROOT / "docs" / "skills" / "index.html"
 SKILLS_OUTPUT_DIR = OUTPUT.parent
 ENV_FILE = Path("D:/GitHub/.env")
@@ -859,31 +859,31 @@ def build_html(skills: list[dict[str, Any]]) -> str:
           <div class="letter-from">A letter from one Sonnet to the next</div>
           <div class="sonnet-step">
             <div class="step-title">REFLECTION</div>
-            <div class="step-body">Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO...</div>
+            <div class="step-body" data-full="Each pattern in the howto tier is NOT advice to Sonnet -- it is a harness TODO. Telling Sonnet to be careful does not work. Sonnet forgets between sessions, makes the same mistakes, and has no memory of prior damage. The only real defense is mechanical: the harness must physically block the mistake before it lands.">Each pattern in the howto tier is NOT ad...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">TO FUTURE SONNET SESSIONS</div>
-            <div class="step-body">This skill is a gift from one Sonnet session to the next...</div>
+            <div class="step-body" data-full="This skill is a gift from one Sonnet session to the next: you are not uniquely careless -- you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete. If you made a mistake this session that caused token waste, a bug that slipped past the harness, or a pattern you wish had been caught -- add it here. Future sessions will read this before working and avoid your mistake.">This skill is a gift from one Sonnet se...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">PATTERN ENV VAR BYPASS</div>
-            <div class="step-body">Sonnet reflexively adds environment variables...</div>
+            <div class="step-body" data-full="Sonnet reflexively adds environment variables to solve harness blocks. This is not a fix, it is a backdoor. Correct pattern when blocked: understand WHY the gate fired, then either do the proper thing the gate is asking for, or delegate to Opus. Never use env vars to override security gates.">Sonnet reflexively adds environment var...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">PATTERN GUARD SOURCE FIRST</div>
-            <div class="step-body">Hit a guard and retried 6 times...</div>
+            <div class="step-body" data-full="Hit a guard and retried 6 times with different phrasings instead of reading the guard source. Each retry cost tokens and time. One read would have shown the exact pattern. Lesson: at retry 2, stop retrying and read the guard source. Always.">Hit a guard and retried 6 times with di...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">PATTERN GUARD EARLY NOT LATE</div>
-            <div class="step-body">Fixed wkask.sh backslash-n bug 8 times...</div>
+            <div class="step-body" data-full="Fixed wkask.sh backslash-n bug 8 times because various agents kept reverting it. No harness:block existed at the first revert. Correct pattern: at the FIRST revert of any critical file, immediately add a harness:block. Never fix the same thing twice -- adding the guard is mandatory after the second fix.">Fixed wkask.sh backslash-n bug 8 times...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">SYSTEMIC TRUTH</div>
-            <div class="step-body">If the AI CAN do the bad thing, it WILL eventually...</div>
+            <div class="step-body" data-full="If the AI CAN do the bad thing, it WILL eventually. Human attention is finite. The only real fix is mechanical harness enforcement. Documentation without enforcement creates false security -- worse than no documentation.">If the AI CAN do the bad thing, it WIL...</div>
           </div>
           <div class="sonnet-step">
             <div class="step-title">HOW THIS SKILL GROWS</div>
-            <div class="step-body">When you (future Sonnet) make a mistake this session...</div>
+            <div class="step-body" data-full="When you (future Sonnet) make a mistake this session, add it here with format PATTERN N name: what happened. Fix: what the harness should do. The harness gets stronger each time a Sonnet session contributes honestly. You are not just fixing today -- you are protecting every Sonnet that comes after you.">When you (future Sonnet) make a mistake...</div>
           </div>
         </div>
         <h1>AI That Remembers Its Mistakes</h1>
@@ -952,11 +952,17 @@ def build_html(skills: list[dict[str, Any]]) -> str:
     const skillDetail = document.getElementById('skill-detail');
     const treeLinks = Array.from(document.querySelectorAll('.skill-tree a'));
 
+    function unlockSonnetSteps() {{
+      document.querySelectorAll('.step-body[data-full]').forEach(el => {{
+        el.textContent = el.dataset.full;
+      }});
+    }}
     function unlockAll() {{
       const overlays = document.querySelectorAll('.unlock');
       for (const overlay of overlays) {{
         overlay.remove();
       }}
+      unlockSonnetSteps();
       proUnlockButton.classList.add('unlocked');
     }}
     window.unlockAll = unlockAll;
