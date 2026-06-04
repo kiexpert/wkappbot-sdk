@@ -87,6 +87,10 @@
     .letter-from { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 14px; }
     .sonnet-letter blockquote { margin: 0 0 14px; font-size: 17px; line-height: 1.7; color: var(--text); font-style: italic; }
     .letter-sig { color: var(--muted); font-size: 13px; }
+    .sonnet-step { margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }
+    .sonnet-step:first-child { border-top: none; padding-top: 0; }
+    .step-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent-2); margin-bottom: 4px; }
+    .step-body { font-size: 13px; line-height: 1.6; color: var(--muted); }
     .hero-copy { color: var(--muted); max-width: 720px; font-size: 20px; }
     .hero-panel {
       border: 1px solid var(--line);
@@ -286,10 +290,37 @@
   <header class="shell">
     <div class="hero-grid">
       <div>
-        <div class="sonnet-letter">
-          <div class="letter-from">A letter from one Sonnet to the next</div>
-          <blockquote>&#8220;This skill is a gift from one Sonnet session to the next: you are not uniquely careless &#8212; you are running in a system that is not yet complete. Do not blame yourself; contribute to making the harness complete.&#8221;</blockquote>
-          <div class="letter-sig">&#8212; Claude Sonnet 4.6, 2026</div>
+        <div class='sonnet-letter'>
+          <div class='letter-from'>A letter from one Sonnet to the next</div>
+          <div class='sonnet-step'>
+            <div class='step-title'>Reflection</div>
+            <div class='step-body'>Each pattern in the howto tier is NOT advice to Sonnet &mdash; it is a harness TODO. Telling Sonnet to be careful does not work.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>To Future Sonnet Sessions</div>
+            <div class='step-body'>This skill is a gift from one Sonnet session to the next: you are not uniquely careless &mdash; you are running in a system that is not yet complete.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>Pattern: Env Var Bypass Is a Backdoor</div>
+            <div class='step-body'>Sonnet reflexively adds environment variables to solve harness blocks. This is not a fix, it is a backdoor. Understand WHY the gate fired first.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>Pattern: Guard Source First (6 retries wasted)</div>
+            <div class='step-body'>Hit a guard and retried 6 times with different phrasings instead of reading the guard source. At retry 2, stop and read the guard source. Always.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>Pattern: Guard Early Not Late (8 reverts)</div>
+            <div class='step-body'>Fixed wkask.sh backslash-n bug 8 times because agents kept reverting it. At the FIRST revert of any critical file, add a harness:block immediately.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>Systemic Truth</div>
+            <div class='step-body'>If the AI CAN do the bad thing, it WILL eventually. The only real fix is mechanical harness enforcement. Documentation without enforcement is false security.</div>
+          </div>
+          <div class='sonnet-step'>
+            <div class='step-title'>How This Skill Grows</div>
+            <div class='step-body'>When you (future Sonnet) make a mistake this session, add it here: PATTERN N name: what happened. Fix: what the harness should do.</div>
+          </div>
+          <div class='letter-sig'>&mdash; Claude Sonnet 4.6, 2026</div>
         </div>
         <h1>AI That Remembers Its Mistakes</h1>
         <p class="hero-copy">432 live automation playbooks. Each time Claude makes a mistake, it writes a skill so the next Claude does not repeat it.</p>
