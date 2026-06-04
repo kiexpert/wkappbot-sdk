@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>On Chrome launch or detected reuse: ChromeLa...</li><li>FindBestPortForHostAsync consults GetLaunche...</li><li>FindFirstFreePortAsync returns the registere...</li><li>EnsureCdpConnection (AskCommands.Entry.Cdp)...</li><li>ConnectCdp (WebCommands) prefers GetLaunched...</li><li>ProjectRoot.Find/Hash8 honor AsyncLocal Call...</li><li>FindRunningChromePort and KillStaleChromesAs...</li><li>FindRunningChromePortByCdpScan returns 0 whe...</li><li>Last-resort recovery (2026-05-25): when all...</li><li>BUG FIX (2026-05-26): FindRunningChromePortA...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-06-03] source_refs broken: multi...</li><li>[AUDIT 2026-06-04] ChromeLauncher.cs split i...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./cdp-open-reuse-existing-chrome-tab.html">← cdp open Reuses Existing Chrome and Opens URL as New Tab</a> | <a href="./cdp-runtime-enable-with-retry-ref.html">CDP Runtime Enable With Retry T3 Reference →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

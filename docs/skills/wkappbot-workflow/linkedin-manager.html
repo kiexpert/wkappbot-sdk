@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>1. Find LinkedIn tab: urllib /json, filter u...</li><li>2. Activate + CDP connect suppress_origin=Tr...</li><li>3. Scroll to load sections: Runtime.evaluate...</li><li>4. Extract text chunks: innerText.substring(...</li><li>5. Experience section: getElementById(&#x27;exper...</li><li>6. Edit headline: navigate linkedin.com/me/p...</li><li>7. Add experience: navigate to profile add e...</li><li>8. Save buttons: comtypes UIA FindFirst name...</li><li>9. Headline needs update: add WKAppBot SDK O...</li><li>10. Experience: add WKAppBot SDK 2025.08~pre...</li><li>12. LinkedIn headline updated 2026-04-30: WK...</li><li>12. LinkedIn headline updated 2026-04-30: WK...</li><li>15. Experience added 2026-04-30: WKAppBot SD...</li><li>15. Experience added 2026-04-30: WKAppBot SD...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./harness-skill-guard-format.html">← harness:skill Format — Required Single-Line Pattern</a> | <a href="./lm-wiki-personal-knowledge-base.html">LM Wiki — Personal Knowledge Base with Markdown (Claude Code + Obsidian) →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

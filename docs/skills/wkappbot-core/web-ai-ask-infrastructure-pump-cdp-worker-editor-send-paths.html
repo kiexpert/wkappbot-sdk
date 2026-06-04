@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>1. [PUMP ARCHITECTURE] window.__wkAskPump =...</li><li>2. [trySend() SEND PATH HIERARCHY] 5-tier fa...</li><li>3. [EDITOR TYPES BY AI] Claude.ai: div.tipta...</li><li>4. [CDP_SIGNAL FLOW] When trySend() returns...</li><li>5. [CROSS-PROMPT DELIVERY ??TWO PATHS] For t...</li><li>6. [ATTACHMENT TRANSACTION LOCK] When file a...</li><li>7. [PLACEHOLDER vs DRAFT BUG ??NON-CRITICAL]...</li><li>8. [SUBMIT WATCHDOG + TICK LOGGING] Watchdog...</li><li>2026-05-06 WATCHDOG TUNING: Long drafts can...</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask g...</li><li>10. [DISPATCH PATH OWNERSHIP] wkappbot ask g...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./user-skill-template.html">← User Skill Template</a> | <a href="./web-open-idle-keepalive.html">web open --keeplogin-Ns: login session keepalive →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

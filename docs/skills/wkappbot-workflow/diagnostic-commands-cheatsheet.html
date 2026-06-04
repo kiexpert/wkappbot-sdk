@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>whisper dictate --target GRAP --lang ko or e...</li><li>whisper study --batch N --for DURATION --eng...</li><li>whisper pipeline --loop or --once --for DURA...</li><li>whisper slice or clean or index with --split...</li><li>whisper phoneme-search --db DIR --query FILE...</li><li>validate SCENARIO_YAML: YAML scenario syntax...</li><li>claude-usage: prints current session JSONL s...</li><li>eye tick: one-shot Eye status query includin...</li><li>--sudo eye tick: same as eye tick but via ad...</li><li>windows FILTER --deep --process NAME --cmd S...</li><li>logcat REGEX --past Nh -f --timeout N --json...</li><li>gc PATTERN --days N --sweep: cleanup stale l...</li><li>skill audit --app X: cross-check all skills...</li><li>skill verify ID: check a single skill source...</li><li>Diagnostic decision tree: system feels stuck...</li><li>Healthy baseline: eye tick total under 100ms...</li><li>Maintainer sync (2026-05-01): HQ copy is aut...</li><li>EYE / HOT-SWAP LIFECYCLE COMMANDS (force-swa...</li><li>EYE / HOT-SWAP LIFECYCLE COMMANDS (force-swa...</li><li>whisper study repeated runs should reuse the...</li><li>whisper study repeated runs should reuse the...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./delegation-policy-all-commands-use-mandatory-haiku-codex-opus-routing-in-claude-md.html">← delegation policy: all commands use mandatory Haiku/Codex/Opus routing in CLAUDE.md</a> | <a href="./eye-tick-elevated-pipe-parallel-accept.html">ElevatedEyeProxy: 32 Parallel Acceptors Prevent HANDSHAKE-MISS Burst →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

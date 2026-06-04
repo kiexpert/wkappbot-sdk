@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Save alias: grap save @chatgpt {domain:&#x27;chat...</li><li>Save by resolving window: grap save @notepad...</li><li>List all aliases: grap list</li><li>Show full grap: grap show @chatgpt</li><li>Verify all aliases (stale hwnd auto-stripped...</li><li>Use in a11y: a11y find @chatgpt</li><li>Suffix appended after expansion: a11y click...</li><li>Remove alias: grap remove @chatgpt</li><li>Storage: wkappbot.hq/profiles/grap_aliases.j...</li><li>Self-healing: stale hwnd is stripped on expa...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./github-pat-fine-grained-permission-edit.html">← GitHub Fine-grained PAT permission edit via webbot</a> | <a href="./grap-hwnd-volatility-hwnd-stale-between-find-and-use.html">grap hwnd volatility: hwnd stale between find and use →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

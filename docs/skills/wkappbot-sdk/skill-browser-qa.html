@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>STATIC CHECKS (no server needed): (1) grep &#x27;...</li><li>BUILD VERIFY: python scripts/build-skill-pag...</li><li>RUNTIME SETUP: python -m http.server 8888 --...</li><li>RUNTIME CHECK 1 - no cookie: open detail pag...</li><li>RUNTIME CHECK 2 - invalid PAT: click lock bu...</li><li>RUNTIME CHECK 3 - valid PAT (collaborator):...</li><li>RUNTIME CHECK 4 - PAT persists: reload page...</li><li>RUNTIME CHECK 5 - 404 behavior: navigate to...</li><li>RUNTIME CHECK 6 - back link: from detail pag...</li><li>KNOWN BUGS HISTORY: (1) {{ double-brace bug:...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./skill-browser-launch-checklist.html">← Skill Browser Launch Checklist: Pre-Live QA</a> | <a href="./skill-browser-qa-howto.html">Skill Browser QA HowTo →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

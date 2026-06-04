@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Run: powershell -File test/youtube-ad-skippe...</li><li>Added &#x27;ending&#x27; detection (video in last 2s)...</li><li>UNIFIED AD DETECTION: var isAd = document.do...</li><li>COMPLETE STRATEGY (2026-05-23): (1) End-roll...</li><li>KEY FINDING (2026-05-23): mid-roll ads at t=...</li><li>NO-CDP MODE (2026-05-25): wkappbot a11y work...</li><li>NO-CDP GRAP LESSONS (2026-05-25 live investi...</li><li>AD STATE DETECTION (2026-05-25): When ad is...</li><li>URL-REDIRECT SKIP STRATEGY (user idea 2026-0...</li><li>PLAYBACK-POSITION JUMP: Ad detected + skip u...</li><li>ADDRESS BAR HOOK (smart activation): Instead...</li><li>TITLE-CHANGE HOOK (correct smart activation)...</li><li>v1.4 URL redirect: when _find_skip_path() de...</li><li>NAMING: call this process &#x27;YouTube watcher&#x27;...</li><li>v1.5 mouse-burst: WH_MOUSE_LL global mouse h...</li><li>v1.6 fix: WH_MOUSE_LL must run in a dedicate...</li><li>v1.6 simple-poll: removed WH_MOUSE_LL entire...</li><li>v1.6 event-driven: removed WH_MOUSE_LL globa...</li><li>RENAME (2026-05-26): yt_ad_skipper.py rename...</li><li>v1.42 2026-05-27: yt CLEARED (Edge-shrink cu...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkjobs-ai-process-monitor.html">← wkjobs: AI process monitor</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

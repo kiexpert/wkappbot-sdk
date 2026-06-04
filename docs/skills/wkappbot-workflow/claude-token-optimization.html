@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>[SKILL-SEARCH-FIRST] MANDATORY before any Gl...</li><li>[PRETOOLUSE-HOOK] Enforce skill-search disci...</li><li>[CLI-SKILL-HINT] PrintSkillSearchHint() embe...</li><li>[CLAUDEIGNORE] Create .claudeignore in proje...</li><li>[CLAUDEIGNORE-HQ] WKAppBot-specific .claudei...</li><li>[CLAUDE-MD-200] CLAUDE.md hard cap = 200 lin...</li><li>[SESSION] Use /compact when conversation gro...</li><li>[MCP] Only connect MCP servers you actively...</li><li>[QMD-MODES] Three search modes: (1) qmd sear...</li><li>[QMD-TIPS] Search without --collection searc...</li><li>[3-AGENT] Split work into 3 roles: (1) Archi...</li><li>[3-AGENT-WHY] Without role separation, Claud...</li><li>[CLAUDE-MD-RULES] 5 rules to embed: (1) Neve...</li><li>[PRIORITY] Apply in order: skill-search-firs...</li><li>[IMPACT] Combined: same token budget handles...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./claude-terminal-via-appbot-primary.html">← Claude Terminal via AppBot as Primary Workflow -- Ditch VS Code Extension for Automation</a> | <a href="./claude-kill-guard-hook.html">claude-kill-guard-hook →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

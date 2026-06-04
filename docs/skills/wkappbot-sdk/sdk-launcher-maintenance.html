@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Repo: d:\GitHub\wkappbot-sdk -- Launcher sou...</li><li>Build: build.cmd (full) OR dotnet publish cs...</li><li>AOT requires MSVC linker (Visual Studio). bu...</li><li>Core binary: downloaded via build.cmd --down...</li><li>Hot-swap: launcher watches wkappbot-core.new...</li><li>Debug tracing: WKAPPBOT_DEBUG=1 enables rela...</li><li>CI: build.yml builds launcher+core. extended...</li><li>Public-safe checklist: no hardcoded dev path...</li><li>Suggest/skill filing: run D:\GitHub\WKAppBot...</li><li>license status: Launcher-owned fast-exit (Pr...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./gmail-support-bot.html">← Gmail Support Bot — OAuth2 setup + auto-reply flow</a> | <a href="./launcher-wkappbot-chrome-target-env-pipe-protocol.html">Launcher WKAPPBOT_CHROME_TARGET env + pipe protocol →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

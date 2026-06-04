@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>PURPOSE: wkcdp-mon.ps1 lists all active wkap...</li><li>PATH: D:/GitHub/WKAppBot/bin/wkcdp-mon.ps1 (...</li><li>FLAGS: (no flag)=one-shot</li><li>-f=follow/watch mode 3s refresh</li><li>-i N=interval seconds</li><li>-tabs=tab list per session</li><li>-DryRun=list stale idle sessions to be kille...</li><li>-KillIdle=kill stale idle sessions (age&gt;30m,...</li><li>SLOW STARTUP: Add-Type C# compile on first r...</li><li>RUN: PowerShell tool: &amp; &#x27;D:/GitHub/WKAppBot/...</li><li>KILL idle: &amp; &#x27;D:/GitHub/WKAppBot/bin/wkcdp-m...</li><li>FLAGS UPDATE (2026-05-26): -KillIdle = kill...</li><li>CWD INVERSION FIX (2026-05-26): -KillIdle ki...</li><li>KILL-EXECUTE BUG FIXED (2026-05-26): wkcdp-m...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkappbot-taskkill-usage.html">← wkappbot taskkill: classify and kill wkappbot processes</a> | <a href="./wkedit-shell-distortion-recovery.html">wkedit shell distortion recovery →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

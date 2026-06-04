@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Language: English only -- no Korean in commi...</li><li>Format: &#x27;&lt;type&gt;: &lt;what changed and why&gt;&#x27; --...</li><li>Types: feat / fix / refactor / test / docs /...</li><li>feat = new user-visible capability</li><li>fix = bug fix (describe symptom, not file na...</li><li>refactor = restructuring with no behavior ch...</li><li>test = test additions or corrections</li><li>docs = documentation only (CLAUDE.md, README...</li><li>bump = version bump (always 3 files: Assembl...</li><li>chore = build/tooling/CI, no production code...</li><li>Body: bullet points for non-obvious details...</li><li>- Use &#x27;- &#x27; bullets, not numbered lists</li><li>- Explain WHY, not WHAT (the diff already sh...</li><li>- Max 5 bullets; if more needed, consider sp...</li><li>NO file listings -- never list changed files...</li><li>Bad: &#x27;fix: TeeTextWriter.cs, Program.cs, Eye...</li><li>Good: &#x27;fix: --sudo no longer spawns a visibl...</li><li>Co-Authored-By line: always append &#x27;Co-Autho...</li><li>Examples:</li><li>feat: multi-browser CDP port scan auto-route...</li><li>fix: elevated Eye proxy drops OperationCance...</li><li>fix: webbot window position wrong when sandb...</li><li>refactor: split TeeTextWriter error record i...</li><li>bump: v5.11 -&gt; v5.12 (WebBot multi-port scan...</li><li>chore: add git commit conventions skill</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./file-command-cheatsheet-ref.html">← file cheatsheet reference</a> | <a href="./grap.html">grap -- UI Element Address System (Window + UIA Scope + Web + ADB) →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

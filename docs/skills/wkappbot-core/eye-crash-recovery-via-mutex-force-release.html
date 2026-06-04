@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>DIAGNOSE STEP 1 — Symptom: wkappbot consoles...</li><li>DIAGNOSE STEP 2 — Confirm AbandonedMutex: ta...</li><li>DIAGNOSE STEP 3 — Confirm mutex still locked...</li><li>DIAGNOSE STEP 4 — Find mutex names WITHOUT s...</li><li>FIX STEP 1 — Force-release all 3 Eye mutexes...</li><li>FIX STEP 2 — Restart Eye: wkappbot-core.exe...</li><li>FIX STEP 3 — Console auto-recovery: wkappbot...</li><li>CHROME ZOMBIE — When Eye dies, it abandons h...</li><li>CHROME ZOMBIE ROOT CAUSE — Eye mutex Abandon...</li><li>HANDLE SCANNER — wkfix.ps1 -ScanHandles &lt;pid...</li><li>NUKE PATTERN — wkfix.ps1 -Nuke &lt;pid&gt;: enumer...</li><li>CHROME SINGLETON — Chrome uses a named kerne...</li><li>SHORTCUT — wkfix.ps1 at D:/GitHub/WKAppBot/b...</li><li>ROOT CAUSE SUMMARY — Three bugs filed as sug...</li><li>FIND-OWNER PATTERN: zombie PID TerminateProc...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>SELF-COMPLETING LOOP: FindOwner(zombie_chrom...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li><li>CHROME KILL ORDER: (1) Direct KillPid first...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./eye-hotswap-stamp-10min-expiry.html">← Eye _lastFailedSwapStamp 10-min auto-expiry</a> | <a href="./eye-dpi-drift-snap-timing-fix.html">Eye DPI drift: snap timing fix →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

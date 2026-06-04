@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>[WHAT-IS-GRAP] grap = UI address. Before &#x27;#&#x27;...</li><li>[WINDOW-PATTERNS] Before &#x27;#&#x27; -- addressing a...</li><li>[JSON5-SPEC] JSON5-extended grap syntax -- o...</li><li>[SCOPE-CHAIN] After &#x27;#&#x27; -- UIA element drill...</li><li>[TAB-PORTAL] Browser tab switching built int...</li><li>[WIN32-CHILD] &#x27;/&#x27; drills Win32 child windows...</li><li>[ANDROID] adb:// prefix routes to Android UI...</li><li>[NODE-TAG] Element label format in CURSOR/TA...</li><li>[ABS-TAG-PATH] Official absolute UIA tag pat...</li><li>[FIND-OUTPUT] &#x27;a11y find &lt;grap&gt;&#x27; stdout form...</li><li>[TIPS] Real-world patterns: # Paste &amp; go: co...</li><li>CWD FIELD (2026-05-02): {cwd:&#x27;D:/path&#x27;} find...</li><li>[MDI-CHILD] (2026-05-02) MDI child windows a...</li><li>[WIN-CLICK-DEPRECATED] (2026-05-02) win-clic...</li><li>STOP-EARLY PATH (MFC/legacy): grap child pat...</li><li>OR COVERAGE-SUM MECHANICS (2026-05-18): ; OR...</li><li>SPECIAL CHAR QUOTING IN FIELD VALUES (2026-0...</li><li>SHELL PARSING BREAKS REGEX VALUES (2026-05-1...</li><li>SHELL BRACE EXPANSION GOTCHA (2026-05-18): {...</li><li>CORRECTION on step 18 (2026-05-18): /regex/...</li><li>CORRECTION (2026-05-18, Codex review): Step...</li><li>OPUS SOURCE REVIEW (2026-05-18): ; OR actual...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./git-commit-conventions.html">← Git Commit Conventions</a> | <a href="./haiku-as-qa-canary.html">Haiku as QA canary — fresh-eyes mechanical execution surfaces validator and CLI failure modes →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

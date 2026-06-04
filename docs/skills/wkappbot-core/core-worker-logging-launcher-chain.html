@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>ARCHITECTURE OVERVIEW: Three layers — (1) Co...</li><li>LAYER 1 — Core TeeTextWriter: created when L...</li><li>LAYER 2 — Worker self-log (v5.13.133): when...</li><li>LAYER 2 check logic: IsLauncherInParentChain...</li><li>LAYER 3 — Launcher relay fallback (v5.13.136...</li><li>Silent swallow (exit 0 + errors): code==0 AN...</li><li>errors.jsonl entry sources: &#x27;core&#x27; (TeeTextW...</li><li>RELAY FLUSH RULE: in piped-relay mode, stder...</li><li>Launcher stdout loop: catch Exception explic...</li><li>Empty stdout + non-zero exit: [LAUNCHER] Cor...</li><li>Sentinel \0UIT: must be checked on RAW BYTES...</li><li>UNIFIED EXIT FUNCTIONS (v5.13.137+): Two fun...</li><li>MCP LOOP EXIT: McpCommand returns before Tee...</li><li>[DEV] Implementation: IsLauncherInParentChai...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkappbot-build-verify-workflow-ref.html">← WKAppBot Build Verify Workflow T3 Reference</a> | <a href="./wkchat-shortcut-geometry-lnk-update.html">wkchat .lnk shortcut window geometry update -- write WindowOrigin into NT_CONSOLE_PROPS →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

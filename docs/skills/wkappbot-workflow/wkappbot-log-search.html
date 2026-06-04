@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Start from .wkappbot/hq/logs/ and .wkappbot/...</li><li>Trace the caller chain first when a process...</li><li>Map the command to its log family: old ask ....</li><li>For failures, check errors.jsonl first, then...</li><li>For UI or routing stalls, search for FindAll...</li><li>Use wkappbot logcat for quick filtering when...</li><li>Correlate the timestamp in command_history.j...</li><li>Use scripts/find-wkappbot-caller-chain.ps1 f...</li><li>For blocked launcher or sudo storms, inspect...</li><li>[CDP:DIALOG:BLOCKED] log pattern: Chrome JS...</li><li>[CDP:NODE-ERROR] log pattern: node access fa...</li><li>[REAPER] log pattern: idle tab recycled (pin...</li><li>[TAB-CAP] log pattern: oldest tab killed to...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./anthropic-computer-use-cross-platform.html">← Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch)</a> | <a href="./appbot-telemetry-promotion.html">AppBot Telemetry and Skill Promotion →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

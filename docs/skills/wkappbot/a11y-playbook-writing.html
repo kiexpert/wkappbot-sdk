@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Read the shared repo guidance first: AGENTS....</li><li>Reuse existing skills before inventing new f...</li><li>Write the playbook as a runnable scenario: `...</li><li>Discover exact targets with `a11y find` and...</li><li>For Notepad close flows, prefer `window_clos...</li><li>Avoid destructive process-kill shortcuts for...</li><li>Prefer stable selectors in scenarios: `contr...</li><li>Validate the playbook after edits with the o...</li><li>After creating or updating the skill, verify...</li><li>Use wkappbot skill contribute / wkappbot ski...</li><li>Screenshot action supports per-step window s...</li><li>Verified 2026-04-21: test-run-scenario-scree...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids.html">← a11y grid-read: clipboard bridge for owner-drawn grids</a> | <a href="./a11y-read-inspect-improvement-ideas.html">a11y read/inspect improvements for elevated MFC MDI →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

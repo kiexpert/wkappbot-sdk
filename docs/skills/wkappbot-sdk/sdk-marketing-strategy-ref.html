@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>PARENT T1: wkappbot skill read sdk-marketing...</li><li>HOW TO AUTO-EVOLVE: After each press hit, Re...</li><li>PRESS CONTACTS LOG (add entries as submitted...</li><li>OUTLET</li><li>CONTACT</li><li>STATUS</li><li>RESULT\n example: 2026-06-04</li><li>IT Chosun</li><li>***</li><li>SUBMITTED</li><li>pending</li><li>CAMPAIGN RESULTS LOG (add after each push):\...</li><li>CHANNEL</li><li>ACTION</li><li>VISITORS</li><li>STARS</li><li>PRO_CONVERTS\n example: 2026-06-04</li><li>Reddit r/ClaudeAI</li><li>Show HN post</li><li>0</li><li>0</li><li>0</li><li>A/B TEST HISTORY:\n Hero variants tested and...</li><li>WHAT WORKED (update after results):\n The So...</li><li>WHAT DID NOT WORK (update after results):\n...</li><li>NEXT ACTIONS (Opus updates this after each c...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <div class="related"><strong>Related:</strong> <a href="./sdk-marketing-strategy-howto.html">SDK Marketing Strategy HowTo: Hero Redesign and SEO</a></div>
@@ -347,19 +347,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

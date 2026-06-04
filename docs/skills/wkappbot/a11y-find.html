@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Keep the emitted output aligned with the cur...</li><li>Treat the grap as what was actually matched:...</li><li>Separate root hwnd from process-owned hwnd;...</li><li>Keep output shell-safe and markdown-friendly...</li><li>Prefer short operator flags like verify, rev...</li><li>Verify by rerunning a11y find on the emitted...</li><li>Prefer process-first search logic for matchi...</li><li>[v6.2+ SCORE OUTPUT] find [OK] includes scor...</li><li>[v6.2+ MDI FALLBACK] Simple &#x27;a11y find *patt...</li><li>[v6.2+ CMD FALLBACK NOISE FIX] IsSearcherPro...</li><li>[v6.2+ EXAMPLES] Concrete verified behaviors...</li><li>[v6.3+ AMB OUTPUT] Multiple matches: [OK] re...</li><li>Verified 2026-04-24: test-a11y-find-grap-ver...</li><li>[v6.3+ CLS PATH] cls ancestor path: simple p...</li><li>PARENT CHAIN FIELDS (2026-05-18): ppid:N (di...</li><li>USAGE NOTE (2026-05-18): ppids filter works...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./a11y-close-safety-ambiguity-focus-node-diagnostics.html">← a11y close safety: ambiguity + focus-node diagnostics</a> | <a href="./a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows.html">a11y find: MFC deep-descendant grandchildren via EnumChildWindows →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

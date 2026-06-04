@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Search CommandHelpMap.cs for the key</li><li>If missing: add entry</li><li>If removed: keep help + scrub dispatch case-...</li><li>Build + publish wkappbot-core.exe</li><li>Verify: wkappbot &lt;cmd&gt; --help shows non-empt...</li><li>Top-level aliases such as close, kill, and w...</li><li>Top-level aliases such as close, kill, and w...</li><li>2026-05-20: wkask.ps1 wrong-tab response cap...</li><li>Verified 2026-05-25: ev-exec-cmdhelp.sh (res...</li><li>2026-05-26: --exec alias pattern: if a Comma...</li><li>Verified 2026-05-25: ev-exec-commandhelp-ent...</li><li>[AUDIT 2026-05-29] CommandHelp.cs split: Com...</li><li>Verified 2026-06-02: ev-schedule-commandhelp...</li><li>[AUDIT 2026-06-03] source_refs broken: stale...</li><li>[AUDIT 2026-06-04] CommandHelp.cs refactored...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./codex-friendly-skill-template.html">← Codex-Friendly Skill Template</a> | <a href="./conpty-enter-intercept-two-phase-decide-then-commit.html">ConPTY Enter-intercept two-phase decide-then-commit →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

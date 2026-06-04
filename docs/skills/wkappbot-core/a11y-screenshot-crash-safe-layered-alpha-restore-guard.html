@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>PROBLEM SuppressBlockingWindows in Screensho...</li><li>FIX ScreenshotCommand.AlphaRecovery.cs adds...</li><li>HOOKS Console.CancelKeyPress + AppDomain.Pro...</li><li>RECOVERY RecoverOrphanedAlpha() runs in Prog...</li><li>INVARIANT persist BEFORE alpha=0; recovery i...</li><li>ENTRY POINTS AlphaRecord, AlphaClearPending,...</li><li>PROBLEM: SuppressBlockingWindows in csharp/s...</li><li>PERSIST: ScreenshotCommand.AlphaRecovery.cs...</li><li>GRACEFUL HOOKS: First AlphaRecord() call als...</li><li>STARTUP RECOVERY: Program.Dispatch.cs Run()...</li><li>CLEAR ON SUCCESS: RestoreBlockingWindows tai...</li><li>EVIDENCE: D:/GitHub/WKAppBot/.wkappbot/evide...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./a11y-kill-json5-grap-support.html">← a11y kill JSON5 grap support</a> | <a href="./a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern.html">a11y set-value: 50ms delay + read-back warning for Win11 RichTextBox and Chrome stale ValuePattern →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

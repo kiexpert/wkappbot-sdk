@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>CONCEPT: Rules live in CLAUDE.md harness sec...</li><li>HOW TO ADD A TRIGGER: append to CLAUDE.md ha...</li><li>IMPLEMENTATION: wkharness-post.ps1 SELF-HARN...</li><li>PHILOSOPHY: AI has no persistent memory acro...</li><li>EXTEND: add harness:learn for any pattern yo...</li><li>DISTINCTION from harness:done: harness:done...</li><li>Verified 2026-05-22: harness:learn + skill c...</li><li>STDOUT FIX (2026-05-22): harness:learn must...</li><li>DEBUG METHOD (2026-05-22): to confirm PostTo...</li><li>PostToolUse hook debug: if debug log empty,...</li><li>PostToolUse hook fires but tool_input.file_p...</li><li>BUG FOUND (2026-05-22): SELF-HARNESS uses $e...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./handoff-send-best-practice.html">← handoff send best practice</a> | <a href="./harness-skill-format-required-single-line-pattern.html">harness:skill Format — Required Single-Line Pattern →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

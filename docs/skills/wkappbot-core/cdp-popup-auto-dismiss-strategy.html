@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>POPUP AUTO-DISMISS runs automatically before...</li><li>STAGE 1 -- ChatGPT only (chatgpt.com): finds...</li><li>continue without</li><li>use as guest</li><li>skip</li><li>not now/i and clicks. Maintains anonymous se...</li><li>STAGE 2 -- All domains: walks visible [role=...</li><li>EXCLUSION (CRITICAL): overlays matching /acc...</li><li>cookie.*consent</li><li>privacy.*policy/i on AI quota hosts (chatgpt...</li><li>INTEGRATION POINTS: hooked into WaitForEdito...</li><li>QA CHECK: wkappbot ask gpt &#x27;say: hello&#x27; shou...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait.html">← CDP focus-steal guard: Runtime.evaluate in IsFocusStealingMethod + weMinimized + 500ms wait</a> | <a href="./cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception.html">cdp probe port-9 guard: discard low-port values to prevent HttpRequestException →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

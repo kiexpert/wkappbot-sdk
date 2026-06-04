@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>OVERVIEW: automated AI news digest at 11:00...</li><li>SEARCH KEYWORDS: &#x27;AI desktop automation 2026...</li><li>PIPELINE: (1) wkappbot web search &lt;keyword&gt;...</li><li>SCHEDULE: wkappbot schedule add &#x27;bash .../ai...</li><li>SCRIPT LOCATION: bin/wkappbot.hq/scripts/ai-...</li><li>GEMINI FILTER PROMPT: instructs Gemini to ou...</li><li>COST: 5 web searches + 1 Gemini call per run...</li><li>KNOWN ISSUE: Gemini ask can hang if rate-lim...</li><li>SUGGEST TAG: all news items tagged [AI-NEWS]...</li><li>EXIT ADMIN SESSION: briefing runs as user (n...</li><li>SUGGEST DEDUPE AND SKILL HEALING: Before fil...</li><li>Verified 2026-05-17: (resolve ts=2026-05-15T...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./harness-engineering-korean-interview.html">← AI Harness Engineering -- Korean YouTube Interview Key Points</a> | <a href="./anthropic-computer-use-cross-platform.html">Anthropic Computer Use — cross-platform AI desktop control (API + Cowork/Dispatch) →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

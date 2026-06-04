@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>ARCHITECTURE: Master profile at {DataDir}/ch...</li><li>ON LAUNCH (CopyFromMaster): copies Default/L...</li><li>ON EXIT (MergeBackToMaster): SQLite merge of...</li><li>SESSION COOKIES NOT SYNCED: expires_utc==0 (...</li><li>TROUBLESHOOT auth expiring: 1) Check [CHROME...</li><li>KEY FILES: ChromeProfileSync.cs (launch copy...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>IMPORT FROM PERSONAL CHROME: Copy cookies fr...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>CURRENT BOOTSTRAP FLOW (personal Chrome impo...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>IMPROVEMENT: Replace CopyIfNewer file-copy w...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li><li>2026-05-07 PROFILE RENAME: Chrome profile di...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./cheap-commit-todo-gate.html">← cheap-commit-todo-gate</a> | <a href="./claude-code-ai-audit-log-unified-tool-call-logging.html">Claude Code AI Audit Log -- unified tool call logging →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

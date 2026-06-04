@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>[WHEN-TO-USE] Prefer wkedit for: (1) regex b...</li><li>tr &#x27;\n&#x27; &#x27; &#x27;) wkappbot file edit &#x27;&lt;regex&gt;&#x27; &#x27;&lt;...</li><li>tr &#x27;\n&#x27; &#x27; &#x27;) wkappbot file edit &#x27;Console\.Wr...</li><li>sort LESSON: regex that captures only part o...</li><li>IMPROVEMENT #9: --dry-run misleading output...</li><li>IMPROVEMENT #1: --line N / --line-range N:M...</li><li>IMPROVEMENT #2: --nth N occurrence targeting...</li><li>IMPROVEMENT #3: Backslash-heavy PS1 shell co...</li><li>IMPROVEMENT #4: Capture group $1 shell expan...</li><li>IMPROVEMENT #5: --patch + --dry-run combo. -...</li><li>IMPROVEMENT #6: No .NET regex mode flags. No...</li><li>IMPROVEMENT #7: No append/prepend/insert-aft...</li><li>IMPROVEMENT #8: --regex not supported in --o...</li><li>LIVE TEST RESULTS (2026-05-18): #1 --line N:...</li><li>BUG (2026-05-25): wkappbot file edit double-...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkappbot-windows-focus-flag-and-no-filter-relevance-mode.html">← wkappbot windows -- focus flag and no-filter relevance mode</a> | <a href="./wkedit-encoding-hell.html">wkedit find-pattern encoding hell: BOM + CRLF mismatch causes &#x27;not found&#x27; →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

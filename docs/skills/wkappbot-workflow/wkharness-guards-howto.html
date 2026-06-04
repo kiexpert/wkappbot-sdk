@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>G1 ASK-GUARD: wkappbot ask/whisper with run_...</li><li>G2 KILL-GUARD: PS terminate-cmdlet on wkappb...</li><li>G3 SKILL-SEARCH-NUDGE: soft exit-0 nudge, no...</li><li>G4 SKILL-EDIT-GUARD: direct .skill.json file...</li><li>G5 PACE-GUARD: Sonnet%&gt;Total% fires on Edit/...</li><li>G6 CP949-GUARD: non-CP949 chars in Write blo...</li><li>G7 AGENT-BRIEF-GUARD: fewer than 3 wkappbot...</li><li>G8 OPUS-BUDGET-GUARD: Opus at 95% weekly bud...</li><li>G9 STALL-GUARD: 300s + 10 calls solo -&gt; bloc...</li><li>G10 BG-TASK-GUARD: bg task mark &gt;30s -&gt; bloc...</li><li>SPEC-GATE: Opus Agent missing SPEC block -&gt;...</li><li>CLAUDE-MD-SYNC: Agent dispatch without Pendi...</li><li>USAGE-TEST-GUARD: 50pct Opus redirect to wkc...</li><li>WKCLAUDE-DIRECT: direct wkclaude.sh/cmd/ps1...</li><li>FULL ESCAPE when all delegation blocked: (1)...</li><li>GUARD 3 SKILL-SEARCH-NUDGE: soft exit-0 nudg...</li><li>GUARD 4 SKILL-EDIT-GUARD: blocks .skill.json...</li><li>GUARD 5 PACE-GUARD: blocks Sonnet Edit/Write...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkharness-guards.html">← wkharness-guards</a> | <a href="./wktool-pattern.html">wktool pattern: token-efficient monitoring →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

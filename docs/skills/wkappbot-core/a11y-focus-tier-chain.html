@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>SMART WINDOW ORDER — SmartSetWindowOrder(hwn...</li><li>WINDOW-LEVEL FOCUS — A11yFocus(hwnd, tag) [A...</li><li>ELEMENT-LEVEL FOCUS — A11yFocusElement(el, h...</li><li>WRITE ACTION PRE-FOCUS — A11yCommand.cs elem...</li><li>ZERO-STEAL RULES (absolute, no exceptions):...</li><li>OVERLAY GUARD + SOURCE FILES SuppressFullscr...</li><li>FOCUSLESS-FIRST PRINCIPLE (cross-ref: skill...</li><li>COMMON PITFALLS: DON&#x27;T use SetForegroundWind...</li><li>VERSION HISTORY: v1.0 (2026-05-03): initial...</li><li>FOCUS-STEAL bug investigation (2026-05-19):...</li><li>FOCUS-STEAL fix dispatch (2026-05-19 18:40):...</li><li>Verified 2026-05-19: ev-2026-05-19-1840-focu...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./a11y-focus-steal-user-active-silent-yield.html">← a11y focus-steal: user-active silent yield in RestoreFocusWithRetryAsync</a> | <a href="./a11y-hack-ocr-opt-in-vision-worker-sentinel-bridge.html">a11y hack: --ocr opt-in + VisionWorker sentinel bridge (focusless) →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

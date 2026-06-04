@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>WHEN: session end, batch work complete, or u...</li><li>STEP 1 git log: git log --oneline --since=la...</li><li>STEP 2 match to pending: for each [ ] item i...</li><li>STEP 3 add new items: new work not in list -...</li><li>STEP 4 commit: git add CLAUDE.md &amp;&amp; git comm...</li><li>CANONICAL RULE: CLAUDE.md is only source of...</li><li>ENCODING RULE: CLAUDE.md has Korean -- use w...</li><li>NEW ITEM FORMAT: - [x] short description, no...</li><li>SCOPE: only this repo items. Skip wkappbot c...</li><li>CRLF NOTE (2026-05-25): CLAUDE.md uses CRLF...</li><li>CRLF APPEND WORKAROUND: wkappbot file edit m...</li><li>COMPRESS PATTERN (2026-05-26): when Pending...</li><li>BATCH RESOLVE 2026-05-29: CommandHelpMap mai...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./claude-proxy-context-limit-auto-handoff-to-gemini-agent.html">← claude-proxy: Context Limit Auto-Handoff to Gemini Agent</a> | <a href="./claude-md-guide.html">CLAUDE.md 역할 안내: 전역 vs 프로젝트 + 셀프힐링 →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

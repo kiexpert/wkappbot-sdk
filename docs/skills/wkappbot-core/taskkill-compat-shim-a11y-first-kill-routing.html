@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Invoke via taskkill.exe (busybox symlink) OR...</li><li>/PID N maps to regex:^\[N\] (anchored PID pr...</li><li>Bare positional: digits -&gt; /PID, *.exe -&gt; /I...</li><li>/F is ignored (a11y kill is force by default...</li><li>For complex filters use grap directly: wkapp...</li><li>Run &#x27;wkappbot taskkill --help&#x27; to see the fu...</li><li>Verified 2026-04-21: test-taskkill-help.cmd...</li><li>Verified 2026-05-03: callout window placemen...</li><li>v1.5 (2026-05-06): --force-all REMOVED. --fo...</li><li>v1.6 (2026-05-05): --force output now shows...</li><li>v1.7 (2026-05-06): taskkill classify and --f...</li><li>REQUESTED BEHAVIOR (suggest 2026-05-26): /IM...</li><li>v1.9 (2026-05-28): DEFAULT PATH now auto-kil...</li><li>SPEC v2.0 (2026-05-28): PROTECTED = process...</li><li>SPEC v2.1 CORRECTION (2026-05-28): PROTECTED...</li><li>UNCLE-KILL LESSON (Opus 2026-05-29): GetDesc...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./ev-st.html">← SwapTrace ***</a> | <a href="./test-step-repeated.html">Test-Step-Repeated →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

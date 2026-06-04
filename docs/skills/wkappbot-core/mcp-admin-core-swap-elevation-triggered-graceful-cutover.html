@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>## 트리거 조건</li><li>normal Core가 UIPI 차단 감지 -&gt; 응답에 &#x27;_elevationRe...</li><li>## 어드민 Core 스폰 (SpawnAdminCore 백그라운드 스레드)</li><li>1. NamedPipe 서버 2개 생성: wkappbot-mcp-admin-{P...</li><li>2. ShellExecuteExW runas -&gt; wkappbot-core.ex...</li><li>3. 60초 WaitForConnectionAsync -- UAC 승인 후 ad...</li><li>## 절체 (transition) 순서</li><li>1. 기존 normal Core stdin close (CloseHandle)...</li><li>2. adminMode = true -&gt; 이후 stdin은 모두 admin Co...</li><li>3. initialize 리플레이 -&gt; 원래 elevation 요청 재전송 -&gt;...</li><li>4. admin Core stdout relay: 응답 id로 inflight...</li><li>## hot-swap과의 상호작용</li><li>FSW가 .new.exe 감지해도 adminMode=true면 -&gt; pendin...</li><li>admin Core stdout EOF (= admin Core 종료) -&gt; f...</li><li>pending swap은 Launcher가 다음 FSW 이벤트(새 stamp)...</li><li>## 실패 시</li><li>UAC 거부 -&gt; elevationRequestLine에서 id 추출 -&gt; JS...</li><li>60s 타임아웃 -&gt; TerminateProcess(adminProc) + pi...</li><li>## 핵심 설계</li><li>normal Core + admin Core 동시 공존 불가 -- 절체 시 no...</li><li>admin Core가 살아있는 동안 hot-swap은 defer -- 버전 불일...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./launcher-aot-build-vswhere-path.html">← Launcher NativeAOT build needs vswhere.exe in PATH</a> | <a href="./mcp-automation-patterns.html">MCP Automation Patterns →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

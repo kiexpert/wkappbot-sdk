@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>[CRASH REBOOT CASCADE] 1) ctfmon starts late...</li><li>[SYMPTOMS CHECKLIST] Korean input (한/영 key)...</li><li>[WHY VS CODE WORKS BUT CONSOLE DOESNT] VS Co...</li><li>[RECOVERY 1 - Korean IME + encoding] powersh...</li><li>[RECOVERY 2 - Windows Terminal IME still dea...</li><li>[RECOVERY 3 - MouseCCA spawn storm] (Get-Pro...</li><li>[WHAT WORKED 2026-05-05] Korean IME: recover...</li><li>[WHAT DIDNT WORK 2026-05-05] ImmAssociateCon...</li><li>[PERMANENT FIXES APPLIED] (1) HKCU\Run: ctfm...</li><li>[LONG-TERM IMPROVEMENT NEEDED] Eye startup s...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./core-pre-command-flag-skip.html">← Core skips leading launcher flags (--sudo etc.) before computing subcommand</a> | <a href="./developer-skill-template.html">Developer Skill Template →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

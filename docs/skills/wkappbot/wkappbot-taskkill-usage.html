@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>CLASSIFY (callout popup, no actual kill): wk...</li><li>Zombie Eye cleanup (100+ procs after 24h): H...</li><li>--force PID: CDP port guard (--remote-debugg...</li><li>PENDING behavior improvement (suggest filed...</li><li>TEST A verified 2026-05-26: wkappbot taskkil...</li><li>CMDLINE FILTER (wkzombie proprietary, 2026-0...</li><li>SMART TASKKILL NOTE: wktaskkill.ps1 deleted...</li><li>ZOMBIE AUTO-KILL (Core v1.9, 2026-05-28): wk...</li><li>QUICK REFERENCE -- which tool to use (read t...</li><li>CORRECTION (2026-05-28, source v1.9 verified...</li><li>WMI HANG BUG (2026-05-28): IsDescendantOfAiP...</li><li>FindCallingAiProcessPid PID-11940 HANG ROOT...</li><li>PARTIAL FIX DEPLOYED (commit 493a5b25a): (1)...</li><li>ALL HANGS FIXED (commits af807931e + c29bbd1...</li><li>CORRECTION (Opus verified 2026-05-28): wkapp...</li><li>SPEC: Uncle-process kill for singleton clean...</li><li>UNCLE-KILL SPEC FINAL (2026-05-29, learned f...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkappbot-run-process-launcher-with-integrated-tracking.html">← wkappbot run: process launcher with integrated tracking</a> | <a href="./wkcdp-mon.html">wkcdp-mon: CDP 크롬 세션 모니터 →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

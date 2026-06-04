@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>resolver_channel = AbbreviateCwd(CWD) compar...</li><li>Cross-author 1st resolve: writes half_resolv...</li><li>Cross-author second resolve (other party): c...</li><li>Same-author self-resolve (full flow): requir...</li><li>--force reason: bypasses gate, posts overrid...</li><li>--confirm flag: 2nd-party confirmation path....</li><li>Verified 2026-04-26: test-suggest-resolve-co...</li><li>AUTO-CONFIRM (Eye-side, runs at startup + ho...</li><li>SUGGESTER CHECK (author-side, ID only): wkap...</li><li>DUAL HISTORY: on full resolve, appends to (1...</li><li>SUGGESTER GUARD (2026-05-01): when suggester...</li><li>REQUIREMENT DESIGN RULES (learned 2026-05-09...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./suggest-requirement-error-format.html">← suggest --requirement error messages: format example + launcher flag</a> | <a href="./suggest-cmd-guard-word-boundary.html">suggest resolve CMD guard: word-boundary key extraction fix →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

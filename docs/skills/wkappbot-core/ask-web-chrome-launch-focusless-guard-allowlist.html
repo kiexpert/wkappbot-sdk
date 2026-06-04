@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>AppBotPipe.StartTracked blocks UseShellExecu...</li><li>ChromeLauncher uses UseShellExecute=true+Win...</li><li>Focus stays on user&#x27;s current app; CDP port...</li><li>If Chrome fails to launch again check the Ap...</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync...</li><li>5. 2026-05-03 (commit 9db2e112): LaunchAsync...</li><li>[AUDIT 2026-05-29] ChromeLauncher.cs split i...</li><li>[AUDIT 2026-06-03] source_refs broken: stale...</li><li>[AUDIT 2026-06-04] AppBotPipe.Start ref brok...</li><li>[AUDIT 2026-06-04] ChromeLauncher.cs partial...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./ask-cdp-uia-focus-steal-coverage-via-sentinel.html">← ask-*/triad CDP focus-steal coverage via sentinel user-active yield</a> | <a href="./autoheal-userinput-protection.html">AutoHeal - User Input Protection: Focusless-First + Focus Theft Recovery →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

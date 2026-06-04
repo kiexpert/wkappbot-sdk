@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Create a GitHub account at github.com/signup...</li><li>Install gh CLI: Windows -&gt; &#x27;winget install -...</li><li>Authenticate: run &#x27;gh auth login&#x27;, choose Gi...</li><li>Download wkappbot: &#x27;gh release download --re...</li><li>Install: extract the zip into %USERPROFILE%\...</li><li>Verify install: open a fresh terminal and ru...</li><li>Check license: &#x27;wkappbot license status&#x27; - o...</li><li>Upgrade (optional): follow SUBSCRIBE.md - ba...</li><li>First automation: &#x27;wkappbot windows&#x27; or &#x27;wka...</li><li>Correct default behavior: &#x27;wkappbot windows&#x27;...</li><li>[AUDIT 2026-06-03] source_refs broken: missi...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./wkagent-name-python-prototype.html">← wkagent-name Python Prototype: 10x Speed Improvement</a> | <a href="./sdk-public-skill-index.html">WKAppBot SDK Public Skill Index -- reference, patterns, and best practices for global users →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

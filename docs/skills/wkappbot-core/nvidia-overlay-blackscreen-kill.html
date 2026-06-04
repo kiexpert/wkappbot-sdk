@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>SYMPTOM: desktop periodically goes black, ta...</li><li>DETECT: wkappbot screensaver close logs [SCR...</li><li>Where CPU -gt 50</li><li>KILL SESSION: Get-Process NVIDIA Overlay -EA...</li><li>Stop-Process -Force. Get-Process nvcontainer</li><li>Sort CPU -Desc</li><li>Select -First 2</li><li>Stop-Process -Force</li><li>PERMANENT FIX: GeForce Experience -&gt; Setting...</li><li>INTEGRATED: screensaver close (v7.3.193+) au...</li><li>WKAPPBOT_NO_SCREENSAVER=1 disables periodic...</li><li>SCREENSAVER SELF-WIPE: ScreenSaverOverlay.Li...</li><li>BUG FIX 2026-05-27: WipeBlockingOverlays() w...</li><li>DETECTION FIX 2026-05-27: WipeBlockingOverla...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./nfrunlite-reconnect-popup-dismiss.html">← nfrunlite reconnect popup dismiss via a11y click window-relative coords</a> | <a href="./operator-skill-template.html">Operator Skill Template →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }

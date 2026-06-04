@@ -264,7 +264,7 @@
       <h2>Steps</h2>
       <div class="steps-wrap">
         <ol class="steps blurred"><li>Process model -- browser process: exactly on...</li><li>Process model -- renderer processes: one or...</li><li>Process model -- GPU and utility: one shared...</li><li>CDP transport -- HTTP discovery surface: Chr...</li><li>CDP transport -- WebSocket and target model:...</li><li>wkappbot CdpClient shape: csharp/src/WKAppBo...</li><li>wkappbot.cdp Win32 property -- placement: Ch...</li><li>wkappbot.cdp Win32 property -- scoring and i...</li><li>Foreign-CDP filter (a11y find/windows): A11y...</li><li>EnumWindows scope -- why only the browser pr...</li><li>Common wkappbot CDP usage -- mapping web sub...</li><li>Reconnect and lifecycle: Chrome restarts (cr...</li><li>2026-05-20 DIAGNOSIS: MyCdpContext.CallerVal...</li><li>2026-05-20: CallerCwdSnapshot, ParentCwdSnap...</li><li>2026-05-20 context: reviewed in relation to...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
       </div>
       <footer class="skill-footer">
         <nav class="skill-nav"><a href="./cdp-port-isolation-sha256-4-port-block-per-project-cwd.html">← CDP port isolation: SHA256 4-port block per project CWD</a> | <a href="./cls-path-glob-matching.html">cls glob-path: ancestor search and depth patterns →</a></nav>
@@ -346,19 +346,19 @@
       }
     }
     proUnlockButton.addEventListener('click', () => {
-      const existing = localStorage.getItem('gh_token') || '';
+      const existing = sessionStorage.getItem('gh_token') || '';
       const token = window.prompt('Enter GitHub Personal Access Token', existing);
       if (token === null) return;
       const trimmed = token.trim();
       if (!trimmed) {
-        localStorage.removeItem('gh_token');
+        sessionStorage.removeItem('gh_token');
         showIdleState();
         return;
       }
-      localStorage.setItem('gh_token', trimmed);
+      sessionStorage.setItem('gh_token', trimmed);
       checkGitHubAccess(trimmed);
     });
-    checkGitHubAccess(localStorage.getItem('gh_token'));
+    checkGitHubAccess(sessionStorage.getItem('gh_token'));
   </script>
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }
