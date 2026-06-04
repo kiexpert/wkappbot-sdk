@@ -712,6 +712,7 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
   </main>
   {pro_button_and_script}
   <script>
+    if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }
     function toggleSidebar(){{
       var s=document.getElementById('sidebar');
       var open=s.classList.toggle('open');
