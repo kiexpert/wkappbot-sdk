@@ -17,7 +17,9 @@
     "2026-06-02: wkappbot-the-artificial-knowledge-platform skill added to README.md pitch section. Resolving suggest ts=2026-06-02T13:55:57",
     "2026-06-02 marketing: build-skill-page.py automation script + docs/index.html + GHA workflow pending Codex",
     "SECTION SKILL-TREE: bash scripts/check-skill-tree.sh -- auto-heals T2/T3 skills missing parent T1 backlinks. Runs after skill migrations. 103 skills checked, auto-adds 'Parent T1: wkappbot skill read BASE' step to orphaned skills. Run separately (slow: ~103 skill reads). Not in 3h loop -- run on-demand or post-migration.",
-    "GATE PATTERN: when wk-only-gate blocks gg-main.sh (RAM>60% or Sonnet-hogging), delegate via Agent(model:haiku) with SPEC block. Do NOT retry bash directly. Haiku runs gg-main.sh without triggering the gate."
+    "GATE PATTERN: when wk-only-gate blocks gg-main.sh (RAM>60% or Sonnet-hogging), delegate via Agent(model:haiku) with SPEC block. Do NOT retry bash directly. Haiku runs gg-main.sh without triggering the gate.",
+    "SECTION DEV-BUILD (ADD TO gg-main): check dev repo build status. gh run list --limit 1 --repo kiexpert/wkappbot => if failure: CRIT escalate to Core team. This was missed 2026-06-04 -- v7.5.35-sdk was released without checking Dev repo build green. Command: gh run list --limit 3 --repo kiexpert/wkappbot 2>&1 | grep -E 'failure|success|in_progress'",
+    "SECTION RELEASE-NOTES (ADD TO gg-main): check latest release notes are not stub. gh release view --repo kiexpert/wkappbot-sdk --json body --jq .body => if body contains only 'Full Changelog' link (< 200 chars) or is empty: WARN 'Release notes are stub — add proper changelog before publishing'. Missed 2026-06-04: v7.5.35-sdk shipped with only auto-generated Full Changelog link, no user-readable content."
   ],
   "requirements": [
     {
@@ -49,6 +51,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T03:59:22.3966318Z",
-  "updated": "2026-06-04T03:33:33.7055618Z",
-  "version": "1.30"
+  "updated": "2026-06-04T13:07:55.6910272Z",
+  "version": "1.34"
 }
