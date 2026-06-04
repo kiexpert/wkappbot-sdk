@@ -443,36 +443,6 @@ wkappbot skill read standard-appbot-window  # Usage: caller HWND detection, CDP 
 wkappbot skill read standard-chrome-window  # Impl: Chrome window filtering, DPI validation, Z-order
 wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: ancestor walk maintenance, regression testing
 
-## harness:skill csharp/**/*ChromeLauncher*.cs
-wkappbot skill read standard-appbot-window  # Usage: caller HWND detection, launch scope rules
-wkappbot skill read standard-chrome-window  # Impl: Chrome process lifecycle, port registration
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: port collision handling, instance reuse validation
-
-## harness:skill csharp/**/*CallerPlacement*.cs
-wkappbot skill read standard-appbot-window  # Usage: caller rect and placement scope
-wkappbot skill read standard-chrome-window  # Impl: window position calculation, DPI scaling
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: placement accuracy testing
-
-## harness:skill csharp/**/*CallerHwnd*.cs
-wkappbot skill read standard-appbot-window  # Usage: HWND resolution scope, fallback chain
-wkappbot skill read standard-chrome-window  # Impl: window search filtering, native API calls
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: 3-tier fallback validation
-
-## harness:skill csharp/**/*PlacementValidate*.cs
-wkappbot skill read standard-appbot-window  # Usage: placement validation scope
-wkappbot skill read standard-chrome-window  # Impl: rect intersection, bounds checking
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: edge case testing (multi-monitor, DPI)
-
-## harness:skill csharp/**/*Stage23*.cs
-wkappbot skill read standard-appbot-window  # Usage: Stage 2/3 UIA element scope
-wkappbot skill read standard-chrome-window  # Impl: Chrome element filtering, property extraction
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: UIA property validation
-
-## harness:skill csharp/**/*EyeCmdPipe*.cs
-wkappbot skill read standard-appbot-window  # Usage: Eye IPC command routing scope
-wkappbot skill read eye-ipc-caller-hwnd-resolution  # Impl: IPC message format, HWND routing
-wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: message serialization testing
-
 ## harness:skill csharp/**/*.cs
 wkappbot skill read sdk-launcher-maintenance  # Usage: SDK launcher lifecycle and versioning
 wkappbot skill read wkappbot-build-verify-workflow  # Impl: publish process, hot-swap deployment
@@ -498,7 +468,8 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] push pending: pre-push hook AI 차단 (suggest 제출됨)
 - [x] nightly-heal 2026-06-04: skill audit clean (all broken refs cross-repo Core/other-app = expected, 0 SDK-owned broken refs); version parity OK (README/VERSIONING/CHANGELOG/CLAUDE all v7.5.0); Pending already compressed (2 [x], 54 [ ]) -- no further compress needed
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
-- [ ] gg-main 3h 2026-06-04 ~15:00: Amber — ChromeHealthCheck fix committed not deployed (RAM 63% blocks build), Chrome mult risk active, Extended Smoke cancelled. RAM Memory Compression 1.1GB unkillable. Build needed: dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release
+- [ ] skill browser SEO + sonnet reflection fix: per-skill static pages + left treeview + all 7 reflection items + 44-char preview + 3-state auth unlock
+- [x] gg-main 3h 2026-06-04 ~15:00: Amber resolved. ~16:30 check: Amber(경계) Chrome=4, CI 5/5 green, suggest 긴급2+중요13
 - [ ] skill-browser-launch-checklist: deploy skills-data-full.js to wkappbot-harness before Pro unlock goes live
 - [ ] contributor service: skills-data-full.js generation + raw.githubusercontent.com dynamic load + localhost test (auto-approved, no confirmation needed)
 - [ ] WKHARNESS_OPUS_FG env var 백도어 언급 스킬 전체 정리 필요
