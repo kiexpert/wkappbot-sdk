@@ -21,7 +21,9 @@
     "SELFTEST HISTORY: 57/57 passing (100%) as of 2026-05-24. Guards: ask-guard, wrapper-first, sed-guard, codex-sandbox-guard, kill-guard, skill-edit-guard, pace-guard, agent-brief-guard, opus-budget-guard, stall-guard, bg-task-guard, agents-heal-guard, commit-hook-guard, wkclaude-direct-guard, cd-noise-guard, deny-native-tool. Progress: 14/51 -> 54/55 -> 56/57 -> 57/57.",
     "MULTI-SESSION FLAG CONFLICT: pending flag files are global not session-scoped. Multiple sessions reset each other prematurely. Fix pending: add session ID to flag file names.",
     "KILL-GUARD BYPASS IN WKCODEX: kill-guard scans TASK STRING for process-termination keywords (PS direct-terminate cmdlet names, ps1-interpreter names). Omit these from wkcodex task description, let Codex infer. SHELL-PS1-GUARD: Bash command with both bash and ps1-interpreter in same string is harness:block.",
-    "USAGE-TEST-GUARD DESIGN (2026-05-18): 50% random redirect of Agent(model:opus) to wkclaude.sh habit trainer. Builds wrapper usage and surfaces hidden bugs. 50% fire rate means retrying Agent() may pass."
+    "USAGE-TEST-GUARD DESIGN (2026-05-18): 50% random redirect of Agent(model:opus) to wkclaude.sh habit trainer. Builds wrapper usage and surfaces hidden bugs. 50% fire rate means retrying Agent() may pass.",
+    "BUG (2026-06-04): git -c core.hooksPath='' bypasses pre-push hook. harness:block covers --no-verify but not the core.hooksPath override path. Sonnet pushed directly to main via this gap. Fix needed in wkharness-guards.ps1: harness:block (?i)● (?:Bash|PowerShell)\\(.*\\bgit\\b.*core\\.hooksPath",
+    "Parent T1: wkappbot skill read wkharness-guards"
   ],
   "requirements": [
     {
@@ -46,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-31T13:17:29.6352119Z",
-  "updated": "2026-05-31T13:17:29.6352213Z",
-  "version": "1.0"
+  "updated": "2026-06-04T11:36:27.5933747Z",
+  "version": "1.4"
 }

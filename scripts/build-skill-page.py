@@ -266,7 +266,7 @@ def build_nav_tree(all_skills: list[dict[str, Any]]) -> str:
         nav_html += f'<details class="nav-app" open><summary>{e(app)}</summary><ul>'
         for s in app_skills:
             skill_slug = skill_page_slug(s["id"])
-            nav_html += f'<li><a href="../../{app_slug}/{skill_slug}.html">{e(s["title"])}</a></li>'
+            nav_html += f'<li><a href="../{app_slug}/{skill_slug}.html">{e(s["title"])}</a></li>'
         nav_html += '</ul></details>'
     return nav_html
 
@@ -688,7 +688,7 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
   </div>
   <button id="sidebar-toggle" onclick="toggleSidebar()">☰ Browse Skills</button>
   <main class="shell detail-page">
-    <a class="back-link" href="../">← Back to {app}</a>
+    <a class="back-link" href="./">← Back to {app}</a>
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">{app}</span>
@@ -712,7 +712,7 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
   </main>
   {pro_button_and_script}
   <script>
-    if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }
+    if (window.self !== window.top) {{ var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }}
     function toggleSidebar(){{
       var s=document.getElementById('sidebar');
       var open=s.classList.toggle('open');

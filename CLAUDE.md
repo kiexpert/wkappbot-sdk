@@ -468,7 +468,8 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] push pending: pre-push hook AI 차단 (suggest 제출됨)
 - [x] nightly-heal 2026-06-04: skill audit clean (all broken refs cross-repo Core/other-app = expected, 0 SDK-owned broken refs); version parity OK (README/VERSIONING/CHANGELOG/CLAUDE all v7.5.0); Pending already compressed (2 [x], 54 [ ]) -- no further compress needed
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
-- [ ] skill browser SEO + sonnet reflection fix: per-skill static pages + left treeview + all 7 reflection items + 44-char preview + 3-state auth unlock
+- [ ] push skill-browser refactor to origin/main (Opus squash+push)
+- [x] skill browser SEO + sonnet reflection fix: per-skill static pages + left treeview + all 7 reflection items + 44-char preview + 3-state auth unlock
 - [x] gg-main 3h 2026-06-04 ~15:00: Amber resolved. ~16:30 check: Amber(경계) Chrome=4, CI 5/5 green, suggest 긴급2+중요13
 - [ ] skill-browser-launch-checklist: deploy skills-data-full.js to wkappbot-harness before Pro unlock goes live
 - [ ] contributor service: skills-data-full.js generation + raw.githubusercontent.com dynamic load + localhost test (auto-approved, no confirmation needed)
