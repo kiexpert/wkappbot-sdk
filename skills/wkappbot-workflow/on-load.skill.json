@@ -26,6 +26,21 @@
       "cmd": "wkappbot skill read on-load-ref",
       "expect": "SCOPE FILTER",
       "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "suggest",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "CLAUDE.md",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-session-handoff",
+      "expect": "session",
+      "prompt": null
     }
   ],
   "primary_cmd": null,
@@ -38,6 +53,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-06-03T05:41:48.7327646Z",
-  "version": "1.106"
+  "updated": "2026-06-04T12:25:07.0925528Z",
+  "version": "1.109"
 }
