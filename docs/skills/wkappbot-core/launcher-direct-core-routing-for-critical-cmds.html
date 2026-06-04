@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">launcher</span><span class="chip">routing</span><span class="chip">suggest</span><span class="chip">skill</span><span class="chip">encoding</span><span class="chip">iocp</span><span class="chip">direct-core</span><span class="chip">critical</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Critical commands (suggest, skill, eye) route directly to Core process bypassing the Launcher IPC pipe to avoid deadlocks.</li><li>Direct routing: Launcher detects critical commands and spawns Core with DETACHED_PROCESS + direct stdio instead of pipe relay.</li><li>Why: pipe relay has IOCP overhead and ConPTY LPC deadlock risk. Direct Core ensures commands complete even when Eye is unhealthy.</li></ol>
+        <ol class="steps"><li>Critical commands (suggest, skill, eye) rout...</li><li>Direct routing: Launcher detects critical co...</li><li>Why: pipe relay has IOCP overhead and ConPTY...</li></ol>
         
       </div>
       <footer class="skill-footer">

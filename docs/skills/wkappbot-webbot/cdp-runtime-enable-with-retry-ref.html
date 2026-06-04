@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>v7.5.8 fix (commit 0cf4bc8ae): BeginAttachmentLockAsync + CompleteAttachmentLockAsync wrap around EnableRuntimeWithRetry. Catches any exception (including timeout), gracefully releases lock, fresh socket state on next ConnectAsync.</li><li>PipeBreakToken AsyncLocal: EnableRuntimeWithRetry checks PipeBreakToken.Value before each delay. If Eye pipe dead -&gt; cancel immediately, don&#x27;t wait full backoff. Defined in CdpClient.InputGuard.cs.</li><li>BeginAttachmentLock graceful Complete added to mirror existing: CdpClient.Core.cs catch block adds try{await CompleteAttachmentLockAsync(...)}catch{} pattern (also v7.5.6, commit 62c3e17fe).</li></ol>
+        <ol class="steps"><li>v7.5.8 fix (commit 0cf4bc8ae): BeginAttachme...</li><li>PipeBreakToken AsyncLocal: EnableRuntimeWith...</li><li>BeginAttachmentLock graceful Complete added...</li></ol>
         
       </div>
       <footer class="skill-footer">

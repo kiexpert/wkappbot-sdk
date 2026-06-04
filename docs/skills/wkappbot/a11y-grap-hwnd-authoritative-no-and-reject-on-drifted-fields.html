@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">a11y</span><span class="chip">grap</span><span class="chip">hwnd</span><span class="chip">windowfinder</span><span class="chip">hts</span><span class="chip">mfc</span><span class="chip">sibling-popup</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>If grap dict has hwnd field and IsWindow(hwnd) returns the single WindowInfo (no AND-match on other fields)</li><li>Prior behavior AND-matched pid/title/cls/proc/domain/url/cmd -- any drift returned empty list</li><li>Empty result let callers enumerate and pick closest match (often wrong sibling)</li><li>Now: hwnd is the truth; other fields are captured hints not constraints</li><li>Use this when writing grap from &#x27;a11y find&#x27; TARGET line -- the hwnd remains valid across hot-swap</li></ol>
+        <ol class="steps"><li>If grap dict has hwnd field and IsWindow(hwn...</li><li>Prior behavior AND-matched pid/title/cls/pro...</li><li>Empty result let callers enumerate and pick...</li><li>Now: hwnd is the truth; other fields are cap...</li><li>Use this when writing grap from &#x27;a11y find&#x27;...</li></ol>
         
       </div>
       <footer class="skill-footer">

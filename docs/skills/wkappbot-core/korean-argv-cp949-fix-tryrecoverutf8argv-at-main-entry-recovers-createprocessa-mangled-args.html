@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Algorithm: GetCommandLineA() raw bytes -&gt; strict UTF-8 decode -&gt; if valid: CommandLineToArgvW re-parse. CP949 lead bytes (0xBE, 0xB3) fail UTF-8 check -&gt; CreateProcessW callers pass unchanged. Affects speak/slack/prompt/a11y with Korean content. Fix deployed 2026-04-20 commit tagged in news-***-sudo-encoding.</li><li>speak command: wkappbot speak [Korean text] from Git Bash now correctly passes to TTS. Exit 0 confirmed.</li><li>slack send and a11y find with Korean window title also fixed by same TryRecoverUtf8Argv path.</li><li>Verified 2026-04-21: test-speak-korean-argv.sh (resolve ts=2026-04-18T10:08)</li></ol>
+        <ol class="steps"><li>Algorithm: GetCommandLineA() raw bytes -&gt; st...</li><li>speak command: wkappbot speak [Korean text]...</li><li>slack send and a11y find with Korean window...</li><li>Verified 2026-04-21: test-speak-korean-argv....</li></ol>
         
       </div>
       <footer class="skill-footer">

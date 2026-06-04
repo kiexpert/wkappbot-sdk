@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Eye stores context-alert history in runtime/context_warned.json (key=jsonlPath, value=maxMbAlerted). On startup LoadContextWarnedState() pre-populates contextWarnedPcts so hot-swapped Eye inherits the previous session&#x27;s alert history.</li><li>SaveContextWarnedEntry() is called after every new alert. It only writes if new MB &gt; previous MB (never decrements). This ensures a new session JSONL starts fresh at 0 while an old large JSONL stays deduped.</li><li>State file is in bin/wkappbot.hq/runtime/context_warned.json. Dedup is keyed by jsonlPath (lowercased, forward-slashes). To force re-alert on a JSONL, delete its key from the JSON file or delete the file entirely.</li><li>Verified 2026-04-21: test-eye-tick-context-warned-persist.sh (resolve ts=2026-04-21T13:10)</li></ol>
+        <ol class="steps"><li>Eye stores context-alert history in runtime/...</li><li>SaveContextWarnedEntry() is called after eve...</li><li>State file is in bin/wkappbot.hq/runtime/con...</li><li>Verified 2026-04-21: test-eye-tick-context-w...</li></ol>
         
       </div>
       <footer class="skill-footer">

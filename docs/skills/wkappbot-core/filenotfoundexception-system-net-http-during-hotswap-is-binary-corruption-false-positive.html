@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>1. Verify csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj sets PublishTrimmed=false. If true, trimming is NOT enabled so a missing System.Net.Http at runtime cannot be caused by linker trim.</li><li>2. Look in bin/ for unusually small wkappbot-core.broken-*.exe artifacts (~7MB instead of ~245MB) timestamped near the exception. Their presence confirms a partial publish/copy during hotswap.</li><li>3. Match exception timestamp to git log entries within +/- 30 minutes (git log --since/--until). High commit density right before the crash = active rebuild guardrail swap window.</li><li>4. If all three signals match (PublishTrimmed=false + tiny broken binary + active hotswap timing), resolve as false positive: the next clean build replaces the truncated copy and the exception cannot reproduce.</li><li>5. Reference: suggest 2026-05-15T03:17:17 resolved as binary corruption false positive 2026-05-15.</li><li>Verified 2026-05-15: ***.ps1 (resolve ts=2026-05-15T03:17:17)</li><li>Verified 2026-05-15: test-system-io-filesystem-watcher-binary-corruption-false-positive.cmd (resolve ts=2026-05-11T03:21:49.1690687Z)</li></ol>
+        <ol class="steps"><li>1. Verify csharp/src/WKAppBot.CLI/WKAppBot.C...</li><li>2. Look in bin/ for unusually small wkappbot...</li><li>3. Match exception timestamp to git log entr...</li><li>4. If all three signals match (PublishTrimme...</li><li>5. Reference: suggest 2026-05-15T03:17:17 re...</li><li>Verified 2026-05-15: ***.ps1 (resolve ts=202...</li><li>Verified 2026-05-15: test-system-io-filesyst...</li></ol>
         
       </div>
       <footer class="skill-footer">

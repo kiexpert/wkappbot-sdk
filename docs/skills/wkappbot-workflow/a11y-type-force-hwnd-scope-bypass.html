@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>When hwnd: is in the grap, CheckMissingScope is skipped. When --force is passed, ReadinessContext.Force=true bypasses IsEnabled/IsVisible/ReadOnly gates in ActionReadiness for Win32 and CDP paths.</li><li>--force flag sets ReadinessContext.Force=true. In ActionReadiness.cs (Win32) and CdpActionReadiness.cs (CDP), the IsEnabled/IsVisible/ReadOnly blocking checks are wrapped with &#x27;!ctx.Force&#x27;. The warning message hints &#x27;--force to override&#x27; when the element is disabled.</li><li>Use case: HTS/Heroes4 controls that report IsEnabled=False but accept WM_CHAR input. Use: &#x27;wkappbot --sudo a11y type {proc:&quot;nfrunlite&quot;,hwnd:0xABCD} text --force&#x27;. Both guards are now bypassed.</li><li>Verified 2026-04-21: test-a11y-type-force-hwnd.sh (resolve ts=2026-04-21T17:55)</li></ol>
+        <ol class="steps"><li>When hwnd: is in the grap, CheckMissingScope...</li><li>--force flag sets ReadinessContext.Force=tru...</li><li>Use case: HTS/Heroes4 controls that report I...</li><li>Verified 2026-04-21: test-a11y-type-force-hw...</li></ol>
         
       </div>
       <footer class="skill-footer">

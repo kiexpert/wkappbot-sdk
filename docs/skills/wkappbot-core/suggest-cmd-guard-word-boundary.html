@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Use HasCmdToken(text, prefix, key) instead of text.Contains(prefix+key): checks char after match is non-alphanumeric</li><li>Example false-positive fixed: &#x27;a11y commands&#x27; no longer triggers key &#x27;com&#x27; because &#x27;commands&#x27;[3]=&#x27;m&#x27; is alphanumeric</li><li>Example false-positive fixed: &#x27;--commit&#x27; no longer triggers key &#x27;com&#x27;</li><li>Location: SuggestCommand.Resolve.cs, in &#x27;Non-merge: extract mentioned commands from suggest text&#x27; block</li><li>If new short CommandHelpMap keys are added, word-boundary is already enforced -- no additional change needed</li><li>Fix location: SuggestCommand.Resolve.cs -- resolve guard pre-load block at lines ~204-217 (v6.2.1 commit e3724001)</li><li>Verified 2026-04-24: test-suggest-list-cmd-guard-word-boundary.sh (resolve ts=2026-04-24T05:32:39)</li></ol>
+        <ol class="steps"><li>Use HasCmdToken(text, prefix, key) instead o...</li><li>Example false-positive fixed: &#x27;a11y commands...</li><li>Example false-positive fixed: &#x27;--commit&#x27; no...</li><li>Location: SuggestCommand.Resolve.cs, in &#x27;Non...</li><li>If new short CommandHelpMap keys are added,...</li><li>Fix location: SuggestCommand.Resolve.cs -- r...</li><li>Verified 2026-04-24: test-suggest-list-cmd-g...</li></ol>
         
       </div>
       <footer class="skill-footer">

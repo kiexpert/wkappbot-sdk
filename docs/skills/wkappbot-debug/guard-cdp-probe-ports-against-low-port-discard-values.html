@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Validate CDP port in [1024, 65535] BEFORE issuing the HTTP probe. 0/negative/port&lt;1024 are never legit user-mode CDP endpoints.</li><li>Wrap CDP HTTP calls with typed catch (HttpRequestException, TaskCanceledException) and fall through to empty result instead of bubbling.</li><li>Never rely on &#x27;port &gt; 0&#x27; alone -- GetPropW may return stray low values for Electron windows that briefly had the prop set then lost it.</li><li>Affected file: csharp/src/WKAppBot.Win32/Window/WindowFinder.cs around line 1168. Suggest 2026-04-19T18:22 fixed via v6.0.53. Verify: wkappbot slack send test (exit 0 -- no HttpRequestException on 127.0.0.1:9) and wkappbot slack list --limit 3.</li><li>Verified 2026-04-21: test-slack-port9-fix.cmd (resolve ts=2026-04-19T18:22)</li></ol>
+        <ol class="steps"><li>Validate CDP port in [1024, 65535] BEFORE is...</li><li>Wrap CDP HTTP calls with typed catch (HttpRe...</li><li>Never rely on &#x27;port &gt; 0&#x27; alone -- GetPropW m...</li><li>Affected file: csharp/src/WKAppBot.Win32/Win...</li><li>Verified 2026-04-21: test-slack-port9-fix.cm...</li></ol>
         
       </div>
       <footer class="skill-footer">

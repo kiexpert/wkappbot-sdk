@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">skill</span><span class="chip">export</span><span class="chip">if-newer</span><span class="chip">cache</span><span class="chip">version</span><span class="chip">claude</span><span class="chip">codex</span><span class="chip">refresh</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>USAGE: wkappbot skill read &lt;id&gt; --if-newer -- skips write if cached SKILL.md version &gt;= catalog version</li><li>BEHAVIOR: cached v &gt;= catalog =&gt; [SKILL:EXPORT] up-to-date v{ver}. cached v &lt; catalog =&gt; normal export fires</li><li>SKILL.MD HEADER: every exported file starts with Refresh line showing --if-newer command and current version so AI always knows how to refresh</li><li>CALLER GATING: Claude parent =&gt; .claude/ paths only. Codex parent =&gt; .codex/ paths only. No cross-writes</li><li>WITHOUT FLAG: wkappbot skill read &lt;id&gt; always exports regardless of cache (force-refresh)</li><li>CODE: SkillCommand.AiExport.cs IsExportedSkillCurrent() parses Refresh line via regex v(\d+\.\d+). SkillCommand.cs parses --if-newer at skill read handler</li></ol>
+        <ol class="steps"><li>USAGE: wkappbot skill read &lt;id&gt; --if-newer -...</li><li>BEHAVIOR: cached v &gt;= catalog =&gt; [SKILL:EXPO...</li><li>SKILL.MD HEADER: every exported file starts...</li><li>CALLER GATING: Claude parent =&gt; .claude/ pat...</li><li>WITHOUT FLAG: wkappbot skill read &lt;id&gt; alway...</li><li>CODE: SkillCommand.AiExport.cs IsExportedSki...</li></ol>
         
       </div>
       <footer class="skill-footer">

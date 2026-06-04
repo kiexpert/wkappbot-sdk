@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Old: hardcoded 30s from Loaded event (races with synth.Speak + player.Load)</li><li>New: _safetyTimerArmed flag, armed in KaraokeTick when _stopwatch.IsRunning</li><li>Duration computed from last marker AudioPos + 30s buffer (min 60s)</li><li>Fixes: 250-300 char Korean text timing out before playback completes</li><li>Verified 2026-04-26: test-speak-timeout-safety.sh (resolve ts=2026-04-26T09:58:39.7038554Z)</li></ol>
+        <ol class="steps"><li>Old: hardcoded 30s from Loaded event (races...</li><li>New: _safetyTimerArmed flag, armed in Karaok...</li><li>Duration computed from last marker AudioPos...</li><li>Fixes: 250-300 char Korean text timing out b...</li><li>Verified 2026-04-26: test-speak-timeout-safe...</li></ol>
         
       </div>
       <footer class="skill-footer">

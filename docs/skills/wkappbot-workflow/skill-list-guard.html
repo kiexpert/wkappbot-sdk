@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">skill-list</span><span class="chip">skill-news</span><span class="chip">guard</span><span class="chip">edit</span><span class="chip">write</span><span class="chip">warn</span><span class="chip">session</span><span class="chip">harness</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>TRIGGER: fires on Edit/Write tool call when session has no recent skill news/list run (stale &gt;60 min). Warn-only, exit 0.</li><li>CHECK: reads session JSONL last 300 lines for wkappbot skill (list</li><li>news) pattern. Uses per-session marker file in TEMP (claude_skill_list_checked_&lt;sid&gt;.lock).</li><li>MESSAGE: recommends wkappbot skill news (primary, shows NEW/UPD last 7 days) or wkappbot skill list (full catalog).</li><li>SOURCE: wkharness-guards.ps1 line ~535. Stderr output via [Console]::Error.WriteLine.</li></ol>
+        <ol class="steps"><li>TRIGGER: fires on Edit/Write tool call when...</li><li>CHECK: reads session JSONL last 300 lines fo...</li><li>news) pattern. Uses per-session marker file...</li><li>MESSAGE: recommends wkappbot skill news (pri...</li><li>SOURCE: wkharness-guards.ps1 line ~535. Stde...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>PATTERN: Sonnet=architect+judge, Haiku=proof-of-concept builder (new file only), wkcodex=production integrator. Original source never touched until solution verified.</li><li>SONNET DEFINES: problem + input/output spec + acceptance criteria. NOT &#x27;find and fix&#x27; but &#x27;verify this algorithm works&#x27;. Exact definition = reliable Haiku output.</li><li>HAIKU BUILDS: new file only (/tmp or evidence/ dir). No existing source imports. Standalone runnable. Self-test included: &#x27;if output==expected: PASS&#x27;.</li><li>SONNET JUDGES: reads PASS/FAIL + Haiku output. Writes precise diff: old_string/new_string + file:line for wkcodex. NEVER sends Haiku back to original source.</li><li>wkcodex APPLIES: receives Sonnet diff. Applies to real source + dotnet build + smoke test + commit. next:haiku-sandbox-problem-solving-howto for brief templates. cluster:haiku-sandbox-problem-solving-ref for real examples.</li></ol>
+        <ol class="steps"><li>PATTERN: Sonnet=architect+judge, Haiku=proof...</li><li>SONNET DEFINES: problem + input/output spec...</li><li>HAIKU BUILDS: new file only (/tmp or evidenc...</li><li>SONNET JUDGES: reads PASS/FAIL + Haiku outpu...</li><li>wkcodex APPLIES: receives Sonnet diff. Appli...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">launcher</span><span class="chip">encoding</span><span class="chip">console</span><span class="chip">cp949</span><span class="chip">utf8</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Write UTF-8 bootstrap lines into both PowerShell profile files: set Console.InputEncoding, Console.OutputEncoding, and $global:OutputEncoding to UTF-8; set LANG=C.UTF-8, LC_ALL=C.UTF-8, PYTHONUTF8=1, and PYTHONIOENCODING=utf-8; run chcp 65001.</li><li>Write Git Bash locale defaults into ~/.bashrc and source them from ~/.bash_profile: export LANG=C.UTF-8; export LC_ALL=C.UTF-8; export PYTHONUTF8=1; export PYTHONIOENCODING=utf-8; export LESSCHARSET=utf-8.</li><li>Persist PYTHONUTF8=1 and PYTHONIOENCODING=utf-8 as user environment variables so every new Python process inherits UTF-8 even outside the shell bootstrap.</li><li>Verify fresh shells with cmd /c chcp, PowerShell console encodings, Git Bash ***, and python -c checks before blaming file contents.</li><li>If Bash argv is still mangled, use TryRecoverUtf8Argv or ASCII-only wrappers instead of guessing that the file is broken.</li><li>Keep tools/bootstrap_utf8_shells.ps1 only as the mechanical equivalent of the same steps.</li></ol>
+        <ol class="steps"><li>Write UTF-8 bootstrap lines into both PowerS...</li><li>Write Git Bash locale defaults into ~/.bashr...</li><li>Persist PYTHONUTF8=1 and PYTHONIOENCODING=ut...</li><li>Verify fresh shells with cmd /c chcp, PowerS...</li><li>If Bash argv is still mangled, use TryRecove...</li><li>Keep tools/bootstrap_utf8_shells.ps1 only as...</li></ol>
         
       </div>
       <footer class="skill-footer">

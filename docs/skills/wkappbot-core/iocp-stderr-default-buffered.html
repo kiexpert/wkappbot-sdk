@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">project</span><span class="chip">developer</span><span class="chip">launcher</span><span class="chip">stderr</span><span class="chip">visibility</span><span class="chip">debugging</span><span class="chip">iocp</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>ARCHITECTURE: Launcher/IocpPipeRelay.cs splits stderr -- showStderr=false by default, buffered and printed only on non-zero exit. showStderr=true prints passthrough immediately.</li><li>ENABLE PASSTHROUGH: wkappbot --stderr cmd (explicit) or wkappbot --sudo cmd (implicit in v5.14+). PulseStep.Line and Console.Error invisible without passthrough.</li><li>TROUBLESHOOTING: If Console.Error.WriteLine invisible -- check --stderr flag. Exit code 0 drops buffer. Use Console.WriteLine (stdout) for always-visible output.</li></ol>
+        <ol class="steps"><li>ARCHITECTURE: Launcher/IocpPipeRelay.cs spli...</li><li>ENABLE PASSTHROUGH: wkappbot --stderr cmd (e...</li><li>TROUBLESHOOTING: If Console.Error.WriteLine...</li></ol>
         
       </div>
       <footer class="skill-footer">

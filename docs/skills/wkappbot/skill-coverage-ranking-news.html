@@ -263,10 +263,7 @@
       <div class="tags"><span class="chip">skill</span><span class="chip">search</span><span class="chip">news</span><span class="chip">ranking</span><span class="chip">coverage</span><span class="chip">operator</span><span class="chip">project</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>wkappbot skill search &lt;keyword&gt;  -- returns all matches ranked by coverage score (cov=X.XX shown per result)
-wkappbot skill news [query] [--days N]  -- lists skills updated in last N days (default 7). With query: coverage-ranked. Without: sorted by LastActivity.
-Coverage score = sum over all (token, field) pairs where field.Contains(token): tok.Length / field.Length. Fields: id, title, desc, best-matching tag. Higher = token covers larger fraction of matched field.
-PrintSkillHintOnError (on non-zero exit) also uses SkillCoverageScore() -- same ranking for error-time skill hints (threshold &gt;= 0.3).</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27; matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27; matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide</li></ol>
+        <ol class="steps"><li>wkappbot skill search &lt;keyword&gt; -- returns a...</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27;...</li><li>MULTI-WORD = PHRASE SEARCH: &#x27;session start&#x27;...</li></ol>
         
       </div>
       <footer class="skill-footer">

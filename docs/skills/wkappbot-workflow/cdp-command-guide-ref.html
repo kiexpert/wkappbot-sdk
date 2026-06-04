@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>POST-REBOOT RECOVERY: kill ONLY chrome PIDs with --remote-debugging-port=&lt;our-port&gt;. Delete *.lock *-journal LOCK LOG.old from chrome-profiles/cdp=PORT/. PRESERVE Cookies/Login Data/Local State.</li><li>JS ALERT DETECTION: cdp-mon connects WebSocket (200ms timeout), Runtime.evaluate timeout (300ms) -&gt; Alert=true. Post-command alerts NOT detected. Fix: wkappbot cdp eval GRAP &#x27;window.onbeforeunload=null&#x27;.</li><li>IME DAEMON: Watch-ImeDaemon counts ime-relay-daemon processes; 2+ = auto-kill oldest. Root cause: HasRealImeContext returning true on CASCADIA (fix commit 139cf6fb: check UnicodeWindowClasses before ImmGetContext).</li><li>TAB ACCUMULATION BUG (fixed fe65cbf0): --target-tag caused sandbox-miss on wrong Chrome instance. Fix: removed --target-tag, URL-match existing tab by host.</li><li>Verified 2026-05-18: test-cdp-tabs-translate-feature-flag.sh, test-cdp-open-zombie-port-cleanup.sh</li></ol>
+        <ol class="steps"><li>POST-REBOOT RECOVERY: kill ONLY chrome PIDs...</li><li>JS ALERT DETECTION: cdp-mon connects WebSock...</li><li>IME DAEMON: Watch-ImeDaemon counts ime-relay...</li><li>TAB ACCUMULATION BUG (fixed fe65cbf0): --tar...</li><li>Verified 2026-05-18: test-cdp-tabs-translate...</li></ol>
         
       </div>
       <footer class="skill-footer">

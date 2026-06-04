@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">focusless</span><span class="chip">uia</span><span class="chip">win32</span><span class="chip">input</span><span class="chip">mfc</span><span class="chip">focus</span><span class="chip">project</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Tier 1 (preferred, truly focusless): UIA Invoke / Value / Toggle / Select patterns — element pattern call, no message pump, no foreground change.</li><li>Tier 2 (focusless typing): Win32 PostMessage with WM_CHAR — bypasses focus-grab. Note for MFC CMaskEditEx, send WM_CHAR only; never EM_SETTEXT or you get double input because TranslateMessage already auto-generates WM_CHAR.</li><li>Tier 3 (last resort): SendInput / Hotkey — must call EnsureFocus first, so this path can steal focus from the user. Use only when patterns 1+2 unavailable.</li></ol>
+        <ol class="steps"><li>Tier 1 (preferred, truly focusless): UIA Inv...</li><li>Tier 2 (focusless typing): Win32 PostMessage...</li><li>Tier 3 (last resort): SendInput / Hotkey — m...</li></ol>
         
       </div>
       <footer class="skill-footer">

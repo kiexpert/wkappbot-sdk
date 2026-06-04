@@ -263,12 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>PORT: DerivePort(root) = SHA256(path.lower())[0:4] uint32 % 174 * 4 + 9300. Always &amp; 0xFFFC aligned. 174 blocks x 4 ports in 9300-9995.
-ROOT: ProjectRoot.Find(parentProcessCWD) -- not raw CWD. Claude moves to subdirs; git root is stable identity. Read via GetParentProcessId + GetProcessCurrentDirectory (NtQueryInformationProcess).
-BLOCK: ports [base..base+3] belong to one project. Collision tries remaining 3 slots. All 4 taken = hard error (intentional).
-FOREIGN REJECT: (1) FindRunningChromePortAny: registered=0 means skip (0!=port). (2) WebOpenCommand: reject if (found&amp;0xFFFC)!=(derived&amp;0xFFFC). (3) explicit --port: AppBotExit(1) if outside block.
-SANDBOX KEY: BuildSandboxKey uses SHA256(callerCWD)[0:4] not HWND. Format: cmd+host+cwdHash4. Stable across sessions unlike HWND.
-POSITION: always pass --window-position to Chrome. CallerHwnd latched=caller-offset. No latch=ExpectedBounds top-right. ComputePlacementNearCaller() null=no reposition. No geometry file persistence.</li></ol>
+        <ol class="steps"><li>PORT: DerivePort(root) = SHA256(path.lower()...</li></ol>
         
       </div>
       <footer class="skill-footer">

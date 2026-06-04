@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">a11y</span><span class="chip">diff</span><span class="chip">action</span><span class="chip">ux</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>FEATURE: reads parent window node list before and after mutating actions (invoke/type/click/toggle/expand/collapse/select/set-value/set-range)</li><li>FORMAT: &lt; [role] removed-node  and  &gt; [role] added-node per line -- matches wkappbot file edit diff style</li><li>NO-CHANGE: if diff empty wait 1s re-read re-diff. Still empty: [WARN] no state change after action + exit 1</li><li>BROKER: if [BLOCKER] appears in post not pre, marks line with &lt;- NEW BROKERR</li><li>SKIP: non-mutating (read/wait/screenshot/inspect/find/windows) skip diff</li><li>IMPL: A11yActions.ActionDiff.cs partial class -- SnapshotNodeLines() DiffAndPrint() TryGetWindowGrap()</li><li>SESSION-2026-05-21: skill registered, codex implementation dispatched to csharp/src/WKAppBot.Core/Actions/A11yActions.ActionDiff.cs</li></ol>
+        <ol class="steps"><li>FEATURE: reads parent window node list befor...</li><li>FORMAT: &lt; [role] removed-node and &gt; [role] a...</li><li>NO-CHANGE: if diff empty wait 1s re-read re-...</li><li>BROKER: if [BLOCKER] appears in post not pre...</li><li>SKIP: non-mutating (read/wait/screenshot/ins...</li><li>IMPL: A11yActions.ActionDiff.cs partial clas...</li><li>SESSION-2026-05-21: skill registered, codex...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>PATTERN: each wkXXX.ps1 in WKAppBot/bin gets .sh (bash relay) + .cmd (CMD relay) counterparts auto-managed by wkwrap.sh/cmd.</li><li>RELAY: wkXXX.sh -&gt; powershell -File wkXXX.ps1 via wkwrap.sh. wkXXX.cmd -&gt; same via wkwrap.cmd. basename $0 detection.</li><li>INSTALL: wkwrap.sh --install scans wk*.ps1, creates missing .sh + .cmd. Run after adding new .ps1 tools.</li><li>STATUS: wkwrap.sh --status shows coverage table (.ps1 / .sh / .cmd per tool).</li><li>HARNESS GUIDANCE (MANDATORY): always refer users to .sh (bash) or .cmd (CMD) -- never .ps1 in harness error messages. PS1 is for direct expert use only.</li><li>MAINTENANCE: wkharness -Status calls wkwrap.sh --install automatically to keep wrappers up to date.</li><li>SPECIAL WRAPPERS (not relay): wkclaude.sh pre-bakes --print --model haiku. wkcodex.sh calls wkcodex.ps1 (harness symlink). These are NOT replaced by --install.</li></ol>
+        <ol class="steps"><li>PATTERN: each wkXXX.ps1 in WKAppBot/bin gets...</li><li>RELAY: wkXXX.sh -&gt; powershell -File wkXXX.ps...</li><li>INSTALL: wkwrap.sh --install scans wk*.ps1,...</li><li>STATUS: wkwrap.sh --status shows coverage ta...</li><li>HARNESS GUIDANCE (MANDATORY): always refer u...</li><li>MAINTENANCE: wkharness -Status calls wkwrap....</li><li>SPECIAL WRAPPERS (not relay): wkclaude.sh pr...</li></ol>
         
       </div>
       <footer class="skill-footer">

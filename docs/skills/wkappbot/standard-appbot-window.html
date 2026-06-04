@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>FOREGROUND IS IRRELEVANT. Never use GetForegroundWindow(). Only P2 ancestor walk: 8-level from wkappbot.exe PID, EnumWindows per ancestor PID, first IsWindow + non-zero GetWindowRect. No class filter, no IsWindowVisible.</li><li>Detection order: (0) WKAPPBOT_CALLER_HWND env override (1) GA_ROOTOWNER pre-pass on ConPTY -&gt; CASCADIA (2) wtMatch via WT_SESSION env (isBig&gt;=200x100) (3) non-terminal isBig ancestor (IDE: VS Code/Cursor) (4) Zero = skip.</li><li>Zero returned = placement SKIP. Chrome stays at last valid position. Never fall back to foreground. Never move Chrome to screen center on zero.</li><li>__hwnd IPC: one field only. EyeCmdPipeClient prepends __hwnd:0xHHHH to JSON args before pipe send. Eye server strips it, sets CallerHwnd AsyncLocal. Never use __conhwnd or two fields.</li><li>NEVER: GetForegroundWindow for caller, IsWindowVisible filter in P2, Chrome in KnownHostProcessNames, negative coord as off-screen signal, two IPC fields. next:standard-appbot-window-howto for FindRectProviderHwnd + IPC details. cluster:standard-appbot-window-ref for GAP fixes + DPI audit.</li></ol>
+        <ol class="steps"><li>FOREGROUND IS IRRELEVANT. Never use GetForeg...</li><li>Detection order: (0) WKAPPBOT_CALLER_HWND en...</li><li>Zero returned = placement SKIP. Chrome stays...</li><li>__hwnd IPC: one field only. EyeCmdPipeClient...</li><li>NEVER: GetForegroundWindow for caller, IsWin...</li></ol>
         
       </div>
       <footer class="skill-footer">

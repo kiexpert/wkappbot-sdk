@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>When &#x27;a11y type&#x27; aborts with &#x27;blocker persists&#x27;, verify that the so-called blocker window is actually the parent (ancestor) of the target — parent containers are not real obstructions and should be ignored.</li><li>Workaround: re-run the same command with --sudo. The elevated path uses IsAncestorWindow() to detect this case and skips the blocker abort automatically.</li><li>Long-term fix: walk the UIA tree and confirm blocker is an ancestor of target before bypassing; never blanket-skip blocker checks for non-ancestor overlays.</li></ol>
+        <ol class="steps"><li>When &#x27;a11y type&#x27; aborts with &#x27;blocker persis...</li><li>Workaround: re-run the same command with --s...</li><li>Long-term fix: walk the UIA tree and confirm...</li></ol>
         
       </div>
       <footer class="skill-footer">

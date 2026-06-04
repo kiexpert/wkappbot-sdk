@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>commit 96e340c4 fix(eye/startup): remove tick-timeout self-terminate; fix blocking FindAllPrompts. commit 34c1a3a2: skip SupplementCardsFromPrompts until MCP cache warm. commit 7fe947bb: warm up MCP prompt cache 3s after window ready, never at startup. perf commit: FindAllPrompts cooldown 1s to 10s.</li><li>eye tick now returns quickly at startup. FindAllPrompts not called until prompt cache is warm.</li><li>Focus steal eliminated: FindAllPrompts was calling Chrome CDP which stole foreground during warmup. Guard prevents this.</li><li>Verified 2026-04-21: test-eye-tick-findallprompts-cooldown.sh (resolve ts=2026-04-20T22:52:00Z)</li></ol>
+        <ol class="steps"><li>commit 96e340c4 fix(eye/startup): remove tic...</li><li>eye tick now returns quickly at startup. Fin...</li><li>Focus steal eliminated: FindAllPrompts was c...</li><li>Verified 2026-04-21: test-eye-tick-findallpr...</li></ol>
         
       </div>
       <footer class="skill-footer">

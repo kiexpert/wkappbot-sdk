@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>a11y find returns &#x27;hwnd:0xXXXXXXXX&#x27; which is valid at query time. If the process recreates the window (common in WPF, Chrome, HTS), the hwnd is stale within seconds.</li><li>Best practice: use hwnd: form only for immediate single-step operations. For multi-step sequences (find -&gt; click -&gt; type), re-query at each step or use title-based grap which re-resolves dynamically.</li><li>Mitigation in runtime: IsWindow() check before each operation; if stale, falls back to title-wildcard + --nth 1. This fallback is visible in logs as [A11Y] hwnd stale -&gt; retry with pattern. Consider using wkappbot a11y find directly before each step in automation scripts.</li><li>Verified 2026-04-22: test-a11y-find-focus-steal-guard.sh (resolve ts=2026-04-20T12:25:00.0052832Z)</li></ol>
+        <ol class="steps"><li>a11y find returns &#x27;hwnd:0xXXXXXXXX&#x27; which is...</li><li>Best practice: use hwnd: form only for immed...</li><li>Mitigation in runtime: IsWindow() check befo...</li><li>Verified 2026-04-22: test-a11y-find-focus-st...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>In .NET 8, Process.WaitForExitAsync with redirected stdout/stderr waits for BOTH process exit AND stream EOF</li><li>If child exits cleanly but grandchild (daemon) inherits stdout pipe, WaitForExitAsync stalls on stream-EOF half and fires 30s timeout with stdoutDone=False</li><li>Fix (ElevatedEyeProxy.cs ExecuteCommand): on OperationCanceledException, call proc.Refresh() + check proc.HasExited. If true, grace-drain streams 2s then return ExitCode=proc.ExitCode as success</li><li>Only when HasExited=false is it a true hang -- then kill tree + return -1 with timeout Error. Post-exit 3s drain path also no longer tags Error since grandchild holding pipe is a success case, not retry-worthy</li></ol>
+        <ol class="steps"><li>In .NET 8, Process.WaitForExitAsync with red...</li><li>If child exits cleanly but grandchild (daemo...</li><li>Fix (ElevatedEyeProxy.cs ExecuteCommand): on...</li><li>Only when HasExited=false is it a true hang...</li></ol>
         
       </div>
       <footer class="skill-footer">

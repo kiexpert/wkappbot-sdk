@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Add static _lastHomeworkHash _lastHomeworkCount _lastHomeworkFiredAt to CheckAndSendHomework owner class (process-wide dedup)</li><li>Update _lastHomeworkHash + _lastHomeworkFiredAt only on successful MCP delivery -- failed retries don&#x27;t poison cooldown</li><li>Auto-clear hash when pending.Count drops to 0 -- ensures fresh fire for next non-empty list</li><li>WKAPPBOT_NO_HOMEWORK_NAG env override (optional future): set to 1 to disable homework nags entirely for testing</li></ol>
+        <ol class="steps"><li>Add static _lastHomeworkHash _lastHomeworkCo...</li><li>Update _lastHomeworkHash + _lastHomeworkFire...</li><li>Auto-clear hash when pending.Count drops to...</li><li>WKAPPBOT_NO_HOMEWORK_NAG env override (optio...</li></ol>
         
       </div>
       <footer class="skill-footer">

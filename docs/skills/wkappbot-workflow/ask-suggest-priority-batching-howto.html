@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>wkappbot suggest list (one page). Merge duplicates: wkappbot suggest merge --all-matching PATTERN --dry-run first.</li><li>Batch rank via GPT --timeout 20s with full list. Fire-and-forget background. Continue analysis in parallel.</li><li>Per-item queries (concurrent): fire all at once with ts+title+root-cause question. STOP. Wait for responses.</li><li>STOP after firing queries. Do NOT use Claude tokens while GPT runs. Resume ONLY after responses or 20s timeout.</li><li>NO-RESPONSE: FindAllPrompts:0 in log = Chrome AI tab closed. Re-open with --new-tab. File BUG-AUTO.</li><li>After responses: brief Opus with ts+title+result+fix-path. Agent(model:opus, prompt:fix+resolve).</li><li>PIPELINE HEALTH first: wkappbot cdp ping --sync --timeout 20s. Broken = BUG-AUTO + fallback to codebase analysis.</li><li>Failure fallback: no response in 20s = continue with codebase analysis. Never block indefinitely.</li></ol>
+        <ol class="steps"><li>wkappbot suggest list (one page). Merge dupl...</li><li>Batch rank via GPT --timeout 20s with full l...</li><li>Per-item queries (concurrent): fire all at o...</li><li>STOP after firing queries. Do NOT use Claude...</li><li>NO-RESPONSE: FindAllPrompts:0 in log = Chrom...</li><li>After responses: brief Opus with ts+title+re...</li><li>PIPELINE HEALTH first: wkappbot cdp ping --s...</li><li>Failure fallback: no response in 20s = conti...</li></ol>
         
       </div>
       <footer class="skill-footer">

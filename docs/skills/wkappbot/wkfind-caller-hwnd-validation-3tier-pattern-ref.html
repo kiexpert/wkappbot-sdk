@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>HISTORICAL 3-TIER (OBSOLETE): step 1 &#x27;console&gt;host&gt;foreground&#x27; and &#x27;GetForegroundWindow fallback&#x27; from old model are SUPERSEDED by current GA_ROOTOWNER pre-pass. Do NOT implement the old model.</li><li>FIX SPEC 2026-05-20: MyCdpContext.cs lines 220-225 remove GetForegroundWindow fallback. MyCdpContext.CallerValidation.cs line 93 remove Chrome from IsKnownHostProcess. EyeCmdPipeClient.cs add GetAncestorPidChain().</li><li>CLAUDE.md GUARD added 2026-05-20 (commit 311fda436): before any callerHwnd/placement change, must read standard-appbot-window + standard-chrome-window + this skill. 5 absolute rules documented.</li><li>Verified 2026-05-28: ev-caller-rect-stability.sh (resolve ts=2026-05-28T05:10:11). 2026-05-18: CHROME:WARN CALLER_UNDETECTABLE added in ChromeLauncher.CallerRecovery.cs (commit 5383b02e9).</li></ol>
+        <ol class="steps"><li>HISTORICAL 3-TIER (OBSOLETE): step 1 &#x27;consol...</li><li>FIX SPEC 2026-05-20: MyCdpContext.cs lines 2...</li><li>CLAUDE.md GUARD added 2026-05-20 (commit 311...</li><li>Verified 2026-05-28: ev-caller-rect-stabilit...</li></ol>
         
       </div>
       <footer class="skill-footer">

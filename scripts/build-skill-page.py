@@ -335,12 +335,11 @@ def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx:
             related_links_html = "\n      ".join(sections)
 
     steps = skill["steps"] or ["This skill is available in the live WKAppBot catalog."]
+    step_items = "".join(f"<li>{e(preview_step(step))}</li>" for step in steps)
     if premium:
-        step_items = "".join(f"<li>{e(preview_step(step))}</li>" for step in steps)
         blur_class = " blurred"
         overlay = '<div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>'
     else:
-        step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
         blur_class = ""
         overlay = ""
 

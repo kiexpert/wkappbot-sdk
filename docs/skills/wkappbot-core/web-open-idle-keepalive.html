@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>--keeplogin-Ns / --keeplogin N / --keeplogin Ns: only accepted forms</li><li>Injects JS Web Worker (blob URL) -- setInterval(1s) immune to background tab throttling</li><li>Main thread tracks user events (mousemove/click/keydown/scroll) → posts &#x27;activity&#x27; to Worker</li><li>CDP polls window._kaIdleMs each tick -- if &gt;= 60s → location.href=url injected</li><li>Output: # KEEPALIVE url=... interval=Ns idle-threshold=60s pid=...</li><li>On inject: # LOGIN-KEEPALIVE url=... idle=Xs ts=...</li><li>Blocks until Ctrl+C</li><li>Verified 2026-04-27: test-web-open-keeplogin-implemented.sh (resolve ts=2026-04-26T16:21)</li></ol>
+        <ol class="steps"><li>--keeplogin-Ns / --keeplogin N / --keeplogin...</li><li>Injects JS Web Worker (blob URL) -- setInter...</li><li>Main thread tracks user events (mousemove/cl...</li><li>CDP polls window._kaIdleMs each tick -- if &gt;...</li><li>Output: # KEEPALIVE url=... interval=Ns idle...</li><li>On inject: # LOGIN-KEEPALIVE url=... idle=Xs...</li><li>Blocks until Ctrl+C</li><li>Verified 2026-04-27: test-web-open-keeplogin...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>GLOBAL CLAUDE.MD INTEGRATION: after CWD pass, also load ~/.claude/CLAUDE.md with skipEditCatchAll=true. Gate with -not env:WKHARNESS_SELFTEST so 72 self-test cases unaffected. CWD first, then edited-file repo, then global.</li><li>isEditOp CORRECTION (final 2026-05-27, commit 53feb82): discrimination done in harness:skill PATTERN, not guard code. Robust prefix (?:Edit\(</li><li>Write\(</li><li>Bash\(...)  covers Edit/Write tool + Bash appbot-edit/wkedit. wkcodex/wkclaude excluded (delegation wrappers).</li><li>LOCK-CLEAR CATCH-22 RESOLVED (commit 53feb82): wkappbot skill edit no longer arms lock. Post-hook verb-anchors source-edit detection and excludes skill catalog ops. Earlier clean-text-only hygiene obsolete.</li><li>Edit/Write tool bypass confirmed: Bash appbot-edit on .ps1 BLOCKS, Edit TOOL on same .ps1 PASSES. Cause: early exit-0 in wkharness-guards.ps1 ~line 1430 short-circuits Edit/Write before harness eval.</li><li>SELF-TEST: 72 deterministic cases in wkharness -Test. Gate global-load with env:WKHARNESS_SELFTEST to keep tests isolated from real user-level rules.</li></ol>
+        <ol class="steps"><li>GLOBAL CLAUDE.MD INTEGRATION: after CWD pass...</li><li>isEditOp CORRECTION (final 2026-05-27, commi...</li><li>Write\(</li><li>Bash\(...) covers Edit/Write tool + Bash app...</li><li>LOCK-CLEAR CATCH-22 RESOLVED (commit 53feb82...</li><li>Edit/Write tool bypass confirmed: Bash appbo...</li><li>SELF-TEST: 72 deterministic cases in wkharne...</li></ol>
         
       </div>
       <footer class="skill-footer">

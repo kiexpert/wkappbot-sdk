@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>PROBLEM: GetForegroundWindow() in Eye context returns Eye window, not caller. Fix: Launcher prepends __hwnd:0xHHHH to pipe args. Eye sets CallerHwnd AsyncLocal from prefix.</li><li>__hwnd IPC: EyeCmdPipeClient.TryDelegate -&gt; ResolveCallerTerminalHwnd() -&gt; if hwnd!=Zero prepend __hwnd:0xHHHH to JSON args array. Eye strips prefix, validates IsWindow, sets CallerHwndForPlacement static + AsyncLocal.</li><li>GA_ROOTOWNER (flag=3) = THE correct API. GetAncestor(pcw, 3) on Vis=True PseudoConsoleWindow -&gt; CASCADIA tab. GA_ROOT (flag=2) returns self for ALL PCWs (WRONG). Verified on 4 PCW/CASCADIA pairs 2026-05-24.</li><li>Multi-monitor: negative x/y coords valid on left monitor. Never reject by sign. Use MonitorFromPoint(). Iconified caller terminal = walk returns Zero = placement skip (CORRECT -- user not watching). next:eye-ipc-caller-hwnd-resolution-ref for gap history, GA_ROOTOWNER verified chain, multi-monitor debug.</li></ol>
+        <ol class="steps"><li>PROBLEM: GetForegroundWindow() in Eye contex...</li><li>__hwnd IPC: EyeCmdPipeClient.TryDelegate -&gt;...</li><li>GA_ROOTOWNER (flag=3) = THE correct API. Get...</li><li>Multi-monitor: negative x/y coords valid on...</li></ol>
         
       </div>
       <footer class="skill-footer">

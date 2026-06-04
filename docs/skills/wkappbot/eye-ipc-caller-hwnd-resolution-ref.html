@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>GAPS HISTORY: A=Zero hwnd stale CallerHwndForPlacement (Eye should reset when prefix absent). B=Static CallerHwndForPlacement survives hot-swap. C=Integrated terminal ConPTY host is IDE (ancestor walk finds IDE not terminal panel). Most fixed by 2026-05-24.</li><li>GA_ROOTOWNER VERIFIED CHAIN (2026-05-24, commit c631b2f3): wkappbot-core(14088)-&gt;claude(16500)-&gt;..-&gt;PCW(12600 Vis=True)-&gt;GA_ROOTOWNER-&gt;CASCADIA 0x606A2. All 4 test pairs confirmed. Vis=False PCW = AllocConsole = GA_ROOT==GA_ROOTOWNER==self (useless).</li><li>Multi-monitor debug: cdp-mon.ps1 [OFF-SCREEN] label uses old sign-based check (99.9% false positive on multi-monitor). True check: wkappbot.hq/runtime/cdp-state.jsonl caller_hwnd field + MonitorFromPoint API.</li><li>Iconified caller design: minimized terminal = background/batch run = Chrome should NOT move. Optional future: WINDOWPLACEMENT.rcNormalPosition for would-be restore position. Low priority.</li></ol>
+        <ol class="steps"><li>GAPS HISTORY: A=Zero hwnd stale CallerHwndFo...</li><li>GA_ROOTOWNER VERIFIED CHAIN (2026-05-24, com...</li><li>Multi-monitor debug: cdp-mon.ps1 [OFF-SCREEN...</li><li>Iconified caller design: minimized terminal...</li></ol>
         
       </div>
       <footer class="skill-footer">

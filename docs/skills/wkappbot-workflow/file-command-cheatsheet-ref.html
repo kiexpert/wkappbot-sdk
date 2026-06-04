@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">file</span><span class="chip">reference</span><span class="chip">grep</span><span class="chip">encoding</span><span class="chip">gotchas</span><span class="chip">wkappbot</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>GREP STARVATION FALLBACK: when the built-in Grep tool fails with uv_spawn EUNKNOWN under resource starvation (Defender RAM storm), use wkappbot file grep (in-process, no subprocess spawn, gate-exempt). Running rg directly hits the same spawn starvation. Verified 2026-06-04 finding matches in a 1400-line file while built-in Grep failed.</li><li>ENCODING: wkappbot file edit is UTF-8 and BOM and CRLF safe; after an edit a U+FFFD corruption triggers an auto Slack alert. Keep binary files (pdf, mp4, images) as-is, never text-convert.</li><li>BACKUP UNDO: wkappbot file edit writes a .bak backup automatically; undo by restoring from that backup.</li></ol>
+        <ol class="steps"><li>GREP STARVATION FALLBACK: when the built-in...</li><li>ENCODING: wkappbot file edit is UTF-8 and BO...</li><li>BACKUP UNDO: wkappbot file edit writes a .ba...</li></ol>
         
       </div>
       <footer class="skill-footer">

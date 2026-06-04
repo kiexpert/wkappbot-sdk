@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">a11y</span><span class="chip">grid-read</span><span class="chip">hts</span><span class="chip">mfc</span><span class="chip">owner-drawn</span><span class="chip">clipboard</span><span class="chip">focusless-first</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Locate grid via grap (e.g. &#x27;*Hero*/Form1101/*grid*&#x27;)</li><li>a11y grid-read &lt;grap&gt; -- runs default Ctrl+A,Ctrl+C chord</li><li>Custom chord via --text &#x27;ctrl+shift+c&#x27; for apps with dedicated &#x27;copy all&#x27; binding</li><li>Clipboard polled for up to 2s; TSV dumped to stdout on success</li><li>If empty clipboard after timeout the app did not honor the chord -- probe the right hotkey via the app&#x27;s menu</li><li>100pct accuracy -- no OCR error, values come from the app&#x27;s own copy path</li><li>Usage example: wkappbot a11y read &#x27;*Hero*/grid-area&#x27; returns only container; use wkappbot a11y grid-read &#x27;*Hero*/grid-area&#x27; for TSV cells</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-17T21:14)</li></ol>
+        <ol class="steps"><li>Locate grid via grap (e.g. &#x27;*Hero*/Form1101/...</li><li>a11y grid-read &lt;grap&gt; -- runs default Ctrl+A...</li><li>Custom chord via --text &#x27;ctrl+shift+c&#x27; for a...</li><li>Clipboard polled for up to 2s; TSV dumped to...</li><li>If empty clipboard after timeout the app did...</li><li>100pct accuracy -- no OCR error, values come...</li><li>Usage example: wkappbot a11y read &#x27;*Hero*/gr...</li><li>Verified 2026-04-19: experience/tests/sessio...</li></ol>
         
       </div>
       <footer class="skill-footer">

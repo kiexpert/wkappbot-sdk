@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">file</span><span class="chip">howto</span><span class="chip">edit</span><span class="chip">glob</span><span class="chip">grep</span><span class="chip">wkappbot</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>READ WRITE EDIT: wkappbot file read PATH; wkappbot file write PATH with content; wkappbot file edit auto-creates a .bak backup and is encoding-safe (use it instead of sed or awk for multi-file or CP949-risky edits).</li><li>GLOB: wkappbot file glob MUST use the double-star slash prefix to recurse; without it only the top directory matches.</li><li>GREP: wkappbot file grep with a regex and a path searches in-process; it is the robust fallback when the built-in Grep fails under load (see the ref tier).</li><li>BATCH MULTI-FILE: prefer wkappbot file edit or wkedit for atomic multi-file edits; never use python or sed for batch source edits because of CRLF and encoding corruption.</li></ol>
+        <ol class="steps"><li>READ WRITE EDIT: wkappbot file read PATH; wk...</li><li>GLOB: wkappbot file glob MUST use the double...</li><li>GREP: wkappbot file grep with a regex and a...</li><li>BATCH MULTI-FILE: prefer wkappbot file edit...</li></ol>
         
       </div>
       <footer class="skill-footer">

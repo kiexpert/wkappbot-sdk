@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>WHY: SDK is canonical launcher. Core Launcher diverges without this; HWND fixes must be applied twice. HOW: Replace LauncherCsproj with SDK-conditional plus Core-fallback in WKAppBot.CLI.csproj. PATH: 4 parents from WKAppBot.CLI dir = D:\GitHub, append wkappbot-sdk\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj. FALLBACK: SDK absent uses Core Launcher, no build break. COMMIT: ff23fde97 WKAppBot Core 2026-05-24.</li><li>BUILD SOURCE OF TRUTH (verified 2026-05-27): WKAppBot.CLI.csproj references D:/GitHub/wkappbot-sdk as the WKAppBot.Launcher source -- WKAppBot/sdk does NOT contain MyCdpContext placement files. Therefore a placement fix committed in wkappbot-sdk deploys via the standard wkappbot-pub/build.cmd path (which compiles the launcher from the wkappbot-sdk reference into bin/). No manual copy into WKAppBot/sdk is needed. Confirm before deploy: grep -q wkappbot-sdk WKAppBot.CLI.csproj.</li></ol>
+        <ol class="steps"><li>WHY: SDK is canonical launcher. Core Launche...</li><li>BUILD SOURCE OF TRUTH (verified 2026-05-27):...</li></ol>
         
       </div>
       <footer class="skill-footer">

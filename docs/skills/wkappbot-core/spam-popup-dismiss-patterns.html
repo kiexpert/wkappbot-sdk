@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">spam</span><span class="chip">popup</span><span class="chip">toast</span><span class="chip">OneDrive</span><span class="chip">Coupang</span><span class="chip">HncUpdateTray</span><span class="chip">WM_CLOSE</span><span class="chip">screenshot</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Tier1 WM_CLOSE: EnumWindows match (cls_substr,title_substr) pairs, PostMessage WM_CLOSE (non-elevated works for HncUpdateTray)</li><li>Tier2 toast: grab monitor bottom-right 520x232px, numpy R&lt;100 G&lt;150 B&gt;180 blue mask, click X at (right-35, top+18)</li><li>HncUpdateTray.exe shows Coupang ads as ToastForm WPF windows -- WM_CLOSE works</li><li>OneDrive WinRT toast has no HWND -- screenshot only</li><li>run_local_ai_news_collect.py main() calls _dismiss_spam_popups() first each cycle</li><li>Maintainer sync (2026-05-01): HQ copy is authoritative.</li></ol>
+        <ol class="steps"><li>Tier1 WM_CLOSE: EnumWindows match (cls_subst...</li><li>Tier2 toast: grab monitor bottom-right 520x2...</li><li>HncUpdateTray.exe shows Coupang ads as Toast...</li><li>OneDrive WinRT toast has no HWND -- screensh...</li><li>run_local_ai_news_collect.py main() calls _d...</li><li>Maintainer sync (2026-05-01): HQ copy is aut...</li></ol>
         
       </div>
       <footer class="skill-footer">

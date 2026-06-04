@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Use process: &lt;exeName&gt; in scenario YAML app block to adopt-only (fail if not running). Use app.adopt: true for soft-adopt (try adopt, launch if absent). Use --no-dup CLI flag to adopt by launch exe name if already running. TryAdoptProcess uses Process.GetProcessesByName(exeName). Elevated processes (like nkrunlite/nfrunlite) are adopted and then the admin Eye proxy is used. Evidence: [RUN] Adopted existing process: nfrunlite (pid=8420)</li><li>In scenario YAML: set app.process: nfrunlite to adopt-only. If process not found, scenario fails immediately (no launch fallback).</li><li>Use app.adopt: true for soft-adopt: tries GetProcessesByName on Launch exe first, launches fresh only if not found.</li><li>CLI: wkappbot run &lt;scenario.yaml&gt; --no-dup skips launch if exe already running (NoDup=true in ScenarioRunner). Elevated processes use admin Eye proxy automatically after adoption.</li><li>Verified 2026-04-21: test-run-no-dup-adopt.sh (resolve ts=2026-04-21T13:08)</li></ol>
+        <ol class="steps"><li>Use process: &lt;exeName&gt; in scenario YAML app...</li><li>In scenario YAML: set app.process: nfrunlite...</li><li>Use app.adopt: true for soft-adopt: tries Ge...</li><li>CLI: wkappbot run &lt;scenario.yaml&gt; --no-dup s...</li><li>Verified 2026-04-21: test-run-no-dup-adopt.s...</li></ol>
         
       </div>
       <footer class="skill-footer">

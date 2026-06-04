@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>CLI click tier order in A11yActions.Click.cs: (1) LegacyIA.DoDefaultAction() focusless, (2) WM_LBUTTON to element hwnd, (3) TryElectronSurfaceClick() WM_LBUTTON to Chrome_RenderWidgetHostHWND, (4) TryCdpTrustedClick() Input.dispatchMouseEvent isTrusted=true, (5) TryReactFiberClickAsync() __reactProps.onClick JS call.</li><li>TryCdpTrustedClick() verifies success via pixel-diff check (&gt;2% change = ok). If click verified, returns immediately. TryReactFiberClickAsync() calls __reactFiber.memoizedProps.onClick for React-controlled buttons where isTrusted enforcement blocks CDP dispatchMouseEvent.</li><li>Known gap: Scenario/ActionExecutor path does NOT include CDP or React fiber tiers -- only UIA Invoke + element-rect SendInput. If Invoke silently succeeds on React buttons (S_OK but no DOM event), the action returns prematurely. Full fix pending; CLI path already handles this.</li><li>Verified 2026-04-22: test-a11y-find-click-react-fiber-fallback.sh (resolve ts=2026-04-21T10:46)</li><li>2026-04-30: invoke action now uses AutoApproveYield=true -- bypasses user-active callout for focusless InvokePattern operations (commit c3c48225)</li></ol>
+        <ol class="steps"><li>CLI click tier order in A11yActions.Click.cs...</li><li>TryCdpTrustedClick() verifies success via pi...</li><li>Known gap: Scenario/ActionExecutor path does...</li><li>Verified 2026-04-22: test-a11y-find-click-re...</li><li>2026-04-30: invoke action now uses AutoAppro...</li></ol>
         
       </div>
       <footer class="skill-footer">

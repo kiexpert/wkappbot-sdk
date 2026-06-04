@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">skill-heal</span><span class="chip">nightly</span><span class="chip">howto</span><span class="chip">schedule</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>GUARD PRE-REQ before Agent(opus): (1) wkappbot skill edit any-id --add-step to satisfy skill-update-pending. (2) Edit CLAUDE.md Pending to satisfy claude-md-sync-guard. Both must clear before Agent fires.</li><li>STEP 2 EXECUTION: Agent(model=opus) runs skill audit, fixes broken refs, applies repo-health LITE, compresses Pending if over 15 done items, commits.</li><li>MULTI-DELEGATION: each wkcodex/Agent completion re-arms skill-update-pending lock. Add fresh skill edit before EACH delegation round.</li><li>DELEGATION FALLBACK: wkappbot Pending compress inline via file edit (gate-allowed) when wkcodex lock loops.</li><li>SCHEDULE: CronCreate(cron=13 4 star star star durable=true) fires daily at 04:13. Job survives restarts via .claude/scheduled_tasks.json.</li></ol>
+        <ol class="steps"><li>GUARD PRE-REQ before Agent(opus): (1) wkappb...</li><li>STEP 2 EXECUTION: Agent(model=opus) runs ski...</li><li>MULTI-DELEGATION: each wkcodex/Agent complet...</li><li>DELEGATION FALLBACK: wkappbot Pending compre...</li><li>SCHEDULE: CronCreate(cron=13 4 star star sta...</li></ol>
         
       </div>
       <footer class="skill-footer">

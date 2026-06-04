@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>GAPS FIXED: A stale CallerHwndForPlacement reset (7c19f50cb). B EyeMcpClient static leak (d7bc05191). G IsWindow validation on pipe parse. I MCP _meta validation. D/J Admin Eye --sudo (d557c6486). P1/P3 foreground removed (08b0b423). P2 hidden-window (e450655a). GA_ROOT simplified (6d656296d).</li><li>DPI verified 2026-05-16: GetWindowRect + CDP Browser.setWindowBounds + Win32 SetWindowPos all PHYSICAL pixels end-to-end when PerMonitorV2. No LogicalToPhysical needed in TryMoveChromeToCallerAsync.</li><li>2026-05-20 FIX: consoleHwnd zero-rect skip -- GetConsoleWindow() returns PseudoConsoleWindow with (0,0,0,0) under ConPTY. Validate rect before using. Correct path = CASCADIA from P2 ancestor walk.</li><li>2026-05-20 ROOT CAUSE: largest-terminal fallback removed (non-deterministic). Zero = placement skip. P2 ancestor walk is only correct path (commit 9c3e723d).</li><li>Verified 2026-05-21: experience/tests/a11y/find/test-a11y-find-domain-youtube-verify.sh (ts=2026-05-21T01:18:05)</li></ol>
+        <ol class="steps"><li>GAPS FIXED: A stale CallerHwndForPlacement r...</li><li>DPI verified 2026-05-16: GetWindowRect + CDP...</li><li>2026-05-20 FIX: consoleHwnd zero-rect skip -...</li><li>2026-05-20 ROOT CAUSE: largest-terminal fall...</li><li>Verified 2026-05-21: experience/tests/a11y/f...</li></ol>
         
       </div>
       <footer class="skill-footer">

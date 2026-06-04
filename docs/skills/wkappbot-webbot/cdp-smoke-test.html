@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">cdp</span><span class="chip">test</span><span class="chip">smoke</span><span class="chip">regression</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>RUN: bash D:/GitHub/WKAppBot/bin/cdp-smoke-test.sh 2&gt;/dev/null</li><li>TESTS: open --new-window, url, title, navigate, html, status, fetch, tabs, open-reuse, close</li><li>EXPECT: 10/10 pass under 20s</li><li>FAIL GUIDE: url-title empty=stdout bug. wrong tab=domain grap. open hangs=zombie Chrome</li><li>BASELINE: Before smoke test, run wkcdp-mon to establish baseline: record [PORT] [MEM] [LAT(avg)] for each session. After test, compare: (1) MEM growth &gt; 100M/session = memory leak, (2) LAT spike &gt; 50ms avg = performance regression, (3) DRIFT change = position handling issue, (4) extra procs in Get-Process chrome = zombie accumulation. wkcdp-mon baseline → test → post-test wkcdp-mon = complete health diagnostic.</li></ol>
+        <ol class="steps"><li>RUN: bash D:/GitHub/WKAppBot/bin/cdp-smoke-t...</li><li>TESTS: open --new-window, url, title, naviga...</li><li>EXPECT: 10/10 pass under 20s</li><li>FAIL GUIDE: url-title empty=stdout bug. wron...</li><li>BASELINE: Before smoke test, run wkcdp-mon t...</li></ol>
         
       </div>
       <footer class="skill-footer">

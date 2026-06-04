@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">developer</span><span class="chip">project</span><span class="chip">debugging</span><span class="chip">pulse</span><span class="chip">stepprofiler</span><span class="chip">tracing</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>PulseStep.Line() calls Emit(force=true) -- bypasses WKAPPBOT_PROFILE=1 check and 100ms threshold. Always prints to stderr.</li><li>Ring trail: last 20 emitted lines stored in LinkedList with lock. GetRecentTrail(n) returns newest-last slice for UAC/elevation context.</li><li>Usage: PulseStep.Init sets up session keyed by CallerMemberName. Mark() records checkpoint. Done() prints total. Line() forces output.</li></ol>
+        <ol class="steps"><li>PulseStep.Line() calls Emit(force=true) -- b...</li><li>Ring trail: last 20 emitted lines stored in...</li><li>Usage: PulseStep.Init sets up session keyed...</li></ol>
         
       </div>
       <footer class="skill-footer">

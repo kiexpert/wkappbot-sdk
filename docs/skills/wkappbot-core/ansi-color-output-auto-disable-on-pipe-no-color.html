@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">ansi</span><span class="chip">color</span><span class="chip">cli</span><span class="chip">pipe</span><span class="chip">no-color</span><span class="chip">project</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Create Ansi.cs helper: static readonly bool IsEnabled = !Console.IsOutputRedirected &amp;&amp; Environment.GetEnvironmentVariable(&quot;NO_COLOR&quot;) == null;</li><li>Apply colors: Ansi.IsEnabled ? $&quot;\x1b[1;96m{text}\x1b[0m&quot; : text (always provide plain fallback)</li><li>Color palette: dim cyan \x1b[2;36m = headers, bold cyan \x1b[1;96m = key values, bold green \x1b[1;32m = OK, bold red \x1b[1;31m = MISS/error, yellow \x1b[33m = warnings</li><li>IsEnabled is static readonly -- evaluated once at startup, never changes mid-process</li><li>Test: redirect stdout to file and verify no escape codes appear in output</li></ol>
+        <ol class="steps"><li>Create Ansi.cs helper: static readonly bool...</li><li>Apply colors: Ansi.IsEnabled ? $&quot;\x1b[1;96m{...</li><li>Color palette: dim cyan \x1b[2;36m = headers...</li><li>IsEnabled is static readonly -- evaluated on...</li><li>Test: redirect stdout to file and verify no...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">cookbook</span><span class="chip">beginner</span><span class="chip">focus-steal</span><span class="chip">sentinel</span><span class="chip">readiness</span><span class="chip">checklist</span><span class="chip">a11y-action</span><span class="chip">probe</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>WHY THIS EXISTS. Every a11y action runs on behalf of the user but can accidentally grab the foreground window (SetForegroundWindow, UIA activation on Chromium/Electron, SendInput). If it does, the user loses their typing / dialog / mouse context. Two complementary tools solve this: (1) InputReadiness.Probe shows the magnifier and yields to active user input BEFORE the action fires; (2) FocusStealSentinel watches the foreground during the action and restores + self-reports if theft happened. Find is the only exempt action -- it is legitimate foreground exploration.</li></ol>
+        <ol class="steps"><li>WHY THIS EXISTS. Every a11y action runs on b...</li></ol>
         
       </div>
       <footer class="skill-footer">

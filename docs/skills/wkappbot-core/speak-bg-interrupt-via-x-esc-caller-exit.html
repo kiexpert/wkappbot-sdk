@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>speak --bg: spawns child process and prints &#x27;[SPEAK] launched pid=N caller=M&#x27; for scripting/grep</li><li>SpeakOverlayWindow: X button (closeBtn, top-right, Focusable=false) signals stop immediately</li><li>ESC key and window close (Alt-F4/Closing) also trigger RequestStop -- all paths are idempotent</li><li>stopSignal (ManualResetEventSlim) replaces Thread.Sleep: stopSignal.Wait(totalMs) + player.Stop() cuts audio</li><li>caller-exit watch: --caller-pid &lt;pid&gt; starts 500ms timer; when caller process exits, TTS stops automatically</li></ol>
+        <ol class="steps"><li>speak --bg: spawns child process and prints...</li><li>SpeakOverlayWindow: X button (closeBtn, top-...</li><li>ESC key and window close (Alt-F4/Closing) al...</li><li>stopSignal (ManualResetEventSlim) replaces T...</li><li>caller-exit watch: --caller-pid &lt;pid&gt; starts...</li></ol>
         
       </div>
       <footer class="skill-footer">

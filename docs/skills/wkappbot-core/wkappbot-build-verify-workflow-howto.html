@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Refactor loop: (1) make change (2) wkappbot-pub\build.cmd (3) check last 3 lines for staged+skills installed (4) wkappbot --version to force swap (5) wkappbot &lt;affected-cmd&gt; smoke test (6) git add+commit ONLY after all green.</li><li>Partial-class split pattern: new file must have same namespace WKAppBot.CLI AND internal partial class Program. No extra using-statements beyond what extracted code needs.</li><li>CS0246 (type/namespace not found): new file created but not referenced, OR extracted method left dangling reference. Read error location and verify both sites.</li><li>Smoke check: wkappbot --version (expect base version). wkappbot exec list (expect built-in presets). wkappbot &lt;affected-command&gt; with minimal args.</li><li>Launcher auto-swap failing: see hot-swap-stuck-orphan-mcp-workers-kill-force-swap skill. Short: wkappbot --sudo --force-swap eye tick when admin orphan blocks.</li><li>After deploy: wkappbot skill sync to push local edits to HQ. Conflicts -&gt; wkappbot skill sync --resolve &lt;id&gt;. Never leave split-brain pending.</li></ol>
+        <ol class="steps"><li>Refactor loop: (1) make change (2) wkappbot-...</li><li>Partial-class split pattern: new file must h...</li><li>CS0246 (type/namespace not found): new file...</li><li>Smoke check: wkappbot --version (expect base...</li><li>Launcher auto-swap failing: see hot-swap-stu...</li><li>After deploy: wkappbot skill sync to push lo...</li></ol>
         
       </div>
       <footer class="skill-footer">

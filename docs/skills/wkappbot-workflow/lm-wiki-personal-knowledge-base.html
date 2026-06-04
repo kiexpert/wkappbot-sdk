@@ -263,78 +263,7 @@
       <div class="tags"><span class="chip">user</span><span class="chip">workflow</span><span class="chip">knowledge-management</span><span class="chip">obsidian</span><span class="chip">claude-code</span><span class="chip">second-brain</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>CORE CONCEPT — two folders only.
-raw/  = original sources (web clips, transcripts, docs, meeting notes)
-wiki/ = processed, interlinked markdown pages Claude writes
-
-Claude reads raw/, extracts entities/concepts/summaries, writes wiki/ pages with [[backlinks]].
-Obsidian renders the link graph visually.
-
-Why not RAG?
-RAG = similarity search on chunks (find chunks similar to query).
-Wiki = relationship traversal (follow [[links]] through context).
-Wiki gives deeper context. Zero embedding cost. Zero vector DB.
-Karpathy: &#x27;I thought I needed RAG. Just a markdown folder was enough.&#x27;
-95% token reduction reported by early adopters vs full-context approaches.</li><li>SETUP
-1. Install Obsidian (free): obsidian.md → New vault → point to your wiki folder.
-2. Get Karpathy&#x27;s lm_wiki.md prompt from GitHub (search: karpathy lm_wiki).
-3. Open Claude Code in your project folder.
-4. Paste the full lm_wiki.md content then add:
-   &#x27;Read the above spec and implement this wiki system in the current folder.&#x27;
-5. Claude Code creates:
-   raw/          original sources go here
-   wiki/         processed pages (concepts/, entities/, analysis/)
-   .claude/      CLAUDE.md with workflow rules Claude reads every session
-   wiki/index.md navigation map — AI reads this first to find relevant pages</li><li>INGEST WORKFLOW — adding content to raw/ then processing
-Web content:
-  Install Obsidian Web Clipper (Chrome Web Store).
-  Settings → Default template → Location: set to raw/
-  Clips save to raw/ with tags + source URL automatically.
-
-YouTube transcript:
-  Paste transcript text into raw/ as a .md file, then:
-  &#x27;ingest the new source in raw/&#x27;
-
-Any file:
-  Drop .md / .txt / .pdf text into raw/, then ask Claude Code:
-  &#x27;ingest&#x27; or &#x27;process new sources in raw/&#x27;
-
-After ingest: Claude creates wiki pages, links related concepts,
-updates wiki/index.md. Check Obsidian graph view to see new connections.</li><li>QUERY — asking questions against your wiki
-Ask naturally in Claude Code or Claude.ai Projects:
-  &#x27;What is the most important thing about Claude Code?&#x27;
-  &#x27;Do I have any notes on MCP servers?&#x27;
-  &#x27;Summarize my content strategy notes&#x27;
-  &#x27;What did I capture last week?&#x27;
-
-Claude reads wiki/index.md first (navigation map),
-follows [[backlinks]] to relevant pages, synthesizes answer.
-No similarity search — pure link traversal, full context preserved.</li><li>MAINTENANCE — keeping the wiki healthy
-Lint (health check):
-  Type: &#x27;lint&#x27;
-  Claude scans wiki for broken links, orphan pages, missing backlinks,
-  inconsistent data, gaps. Fixes or reports each issue.
-  Run daily or weekly. Automate with Claude.ai Projects scheduled task.
-
-Hot cache (wiki/hot.md):
-  ~500 chars of recent context cached here.
-  AI reads hot.md first to orient without scanning the full wiki.
-  Saves tokens significantly — especially on new sessions.
-  Update: &#x27;update hot cache with today&#x27;s work&#x27;</li><li>CLAUDE.AI PROJECTS — no-code ongoing management (alternative to Claude Code)
-1. Claude.ai → New Project → select your wiki folder as project folder.
-2. System prompt: &#x27;Work in this wiki. Reference .claude/CLAUDE.md for workflow rules.&#x27;
-3. First message: &#x27;Scan the wiki and give me a status report.&#x27;
-
-Scheduled tasks (set up once, run automatically):
-  Daily morning: briefing on recent additions + action items
-  Weekly: lint run — fix broken links, fill gaps
-  Auto-ingest: process any new files dropped in raw/
-  Index sync: keep wiki/index.md up to date
-
-Notion + Obsidian split (optional):
-  Notion = operations, schedules, project status (database + automation features)
-  Obsidian wiki = knowledge, strategy, research accumulation
-  Both fed by Claude — different purposes, same AI backbone.</li></ol>
+        <ol class="steps"><li>CORE CONCEPT — two folders only. raw/ = orig...</li><li>SETUP 1. Install Obsidian (free): obsidian.m...</li><li>INGEST WORKFLOW — adding content to raw/ the...</li><li>QUERY — asking questions against your wiki A...</li><li>MAINTENANCE — keeping the wiki healthy Lint...</li><li>CLAUDE.AI PROJECTS — no-code ongoing managem...</li></ol>
         
       </div>
       <footer class="skill-footer">

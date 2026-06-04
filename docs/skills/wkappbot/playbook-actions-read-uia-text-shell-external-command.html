@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>action: read -- target: {automation_id/name/ control_type} params.store_as captures UiaLocator.GetText result into ${store_as} for later steps.</li><li>action: shell -- params.command required. params.args string, params.working_dir, params.timeout_sec (default 30), params.exit_code (default 0), params.store_as stores stdout.</li><li>Behavior: shell uses UseShellExecute=false + CreateNoWindow=true + UTF-8 stdout/stderr. read delegates to the same UiaLocator.GetText helper used by DoAssert.</li><li>Dispatch sites: csharp/src/WKAppBot.Core/Runner/ActionExecutor.cs (DoRead, DoShell); parser: csharp/src/WKAppBot.Core/Scenario/ScenarioParser.cs; params: csharp/src/WKAppBot.Core/Scenario/Models.cs (StoreAs, Command, Args, WorkingDir, TimeoutSec, ExitCode).</li><li>Reference scenario: scenarios/read_shell_test.yaml -- Calculator + cmd.exe -- 5/5 PASS.</li><li>Verified 2026-04-21: test-run-playbook-read-shell-actions.cmd (resolve ts=2026-04-21T06:03)</li></ol>
+        <ol class="steps"><li>action: read -- target: {automation_id/name/...</li><li>action: shell -- params.command required. pa...</li><li>Behavior: shell uses UseShellExecute=false +...</li><li>Dispatch sites: csharp/src/WKAppBot.Core/Run...</li><li>Reference scenario: scenarios/read_shell_tes...</li><li>Verified 2026-04-21: test-run-playbook-read-...</li></ol>
         
       </div>
       <footer class="skill-footer">

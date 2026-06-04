@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">caller-window</span><span class="chip">hwnd-validation</span><span class="chip">process-chain</span><span class="chip">multi-monitor</span><span class="chip">windows-terminal</span><span class="chip">chrome-placement</span><span class="chip">wkfind</span><span class="chip">edge-cases</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>CURRENT MODEL (2026-05-28, EyeCmdPipeClient.WindowDetection.cs): (0) WKAPPBOT_CALLER_HWND env (1) GA_ROOTOWNER pre-pass on ConPTY -&gt; CASCADIA (2) WT_SESSION terminal pass isBig&gt;=200x100 (3) non-terminal isBig ancestor (IDE) (4) Zero=skip. OLD 3-tier console&gt;host&gt;foreground is OBSOLETE -- do NOT implement.</li><li>PseudoConsoleWindow is NOT rejected. It is the KEY input: find Vis=True PCW ancestor, GetAncestor(pcw, GA_ROOTOWNER) -&gt; CASCADIA tab window.</li><li>Validation logged to cdp-state.jsonl: [VALIDATION] hwnd=0x... class=... verdict=on_screen/off_screen/invalid. Diagnose placement failures here.</li><li>SEE standard-appbot-window for full detection spec. This skill = correction overlay for historical 3-tier model errors. next:wkfind-caller-hwnd-validation-3tier-pattern-ref for audit history + verified tests.</li></ol>
+        <ol class="steps"><li>CURRENT MODEL (2026-05-28, EyeCmdPipeClient....</li><li>PseudoConsoleWindow is NOT rejected. It is t...</li><li>Validation logged to cdp-state.jsonl: [VALID...</li><li>SEE standard-appbot-window for full detectio...</li></ol>
         
       </div>
       <footer class="skill-footer">

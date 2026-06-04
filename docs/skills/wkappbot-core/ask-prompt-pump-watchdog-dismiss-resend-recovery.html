@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">ask</span><span class="chip">chat</span><span class="chip">prompt-pump</span><span class="chip">watchdog</span><span class="chip">cowork</span><span class="chip">dismiss</span><span class="chip">recovery</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Pump arms watchdog after last append</li><li>T+7s: check editor text length; if &gt;0 editor still has content</li><li>Recovery call DismissDialogAsync -- closes CoWork promo banners, Gemini copyright dialogs, X-icon popovers</li><li>Re-fire SendPromptAsync</li><li>T+10s: recheck; if still stuck BUG-AUTO with &#x27;recovery failed&#x27; hint</li><li>Quiet when no popover (NONE return); self-heals when popover was the blocker</li><li>Verified 2026-04-19: experience/tests/session/test-session-fix-verify-***.sh (resolve ts=2026-04-19T05:29)</li><li>Verified 2026-04-22: test-file-grep-pump-watchdog.sh (resolve ts=2026-04-20T06:28:51.1783280Z)</li></ol>
+        <ol class="steps"><li>Pump arms watchdog after last append</li><li>T+7s: check editor text length; if &gt;0 editor...</li><li>Recovery call DismissDialogAsync -- closes C...</li><li>Re-fire SendPromptAsync</li><li>T+10s: recheck; if still stuck BUG-AUTO with...</li><li>Quiet when no popover (NONE return); self-he...</li><li>Verified 2026-04-19: experience/tests/sessio...</li><li>Verified 2026-04-22: test-file-grep-pump-wat...</li></ol>
         
       </div>
       <footer class="skill-footer">

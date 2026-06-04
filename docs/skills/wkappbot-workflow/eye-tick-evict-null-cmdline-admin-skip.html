@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>When eye-evict triggers, call GetProcessCommandLine on the target process. If it returns null or empty, treat the process as admin-elevated (UAC-restricted) and skip the window check before eviction decision.</li><li>Fix deployed in commit 8b633583: guard added in EyeCommand evict path. Prevents false eviction of elevated processes (e.g., Heroes4/HTS running as admin) during Eye scan cycles.</li><li>If eye-evict causes unexpected process eviction on HTS/Heroes4, check if the process is running as administrator. Use &#x27;wkappbot eye tick&#x27; to verify eye state. Null cmdline on a process = admin token; the guard skips such processes automatically.</li><li>Verified 2026-04-21: test-eye-tick-evict-null-cmdline.sh (resolve ts=2026-04-20T07:27)</li></ol>
+        <ol class="steps"><li>When eye-evict triggers, call GetProcessComm...</li><li>Fix deployed in commit 8b633583: guard added...</li><li>If eye-evict causes unexpected process evict...</li><li>Verified 2026-04-21: test-eye-tick-evict-nul...</li></ol>
         
       </div>
       <footer class="skill-footer">

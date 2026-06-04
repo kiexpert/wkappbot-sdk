@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">github</span><span class="chip">actions</span><span class="chip">budget</span><span class="chip">pat</span><span class="chip">ci</span><span class="chip">403</span><span class="chip">sync</span><span class="chip">billing</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>SYMPTOM: runs fail in under 15s. Check gh run view --log-failed for billing or 403 clues.</li><li>BUDGET FIX: edit Actions row at github.com/settings/billing/budgets and raise limit. CDP read: wkappbot a11y read with eval-js document.body.innerText on billing tab.</li><li>GH_PAT MISSING: sync push logs blank GH_PAT then fatal 403. Check: gh secret list --repo ***/WKAppBot</li><li>PAT FIX: gh secret set GH_PAT --repo ***/WKAppBot --body TOKEN where TOKEN comes from gh auth token</li><li>RERUN: gh run rerun RUNID. Check result with gh run list.</li></ol>
+        <ol class="steps"><li>SYMPTOM: runs fail in under 15s. Check gh ru...</li><li>BUDGET FIX: edit Actions row at github.com/s...</li><li>GH_PAT MISSING: sync push logs blank GH_PAT...</li><li>PAT FIX: gh secret set GH_PAT --repo ***/WKA...</li><li>RERUN: gh run rerun RUNID. Check result with...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">claude-usage</span><span class="chip">slack</span><span class="chip">alert</span><span class="chip">dedup</span><span class="chip">state-file</span><span class="chip">reset-detection</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Compute newLevel: NONE, WARNING (&gt;=85), CRITICAL (&gt;=95), SESSION (session &gt;=90)</li><li>Load last state from claude-usage-alert-state.json</li><li>Suppress if newLevel == lastLevel and &lt;1h since last post</li><li>Escalation (rank up) posts immediately regardless of cooldown</li><li>NONE transition from non-NONE: clear state so post-reset fresh alerts work</li><li>Persist new state after successful post</li></ol>
+        <ol class="steps"><li>Compute newLevel: NONE, WARNING (&gt;=85), CRIT...</li><li>Load last state from claude-usage-alert-stat...</li><li>Suppress if newLevel == lastLevel and &lt;1h si...</li><li>Escalation (rank up) posts immediately regar...</li><li>NONE transition from non-NONE: clear state s...</li><li>Persist new state after successful post</li></ol>
         
       </div>
       <footer class="skill-footer">

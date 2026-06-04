@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>SYMPTOM: ask gpt hangs 15s EDITOR-WAIT repeatedly, zombie wkappbot-core accumulates. Cause: wkzombie force-kills Eye leaving Chrome tab dirty (chrome-error://, Aw Snap, session-restore dialog blocking editor).</li><li>DETECTION (IsBadTabState): url starts with chrome-error:// or chrome://crash, or title contains Aw Snap. Implemented in CdpClient.TabRecovery.cs as static bool IsBadTabState(string url, string title).</li><li>RECOVERY: on bad tab detected, navigate fresh https://chatgpt.com before entering EDITOR-WAIT. Max 3s detection budget, silent fail on exception.</li><li>IMPLEMENTATION STATUS: CdpClient.TabRecovery.cs DONE at D:/GitHub/WKAppBot/csharp/src/WKAppBot.WebBot/. AskCommands.ChatGpt.EditorWait.cs PENDING -- insert try-catch IsBadTabState block at line 51 after cdp.EnsureChromeNotIconic() and before Console.Write EDITOR-WAIT.</li><li>NEXT STEPS: see CLAUDE.md CDP-TODO-1 (wire EditorWait.cs) CDP-TODO-2 (build) CDP-TODO-3 (commit). New session required due to pace exhaustion.</li></ol>
+        <ol class="steps"><li>SYMPTOM: ask gpt hangs 15s EDITOR-WAIT repea...</li><li>DETECTION (IsBadTabState): url starts with c...</li><li>RECOVERY: on bad tab detected, navigate fres...</li><li>IMPLEMENTATION STATUS: CdpClient.TabRecovery...</li><li>NEXT STEPS: see CLAUDE.md CDP-TODO-1 (wire E...</li></ol>
         
       </div>
       <footer class="skill-footer">

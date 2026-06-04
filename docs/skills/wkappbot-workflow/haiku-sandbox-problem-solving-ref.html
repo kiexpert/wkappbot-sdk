@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>SUCCESS 2026-05-31 wkjobs: Haiku diagnosed  reserved-var collision (line 118) + / scope bug (lines 264-265) without touching original. Sonnet verified. Haiku applied fix. Clean commit 089b4d095.</li><li>SUCCESS 2026-05-31 EndMarker: Sonnet analyzed git grep output, identified EyeCmdPipeServer.Pipe.cs:278 catch{} swallowing EndMarker. Haiku applied 2-line fix + 200ms retry. No prototype needed (Sonnet certain). Commit 7ab1ae533.</li><li>FAILURE 2026-05-31 skill T1 split: Haiku sent to read fat suggest-workflow (36 steps) then split T1/T2/T3. Context overload -&gt; dropped all steps from T1 (empty). Fix: Sonnet writes T1 content from own context, Haiku only executes skill contribute CLI commands.</li><li>FAILURE MODE: &#x27;find and fix&#x27; brief = Haiku reads source + diagnoses + edits = triple context load = unreliable. Always split into 3 separate calls: (1) Haiku diagnose, (2) Sonnet judge, (3) Haiku/wkcodex apply.</li><li>EVOLUTION: pattern emerged from observing that Haiku succeeds on clean canvas (new file, specific task) and fails on open-ended exploration of existing complex code. Prototype = bounded problem space.</li></ol>
+        <ol class="steps"><li>SUCCESS 2026-05-31 wkjobs: Haiku diagnosed r...</li><li>SUCCESS 2026-05-31 EndMarker: Sonnet analyze...</li><li>FAILURE 2026-05-31 skill T1 split: Haiku sen...</li><li>FAILURE MODE: &#x27;find and fix&#x27; brief = Haiku r...</li><li>EVOLUTION: pattern emerged from observing th...</li></ol>
         
       </div>
       <footer class="skill-footer">

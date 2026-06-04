@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">mdi</span><span class="chip">focusless</span><span class="chip">swp-noactivate</span><span class="chip">inspect</span><span class="chip">capture</span><span class="chip">z-order</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>WRONG: BringWindowToTop(hwnd) then SetWindowPos(HWND_TOP+SWP_NOACTIVATE) -- BringWindowToTop activates the window first, defeating SWP_NOACTIVATE.</li><li>CORRECT: SetWindowPos(hwnd, HWND_TOP, 0,0,0,0, SWP_NOMOVE</li><li>SWP_NOSIZE</li><li>SWP_NOACTIVATE) alone raises z-order without focus steal.</li><li>CONTEXT: InspectionCommands.Capture.cs MDI child form capture -- form.Handle raised before PrintWindow capture. BringWindowToTop was removed in commit c0a53964.</li><li>VERIFY: wkappbot a11y inspect on elevated MDI app must not steal user focus. FocusStealSentinel must not fire during a11y inspect.</li></ol>
+        <ol class="steps"><li>WRONG: BringWindowToTop(hwnd) then SetWindow...</li><li>CORRECT: SetWindowPos(hwnd, HWND_TOP, 0,0,0,...</li><li>SWP_NOSIZE</li><li>SWP_NOACTIVATE) alone raises z-order without...</li><li>CONTEXT: InspectionCommands.Capture.cs MDI c...</li><li>VERIFY: wkappbot a11y inspect on elevated MD...</li></ol>
         
       </div>
       <footer class="skill-footer">

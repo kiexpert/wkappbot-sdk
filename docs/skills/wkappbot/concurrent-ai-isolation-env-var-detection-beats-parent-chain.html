@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">wkappbot</span><span class="chip">eye</span><span class="chip">session</span><span class="chip">concurrent</span><span class="chip">ai</span><span class="chip">env-var</span><span class="chip">detached-process</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>When Claude Code and Codex run side-by-side under VS Code, AppBotPipe.Spawn uses DETACHED_PROCESS which severs the Windows parent chain (parent appears as PID 8). Identity detection therefore must read env vars first.</li><li>Identity priority: CLAUDE_CODE_ENTRYPOINT (Claude Code VS Code extension) -&gt; CODEX_HOME (Codex CLI) -&gt; VSCODE_PID (host). Walk the parent process chain only as a last resort when none of these env vars are present.</li><li>If two AIs share the same CWD, never use a CWD scan to pick the active session JSONL — pass SessionJsonl (exact file path) explicitly so size/content reads target the right transcript.</li></ol>
+        <ol class="steps"><li>When Claude Code and Codex run side-by-side...</li><li>Identity priority: CLAUDE_CODE_ENTRYPOINT (C...</li><li>If two AIs share the same CWD, never use a C...</li></ol>
         
       </div>
       <footer class="skill-footer">

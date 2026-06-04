@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">wkchat</span><span class="chip">chat</span><span class="chip">session</span><span class="chip">launcher</span><span class="chip">routing</span><span class="chip">operator</span><span class="chip">reference</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Chat sessions set and inherit WKAPPBOT_CHAT_SESSION=1</li><li>Use wkappbot chat for interactive REPL only; nested commands inside the session must be treated as single-shot calls</li><li>If a child launch needs interactive chat behavior, clear the session marker in the parent shell before starting it</li><li>Verify the live behavior with wkappbot chat --help and wkappbot skill read wkchat-session-routing-guard</li><li>Keep the outer chat guard in the launcher; nested chat sessions still inherit WKAPPBOT_CHAT_SESSION=1 for child routing</li><li>When the session guard is active, Launcher keeps chat on the interactive stdio path and skips Eye routing</li></ol>
+        <ol class="steps"><li>Chat sessions set and inherit WKAPPBOT_CHAT_...</li><li>Use wkappbot chat for interactive REPL only;...</li><li>If a child launch needs interactive chat beh...</li><li>Verify the live behavior with wkappbot chat...</li><li>Keep the outer chat guard in the launcher; n...</li><li>When the session guard is active, Launcher k...</li></ol>
         
       </div>
       <footer class="skill-footer">

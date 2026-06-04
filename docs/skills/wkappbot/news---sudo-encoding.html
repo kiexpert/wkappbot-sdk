@@ -263,24 +263,7 @@
       <div class="tags"><span class="chip">news</span><span class="chip">sudo</span><span class="chip">encoding</span><span class="chip">eye</span><span class="chip">pipe</span><span class="chip">argv</span><span class="chip">unicode</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>FIX 1: wkappbot_elevated pipe routing (root cause of 30s proxy timeout).
-Normal Eye was opening ElevatedEyeServer on wkappbot_elevated alongside admin Eye.
-Client connected to whichever accepted first -- normal Eye intercepted, then spawned
-non-elevated subprocess which timed out (stdoutDone=False stderrDone=False).
-Solution: normal Eye -&gt; wkappbot_eye_ipc (tick IPC only). Admin Eye -&gt; wkappbot_elevated.
-Files: AppBotEyeGlobalMode.cs L613, ElevatedEyeProxy.cs (new EyeIpcServer class).
-
-FIX 2: --sudo proxy Korean output mojibake.
-ProcessStartInfo default StandardOutputEncoding = system ACP (CP949 on Korean Windows).
-Subprocess wrote UTF-8 but admin Eye parent read bytes as CP949 -&gt; mojibake.
-Solution: psi.StandardOutputEncoding = Encoding.UTF8 in ElevatedEyeProxy.cs ExecuteCommand.
-
-FIX 3: Korean argv from CreateProcessA.
-CreateProcessA converts UTF-8 bytes through CP949 to wide chars, corrupting Korean args[].
-Solution: TryRecoverUtf8Argv() in Program.cs, runs at Main() entry before any arg inspection.
-Algorithm: GetCommandLineA() raw bytes -&gt; strict UTF-8 decode -&gt; if valid: CommandLineToArgvW re-parse.
-CP949 Korean lead bytes (0xBE, 0xB3...) fail UTF-8 check immediately -&gt; CreateProcessW callers pass through unchanged.
-NativeMethods added: GetCommandLineA, CommandLineToArgvW, LocalFree (shell32+kernel32).</li></ol>
+        <ol class="steps"><li>FIX 1: wkappbot_elevated pipe routing (root...</li></ol>
         
       </div>
       <footer class="skill-footer">

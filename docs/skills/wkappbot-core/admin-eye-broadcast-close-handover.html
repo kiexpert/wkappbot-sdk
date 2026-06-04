@@ -263,47 +263,7 @@
       <div class="tags"><span class="chip">project</span><span class="chip">admin</span><span class="chip">eye</span><span class="chip">ipc</span><span class="chip">named-pipe</span><span class="chip">recovery</span><span class="chip">broadcast</span><span class="chip">hand-over</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>WHY THE PATTERN EXISTS
-Admin Eye can fall into a state where it accepts pipe connections but hangs on request processing (Bug 1). Without active eviction, simply spawning a new admin Eye fails: the hung one still holds the pipe, new one contends, requests route to the dead one. Plain kill breaks the &#x27;NEVER kill Eye&#x27; rule for user Eye — but admin Eye is separate, has no mutex, and can be replaced.</li><li>PHASE 1 — GRACEFUL BROADCAST
-New admin calls AdminEyeBroadcastClose.FireBroadcast().
-Uses Global\WKAppBotAdminEyeBroadcastClose ManualResetEvent.
-  ev.Set() → sleep 500ms → ev.Reset()
-  poll File.Exists(&#x27;\.\pipe\wkappbot_elevated&#x27;) up to 2s
-Old admins with StartListener() active observe the signal, cancel their
-proxyCts, release pipe, exit process. When no admin holds the pipe,
-File.Exists returns false → gap confirmed.</li><li>PHASE 2 — FORCE KILL FALLBACK
-If pipe still present after the grace period (old admin lacks listener —
-typical first-upgrade bootstrap), enumerate wkappbot-core processes and
-Process.Kill(entireProcessTree:false) each one except self.
-Caller is an already-elevated admin Eye so Kill is authorized.
-Guardian respawns user Eye afterward with --sudo marker inherited.</li><li>WIRING INTO ADMIN EYE STARTUP
-In EyeCommand isElevatedArg branch, immediately after entering the
-elevated proxy path:
-  AdminEyeBroadcastClose.FireBroadcast();   // before any resource claim
-  var proxyCts = new CancellationTokenSource();
-  AdminEyeBroadcastClose.StartListener(proxyCts);  // watch for future successors
-Then start pipe server and enter main loop — clean slate guaranteed.</li><li>SUBPROCESS TIMEOUT BACKSTOP
-Inside admin Eye ExecuteCommand, WaitForExitAsync must have a hard
-timeout (30s recommended). Without it, a hung subprocess blocks the
-request handler forever. With the timeout:
-  proc.Kill(entireProcessTree:true) on timeout
-  return EyeProxyResponse { ExitCode = -1, Error = &#x27;Subprocess timeout&#x27; }
-Pipe handler always returns, admin Eye keeps servicing new requests.</li><li>CALLER-SIDE FAST-FAIL PAIRING
-In Core --sudo proxy-route, ExecuteViaProxy should use a short timeout
-(e.g. 1500ms) for the first attempt. If -1 returned, call
-LaunchElevatedEye to trigger the spawn → FireBroadcast → fresh admin.
-This keeps the user-visible round-trip under ~3s even in worst case.</li><li>OBSERVABILITY MARKERS (PULSE + stderr)
-Expect to see these during hand-over:
-  [EYE:ADMIN-CLOSE] broadcast close fired — waiting for old admin Eye(s) to drain
-  [EYE:ADMIN-CLOSE] graceful close did not free pipe — escalating to force kill
-  [EYE:ADMIN-CLOSE] force-killed N other wkappbot-core process(es)
-  [EYE:ADMIN-CLOSE] pipe cleared after force kill — clean gap
-Absence of these while [SUDO] Routing appears means a hand-over never
-triggered — hung admin is still live. Investigate subprocess timeouts.</li><li>REGRESSION TESTS
-bin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh (T1–T10)
-  T7 covers admin Eye round-trip; T7d budget 8s verifies fast-fail + recovery path total.
-  If T7c/d fail repeatedly across sessions, root cause is inside admin Eye
-  ExecuteCommand subprocess spawn — NOT the broadcast-close layer.</li></ol>
+        <ol class="steps"><li>WHY THE PATTERN EXISTS Admin Eye can fall in...</li><li>PHASE 1 — GRACEFUL BROADCAST New admin calls...</li><li>PHASE 2 — FORCE KILL FALLBACK If pipe still...</li><li>WIRING INTO ADMIN EYE STARTUP In EyeCommand...</li><li>SUBPROCESS TIMEOUT BACKSTOP Inside admin Eye...</li><li>CALLER-SIDE FAST-FAIL PAIRING In Core --sudo...</li><li>OBSERVABILITY MARKERS (PULSE + stderr) Expec...</li><li>REGRESSION TESTS bin/wkappbot.hq/experience/...</li></ol>
         
       </div>
       <footer class="skill-footer">

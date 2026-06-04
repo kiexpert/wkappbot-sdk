@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>1. ResolvePwshExe(name) in ChatCommand.Resolvers.cs probes well-known PowerShell 7 install paths (Program Files, LocalAppData), falls back to Windows PowerShell 5 (System32 WindowsPowerShell v1.0), then PATH walk.</li><li>2. RunStart calls ResolvePwshExe when cmdArgv[0] is pwsh/pwsh.exe/powershell/powershell.exe after IsExternalExe branch selects exe = cmdArgv[0].</li><li>3. Bug: parallel workers (RunParallelWithFlushAsync -&gt; RunGeminiLoopAsync -&gt; AskGemini) failed with &#x27;An error occurred trying to start process pwsh ... file not found&#x27; because PATH was empty/stripped.</li><li>4. Verified 2026-05-15: suggest 2026-05-14T11:07:40 resolved at commit c1fe24743.</li></ol>
+        <ol class="steps"><li>1. ResolvePwshExe(name) in ChatCommand.Resol...</li><li>2. RunStart calls ResolvePwshExe when cmdArg...</li><li>3. Bug: parallel workers (RunParallelWithFlu...</li><li>4. Verified 2026-05-15: suggest 2026-05-14T1...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">reddit</span><span class="chip">chrome</span><span class="chip">modal</span><span class="chip">uia</span><span class="chip">flair</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>1. a11y find shows only X-close button (32x33px) as UIA Button in modal -- Add and Cancel buttons missing from UIA tree</li><li>2. a11y click grap fails -- fallback to WM_LBUTTON PostMessage which Chrome modal ignores (NeedsPhysicalClick)</li><li>3. CDP eval-js querySelector click fires but isTrusted=false -- React modal ignores it</li><li>4. Select flair radio via: wkappbot a11y invoke grap#Rad_post-flair-radio-input-1</li><li>5. User must physically click Add -- or use screen coords: X-button UIA pos + (0, +418) approx</li><li>6. Bug filed suggest ts=***.941499 -- fix = CDP Input.dispatchMouseEvent or --cdp-xy flag</li></ol>
+        <ol class="steps"><li>1. a11y find shows only X-close button (32x3...</li><li>2. a11y click grap fails -- fallback to WM_L...</li><li>3. CDP eval-js querySelector click fires but...</li><li>4. Select flair radio via: wkappbot a11y inv...</li><li>5. User must physically click Add -- or use...</li><li>6. Bug filed suggest ts=***.941499 -- fix =...</li></ol>
         
       </div>
       <footer class="skill-footer">

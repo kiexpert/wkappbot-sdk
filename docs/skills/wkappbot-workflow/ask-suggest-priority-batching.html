@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">ask</span><span class="chip">gpt</span><span class="chip">suggest</span><span class="chip">priority</span><span class="chip">batching</span><span class="chip">triage</span><span class="chip">workflow</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Batch triage: one GPT ranking pass for full page, then per-item queries fired concurrently. next:ask-suggest-priority-batching-howto for execution steps. cluster:ask-suggest-priority-batching-ref for calibration history.</li><li>DELEGATION PATTERN: Sonnet fires queries and waits. After responses arrive, brief Opus with ts+title+result+fix-path. Opus edits/builds/resolves. Sonnet never writes code inline.</li><li>TIMEOUT=20s (--timeout 20s). No response in 20s = proceed with codebase analysis immediately. Never block indefinitely. No retry.</li><li>STOP after firing queries. Do NOT use Sonnet tokens while GPT runs. Resume only after responses or 20s timeout. This is the whole point of batching.</li><li>PIPELINE HEALTH CHECK: ping --new-session --sync --timeout 20s before triage. Broken pipeline = file BUG-AUTO + continue with codebase analysis fallback.</li></ol>
+        <ol class="steps"><li>Batch triage: one GPT ranking pass for full...</li><li>DELEGATION PATTERN: Sonnet fires queries and...</li><li>TIMEOUT=20s (--timeout 20s). No response in...</li><li>STOP after firing queries. Do NOT use Sonnet...</li><li>PIPELINE HEALTH CHECK: ping --new-session --...</li></ol>
         
       </div>
       <footer class="skill-footer">

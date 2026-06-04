@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>ActionExecutor.cs DoSetValue: Thread.Sleep(50) after vp.Pattern.SetValue(text). ReadElementValue() checks Value then TextPattern then Name. If read-back empty and text non-empty: logs stale cache warning. a11y set-value affected command. Win11 Notepad RichEditD2DPT and Chrome input workaround.</li><li>If stale warning appears: try type_text instead (uses WM_CHAR/EM_REPLACESEL tiers which bypass UIA cache).</li><li>Root cause: Win11 RichEditD2DPT and Chrome accessibility bridge don&#x27;t sync ValuePattern.Value synchronously after SetValue COM call.</li><li>Verified 2026-04-21: test-set-value-readback.sh (resolve ts=2026-04-17T09:12)</li></ol>
+        <ol class="steps"><li>ActionExecutor.cs DoSetValue: Thread.Sleep(5...</li><li>If stale warning appears: try type_text inst...</li><li>Root cause: Win11 RichEditD2DPT and Chrome a...</li><li>Verified 2026-04-21: test-set-value-readback...</li></ol>
         
       </div>
       <footer class="skill-footer">

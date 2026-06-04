@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">ask</span><span class="chip">cdp</span><span class="chip">chrome</span><span class="chip">anon-tab</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Gate TryCloseAnonymousTabAsync on ok=true in AskCommands.ChatGpt.cs and AskCommands.Claude.cs.</li><li>Never close the anon tab when ok=false -- user is mid-login or the page failed (TAB:ANON-CLOSE death-spiral fix: suggest 2026-05-18T04:28:01).</li><li>AskCommands.Gemini.cs keeps its &#x27;if (!ok)&#x27; close-on-failure convention (anon tab IS the failure tab); do not normalize across files.</li><li>Verified 2026-05-18: ev-tab-anon-close-failure-preserves-tab.sh (resolve ts=2026-05-18T04:28:01)</li></ol>
+        <ol class="steps"><li>Gate TryCloseAnonymousTabAsync on ok=true in...</li><li>Never close the anon tab when ok=false -- us...</li><li>AskCommands.Gemini.cs keeps its &#x27;if (!ok)&#x27; c...</li><li>Verified 2026-05-18: ev-tab-anon-close-failu...</li></ol>
         
       </div>
       <footer class="skill-footer">

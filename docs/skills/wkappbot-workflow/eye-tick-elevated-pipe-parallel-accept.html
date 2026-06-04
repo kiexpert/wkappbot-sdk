@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>Root cause: single WaitForConnectionAsync loop created an accept-gap between connections. 26 parallel --sudo calls saturated the 1500ms budget. Fix: ElevatedEyeProxy.ListenAsync spawns AcceptWorkers=32 AcceptLoop tasks, each owning its own NamedPipeServerStream instance ready in WaitForConnectionAsync.</li><li>Each AcceptLoop(workerId, ct) independently waits, accepts, dispatches to Task.Run(HandleClient), then immediately loops back to arm a new NamedPipeServerStream. ~32 acceptors are always armed in parallel, absorbing bursts up to 32 simultaneous ConnectAsync without any gap.</li><li>If HANDSHAKE-MISS reappears with burst&gt;32, increase AcceptWorkers constant in ElevatedEyeProxy.cs (max=255 per MaxAllowedServerInstances). Also ensures connectedPipe.Dispose() in HandleClient finally to close the prior connection leak.</li><li>Verified 2026-04-21: test-eye-tick-handshake-miss-parallel.sh (resolve ts=2026-04-21T17:52)</li></ol>
+        <ol class="steps"><li>Root cause: single WaitForConnectionAsync lo...</li><li>Each AcceptLoop(workerId, ct) independently...</li><li>If HANDSHAKE-MISS reappears with burst&gt;32, i...</li><li>Verified 2026-04-21: test-eye-tick-handshake...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"><span class="chip">wkappbot-core</span><span class="chip">launcher</span><span class="chip">sudo</span><span class="chip">dispatch</span><span class="chip">args</span></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>1. Symptom: wkappbot --sudo a11y invoke X -&gt; Unknown command: --sudo (also a11y read, win-click).</li><li>2. Cause: Program.Dispatch.cs computed command = args[0].ToLowerInvariant() without skipping --sudo.</li><li>3. Fix: Program.Args.cs adds IsPreCommandFlag() allowlist; Program.Dispatch.cs walks until non-flag.</li><li>4. --sudo retained in restArgs so downstream SudoHandler.EnsureAdminForSudo / ElevatedEyeProxy still routes elevation.</li><li>5. Verify: wkappbot --sudo a11y invoke / read / win-click all reach proper handlers post-fix.</li><li>BUG REPORT cmds: a11y invoke / a11y inspect / a11y read / win-click ALL routed correctly post-fix when --sudo prefixes the subcommand verb.</li></ol>
+        <ol class="steps"><li>1. Symptom: wkappbot --sudo a11y invoke X -&gt;...</li><li>2. Cause: Program.Dispatch.cs computed comma...</li><li>3. Fix: Program.Args.cs adds IsPreCommandFla...</li><li>4. --sudo retained in restArgs so downstream...</li><li>5. Verify: wkappbot --sudo a11y invoke / rea...</li><li>BUG REPORT cmds: a11y invoke / a11y inspect...</li></ol>
         
       </div>
       <footer class="skill-footer">

@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>IsFocusStealingMethod includes Runtime.evaluate unconditionally (removed expression-based IsFocusRiskExpression conditional).</li><li>Track weMinimized=true when we call ShowWindowNative -- only restore Chrome if weMinimized (prevents restoring already-minimized Chrome on every eval).</li><li>After ShowWindowNative(SW_SHOWMINNOACTIVE), wait 50x10ms for IsIconic() to confirm minimize completed before sending CDP command (RACE fix).</li><li>Verified 2026-04-23: experience/tests/cdp/test-cdp-runtime-evaluate-focus-steal-guard.sh (resolve ts=2026-04-22T23:40:01). Page.navigate also added to IsFocusStealingMethod + knownGuarded (2026-04-28, commit b0ccd8e4) -- tab navigation activates Chrome window just like Page.bringToFront.</li></ol>
+        <ol class="steps"><li>IsFocusStealingMethod includes Runtime.evalu...</li><li>Track weMinimized=true when we call ShowWind...</li><li>After ShowWindowNative(SW_SHOWMINNOACTIVE),...</li><li>Verified 2026-04-23: experience/tests/cdp/te...</li></ol>
         
       </div>
       <footer class="skill-footer">

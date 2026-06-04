@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>1. Call GET /repos/{owner}/{repo}/invitations after permission=none check</li><li>Eye callout message: activation-pending users must NOT see silent Free tier -- always show numbered guide with github.com/invitations URL</li><li>Implementation deferred to license-auth sprint: wire GET /repos/invitations check into LicenseChecker before Free-tier fallback branch</li><li>After permission=none: call GET /repos/invitations, match invitee, show numbered guide: 1) check email invite 2) go github.com/invitations 3) accept WKAppBot repo 4) rerun wkappbot</li><li>Root cause: spec step 22 assumes permission reflects immediately after invite, but only activates after acceptance. indistinguishable from never-invited until accepted. Better UX than silent Free downgrade.</li><li>Business plan draft onboarding document: Customer who paid and gets invite but not yet accepted gets Free tier -- document in onboarding that invite must be accepted before license activates.</li></ol>
+        <ol class="steps"><li>1. Call GET /repos/{owner}/{repo}/invitation...</li><li>Eye callout message: activation-pending user...</li><li>Implementation deferred to license-auth spri...</li><li>After permission=none: call GET /repos/invit...</li><li>Root cause: spec step 22 assumes permission...</li><li>Business plan draft onboarding document: Cus...</li></ol>
         
       </div>
       <footer class="skill-footer">

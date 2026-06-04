@@ -263,7 +263,7 @@
       <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps"><li>USE: await CdpClient.AppBotSleepAsync(maxMs, async () =&gt; { var r = await EvalAsync(...); return r == expected; })</li><li>SYNC overload: await CdpClient.AppBotSleepAsync(maxMs, () =&gt; someFlag)</li><li>Default poll interval: 33ms (~30fps). CDP round-trip is 1-50ms so 33ms catches condition within 1-2 cycles.</li><li>NEVER use Task.Delay &gt;= 1000ms in CDP code without an exit condition. All blind waits are bugs -- file suggest if found.</li><li>Location: CdpClient.Sleep.cs (WKAppBot.WebBot partial class)</li></ol>
+        <ol class="steps"><li>USE: await CdpClient.AppBotSleepAsync(maxMs,...</li><li>SYNC overload: await CdpClient.AppBotSleepAs...</li><li>Default poll interval: 33ms (~30fps). CDP ro...</li><li>NEVER use Task.Delay &gt;= 1000ms in CDP code w...</li><li>Location: CdpClient.Sleep.cs (WKAppBot.WebBo...</li></ol>
         
       </div>
       <footer class="skill-footer">
