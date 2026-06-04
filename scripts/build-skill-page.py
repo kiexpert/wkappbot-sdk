@@ -248,10 +248,11 @@ def render_stars(count: int) -> str:
 
 
 
-def build_skill_detail_html(skill: dict[str, Any]) -> str:
+def build_skill_detail_html(skill: dict[str, Any], all_skills: list = None, idx: int = 0) -> str:
     title = e(skill["title"])
     desc = e(skill["desc"] or "No description yet.")
     app = e(skill["app"])
+    app_slug = skill_page_slug(skill["app"])
     audience = e(skill["audience"])
     tags = "".join(f'<span class="chip">{e(tag)}</span>' for tag in skill["tags"])
     premium = bool(skill.get("premium", False))
@@ -260,13 +261,60 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
     parent_link = ""
     if parent_id:
         parent_slug = skill_page_slug(parent_id)
-        parent_link = f'<div class="breadcrumb">Part of: <a href="../{e(parent_slug)}/">{e(parent_id)}</a></div>'
+        parent_link = f'<div class="breadcrumb">Part of: <a href="{e(parent_slug)}.html">{e(parent_id)}</a></div>'
+
+    # Build related links (siblings and prev/next)
+    related_links_html = ""
+    if all_skills:
+        # Find sibling skills (same base ID with different tier suffixes)
+        sibling_links = []
+        for s in all_skills:
+            s_id = s.get("id", "")
+            if s_id != skill_id and infer_parent_skill_id(s_id) == parent_id and parent_id:
+                sibling_slug = skill_page_slug(s_id)
+                sibling_title = e(s.get("title", ""))
+                sibling_links.append(f'<a href="../{sibling_slug}.html">{sibling_title}</a>')
+
+        # Find prev/next skills within same app
+        app_skills = [s for s in all_skills if s.get("app") == skill["app"]]
+        app_skills_sorted = sorted(app_skills, key=lambda s: str(s.get("title", "")).lower())
+
+        prev_next_html = ""
+        for i, s in enumerate(app_skills_sorted):
+            if s.get("id") == skill_id:
+                prev_html = ""
+                next_html = ""
+                if i > 0:
+                    prev_skill = app_skills_sorted[i - 1]
+                    prev_slug = skill_page_slug(prev_skill.get("id", ""))
+                    prev_title = e(prev_skill.get("title", ""))
+                    prev_html = f'<a href="../{prev_slug}.html">← {prev_title}</a>'
+                if i < len(app_skills_sorted) - 1:
+                    next_skill = app_skills_sorted[i + 1]
+                    next_slug = skill_page_slug(next_skill.get("id", ""))
+                    next_title = e(next_skill.get("title", ""))
+                    next_html = f'<a href="../{next_slug}.html">{next_title} →</a>'
+
+                if prev_html or next_html:
+                    separator = " | " if (prev_html and next_html) else ""
+                    prev_next_html = f'<nav class="skill-nav">{prev_html}{separator}{next_html}</nav>'
+                break
+
+        # Combine related sections
+        sections = []
+        if sibling_links:
+            sections.append(f'<div class="related"><strong>Related:</strong> {", ".join(sibling_links)}</div>')
+        if prev_next_html:
+            sections.append(prev_next_html)
+
+        if sections:
+            related_links_html = "\n      ".join(sections)
 
     steps = skill["steps"] or ["This skill is available in the live WKAppBot catalog."]
     if premium:
         step_items = "".join(f"<li>{e(preview_step(step))}</li>" for step in steps)
         blur_class = " blurred"
-        overlay = '<div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>'
+        overlay = '<div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="../../#pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>'
     else:
         step_items = "".join(f"<li>{e(step)}</li>" for step in steps)
         blur_class = ""
@@ -371,12 +419,12 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title} | WKAppBot Skills</title>
   <meta name="description" content="{e(truncate(str(skill['desc']), 200))}">
-  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/{e(skill["slug"])}/'>
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/{app_slug}/{e(skill_page_slug(skill_id))}.html'>
   <script type='application/ld+json'>{{"@context":"https://schema.org","@type":"TechArticle","name":"{e(skill["title"])}","description":"{e(skill["desc"][:120])}"}}</script>
   <meta property="og:title" content="{title} | WKAppBot Skills">
   <meta property="og:description" content="{e(truncate(str(skill['desc']), 200))}">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/{e(skill['slug'])}/">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/{app_slug}/{e(skill_page_slug(skill_id))}.html">
   <meta name="twitter:card" content="summary">
   <style>
     :root {{
@@ -482,7 +530,7 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
 </head>
 <body>
   <main class="shell detail-page">
-    <a class="back-link" href="../">← Back to Skills Index</a>
+    <a class="back-link" href="../">← Back to {app}</a>
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">{app}</span>
@@ -506,7 +554,8 @@ def build_skill_detail_html(skill: dict[str, Any]) -> str:
 """
 
 
-def build_skill_tree(skills: list[dict[str, Any]]) -> str:
+def build_html(skills: list[dict[str, Any]]) -> str:
+    """Generate app navigation index page only."""
     skills_by_app: dict[str, list[dict[str, Any]]] = {}
     for skill in skills:
         app = skill["app"]
@@ -514,30 +563,23 @@ def build_skill_tree(skills: list[dict[str, Any]]) -> str:
             skills_by_app[app] = []
         skills_by_app[app].append(skill)
 
-    tree_html = ""
+    app_list = ""
     for app in sorted(skills_by_app.keys()):
-        app_skills = skills_by_app[app]
-        tree_html += f'<details><summary style="cursor:pointer;font-weight:700;padding:6px 0">{e(app)}</summary><ul style="list-style:none;padding:0;margin:0">'
-        for skill in sorted(app_skills, key=lambda s: s["title"]):
-            tree_html += f'<li><a href="#skill-{e(skill["slug"])}" style="display:block;padding:4px 8px;color:#a8b2c2;text-decoration:none;font-size:13px" data-skill-slug="{e(skill["slug"])}" data-search="{e(skill["title"] + " " + skill["desc"] + " " + " ".join(skill["tags"]))}">{e(skill["title"])}</a></li>'
-        tree_html += '</ul></details>'
-    return tree_html
+        app_slug = skill_page_slug(app)
+        app_count = len(skills_by_app[app])
+        app_list += f'<li class="app-item"><h2><a href="{app_slug}/">{e(app)}</a></h2><p>{app_count} skills</p></li>'
 
-
-def build_index_html(skills: list[dict[str, Any]]) -> str:
-    """Generate navigation-only index page with search and tree view."""
-    count = len(skills)
-    tree = build_skill_tree(skills)
-
+    total = len(skills)
     return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WKAppBot Skills Index</title>
-  <meta name="description" content="Browse {count} live AI automation playbooks from WKAppBot skill catalog.">
-  <meta property="og:title" content="WKAppBot Skills Index">
-  <meta property="og:description" content="Browse live AI automation playbooks">
+  <title>WKAppBot Skills</title>
+  <meta name="description" content="AI automation playbooks organized by application. Browse {total} skills total.">
+  <link rel="canonical" href="https://kiexpert.github.io/wkappbot-sdk/skills/">
+  <meta property="og:title" content="WKAppBot Skills">
+  <meta property="og:description" content="Browse {total} live AI automation playbooks">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/">
   <style>
@@ -548,7 +590,6 @@ def build_index_html(skills: list[dict[str, Any]]) -> str:
       --muted: #a8b2c2;
       --line: rgba(255,255,255,.12);
       --accent: #6ee7b7;
-      --accent-2: #7dd3fc;
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -560,90 +601,51 @@ def build_index_html(skills: list[dict[str, Any]]) -> str:
     }}
     a {{ color: inherit; text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
-    .shell {{ width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 0 16px; }}
+    .shell {{ width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 0 16px; }}
     header {{
       border-bottom: 1px solid var(--line);
-      padding: 20px 0;
-      margin-bottom: 20px;
+      padding: 40px 0;
+      margin-bottom: 40px;
     }}
     header h1 {{
       margin: 0 0 8px;
-      font-size: 28px;
+      font-size: 32px;
       font-weight: 800;
     }}
     header p {{
       margin: 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 16px;
     }}
-    .toolbar {{
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--line);
-    }}
-    input[type="search"] {{
-      flex: 1;
-      min-height: 40px;
-      padding: 0 12px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #0c111a;
-      color: var(--text);
-      font-size: 14px;
-    }}
-    input[type="search"]:focus {{
-      outline: none;
-      border-color: var(--accent);
-    }}
-    .result-count {{
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }}
-    nav {{
-      padding: 16px 0 40px;
-    }}
-    nav details {{
-      margin-bottom: 8px;
-    }}
-    nav summary {{
-      cursor: pointer;
-      font-weight: 700;
-      padding: 8px 0;
-      user-select: none;
-    }}
-    nav summary:hover {{
-      color: var(--accent);
-    }}
-    nav ul {{
+    .app-list {{
       list-style: none;
       padding: 0;
-      margin: 8px 0 0 0;
+      margin: 0;
     }}
-    nav li {{
-      margin: 4px 0;
+    .app-item {{
+      margin: 16px 0;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(16,23,34,.5);
     }}
-    nav a {{
-      display: block;
-      padding: 4px 8px;
-      color: var(--muted);
-      font-size: 13px;
-      border-radius: 4px;
+    .app-item h2 {{
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 700;
     }}
-    nav a:hover {{
-      background: rgba(110,231,183,.1);
+    .app-item a {{
       color: var(--accent);
     }}
-    nav a.hidden {{
-      display: none;
+    .app-item p {{
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
     }}
     footer {{
       color: var(--muted);
       font-size: 12px;
-      padding: 20px 0 40px;
+      padding: 40px 0;
       border-top: 1px solid var(--line);
     }}
   </style>
@@ -651,39 +653,129 @@ def build_index_html(skills: list[dict[str, Any]]) -> str:
 <body>
   <div class="shell">
     <header>
+      <nav><a href="../">WKAppBot</a> / Skills</nav>
       <h1>WKAppBot Skills</h1>
-      <p>Browse {count} live AI automation playbooks from the WKAppBot catalog</p>
+      <p>AI automation playbooks organized by application. {total} skills total.</p>
     </header>
-    <div class="toolbar">
-      <input id="search" type="search" placeholder="Search skills, tags, or descriptions..." autocomplete="off">
-      <div id="resultCount" class="result-count">{count} skills</div>
-    </div>
-    <nav>
-{tree}
-    </nav>
+    <ul class="app-list">
+{app_list}
+    </ul>
     <footer>
       <p>Generated from live WKAppBot HQ skill catalog. <a href="../">← Back to home</a></p>
     </footer>
   </div>
+</body>
+</html>
+"""
 
-  <script>
-    const search = document.getElementById('search');
-    const resultCount = document.getElementById('resultCount');
-    const treeLinks = Array.from(document.querySelectorAll('nav a'));
 
-    function applySearch() {{
-      const q = search.value.trim().toLowerCase();
-      let visible = 0;
-      for (const link of treeLinks) {{
-        const match = !q || link.dataset.search.toLowerCase().includes(q);
-        link.classList.toggle('hidden', !match);
-        if (match) visible += 1;
-      }}
-      resultCount.textContent = visible + (visible === 1 ? ' skill' : ' skills');
+def build_app_index(app_name: str, app_skills: list[dict[str, Any]]) -> str:
+    """Generate per-app skill listing page."""
+    app_slug = skill_page_slug(app_name)
+    count = len(app_skills)
+
+    skill_items = ""
+    for skill in sorted(app_skills, key=lambda s: s["title"]):
+        skill_slug = skill_page_slug(skill["id"])
+        desc = truncate(skill["desc"], 120) if skill["desc"] else "No description."
+        skill_items += f'<li class="skill-item"><a href="{skill_slug}.html">{e(skill["title"])}</a><p>{e(desc)}</p></li>'
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{e(app_name)} Skills — WKAppBot</title>
+  <meta name="description" content="{count} automation skills for {e(app_name)}.">
+  <link rel="canonical" href="https://kiexpert.github.io/wkappbot-sdk/skills/{app_slug}/">
+  <meta property="og:title" content="{e(app_name)} Skills — WKAppBot">
+  <meta property="og:description" content="Browse {count} automation skills">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/{app_slug}/">
+  <style>
+    :root {{
+      color-scheme: dark;
+      --bg: #07090d;
+      --text: #f4f7fb;
+      --muted: #a8b2c2;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ee7b7;
     }}
-
-    search.addEventListener('input', applySearch);
-  </script>
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }}
+    a {{ color: inherit; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+    .shell {{ width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 0 16px; }}
+    header {{
+      border-bottom: 1px solid var(--line);
+      padding: 40px 0;
+      margin-bottom: 40px;
+    }}
+    header nav {{
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }}
+    header nav a {{
+      color: var(--accent);
+    }}
+    header h1 {{
+      margin: 0;
+      font-size: 32px;
+      font-weight: 800;
+    }}
+    .skill-list {{
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }}
+    .skill-item {{
+      margin: 12px 0;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }}
+    .skill-item:last-child {{
+      border-bottom: none;
+    }}
+    .skill-item a {{
+      display: block;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }}
+    .skill-item p {{
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }}
+    footer {{
+      color: var(--muted);
+      font-size: 12px;
+      padding: 40px 0;
+      border-top: 1px solid var(--line);
+    }}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <nav><a href="../">WKAppBot Skills</a> / {e(app_name)}</nav>
+      <h1>{e(app_name)}</h1>
+    </header>
+    <ul class="skill-list">
+{skill_items}
+    </ul>
+    <footer>
+      <p>Generated from live WKAppBot HQ skill catalog. <a href="../">← Back to skills</a></p>
+    </footer>
+  </div>
 </body>
 </html>
 """
@@ -694,11 +786,30 @@ def build_index_html(skills: list[dict[str, Any]]) -> str:
 def main() -> int:
     skills = collect_skills()
     SKILLS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(build_index_html(skills), encoding="utf-8")
+
+    # Build main index (app navigation only)
+    OUTPUT.write_text(build_html(skills), encoding="utf-8")
+
+    # Group skills by app and build per-app indices + detail pages
+    skills_by_app: dict[str, list[dict[str, Any]]] = {}
     for skill in skills:
-        skill_dir = SKILLS_OUTPUT_DIR / str(skill["slug"])
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "index.html").write_text(build_skill_detail_html(skill), encoding="utf-8")
+        app = skill["app"]
+        if app not in skills_by_app:
+            skills_by_app[app] = []
+        skills_by_app[app].append(skill)
+
+    for app_name, app_skills in sorted(skills_by_app.items()):
+        app_slug = skill_page_slug(app_name)
+        app_dir = SKILLS_OUTPUT_DIR / app_slug
+        app_dir.mkdir(parents=True, exist_ok=True)
+
+        # Build per-app index
+        (app_dir / "index.html").write_text(build_app_index(app_name, app_skills), encoding="utf-8")
+
+        # Build individual skill pages
+        for skill in app_skills:
+            skill_slug = skill_page_slug(skill["id"])
+            (app_dir / f"{skill_slug}.html").write_text(build_skill_detail_html(skill), encoding="utf-8")
 
     # Generate skills-data-full.js with full skill data (id, slug, steps)
     SKILLS_FULL_OUTPUT = SKILLS_OUTPUT_DIR / "skills-data-full.js"
@@ -710,17 +821,28 @@ def main() -> int:
     SITEMAP_OUTPUT = REPO_ROOT / "docs" / "skills" / "sitemap.xml"
     base = "https://kiexpert.github.io/wkappbot-sdk/skills"
     urls = [f"<url><loc>{base}/</loc></url>"]
-    for s in skills:
-        if any(s["slug"].endswith(suffix) for suffix in ("-howto", "-ref", "-t2-howto", "-t3-ref", "-t2", "-t3")):
+
+    # Add per-app indices to sitemap
+    for app_name in sorted(skills_by_app.keys()):
+        app_slug = skill_page_slug(app_name)
+        urls.append(f"<url><loc>{base}/{app_slug}/</loc></url>")
+
+    # Add individual skill pages (exclude tier suffixes)
+    for skill in skills:
+        if any(skill["id"].endswith(suffix) for suffix in ("-howto", "-ref", "-t2-howto", "-t3-ref", "-t2", "-t3")):
             continue
-        urls.append(f"<url><loc>{base}/{s['slug']}/</loc></url>")
+        app_slug = skill_page_slug(skill["app"])
+        skill_slug = skill_page_slug(skill["id"])
+        urls.append(f"<url><loc>{base}/{app_slug}/{skill_slug}.html</loc></url>")
+
     NL = chr(10)
     sitemap = ('<?xml version="1.0" encoding="UTF-8"?>' + NL
                + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + NL
                + NL.join(urls) + NL + '</urlset>')
     SITEMAP_OUTPUT.write_text(sitemap, encoding="utf-8")
 
-    print(f"Generated {OUTPUT} with {len(skills)} skills and {len(skills)} detail pages")
+    total_pages = 1 + len(skills_by_app) + len(skills)
+    print(f"Generated {OUTPUT} with {len(skills)} skills, {len(skills_by_app)} app indices, and {total_pages} total pages")
     return 0 if len(skills) > 50 else 1
 
 
