@@ -1,7 +1,7 @@
 #!/bin/bash
 # gg-main.sh: SDK Product Manager Comprehensive Health Check
 # Purpose: Detect ALL known bad conditions, report each with the related skill ID.
-# Sections: E Eye  Z Chrome/Zombie  B CDP/Ask  P Suggest  C CI  O Dev-Build  S GitHub-Status  D CDP-anomaly  V Version  R Release  G CLAUDE.md  H Skill-audit  A Summary
+# Sections: E Eye  Z Chrome/Zombie  B CDP/Ask  P Suggest  C CI  O Dev-Build  N Release-Notes  S GitHub-Status  D CDP-anomaly  V Version  R Release  G CLAUDE.md  H Skill-audit  A Summary
 # Exit: 0 = green (no issues), 1 = amber (WARN), 2 = critical (CRITICAL)
 # Run: bash scripts/gg-main.sh
 
@@ -226,6 +226,30 @@ if command -v gh >/dev/null 2>&1; then
       "Verify gh auth + repo access"
   else
     echo "  dev repo status unknown (gh unavailable)"
+  fi
+else
+  echo "  [SKIP] gh not available"
+fi
+echo ""
+
+# ============================================================================
+# SECTION N: Release Notes Quality
+# ============================================================================
+echo "==[ N ] RELEASE NOTES QUALITY =="
+if command -v gh >/dev/null 2>&1; then
+  LATEST_TAG=$(gh release list --limit 1 --repo kiexpert/wkappbot-sdk --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+  if [ -n "$LATEST_TAG" ]; then
+    NOTES=$(gh release view "$LATEST_TAG" --repo kiexpert/wkappbot-sdk --json body --jq '.body' 2>/dev/null || echo "")
+    NOTES_LEN=${#NOTES}
+    if [ "$NOTES_LEN" -lt 200 ] || echo "$NOTES" | grep -q "^\*\*Full Changelog\*\*:"; then
+      note_warn "Release $LATEST_TAG has stub notes (${NOTES_LEN} chars) -- expand before publishing" \
+        "sdk-launcher-maintenance" \
+        "gh release view $LATEST_TAG --repo kiexpert/wkappbot-sdk && edit notes"
+    else
+      echo "  OK: Release $LATEST_TAG notes sufficient (${NOTES_LEN} chars)"
+    fi
+  else
+    echo "  [SKIP] No releases found"
   fi
 else
   echo "  [SKIP] gh not available"
