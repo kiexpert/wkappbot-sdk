@@ -125,7 +125,7 @@ fi
 
 WKASK_SH="$(command -v wkask.sh 2>/dev/null || echo D:/GitHub/WKAppBot/bin/wkask.sh)"
 if [ -f "$WKASK_SH" ]; then
-  if grep -qE 'Bypass[^\n]*\\n[^\n]*-File' "$WKASK_SH" 2>/dev/null; then
+  if grep -qE 'Bypass.*\\n.*-File' "$WKASK_SH" 2>/dev/null; then
     note_crit "wkask.sh contains literal \\n between Bypass and -File (exec broken)" \
       "wktool-pattern" \
       "Edit wkask.sh: collapse to single-line exec"

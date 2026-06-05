@@ -505,7 +505,8 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] WKHARNESS_OPUS_FG env var 백도어 언급 스킬 전체 정리 필요
 - [ ] wkappbot-harness repo 삭제 필요 (허락 없이 생성한 것, delete_repo scope 필요)
 - [ ] skill-heal-nightly 3tier 분리 필요 (21 steps, update-gate 차단 중)
-- [ ] wkask.sh \n bug: Codex agent "Review recent Codex Gemini work" keeps reverting bin/wkask.sh to broken version. Fixed 3x this session. Need Codex deny rule for this file.
+- [x] wkask.sh \n bug 2026-06-05 (gg final health): ROOT CAUSE found = gg-main.sh detection pattern was buggy (`Bypass[^\n]*\\n[^\n]*-File` -- `[^\n]*` excludes literal 'n' chars so never spanned the text), so the broken Core file went UNDETECTED = the "false-positive" was actually a false-NEGATIVE. Fixed pattern to `Bypass.*\\n.*-File` (commit pending). SDK bin/wkask.sh = CLEAN (single-line); Core D:/GitHub/WKAppBot/bin/wkask.sh = WAS broken (literal \n), fixed to single-line + smoke-verified (exec reaches wkask.ps1, no \n arg error). Codex deny-rule for Core bin/wkask.sh still needed to stop reverts.
+- [ ] gg-main final WARN classification 2026-06-05: Eye 5>3=boundary (1x13h PROTECTED survivor, reaper handles; not crit) MONITOR; suggests 14>5=backlog MONITOR; FOCUS-STEAL 3 + CHROME:CAP 7 = Core-scope ESCALATE; CI CDP Smoke fail=expected (real-site nav timeout) SKIP-rule OK; dev-repo skipped=non-standard MONITOR. SECURITY.md 7.5.x = intentional range, not drift.
 - [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start → 닫기 dialog). Needs auto-restore or on-screen Chrome guard before ask.
 - [ ] wkask Gemini: Google cookie consent banner off-screen (Chrome minimized). Same root cause as GPT issue.
 - [ ] wkask Gemini -Wait arch bug: sync exec + completed log → suggest needed (wkappbot ask gemini direct works)
