@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.5.0 - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.5.35-sdk - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -464,6 +464,16 @@ wkappbot skill read wkharness-guards            # Impl: ctypes Windows API patte
 wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
 ## Pending
+
+- [ ] suggest triage 2026-06-05 (RANK 1-4, 2긴급+19중요+2기타 SDK channel; GPT ranking skipped — Chrome>5/CDP-bug risk per gg step 4 note; classified by SPEC impact/urgency/effort/scope):
+  - RANK 1 [8/9] BUG-CDP LOGIN_PAGE ports 9980 session expired | impact=HIGH blocks ask/CDP user workflow, user-facing | effort=MED | scope=Core (login-wipe = chrome multiplication root, tracked DG-personal-docs [31]) → SDK mitigation already live (MyCdpContext.ChromeHealthCheck auto-cleanup); monitor recurrence, no new SDK fix
+  - RANK 2 [17] sdk-find-stable: dev repo build not green (failure) | impact=HIGH blocks releases | effort=LOW (verify) | scope=Core build (kiexpert/wkappbot) → escalate: gh run list --repo kiexpert/wkappbot; add to gg DEV-BUILD section (already in skill v1.34 step 14)
+  - RANK 3 [18/19/20] HARNESS GAP core.hooksPath='' bypasses pre-push | impact=MED security | effort=LOW | scope=SDK harness → ALREADY PATCHED (CLAUDE.md harness:block core.hooksPath rule present); resolve-as-fixed pending Eye stable
+  - RANK 3 [21/22] CRITICAL Chrome mult false-positive MERGE×2 | impact=MED | effort=DONE | scope=SDK ChromeHealthCheck.cs (MainWindowHandle filter + Skip(2) keep-2, threshold>3, commit 6dc2e6d9) → verified fixed; resolve pending
+  - RANK 3 [15/16] FEAT agent-msg command | impact=LOW nice-to-have | effort=MED | scope=SDK feature → backlog, not blocking
+  - RANK 4 [15→ts 2026-06-03T19:56:35] WebSocketException ReconnectAsync + [21→ts 2026-06-02T01:59:32] Runtime.evaluate timeout | stale BUG-AUTO CdpClient (Core, OUT OF SCOPE) from cold-start "ask gemini say:test" smoke | dismiss-stale per resolve-stale-bug-auto-merge-noise
+  - RANK 4 [35/36] wkask.sh literal-backslash exec | scope=SDK but fixed 3x (commit 94026081) → Codex deny-rule needed (Pending below); [37] skill sync CONFLICTS UX=LOW; [40] pre-push AI-block UX=LOW; [42] FEAT skill 3-tier auto-detect=LOW; [202/203] pre-commit false-block=already fixed
+  - BLOCKER: actual suggest resolve/merge IPC-lagged (Eye); triage documented only, formal resolution next stable session
 
 <!-- compressed 2026-06-04 nightly-heal: all resolved [x] items folded into the single DONE-ARCHIVE line below; raw history in git -->
 - [x] DONE-ARCHIVE (compressed 2026-06-04, all prior [x] clusters): v7.5.0-sdk release + 3x nightly-heal 2026-05-30..06-04 (wkask.sh/ps1 fixes, wkcdp-mon MonitorFromPoint, wkzombie safe-skip, CDP cdp-open 143min->30s Core 82d60f74f, Chrome multiplication SDK auto-cleanup MyCdpContext.ChromeHealthCheck, gg-main-enhanced, doc bump v7.4->v7.5, gh release); skill-browser + 3tier cluster (wkask log fixes, wksplit-cs, sdk-gg-main-automation/suggest-triage/wkharness/cdp-command 3tier splits, docs/skills restructure + self-heal scripts, PAT pro unlock b26ad540, 3-state auth b057a503, 423 skill pages built); wkjobs/taskkill suite + Codex harness/wrappers + caller-HWND resolution + a11y WT terminal + wkdoctor 10-checks; test-auth.html probe page (05b47480); gg triage 2026-06-04 (wkask.sh merges, Chrome 16->2 auto-cleanup verified); payment-skill ref heal (SUBSCRIBE.md Korean anchor + drop missing kis_payment_watcher.py refs, v1.8). Commit hashes in git log.
