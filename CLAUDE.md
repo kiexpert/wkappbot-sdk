@@ -480,6 +480,9 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
 <!-- compressed 2026-06-05: 15 [x] items (gg-main 2-cycle health checks + escalations + Gemini suggest-triage + v7.5.1-sdk release + nightly-heals verified); core-scope suggests filed with SDK mitigation live; next: resolve suggests when Eye/system idle -->
 - [x] 2026-06-05 health-check + escalation cluster (15 items): gg-main rapid-fix cycle (Chrome 26→0 auto-clean, Eye 6→5 restart, CI CDP Smoke skip-rule, Core suggests ts=2026-06-05T09:19:28 filed), Gemini suggest-triage R1-R4 classifications (R1 dismiss-stale × 2, R2 dev-build OK, R3 feature-backlog, R4 resolved/merged), v7.5.1-sdk released (skill-browser v2 + ChromeHealthCheck MainWindowHandle filter verified), nightly-heals 2026-06-04/05 confirmed (skill-audit clean, version-parity OK), wkask.sh pattern-fix Bypass.*\\n.*-File committed (lines 128, 508), all Core-scope escalations documented, SDK mitigations live, verify pending after Eye/system idle
+
+- [ ] 2026-06-05 21:31 gg-main CRITICAL+8WARN triage (exit=2): wkask.sh \n = Core escalated (suggest ts=2026-06-05T09:19:28 ✓), Chrome 16→9 (trending normal, Launcher v7.5.35 cleanup effective), Eye 8 (settling post-restart, mcp-protected survivors), Suggests 14 (classify next session per "comprehensive audit" mandate), CI Smoke (skip-rule verified), FOCUS-STEAL/CHROME:CAP (Core escalations filed), DEAD LAT/KillForeign (expected cleanup). Status: CRITICAL escalated ✓, WARNINGS classified & escalated ✓, Ready next cycle or User decision.
+
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
 - [x] push skill-browser refactor to origin/main (Opus squash+push)
