@@ -111,13 +111,13 @@ The chain grows. The system gets harder to break.
 
 ---
 
-## What's New in v7.5
+## What's New in v7.5.35
 
-- **`wkask.sh` streaming fix (CRITICAL)** -- a stray `\n` literal in the `exec` line broke the bash relay entirely. Restored to a single-line `exec powershell ... -File wkask.ps1 "$@"`.
-- **`wkask.ps1` colour-helper cleanup** -- mojibake `??` prefixes replaced with clean ASCII tags (`[OK]/[INFO]/[WARN]/[ERR]/==`) so codex/bash streaming stays readable.
-- **`wkcdp-mon.ps1` multi-monitor off-screen detection** -- `Invoke-KillIdle` now uses `MonitorFromPoint` (`WkWin32::IsOnAnyMonitor`) instead of a negative-coord regex, eliminating false positives on left-monitor setups.
-- **`wkzombie.ps1` null-StartTime guard** -- Access-Denied processes return `age=-1` and are skipped, not killed.
-- **Chrome multiplication SDK-side mitigation** -- `MyCdpContext.ChromeHealthCheck.CleanExcessiveChromeProcesses()` auto-cleans duplicate Chrome processes when more than 5 are detected, preserving the 2 oldest. Integrated with `gg-main-enhanced.ps1`.
+- **gg-main health check enhancements** -- release-notes quality verification, dev-repo build status, GitHub service status monitoring for release readiness.
+- **Skill browser v2** -- deep-linking via URL hash (SEO-safe), sidebar navigation, sonnet-reflection 7-step display, 44-char preview limits for better marketing appeal.
+- **Chrome health filter (SDK-side mitigation)** -- count only main browser instances via `MainWindowHandle` filter, exclude renderer/GPU subprocesses (resolves false-positive multiplication alerts).
+- **Watchdog emergency-kill reap-protect** -- AI-spawned processes (pythonw/node/codex) protected from reaping, priority-based ranking for OS resource management.
+- **GHA auto-build skill pages** -- GitHub Actions workflow (6h cron + on-push) to regenerate 443+ skill browser pages automatically.
 
 ### v7.4 highlights (still active)
 
