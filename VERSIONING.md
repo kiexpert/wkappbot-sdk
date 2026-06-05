@@ -34,7 +34,7 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`7.5` -- bumped at 2026-05-30 -- wkask.sh streaming exec fix (stray `\n` literal removed), wkask.ps1 colour-helper mojibake cleanup ([OK]/[INFO]/[WARN]/[ERR] ASCII tags), wkcdp-mon.ps1 multi-monitor off-screen detection via `MonitorFromPoint`, wkzombie.ps1 null-StartTime safe-skip verified, wkci.sh executable bit set, Chrome multiplication SDK-side auto-cleanup (`MyCdpContext.ChromeHealthCheck`) integrated with `gg-main-enhanced`
+`7.5.35` -- bumped at 2026-06-04 -- gg-main health check enhancements (release-notes quality, dev-repo build, GitHub status monitoring), skill browser v2 (deep-linking, SEO, sidebar nav, sonnet-reflection, 44-char preview), Chrome health filter (MainWindowHandle, exclude renderer procs), watchdog emergency-kill reap-protect, GHA auto-build skill pages, CLAUDE.md session-based pending tracking
 
 ## Previous versions
 

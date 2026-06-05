@@ -3,6 +3,25 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.5.35-sdk] - 2026-06-04
+
+### Added
+- **gg-main health check enhancements**: release-notes quality check, dev-repo build status verification, GitHub service status monitoring
+- **Skill browser v2**: deep-linking via URL hash (SEO-safe), sidebar navigation, sonnet-reflection 7-step display, 44-char preview limits for marketing appeal
+- **Watchdog emergency-kill**: reap-protect logic for AI-spawned processes (pythonw/node/codex), priority-based process ranking (CPU/mem)
+- **GHA auto-build**: GitHub Actions workflow (6h cron + on-push) to regenerate skill browser pages (443+ skills)
+- **CLAUDE.md session tracking**: session-based pending item logging, gg-main autonomous fix documentation
+
+### Fixed
+- **Chrome health check**: count only main browser instances via MainWindowHandle filter, exclude renderer/GPU subprocesses (resolves false-positive multiplication alerts)
+- **gg-main auto-cleanup**: route Stop-Process to wkappbot taskkill for kill-protection compliance (prevent accidental active-session termination)
+- **Skill browser**: fetch path corrections, nav link structure migration (app/{id}.html), iframe sidebar integration
+- **CI paths**: UX Audit and skill-page checks updated for v2 directory structure
+
+### Changed
+- **Skill browser architecture**: migrated to app/{id}.html structure (from flat index), separated index (nav-only) from skill pages (content-only)
+- **Pending tracking**: session-based logging in CLAUDE.md (Pending block) with automated compress checkpoints (15-item threshold)
+
 ## [7.5.0-sdk] - 2026-05-30
 
 ### Fixed
