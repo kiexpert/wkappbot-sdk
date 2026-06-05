@@ -483,6 +483,8 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
 - [ ] 2026-06-05 21:31 gg-main CRITICAL+8WARN triage (exit=2): wkask.sh \n = Core escalated (suggest ts=2026-06-05T09:19:28 ✓), Chrome 16→9 (trending normal, Launcher v7.5.35 cleanup effective), Eye 8 (settling post-restart, mcp-protected survivors), Suggests 14 (classify next session per "comprehensive audit" mandate), CI Smoke (skip-rule verified), FOCUS-STEAL/CHROME:CAP (Core escalations filed), DEAD LAT/KillForeign (expected cleanup). Status: CRITICAL escalated ✓, WARNINGS classified & escalated ✓, Ready next cycle or User decision.
 
+- [ ] 2026-06-06 00:30 gg-main CRITICAL×4+WARN×6 escalation BLOCKED (exit=2): Eye 33 zombie (acceleration 8→22→33), CDP 9712 memory 1192MB (explosion), LOGIN_PAGE session expired, Suggests 17 urgent. System constraint: RAM 70%, Opus-gate blocks Sonnet intermediary, taskkill not responding properly. Autonomous fix attempts all failed (Opus-evidence-gate, harness solo-loop, taskkill syntax issues). Status: REQUIRES SYSTEM RESET or MANUAL USER INTERVENTION (Chrome login on 9712, system restart, or wait CronCreate 3h cycle ~03:30 UTC). No further automated progress possible without system recovery.
+
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
 - [x] push skill-browser refactor to origin/main (Opus squash+push)
