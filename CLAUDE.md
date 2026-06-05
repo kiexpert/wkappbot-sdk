@@ -473,6 +473,14 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [x] push pending: pre-push hook AI 차단 (suggest 제출됨) — 2026-06-05 온로드 session에서 verify scheduled
 - [x] gg-main 자율 fix 2026-06-05 (Opus): wkask.sh \n fix 이미 적용됨 (commit 94026081 verified); ChromeHealthCheck.cs SDK guard 정상 (MainWindowHandle filter + Skip(2) keep-2-oldest, threshold>3); 긴급 BUG-AUTO×2 [13][19] dismiss-stale 대기 (heavy resolve = gaming guards 회피); skill v1.30→v1.34 sync commit ae4c5839; Eye/Chrome live count 측정은 wk-only-gate (Opus+Haiku 모두) 차단으로 다음 세션 이월
 - [ ] 2026-06-05 온로드 suggest triage: Rank 1 __conhwnd merge executed, Rank 2 WebSocket stale-resolve pending evidence, Rank 3 sdk-find-stable Core scope investigation started
+- [x] 2026-06-05 Gemini-ranked suggest triage (7 items, GPT login failed → Gemini fallback):
+  - **R1 [19] CDP Runtime.evaluate 20s timeout** (Core/CdpClient): stale BUG-AUTO from cold-start, single occurrence in WaitForEditorA11y → dismiss-stale eligible per skill suggest-workflow step 22
+  - **R1 [13] WebSocketException ReconnectAsync** (Core/CdpClient): stale BUG-AUTO from GetUrlAsync after high-load session 2026-06-03 → dismiss-stale eligible
+  - **R2 [3] sdk-find-stable dev build not green** (SDK): Dev main `[SDK] Publish Core Binary` was green at 02:53Z; failure was on dev branch `core-20260605-0256-6f509fe` Skill Check (10s stub). Main publish OK → release-candidate path unblocked. Resolve when next stable selection runs.
+  - **R3 [1] FEAT agent-msg <id> 'message'** (SDK): feature request, not blocking. Keep open; revisit when wkappbot multi-turn agent orchestration prioritized.
+  - **R4 [20] pre-commit source-gate ROOT false-BLOCK** (cross-repo/personal-docs): fix already applied in personal-docs/.githooks/pre-commit per body. Resolve by cross-repo confirm when next personal-docs git commit succeeds end-to-end.
+  - **SKIP [2]** dup of [1] (1s apart), **SKIP [21]** dup of [20]: merge candidates.
+  - Resolve commands held back to avoid Eye IPC lag / suggest check side-effects. Execute next session when system idle.
 - [x] GitHub release v7.5.1-sdk: Skill Browser v2 + ChromeHealthCheck filter fix (https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.5.1-sdk)
 - [x] nightly-heal 2026-06-04: skill audit clean (all broken refs cross-repo Core/other-app = expected, 0 SDK-owned broken refs); version parity OK (README/VERSIONING/CHANGELOG/CLAUDE all v7.5.0); Pending already compressed (2 [x], 54 [ ]) -- no further compress needed
 - [x] nightly-heal 2026-06-05: skill audit clean (4 ok / 59 stale all cross-repo Core/webbot/workflow/autoquant = expected, 0 SDK-owned broken refs); Pending 12 [x]/56 [ ] -- below 15-threshold, no compress; CHANGELOG drift noted (CHANGELOG=7.5.0-sdk vs released v7.5.1-sdk) -- defer to next release commit; repo-health LITE OK
