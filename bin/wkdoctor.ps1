@@ -1,7 +1,7 @@
 ﻿# wkdoctor -- wkappbot-sdk health check orchestrator
-# Usage: wkdoctor [-Json]
+# Usage: wkdoctor [-Json] [-DefenderFix] [-EmergencyKill] [-Build]
 # Drop custom checks as *.ps1 into wkappbot.hq/doctor/ for plugin extension
-param([switch]$Json, [switch]$EmergencyKill, [switch]$DefenderFix)
+param([switch]$Json, [switch]$EmergencyKill, [switch]$DefenderFix, [switch]$Build)
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $binDir     = $scriptRoot
@@ -44,6 +44,76 @@ function Get-DoctorNote {
     return "蹂듦뎄???뺤긽?닿퀬 寃쎄퀬 $($warnItems.Count)嫄대쭔 ?⑥븯?듬땲??"
 }
 
+# -Build: USER-SIDE bootstrap build of the public Launcher (wkappbot.exe), with a
+# lock-FREE single-flight guard. This is the SDK user's build path -- a public user may
+# not have the private core source, so we build the LAUNCHER only and merely WARN if
+# wkappbot-core.exe is absent (mirrors the legacy wkappbot.cmd :rebuild). Distinct from
+# the private dev staging pipeline (wkbuild/wktest-smoke/promote). NEVER starts Eye.
+#
+# Single-flight by PROCESS LIST (no lock file/dir): a concurrent build is just another
+# live "wkdoctor.ps1 ... -Build" powershell process. We reuse wkdoctor's EXISTING
+# process-query machinery (Get-CimInstance Win32_Process -- same source as Get-EkAncestry
+# and the WMI-culprit query) with a targeted, LIVE query. Live (not the 9s-TTL cached
+# wktasklist snapshot) is deliberate: concurrent builders are visible immediately, so there
+# is no snapshot-staleness window and no cross-repo wktasklist dependency. A dead doctor
+# vanishes from the list => no stale state by design. Election is deterministic by LOWEST
+# PID among all live -Build doctors (tie-safe even if two start in the same instant): the
+# minimum-PID process builds; every other immediately fast-fails (exit 2), so a pile-up of
+# waiting processes can never form.
+if ($Build) {
+    $launcherProj = Join-Path $repoRoot 'csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj'
+    $wkExe        = Join-Path $binDir 'wkappbot.exe'
+    $wkCore       = Join-Path $binDir 'wkappbot-core.exe'
+
+    # No-op fast path: launcher already present => health note, nothing to build.
+    if (Test-Path $wkExe) {
+        Write-Host "[wkdoctor] wkappbot.exe present -- no build needed." -ForegroundColor Green
+        if (-not (Test-Path $wkCore)) {
+            Write-Host "[wkdoctor] note: wkappbot-core.exe absent -- launcher-only commands work; core-dependent commands fail." -ForegroundColor Yellow
+        }
+        exit 0
+    }
+
+    # SINGLE-FLIGHT election via the live process list (NO lock file).
+    $selfPid  = $PID
+    $builders = @()
+    try {
+        $builders = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe' OR Name='pwsh.exe'" -ErrorAction Stop |
+            Where-Object { $_.CommandLine -and ($_.CommandLine -match 'wkdoctor\.ps1') -and ($_.CommandLine -match '-Build') } |
+            ForEach-Object { [int]$_.ProcessId })
+    } catch {
+        $builders = @()   # fail-safe: query failed => treat self as sole builder and proceed.
+    }
+    if ($builders.Count -eq 0) { $builders = @($selfPid) }
+    $electedPid = ($builders | Sort-Object | Select-Object -First 1)
+    if ($electedPid -ne $selfPid) {
+        Write-Host "[wkdoctor] build in progress (pid=$electedPid) -- retry shortly." -ForegroundColor Yellow
+        exit 2
+    }
+
+    # Elected builder: build the launcher (self-contained, trimmed single exe).
+    if (-not (Test-Path $launcherProj)) {
+        Write-Host "[wkdoctor] ERROR: Launcher project not found: $launcherProj" -ForegroundColor Red
+        exit 1
+    }
+    $dotnet = 'C:\Program Files\dotnet\dotnet.exe'
+    if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
+    Write-Host "[wkdoctor] wkappbot.exe missing -- building launcher (pid=$selfPid)..." -ForegroundColor Cyan
+    & $dotnet publish $launcherProj -c Release --verbosity minimal
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[wkdoctor] build FAILED (dotnet exit $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path $wkExe)) {
+        Write-Host "[wkdoctor] build reported success but wkappbot.exe still missing." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "[wkdoctor] build OK -- wkappbot.exe deployed." -ForegroundColor Green
+    if (-not (Test-Path $wkCore)) {
+        Write-Host "[wkdoctor] note: wkappbot-core.exe absent -- launcher-only commands work; core-dependent commands fail." -ForegroundColor Yellow
+    }
+    exit 0
+}
 # -DefenderFix: apply the durable Defender exclusions that stop the MsMpEng dev-folder
 # scan storm (the root cause of the RAM/CPU pressure the watchdog only band-aids).
 # Routed through wkdoctor on purpose: wkdoctor is a wk-tool so the harness pace-gate

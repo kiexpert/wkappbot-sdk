@@ -10,25 +10,27 @@ if "%THIS_DIR:~-1%"=="\" set THIS_DIR=%THIS_DIR:~0,-1%
 
 set WKEXE=%THIS_DIR%\wkappbot.exe
 set WKCORE=%THIS_DIR%\wkappbot-core.exe
-set LAUNCHER_PROJ=%THIS_DIR%\..\csharp\src\WKAppBot.Launcher\WKAppBot.Launcher.csproj
 
 if not exist "%WKEXE%" goto :rebuild
 if not exist "%WKCORE%" goto :warn_core
 goto :run
 
 :rebuild
-echo [wkappbot] wkappbot.exe missing -- building launcher...
-if not exist "%LAUNCHER_PROJ%" (
-    echo [wkappbot] ERROR: Launcher project not found.
-    echo             Expected: %LAUNCHER_PROJ%
+rem Delegate the USER-SIDE bootstrap build to wkdoctor -Build. wkdoctor owns the
+rem build AND the lock-FREE single-flight guard (process-list election), so many
+rem concurrent wkappbot.cmd fallbacks (PATH resolves this .cmd only while wkappbot.exe
+rem is absent) collapse to exactly ONE launcher build instead of a build storm.
+echo [wkappbot] wkappbot.exe missing -- delegating build to wkdoctor -Build...
+call "%THIS_DIR%\wkdoctor.cmd" -Build
+set WKBUILD_RC=%ERRORLEVEL%
+if not exist "%WKEXE%" (
+    if "%WKBUILD_RC%"=="2" (
+        echo [wkappbot] launcher build already in progress -- retry shortly.
+    ) else (
+        echo [wkappbot] launcher build did not produce wkappbot.exe ^(rc=%WKBUILD_RC%^)
+    )
     exit /b 1
 )
-"C:\Program Files\dotnet\dotnet.exe" publish "%LAUNCHER_PROJ%" -c Release --verbosity minimal
-if errorlevel 1 (
-    echo [wkappbot] Build FAILED
-    exit /b 1
-)
-echo [wkappbot] Build OK -- wkappbot.exe deployed
 if not exist "%WKCORE%" goto :warn_core
 goto :run
 
