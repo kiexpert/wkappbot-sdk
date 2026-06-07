@@ -9,7 +9,8 @@
     "GG TRIGGER. User message exactly gg or ggg -> locate the gg Main Workflow section in project root markdown rules file and execute every step sequentially end-to-end NO confirmation, finish with repo-health-doctor. If section missing: ask user for recurring tasks, add the gg Main Workflow section, then run it same session. Quota/limit error: mark handoff_pending, do NOT retry same CLI.",
     "BARE KOREAN KEYWORD RULE. If user drops an isolated Korean keyword or short phrase, run wkappbot skill search term FIRST. Never guess intent before the skill search resolves a matching skill.",
     "NAVIGATION. Execution details (commands, mandatory loads, agent rules, file-edit discipline, skill-edit discipline, TODO sync) -> wkappbot skill read on-load-howto. History or incident notes or dated bug accumulation -> wkappbot skill read on-load-ref. Both are part of this cluster.",
-    "AGENT DISPATCH PRE-FLIGHT (before every delegation): wkappbot skill read agent-dispatch-preflight. Sequence: (0) Read CLAUDE.md first (Edit fails without Read). (1) Edit CLAUDE.md to add Pending entry. (2) Agent() MUST have run_in_background:true. (3) Prompt needs 3 skill reads. This session burned 4 attempts and ~4x tokens before getting it right -- read this skill every session to prevent recurrence."
+    "AGENT DISPATCH PRE-FLIGHT (before every delegation): wkappbot skill read agent-dispatch-preflight. Sequence: (0) Read CLAUDE.md first (Edit fails without Read). (1) Edit CLAUDE.md to add Pending entry. (2) Agent() MUST have run_in_background:true. (3) Prompt needs 3 skill reads. This session burned 4 attempts and ~4x tokens before getting it right -- read this skill every session to prevent recurrence.",
+    "MEMORY ORGAN. For predecessor questions and session-memory lookup, use wkhippo recall/foresee/export/status; wkrecall is archived and must not be presented as active."
   ],
   "requirements": [
     {
@@ -53,6 +54,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-06-04T12:25:07.0925528Z",
-  "version": "1.109"
+  "updated": "2026-06-07T11:44:09.5100291Z",
+  "version": "1.111"
 }
