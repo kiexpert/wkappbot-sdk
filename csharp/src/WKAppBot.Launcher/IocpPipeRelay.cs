@@ -171,7 +171,23 @@ partial class Program
         // Append --exit-event as hidden arg (Core opens event by name and signals it)
         var cmd = new StringBuilder($"\"{core.Replace("\"", "\\\"")}\"");
         foreach (var a in args) cmd.Append(" \"").Append(a.Replace("\"", "\\\"")).Append('"');
-        cmd.Append(" \"--exit-event\" \"").Append(exitEventName).Append('"');
+        var hasExitEvent = false;
+        foreach (var a in args)
+        {
+            if (string.Equals(a, "--exit-event", StringComparison.OrdinalIgnoreCase))
+            {
+                hasExitEvent = true;
+                break;
+            }
+        }
+        if (hasExitEvent)
+        {
+            Console.Error.WriteLine("[LAUNCHER] re-entrant --exit-event detected; skipping re-append to break recursion");
+        }
+        else
+        {
+            cmd.Append(" \"--exit-event\" \"").Append(exitEventName).Append('"');
+        }
         var cmdArr = (cmd.ToString() + "\0").ToCharArray();
         var si = new STARTUPINFOW
         {
