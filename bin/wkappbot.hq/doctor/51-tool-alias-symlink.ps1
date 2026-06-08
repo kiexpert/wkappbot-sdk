@@ -63,6 +63,31 @@ function Invoke-MkLink {
     }
 }
 
+function Get-WkAppBotBinRoot {
+    $cmd = $null
+    foreach ($name in @('wkappbot.exe', 'wkappbot')) {
+        try {
+            $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        } catch {
+            $cmd = $null
+        }
+        if ($cmd -and $cmd.Source) {
+            $path = $cmd.Source
+            if (-not [System.IO.Path]::IsPathRooted($path)) {
+                try { $path = (Get-Command $path -ErrorAction SilentlyContinue).Source } catch {}
+            }
+            if ($path) {
+                $root = Split-Path -Parent $path
+                if (Test-Path -LiteralPath $root -PathType Container) {
+                    return [System.IO.Path]::GetFullPath($root)
+                }
+            }
+        }
+    }
+
+    return $null
+}
+
 function Ensure-ToolAliasLink {
     param(
         [Parameter(Mandatory)][string]$LinkPath,
@@ -105,11 +130,14 @@ function Ensure-ToolAliasLink {
 }
 
 $doctorDir = $PSScriptRoot
-$bin = Split-Path -Parent (Split-Path -Parent $doctorDir)
-$bin = [System.IO.Path]::GetFullPath($bin)
+$sdkBin = Split-Path -Parent (Split-Path -Parent $doctorDir)
+$sdkBin = [System.IO.Path]::GetFullPath($sdkBin)
+$pathBin = Get-WkAppBotBinRoot
+if (-not $pathBin) {
+    $pathBin = $sdkBin
+}
 $aliasRoots = @(
-    @{ Root = $bin; Label = 'SDK/bin' },
-    @{ Root = 'D:\GitHub\WKAppBot\bin'; Label = 'WKAppBot/bin' }
+    @{ Root = $pathBin; Label = 'PATH/bin' }
 )
 
 foreach ($root in $aliasRoots) {
