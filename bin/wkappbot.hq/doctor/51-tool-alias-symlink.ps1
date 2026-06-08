@@ -122,35 +122,6 @@ function Ensure-ToolAliasLink {
     }
 }
 
-function Get-GeminiCliPath {
-    $cmd = $null
-    try {
-        $cmd = Get-Command gemini.cmd -ErrorAction SilentlyContinue
-    } catch {}
-    if ($cmd -and $cmd.Source) {
-        return [System.IO.Path]::GetFullPath($cmd.Source)
-    }
-
-    try {
-        $cmd = Get-Command gemini -ErrorAction SilentlyContinue
-    } catch {}
-    if ($cmd -and $cmd.Source) {
-        return [System.IO.Path]::GetFullPath($cmd.Source)
-    }
-
-    $fallbacks = @(
-        'D:\SDK\npm\gemini.cmd',
-        'D:\SDK\npm\gemini'
-    )
-    foreach ($path in $fallbacks) {
-        if (Test-Path -LiteralPath $path -PathType Leaf) {
-            return [System.IO.Path]::GetFullPath($path)
-        }
-    }
-
-    return $null
-}
-
 $doctorDir = $PSScriptRoot
 $doctorBin = [System.IO.Path]::GetFullPath((Split-Path -Parent (Split-Path -Parent $doctorDir)))
 $pathBin = Get-WkAppBotBinRoot
@@ -172,12 +143,12 @@ foreach ($root in $aliasRoots) {
         @{ Label = "$($root.Label) agy.sh alias";       Link = (Join-Path $rootPath 'agy.sh');       Target = (Join-Path $rootPath 'wkwrap.sh') }
     )
 
-    $geminiCli = Get-GeminiCliPath
-    if ($geminiCli) {
+    $wkwrapExe = Join-Path $rootPath 'wkwrap.exe'
+    if (Test-Path -LiteralPath $wkwrapExe -PathType Leaf) {
         $aliasPairs += @{
             Label = "$($root.Label) agy.exe alias"
             Link = (Join-Path $rootPath 'agy.exe')
-            Target = $geminiCli
+            Target = $wkwrapExe
         }
     }
 
@@ -190,7 +161,7 @@ foreach ($root in $aliasRoots) {
     $agyExe = Join-Path $rootPath 'agy.exe'
     $hasAgyExe = Test-Path -LiteralPath $agyExe -PathType Leaf
     if ((Test-Path -LiteralPath $agyCmd -PathType Leaf) -and (Test-Path -LiteralPath $agySh -PathType Leaf)) {
-        $summary = if ($hasAgyExe) { 'connected via direct gemini cli' } else { 'connected via wkwrap (exe unavailable)' }
+        $summary = if ($hasAgyExe) { 'connected via wkwrap' } else { 'connected via wkwrap (exe unavailable)' }
         Add-Check "$($root.Label) agy aliases" 'ok' $summary
         Emit 'ok' "$($root.Label) agy aliases" $summary
     }
