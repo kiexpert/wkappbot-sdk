@@ -130,14 +130,14 @@ function Ensure-ToolAliasLink {
 }
 
 $doctorDir = $PSScriptRoot
-$sdkBin = Split-Path -Parent (Split-Path -Parent $doctorDir)
-$sdkBin = [System.IO.Path]::GetFullPath($sdkBin)
 $pathBin = Get-WkAppBotBinRoot
+$rootLabel = 'PATH/bin'
 if (-not $pathBin) {
-    $pathBin = $sdkBin
+    $pathBin = [System.IO.Path]::GetFullPath($doctorDir)
+    $rootLabel = 'doctor fallback'
 }
 $aliasRoots = @(
-    @{ Root = $pathBin; Label = 'PATH/bin' }
+    @{ Root = $pathBin; Label = $rootLabel }
 )
 
 foreach ($root in $aliasRoots) {
