@@ -30,18 +30,18 @@ function Emit {
 function Get-DoctorNote {
     $warnItems = @($items | Where-Object { $_.Status -eq 'warn' })
     if ($fail -gt 0) {
-        return '臾몄젣???⑥븘 ?덉뒿?덈떎.'
+        return 'One or more checks failed.'
     }
     if ($warnItems.Count -eq 0) {
-        return '紐⑤몢 ?뺤긽?낅땲??'
+        return 'All checks passed.'
     }
 
     $warnNames = @($warnItems | ForEach-Object { $_.Name })
     if ($warnNames.Count -gt 0 -and (@($warnNames -join ' ') -match 'codex')) {
-        return "蹂듦뎄???뺤긽?닿퀬 codex 留곹겕 寃쎄퀬留??⑥븯?듬땲??"
+        return 'System is healthy, but codex link warnings remain.'
     }
 
-    return "蹂듦뎄???뺤긽?닿퀬 寃쎄퀬 $($warnItems.Count)嫄대쭔 ?⑥븯?듬땲??"
+    return "System is healthy, but $($warnItems.Count) warning(s) remain."
 }
 
 # -Build: USER-SIDE bootstrap build of the public Launcher (wkappbot.exe), with a

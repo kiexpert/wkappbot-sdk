@@ -146,4 +146,11 @@ foreach ($root in $aliasRoots) {
     foreach ($pair in $aliasPairs) {
         Ensure-ToolAliasLink -LinkPath $pair.Link -TargetPath $pair.Target -Label $pair.Label
     }
+
+    $agyCmd = Join-Path $rootPath 'agy.cmd'
+    $agySh = Join-Path $rootPath 'agy.sh'
+    if ((Test-Path -LiteralPath $agyCmd -PathType Leaf) -and (Test-Path -LiteralPath $agySh -PathType Leaf)) {
+        Add-Check "$($root.Label) agy aliases" 'ok' 'connected via wkwrap'
+        Emit 'ok' "$($root.Label) agy aliases" 'connected via wkwrap'
+    }
 }
