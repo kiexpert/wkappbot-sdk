@@ -1,0 +1,1 @@
+- [ ] 2026-06-06 nightly-heal: STEP 2 running (Opus subagent, skill audit + repo-health + Pending compress)

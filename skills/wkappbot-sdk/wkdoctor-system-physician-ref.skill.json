@@ -1,0 +1,21 @@
+{
+  "id": "wkdoctor-system-physician-ref",
+  "app": "wkappbot-sdk",
+  "title": "WkDoctor: System Physician (T3 ref)",
+  "title_ko": "WkDoctor: 시스템 주치의 (T3 레퍼런스)",
+  "desc": "T3 reference tier. Implementation details of the Physician-vs-Reaper design. History of WMI overhead reduction and dual-trigger policy.",
+  "steps": [
+    "WMI OVERHEAD REDUCTION: previous versions performed raw 'Get-CimInstance Win32_Process' on every check. v2.0 integrates with 'wktasklist -Json' to share its 9-second cache, dramatically reducing WMI scan storms during emergency triggers.",
+    "DUAL-TRIGGER POLICY: user requirement 2026-06-06 moved from RAM-only to 'CPU or RAM > 60%' trigger. This aligns wkdoctor with the wkharness PreToolUse guards. Policy: recover until BOTH are below 40%.",
+    "ADMIN EYE INTEGRATION: moved from 'Start-Process -Verb RunAs' to 'wkappbot --sudo exec' pattern. This leverages the Eye's persistent elevation, allowing wkdoctor to apply Defender exclusions without repeated UAC popups for the same session.",
+    "DYNAMIC SANCTUARY: hardcoded paths (D:\\GitHub) were removed in favor of relative detection (2 levels up from bin/). This ensures portability of the sanctuary across different developer environments."
+  ],
+  "requirements": [
+    { "cmd": "wkappbot skill read wkdoctor-system-physician-ref", "expect": "WMI" },
+    { "cmd": "wkappbot skill read wkdoctor-system-physician-ref", "expect": "60%" },
+    { "cmd": "wkappbot skill read wkdoctor-system-physician-ref", "expect": "bin/" }
+  ],
+  "tags": ["wkdoctor", "reference", "history", "wmi", "cache", "elevation", "t3"],
+  "author": "gemini",
+  "version": "1.0"
+}

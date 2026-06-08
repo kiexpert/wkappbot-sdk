@@ -1,0 +1,21 @@
+{
+  "id": "wktasklist-intelligent-management-ref",
+  "app": "wkappbot-sdk",
+  "title": "WkTaskList: Intelligent Management (T3 ref)",
+  "title_ko": "WkTaskList: 지능형 관리 (T3 레퍼런스)",
+  "desc": "T3 reference tier. History and technical evolution of the upgraded wktasklist. Documents scaling changes and philosophy.",
+  "steps": [
+    "EVOLUTION: v1.0 used raw милли온-scale scores based on CPU*200. v5.0 introduced 0-100 normalization using sigmoid-like dampening to keep high-impact processes at 99.99 for readability.",
+    "FORMATTING: user requirement 2026-06-06 mandated fixed XX.YY format (정수 두자리, 소수점 두자리) for all SCORE values to ensure table alignment and professional look.",
+    "INTEGRATION: wkdoctor now uses 'wktasklist -Json' output as its primary data source, sharing the 9-second cache and reducing expensive WMI queries during emergency situations.",
+    "SANCTUARY DESIGN: the 'Quant Sanctuary' (-5,000) was established to protect Kiwoom HTS engines from accidental reaper kills, prioritizing financial signal integrity over raw system resource recovery."
+  ],
+  "requirements": [
+    { "cmd": "wkappbot skill read wktasklist-intelligent-management-ref", "expect": "XX.YY" },
+    { "cmd": "wkappbot skill read wktasklist-intelligent-management-ref", "expect": "million-scale" },
+    { "cmd": "wkappbot skill read wktasklist-intelligent-management-ref", "expect": "Quant Sanctuary" }
+  ],
+  "tags": ["wktasklist", "reference", "history", "evolution", "scaling", "xx.yy", "t3"],
+  "author": "gemini",
+  "version": "1.0"
+}

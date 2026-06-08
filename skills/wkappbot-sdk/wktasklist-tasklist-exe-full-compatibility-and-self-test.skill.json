@@ -1,0 +1,49 @@
+{
+  "id": "wktasklist-tasklist-exe-full-compatibility-and-self-test",
+  "app": "wkappbot-sdk",
+  "title": "wktasklist: tasklist.exe full compatibility and self-test",
+  "title_ko": null,
+  "desc": "Complete wktasklist.ps1 upgrade: /FO TABLE/LIST/CSV, /V verbose, /FI filters with range operators (MEMUSAGE> CPUUSAGE>), -Test auto-validation",
+  "steps": [
+    "Add -FO parameter support for TABLE LIST CSV formats",
+    "Implement Format-AsTable, Format-AsList, Format-AsCsv output functions",
+    "Add regex-based filter parser supporting FIELD OPERATOR VALUE syntax",
+    "Implement MEMUSAGE and CPUUSAGE range filters with > < >= <= operators",
+    "Add USERNAME and extended filter operator support",
+    "Create Test-WkTaskList function with 12 filter test cases",
+    "Add -Test flag to run automated validation and report results"
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -File D:/GitHub/WKAppBot/bin/wktasklist.ps1",
+      "expect": "Table output with PID NAME MB CMD columns",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File D:/GitHub/WKAppBot/bin/wktasklist.ps1 -FO CSV",
+      "expect": "CSV header plus process data rows",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File D:/GitHub/WKAppBot/bin/wktasklist.ps1 -Test",
+      "expect": "PASSED X/12 summary line with checkmark",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wktasklist",
+    "tasklist",
+    "compatibility",
+    "filter",
+    "range",
+    "process",
+    "windows"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-06T08:14:12.8655725Z",
+  "updated": "2026-06-06T08:14:12.8655822Z",
+  "version": "1.0"
+}

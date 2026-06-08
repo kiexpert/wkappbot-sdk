@@ -1,0 +1,21 @@
+{
+  "id": "wkdoctor-system-physician",
+  "app": "wkappbot-sdk",
+  "title": "WkDoctor: System Physician & Sanctuary Guardian (T1 core)",
+  "title_ko": "WkDoctor: 시스템 주치의 및 성역 수호자 (T1 코어)",
+  "desc": "T1 core tier. wkdoctor system health orchestrator. Handles DefenderFix (optimization) and EmergencyKill (reaper) with sanctuary awareness. Treats root cause (Defender) before symptoms (Resource Hogs).",
+  "steps": [
+    "PHILOSOPHY: wkdoctor acts as a 'Physician'. It treats the root cause of system lag (often Windows Defender scanning dev folders) before resorting to the 'Reaper' (EmergencyKill).",
+    "DEFENDER SANCTUARY: automatically detects workspace root and establishes a protected 'Sanctuary' for Quant engines and AI tools. Persistent elevation via Admin Eye.",
+    "EMERGENCY KILL: triggered automatically by harness guards at 60% CPU or 60% RAM. Uses intelligent SCORE-based targets, protecting AI family and User Research (Edge).",
+    "WHEN TO RUN: (1) high system lag (run -DefenderFix), (2) out-of-control processes (run -EmergencyKill), (3) general health check (run without args)."
+  ],
+  "requirements": [
+    { "cmd": "wkdoctor", "expect": "pass" },
+    { "cmd": "wkdoctor -DefenderFix", "expect": "Sanctuary" },
+    { "cmd": "wkdoctor -EmergencyKill", "expect": "done" }
+  ],
+  "tags": ["wkdoctor", "physician", "health", "defender", "reaper", "emergency-kill", "uac", "admin-eye", "t1", "core", "3tier"],
+  "author": "gemini",
+  "version": "1.0"
+}

@@ -550,4 +550,4 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
 - [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
 - [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
-- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
+- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)- [ ] nightly-heal 2026-06-06: autonomous skill audit + Pending compression

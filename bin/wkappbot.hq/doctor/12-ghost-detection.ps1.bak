@@ -1,0 +1,36 @@
+# Ghost Process Detection
+# Identifies very old AI-related processes that might be stuck
+
+$now = Get-Date
+$ghostFound = $false
+
+# $taskListPath is defined in wkdoctor.ps1
+if (-not $taskListPath) { $taskListPath = "D:\GitHub\WKAppBot\bin\wktasklist.ps1" }
+
+try {
+    $rawJson = & $taskListPath -Json -ErrorAction Stop
+    $procList = $rawJson | ConvertFrom-Json
+    foreach ($p in $procList) {
+        # Target common AI runtime processes with strict matching
+        if ($p.Name -match '^(python|node|codex|agent|claude|wkappbot-core)$') {
+            if ($p.StartTime) {
+                try {
+                    $startTime = [DateTime]::Parse($p.StartTime)
+                    $ageHours = ($now - $startTime).TotalHours
+                    # If running for more than 12 hours, mark as suspicious
+                    if ($ageHours -gt 12) {
+                        Add-Check "ghost-detect" "warn" "Process $($p.Name) (PID $($p.PID)) running for $([int]$ageHours)h"
+                        Emit "!" "ghost-detect" "$($p.Name) (PID $($p.PID)) is $([int]$ageHours)h old"
+                        $ghostFound = $true
+                    }
+                } catch {}
+            }
+        }
+    }
+} catch {
+    Add-Check "ghost-detect" "warn" "Could not fetch process list for ghost detection"
+}
+
+if (-not $ghostFound) {
+    Add-Check "ghost-detect" "ok" "No suspicious long-running AI processes found"
+}

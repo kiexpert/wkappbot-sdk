@@ -1,0 +1,21 @@
+{
+  "id": "wkdoctor-system-physician-howto",
+  "app": "wkappbot-sdk",
+  "title": "WkDoctor: System Physician (T2 howto)",
+  "title_ko": "WkDoctor: 시스템 주치의 (T2 하우투)",
+  "desc": "T2 howto tier. Practical commands for system health, Defender optimization, and emergency process cleanup.",
+  "steps": [
+    "HEALTH CHECK: run 'wkdoctor' (or 'wkdoctor -Json' for tools) to see overall system health. 17+ 'ok' checks is the target.",
+    "DEFENDER FIX: run 'wkdoctor -DefenderFix'. It will self-elevate via Admin Eye (approve UAC once). It resets old patterns and adds the current workspace root to exclusions.",
+    "EMERGENCY KILL: run 'wkdoctor -EmergencyKill'. It first ensures Defender is optimized (root cause), then kills high-interference processes (symptom) until CPU/RAM drop to 40%.",
+    "INTELLIGENT BYPASS: if 'wkdoctor -DefenderFix' is run and settings are already perfect, it exits quietly with 'Already optimized' to save time and token budget."
+  ],
+  "requirements": [
+    { "cmd": "wkdoctor", "expect": "note" },
+    { "cmd": "wkdoctor -DefenderFix", "expect": "Admin Eye" },
+    { "cmd": "wkdoctor -EmergencyKill", "expect": "check trigger" }
+  ],
+  "tags": ["wkdoctor", "howto", "commands", "defender", "reaper", "t2"],
+  "author": "gemini",
+  "version": "1.0"
+}

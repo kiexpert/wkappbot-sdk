@@ -5,7 +5,7 @@ description: "Suggest = AI-logged bug/improvement record. Triage with merge, res
 tags: [wkappbot, suggest, workflow, operator, riqua, evidence-script, commit-guard, skill-guard]
 ---
 
-> **Refresh**: `wkappbot skill read suggest-workflow --if-newer` — v1.37 (2026-04-07)
+> **Refresh**: `wkappbot skill read suggest-workflow --if-newer` — v1.40 (2026-04-07)
 
 # Suggest Management Workflow
 

@@ -1,0 +1,22 @@
+{
+  "id": "wktasklist-intelligent-management-howto",
+  "app": "wkappbot-sdk",
+  "title": "WkTaskList: Intelligent Management (T2 howto)",
+  "title_ko": "WkTaskList: 지능형 관리 (T2 하우투)",
+  "desc": "T2 howto tier. Usage commands for the upgraded wktasklist. Covers filtering, formatting, and risk assessment.",
+  "steps": [
+    "COMMAND: run 'wktasklist' for default table view sorted by SCORE.",
+    "VERBOSE: use '-V' to see User, Session#, and full CommandLine.",
+    "FORMATS: use '-FO LIST' for key-value list or '-FO CSV' for export. '-Json' for programmatic integration.",
+    "FILTERING (/FI): supports range operators for numeric fields. Ex: 'wktasklist /FI \"SCORE>80\"' (dangerous ghosts), 'wktasklist /FI \"MEMUSAGE>500000\"' (RAM hogs > 500MB), 'wktasklist /FI \"CPUUSAGE>10\"' (CPU hogs > 10%).",
+    "RECOVERY: if score scaling seems off or lag persists, run 'wkdoctor -DefenderFix' to reset sanctuary and re-establish baseline."
+  ],
+  "requirements": [
+    { "cmd": "wktasklist -FO TABLE", "expect": "SCORE" },
+    { "cmd": "wktasklist -FO LIST", "expect": "PID" },
+    { "cmd": "wktasklist -FO CSV", "expect": "MB" }
+  ],
+  "tags": ["wktasklist", "howto", "commands", "filtering", "score", "xx.yy", "t2"],
+  "author": "gemini",
+  "version": "1.0"
+}

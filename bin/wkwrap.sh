@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wkwrap.sh -- universal bash->PS1 relay + .sh/.cmd auto-install (harness-managed)
+# wkdoctor.sh -- universal bash->PS1 relay + auto-install (harness-managed)
 # RELAY (called as wkXXX.sh): routes to wkXXX.ps1 via powershell
 # MAINTENANCE (called as wkwrap.sh): --install / --status / help
 SELF="$(basename "$0" .sh)"

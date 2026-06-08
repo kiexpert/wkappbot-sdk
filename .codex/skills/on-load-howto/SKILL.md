@@ -1,0 +1,26 @@
+---
+id: on-load-howto
+app: wkappbot-workflow
+description: "T2 domain tier of on-load. Session-start execution commands -- mandatory skill loads, skill news, handoff recovery, suggest backlog Opus delegation, wkharness status, agent rules, skill-edit discipline, wkedit rule, TODO sync, post-fix rule, nightly schedule, Gmail sync. T1 = on-load. T3 history = on-load-ref."
+tags: [session, on-load, 3tier, t2, howto, execution, commands, handoff, suggest, agent, wkedit]
+---
+
+> **Refresh**: `wkappbot skill read on-load-howto --if-newer` — v1.2 (2026-05-31)
+
+# T2 HowTo: on-load execution
+
+## Steps
+
+1. MANDATORY SKILL LOADS at session-start/post-compaction. wkappbot skill read suggest-workflow, then wkappbot skill read ask-suggest-priority-batching. First session also: wkappbot skill read claude-md-guide. Failure -> skip + report.
+2. SKILL NEWS. wkappbot skill news (default 7 days) at session start -- shows NEW/UPD skills since last week. More useful than skill list. skill-list-guard warns on Edit/Write if neither was run this session.
+3. HANDOFF/CONTEXT RECOVERY. wkappbot session list with --claude --cwd shows current and previous sessions. Tail prev JSONL via Get-Content prev.jsonl -Encoding UTF8 -Tail 150. Extract last user request + unfinished items + proposed next step. Post-compaction: tail current too. Full mechanics: wkappbot skill read claude-session-handoff. PREFERRED SHORTCUT (2026-05-16): wkappbot session handoff CLI -- shows recent turns + tool summaries, falls back to manual JSONL only if needed.
+4. SUGGEST BACKLOG. wkappbot suggest list then Agent model opus with prompt that loads suggest-workflow + ask-suggest-priority-batching + on-load and triages the list (priority: BUG-AUTO -> important -> AI-NEWS merge). SCOPE FILTER MANDATORY: act ONLY on suggests in YOUR app or project or duty domain (see on-load-ref for full incident).
+5. WKHARNESS health. 12 PreToolUse guards active. Run wkharness with -Status switch via PowerShell tool. Details: wkappbot skill read wkharness-guards. CDP: project-scoped only, never cross project boundaries.
+6. AGENT RULES MANDATORY. Every Agent() call prompt MUST contain 3+ wkappbot skill read id refs -- agents start with zero context, skill reads are the only briefing. Use wkappbot skill search kw1 kw2 to find valid IDs FIRST (guard 7 validates each ID exists). Guard block (PreToolUse:Agent hook error / No stderr): add refs and retry Agent(). NEVER do the work yourself after a block = harness violation. Tier routing: wkappbot skill read claude-code-agent-tier-routing (Haiku=survey, Codex=splits/refactor, Opus=judgment, Triad=ambiguous).
+7. SKILL EDIT DISCIPLINE. NEVER directly Edit or Write skill JSON files -- guard 4 blocks it; pipe char is step separator, direct edits corrupt steps + miss version bump + drop from skill search. ALWAYS use wkappbot skill edit id or wkappbot skill contribute. Mistaken direct edit: git checkout the path, wkappbot skill read id to verify clean, redo via skill edit.
+8. WKEDIT RULE MANDATORY. Multi-file edits AND any file containing multibyte chars (Korean, CJK, emoji) MUST use wkedit, never Edit or Write directly (silent CRLF or encoding corruption). Pattern: wkedit file1 file2 file3. Single-file ASCII-only edits MAY use Edit tool.
+9. TODO SYNC. Check repo project Pending section at session start. All tasks must be tracked there. Mark completed items with x and commit immediately after finishing each task. Project Pending is canonical source.
+10. POST-FIX RULE. After each bug fix or new feature, immediately add requirement to the relevant skill: wkappbot skill add-requirement id with cmd arrow expected. Prevents context debt in future sessions.
+11. NIGHTLY SCHEDULE. Session start: ensure CronCreate nightly (13 4 * * *) registered before wk-only-gate. Add gg todo to Pending before Agent calls (claude-md-sync-guard).
+12. GMAIL SYNC step in gg workflow. After naver sync run the gmail mail sync python script from personal-docs. Outputs in resume drafts gmail folder.
+13. KEY SKILLS 2026-05-31: skill-migration-3tier (split fat skills), skill-3tier-lazy-arch (design), token-economy (Haiku 33% KPI), pre-commit-full-block-plan (bypass roadmap), sonnet-bug-stop-policy (Sonnet bug patterns + harness TODOs), wkagent-name-tool (AI identity), claudemd-slim-plan (CLAUDE.md optimization). Tag search: wkappbot skill search skill-tree

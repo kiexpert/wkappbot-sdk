@@ -52,4 +52,9 @@ for a in "$@"; do
     prompt_parts+=("$a")
   fi
 done
+
+if ! _wk_harness_validate_delegation_brief "wkclaude" "$*" "${prompt_parts[*]}" "$MODEL"; then
+  exit 1
+fi
+
 exec claude "${opts[@]}" "${prompt_parts[*]}"

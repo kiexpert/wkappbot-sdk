@@ -61,5 +61,10 @@ for a in "$@"; do
   else task_parts+=("$a")
   fi
 done
+
+if ! _wk_harness_validate_delegation_brief "wkcodex" "$*" "${task_parts[*]}" "${WKCODEX_MODEL:-}"; then
+  exit 1
+fi
+
 exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass \
   -File "D:/GitHub/wkcodex.ps1" -Task "${task_parts[*]}" "${opts[@]}"
