@@ -64,23 +64,16 @@ function Invoke-MkLink {
 }
 
 function Get-WkAppBotBinRoot {
-    $cmd = $null
-    foreach ($name in @('wkappbot.exe', 'wkappbot')) {
-        try {
-            $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
-        } catch {
-            $cmd = $null
+    $pathValue = [Environment]::GetEnvironmentVariable('PATH', 'Process')
+    foreach ($dir in ($pathValue -split ';')) {
+        if ([string]::IsNullOrWhiteSpace($dir)) {
+            continue
         }
-        if ($cmd -and $cmd.Source) {
-            $path = $cmd.Source
-            if (-not [System.IO.Path]::IsPathRooted($path)) {
-                try { $path = (Get-Command $path -ErrorAction SilentlyContinue).Source } catch {}
-            }
-            if ($path) {
-                $root = Split-Path -Parent $path
-                if (Test-Path -LiteralPath $root -PathType Container) {
-                    return [System.IO.Path]::GetFullPath($root)
-                }
+        $root = $dir.Trim()
+        foreach ($candidate in @('wkappbot.exe', 'wkappbot.cmd', 'wkappbot')) {
+            $path = Join-Path $root $candidate
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+                return [System.IO.Path]::GetFullPath($root)
             }
         }
     }
@@ -130,10 +123,11 @@ function Ensure-ToolAliasLink {
 }
 
 $doctorDir = $PSScriptRoot
+$doctorBin = [System.IO.Path]::GetFullPath((Split-Path -Parent (Split-Path -Parent $doctorDir)))
 $pathBin = Get-WkAppBotBinRoot
 $rootLabel = 'PATH appbot bin'
 if (-not $pathBin) {
-    $pathBin = [System.IO.Path]::GetFullPath($doctorDir)
+    $pathBin = $doctorBin
     $rootLabel = 'doctor folder'
 }
 $aliasRoots = @(
