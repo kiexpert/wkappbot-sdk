@@ -1,6 +1,6 @@
 # wkdoctor check: tool alias symlink integrity and auto-repair
-# Repairs wkdoctor/ag y alias links when they are missing, broken, or pointing
-# at the wrong target.
+# Repairs wkdoctor/agy alias links by delegating to the wrapper install path.
+# Doctor only diagnoses and re-checks; the install process owns link creation.
 
 function Normalize-PathForCompare {
     param([string]$Path)
@@ -46,23 +46,6 @@ function Test-ToolAliasLinkHealth {
     return @{ Healthy = $healthy; Target = $actualTarget }
 }
 
-function Invoke-MkLink {
-    param(
-        [Parameter(Mandatory)][string]$LinkPath,
-        [Parameter(Mandatory)][string]$TargetPath
-    )
-
-    & "$env:SystemRoot\System32\cmd.exe" /c mklink "$LinkPath" "$TargetPath" *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "mklink failed with exit $LASTEXITCODE"
-    }
-
-    $check = Test-ToolAliasLinkHealth -LinkPath $LinkPath -TargetPath $TargetPath
-    if (-not $check.Healthy) {
-        throw "mklink reported success but $LinkPath was not created with target $TargetPath"
-    }
-}
-
 function Get-WkAppBotBinRoot {
     $pathValue = [Environment]::GetEnvironmentVariable('PATH', 'Process')
     foreach ($dir in ($pathValue -split ';')) {
@@ -87,6 +70,41 @@ function Get-AgyInstallExePath {
         return [System.IO.Path]::GetFullPath($target)
     }
     return $null
+}
+
+$script:WrapperInstallRan = $false
+
+function Invoke-WrapperInstall {
+    param(
+        [Parameter(Mandatory)][string]$Reason
+    )
+
+    if ($script:WrapperInstallRan) {
+        return
+    }
+
+    $installerCandidates = @(
+        (Join-Path 'D:\GitHub\wkappbot-kih\tools' 'wkharness-session-init.ps1')
+    )
+    if ($env:WKHARNESS_REPO_ROOT) {
+        $installerCandidates = @(
+            (Join-Path $env:WKHARNESS_REPO_ROOT 'tools\wkharness-session-init.ps1')
+        ) + $installerCandidates
+    }
+
+    $installer = $installerCandidates | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Leaf) } | Select-Object -First 1
+    if (-not $installer) {
+        throw "wrapper installer not found for repair request: $Reason"
+    }
+
+    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    & $psExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $installer 2>&1 | ForEach-Object {
+        Write-Host "  [wrapper-install] $_" -ForegroundColor DarkGray
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "wrapper installer failed with exit $LASTEXITCODE"
+    }
+    $script:WrapperInstallRan = $true
 }
 
 function Ensure-ToolAliasLink {
@@ -118,15 +136,17 @@ function Ensure-ToolAliasLink {
     }
 
     try {
-        if (Test-Path -LiteralPath $linkResolved) {
-            Remove-Item -LiteralPath $linkResolved -Force -ErrorAction Stop
+        Invoke-WrapperInstall -Reason $Label
+        $recheck = Test-ToolAliasLinkHealth -LinkPath $linkResolved -TargetPath $targetResolved
+        if ($recheck.Healthy) {
+            Add-Check $Label 'ok' "auto-repaired via wrapper install -> $targetResolved"
+            Emit 'ok' $Label "auto-repaired via wrapper install -> $targetResolved"
+        } else {
+            throw "wrapper install completed but $linkResolved still targets '$($recheck.Target)'"
         }
-        Invoke-MkLink -LinkPath $linkResolved -TargetPath $targetResolved
-        Add-Check $Label 'ok' "auto-repaired -> $targetResolved"
-        Emit 'ok' $Label "auto-repaired -> $targetResolved"
     } catch {
-        Add-Check $Label 'fail' "repair failed: $_"
-        Emit 'fail' $Label "repair failed: $_"
+        Add-Check $Label 'fail' "repair failed via wrapper install: $_"
+        Emit 'fail' $Label "repair failed via wrapper install: $_"
     }
 }
 

@@ -36,6 +36,38 @@ function Get-LineageInfo {
     return @{ IsAi = $isAiDescendant; IsOrphan = $isOrphan; Depth = $depth }
 }
 
+function Get-CommandLineRiskScore {
+    param($p)
+
+    $cmd = [string]$p.CommandLine
+    if ([string]::IsNullOrWhiteSpace($cmd)) { return 0.0 }
+
+    $name = [string]$p.Name
+    $risk = 0.0
+
+    if ($name -match '^(powershell|pwsh|cmd|wscript|cscript|mshta|rundll32|regsvr32|python|node|java|perl|ruby|bash|sh)$') {
+        $risk += 8
+    }
+
+    if ($cmd -match '(?i)(-enc|-encodedcommand|frombase64string|invoke-webrequest|invoke-expression|iwr\b|wget\b|curl\b|downloadstring|downloadfile|bypass|noprofile|hidden)') {
+        $risk += 10
+    }
+
+    if ($cmd -match '(?i)(https?://|ftp://|\\\\)') {
+        $risk += 8
+    }
+
+    if ($cmd -match '(?i)(\\AppData\\Local\\Temp\\|\\Temp\\|\\Downloads\\|%TEMP%|%TMP%)') {
+        $risk += 8
+    }
+
+    if ($cmd.Length -gt 220) {
+        $risk += 4
+    }
+
+    return [Math]::Min(20.0, $risk)
+}
+
 $systemRamPct = Get-RamPct
 
 # 1. Fetch Process List
@@ -52,33 +84,27 @@ $scoredItems = [System.Collections.Generic.List[PSCustomObject]]::new()
 foreach ($p in $procList) {
     if ($p.Name -in $ignoreList) { continue }
 
-    $score = 0
     $lineage = Get-LineageInfo $p $procList
 
     # --- Scoring Logic ---
     $cpuPct = if ($null -ne $p.PSObject.Properties['CpuPct']) { [double]$p.CpuPct } else { 0.0 }
-    $depthPenalty = [Math]::Pow([Math]::Max(0, [double]$lineage.Depth), 2) * 4
-    $interferenceScore = ($cpuPct * 2.0) + ($p.WorkingSetMB / 100.0) + $depthPenalty
-    $score += $interferenceScore
+    $cpuRisk = [Math]::Min(45.0, $cpuPct * 1.8)
+    $memRisk = [Math]::Min(25.0, [double]$p.WorkingSetMB / 32.0)
+    $depthRisk = [Math]::Min(20.0, [Math]::Pow([Math]::Max(0, [double]$lineage.Depth), 2) * 4.0)
+    $cmdRisk = Get-CommandLineRiskScore $p
+    $orphanRisk = if ($lineage.IsOrphan) { 8.0 } else { 0.0 }
+    $score = [Math]::Min(100.0, $cpuRisk + $memRisk + $depthRisk + $cmdRisk + $orphanRisk)
 
     $isLean = ($cpuPct -lt 1.0 -and $p.WorkingSetMB -lt 100)
     if ($isLean) {
         $score -= 50
     }
 
-    if ($lineage.IsOrphan) {
-        if (-not $isLean -or $systemRamPct -gt 85) { $score += 20 }
-    }
-
-    if ($p.StartTime -and ($p.Name -match 'python|node|codex')) {
-        try {
-            $ageHours = ($now - [DateTime]::Parse($p.StartTime)).TotalHours
-            if ($ageHours -gt 12 -and -not $isLean) { $score += 10 }
-        } catch {}
-    }
-
     if ($p.Name -in $aiProcs) { $score -= 1000 }
     if ($lineage.IsAi) { $score -= 500 }
+    if ($p.Name -match '^(taskmgr|taskhostw|explorer|conhost)$' -and -not $lineage.IsOrphan) {
+        $score -= 15
+    }
 
     $scoredItems.Add([PSCustomObject]@{
         PID    = $p.PID
