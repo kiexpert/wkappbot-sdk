@@ -131,10 +131,10 @@ function Ensure-ToolAliasLink {
 
 $doctorDir = $PSScriptRoot
 $pathBin = Get-WkAppBotBinRoot
-$rootLabel = 'PATH/bin'
+$rootLabel = 'PATH appbot bin'
 if (-not $pathBin) {
     $pathBin = [System.IO.Path]::GetFullPath($doctorDir)
-    $rootLabel = 'doctor fallback'
+    $rootLabel = 'doctor folder'
 }
 $aliasRoots = @(
     @{ Root = $pathBin; Label = $rootLabel }
