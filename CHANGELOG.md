@@ -3,6 +3,21 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.5.49-sdk] - 2026-06-08
+
+### Added
+- **`wkdoctor` agy integration**: check 08-harness-connection for antigravity CLI and Gemini settings auto-recovery
+- **Alias symlink auto-repair**: doctor auto-heals tool alias breaks, routes to PATH order or doctor-bin fallback
+
+### Fixed (CRITICAL)
+- **agy wrapper shim policy**: reverted overly strict wrapper policy; delegates alias repair to wrapper install
+- **Alias routing**: prefer PATH appbot bin for aliases; fallback to doctor folder when PATH missing
+- **agy alias** + **gemini cli routing**: direct agy to Gemini for compatibility; routes via direct gemini CLI when configured
+
+### Changed
+- **Doctor ghost score/depth penalty**: normalized scoring for multi-repo diagnostics
+- **Harness alias resolution**: english notes and summary for alias root labels
+
 ## [7.5.35-sdk] - 2026-06-04
 
 ### Added

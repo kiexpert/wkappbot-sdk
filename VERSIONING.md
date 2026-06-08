@@ -34,6 +34,10 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
+`7.5.49` -- bumped at 2026-06-08 -- wkdoctor agy integration (antigravity CLI + Gemini settings), alias symlink auto-repair (tool alias breaks), agy wrapper policy revert (delegate to wrapper install), alias routing (PATH order + doctor-bin fallback), ghost score/depth penalty normalization, harness alias english notes
+
+## Previous version
+
 `7.5.35` -- bumped at 2026-06-04 -- gg-main health check enhancements (release-notes quality, dev-repo build, GitHub status monitoring), skill browser v2 (deep-linking, SEO, sidebar nav, sonnet-reflection, 44-char preview), Chrome health filter (MainWindowHandle, exclude renderer procs), watchdog emergency-kill reap-protect, GHA auto-build skill pages, CLAUDE.md session-based pending tracking
 
 ## Previous versions
