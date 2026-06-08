@@ -1,5 +1,4 @@
-# wkdoctor check: tool alias symlink integrity and auto-repair
-# Repairs wkdoctor/agy alias links by delegating to the wrapper install path.
+# wkdoctor check: direct agy.exe alias integrity and auto-repair
 # Doctor only diagnoses and re-checks; the install process owns link creation.
 
 function Normalize-PathForCompare {
@@ -166,31 +165,10 @@ $aliasRoots = @(
 foreach ($root in $aliasRoots) {
     $rootPath = [System.IO.Path]::GetFullPath($root.Root)
     $aliasPairs = @(
-        @{ Label = "$($root.Label) wkdoctor.cmd alias"; Link = (Join-Path $rootPath 'wkdoctor.cmd'); Target = (Join-Path $rootPath 'wkwrap.cmd') },
-        @{ Label = "$($root.Label) wkdoctor.sh alias";  Link = (Join-Path $rootPath 'wkdoctor.sh');  Target = (Join-Path $rootPath 'wkwrap.sh') },
-        @{ Label = "$($root.Label) agy.cmd alias";      Link = (Join-Path $rootPath 'agy.cmd');      Target = (Join-Path $rootPath 'wkwrap.cmd') },
-        @{ Label = "$($root.Label) agy.sh alias";       Link = (Join-Path $rootPath 'agy.sh');       Target = (Join-Path $rootPath 'wkwrap.sh') }
+        @{ Label = "$($root.Label) agy.exe alias";      Link = (Join-Path $rootPath 'agy.exe');      Target = $agyInstallExe }
     )
-
-    if ($agyInstallExe) {
-        $aliasPairs += @{
-            Label = "$($root.Label) agy.exe alias"
-            Link = (Join-Path $rootPath 'agy.exe')
-            Target = $agyInstallExe
-        }
-    }
 
     foreach ($pair in $aliasPairs) {
         Ensure-ToolAliasLink -LinkPath $pair.Link -TargetPath $pair.Target -Label $pair.Label
-    }
-
-    $agyCmd = Join-Path $rootPath 'agy.cmd'
-    $agySh = Join-Path $rootPath 'agy.sh'
-    $agyExe = Join-Path $rootPath 'agy.exe'
-    $hasAgyExe = Test-Path -LiteralPath $agyExe -PathType Leaf
-    if ((Test-Path -LiteralPath $agyCmd -PathType Leaf) -and (Test-Path -LiteralPath $agySh -PathType Leaf)) {
-        $summary = if ($hasAgyExe) { 'connected via direct agy install' } else { 'connected via direct agy install (exe unavailable)' }
-        Add-Check "$($root.Label) agy aliases" 'ok' $summary
-        Emit 'ok' "$($root.Label) agy aliases" $summary
     }
 }
