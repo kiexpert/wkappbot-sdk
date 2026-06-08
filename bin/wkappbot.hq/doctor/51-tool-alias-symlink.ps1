@@ -81,6 +81,14 @@ function Get-WkAppBotBinRoot {
     return $null
 }
 
+function Get-AgyInstallExePath {
+    $target = Join-Path $env:LOCALAPPDATA 'agy\bin\agy.exe'
+    if (Test-Path -LiteralPath $target -PathType Leaf) {
+        return [System.IO.Path]::GetFullPath($target)
+    }
+    return $null
+}
+
 function Ensure-ToolAliasLink {
     param(
         [Parameter(Mandatory)][string]$LinkPath,
@@ -130,6 +138,7 @@ if (-not $pathBin) {
     $pathBin = $doctorBin
     $rootLabel = 'doctor folder'
 }
+$agyInstallExe = Get-AgyInstallExePath
 $aliasRoots = @(
     @{ Root = $pathBin; Label = $rootLabel }
 )
@@ -143,12 +152,11 @@ foreach ($root in $aliasRoots) {
         @{ Label = "$($root.Label) agy.sh alias";       Link = (Join-Path $rootPath 'agy.sh');       Target = (Join-Path $rootPath 'wkwrap.sh') }
     )
 
-    $wkwrapExe = Join-Path $rootPath 'wkwrap.exe'
-    if (Test-Path -LiteralPath $wkwrapExe -PathType Leaf) {
+    if ($agyInstallExe) {
         $aliasPairs += @{
             Label = "$($root.Label) agy.exe alias"
             Link = (Join-Path $rootPath 'agy.exe')
-            Target = $wkwrapExe
+            Target = $agyInstallExe
         }
     }
 
@@ -161,7 +169,7 @@ foreach ($root in $aliasRoots) {
     $agyExe = Join-Path $rootPath 'agy.exe'
     $hasAgyExe = Test-Path -LiteralPath $agyExe -PathType Leaf
     if ((Test-Path -LiteralPath $agyCmd -PathType Leaf) -and (Test-Path -LiteralPath $agySh -PathType Leaf)) {
-        $summary = if ($hasAgyExe) { 'connected via wkwrap' } else { 'connected via wkwrap (exe unavailable)' }
+        $summary = if ($hasAgyExe) { 'connected via direct agy install' } else { 'connected via direct agy install (exe unavailable)' }
         Add-Check "$($root.Label) agy aliases" 'ok' $summary
         Emit 'ok' "$($root.Label) agy aliases" $summary
     }
