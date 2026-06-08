@@ -143,14 +143,26 @@ foreach ($root in $aliasRoots) {
         @{ Label = "$($root.Label) agy.sh alias";       Link = (Join-Path $rootPath 'agy.sh');       Target = (Join-Path $rootPath 'wkwrap.sh') }
     )
 
+    $wkwrapExe = Join-Path $rootPath 'wkwrap.exe'
+    if (Test-Path -LiteralPath $wkwrapExe -PathType Leaf) {
+        $aliasPairs += @{
+            Label = "$($root.Label) agy.exe alias"
+            Link = (Join-Path $rootPath 'agy.exe')
+            Target = $wkwrapExe
+        }
+    }
+
     foreach ($pair in $aliasPairs) {
         Ensure-ToolAliasLink -LinkPath $pair.Link -TargetPath $pair.Target -Label $pair.Label
     }
 
     $agyCmd = Join-Path $rootPath 'agy.cmd'
     $agySh = Join-Path $rootPath 'agy.sh'
+    $agyExe = Join-Path $rootPath 'agy.exe'
+    $hasAgyExe = Test-Path -LiteralPath $agyExe -PathType Leaf
     if ((Test-Path -LiteralPath $agyCmd -PathType Leaf) -and (Test-Path -LiteralPath $agySh -PathType Leaf)) {
-        Add-Check "$($root.Label) agy aliases" 'ok' 'connected via wkwrap'
-        Emit 'ok' "$($root.Label) agy aliases" 'connected via wkwrap'
+        $summary = if ($hasAgyExe) { 'connected via wkwrap' } else { 'connected via wkwrap (exe unavailable)' }
+        Add-Check "$($root.Label) agy aliases" 'ok' $summary
+        Emit 'ok' "$($root.Label) agy aliases" $summary
     }
 }
