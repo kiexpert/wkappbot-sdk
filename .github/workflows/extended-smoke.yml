@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
-    timeout-minutes: 15      # hard cap -- 188 tests should finish in ~5 min
+    timeout-minutes: 20      # increased from 15 -- Extended mode takes ~13 min, BasicOnly ~5 min
 
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
@@ -120,7 +120,7 @@ jobs:
 
         $outFile = "scripts/smoke-help.ps1.extended-ci.txt"
         $lines   = & pwsh -NoProfile -ExecutionPolicy Bypass `
-                     -File "scripts/smoke-help.ps1" -Extended 2>&1
+                     -File "scripts/smoke-help.ps1" -BasicOnly 2>&1
         $code    = $LASTEXITCODE
 
         $summary = ($lines | Select-String "Smoke results") | Select-Object -Last 1

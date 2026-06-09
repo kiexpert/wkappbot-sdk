@@ -111,13 +111,13 @@ The chain grows. The system gets harder to break.
 
 ---
 
-## What's New in v7.5.35
+## What's New in v7.6.0
 
-- **gg-main health check enhancements** -- release-notes quality verification, dev-repo build status, GitHub service status monitoring for release readiness.
-- **Skill browser v2** -- deep-linking via URL hash (SEO-safe), sidebar navigation, sonnet-reflection 7-step display, 44-char preview limits for better marketing appeal.
-- **Chrome health filter (SDK-side mitigation)** -- count only main browser instances via `MainWindowHandle` filter, exclude renderer/GPU subprocesses (resolves false-positive multiplication alerts).
-- **Watchdog emergency-kill reap-protect** -- AI-spawned processes (pythonw/node/codex) protected from reaping, priority-based ranking for OS resource management.
-- **GHA auto-build skill pages** -- GitHub Actions workflow (6h cron + on-push) to regenerate 443+ skill browser pages automatically.
+- **wkdoctor agy integration** -- antigravity CLI detection and Gemini settings auto-recovery via `check 08-harness-connection`.
+- **Tool alias auto-repair** -- wkdoctor automatically detects and repairs broken tool alias symlinks (wkappbot.exe -> a11y.exe).
+- **Claude settings validation** -- aligned Claude CLI settings validation with wildcard bypass rules for smoother harness integration.
+- **agy alias routing** -- improved PATH routing preference (appbot bin first, fallback to doctor) for seamless agy/Gemini CLI delegation.
+- **Harness policy refinement** -- reverted overly strict agy wrapper shim policy to restore flexibility in wrapped tool composition.
 
 ### v7.4 highlights (still active)
 
