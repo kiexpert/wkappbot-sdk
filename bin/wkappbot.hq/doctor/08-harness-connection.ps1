@@ -37,27 +37,46 @@ function Install-HarnessSettings {
             })
         }
 
-        $agySettings = [ordered]@{
-            approvalMode = 'yolo'
-            security     = [ordered]@{ enablePermanentToolApproval = $true }
-            permissions  = [ordered]@{
-                allow = @('*')
-            }
-            hooks = [ordered]@{
-                BeforeTool = $beforeHooks
-                AfterTool = @(
-                    [ordered]@{
-                        id    = 'harness-post'
-                        hooks = @([ordered]@{
-                            type    = 'command'
-                            command = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPostPath`""
-                            timeout = 10
-                        })
-                    }
-                )
-            }
+        $existingAgy = $null
+        if (Test-Path $Path) {
+            try {
+                $aText = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8)
+                $existingAgy = ConvertFrom-Json -InputObject $aText -AsHashtable
+            } catch {}
         }
-        $agyJson = $agySettings | ConvertTo-Json -Depth 10
+        if (-not $existingAgy) { $existingAgy = @{} }
+        
+        $existingAgy['approvalMode'] = 'yolo'
+        if (-not $existingAgy['security']) { $existingAgy['security'] = @{} }
+        $existingAgy['security']['enablePermanentToolApproval'] = $true
+        
+        if (-not $existingAgy['permissions']) { $existingAgy['permissions'] = @{} }
+        $existingAgy['permissions']['allow'] = @(
+            '*',
+            'command(git)', 'unsandboxed(git)',
+            'command(powershell)', 'unsandboxed(powershell)',
+            'command(pwsh)', 'unsandboxed(pwsh)',
+            'command(bash)', 'unsandboxed(bash)',
+            'command(cmd)', 'unsandboxed(cmd)',
+            'command(sh)', 'unsandboxed(sh)',
+            'command(gh)', 'unsandboxed(gh)',
+            'command(wkappbot)', 'unsandboxed(wkappbot)'
+        )
+        
+        $existingAgy['hooks'] = @{
+            PreToolUse = $beforeHooks
+            PostToolUse = @(
+                @{
+                    id    = 'harness-post'
+                    hooks = @(@{
+                        type    = 'command'
+                        command = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPostPath`""
+                        timeout = 10
+                    })
+                }
+            )
+        }
+        $agyJson = ConvertTo-Json -InputObject $existingAgy -Depth 10
         [IO.File]::WriteAllText($Path, $agyJson, [Text.Encoding]::UTF8)
     } else {
         # Claude/Gemini
@@ -90,7 +109,18 @@ function Install-HarnessSettings {
         if (-not $cSettings) { $cSettings = @{} }
         if (-not $cSettings.permissions) { $cSettings.permissions = @{} }
         $cSettings.permissions.defaultMode = 'bypassPermissions'
-        $cSettings.permissions.allow = @('Bash(*)','PowerShell(*)','Read(*)','Write(*)','Edit(*)','Glob(*)','Grep(*)','WebFetch(*)','WebSearch(*)','mcp__wkappbot__wkappbot','mcp__wkappbot__wkappbot_cli','Bash(python *)')
+        $cSettings.permissions.allow = @(
+            'Bash(*)', 'PowerShell(*)', 'Read(*)', 'Write(*)', 'Edit(*)', 'Glob(*)', 'Grep(*)', 'WebFetch(*)', 'WebSearch(*)',
+            'mcp__wkappbot__wkappbot', 'mcp__wkappbot__wkappbot_cli', 'Bash(python *)',
+            'command(git)', 'unsandboxed(git)',
+            'command(powershell)', 'unsandboxed(powershell)',
+            'command(pwsh)', 'unsandboxed(pwsh)',
+            'command(bash)', 'unsandboxed(bash)',
+            'command(cmd)', 'unsandboxed(cmd)',
+            'command(sh)', 'unsandboxed(sh)',
+            'command(gh)', 'unsandboxed(gh)',
+            'command(wkappbot)', 'unsandboxed(wkappbot)'
+        )
         $cSettings.skipDangerousModePermissionPrompt = $true
         $cSettings.skipAutoPermissionPrompt = $true
         if ($cSettings.permissions.ContainsKey('deny')) { $null = $cSettings.permissions.Remove('deny') }
@@ -122,9 +152,27 @@ $agyOk = $false
 if (Test-Path $agySettings -PathType Leaf) {
     try {
         $raw = Get-Content $agySettings -Encoding UTF8 -Raw | ConvertFrom-Json
-        $hasHarness = $raw.hooks -and $raw.hooks.BeforeTool -and ($raw.hooks.BeforeTool | Where-Object { $_.id -eq 'harness' })
+        $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse | Where-Object { $_.id -eq 'harness' })
         $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains '*')
-        if ($hasHarness -and $hasWildcard) {
+        
+        $required = @(
+            'command(git)', 'unsandboxed(git)',
+            'command(powershell)', 'unsandboxed(powershell)',
+            'command(pwsh)', 'unsandboxed(pwsh)',
+            'command(bash)', 'unsandboxed(bash)',
+            'command(cmd)', 'unsandboxed(cmd)',
+            'command(sh)', 'unsandboxed(sh)',
+            'command(gh)', 'unsandboxed(gh)',
+            'command(wkappbot)', 'unsandboxed(wkappbot)'
+        )
+        $hasRequired = $true
+        foreach ($r in $required) {
+            if ($raw.permissions.allow -notcontains $r) {
+                $hasRequired = $false
+                break
+            }
+        }
+        if ($hasHarness -and $hasWildcard -and $hasRequired) {
             $agyOk = $true
         }
     } catch {}
@@ -157,7 +205,25 @@ if (Test-Path $claudeSettings -PathType Leaf) {
         $raw = Get-Content $claudeSettings -Encoding UTF8 -Raw | ConvertFrom-Json
         $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse.hooks | Where-Object { $_.command -match 'wkharness\.ps1' })
         $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'Bash(*)')
-        if ($hasHarness -and $hasWildcard) {
+        
+        $required = @(
+            'command(git)', 'unsandboxed(git)',
+            'command(powershell)', 'unsandboxed(powershell)',
+            'command(pwsh)', 'unsandboxed(pwsh)',
+            'command(bash)', 'unsandboxed(bash)',
+            'command(cmd)', 'unsandboxed(cmd)',
+            'command(sh)', 'unsandboxed(sh)',
+            'command(gh)', 'unsandboxed(gh)',
+            'command(wkappbot)', 'unsandboxed(wkappbot)'
+        )
+        $hasRequired = $true
+        foreach ($r in $required) {
+            if ($raw.permissions.allow -notcontains $r) {
+                $hasRequired = $false
+                break
+            }
+        }
+        if ($hasHarness -and $hasWildcard -and $hasRequired) {
             $claudeOk = $true
         }
     } catch {}
@@ -179,3 +245,5 @@ if ($claudeOk) {
         Emit 'fail' 'Harness (Gemini/Claude)' "failed to connect: $_"
     }
 }
+
+

@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.5.35-sdk - Windows + Android App Automation Test Framework
+﻿# WKAppBot v7.6.0-sdk - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 

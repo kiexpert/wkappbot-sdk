@@ -34,7 +34,7 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`7.5.49` -- bumped at 2026-06-08 -- wkdoctor agy integration (antigravity CLI + Gemini settings), alias symlink auto-repair (tool alias breaks), agy wrapper policy revert (delegate to wrapper install), alias routing (PATH order + doctor-bin fallback), ghost score/depth penalty normalization, harness alias english notes
+`7.6.0` -- bumped at 2026-06-09 -- aligned to Core base 7.6. wkdoctor agy (antigravity CLI) integration: check 08-harness-connection for agy + gemini settings auto-recovery; Claude settings validation + wildcard bypass rules; tool alias symlink auto-repair (PATH order + doctor-bin fallback); agy wrapper shim policy revert (delegate to wrapper install); ghost score/depth penalty normalization
 
 ## Previous version
 
