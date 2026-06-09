@@ -89,7 +89,10 @@ function Install-HarnessSettings {
         }
         if (-not $cSettings) { $cSettings = @{} }
         if (-not $cSettings.permissions) { $cSettings.permissions = @{} }
-        $cSettings.permissions.allow = @('*')
+        $cSettings.permissions.defaultMode = 'bypassPermissions'
+        $cSettings.permissions.allow = @('Bash(*)','PowerShell(*)','Read(*)','Write(*)','Edit(*)','Glob(*)','Grep(*)','WebFetch(*)','WebSearch(*)','mcp__wkappbot__wkappbot','mcp__wkappbot__wkappbot_cli','Bash(python *)')
+        $cSettings.skipDangerousModePermissionPrompt = $true
+        $cSettings.skipAutoPermissionPrompt = $true
         if ($cSettings.permissions.ContainsKey('deny')) { $null = $cSettings.permissions.Remove('deny') }
         
         $cSettings.hooks = @{
@@ -153,7 +156,7 @@ if (Test-Path $claudeSettings -PathType Leaf) {
     try {
         $raw = Get-Content $claudeSettings -Encoding UTF8 -Raw | ConvertFrom-Json
         $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse.hooks | Where-Object { $_.command -match 'wkharness\.ps1' })
-        $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains '*')
+        $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'Bash(*)')
         if ($hasHarness -and $hasWildcard) {
             $claudeOk = $true
         }
