@@ -1,0 +1,51 @@
+{
+  "id": "harness-active-model-scoping",
+  "app": "wkappbot-workflow",
+  "title": "Harness Active-Model Scoping",
+  "title_ko": null,
+  "desc": "T1 core. The harness must scope every gate/score/pace to WHO works now (active model via wkagent-name) and WHETHER a human watches (transcript-derived, no marker files). 5 principles from the 2026-06-09 guard-storm incident. P4 already patched.",
+  "steps": [
+    "THESIS: scope every gate/score/pace to WHO works now (active model via wkagent-name) and WHETHER a human is watching (transcript-derived state, no marker files).",
+    "P1 Skill comments by verified identity: author field = wkagent-name (verified, not self-claimed); store comments in a separate skill-comments.jsonl NOT the skill body (body bloat costs tokens every read); a survey passing a transfer-quiz grants the executor a stall-reset token; bare praise earns nothing.",
+    "P2 Cheap-model comprehension raises the author score: a Haiku passing a skill transfer-quiz proves the skill is self-sufficient and the author earns knowledge-score; judged against the skill DECLARED target-tier (Haiku-tier by Haiku, Opus-tier by Opus, never penalize inherently complex skills); quiz runs async once at contribute or edit time; this forces authors to make tacit knowledge explicit for the cheapest declared-tier successor.",
+    "P3 Pace is active-model-scoped not global: 2026-06-09 gemini-pace hit 954/500 and blocked Opus and Haiku git/dotnet/gh calls that use zero Gemini, deadlocking a release; check only the active model quota (Opus budget, Sonnet pace, Haiku near-unlimited, Gemini weekly charged only when Gemini runs); a delegated agent uses ITS OWN model quota; non-Gemini commands are exempt.",
+    "P4 Stall resets on user turn DONE 2026-06-09: Sync-WkStallResetOnUserTurn (Haiku patch) -- a fresh user message resets the 300s and 10-call window since the human is watching; autonomous wakeups (ScheduleWakeup, loop) keep stall active.",
+    "P5 Gate-as-sign, and it EXTENDS to suggests and skill-ids: every guard block must name a VERIFIED working escape, never a dead-end (stall-guard said delegate but the delegate paths wkcodex and Agent were themselves blocked -- failed guidance that made Opus give up). The SAME rule applies to anything a human or another agent receives: a bare-jargon suggest title like 'Implement harness active-model-scoping' makes the Core owner ask 'which suggest, why should I look' -- 2026-06-09 the owner had to ask the user. ALWAYS prepend a one-line why/priority/context comment so the recipient self-routes without asking. Friendly context IS the sign; a title or a block with no escape and no why is the anti-pattern.",
+    "IMPL STATUS: P4 patched; P1, P2, P3, P5 pending Core. CROSS-LINKS: wkagent-name-tool, wkharness-guards, pace-calibration-log, stall-guard-wk-exemption, releasing-under-harness-pace-guards, opus-mechanical-self-drag-antipattern, knowledge-ification-procedure-jisikhwa."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool",
+      "expect": "active model identity tool",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read releasing-under-harness-pace-guards",
+      "expect": "pace bypass + incident",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "shows 5 principles",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "pace",
+    "stall",
+    "wkagent-name",
+    "active-model",
+    "comments",
+    "gate-as-sign",
+    "5-principles",
+    "2026-06-09"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T13:26:02.8681864Z",
+  "updated": "2026-06-09T13:41:17.6078571Z",
+  "version": "1.2"
+}

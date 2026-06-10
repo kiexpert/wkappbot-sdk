@@ -1,0 +1,49 @@
+{
+  "id": "opus-mechanical-self-drag-antipattern",
+  "app": "wkappbot-workflow",
+  "title": "Opus Mechanical Self-Drag Antipattern",
+  "title_ko": null,
+  "desc": "T1 reflex. When an expensive model (Opus) executes MECHANICAL work directly, it walks into the stacked guard maze and burns 10x time. Delegate mechanical to Haiku from the start. 2026-06-09 incident: Opus dragged a 1-function harness patch 10+ min; Haiku did it in 65s.",
+  "steps": [
+    "TRIGGER: an expensive model (Opus) is about to execute MECHANICAL work directly -- a file edit, git, build, gh release, or harness patch.",
+    "REFLEX: STOP and delegate to Haiku or codex IMMEDIATELY. Opus executing mechanical work directly walks into the stacked guard maze (pace, stall, tier-gate) and burns roughly 10x the time fighting guards instead of doing the task.",
+    "INCIDENT 2026-06-09: Opus dragged a one-function stall-guard patch for 10-plus minutes through gemini-pace 954/500, then claude-pace 172 percent, then stall-guard, then tier-gate; the moment tier-gate cleared, a Haiku subagent applied the exact same edit in 65 seconds. Subagents are pace/wk-only exempt, so they sail through.",
+    "ROOT CAUSE: Opus value is judgment, decomposition, briefing, synthesis, and final review -- NOT mechanical execution. Pushing mechanical work through guards is the wrong-layer trap. Conduct, do not execute.",
+    "RULE: mechanical work (edits, git, build, release, harness patches) goes to Haiku or codex from the START. Opus writes the precise old/new strings and the SPEC, then dispatches and reviews. The guards are calibrated to push exactly this delegation -- fighting them is the signal you are at the wrong layer.",
+    "CROSS-LINKS: claude-code-agent-tier-routing, releasing-under-harness-pace-guards, opus-self-reflection, haiku-as-qa-canary, delegation-preflight-oneshot."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "shows Haiku for mechanical/survey, Opus for judgment",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read releasing-under-harness-pace-guards",
+      "expect": "shows the guard bypass paths",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read opus-mechanical-self-drag-antipattern",
+      "expect": "shows the reflex",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "opus",
+    "haiku",
+    "delegation",
+    "mechanical",
+    "reflex",
+    "guard-maze",
+    "wrong-layer",
+    "2026-06-09"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T13:24:55.7089299Z",
+  "updated": "2026-06-09T13:24:55.7089388Z",
+  "version": "1.0"
+}

@@ -46,6 +46,8 @@
 
 ### Source File Size
 ~400 lines/file recommended. **WKAppBot code only** (do NOT refactor customer code!)
+**Split-first analysis (2026-06-11)**: before you deep-read / refactor / debug a hard or >400-line WKAppBot source, FIRST split it with the hardened splitter (`wksplit-ps1` for .ps1, `wksplit-cs` for .cs) -- 0-token, deterministic, 6-gate run-verified so it cannot ship a broken split -- then analyze the small focused modules. Free + safe + clearer, and it leaves the code under the cap. The splitter is an analysis accelerator, not just a refactoring chore. Detail: `wkappbot skill read wksplit-cs-utility`.
+**Fat markdown -> heal + score (2026-06-11)**: same principle for docs. When a markdown file (CLAUDE.md, README, a fat skill body) is bloated, token-hostile, or drifted, run `wkappbot skill read md-heal` (+ `claude-md-guide`, `claudemd-slim-plan`) and optimize it -- tier it, cut drift, move history to refs. An MD carries a knowledge/diet score too (the harness already computes a CLAUDE.md diet-score via the `claude-md-diet-score` gate); a low score should route you to the heal. ONE UNIFYING PRINCIPLE: every artifact carries a quality score, and a low score routes you to its optimizer -- a >400-line source -> split-first, a low skill tier-score -> 3-tier split, a fat/drifted MD -> md-heal.
 
 ### Skill Authoring Rules
 - **Always use `wkappbot skill contribute` / `wkappbot skill edit` to create/modify skills**
@@ -464,6 +466,11 @@ wkappbot skill read wkagent-name-tool           # Usage: agent model detection
 wkappbot skill read wkharness-guards            # Impl: ctypes Windows API patterns
 wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
+## harness:skill bin/wkappbot.hq/doctor/*harness*
+wkappbot skill read cross-family-harness-integration       # Usage: the cross-family harness map + personal-docs->kih migration + the divergence trap
+wkappbot skill read cross-family-harness-integration-howto # Impl: relay, induce, autonomy.toml, doctor repair guards
+wkappbot skill read wkdoctor-system-physician              # Task: doctor module patterns + repair-vehicle governance
+
 ## Pending
 
 - [ ] suggest triage 2026-06-05 (RANK 1-4, 2긴급+19중요+2기타 SDK channel; GPT ranking skipped — Chrome>5/CDP-bug risk per gg step 4 note; classified by SPEC impact/urgency/effort/scope):
@@ -476,11 +483,8 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
   - RANK 4 [35/36] wkask.sh literal-backslash exec | scope=SDK but fixed 3x (commit 94026081) → Codex deny-rule needed (Pending below); [37] skill sync CONFLICTS UX=LOW; [40] pre-push AI-block UX=LOW; [42] FEAT skill 3-tier auto-detect=LOW; [202/203] pre-commit false-block=already fixed
   - BLOCKER: actual suggest resolve/merge IPC-lagged (Eye); triage documented only, formal resolution next stable session
 
-<!-- compressed 2026-06-04 nightly-heal: all resolved [x] items folded into the single DONE-ARCHIVE line below; raw history in git -->
-- [x] DONE-ARCHIVE (compressed 2026-06-04, all prior [x] clusters): v7.5.0-sdk release + 3x nightly-heal 2026-05-30..06-04 (wkask.sh/ps1 fixes, wkcdp-mon MonitorFromPoint, wkzombie safe-skip, CDP cdp-open 143min->30s Core 82d60f74f, Chrome multiplication SDK auto-cleanup MyCdpContext.ChromeHealthCheck, gg-main-enhanced, doc bump v7.4->v7.5, gh release); skill-browser + 3tier cluster (wkask log fixes, wksplit-cs, sdk-gg-main-automation/suggest-triage/wkharness/cdp-command 3tier splits, docs/skills restructure + self-heal scripts, PAT pro unlock b26ad540, 3-state auth b057a503, 423 skill pages built); wkjobs/taskkill suite + Codex harness/wrappers + caller-HWND resolution + a11y WT terminal + wkdoctor 10-checks; test-auth.html probe page (05b47480); gg triage 2026-06-04 (wkask.sh merges, Chrome 16->2 auto-cleanup verified); payment-skill ref heal (SUBSCRIBE.md Korean anchor + drop missing kis_payment_watcher.py refs, v1.8). Commit hashes in git log.
-
-<!-- compressed 2026-06-05: 15 [x] items (gg-main 2-cycle health checks + escalations + Gemini suggest-triage + v7.5.1-sdk release + nightly-heals verified); core-scope suggests filed with SDK mitigation live; next: resolve suggests when Eye/system idle -->
-- [x] 2026-06-05 health-check + escalation cluster (15 items): gg-main rapid-fix cycle (Chrome 26→0 auto-clean, Eye 6→5 restart, CI CDP Smoke skip-rule, Core suggests ts=2026-06-05T09:19:28 filed), Gemini suggest-triage R1-R4 classifications (R1 dismiss-stale × 2, R2 dev-build OK, R3 feature-backlog, R4 resolved/merged), v7.5.1-sdk released (skill-browser v2 + ChromeHealthCheck MainWindowHandle filter verified), nightly-heals 2026-06-04/05 confirmed (skill-audit clean, version-parity OK), wkask.sh pattern-fix Bypass.*\\n.*-File committed (lines 128, 508), all Core-scope escalations documented, SDK mitigations live, verify pending after Eye/system idle
+<!-- compressed 2026-06-11 nightly-heal: [x] clusters from 06-04 and 06-05 folded below; raw history in git -->
+- [x] DONE-ARCHIVE (compressed 2026-06-11, clusters thru 06-05): v7.5.0-sdk release + nightly-heals 2026-05-30..06-04 (wkask.sh/ps1 fixes, wkcdp-mon MonitorFromPoint, CDP cdp-open 143min->30s Core 82d60f74f, Chrome multiplication MyCdpContext.ChromeHealthCheck, gg-main-enhanced, gh release); skill-browser v2 + 3tier cluster (sdk-gg-main-automation/suggest-triage/wkharness/cdp-command splits, PAT pro b26ad540, 3-state auth b057a503, 423 pages, per-skill static+treeview+7 reflection items); wkjobs/taskkill/caller-HWND/wkdoctor; push skill-browser to origin/main (Opus squash); v7.5.1-sdk released (ChromeHealthCheck MainWindowHandle filter); wkask.sh \n bug ROOT CAUSE fixed pattern Bypass.*\\n.*-File (commit 94026081); gg-main 06-04 Amber resolved; 06-05 gg-main Chrome 26→0 auto-clean, Core suggests ts=2026-06-05T09:19:28 filed. Commit hashes in git log.
 
 - [ ] 2026-06-05 21:31 gg-main CRITICAL+8WARN triage (exit=2): wkask.sh \n = Core escalated (suggest ts=2026-06-05T09:19:28 ✓), Chrome 16→9 (trending normal, Launcher v7.5.35 cleanup effective), Eye 8 (settling post-restart, mcp-protected survivors), Suggests 14 (classify next session per "comprehensive audit" mandate), CI Smoke (skip-rule verified), FOCUS-STEAL/CHROME:CAP (Core escalations filed), DEAD LAT/KillForeign (expected cleanup). Status: CRITICAL escalated ✓, WARNINGS classified & escalated ✓, Ready next cycle or User decision.
 
@@ -490,15 +494,11 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
-- [x] push skill-browser refactor to origin/main (Opus squash+push)
-- [x] skill browser SEO + sonnet reflection fix: per-skill static pages + left treeview + all 7 reflection items + 44-char preview + 3-state auth unlock
-- [x] gg-main 3h 2026-06-04 ~15:00: Amber resolved. ~16:30 check: Amber(경계) Chrome=4, CI 5/5 green, suggest 긴급2+중요13
 - [ ] skill-browser-launch-checklist: deploy skills-data-full.js to wkappbot-harness before Pro unlock goes live
 - [ ] contributor service: skills-data-full.js generation + raw.githubusercontent.com dynamic load + localhost test (auto-approved, no confirmation needed)
 - [ ] WKHARNESS_OPUS_FG env var 백도어 언급 스킬 전체 정리 필요
 - [ ] wkappbot-harness repo 삭제 필요 (허락 없이 생성한 것, delete_repo scope 필요)
 - [ ] skill-heal-nightly 3tier 분리 필요 (21 steps, update-gate 차단 중)
-- [x] wkask.sh \n bug 2026-06-05 (gg final health): ROOT CAUSE found = gg-main.sh detection pattern was buggy (`Bypass[^\n]*\\n[^\n]*-File` -- `[^\n]*` excludes literal 'n' chars so never spanned the text), so the broken Core file went UNDETECTED = the "false-positive" was actually a false-NEGATIVE. Fixed pattern to `Bypass.*\\n.*-File` (commit pending). SDK bin/wkask.sh = CLEAN (single-line); Core D:/GitHub/WKAppBot/bin/wkask.sh = WAS broken (literal \n), fixed to single-line + smoke-verified (exec reaches wkask.ps1, no \n arg error). Codex deny-rule for Core bin/wkask.sh still needed to stop reverts.
 - [ ] gg-main final WARN classification 2026-06-05: Eye 5>3=boundary (1x13h PROTECTED survivor, reaper handles; not crit) MONITOR; suggests 14>5=backlog MONITOR; FOCUS-STEAL 3 + CHROME:CAP 7 = Core-scope ESCALATE; CI CDP Smoke fail=expected (real-site nav timeout) SKIP-rule OK; dev-repo skipped=non-standard MONITOR. SECURITY.md 7.5.x = intentional range, not drift.
 - [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start → 닫기 dialog). Needs auto-restore or on-screen Chrome guard before ask.
 - [ ] wkask Gemini: Google cookie consent banner off-screen (Chrome minimized). Same root cause as GPT issue.
@@ -553,4 +553,5 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 - [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
 - [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
 - [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
-- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)- [ ] nightly-heal 2026-06-06: autonomous skill audit + Pending compression
+- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
+- [x] nightly-heal 2026-06-11: skill audit run (FILE MISSING = expected, Core repo refs); 5 new SDK skills installed (releasing-under-harness-pace-guards, sdk-release-playbook-howto/ref, harness-active-model-scoping, opus-mechanical-self-drag-antipattern); CLAUDE.md Pending compressed 563→555 lines

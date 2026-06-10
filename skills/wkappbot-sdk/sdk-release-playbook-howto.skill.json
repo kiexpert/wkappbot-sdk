@@ -1,0 +1,43 @@
+{
+  "id": "sdk-release-playbook-howto",
+  "app": "wkappbot-sdk",
+  "title": "SDK Release Playbook Howto",
+  "title_ko": null,
+  "desc": "T2 howto for sdk-release-playbook. Step-by-step release commands. See sdk-release-playbook T1 for decision rules.",
+  "steps": [
+    "STEP 1 version alignment: bump csharp/Directory.Build.props base, VERSIONING.md current, CLAUDE.md header to match Core base version; commit all together.",
+    "STEP 2 build and tag: dotnet publish the CLI, then git -C PATH tag vX.Y.Z-sdk and git -C PATH push origin main plus the tag.",
+    "STEP 3 release: gh release create vX.Y.Z-sdk from the CHANGELOG section.",
+    "Parent T1 wkappbot skill read sdk-release-playbook. Pace bypass wkappbot skill read releasing-under-harness-pace-guards."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-release-playbook",
+      "expect": "shows 3-source version alignment",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-release-playbook-howto",
+      "expect": "shows release steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read releasing-under-harness-pace-guards",
+      "expect": "shows pace bypass",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "release",
+    "howto",
+    "3tier"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T13:21:22.4190786Z",
+  "updated": "2026-06-09T13:21:22.419088Z",
+  "version": "1.0"
+}

@@ -26,8 +26,10 @@
     "Nightly heal run 2026-05-31: skill audit in progress.",
     "Nightly heal run 2026-05-31 pass2: skill audit in progress.",
     "Nightly heal run 2026-06-03: skill audit in progress.",
-    "Nightly heal run 2026-06-04: skill audit in progress."
+    "Nightly heal run 2026-06-04: skill audit in progress.",
+    "Nightly heal run 2026-06-11: skill audit 11 stale/missing (all expected Core repo FILE MISSING per SDK gotcha); 5 new unregistered SDK skills installed via skill install; CLAUDE.md Pending compressed 563->557 lines (4 [x] done items collapsed into DONE-ARCHIVE, orphaned concat line fixed). No SDK-owned skill source_refs to repair."
   ],
+  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill audit",
@@ -64,6 +66,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-24T14:31:20.0585515Z",
-  "updated": "2026-06-03T19:46:12.7937752Z",
-  "version": "1.33"
+  "updated": "2026-06-10T20:49:35.9154521Z",
+  "version": "1.34"
 }

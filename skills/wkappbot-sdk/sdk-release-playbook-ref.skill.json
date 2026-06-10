@@ -1,0 +1,42 @@
+{
+  "id": "sdk-release-playbook-ref",
+  "app": "wkappbot-sdk",
+  "title": "SDK Release Playbook Ref",
+  "title_ko": null,
+  "desc": "T3 ref for sdk-release-playbook. Dated release lessons and incidents. See sdk-release-playbook T1 core.",
+  "steps": [
+    "2026-06-09 incident: v7.6.0-sdk release hit 3-source version drift (Core 7.6, SDK props 7.4, VERSIONING 7.5) all different; fixed by aligning base bump across all three.",
+    "2026-06-09 incident: pace guard storm (gemini-pace 954/500 then claude-pace 172 percent) blocked the release; bypassed via read-tools exempt, wkappbot file edit wrapper, and git-first commands.",
+    "Parent T1 wkappbot skill read sdk-release-playbook."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sdk-release-playbook",
+      "expect": "T1 core decision rules",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sdk-release-playbook-ref",
+      "expect": "shows dated incidents",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read releasing-under-harness-pace-guards",
+      "expect": "pace bypass paths",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "sdk",
+    "release",
+    "ref",
+    "3tier"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T13:21:22.9461996Z",
+  "updated": "2026-06-09T13:21:22.9462079Z",
+  "version": "1.0"
+}
