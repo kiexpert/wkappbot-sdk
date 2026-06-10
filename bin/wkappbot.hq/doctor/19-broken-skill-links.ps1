@@ -38,9 +38,30 @@ try {
     }
     $existingIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     foreach ($line in $listOutput) {
-        # Match pattern: "(skill-id) v" where skill-id is lowercase alphanumeric+hyphen
+        # Match pattern 1: "Title Text (skill-id) v" -- skill has a display title with id in parens
         if ($line -match '\(([a-z][a-z0-9-]+)\)\s+v\d') {
             [void]$existingIds.Add($Matches[1])
+        }
+        # Match pattern 2: "[app] skill-id v" -- skill id is the bare display name (no title)
+        # Line format: "  [app-name] skill-id vN.N [age] ..."
+        elseif ($line -match '^\s+\[[^\]]+\]\s+([a-z][a-z0-9-]+)\s+v\d') {
+            [void]$existingIds.Add($Matches[1])
+        }
+    }
+    # Pattern 3 supplement: scan skill JSON files directly for "id" field.
+    # This catches skills whose display name (title) differs from their id AND
+    # does not include the id in parentheses (e.g. "Post-Compaction Recovery v1.0").
+    $_m19_idPattern = [regex]'"id"\s*:\s*"([a-z][a-z0-9-]+)"'
+    $_m19_jsonDirsA = @(
+        (Join-Path $_m19_hqDir 'skills'),                                    # SDK local HQ skills
+        (Join-Path $env:USERPROFILE '.wkappbot\bin\bin\wkappbot.hq\skills')  # user HQ skills
+    )
+    foreach ($_m19_jDir in $_m19_jsonDirsA) {
+        if (-not (Test-Path $_m19_jDir -PathType Container)) { continue }
+        Get-ChildItem -Path $_m19_jDir -Recurse -Filter '*.skill.json' -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $rawJ = [System.IO.File]::ReadAllText($_.FullName, [System.Text.Encoding]::UTF8)
+            $mj = $_m19_idPattern.Match($rawJ)
+            if ($mj.Success) { [void]$existingIds.Add($mj.Groups[1].Value) }
         }
     }
 } catch {

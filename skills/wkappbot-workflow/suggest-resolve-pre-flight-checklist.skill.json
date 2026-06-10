@@ -19,7 +19,7 @@
       "prompt": null
     },
     {
-      "cmd": "wkappbot skill read suggest-resolve-preflight-checklist",
+      "cmd": "wkappbot skill read suggest-resolve-pre-flight-checklist",
       "expect": "STEP 1",
       "prompt": null
     },
@@ -46,5 +46,5 @@
   "author": "claude",
   "created": "2026-05-14T06:38:19.3089414Z",
   "updated": "2026-05-14T06:44:20.7420754Z",
-  "version": "1.16"
+  "version": "1.17"
 }

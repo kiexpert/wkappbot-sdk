@@ -18,11 +18,6 @@
   ],
   "requirements": [
     {
-      "cmd": "wkappbot skill read wkappbot-sdk-daily-heal-checklist",
-      "expect": "shows E/C/S/G/L/P/R sections",
-      "prompt": null
-    },
-    {
       "cmd": "bash 'D:/GitHub/wkappbot-sdk/scripts/daily-heal.sh'",
       "expect": "outputs markdown with check or cross per section",
       "prompt": null
@@ -46,6 +41,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T05:15:48.8437073Z",
-  "updated": "2026-06-02T15:30:27.8149409Z",
-  "version": "1.20"
+  "updated": "2026-06-10T10:42:34.0000000Z",
+  "version": "1.21"
 }
