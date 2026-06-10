@@ -83,16 +83,16 @@ if (Test-Path $_paceJson) {
                 Emit '!' 'Pace: over-target' "pace=$($pjTotal)% > target=$($pjTarget)%  ($anchorStr)"
             }
         } else {
-            Add-Check 'Pace: over-target' 'ok' "pace=$($pjTotal)%  target=$($pjTarget)%  [OK]"
-            Emit 'ok' 'Pace: over-target' "pace=$($pjTotal)%  target=$($pjTarget)%  [OK]"
+            Add-Check 'Pace: on-track' 'ok' "pace=$($pjTotal)%  target=$($pjTarget)%  [OK]"
+            Emit 'ok' 'Pace: on-track' "pace=$($pjTotal)%  target=$($pjTarget)%  [OK]"
         }
     } catch {
         Add-Check 'Pace: over-target' 'warn' "pace.json unreadable: $_"
         Emit '!' 'Pace: over-target' 'pace.json unreadable'
     }
 } else {
-    Add-Check 'Pace: over-target' 'ok' 'pace.json absent -- no pace brick possible'
-    Emit 'ok' 'Pace: over-target' 'pace.json absent'
+    Add-Check 'Pace: on-track' 'ok' 'pace.json absent -- no pace brick possible'
+    Emit 'ok' 'Pace: on-track' 'pace.json absent'
 }
 
 # ── (b) SAFETY short-circuit in wkharness-guards-pace.ps1 ────────────────────────────────────
