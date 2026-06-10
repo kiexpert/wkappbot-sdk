@@ -1,6 +1,9 @@
 # Normalized Dynamic Defender Check for wkdoctor
-$binDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$wsRoot = Split-Path -Parent (Split-Path -Parent $binDir)
+# NOTE: use a LOCAL var name, never the shared $binDir -- this module is dot-sourced
+# into wkdoctor.ps1's scope, and overwriting $binDir corrupted it for every later
+# module (07-51 then looked under ...\doctor instead of ...\bin). 2026-06-10.
+$_dfBinDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$wsRoot = Split-Path -Parent (Split-Path -Parent $_dfBinDir)
 
 $desiredPaths = @($wsRoot, "$HOME\.claude", "$env:LOCALAPPDATA\Temp\claude", "$env:TEMP\wktasklist-snapshot.json")
 $desiredProcs = @("powershell.exe", "cmd.exe", "claude.exe", "python.exe", "pythonw.exe", "node.exe", "codex.exe", "wkappbot-core.exe", "khmini.exe", "nkmini.exe", "heroglobal.exe")
