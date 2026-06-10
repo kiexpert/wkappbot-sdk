@@ -1,0 +1,55 @@
+name: wkdoctor telemetry collector
+
+# Collects wkdoctor diagnostics from DEPLOYED users who have NO repo write access.
+# A write-less user can still OPEN AN ISSUE on a public repo; their doctor posts a sanitized
+# diagnostic as an issue titled "[wkdoctor] ...". This workflow (running with the repo's own
+# Actions token, NOT the user's) parses it, labels by severity, acknowledges, and auto-closes.
+# Nothing is ever pushed to main -- the fleet dashboard is the issue search by label.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  collect:
+    if: startsWith(github.event.issue.title, '[wkdoctor]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse, label, acknowledge, close
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const num = issue.number;
+            const body = issue.body || '';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Summary line: "wkdoctor: X ok, Y warn, Z fail"
+            const m = body.match(/wkdoctor:\s*(\d+)\s*ok,\s*(\d+)\s*warn,\s*(\d+)\s*fail/i);
+            const fails = [...body.matchAll(/^\s*\[x\]\s*(.+)$/gim)].map(x => x[1].trim()).slice(0, 25);
+
+            let summary;
+            const labels = ['wkdoctor-telemetry'];
+            if (m) {
+              const [ok, warn, fail] = [m[1], m[2], m[3]].map(Number);
+              summary = `Collected wkdoctor telemetry: **${ok} ok / ${warn} warn / ${fail} fail**.`;
+              if (fail > 0) labels.push('wkdoctor:fail');
+              else if (warn > 0) labels.push('wkdoctor:warn');
+              else labels.push('wkdoctor:healthy');
+            } else {
+              summary = 'Received wkdoctor telemetry (summary line not found).';
+              labels.push('wkdoctor:unparsed');
+            }
+            if (fails.length) summary += `\n\nFailing checks:\n` + fails.map(f => `- ${f}`).join('\n');
+
+            await github.rest.issues.addLabels({ owner, repo, issue_number: num, labels });
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: num,
+              body: summary + `\n\n_Auto-collected by the wkdoctor telemetry workflow. Closing this report -- the fleet dashboard is the issue search for label \`wkdoctor-telemetry\` (filter by \`wkdoctor:fail\` for outbreaks)._`
+            });
+            await github.rest.issues.update({ owner, repo, issue_number: num, state: 'closed' });
