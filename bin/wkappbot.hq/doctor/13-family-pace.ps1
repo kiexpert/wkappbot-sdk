@@ -255,6 +255,34 @@ if ((Test-Path $_geminiLimFile) -or (Test-Path $_geminiUsageLog)) {
         $status = if ($gFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
         Add-Check 'Family pace: Gemini daily' $status $detail
         Emit $status 'Family pace: Gemini daily' $detail
+
+        # ── Gemini request count (daily) ──────────────────────────────────────────────────────
+        # wkgemini.sh blocks at DAILY_REQ_LIMIT * DAILY_TARGET_PCT / 100 requests.
+        # Mirror those constants here (source: wkappbot-kih/tools/wrappers/wkgemini.sh).
+        $gReqDailyLimit  = 20000  # DAILY_REQ_LIMIT in wkgemini.sh (raised 2026-06-11: gemini is plentiful, daily cap is a runaway backstop only)
+        $gReqTargetPct   = 50     # DAILY_TARGET_PCT in wkgemini.sh (the blocking threshold)
+        $gReqTarget      = [int]($gReqDailyLimit * $gReqTargetPct / 100)   # 10000
+        $gReqUsed        = 0
+        $gReqFlag        = ''
+        if (Test-Path $_geminiUsageLog) {
+            try {
+                foreach ($line in (Get-Content $_geminiUsageLog -Encoding UTF8 -ErrorAction SilentlyContinue)) {
+                    if (-not $line.Trim()) { continue }
+                    try {
+                        $m = $line | ConvertFrom-Json
+                        if ($m.ts -and [DateTimeOffset]::Parse($m.ts) -ge $resetUtc -and -not ($m.quota_exhausted)) {
+                            $gReqUsed++
+                        }
+                    } catch {}
+                }
+            } catch {}
+        }
+        if ($gReqUsed -ge $gReqTarget) { $gReqFlag = ' [OVER]' }
+        elseif ($gReqUsed -ge [int]($gReqTarget * 0.9)) { $gReqFlag = ' [WARN]' }
+        $gReqDetail = "$gReqUsed/$gReqTarget req$gReqFlag  (limit=${gReqDailyLimit}, target=${gReqTargetPct}%)  [daily  wkgemini_usage.jsonl]"
+        $gReqStatus = if ($gReqFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
+        Add-Check 'Family pace: Gemini req' $gReqStatus $gReqDetail
+        Emit $gReqStatus 'Family pace: Gemini req' $gReqDetail
     } catch {
         Add-Check 'Family pace: Gemini daily' 'warn' "parse error: $_"
         Emit '!' 'Family pace: Gemini daily' "parse error"
