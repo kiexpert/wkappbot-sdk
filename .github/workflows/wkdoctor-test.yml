@@ -1,0 +1,241 @@
+name: wkdoctor self-test
+
+# Runs the wkdoctor self-test modules (21-sandbox-integrity, 22-guard-logic-selftests,
+# 23-bintool-param-first, 25-harness-symlink-canonical) in a CI sandbox on windows-latest.
+# Modules that require the live wkappbot environment (wkappbot-core.exe, Eye, real user paths)
+# gate themselves behind a logged SKIP rather than failing -- CI stays green while the
+# deterministic self-tests assert guard correctness, param-placement safety, and symlink
+# canonicality. Destructive ops (DefenderFix, EmergencyKill, -Build) are never invoked here.
+#
+# Triggers:
+#   workflow_dispatch  -- on-demand (the "verify before trust" gate)
+#   push               -- when any doctor module or wkdoctor itself changes
+#   schedule           -- daily at 02:15 UTC
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'bin/wkappbot.hq/doctor/**'
+      - 'bin/wkdoctor.ps1'
+      - '.github/workflows/wkdoctor-test.yml'
+  schedule:
+    - cron: '15 2 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  doctor-selftest:
+    name: wkdoctor self-test (windows-latest)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+
+      # ------------------------------------------------------------------
+      # STEP 1: Run individual self-test modules via a minimal Add-Check/Emit
+      # shim. This isolates each module from wkdoctor.ps1 and lets us assert
+      # their exit signals without the full live binary stack.
+      # The shim accumulates results and exits non-zero if any module records
+      # a 'fail' status (warn is allowed -- that means "live env unavailable").
+      # ------------------------------------------------------------------
+      - name: Run self-test modules (shim)
+        id: selftest_shim
+        shell: pwsh
+        run: |
+          Set-StrictMode -Off
+          $ErrorActionPreference = 'Continue'
+
+          # Minimal shim: same signature as wkdoctor.ps1's Add-Check / Emit.
+          $shimResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+          $shimFail = 0
+
+          function Add-Check {
+            param([string]$Name, [string]$Status, [string]$Detail)
+            $script:shimResults.Add([PSCustomObject]@{ Name = $Name; Status = $Status; Detail = $Detail })
+            if ($Status -eq 'fail') { $script:shimFail++ }
+          }
+
+          function Emit {
+            param([string]$Status, [string]$Name, [string]$Detail)
+            $sym   = if ($Status -eq 'ok') { '[+]' } elseif ($Status -eq 'fail') { '[x]' } else { '[!]' }
+            $color = if ($Status -eq 'ok') { 'Green' } elseif ($Status -eq 'fail') { 'Red' } else { 'Yellow' }
+            $line = "${sym} ${Name}"
+            if ($Detail) { $line += " -- $Detail" }
+            Write-Host $line -ForegroundColor $color
+          }
+
+          # The modules use $binDir / $repoRoot set by wkdoctor.ps1.
+          # Provide them so dot-sourcing does not error on unbound variables.
+          $binDir  = Join-Path $PWD 'bin'
+          $repoRoot = $PWD
+
+          $doctorDir = Join-Path $binDir 'wkappbot.hq\doctor'
+          # Run ONLY the deterministic self-test modules (21-25).
+          # Others need the live env and are covered by the full-suite step below.
+          $selfTestModules = @(
+            '21-sandbox-integrity.ps1',
+            '22-guard-logic-selftests.ps1',
+            '23-bintool-param-first.ps1',
+            '25-harness-symlink-canonical.ps1'
+          )
+
+          Write-Host "=== wkdoctor: self-test modules (shim) ===" -ForegroundColor Cyan
+          foreach ($modName in $selfTestModules) {
+            $modPath = Join-Path $doctorDir $modName
+            if (-not (Test-Path $modPath)) {
+              Write-Host "[!] $modName -- MISSING in repo (path: $modPath)" -ForegroundColor Red
+              $script:shimFail++
+              continue
+            }
+            Write-Host "--- $modName ---" -ForegroundColor DarkCyan
+            . $modPath
+          }
+
+          Write-Host ""
+          Write-Host "=== shim results ===" -ForegroundColor Cyan
+          foreach ($r in $shimResults) {
+            $sym = if ($r.Status -eq 'ok') { '[+]' } elseif ($r.Status -eq 'fail') { '[x]' } else { '[!]' }
+            Write-Host "$sym $($r.Name) [$($r.Status)] -- $($r.Detail)"
+          }
+
+          $ok   = @($shimResults | Where-Object { $_.Status -eq 'ok'   }).Count
+          $warn = @($shimResults | Where-Object { $_.Status -eq 'warn' }).Count
+          $fail = @($shimResults | Where-Object { $_.Status -eq 'fail' }).Count
+          Write-Host ""
+          Write-Host "shim totals: $ok ok, $warn warn, $fail fail" -ForegroundColor $(if ($fail -gt 0) { 'Red' } elseif ($warn -gt 0) { 'Yellow' } else { 'Green' })
+
+          # Export summary for artifact
+          "ok=$ok"     | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "warn=$warn" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "fail=$fail" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+          if ($shimFail -gt 0) {
+            Write-Host "FAIL: $shimFail self-test failure(s) -- see [x] lines above." -ForegroundColor Red
+            exit 1
+          }
+
+      # ------------------------------------------------------------------
+      # STEP 2: Run wkdoctor.ps1 (full suite, -Json) so all modules execute
+      # via the real Add-Check/Emit.
+      # Known CI-expected absences (no wkappbot-core.exe in CI sandbox) are
+      # classified as SKIP rather than fail so the workflow stays green.
+      # Any *unexpected* fail item (not in the CI-skip list) fails the build.
+      # Note: 01-binaries tries auto-build if wkappbot.exe absent; we place a
+      # zero-byte stub so it short-circuits to the version-check path.
+      # Destructive ops (-DefenderFix, -EmergencyKill, -Build) are never invoked.
+      # ------------------------------------------------------------------
+      - name: Setup .NET (present for 01-binaries version check path)
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run full wkdoctor suite (-Json)
+        id: full_suite
+        shell: pwsh
+        run: |
+          Set-StrictMode -Off
+          $ErrorActionPreference = 'Continue'
+
+          # Place a zero-byte stub so 01-binaries skips the auto-build path.
+          # VersionInfo on an empty file returns 0.0.0 (ok, not fail).
+          $binDir = Join-Path $PWD 'bin'
+          New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+          $stubExe = Join-Path $binDir 'wkappbot.exe'
+          if (-not (Test-Path $stubExe)) {
+            [IO.File]::WriteAllBytes($stubExe, @())
+            Write-Host "[ci-stub] created zero-byte wkappbot.exe placeholder" -ForegroundColor DarkGray
+          }
+
+          $wkdoctor = Join-Path $PWD 'bin\wkdoctor.ps1'
+          if (-not (Test-Path $wkdoctor)) {
+            Write-Host "[x] wkdoctor.ps1 not found at $wkdoctor" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "=== wkdoctor full suite (-Json) ===" -ForegroundColor Cyan
+          $rawOut = & pwsh -NoProfile -ExecutionPolicy Bypass -File $wkdoctor -Json 2>&1
+          $rc = $LASTEXITCODE
+          Write-Host "wkdoctor raw exit: $rc"
+
+          # Some modules (e.g. 25-harness-symlink-canonical on machines with live symlinks)
+          # emit [DRY-RUN] lines via Write-Host before the JSON block. Strip non-JSON lines
+          # so ConvertFrom-Json sees only the {...} object.
+          $jsonLines = $rawOut | Where-Object { $_ -is [string] -and $_ -notmatch '^\s*\[DRY-RUN\]' }
+          # Find the JSON object: everything from the first '{' line to the last '}'
+          $jsonStart = ($jsonLines | Select-String -Pattern '^\s*\{' | Select-Object -First 1).LineNumber
+          $jsonEnd   = ($jsonLines | Select-String -Pattern '^\s*\}' | Select-Object -Last  1).LineNumber
+          $jsonOut   = if ($jsonStart -and $jsonEnd) { $jsonLines[($jsonStart-1)..($jsonEnd-1)] } else { $jsonLines }
+
+          # CI-expected missing-env check names -- these fail because wkappbot-core.exe
+          # and the live wkappbot process tree are absent in the sandbox. They are NOT
+          # logic regressions; treat them as SKIP for the purposes of CI gating.
+          $ciSkipNames = @(
+            'wkappbot-core.exe',       # 01-binaries: core binary not present in CI
+            'binary-freshness:core'    # 14-binary-freshness: same root cause
+          )
+
+          $unexpectedFails = [System.Collections.Generic.List[string]]::new()
+
+          # Echo non-JSON output (DRY-RUN lines etc.) for visibility
+          $rawOut | Where-Object { $_ -is [string] -and $_ -match '^\s*\[DRY-RUN\]' } |
+              ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+
+          # Pretty-print and classify
+          try {
+            $parsed = ($jsonOut -join "`n") | ConvertFrom-Json
+            Write-Host "pass=$($parsed.pass)  warn=$($parsed.warn)  fail=$($parsed.fail)"
+            $parsed.items | ForEach-Object {
+              $item = $_
+              $sym  = if ($item.status -eq 'ok') { '[+]' } elseif ($item.status -eq 'fail') { '[x]' } else { '[!]' }
+              $note = ''
+              if ($item.status -eq 'fail') {
+                if ($ciSkipNames -contains $item.name) {
+                  $note = ' [CI-SKIP: expected absence in sandbox]'
+                } else {
+                  $unexpectedFails.Add("$($item.name): $($item.detail)")
+                }
+              }
+              Write-Host "$sym $($item.name) [$($item.status)]$note -- $($item.detail)"
+            }
+          } catch {
+            Write-Host "(could not parse wkdoctor JSON output -- treating as failure)"
+            $rawOut | ForEach-Object { Write-Host $_ }
+            exit 1
+          }
+
+          # Save JSON artifact payload
+          $outDir = Join-Path $PWD 'wkdoctor-output'
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $jsonOut | Out-File -FilePath (Join-Path $outDir 'wkdoctor-full.json') -Encoding utf8
+          @"
+wkdoctor CI run
+date:     $(Get-Date -Format o)
+ref:      $env:GITHUB_REF
+sha:      $env:GITHUB_SHA
+raw_exit: $rc
+ci_skip:  $($ciSkipNames -join ', ')
+"@ | Out-File -FilePath (Join-Path $outDir 'run-summary.txt') -Encoding utf8
+
+          # Fail only on unexpected failures (not CI-skip items).
+          if ($unexpectedFails.Count -gt 0) {
+            Write-Host ""
+            Write-Host "FAIL: $($unexpectedFails.Count) unexpected failure(s):" -ForegroundColor Red
+            $unexpectedFails | ForEach-Object { Write-Host "  [x] $_" -ForegroundColor Red }
+            exit 1
+          }
+          Write-Host ""
+          Write-Host "Full suite: all failures accounted for (CI-skip or none). Green." -ForegroundColor Green
+
+      # ------------------------------------------------------------------
+      # STEP 3: Upload doctor output as an artifact (inspect without re-running)
+      # ------------------------------------------------------------------
+      - name: Upload wkdoctor output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wkdoctor-output-${{ github.run_id }}
+          path: wkdoctor-output/
+          retention-days: 14
