@@ -51,8 +51,47 @@ $devCoreVer = Get-FileVer (Join-Path $coreDevBin 'wkappbot-core.exe')
 
 # --- wkappbot-core.exe freshness ---
 if ($null -eq $sdkCoreVer) {
-    Add-Check 'binary-freshness:core' 'fail' 'wkappbot-core.exe missing from SDK bin'
-    Emit 'fail' 'binary-freshness:core' 'missing -- copy from D:\GitHub\WKAppBot\bin'
+    # PHASE 3: SOLVE -- core missing. Try local dev bin first, then public GitHub release.
+    $coreHealed = $false
+    $coreHealSrc = $null
+
+    # Try local dev bin (private dev machine path)
+    if ($null -ne $devCoreVer) {
+        $coreHealed = Copy-Binary (Join-Path $coreDevBin 'wkappbot-core.exe') `
+                                  (Join-Path $sdkBin      'wkappbot-core.exe')
+        if ($coreHealed) {
+            # DEPLOY-ALL-THREE only on the local dev-copy path
+            Copy-Binary (Join-Path $coreDevBin 'wkappbot-core.exe') (Join-Path $sdkBin 'wkappbot-core.new.exe') | Out-Null
+            Copy-Binary (Join-Path $coreDevBin 'wkappbot-core.exe') (Join-Path $sdkBin 'wkappbot-core.exe.bak') | Out-Null
+            $coreHealSrc = $coreDevBin
+        }
+    }
+
+    # If local source unavailable/failed, try public GitHub (public-user fallback).
+    # Reuse Try-InstallBinaryFromGitHub (defined in 01-binaries.ps1); it pulls core
+    # out of the public SDK release zip. Guard defensively, fail-open if absent.
+    if (-not $coreHealed -and (Get-Command Try-InstallBinaryFromGitHub -ErrorAction SilentlyContinue)) {
+        $ghOk = $false
+        try { $ghOk = Try-InstallBinaryFromGitHub -ExePath (Join-Path $sdkBin 'wkappbot-core.exe') } catch { $ghOk = $false }
+        if ($ghOk) {
+            $coreHealed = $true
+            $coreHealSrc = 'kiexpert/wkappbot-sdk (public release)'
+        }
+    }
+
+    if ($coreHealed) {
+        $newVer = Get-FileVer (Join-Path $sdkBin 'wkappbot-core.exe')
+        if ($coreHealSrc -like '*public release*') {
+            Add-Check 'binary-freshness:core' 'ok' "self-healed: v$newVer (from public SDK release)"
+            Emit 'ok' 'binary-freshness:core' "self-healed: v$newVer (from public SDK release)"
+        } else {
+            Add-Check 'binary-freshness:core' 'ok' "self-healed: v$newVer (from $coreHealSrc)"
+            Emit 'ok' 'binary-freshness:core' "self-healed: v$newVer"
+        }
+    } else {
+        Add-Check 'binary-freshness:core' 'fail' 'wkappbot-core.exe missing from SDK bin'
+        Emit 'fail' 'binary-freshness:core' 'missing -- copy from D:\GitHub\WKAppBot\bin or download public SDK release'
+    }
 } elseif ($null -ne $devCoreVer -and $devCoreVer -gt $sdkCoreVer) {
     # PHASE 3: SOLVE -- core is private, copy from dev repo
     $copied = Copy-Binary (Join-Path $coreDevBin 'wkappbot-core.exe') `
@@ -65,8 +104,22 @@ if ($null -eq $sdkCoreVer) {
         Add-Check 'binary-freshness:core' 'ok' "self-healed: v$sdkCoreVer -> v$newVer (copied from dev bin)"
         Emit 'ok' 'binary-freshness:core' "self-healed: v$sdkCoreVer -> v$newVer"
     } else {
-        Add-Check 'binary-freshness:core' 'warn' "stale v$sdkCoreVer (latest v$devCoreVer) -- copy failed; copy manually from $coreDevBin"
-        Emit '!' 'binary-freshness:core' "stale v$sdkCoreVer < v$devCoreVer -- copy manually from $coreDevBin"
+        # Local copy failed -- mirror the launcher's stale-fallback: try public GitHub release.
+        Add-Check 'binary-freshness:core' 'warn' "stale v$sdkCoreVer (latest v$devCoreVer) -- copy failed; attempting GitHub fallback..."
+        Emit '!' 'binary-freshness:core' "stale v$sdkCoreVer < v$devCoreVer -- attempting GitHub fallback..."
+
+        $ghOk = $false
+        if (Get-Command Try-InstallBinaryFromGitHub -ErrorAction SilentlyContinue) {
+            try { $ghOk = Try-InstallBinaryFromGitHub -ExePath (Join-Path $sdkBin 'wkappbot-core.exe') } catch { $ghOk = $false }
+        }
+        if ($ghOk) {
+            $newVer = Get-FileVer (Join-Path $sdkBin 'wkappbot-core.exe')
+            Add-Check 'binary-freshness:core' 'ok' "self-healed: v$sdkCoreVer -> v$newVer (from public SDK release)"
+            Emit 'ok' 'binary-freshness:core' "self-healed: v$sdkCoreVer -> v$newVer (from public SDK release)"
+        } else {
+            Add-Check 'binary-freshness:core' 'warn' "stale v$sdkCoreVer (latest v$devCoreVer) -- copy and GitHub fallback both failed; copy manually from $coreDevBin"
+            Emit '!' 'binary-freshness:core' "stale v$sdkCoreVer < v$devCoreVer -- GitHub fallback failed; copy manually from $coreDevBin"
+        }
     }
 } elseif ($null -eq $devCoreVer) {
     # Dev repo absent -- warn only, do not touch working binary
