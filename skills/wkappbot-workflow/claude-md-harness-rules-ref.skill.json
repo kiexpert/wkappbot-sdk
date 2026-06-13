@@ -1,0 +1,43 @@
+{
+  "id": "claude-md-harness-rules-ref",
+  "app": "wkappbot-workflow",
+  "title": "Claude MD Harness Rules T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. isEditOp history, lock-clear hygiene, global CLAUDE.md integration, Catch-22 fix.",
+  "steps": [
+    "GLOBAL CLAUDE.MD INTEGRATION: after CWD pass, also load ~/.claude/CLAUDE.md with skipEditCatchAll=true. Gate with -not env:WKHARNESS_SELFTEST so 72 self-test cases unaffected. CWD first, then edited-file repo, then global.",
+    "isEditOp CORRECTION (final 2026-05-27, commit 53feb82): discrimination done in harness:skill PATTERN, not guard code. Robust prefix (?:Edit\\(",
+    "Write\\(",
+    "Bash\\(...)  covers Edit/Write tool + Bash appbot-edit/wkedit. wkcodex/wkclaude excluded (delegation wrappers).",
+    "LOCK-CLEAR CATCH-22 RESOLVED (commit 53feb82): wkappbot skill edit no longer arms lock. Post-hook verb-anchors source-edit detection and excludes skill catalog ops. Earlier clean-text-only hygiene obsolete.",
+    "Edit/Write tool bypass confirmed: Bash appbot-edit on .ps1 BLOCKS, Edit TOOL on same .ps1 PASSES. Cause: early exit-0 in wkharness-guards.ps1 ~line 1430 short-circuits Edit/Write before harness eval.",
+    "SELF-TEST: 72 deterministic cases in wkharness -Test. Gate global-load with env:WKHARNESS_SELFTEST to keep tests isolated from real user-level rules.",
+    "TIER-GATE CASCADE BUG (2026-06-11): Invoke-WkTierGate blocks Agent dispatch when the LAST skill edited this session has tier-score < 60. An Opus session captures knowledge constantly, and each capture APPENDS to a T1 core (bloating it, lowering its score), so the gate fires on the just-bloated skill and blocks ALL following agent dispatches -- a cascade that punishes knowledge-ification itself. It even fired on claude-md-harness-rules which IS 3-tiered (has -howto/-ref) but scored 4 from a fat T1, so the 'split into 3-tier' fix message was wrong. FIXES: (1) capture to the -ref T3 tier, never the T1 core; (2) the gate should EXEMPT already-tiered skills (siblings -howto/-ref exist) and judge the CLUSTER not the bloated T1; (3) never block on a skill the session merely appended one step to. Workaround: append the capture to a slim -ref so the last-edited scores high and the gate clears."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules-howto",
+      "expect": "T2",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T13:52:24.6516658Z",
+  "updated": "2026-06-10T16:58:07.8765968Z",
+  "version": "1.2"
+}

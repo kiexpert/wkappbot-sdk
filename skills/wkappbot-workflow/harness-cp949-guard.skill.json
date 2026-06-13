@@ -1,0 +1,44 @@
+{
+  "id": "harness-cp949-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness cp949-guard: non-CP949 chars in Write",
+  "title_ko": null,
+  "desc": "Blocks the Write tool when content contains characters that do not round-trip through CP949 (Windows Korean codepage), which would corrupt the file on a CP949 console. Use ASCII or Hangul, or route via wkedit.",
+  "steps": [
+    "TRIGGER: fires on the Write tool when the content fails a CP949 round-trip (encode then decode does not equal the original). Common cause: smart quotes, emoji, or mixed CJK that the legacy codepage cannot represent.",
+    "FIX: keep source ASCII-only (code/comments) or plain Hangul; for content that must hold other glyphs, route through wkedit (UTF-8-safe, .bak backup) or delegate via Agent.cmd --model haiku. UTF-8 is canonical storage -- CP949 is only a compatibility gate.",
+    "WHY: a CP949 round-trip failure means a downstream CP949 console or tool will mojibake the file. See: ps-script-mojibake-is-output-encoding-first-not-argv, korean-argv-cp949-hell-with-wkappbot-from-bash, wkedit."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-cp949-guard",
+      "expect": "round-trip",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit",
+      "expect": "backup",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "cp949",
+    "encoding",
+    "write",
+    "guard",
+    "korean"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:31:01.0012109Z",
+  "updated": "2026-06-12T06:31:01.0012218Z",
+  "version": "1.0"
+}

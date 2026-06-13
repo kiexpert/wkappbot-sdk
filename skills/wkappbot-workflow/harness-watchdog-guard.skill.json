@@ -1,0 +1,44 @@
+{
+  "id": "harness-watchdog-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness resource-watchdog: high-RAM emergency mode",
+  "title_ko": null,
+  "desc": "When system RAM crosses the gate threshold the watchdog blocks heavy commands and allows only recovery/read-only/skill ops, to keep the machine from OOM while protecting the AI work set.",
+  "steps": [
+    "TRIGGER: fires when measured RAM percent exceeds the gate (around 85-88 percent) and the command is not read-only/skill/git. Emergency, recovery-ops-only mode.",
+    "FIX: free RAM first -- close Chrome tabs, run wkappbot taskkill /IM wkappbot-core.exe --dry-run to spot zombies, or wkdoctor -EmergencyKill (score-based, spares the AI family). Read-only tools and wkappbot skill ops stay allowed. Delegate heavy work via Agent.cmd --model haiku.",
+    "WHY: above the gate the box risks OOM/paging death; the watchdog buys time without killing active AI sessions. See: wkdoctor-system-physician, wkappbot-taskkill-usage."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-watchdog-guard",
+      "expect": "recovery",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-system-physician",
+      "expect": "Sanctuary",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-taskkill-usage",
+      "expect": "CLASSIFY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "watchdog",
+    "ram",
+    "emergency",
+    "guard",
+    "resource"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:34:10.7314287Z",
+  "updated": "2026-06-12T06:34:10.7314427Z",
+  "version": "1.0"
+}

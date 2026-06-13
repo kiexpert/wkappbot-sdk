@@ -12,7 +12,8 @@
     "STEP 0 (MANDATORY BEFORE CLAUDE.MD EDIT): Read CLAUDE.md FIRST before attempting to Edit it. If you skip Read and go straight to Edit, it will fail with 'File content has changed'. Sequence is always: Read -> Edit (add Pending) -> Agent().",
     "PRE-FLIGHT SEQUENCE (run before every Agent call): (0) Read CLAUDE.md. (1) Edit CLAUDE.md to add Pending entry. (2) Confirm run_in_background: true is in the Agent call. (3) Confirm prompt starts with 3 skill reads. Then fire Agent().",
     "FAILURE PATTERN this session: Edit->pace-block, Agent.cmd->delegation-block, Agent()->sync-guard-block, read-CLAUDE.md->edit-CLAUDE.md->sync-guard-pass, Agent(background)->SUCCESS. 4 attempts = ~4x token waste. This checklist prevents it.",
-    "usage-test-guard DEADLOCK: usage-test-guard (50% random) redirects Agent() to Agent.cmd. Agent.cmd foreground is then blocked by -delegation guard. This creates a deadlock. Resolution: do NOT try Agent.cmd -- just retry Agent() with run_in_background:true. 50% rate means next attempt has 50% chance of passing. After 2 Agent.cmd fails, always retry Agent() directly."
+    "usage-test-guard DEADLOCK: usage-test-guard (50% random) redirects Agent() to Agent.cmd. Agent.cmd foreground is then blocked by -delegation guard. This creates a deadlock. Resolution: do NOT try Agent.cmd -- just retry Agent() with run_in_background:true. 50% rate means next attempt has 50% chance of passing. After 2 Agent.cmd fails, always retry Agent() directly.",
+    "PRE-READ THE BRIEF CONTRACT so the dispatch SUCCEEDS first try (user 2026-06-12): a FAILED Agent/Agent.cmd dispatch is not free -- the brief-guard block re-sends your ENTIRE context (in a large session ~781k tokens, shown live by the guard score). So before EVERY dispatch, satisfy the full contract in one pass: (1) the prompt MUST contain 3+ 'wkappbot skill read <id>' lines and one of them MUST be agent-on-load (the subagent house-rules); (2) the prompt MUST contain the five LABELED sections written as literal labels -- 'Goal:', 'Files:', 'Approach:', 'Constraints:', 'Exit:' -- the guard scans for those exact labels, so embedding files inside Approach fails the Files check; (3) if Opus, run_in_background=true. Pre-read THIS skill before dispatching; one careful brief beats three blocked retries each costing a full-context re-send. Cross: harness-agent-brief-guard, agent-on-load, claude-code-agent-tier-routing."
   ],
   "requirements": [
     {
@@ -50,6 +51,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-03T05:40:47.891057Z",
-  "updated": "2026-06-04T04:58:48.3805205Z",
-  "version": "1.2"
+  "updated": "2026-06-12T07:19:56.1306308Z",
+  "version": "1.4"
 }

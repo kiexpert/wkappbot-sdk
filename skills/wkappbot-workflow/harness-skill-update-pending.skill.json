@@ -1,0 +1,44 @@
+{
+  "id": "harness-skill-update-pending",
+  "app": "wkappbot-workflow",
+  "title": "Harness skill-update-pending: record learning before next delegation",
+  "title_ko": null,
+  "desc": "After a source file write, a lock arms requiring a skill update (record what was learned) before the next delegation, so the next blank agent does not start blind.",
+  "steps": [
+    "TRIGGER: a wkappbot file write/edit (non-skill) arms the code_changed_skill_not_updated lock; the next Agent/wkcodex dispatch is blocked until it clears.",
+    "FIX: clear by recording the learning -- wkappbot skill edit <id> --add-step 'what changed/learned' (or 3 skill reads in the dispatch). Run the cleared dispatch as the very next call with no intervening source write.",
+    "WHY: code changed but knowledge did not = the successor agent starts blind. The lock forces knowledge to keep pace with code. See: claude-md-harness-rules, skill-contribute-edit."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-skill-update-pending",
+      "expect": "blind",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "study-lock",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "skill",
+    "update",
+    "lock",
+    "delegation",
+    "guard"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:35:07.2555143Z",
+  "updated": "2026-06-12T06:35:07.2555257Z",
+  "version": "1.0"
+}

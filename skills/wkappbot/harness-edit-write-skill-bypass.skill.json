@@ -1,0 +1,42 @@
+{
+  "id": "harness-edit-write-skill-bypass",
+  "app": "wkappbot",
+  "title": "harness edit-write skill bypass + lock catch22",
+  "title_ko": null,
+  "desc": "Edit/Write tool bypasses harness:skill while Bash appbot-edit does not; skill-lock self-rearm Catch-22",
+  "steps": [
+    "SYMPTOM: the basic Edit/Write TOOL bypasses harness:skill rules. Controlled test: Bash appbot-edit (wkappbot file edit / wkedit) on a .ps1 BLOCKS correctly, but Edit TOOL on the SAME .ps1 PASSES (harness:skill never fires).",
+    "settings.json PreToolUse runs wkharness.ps1 for ALL tools (no matcher) so the hook IS invoked for Edit/Write; the bypass is internal to wkharness-guards.ps1 -- an early exit-0 short-circuits Edit/Write before the harness:skill/catch-all eval (~line 1386-1453).",
+    "SKILL-LOCK CATCH-22: lock at REPO/.wkappbot/harness/code_changed_skill_not_updated_next_agent_starts_blind.lock. wkappbot skill edit clears it in PreToolUse but its PostToolUse re-arms (mis-tagged bash-wkedit because command contains edit). skill contribute clears WITHOUT re-arm (no edit token) -- use contribute to unblock wkcodex.",
+    "ROOT CAUSE FOUND + FIXED (commit d3fba1b in personal-docs tools/wkharness-guards.ps1): the bypass was the safe-rule loop in Invoke-HarnessRules -- a safe-pattern match returned early for Edit and Write before the skill and catch-all eval. FIX: for Edit/Write pre-phase targeting a source extension (.cs/.py/.ps1/.c/.cpp/.cc/.h/.hpp/.hxx), a safe match now only breaks the safe loop and continues to the skill/catch-all eval instead of returning. Read and dot-md admin-writes still return on a safe match so they stay exempt. Verified via real hook input: unregistered .cs blocked RC=2, Read allowed RC=0.",
+    "Per-repo config path: editing a source file loads that file's git-root CLAUDE.md as the repo harness config (the cross-repo merge fix), so a repo-specific study-lock fires even when the working directory is a different repo. Registering a repo-scoped rule therefore doubles as a live check of the per-repo merge path.",
+    "Lock re-arm root cause fixed in wkharness-post.ps1: Test-WkPostSourceEditCommand now verb-anchors wkedit and wkappbot file edit detection and excludes wkappbot skill edit/contribute/add, so a skill catalog update no longer arms the lock even when its text mentions wkedit.",
+    "STATUS (all fixed + pushed): (1) Step 2's exit-0 was a wrong hypothesis -- the real bypass was the safe-rule loop described in Step 4 (commit d3fba1b). (2) Step 3's Catch-22 is RESOLVED by Step 6 (commit 53feb82): a normal wkappbot skill edit now clears the lock and does NOT re-arm, so the contribute / clean-text workarounds in Step 3 are obsolete -- a plain skill edit is enough to unblock wkcodex. (3) Per-repo binding verified live: Edit tool and Bash wkappbot file edit both fire the source-repo study-lock cross-repo (RC=2); Read stays exempt (RC=0). The personal-docs CLAUDE.md wkharness study-lock rule requires 3 harness skills before any wkharness source edit.",
+    "See claude-md-harness-rules for cheap-agent sandbox-write-freedom suffixes (-proto -probe -model -family) and the read-time proactive notice that pre-announces which skills to study before an edit would block."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass",
+      "expect": "SYMPTOM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "harness-edit-write-skill-bypass",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness bypass lock",
+      "expect": "harness-edit-write-skill-bypass",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-26T14:37:40.443231Z",
+  "updated": "2026-06-12T09:20:25.9751532Z",
+  "version": "1.6"
+}

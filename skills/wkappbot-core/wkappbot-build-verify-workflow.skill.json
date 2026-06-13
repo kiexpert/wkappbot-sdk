@@ -35,8 +35,10 @@
     "skill read Claude Code export (2026-05-23): new feature -- after skill read, detect parent process (claude-code = node.exe ancestor), then write .claude/skills/<id>/SKILL.md (paths frontmatter from skill tags) + ~/.claude/projects/<slug>/memory/skill_<id>.md (index entry). Implementation file: SkillCommand.ClaudeExport.cs (partial class). Slug formula: cwd.Replace(':','-').Replace('\\','-').Replace('//','-'). Paths heuristic: skill tags like 'cdp' -> csharp/**/*Cdp*.cs, 'placement' -> csharp/**/*Placement*.cs.",
     "MANDATORY after ANY Core source edit: (1) publish: dotnet publish csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release -r win-x64 --sc true -o bin/ -- verify 0 Error(s) + staged-for-hot-swap in output. (2) swap: wkappbot --version shows new version. (3) smoke: wkappbot cdp open <affected-url>. (4) commit only after all 3 pass. Build alone does NOT deploy.",
     "2026-05-26: CDP Chrome multiplication fix - ChromeLauncher.ProcessDiscovery.cs FindRunningChromePortAny port-file guard changed from (registered!=port) to (registered>0 && registered!=port). Build: dotnet clean + dotnet publish WKAppBot.CLI.csproj -c Release",
-    "BUILD VIA HARNESS: use wkappbot exec to run dotnet through the harness (direct dotnet is blocked by wk-only-gate). Example: wkappbot exec 'C:/Program Files/dotnet/dotnet' publish 'D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal"
+    "BUILD VIA HARNESS: use wkappbot exec to run dotnet through the harness (direct dotnet is blocked by wk-only-gate). Example: wkappbot exec 'C:/Program Files/dotnet/dotnet' publish 'D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj' -c Release --verbosity minimal",
+    "BIN-CMD-REPOINT VERIFIED APPROACH (2026-06-11): WKAppBot bin/*.cmd are mode=120000 git symlinks stored as 1-line text stubs (core.symlinks=false). The 8 personal-docs stubs contain 'D:/GitHub/personal-docs/tools/Name.cmd'. To repoint to wkappbot-kih: use wkappbot file edit to replace the path string in each stub. The wkappbot file edit command is harness:safe AND doubly exempt from pace+stall. PowerShell.cmd is missing from bin (PowerShell-.cmd exists with trailing-dash typo and is a real batch file, not a stub). Personal-docs Agent.cmd already points to kih .ps1 -- partial migration was done. After all 8 stubs are repointed, git diff should show only path-string changes in mode=120000 objects."
   ],
+  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot a11y --help",
@@ -89,6 +91,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-19T16:44:12.0816945Z",
-  "updated": "2026-05-26T04:03:39.4629012Z",
-  "version": "1.29"
+  "updated": "2026-06-10T19:26:16.4774205Z",
+  "version": "1.31"
 }

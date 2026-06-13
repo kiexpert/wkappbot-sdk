@@ -1,0 +1,59 @@
+{
+  "id": "stall-guard-wk-exemption",
+  "app": "wkappbot-workflow",
+  "title": "stall-guard-wk-exemption",
+  "title_ko": null,
+  "desc": "Stall-guard exemption rules for wk* AI tools: all wk* commands are exempt while pace is under limit, with per-tool budget checks.",
+  "steps": [
+    "EXEMPTION: all wk* tools (wkappbot/wkedit/wkclaude/wkopus/wksonnet/wkhaiku/wkcodex/wkgpt/wkgpt-mini/wkgroq/wkcerbras/wkask) skip stall-guard while pace not exceeded.",
+    "PER-TOOL CHECK: wkcodex/wkgpt/wkgpt-mini -> Codex weekly budget <80% (CodexBlockPct). All others -> Claude totalExceeded==false.",
+    "ALSO EXEMPT (always): wkappbot skill read/search/list/edit/contribute (isSkillCmd check, no pace gate).",
+    "SOURCE: wkharness-guards.ps1 line ~859. Variables: isSkillCmd, isWkToolCmd, wkToolUnderPace.",
+    "CODEX CACHE: reads claude_codex_pace.json from TEMP with CacheTtlMin freshness check to avoid stale blocking after weekly reset.",
+    "LINE-REF UPDATE 2026-05-26: the per-tool budget check (wkToolUnderPace switch + isWkToolCmd) is at wkharness-guards.ps1 ~line 1012, NOT ~859 (step 4 ref went stale after the Fix2 hoisted-clear and Fix3 cross-repo inserts shifted lines). Locate by the 'wkToolUnderPace = switch -Regex (cmd)' block: wkcodex/wkgpt read TEMP/claude_codex_pace.json and allow when pct < CodexBlockPct (80); all other wk* allow when Claude totalExceeded is false.",
+    "HAIKU WK-ONLY-GATE EXEMPTION 2026-05-26: wk-only-gate (guards.ps1 ~540) now skips when isHaikuSession (last session model contains haiku). Previously it applied to ALL sessions incl Haiku subagents, blocking their non-wk commands (python/ls/etc) over-target -- which defeated the delegate-to-cheap-Haiku intent. Now Sonnet+Opus stay gated, Haiku exempt. isHaikuSession is set in wkharness.ps1 right beside isSonnetSession (last-model detection). selftest 72/72. commit 8cef9f5.",
+    "[SPEC 2026-06-06: skill-edit knowledge-reward stall reset] A NEW stall-guard release path (separate from the wk-pace exemption): when a session edits a skill (wkappbot skill edit/contribute) AND that skill's quality score (Get-WkTierScore, the 0-100 bounded helper at wkharness-guards.ps1, same one the update-gate thresholds at 80) is >=70, the harness RESETS the current stall state -- it sets claude_stall_guard.json firstToolAt=lastToolAt=now so the solo-loop elapsed becomes ~0 and the session may continue inline once. DESIGN INTENT: reward future-useful knowledge work (links/cross-refs, new distinct tokens, structure -- NOT paddable length) by granting one continuation. SELF-LIMITING / anti-farming: this is a RESET, not a timed exemption window -- the guard re-arms immediately and re-fires within ~5 min if solo continues, so each genuine >=70 knowledge record buys exactly ONE continuation, no farming. Impl: PostToolUse (wkharness-post.ps1) parses the edited skill id, calls Get-WkTierScore, on >=70 does a single read-modify-write of the stall json (fail-open try/catch); no separate marker file. Philosophy: knowledge that helps successor sessions earns the right to keep working now. Investigation b3ueqe5qj + feasibility confirmed Implementable.",
+    "2026-06-06: gamified knowledge-score message live test",
+    "TIER0/1/2 LADDER (2026-06-10, harness-guard-exemption-ladder-spec v1.6): Single source of truth in wkharness-guards.ps1 isKnowledgeOp/isHarnessSourceEdit helpers. TIER0 (fully-free, never stall-blocked): Skill tool + wkappbot skill read/search/list/edit/contribute/news + .md file edits. TIER1 (study-lock only): Edit/Write of wkharness*.ps1. READ-ONLY built-ins (Read/Glob/Grep/LS/Todo*/Task*): stall BLOCK still applies but pace+wk-only exempt. TIER2: everything else. Accounting is hoisted before the early-exit so read-only tools are counted in stall window. Reset-on-user-turn: already present in Sync-WkStallResetOnUserTurn. Prior per-guard .md/skill/wk* exemptions inside stall block removed -- TIER0 handles them upstream.",
+    "INVESTIGATION PATTERN for WKAppBot bin/*.cmd type: git ls-files -s bin/Name.cmd in the WKAppBot core repo reveals the object mode. mode=120000 means git symlink (ln -sf works in MSYS2 bash). mode=100644 means regular text file containing a path-stub or batch content. The path-stub mechanism: cmd.exe resolves 'D:/GitHub/path/to/File.cmd' as the first non-@echo line and calls it. So repointing a text-stub means: Write the new path string as the entire file content. No symlink privilege needed."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "passes stall-guard (skill cmd exempt)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read x",
+      "expect": "passes stall-guard when Claude pace not exceeded",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "shows stall-guard implementation line ~859",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "stall-guard",
+    "wk",
+    "exempt",
+    "pace",
+    "wkcodex",
+    "wkgpt",
+    "wkopus",
+    "wksonnet",
+    "wkhaiku",
+    "wkgroq",
+    "harness",
+    "pretooluse"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T04:42:39.9875831Z",
+  "updated": "2026-06-10T19:15:58.9295077Z",
+  "version": "1.11"
+}

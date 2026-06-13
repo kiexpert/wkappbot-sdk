@@ -1,0 +1,48 @@
+{
+  "id": "knowledge-ification-procedure-jisikhwa",
+  "app": "personal-docs",
+  "title": "Knowledge-ification procedure jisikhwa",
+  "title_ko": null,
+  "desc": "지식화 (jisikhwa, knowledge-ification): formal repo-wide protocol. On 지식화 trigger, each repo AI captures its own experience and process into a default 3-tier skill (T1 core, T2 howto, T3 ref). The official procedure for intelligence-ifying lived experience into enforced reusable knowledge. Search 지식화 finds this.",
+  "steps": [
+    "TRIGGER: when the user says knowledge-ify (Korean jisikhwa) or a session completes notable work, the repo AI runs this procedure BY DEFAULT, no extra prompting needed.@@SCOPE: capture the AI OWN recent experience plus the process just performed: decisions made, gotchas hit, commands that worked, failures and their fixes, and the why behind each.@@3-TIER SKILLIFY: split into T1 core (decision rules, when-to-use), T2 howto (step-by-step commands and procedure), T3 ref (dated history, lessons, incidents). Cross-link with next and cluster refs. English-only content per encoding guard.@@PER-REPO INTELLIGENCE: each repo agent does this for its own domain; the resulting knowledge lives in that repo knowledge tree and is enforced by the harness so future agents must consult it.@@PURPOSE: the official procedure for the intelligence-ification of knowledge -- lived experience becomes structured, tiered, cross-linked, enforced, reusable knowledge. This grows the Living Knowledge Tree. See ki-concept-definitions and jensen-gtc-harness-agent-vs-wkharness.",
+    "REFLEX-IFICATION (reflex-grade knowledge) -- a mandatory sub-mode of knowledge-ification. Beyond the default 3-tier (T1/T2/T3) REFERENCE capture, when the lived experience is an INCIDENT (a bug, an outage, a guard that silently failed), ALSO distill it into a REFLEX: a short, action-first, trauma-grade trigger that future agents catch INSTINCTIVELY before repeating it. A reflex has four parts: (1) a one-line TRIGGER condition (when you write or audit X...), (2) the STOP/check to perform, (3) the dated INCIDENT proof, (4) the recurring ROOT-CAUSE class so the same mistake is recognized in new disguises. Park reflexes in the reflection-chain skills (sonnet-bug-stop-policy-ref, incident-trauma-reflex) AND cross-link from the tiered skill. A pull-only skill is not enough for hot-path mistakes -- the reflex must be pushed onto the exact wire the next agent will trip. Example: 2026-06-08 command-match-anchor reflex (substring command-detection MUST anchor to command-start; an arg mention falsely satisfied the harness:skill study-lock) -- see sonnet-bug-stop-policy-ref P9 and incident-trauma-reflex.",
+    "GATE-AS-GUIDED-INCENTIVE (2026-06-08 design; refines the CLAUDE.md REFLEX-AUDIT TODO). A knowledge score is most powerful when the harness uses it to GUIDE, not merely to block. Every block should NAME the escape: not 'blocked' but 'raise your knowledge score / split into 3-tier / read the skill to proceed' -- turning the gate from a wall into a sign, so the agent proactively knowledge-ifies to stay unblocked. The loop: block -> guidance -> score -> self-improvement. CRITICAL anti-gaming clause: the score that unblocks MUST be tied to BEHAVIORAL proof (the async Haiku reflex-audit transfer quiz), not only structural points (3-tier present, size) -- otherwise agents game the form without substance. RESERVE HEADROOM so 100 is unreachable by structure alone: structural max 85 plus a reflex-quiz bonus up to 15, so the TOP score REQUIRES a passed transfer quiz. Full loop closes as block -> guidance -> score -> behavioral quiz -> unblock. Cross: incident-trauma-reflex-ref (P9 anchor, P11 model-agnostic harness enforcement), opus-self-reflection-ref (no-feign-ignorance), and the REFLEX-AUDIT graded-bonus TODO (commit d0b173470).",
+    "LINK-BACK + REFLEX-IFICATION MANDATE (user 2026-06-11): knowledge-ifying is NOT done until the new knowledge is WIRED INTO the existing tree. You MUST (1) find the most appropriate existing skills and create back-links FROM at least 3 of them TO the new skill -- bidirectional, not just outbound from the new one; a new skill with zero INBOUND links is an orphan the successor never discovers. And (2) reflex-ify it (bansa-singyeong-hwa): distill an action-first TRIGGER pushed onto the exact wire the next agent will trip (block message, guard footer, or a See-also line in the >=3 source skills), not a pull-only note. RULE: every knowledge-ification = >=3 inbound cross-links + 1 reflex trigger. Example 2026-06-11: ps-script-mojibake-is-output-encoding-first-not-argv was wired back from launcher-console-encoding-3-mode-policy..., korean-argv-cp949-hell-with-wkappbot-from-bash, and powershell-here-string-multiline."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read knowledge-ification-procedure-jisikhwa",
+      "expect": "3-tier",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-ification-procedure-jisikhwa",
+      "expect": "TRIGGER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-ification-procedure-jisikhwa",
+      "expect": "PER-REPO",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "knowledge-ification",
+    "jisikhwa",
+    "3-tier",
+    "protocol",
+    "skill",
+    "self-evolving",
+    "ki",
+    "procedure"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-04T04:52:10.0112737Z",
+  "updated": "2026-06-11T10:38:03.5953217Z",
+  "version": "1.8"
+}

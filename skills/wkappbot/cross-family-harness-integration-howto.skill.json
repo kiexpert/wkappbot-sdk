@@ -1,0 +1,45 @@
+{
+  "id": "cross-family-harness-integration-howto",
+  "app": "wkappbot",
+  "title": "Cross-family harness integration (howto): relay, induce, autonomy.toml",
+  "title_ko": null,
+  "desc": "T2 implementation tier. The relay structure, the exact induce commands, the gemini-cli policy schema (commandPrefix/commandRegex/argsPattern), the wkgemini self-limit, and the codex nudge-guide. Parent: cross-family-harness-integration. Ref: cross-family-harness-integration-ref.",
+  "steps": [
+    "RELAY (D:/GitHub/wkharness.ps1) -- reads stdin JSON; if it is a tool call, maps the gemini/agy tool name to Claude format via two tables (agyMap: run_command->Bash, write_to_file->Write, replace_file_content->Edit...; geminiMap: run_shell_command->Bash, write_file->Write...); sets $isGeminiFam = (the agy 'tool' field exists) OR (the tool needed mapping); logs a usage proxy to ~/.gemini/wkgemini_usage.jsonl; pipes the adapted JSON to wkappbot-kih/tools/wkharness.ps1; captures $kihExit. wkharness-post.ps1 is the parallel AfterTool relay.",
+    "QUEUED IMPL (2026-06-12): make the codex nudge-guide CONDITIONALLY surface the PowerShell-multiline-Agent.cmd pattern ONLY when isCodexSession -- active-model-scoped guidance. Codex (PowerShell-only) sees: pipe a single-quoted here-string to Agent.cmd stdin (full pattern in skill codex-opus-agent-delegation step 10). Claude/bash sessions see the existing bash-heredoc guidance instead -- do NOT show the PS pattern to Claude. Implement in the codex nudge path (Get-WkToolFirstUseNudgePendingContext or the codex nudge-guide): gate on the resolved active model = codex. Pairs with harness-active-model-scoping (scope guidance to WHO works now). NOTE: canonical queue is CLAUDE.md Pending; logged here because CLAUDE.md was edit-locked (pace) when queued -- migrate to Pending when editable."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration-howto",
+      "expect": "isGeminiFam",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration-howto",
+      "expect": "commandPrefix",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration-howto",
+      "expect": "DAILY_REQ_LIMIT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gemini",
+    "howto",
+    "relay",
+    "autonomy-toml",
+    "induce",
+    "wkgemini",
+    "codex-nudge"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T17:37:52.2035307Z",
+  "updated": "2026-06-11T17:20:52.2061535Z",
+  "version": "1.2"
+}

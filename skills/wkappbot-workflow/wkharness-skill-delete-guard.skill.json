@@ -1,15 +1,12 @@
 {
-  "id": "skill-delete-guard",
+  "id": "wkharness-skill-delete-guard",
   "app": "wkappbot-workflow",
   "title": "skill-delete-guard: skill delete forbidden, use archive",
   "title_ko": null,
   "desc": "Blocks 'wkappbot skill delete' commands. Skills must be archived, not deleted, to preserve knowledge history.",
   "steps": [
-    "SAFETY: Catches 'wkappbot skill delete <id>' commands. Deletion permanently removes skill knowledge, breaking any CLAUDE.md or harness references to that skill and losing the accumulated steps.",
-    "SOLUTION: Use 'wkappbot skill archive <id>' instead of delete. Archive preserves the content, removes it from active search results, and keeps history intact for future reference.",
-    "PREVENTION: Never run 'wkappbot skill delete'. If a skill is wrong, edit it (wkappbot skill edit). If it is obsolete, archive it. Deletion is forbidden -- there is no undo."
+    "CANONICAL: this guard skill moved to harness-skill-delete-guard; read that instead."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read skill-delete-guard",
@@ -33,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T07:31:48.1648138Z",
-  "updated": "2026-06-11T07:31:48.1648229Z",
-  "version": "1.0"
+  "updated": "2026-06-12T07:28:53.4539259Z",
+  "version": "1.2"
 }

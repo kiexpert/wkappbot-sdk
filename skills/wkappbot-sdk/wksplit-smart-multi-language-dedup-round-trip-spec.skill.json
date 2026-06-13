@@ -1,0 +1,58 @@
+{
+  "id": "wksplit-smart-multi-language-dedup-round-trip-spec",
+  "app": "wkappbot-sdk",
+  "title": "wksplit smart multi-language dedup + round-trip spec",
+  "title_ko": null,
+  "desc": "Spec to evolve wksplit into ONE smart, multi-language, dedup-aware, round-trip source tool. Universal hash-split dup analysis (zero-LLM) + pluggable per-language backends (ps1/cs/py/sh/js-ts/generic) + symbol-set-identity round-trip gate + BOM-free encoding safety. Supersedes single-purpose wksplit-cs and wksplit-ast. Driven by the 2026-06-06 691K harness append-corruption.",
+  "steps": [
+    "PURPOSE: turn wksplit into a SMART source tool, not a dumb file-shredder. It must support the full reduce-before-refactor pipeline (analyze, dedup, split, rebundle, verify) and work across ALL script languages we handle. Absorb the current single-purpose wksplit-cs.* and wksplit-ast.ps1 into ONE engine with language backends (no-bandaid: one engine, many backends).",
+    "UNIVERSAL FIRST PASS = language-agnostic hash-split duplication analysis (works on ANY text, ZERO LLM tokens). Split at a repeating block marker, hash each segment, group by hash. Reports total-vs-unique segment count = duplication ratio, and the frequency table = the dedup map. This is the cheap diagnose-before-touch step that characterized a 691,245-line file as 296 segments / 17 unique (94pct dup) without reading a line. It runs the SAME for python, powershell, bash, anything.",
+    "MODES: analyze (hash dup-map + size distribution) ; dedup (remove duplication, keep canonical) ; split (semantic modularize by language idiom) ; rebundle (regroup the problem-free units back into cohesive modules) ; verify (round-trip gate). Remember: split is a TEMPORARY analysis state, rebundle is the END state -- never ship thousands of scattered fragments.",
+    "MULTI-LANGUAGE BACKENDS (the diversification the user asked for), pluggable by file extension: ps1/psm1 -> PowerShell AST FunctionDefinitionAst.Extent, verify with [Parser]::ParseFile == 0 errors. cs -> partial-class split, verify with Roslyn or dotnet build. py -> the python 'ast' module (FunctionDef/ClassDef nodes by lineno/end_lineno), verify with python -m py_compile. sh/bash -> function-block split, verify with bash -n. js/ts/jsx/tsx -> JS AST (acorn/babel or tsc), verify with node --check or tsc --noEmit. UNKNOWN/generic -> marker-based block split + hash dedup (the universal fallback used on the harness). Each backend exposes the same analyze/dedup/split/rebundle/verify interface.",
+    "ROUND-TRIP GATE (mandatory before ANY write): (a) the output PARSES/COMPILES clean in that language; (b) SYMBOL-SET IDENTITY -- the set of function/class names in the output equals the input's UNIQUE set (extract names, sort -u, diff must be empty), so nothing is lost or invented; (c) for dedup, the canonical copy = last-definition-wins for interpreted languages (python/powershell/bash/js parse top-to-bottom, last def shadows). Prototype then verify then merge: never overwrite the original until the gate passes; a critical file (harness) also needs a behavior smoke test.",
+    "ENCODING SAFETY is a FIRST-CLASS GATE, not an afterthought: read AND write BOM-free UTF-8 consistently (in PowerShell use [System.IO.File]::WriteAllText with (New-Object System.Text.UTF8Encoding the-false-arg); in python open with encoding utf-8 newline empty; in node write utf8). An earlier wksplit-ast run was correctly REFUSED by its verify gate because the write path mangled U+2026 ellipsis into question-marks, breaking string literals. Preserve non-ASCII (e.g. Korean guard messages) byte-exact; verify a round-trip hash of unchanged regions.",
+    "SAFETY PROTOCOL: always create a timestamped backup (file.bak-ts), operate on a SANDBOX copy, run the round-trip gate, and swap into the live path ONLY on full pass; keep the backup. This is the haiku-sandbox-problem-solving prototype-verify-merge discipline applied to the splitter itself. Cross-link [[reduce-before-refactor-dedup-analyze-rebundle-order]] (the methodology this tool serves), [[haiku-sandbox-problem-solving]], [[wksplit-cs-utility]] (the C# backend to absorb), [[wkharness-guards]] (the 691K corruption case).",
+    "POWERSHELL SPLIT BREAKS param() -- AND YOU MUST VERIFY BY RUNNING (2026-06-10, Flash broke wkhippo via session-find.ps1): a PowerShell split that PREPENDS auto-generated module-loading (dot-source lines) ABOVE the script's param() block breaks it -- param() MUST be the FIRST statement of a PS script (after shebang/comment), else at RUNTIME 'param' runs as a COMMAND -> 'The term param is not recognized'. CRUCIAL TRAP: this PARSES CLEAN (param-as-command is syntactically valid), so [Parser]::ParseFile passes but the tool dies at runtime. Flash also DROPPED Get-Tokens and other helpers entirely. Both were invisible because the split was never RUN. MANDATORY RULES for any split (tool or agent): (1) param() stays FIRST -- emit module-loading BELOW it. (2) NEVER ship a split without RUNNING the tool at least once on a real input -- a clean parse is NOT proof; runtime resolves functions + the param block. (3) diff function survival: grep the pre-split for 'function ' and confirm every name still resolves after the split. (4) cheap models (Flash/Haiku) drop code on complex splits -- splitting a REAL shipped tool must be pro-grade or independently verified. RECOVERY when broken + uncommitted: git checkout the working monolith; keep the extracted lib modules committed for a later VERIFIED re-wire. This is cheap-drops-code materialized on an UNGUARDED bin tool (outside the kih/tools sandbox) -- evidence to either widen the sandbox to bin tools or hard-require run-verification before a split lands."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wksplit analyze big.py",
+      "expect": "prints dup ratio + dedup map without reading content into LLM",
+      "prompt": null
+    },
+    {
+      "cmd": "wksplit dedup file --verify",
+      "expect": "round-trip parse + symbol-set diff empty before swap",
+      "prompt": null
+    },
+    {
+      "cmd": "py_compile / [Parser]::ParseFile / bash -n",
+      "expect": "backend verify gate per language",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wksplit",
+    "splitter",
+    "dedup",
+    "multilang",
+    "python",
+    "powershell",
+    "csharp",
+    "bash",
+    "roundtrip",
+    "ast",
+    "encoding",
+    "rebundle",
+    "spec",
+    "refactor-tool"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-06T16:48:25.2043287Z",
+  "updated": "2026-06-10T12:58:12.0134667Z",
+  "version": "1.2"
+}

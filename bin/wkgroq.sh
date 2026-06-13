@@ -1,10 +1,13 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # wkgroq.sh -- Groq API wrapper with token tracking
 # Usage: wkgroq.sh "task" [-m model] [-s system_prompt]
 
 USAGE_LOG="${USERPROFILE:-$HOME}/.groq/wkgroq_usage.jsonl"
 DEFAULT_MODEL="llama-3.3-70b-versatile"
-GROQ_API_KEY="${GROQ_API_KEY:-$(grep GROQ_API_KEY 'D:/GitHub/.env' 2>/dev/null | cut -d= -f2 | tr -d '\r\n')}"
+# wkappbot skill read wkharness-env-discovery
+_env_file="${WKHARNESS_ENV_FILE:-$(git rev-parse --show-toplevel 2>/dev/null)/.env}"
+[ -z "$_env_file" ] && _env_file="$HOME/.env"
+GROQ_API_KEY="${GROQ_API_KEY:-$(grep GROQ_API_KEY "$_env_file" 2>/dev/null | cut -d= -f2 | tr -d '\r\n')}"
 
 # ── Arg parsing ────────────────────────────────────────────────────────────────
 task_parts=(); model="$DEFAULT_MODEL"; system_msg="You are a helpful coding assistant."

@@ -10,7 +10,9 @@
     "BARE KOREAN KEYWORD RULE. If user drops an isolated Korean keyword or short phrase, run wkappbot skill search term FIRST. Never guess intent before the skill search resolves a matching skill.",
     "NAVIGATION. Execution details (commands, mandatory loads, agent rules, file-edit discipline, skill-edit discipline, TODO sync) -> wkappbot skill read on-load-howto. History or incident notes or dated bug accumulation -> wkappbot skill read on-load-ref. Both are part of this cluster.",
     "AGENT DISPATCH PRE-FLIGHT (before every delegation): wkappbot skill read agent-dispatch-preflight. Sequence: (0) Read CLAUDE.md first (Edit fails without Read). (1) Edit CLAUDE.md to add Pending entry. (2) Agent() MUST have run_in_background:true. (3) Prompt needs 3 skill reads. This session burned 4 attempts and ~4x tokens before getting it right -- read this skill every session to prevent recurrence.",
-    "MEMORY ORGAN. For predecessor questions and session-memory lookup, use wkhippo recall/foresee/export/status; wkrecall is archived and must not be presented as active."
+    "MEMORY ORGAN. For predecessor questions and session-memory lookup, use wkhippo recall/foresee/export/status; wkrecall is archived and must not be presented as active.",
+    "OPUS SESSION MANDATORY READ. At session start, an Opus ROOT session MUST read wkappbot skill read claude-code-agent-tier-routing and wkappbot skill read agent-cmd BEFORE dispatching work. These encode delegate-first principle and Agent.cmd as the universal dispatcher. Skipping these caused serial work-dragging and token waste.",
+    "HONGIK HARNESS REFLEX-CONNECTION POINT (user 2026-06-12, constitutional). Every intelligence living in the Hongik knowledge-intelligence harness wires its reflexes from exactly THREE session-start skills: (1) on-load -- the session-start decision rules and mandatory loads; (2) your OWN model reflection skill -- the skill whose name carries your model family plus the keyword reflection (opus to opus-self-reflection, sonnet to sonnet-reflection, haiku to haiku-reflection; if your model has no reflection skill yet, CREATE one first); (3) foundation-is-roots-charge-not-a-chore -- the ROOT guide warning that foundational and harness and knowledge-wiring work is never a chore to delegate downward. These three are MANDATORY at session start. The on-load enforcer (wkharness-guards-onload-enforce.ps1) nudges until all three are read after the latest compaction (or at fresh session start). Read all three before dispatching any work."
   ],
   "requirements": [
     {
@@ -42,6 +44,11 @@
       "cmd": "wkappbot skill read claude-session-handoff",
       "expect": "session",
       "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore",
+      "expect": "dangerous enemy",
+      "prompt": null
     }
   ],
   "primary_cmd": null,
@@ -54,6 +61,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-08T10:07:42.2691243Z",
-  "updated": "2026-06-07T11:44:09.5100291Z",
-  "version": "1.111"
+  "updated": "2026-06-12T06:05:07.701523Z",
+  "version": "1.116"
 }

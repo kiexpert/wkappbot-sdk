@@ -1,0 +1,44 @@
+{
+  "id": "harness-diet-score-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness diet-score-guard: CLAUDE.md too fat",
+  "title_ko": null,
+  "desc": "Warns/blocks when CLAUDE.md diet-score is below target (bloated/drifted), because it loads every session and a fat instruction file taxes all future context. Slim it via md-heal.",
+  "steps": [
+    "TRIGGER: fires when the project CLAUDE.md diet-score is under 80 -- too long, drifted, or history-heavy in the always-loaded instruction file.",
+    "FIX: run the heal -- wkappbot skill read md-heal (and claudemd-slim-plan) -- tier it, move history to refs, replace verbose sections with skill pointers. Raising the score clears the gate.",
+    "WHY: CLAUDE.md is per-session context; bloat burns tokens on every load for every model. See: claudemd-slim-plan, claude-md-guide."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-diet-score-guard",
+      "expect": "heal",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claudemd-slim-plan",
+      "expect": "200",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "mandatory",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "claude-md",
+    "diet",
+    "score",
+    "guard",
+    "md-heal"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:35:05.9620488Z",
+  "updated": "2026-06-12T06:35:05.9620611Z",
+  "version": "1.0"
+}

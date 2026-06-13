@@ -1,0 +1,36 @@
+{
+  "id": "wkharness-source-sandbox-suffix-cheap-edits-only-word-gitignored-root-merges",
+  "app": "wkappbot-workflow",
+  "title": "wkharness source sandbox suffix: cheap edits only -<word>/gitignored; ROOT merges",
+  "title_ko": null,
+  "desc": "Spec for the cheap-model source-edit sandbox -- which files a cheap tier (haiku/flash/*-mini) may edit (-proto/-probe/any -<word> suffix, or gitignored scratch) and the ROOT merge duty. Impl: Test-WkHarnessSourceIsSandboxed + Test-WkIsCheapAgentSession in wkharness-common.ps1. Bidirectional pair of harness-active-model-scoping P7.",
+  "steps": [
+    "RULE: cheap model tiers (haiku / flash / *-mini, detected by Test-WkIsCheapAgentSession in wkharness-common.ps1 ~L1168) are SANDBOX-RESTRICTED from editing canonical original source. They may edit ONLY (a) a file whose leaf ends in a hyphenated suffix segment, or (b) a gitignored target (scratch, free)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-source-sandbox-suffix",
+      "expect": "probe",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-source-sandbox-suffix",
+      "expect": "Test-WkHarnessSourceIsSandboxed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P7",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:44:19.6733738Z",
+  "updated": "2026-06-11T08:44:19.6733828Z",
+  "version": "1.0"
+}

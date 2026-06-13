@@ -1,0 +1,50 @@
+{
+  "id": "powershell-here-string-multiline",
+  "app": "wkappbot-workflow",
+  "title": "PowerShell here-string -- the clean multiline input method (commit messages, AI prompts)",
+  "title_ko": null,
+  "desc": "How to pass MULTILINE text in PowerShell with zero escaping, via a here-string. The native answer to multiline commit messages, multiline AI-CLI prompts, and file content -- avoids the bash-to-cmd-to-powershell newline corruption that forces heredocs. Recalled by Haiku 2026-06-10.",
+  "steps": [
+    "WHAT: a PowerShell HERE-STRING is the clean way to pass MULTILINE text (git commit messages, prompts to claude/codex/agy, file content) with ZERO escaping. Two forms, both span lines.",
+    "LITERAL form (preferred for prompts and commit messages): open with at-sign then a single-quote as the LAST token on the line, then your raw multi-line text where dollar-signs and backticks stay LITERAL (no expansion), then close with a single-quote then at-sign. Use this whenever the text contains literal dollar signs.",
+    "INTERPOLATING form: identical but uses a DOUBLE-quote instead of the single-quote (open at-doublequote, close doublequote-at). PowerShell EXPANDS dollar-variables and backtick escapes inside -- use ONLY when you actually want substitution.",
+    "THE GOTCHA (parse error if violated): the opening delimiter must be the LAST token on its line, and the CLOSING delimiter must sit at COLUMN 0 -- no leading whitespace, on its own line. Indenting the closer is a syntax error. This is the single most common mistake.",
+    "USE CASES: a literal here-string after git commit -m for multi-line messages; piping a multi-line prompt into an AI CLI without escaping; writing multi-line file content. Pairs with codex-tool-wrappers (the heredoc equivalent for bash-side Agent.cmd).",
+    "SEE ALSO (reflex back-link 2026-06-11): ps-script-mojibake-is-output-encoding-first-not-argv -- if a .ps1 prints garbled Korean or U+FFFD, suspect the console OUTPUT encoding FIRST (set OutputEncoding=UTF8 at script start) before blaming the bash-to-powershell argv boundary; [Console]::InputEncoding does NOT touch -File positional argv."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read powershell-here-string-multiline",
+      "expect": "here-string",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read powershell-here-string-multiline",
+      "expect": "COLUMN 0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search here-string",
+      "expect": "powershell",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "powershell",
+    "here-string",
+    "multiline",
+    "prompt",
+    "commit",
+    "escaping",
+    "quoting",
+    "fleet"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T05:34:24.018712Z",
+  "updated": "2026-06-11T10:38:27.3322064Z",
+  "version": "1.1"
+}

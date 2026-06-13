@@ -1,0 +1,46 @@
+{
+  "id": "cross-family-harness-integration",
+  "app": "wkappbot",
+  "title": "Cross-family harness integration (Claude / gemini / agy / codex)",
+  "title_ko": null,
+  "desc": "How the wkharness guard stack reaches each AI family, why gemini showed false 'Hook failed' + permission prompts, and how to hard-enforce guards on gemini precisely. The hard-won 2026-06-11 playbook. Read before touching D:/GitHub/wkharness.ps1, autonomy.toml, or any cross-family hook. Cluster: -howto (implementation), -ref (the v0->v2 evolution + discoveries). Related: [[claude-md-harness-rules]].",
+  "steps": [
+    "ARCHITECTURE -- one path per family, all converge on the kih guard stack (wkappbot-kih/tools/wkharness*.ps1). Claude: native PreToolUse/PostToolUse hooks -> D:/GitHub/wkharness.ps1 (relay) -> kih. gemini + agy: the relay is also their BeforeTool/AfterTool hook; it ADAPTS their tool-name JSON (run_shell_command/run_command/write_file...) into Claude's tool_name format, then calls kih. codex: NO hooks -- Claude-named cmd wrappers (Write.cmd/Edit.cmd in personal-docs/tools) route through kih, so GUARDS fire but hook NUDGES do not (closed via wkharness-nudge-guide.ps1)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration",
+      "expect": "exit 2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration",
+      "expect": "autonomy",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration",
+      "expect": "induce",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gemini",
+    "agy",
+    "codex",
+    "cross-family",
+    "autonomy-toml",
+    "hook",
+    "dynamic-deny",
+    "verification"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T17:35:40.0383784Z",
+  "updated": "2026-06-10T17:35:40.0383875Z",
+  "version": "1.0"
+}

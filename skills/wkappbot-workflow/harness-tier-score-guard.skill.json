@@ -1,0 +1,44 @@
+{
+  "id": "harness-tier-score-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness tier-score-guard: referenced skill scores too low",
+  "title_ko": null,
+  "desc": "Blocks an Agent dispatch (or skill use) when a skill referenced in the brief scores below threshold, meaning it is a fat un-tiered skill the successor cannot use efficiently. Split it into 3 tiers first.",
+  "steps": [
+    "TRIGGER: fires when a brief-referenced skill has a tier/coverage score under 60 (or 80 in stricter mode) -- a sign it is a monolith, not a 3-tier T1/T2/T3 cluster.",
+    "FIX: split the low-score skill into T1 core + T2 howto + T3 ref via the migration guide, then re-reference it. Raising the score unblocks the dispatch (gate-as-incentive).",
+    "WHY: fat skills are token-hostile and the next agent skips them; the score routes you to fix the knowledge before relying on it. See: skill-migration-3tier, skill-3tier-lazy-arch."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-tier-score-guard",
+      "expect": "split",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "3-tier",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "tier",
+    "score",
+    "skill",
+    "3tier",
+    "guard"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:35:05.335397Z",
+  "updated": "2026-06-12T06:35:05.335409Z",
+  "version": "1.0"
+}

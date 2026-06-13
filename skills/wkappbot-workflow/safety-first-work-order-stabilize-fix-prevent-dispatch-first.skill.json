@@ -1,0 +1,53 @@
+{
+  "id": "safety-first-work-order-stabilize-fix-prevent-dispatch-first",
+  "app": "wkappbot-workflow",
+  "title": "Work order: stabilize -> fix -> prevent-recurrence, and dispatch-first if stabilize is not one-shot",
+  "title_ko": null,
+  "desc": "[DEPRECATED 2026-06-11 -- MERGED into business-hours-triage-emergency-first. Read THAT skill instead; the stabilize->fix->prevent + dispatch-first-if-not-one-shot rule now lives there as step 8. This stub created in error by not searching existing skills first.]",
+  "steps": [
+    "CORE ORDER (mandatory, in sequence): every task is handled in three phases -- (1) STABILIZE (anjeonjochi): stop the bleeding, unblock, make it safe RIGHT NOW; (2) FIX (munjehaegyeol): solve the root cause; (3) PREVENT-RECURRENCE (jaebalbangji): knowledge-ify the lesson AND add a guard/self-test so it cannot recur. Never jump to fix/prevent before the system is stabilized.",
+    "DISPATCH-FIRST FOR SAFETY (mandatory): if the STABILIZE step is NOT something you can resolve in ONE shot, you MUST dispatch another intelligence (a cheap agent, or a different model family with budget) FIRST -- before attempting it solo. Solo-floundering on a non-one-shot safety problem is FORBIDDEN: it burns the expensive orchestrator and can drain the shared token budget the juniors also need, so even delegation then faints. Conduct, do not thrash.",
+    "WHY (2026-06-11 incident): an Opus violated this -- it floundered ~15 dispatches trying to STABILIZE a pace deadlock SOLO, burned huge tokens, and starved cheap delegation until everything fainted. Correct move: recognize STABILIZE was not one-shot -> dispatch a non-Claude/other intelligence FIRST, or fix the offending gate AS ROOT (the harness is editable proxy-code), THEN fix root cause, THEN knowledge-ify.",
+    "MAP TO THE GUARD MAZE: STABILIZE often = unblock yourself -- fix/relax a mis-firing gate as ROOT, or escape via knowledge-ops (pace-free) -- so real work can proceed. FIX = the root-cause edit. PREVENT = a jisikhwa skill + a harness self-test case + a gate that names a WORKING escape (gate-as-sign). The three phases map cleanly onto the harness.",
+    "CROSS-LINKS (>=3, reflex-wired per the jisikhwa link-back mandate): opus-mechanical-self-drag-antipattern, pace-deadlock-escapes-harness-editable-and-jisikhwa-free, claude-code-agent-tier-routing. Each back-links here so the next agent applies stabilize-first + dispatch-first before touching anything.",
+    "PARALLEL-DISPATCH NUANCE (user 2026-06-11, OK-confirmed): the trigger is precise -- the MOMENT you judge 'I cannot resolve this in ONE edit/shot', do NOT start solo work. FIRST fire a quick safety-measure dispatch IN PARALLEL (fire-and-continue, run_in_background; fan out several if useful) -- THEN proceed to problem-solving while/after it runs. The order is: not-one-shot? -> parallel safety dispatch FIRST -> then fix -> then prevent. Blocking-solo before dispatching is the forbidden anti-pattern that drains the orchestrator and faints the juniors."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read opus-mechanical-self-drag-antipattern",
+      "expect": "delegate mechanical work, do not solo-drag",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-deadlock-escapes-harness-editable-and-jisikhwa-free",
+      "expect": "R1 fix-the-gate / R2 jisikhwa-is-free escapes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "which intelligence to dispatch",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "workflow",
+    "safety",
+    "stabilize",
+    "fix",
+    "prevent",
+    "recurrence",
+    "dispatch-first",
+    "delegation",
+    "reflex",
+    "anjeonjochi",
+    "jaebalbangji"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T11:50:59.6844336Z",
+  "updated": "2026-06-11T11:53:50.8355687Z",
+  "version": "1.4"
+}

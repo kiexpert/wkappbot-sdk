@@ -1,0 +1,43 @@
+{
+  "id": "harness-pending-protect",
+  "app": "wkappbot-workflow",
+  "title": "Harness pending-protect: do not shrink the Pending list blindly",
+  "title_ko": null,
+  "desc": "Blocks an action that would drop CLAUDE.md Pending items without recording progress, forcing the AI to reflect (mark done or add a new finding) before history dirties.",
+  "steps": [
+    "TRIGGER: fires when the Pending count in CLAUDE.md decreased relative to the session baseline without a corresponding done-mark or new item.",
+    "FIX: edit CLAUDE.md Pending -- mark the resolved item [x] with a one-line note, or add the new finding [ ], then retry. The gate forces self-reflection before the commit history changes.",
+    "WHY: silently shrinking Pending loses tracked work; CLAUDE.md is canonical -- if it is not there, it does not exist. See: claude-md-todo-sync, claude-md-guide."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-pending-protect",
+      "expect": "reflect",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-todo-sync",
+      "expect": "canonical",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "pending",
+    "claude-md",
+    "guard",
+    "todo"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:34:11.3523249Z",
+  "updated": "2026-06-12T06:34:11.3523364Z",
+  "version": "1.0"
+}

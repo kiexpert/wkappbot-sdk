@@ -1,0 +1,51 @@
+{
+  "id": "wksplit-cs-utility",
+  "app": "wkappbot",
+  "title": "wksplit-cs-utility: C#/PS splitter with 6-gate safety",
+  "title_ko": null,
+  "desc": "Auto-split large .cs/.ps1 files into partial classes or modules. 6 mandatory gates prevent parse-clean-but-dead splits. SPLIT-FIRST: run this before deep-reading or refactoring any >400-line source -- it is free, deterministic, and leaves the code better than you found it. Howto: wksplit-cs-utility-howto. Incidents/history: wksplit-cs-utility-ref.",
+  "steps": [
+    "PURPOSE: wksplit-cs splits large .cs files into C# partial classes; wksplit-ps1 splits .ps1 into dot-sourced modules. Both run 6 mandatory safety gates and exit only on a verified-clean result. Use: python bin/wksplit-cs.py <file.cs> [-m <max-lines>] or bin/wksplit-ps1.ps1 <file.ps1>.",
+    "GATE 1 -- PARAM-FIRST: param() block stays the FIRST statement in every PS1 output file; all dot-sourcing/module imports placed strictly below it. Violation silently parses clean and only dies at runtime. Detail + history: [[wksplit-cs-utility-ref]].",
+    "GATE 2 -- REGEX-HOIST: every inline regex literal containing non-ASCII chars is replaced with a :<Name>Rx var placed after param(). Prevents encoding corruption across bash->PowerShell relay. Implementation detail (PS 5.1 scriptblock scope trap, verified pattern): [[wksplit-cs-utility-howto]].",
+    "GATE 3 -- SYMBOL-REFERENCE PRE-CHECK: collect all FunctionDefinitionAst names across all planned modules; compare to all CommandAst.GetCommandName() calls. Any function called in the original but missing from the planned output is a DROPPED function -> auto-remerge or FAIL. This is the gate that would have saved wkhippo.",
+    "GATE 4 -- RUN-VERIFY (PS) / COMPILE-UNTIL-CLEAN (C#): PS: actually run the split tool once on a real input -- a clean parse is NOT proof (see G1/G3). C#: run dotnet build in a loop, auto-remerge any member causing CS0103/CS0246, retry until 0 warnings AND 0 errors. Exit only on clean build.",
+    "GATE 5 -- RECOMBINE: emit a recombine artifact (-main.ps1 or wksplit -Recombine mode) that dot-sources/concatenates modules back to the original monolith. Proves round-trip correctness and is the instant recovery path if a deployed split breaks.",
+    "GATE 6 -- SELFTEST: built-in self-test creates a temp .csproj, copies split partials (original renamed .bak to avoid CS0111 duplicates), compiles, verifies. Run with --selftest flag.",
+    "SPLIT-FIRST ANALYSIS: any source >400 lines or hard to reason about -> split FIRST, then analyze the small focused modules. The split is FREE (zero tokens, pure AST/build), SAFE (G4/G6 guarantee no broken split ships), and leaves the code under the ~400-line cap. [[wksplit-cs-utility-howto]] [[wksplit-cs-utility-ref]]"
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility",
+      "expect": "G1 PARAM-FIRST",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility",
+      "expect": "G3 SYMBOL-REFERENCE PRE-CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility",
+      "expect": "SPLIT-FIRST ANALYSIS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wksplit",
+    "splitter",
+    "partial-class",
+    "cs",
+    "powershell",
+    "gates",
+    "split-first"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T08:02:00.8943765Z",
+  "updated": "2026-06-10T17:02:22.4294894Z",
+  "version": "1.35"
+}

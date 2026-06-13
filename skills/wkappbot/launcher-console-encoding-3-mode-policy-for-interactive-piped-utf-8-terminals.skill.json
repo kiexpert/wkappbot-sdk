@@ -1,0 +1,48 @@
+{
+  "id": "launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals",
+  "app": "wkappbot",
+  "title": "Launcher console encoding: 3-mode policy for interactive + piped + UTF-8 terminals",
+  "title_ko": null,
+  "desc": "Bootstrap PowerShell, cmd.exe, and Git Bash to start in UTF-8 on Windows. Use when console output or argv is misread because shells still start in CP949/ANSI mode.",
+  "steps": [
+    "Write UTF-8 bootstrap lines into both PowerShell profile files: set Console.InputEncoding, Console.OutputEncoding, and $global:OutputEncoding to UTF-8; set LANG=C.UTF-8, LC_ALL=C.UTF-8, PYTHONUTF8=1, and PYTHONIOENCODING=utf-8; run chcp 65001.",
+    "Write Git Bash locale defaults into ~/.bashrc and source them from ~/.bash_profile: export LANG=C.UTF-8; export LC_ALL=C.UTF-8; export PYTHONUTF8=1; export PYTHONIOENCODING=utf-8; export LESSCHARSET=utf-8.",
+    "Persist PYTHONUTF8=1 and PYTHONIOENCODING=utf-8 as user environment variables so every new Python process inherits UTF-8 even outside the shell bootstrap.",
+    "Verify fresh shells with cmd /c chcp, PowerShell console encodings, Git Bash LANG/LC_ALL/PYTHONUTF8/PYTHONIOENCODING, and python -c checks before blaming file contents.",
+    "If Bash argv is still mangled, use TryRecoverUtf8Argv or ASCII-only wrappers instead of guessing that the file is broken.",
+    "Keep tools/bootstrap_utf8_shells.ps1 only as the mechanical equivalent of the same steps.",
+    "SEE ALSO (reflex back-link 2026-06-11): ps-script-mojibake-is-output-encoding-first-not-argv -- if a .ps1 prints garbled Korean or U+FFFD, suspect the console OUTPUT encoding FIRST (set OutputEncoding=UTF8 at script start) before blaming the bash-to-powershell argv boundary; [Console]::InputEncoding does NOT touch -File positional argv."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "$ cmd /c chcp",
+      "expect": "65001",
+      "prompt": null
+    },
+    {
+      "cmd": "$ Get-Content C:\\Users\\kiexp\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1 -Encoding UTF8",
+      "expect": "PYTHONUTF8=1",
+      "prompt": null
+    },
+    {
+      "cmd": "$ wkappbot skill read cp949-save-guard",
+      "expect": "CP949 Save Guard",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "launcher",
+    "encoding",
+    "console",
+    "cp949",
+    "utf8"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T13:09:14.303161Z",
+  "updated": "2026-06-11T10:38:26.0510596Z",
+  "version": "1.7"
+}

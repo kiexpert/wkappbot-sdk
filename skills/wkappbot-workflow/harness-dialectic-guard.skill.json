@@ -1,0 +1,44 @@
+{
+  "id": "harness-dialectic-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness dialectic-guard: Opus needs cheap groundwork first",
+  "title_ko": null,
+  "desc": "Blocks an Opus dispatch until thesis/antithesis groundwork exists: 2+ Haiku and 1+ Sonnet cheap-model calls completed this session, so Opus synthesizes rather than thinks one-sided.",
+  "steps": [
+    "TRIGGER: fires on an Opus delegation when the session JSONL lacks 2 completed Haiku (or codex-mini) calls plus 1 Sonnet/GPT/Gemini call as prior evidence.",
+    "FIX: run the groundwork via Agent.cmd -- e.g. Agent.cmd --model haiku 'argue FOR'; Agent.cmd --model haiku 'argue AGAINST risks'; Agent.cmd --model sonnet 'synthesize'. Then dispatch Opus.",
+    "WHY: one-sided Opus delegation is wasteful; cheap dialectic builds the evidence Opus refines. See: opus-dialectic-gate, agent-cmd."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-dialectic-guard",
+      "expect": "groundwork",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "routing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "dialectic",
+    "opus",
+    "delegation",
+    "guard",
+    "evidence"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:35:04.680451Z",
+  "updated": "2026-06-12T06:35:04.680465Z",
+  "version": "1.0"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "verify-tool-or-guard-synthetic-live-static",
+  "app": "wkappbot-sdk",
+  "title": "Verify a tool or guard three ways -- synthetic, live, static (parse-clean is NOT proof)",
+  "title_ko": null,
+  "desc": "The verification methodology that emerged 2026-06-10 after a cheap split shipped parse-clean but dead-at-runtime (wkhippo died). Three complementary modes -- synthetic (impersonate a context, assert gate logic, no spawn), live (cheap model exercises the tool, reports friction), static (AST scan for a known break-signature) -- plus the reflex: structural validity is never runtime correctness.",
+  "steps": [
+    "THREE VERIFICATION MODES (decision rule). SYNTHETIC: impersonate the context a real caller would have (set the env/inputs, e.g. WKHARNESS_AGENT_MODEL or WKHARNESS_IS_GEMINI) and ASSERT the gate's verdict -- no agent spawn, deterministic, runs every doctor pass; use for 'does the gate LOGIC classify correctly'. LIVE: dispatch the cheapest real model to EXERCISE the tool and report friction; use for 'does a real model fumble / does the tool actually RUN'. STATIC: AST-scan for a known break-signature (e.g. a displaced param() shows up as a CommandAst named 'param'); fast, catches a structural break before runtime. They are COMPLEMENTARY, not substitutes -- synthetic for logic, live for behavior, static for known structural classes.",
+    "PS5.1 SCRIPTBLOCK SCOPE TRAP FOR SYNTHETIC TESTS (2026-06-10): When writing a synthetic gate test that exercises [regex]::Replace with a MatchEvaluator scriptblock, note that PS5.1 COPIES outer plain variables INTO the scriptblock scope -- they do not close over them. This means: (1) a plain $counter variable incremented inside a scriptblock ALWAYS reads 0 in the outer scope; (2) a List<string> passed as an outer variable DOES work because it is a reference type (the same list object is shared). Synthetic test assertion: to verify G2 hoist ran, check $assignments.Count > 0 AFTER the hoist call, not a counter. Alternatively, use the programmatic-range / manual-Matches approach which avoids scriptblocks entirely (see wksplit-cs-utility step G2 CORRECT IMPLEMENTATION).",
+    "WKSPLIT-CS G3 PRECHECK BUG (2026-06-11): symbol_precheck calls find_members on unfinalized planned-part lines. The planned header from make_header ends with '    {' (class body open). The first body line is blank, so find_members(start_idx=class_body_start) gets lines[start_idx]='', giving class_indent=0 and max_member_indent=4. Real members are indented 8 spaces, so ALL are skipped -- precheck always reports all members as dropped, causing wrong G3 remerge. Fix: find_members must scan forward from start_idx to find the FIRST NON-BLANK line for indent detection, not use start_idx literally. Lesson: always test G3 precheck on the actual unfinalized partial lines, not on finalized file reads.",
+    "REFLEX 2026-06-12 A-GUARD-CAN-BE-PRESENT-BUT-SILENTLY-NOT-FIRE (fail-open blindness): study-lock (Test-WkHarnessStudyLock) did NOT block ROOT editing live harness code, so the harness was modified WITHOUT reading its core skill -- exactly the 'how did you edit it without knowing?' failure. TWO causes proven this session: (1) the Edit/Write TOOL bypasses harness:skill via an early exit-0 in wkharness-guards.ps1 (~line 1430) -- Bash appbot-edit BLOCKS on the same .ps1 but the Edit tool PASSES (see claude-md-harness-rules step 20); (2) required-set can be EMPTY: a doctor/*.ps1 had no inline #/// skill headers and no matching harness:skill rule, so required.Count==0 -> the guard returns false (no block) by design. TRIGGER: whenever you add or rely on a guard, do NOT assume 'present == enforcing'. STOP and prove it FIRES with a SYNTHETIC self-edit test (impersonate the edit, assert the verdict is block) -- this is exactly the doctor self-edit test added to 22-guard-logic-selftests.ps1: assert Test-WkIsHarnessSourceEdit==true AND a harness:skill rule covers the path (required-set non-empty). ROOT-CAUSE CLASS: fail-open guards + tool-path bypass = silent non-enforcement; structural presence is never runtime firing. PREVENTION: every new guard ships with a synthetic 'does it actually fire' canary in the doctor self-test suite, and FAILs the doctor if it cannot fire. Cross: opus-mechanical-self-drag-antipattern, pace-deadlock-escapes-harness-editable-and-jisikhwa-free."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "synthetic",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "parse-clean is NOT proof",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "exercise the runtime",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "verification",
+    "self-test",
+    "synthetic-canary",
+    "live-canary",
+    "static-ast",
+    "run-verify",
+    "parse-clean-not-proof",
+    "reflex",
+    "split-safety",
+    "jisikhwa"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T13:48:04.5266778Z",
+  "updated": "2026-06-12T05:41:02.9555492Z",
+  "version": "1.6"
+}

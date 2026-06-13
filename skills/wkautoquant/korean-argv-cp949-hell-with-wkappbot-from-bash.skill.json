@@ -1,0 +1,41 @@
+{
+  "id": "korean-argv-cp949-hell-with-wkappbot-from-bash",
+  "app": "wkautoquant",
+  "title": "Korean argv CP949 hell with wkappbot from bash",
+  "title_ko": null,
+  "desc": "When calling wkappbot from Git Bash on Korean Windows, Korean-text argv silently corrupts. Bash writes UTF-8 bytes but Windows CreateProcessA reinterprets as CP949 ANSI. Affects speak/slack/prompt with Korean content.",
+  "steps": [
+    "[ROOT] Git Bash writes UTF-8 bytes to argv. Windows console CP=949. wkappbot argv reader via ANSI CP949 decode = garbled.",
+    "[DIAG] cmd.exe //c chcp returns 949 on Korean Win. echo 한 ",
+    " xxd shows ed95 9c (3-byte UTF-8) not CP949 bytes.",
+    "[SYMPTOM] wkappbot speak korean = 30s timeout. slack send = mangled msg. prompt send = rc=1 silent fail. title match on Korean = No window found.",
+    "[TRIED: cmd.exe + chcp 65001] cmd.exe /c 'chcp 65001 && wkappbot speak 한글' — nested quote escape issues + CreateProcess still ANSI-converts. rc=1 path not found.",
+    "[TRIED: Python subprocess UTF-8 encoding] subprocess.run([wk,speak,korean_text],encoding='utf-8') — Python argv passes fine but CreateProcessA conversion layer mangles. Same fail.",
+    "[TRIED: ctypes SetConsoleCP 65001] SetConsoleCP+SetConsoleOutputCP before subprocess — does not affect child process argv decoding.",
+    "[WORKAROUND A: ASCII-only args + hwnd direct] Instead of a11y find {title:이탈종목} use resolve_hts_tables.py to get hwnd then a11y find {hwnd:0xNN}. Done in WkAutoQuant.",
+    "[WORKAROUND B: file-based content] Write Korean to UTF-8 file, invoke wkappbot with ASCII file path arg (if supported). Suggest already filed for --from-file flag on speak/slack/prompt commands.",
+    "[WORKAROUND C: short English-only] Accept speak limitation — emit English-only TTS or skip speak entirely when content has Korean.",
+    "[ROOT FIX NEEDED IN WKAPPBOT] Use CommandLineToArgvW on raw wchar_t command line instead of trusting argv[]. That would bypass ANSI conversion entirely. Already in suggest queue.",
+    "[ACTION NEXT CLAUDE] (1) Check if wkappbot suggest resolved — try speak korean again. (2) If still broken: stick with hwnd-direct grap everywhere + English-only speak + UTF-8 files for Slack content.",
+    "SEE ALSO (reflex back-link 2026-06-11): ps-script-mojibake-is-output-encoding-first-not-argv -- if a .ps1 prints garbled Korean or U+FFFD, suspect the console OUTPUT encoding FIRST (set OutputEncoding=UTF8 at script start) before blaming the bash-to-powershell argv boundary; [Console]::InputEncoding does NOT touch -File positional argv."
+  ],
+  "comments": null,
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot",
+    "encoding",
+    "cp949",
+    "bash",
+    "windows",
+    "korean",
+    "argv",
+    "handoff"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-18T10:05:29.826337Z",
+  "updated": "2026-06-11T10:38:26.6773607Z",
+  "version": "1.1"
+}

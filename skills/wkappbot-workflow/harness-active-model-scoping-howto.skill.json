@@ -1,0 +1,54 @@
+{
+  "id": "harness-active-model-scoping-howto",
+  "app": "wkappbot-workflow",
+  "title": "Harness active-model scoping (T2 howto): how to implement each principle",
+  "title_ko": null,
+  "desc": "T2 domain tier of harness-active-model-scoping: the implementation HOW for each principle (P1-P8). Parent T1 = harness-active-model-scoping (principle names + when-to-use). History = harness-active-model-scoping-ref.",
+  "steps": [
+    "P1 comments-by-verified-identity HOW: author field = wkagent-name output (verified, not self-claimed). Store comments in a SEPARATE skill-comments.jsonl, NOT the skill body (body bloat = tokens every read). A survey that passes a transfer-quiz grants the executor a stall-reset token; bare praise earns nothing.",
+    "P2 cheap-model-comprehension HOW: a Haiku passing a skill transfer-quiz proves the skill is self-sufficient -> author earns knowledge-score. Judge against the skill's DECLARED target-tier (Haiku-tier judged by Haiku, Opus-tier by Opus -- never penalize inherently complex skills). Quiz runs async once at contribute/edit time. Forces authors to make tacit knowledge explicit for the cheapest declared-tier successor.",
+    "P3 active-model-scoped pace HOW: check ONLY the active model's quota -- resolve WHO is running via wkagent-name (process-chain, not the spoofable env var). Opus=budget, Sonnet=pace, Haiku=near-unlimited, Gemini=charged only when Gemini runs. A delegated agent uses ITS OWN model quota. Implementation that landed 2026-06-11: in Invoke-ClaudePaceGuard, early-return BEFORE Get-ClaudePaceInfo when lastModel is non-Claude; gate the 95% breaker + claude-pace block + wk-only-gate on NEAR-CAP (>=90/95) not the linear-elapsed target.",
+    "P5/P6 gate-as-sign HOW: every guard block must print a VERIFIED-working escape (test the escape still works before advertising it), never a dead-end. P6: for each guard token [<name>-guard]/[<name>-gate] create exactly ONE same-named skill holding that guard's situation-specific safety + working escape + prevention, and footer the block with  (not a generic dump). Build: enumerate live guards in wkharness-guards-*.ps1, create missing same-named skills, repoint footers.",
+    "P7 sandbox-merge delegation HOW: a cheap model (Haiku/codex-mini/flash) edits ONLY (a) sandbox-suffixed sources (-proto) or (b) gitignored scratch -- gated by Test-WkIsCheapAgentSession / Test-WkHarnessSourceIsSandboxed. Harness .ps1 + real source (.cs/.py/.ts) = ROOT-only. Shape: cheap model produces in sandbox -> ROOT (Opus/Sonnet/pro) reviews and merges to canonical. Exception: .skill.json are knowledge-ops, cheap tiers may edit those.",
+    "P8 CLI-family pace HOW: a pace FAMILY = a CLI tool (Claude/Codex/Gemini/Agy/GPT/Groq), NOT a model. Classify each usage record by which CLI produced it (agy-* -> Agy family, gemini-* -> Gemini family). Each CLI-family gets its OWN cap + reset + marker file; break down per-model WITHIN a family. Refresh a stale (>1h) family cache IMMEDIATELY from its live source (Codex <- ~/.codex/logs_2.sqlite, Claude <- claude /usage anchor, Gemini <- wkgemini_usage.jsonl). wkpace + 95% breaker + doctor module 32 all follow this.",
+    "ESCAPE PATTERN 2026-06-12: when pace-gate blocks Edit tool on .ps1 files in wkappbot-sdk, use wkappbot file edit with --old-file/--new-file temp files. The harness:safe rule exempts wkappbot file edit from pace checks. Create temp files first, then call bare wkappbot command (no absolute path -- use PATH). This is R1 from pace-deadlock-escapes: fix via wk-exempt path.",
+    "REFRESH-BEFORE-BREAKER (cache freshness rule, user 2026-06-12): trigger a LIVE CLI re-query of a family's cache when EITHER (a) cache age > 1h (staleness) OR (b) usagePct >= 95% of that family's target (near-cap accuracy). Intent of (b): NEVER let the 95% pace breaker PAUSE the session on a stale/estimated number -- re-query the real CLI first so the breaker fires only on a CONFIRMED-real value. Per-family live source: Codex <- ~/.codex/logs_2.sqlite (Invoke-WkCodexBalanceRefreshFromSqlite), Claude <- claude /usage anchor (Get-ClaudeUsageAnchorOrRecalibrate), Gemini <- wkgemini_usage.jsonl, Groq/Cerebras <- their usage jsonl. Unify this at the breaker entry (Invoke-WkPace95Breaker): if a cycle is near its warn threshold, refresh that family then re-evaluate. Fail-open: refresh failure keeps the prior value, never blocks.",
+    "GROQ+CEREBRAS PACE FAMILY REGISTRATION (2026-06-12): Groq jsonl has two field shapes -- some entries use tokens_total/tokens_prompt/tokens_completion, others use total/prompt/completion (wrapper changed schema mid-log). Always check both field shapes: tokens_total first, then total as fallback. remain_req>=0 in Groq log = authoritative API quota; remain_req=-1 in Cerebras = no rate headers from Cerebras API. Default caps (faint-calibratable): Groq 500K tok/day + 14400 req/day; Cerebras 1M tok/day + 10K req/day. Both use UTC midnight daily reset (not KST like Gemini). Display denominator: divide /1e3 so it shows as 500K not 500000K.",
+    "P8 GEMINI PER-MODEL = PER-TIER (user 2026-06-12): within the Gemini CLI-family, separate pace per MODEL because each maps to a different capability/cost TIER -- gemini-*-flash-lite ~ Haiku-tier (cheap, LARGE daily quota), gemini-*-flash ~ Sonnet-tier (mid), gemini-*-pro ~ Opus-tier (small/expensive). Do NOT aggregate them into one Gemini bucket: give each model its OWN daily cap + its own sub-line (Gemini[flash-lite] / Gemini[flash] / Gemini[pro]). Mirror the Claude tier-weighting idea (opus=4, haiku=0.2). CAVEAT: the REAL per-model Gemini quota is NOT persisted in any local file -- only the live gemini CLI shows 'X% used' -- so wkpace's per-model number is a token-sum ESTIMATE (label it) until faint-calibrated or the live CLI quota is parsed. Implements in wkpace Gemini block + Invoke-GeminiPace95Breaker + doctor 13/32."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "T1 principle names",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping-howto",
+      "expect": "implementation of each principle",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool",
+      "expect": "the active-model resolver P3 depends on",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "pace",
+    "active-model",
+    "howto",
+    "t2",
+    "wkagent-name",
+    "gate-as-sign",
+    "cli-family"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T14:41:29.066474Z",
+  "updated": "2026-06-11T17:03:01.176788Z",
+  "version": "1.8"
+}

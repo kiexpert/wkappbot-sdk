@@ -1,0 +1,51 @@
+{
+  "id": "ps-script-mojibake-is-output-encoding-first-not-argv",
+  "app": "wkappbot-workflow",
+  "title": "PS script mojibake is output-encoding first, not argv",
+  "title_ko": null,
+  "desc": "Reflex + diagnostic: when a PowerShell .ps1 prints garbled non-ASCII (Korean mojibake / U+FFFD), suspect the script console OUTPUT encoding FIRST (add OutputEncoding=UTF8 at script start) -- not the bash to powershell argv boundary. InputEncoding only affects stdin, never -File positional argv. Includes the decisive output-vs-argv test and the 2026-06-11 wkhippo incident.",
+  "steps": [
+    "REFLEX (action-first): when a PowerShell .ps1 emits garbled non-ASCII on screen (a Korean keyword shows as mojibake or U+FFFD replacement chars), the FIRST suspect is the script console OUTPUT encoding, NOT the bash to powershell.exe argv boundary. Add at script start: [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) and $OutputEncoding = [System.Text.UTF8Encoding]::new($false). This is the cheapest fix; rule it out before anything expensive.",
+    "WHY argv is usually fine: powershell.exe parses -File positional args from the Windows command line via CommandLineToArgvW (native UTF-16), so the argument normally arrives INTACT. Garbling appears only when the host console OutputEncoding is a non-UTF8 codepage that cannot render the bytes on write.",
+    "INPUT vs ARGV (critical): [Console]::InputEncoding affects ONLY stdin and Read-Host. It does NOT touch -File POSITIONAL args, which are parsed before the first script line runs. An in-script encoding switch can never recover a TRULY lossy argv; that is fixed at the relay via -EncodedCommand (UTF-16LE base64) or stdin. Verify it is really argv before going there.",
+    "DECISIVE TEST: run the script as-is, then again with OutputEncoding=UTF8 set at the top. If the non-ASCII renders correctly after the switch, it was OUTPUT-side and you are done. U+FFFD chars can be an OUTPUT-encode artifact (encoding a valid string to a codepage lacking the glyph); they are NOT proof of lossy INPUT.",
+    "PROCESS LESSON (the wrong turn): tracing the call chain by Read (skill to wkhippo.ps1 to wk-keyword-builder.ps1 to wk-translate.ps1) I over-diagnosed it as a bash-to-powershell argv corruption (the Agent.cmd OEM-codepage class). The user proposed the simpler hypothesis -- switch UTF-8 output at script start -- and that was correct. Try the cheapest hypothesis FIRST.",
+    "INCIDENT 2026-06-11 (wkhippo recent): the Searching-for line showed mojibake for a Korean keyword. Adding UTF-8 OutputEncoding at wkhippo.ps1 start fixed the display AND enabled translation (Korean to Incomplete). Secondary real fix: wk-keyword-builder.ps1 changed its translate call from a powershell -NoProfile -File helper child spawn (which DID mangle Korean argv AND, writing stderr under the caller ErrorActionPreference=Stop, crashed as a NativeCommandError) to an in-process andsign-helper call. BOTH classes existed: outer output-encoding (primary) and inner child-spawn argv+stderr hazard.",
+    "CROSS-LINKS (3+, reflex-wired per jisikhwa link-back mandate): launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals, korean-argv-cp949-hell-with-wkappbot-from-bash, powershell-here-string-multiline. Those skills back-link here so the next agent trips this reflex before re-deriving it."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals",
+      "expect": "console encoding 3-mode policy",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read korean-argv-cp949-hell-with-wkappbot-from-bash",
+      "expect": "argv CP949 class contrasted by this reflex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ps-script-mojibake-is-output-encoding-first-not-argv",
+      "expect": "OUTPUT encoding first not argv",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "encoding",
+    "powershell",
+    "mojibake",
+    "utf8",
+    "console-output",
+    "argv",
+    "reflex",
+    "debugging"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T10:37:37.3032795Z",
+  "updated": "2026-06-11T10:37:37.3032883Z",
+  "version": "1.0"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "harness-kill-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness kill-guard: protect live wkappbot processes",
+  "title_ko": null,
+  "desc": "Blocks Stop-Process/taskkill targeting live wkappbot processes (wkappbot-core, wkchat, wka11y, wkappbot) -- these are active CLI sessions; killing them destroys running conversations. Route through wkappbot taskkill which classifies before killing.",
+  "steps": [
+    "TRIGGER: fires when a PowerShell Stop-Process/Kill-Process or taskkill names a wkappbot process. Direct OS-level kill of these is forbidden without classification.",
+    "FIX: classify first -- wkappbot taskkill /IM wkappbot-core.exe --dry-run shows PROTECTED/ZOMBIE/UNKNOWN with no kill. To force-kill a genuine zombie: wkappbot taskkill --force <pid>. For lifecycle cleanup use wkappbot --sudo eye restart.",
+    "WHY: wkappbot-core/wkchat/wka11y host the user's active AI sessions; a blind kill loses their work. The AI WORK process set is also spared from emergency reaping. See: wkappbot-taskkill-usage."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-kill-guard",
+      "expect": "classify",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-taskkill-usage",
+      "expect": "CLASSIFY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "kill",
+    "taskkill",
+    "protection",
+    "guard",
+    "zombie"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:31:01.5773446Z",
+  "updated": "2026-06-12T06:31:01.5773562Z",
+  "version": "1.0"
+}

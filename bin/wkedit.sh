@@ -8,8 +8,6 @@
 #   wkedit.sh write FILE --text "content"   -> wkappbot file write (different subcmd)
 #   wkedit.sh read FILE                     -> wkappbot file read
 
-. "$(dirname "${BASH_SOURCE[0]}")/wkharness-hints.sh"
-
 check_harness() {
   local root claude_md tool_input pattern
   root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
@@ -27,7 +25,7 @@ check_harness() {
   while IFS= read -r pattern; do
     [[ -z "$pattern" ]] && continue
     if printf '%s' "$tool_input" | grep -Pq -- "$pattern" 2>/dev/null; then
-      _wk_harness_block "wkedit" "$pattern"
+      echo "[harness:block] $pattern" >&2
       exit 1
     fi
   done < <(awk '/^##[[:space:]]+harness:block[[:space:]]+/ { sub(/^##[[:space:]]+harness:block[[:space:]]+/, ""); print }' "$claude_md" 2>/dev/null)
@@ -35,7 +33,7 @@ check_harness() {
   while IFS= read -r pattern; do
     [[ -z "$pattern" ]] && continue
     if printf '%s' "$tool_input" | grep -Pq -- "$pattern" 2>/dev/null; then
-      _wk_harness_warn "wkedit" "$pattern"
+      echo "[harness:warn] $pattern" >&2
     fi
   done < <(awk '/^##[[:space:]]+harness:warn[[:space:]]+/ { sub(/^##[[:space:]]+harness:warn[[:space:]]+/, ""); print }' "$claude_md" 2>/dev/null)
 }

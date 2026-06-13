@@ -1,15 +1,12 @@
 {
-  "id": "no-verify-guard",
+  "id": "wkharness-no-verify-guard",
   "app": "wkappbot-workflow",
   "title": "no-verify-guard: git commit --no-verify forbidden",
   "title_ko": null,
   "desc": "Blocks git commit --no-verify which bypasses pre-commit and pre-push hooks. Hooks enforce CP949, pace, and knowledge gates.",
   "steps": [
-    "SAFETY: Catches any git commit command with --no-verify flag. Hooks (pre-commit, pre-push) enforce critical guards: CP949 encoding check, pace gates, knowledge update gates. Skipping them lets broken or unsafe commits through.",
-    "SOLUTION: Fix the underlying hook failure instead of bypassing it. If a hook fires, read the error message and address the root cause. To delegate the commit to a safer model, use: Agent.cmd --model opus 'commit message here'",
-    "PREVENTION: Never use git commit --no-verify. Hooks are safety rails, not obstacles. If you hit a hook failure you do not understand, read the guard skill (wkappbot skill read <guard-name>) to find the specific escape."
+    "CANONICAL: this guard skill moved to harness-no-verify-guard; read that instead."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read no-verify-guard",
@@ -33,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T07:31:37.1421903Z",
-  "updated": "2026-06-11T07:31:37.1421999Z",
-  "version": "1.0"
+  "updated": "2026-06-12T07:26:00.7473391Z",
+  "version": "1.2"
 }

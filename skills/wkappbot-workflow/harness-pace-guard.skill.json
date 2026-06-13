@@ -1,0 +1,44 @@
+{
+  "id": "harness-pace-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness pace-guard: budget-exceeded edit block",
+  "title_ko": null,
+  "desc": "The pace-guard blocks Edit/Write/Update when the active model budget (weekly/monthly/sonnet/gemini) exceeds its target. Escape: delegate to a pace-exempt subagent via Agent.cmd, or do knowledge-ops which are always free. ROOT edits to .md, harness, and doctor code are TIER1-exempt.",
+  "steps": [
+    "TRIGGER: fires on Edit/Write/Update when Get-ClaudePaceInfo shows sonnetHogging or totalExceeded or sonnetExceeded or monthlyExceeded, or Gemini weekly percent over elapsed percent. Read-only tools and skill/.md ops are exempt.",
+    "ESCAPE: delegate the edit to a pace-exempt subagent -- Agent.cmd --model haiku. Subagents bypass the pace ceiling. KNOWLEDGE-OPS stay free: wkappbot skill read/edit and any .md edit never pace-block (jisikhwa is always free).",
+    "ROOT EXEMPTION: a ROOT (non-agent-child) session edits any .md, the harness scripts (wkharness*.ps1), and wkdoctor modules (bin/wkappbot.hq/doctor/*.ps1) pace-free via Test-WkIsHarnessSourceEdit (TIER1). Arbitrary source stays limited. See: pace-deadlock-escapes-harness-editable-and-jisikhwa-free."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-pace-guard",
+      "expect": "ESCAPE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-deadlock-escapes-harness-editable-and-jisikhwa-free",
+      "expect": "jisikhwa",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "pace",
+    "guard",
+    "budget",
+    "delegation",
+    "agent-cmd"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:30:50.7253255Z",
+  "updated": "2026-06-12T06:30:50.7253369Z",
+  "version": "1.0"
+}

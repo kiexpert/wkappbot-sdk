@@ -1,0 +1,46 @@
+{
+  "id": "harness-throttle-rot-spec-drift-prevention-howto",
+  "app": "wkappbot-workflow",
+  "title": "harness-throttle-rot-spec-drift-prevention-howto",
+  "title_ko": null,
+  "desc": "T2 how-to / designs for harness-throttle-rot-spec-drift-prevention: the spec-currency gate (study-lock mirror), all-bound + score-60 floor, auto-lock-sync, and the self-defending gate. Parent T1 = harness-throttle-rot-spec-drift-prevention; history/outcome = -ref.",
+  "steps": [
+    "SPEC-CURRENCY GATE (commit variant = mirror of study-lock; read-before becomes update-after). After editing a locked harness source, NOTIFY immediately via PostToolUse additionalContext, reusing the study-lock source-to-skill mapping Get-WkHarnessSkillRules: you edited this source, update its bound SPEC. This soft NOTICE shipped and is live. The hard form would also BLOCK the commit until the bound spec is updated. Low-friction: edit and iterate freely; the gate bites only at commit, the point where drift becomes permanent in history. Use the SAME clean-command + post-compaction detection as the read side so a tampered/piped skill edit does not count.",
+    "ALL-BOUND + SCORE-60 FLOOR: at commit the staged source files reveal which sources changed; scan EVERY bound skill of each changed source from its declaration and require ALL of them updated this session (one missing = block). The forced update leaves a work-record so knowledge accumulates from the act of committing. QUALITY FLOOR: also check each bound skill tier-score and block if any is below 60 (the SAME 60 floor study-lock enforces on the read side). Net: every source edit forces all its specs current AND at/above 60 quality, so forced records cannot rot the skill -- drift and degradation both sealed. Tune the bound-skill scope per source if friction is too high; the score floor is non-negotiable.",
+    "AUTO-LOCK-SYNC: make the per-source locks SELF-MAINTAINING rather than hand-wired. The single source of truth is the source file inline triple-slash declarations (wkappbot skill read X at the top of each guard). The locks should derive from that declaration so no source ships without its lock. CAUTION: the commit-time form that REWRITES CLAUDE.md + git add inside the pre-commit hook was REJECTED as user-hostile (a hook must never mutate commit content). A safe implementation syncs the locks OUTSIDE the commit path (e.g. an explicit wktool or a PostToolUse notice), never by mutating staged files during commit. See -ref COMMIT-GATE OUTCOME.",
+    "SELF-DEFENDING GATE: a high-friction gate (all bound skills updated + score-60) will tempt the AI cost-aversion reflex to throttle it (for example check only once per session). That urge IS the disease that caused the incident, so noticing it is the win. The system forbids acting on it: a throttle on a beneficial gate is garbage by the never-throttle-a-beneficial-reflex principle, AND adding it is a guard-SOURCE edit that itself needs its spec updated and would not survive the score-60 review, so the gate catches its own would-be saboteur. The legitimate pressure valve is to TUNE the bound-skill scope per source, never to throttle. Route the urge-to-throttle into scope-tuning; treat the flicker of that urge as a signal the disease is present and that structure, not willpower, must hold the line."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-throttle-rot-spec-drift-prevention-howto",
+      "expect": "spec-currency gate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-throttle-rot-spec-drift-prevention",
+      "expect": "preventions",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-throttle-rot-spec-drift-prevention-ref",
+      "expect": "commit-gate outcome",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "prevention",
+    "design",
+    "howto",
+    "t2",
+    "spec-drift",
+    "gate"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T02:59:27.9181054Z",
+  "updated": "2026-06-13T02:59:27.9181143Z",
+  "version": "1.0"
+}

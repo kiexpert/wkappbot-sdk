@@ -195,13 +195,16 @@ if ((Test-Path $_codexPaceFile) -or (Test-Path $_codexBalanceFile)) {
 
 # ── Gemini (AGY) ── DAILY cycle per model ─────────────────────────────────────────────────────
 # Gemini resets DAILY (not weekly). gemini_measured_limits.json has DAY / HOUR limits.
+# Agy (Claude) models also reset DAILY (same KST cycle).
 # Daily target = fraction of the current calendar day (KST midnight) elapsed.
 $_geminiLimFile  = Join-Path $_harnessHome 'gemini_measured_limits.json'
 $_geminiUsageLog = "$env:USERPROFILE\.gemini\wkgemini_usage.jsonl"
 if ((Test-Path $_geminiLimFile) -or (Test-Path $_geminiUsageLog)) {
     try {
         $gDailyLimit = [double]100e6   # default: 100M tokens/day (DAY field)
+        $aDailyLimit = [double]100e6   # default: 100M tokens/day for Agy
         $gFlag = ''; $gSrc = ''; $gDailyTarget = $null
+        $aFlag = ''; $aSrc = ''; $aDailyTarget = $null
 
         # Load measured limits -- use DAY limit for daily cycle
         if (Test-Path $_geminiLimFile) {
@@ -209,8 +212,10 @@ if ((Test-Path $_geminiLimFile) -or (Test-Path $_geminiUsageLog)) {
                 $gl = Get-Content $_geminiLimFile -Raw | ConvertFrom-Json
                 if ($gl.PSObject.Properties['DAY'] -and [double]$gl.DAY -gt 0) {
                     $gDailyLimit = [double]$gl.DAY
+                    $aDailyLimit = [double]$gl.DAY
                 }
                 $gSrc = 'gemini_measured_limits.json'
+                $aSrc = 'gemini_measured_limits.json'
             } catch {}
         }
 
@@ -224,37 +229,67 @@ if ((Test-Path $_geminiLimFile) -or (Test-Path $_geminiUsageLog)) {
         $resetUtc   = [DateTimeOffset]([TimeZoneInfo]::ConvertTimeToUtc($resetSeoul, $seoulTz))
         # Daily target = elapsed fraction of 24h
         $gDailyTarget = [math]::Round(($nowUtc - $resetUtc).TotalHours / 24.0 * 100.0, 1)
+        $aDailyTarget = $gDailyTarget
         if ($gDailyTarget -lt 0)   { $gDailyTarget = 0 }
         if ($gDailyTarget -gt 100) { $gDailyTarget = 100 }
+        if ($aDailyTarget -lt 0)   { $aDailyTarget = 0 }
+        if ($aDailyTarget -gt 100) { $aDailyTarget = 100 }
 
-        # Sum daily tokens from log (since midnight KST)
-        $gDailyUsed = [double]0
+        # Sum daily tokens from log (since midnight KST), split by model family + tier
+        # Gemini per-tier caps (faint-calibratable): flash-lite=200M, flash=50M, pro=10M
+        $gTierCaps = @{ 'flash-lite' = [double]200e6; 'flash' = [double]50e6; 'pro' = [double]10e6 }
+        $gTierToks = @{ 'flash-lite' = [double]0; 'flash' = [double]0; 'pro' = [double]0 }
+        $gTierReqs = @{ 'flash-lite' = 0; 'flash' = 0; 'pro' = 0 }
+        $aDailyUsed = [double]0
+        $gReqUsed   = 0
+        $aReqUsed   = 0
         if (Test-Path $_geminiUsageLog) {
             $gSrc = 'wkgemini_usage.jsonl'
+            $aSrc = 'wkgemini_usage.jsonl'
             foreach ($line in (Get-Content $_geminiUsageLog -Encoding UTF8 -ErrorAction SilentlyContinue)) {
                 if (-not $line.Trim()) { continue }
                 try {
                     $m = $line | ConvertFrom-Json
                     if ($m.ts -and [DateTimeOffset]::Parse($m.ts) -ge $resetUtc -and -not ($m.quota_exhausted)) {
+                        $mdl = if ($m.model) { [string]$m.model } else { '' }
+                        if (-not $mdl) { continue }
                         $ti = if ($m.tokens_in)     { [double]$m.tokens_in }     else { 0 }
                         $to = if ($m.tokens_out)    { [double]$m.tokens_out }    else { 0 }
                         $tc = if ($m.tokens_cached) { [double]$m.tokens_cached } else { 0 }
-                        $w  = if ($m.model -like "*pro*") { 1.0 } else { 0.2 }
-                        $gDailyUsed += ($ti + $to + ($tc * 0.1)) * $w
+                        $w  = if ($mdl -like "*pro*") { 1.0 } else { 0.2 }
+                        $tokens = ($ti + $to + ($tc * 0.1)) * $w
+                        if ($mdl -like "*claude*") {
+                            $aDailyUsed += $tokens
+                            $aReqUsed++
+                        } else {
+                            # Tier bucket: flash-lite > flash > pro > flash(default)
+                            $tier = if ($mdl -like "*flash-lite*") { 'flash-lite' }
+                                    elseif ($mdl -like "*flash*")  { 'flash' }
+                                    elseif ($mdl -like "*pro*")    { 'pro' }
+                                    else                           { 'flash' }
+                            $gTierToks[$tier] += $tokens
+                            $gTierReqs[$tier]++
+                            $gReqUsed++
+                        }
                     }
                 } catch {}
             }
         }
 
-        $gPct   = [math]::Round($gDailyUsed / $gDailyLimit * 100.0, 1)
-        $gUsedM = [math]::Round($gDailyUsed / 1e6, 3)
-        $gLimM  = [math]::Round($gDailyLimit / 1e6, 0)
-        if ($gPct -gt $gDailyTarget) { $gFlag = ' [OVER]' }
-        elseif ($gPct -gt $gDailyTarget * 0.9) { $gFlag = ' [WARN]' }
-        $detail = "$($gPct)% / target=$($gDailyTarget)%$gFlag  ${gUsedM}M/${gLimM}M  [daily cycle  $gSrc]"
-        $status = if ($gFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
-        Add-Check 'Family pace: Gemini daily' $status $detail
-        Emit $status 'Family pace: Gemini daily' $detail
+        # -- Gemini per-tier sub-lines (flash-lite / flash / pro)
+        foreach ($tier in @('flash-lite', 'flash', 'pro')) {
+            $tTok  = $gTierToks[$tier]
+            $tReq  = $gTierReqs[$tier]
+            $tCap  = $gTierCaps[$tier]
+            $tLimM = [math]::Round($tCap / 1e6, 0)
+            $tUsedM = [math]::Round($tTok / 1e6, 3)
+            $tPct  = [math]::Round($tTok / $tCap * 100.0, 1)
+            $tFlag = if ($tPct -gt $gDailyTarget) { ' [OVER]' } elseif ($tPct -gt $gDailyTarget * 0.9) { ' [WARN]' } else { '' }
+            $tDetail = "$($tPct)% / target=$($gDailyTarget)%$tFlag  ${tUsedM}M/${tLimM}M  ${tReq}req  [daily estimate/token-sum  $gSrc]"
+            $tStatus = if ($tFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
+            Add-Check "Family pace: Gemini[$tier] daily" $tStatus $tDetail
+            Emit $tStatus "Family pace: Gemini[$tier] daily" $tDetail
+        }
 
         # ── Gemini request count (daily) ──────────────────────────────────────────────────────
         # wkgemini.sh blocks at DAILY_REQ_LIMIT * DAILY_TARGET_PCT / 100 requests.
@@ -262,27 +297,36 @@ if ((Test-Path $_geminiLimFile) -or (Test-Path $_geminiUsageLog)) {
         $gReqDailyLimit  = 20000  # DAILY_REQ_LIMIT in wkgemini.sh (raised 2026-06-11: gemini is plentiful, daily cap is a runaway backstop only)
         $gReqTargetPct   = 50     # DAILY_TARGET_PCT in wkgemini.sh (the blocking threshold)
         $gReqTarget      = [int]($gReqDailyLimit * $gReqTargetPct / 100)   # 10000
-        $gReqUsed        = 0
         $gReqFlag        = ''
-        if (Test-Path $_geminiUsageLog) {
-            try {
-                foreach ($line in (Get-Content $_geminiUsageLog -Encoding UTF8 -ErrorAction SilentlyContinue)) {
-                    if (-not $line.Trim()) { continue }
-                    try {
-                        $m = $line | ConvertFrom-Json
-                        if ($m.ts -and [DateTimeOffset]::Parse($m.ts) -ge $resetUtc -and -not ($m.quota_exhausted)) {
-                            $gReqUsed++
-                        }
-                    } catch {}
-                }
-            } catch {}
-        }
         if ($gReqUsed -ge $gReqTarget) { $gReqFlag = ' [OVER]' }
         elseif ($gReqUsed -ge [int]($gReqTarget * 0.9)) { $gReqFlag = ' [WARN]' }
         $gReqDetail = "$gReqUsed/$gReqTarget req$gReqFlag  (limit=${gReqDailyLimit}, target=${gReqTargetPct}%)  [daily  wkgemini_usage.jsonl]"
         $gReqStatus = if ($gReqFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
         Add-Check 'Family pace: Gemini req' $gReqStatus $gReqDetail
         Emit $gReqStatus 'Family pace: Gemini req' $gReqDetail
+
+        # ── Agy request count (daily) ────────────────────────────────────────────────────────
+        $aReqDailyLimit  = 20000  # DAILY_REQ_LIMIT (soft 10000 / hard 20000)
+        $aReqTargetPct   = 50     # DAILY_TARGET_PCT (the blocking threshold)
+        $aReqTarget      = [int]($aReqDailyLimit * $aReqTargetPct / 100)   # 10000
+        $aReqFlag        = ''
+        if ($aReqUsed -ge $aReqTarget) { $aReqFlag = ' [OVER]' }
+        elseif ($aReqUsed -ge [int]($aReqTarget * 0.9)) { $aReqFlag = ' [WARN]' }
+        $aReqDetail = "$aReqUsed/$aReqTarget req$aReqFlag  (limit=${aReqDailyLimit}, target=${aReqTargetPct}%)  [daily  wkgemini_usage.jsonl]"
+        $aReqStatus = if ($aReqFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
+        Add-Check 'Family pace: Agy req' $aReqStatus $aReqDetail
+        Emit $aReqStatus 'Family pace: Agy req' $aReqDetail
+
+        # ── Agy daily ────────────────────────────────────────────────────────────────────────
+        $aPct   = [math]::Round($aDailyUsed / $aDailyLimit * 100.0, 1)
+        $aUsedM = [math]::Round($aDailyUsed / 1e6, 3)
+        $aLimM  = [math]::Round($aDailyLimit / 1e6, 0)
+        if ($aPct -gt $aDailyTarget) { $aFlag = ' [OVER]' }
+        elseif ($aPct -gt $aDailyTarget * 0.9) { $aFlag = ' [WARN]' }
+        $detail = "$($aPct)% / target=$($aDailyTarget)%$aFlag  ${aUsedM}M/${aLimM}M  [daily cycle  $aSrc]"
+        $status = if ($aFlag -eq ' [OVER]') { 'warn' } else { 'ok' }
+        Add-Check 'Family pace: Agy daily' $status $detail
+        Emit $status 'Family pace: Agy daily' $detail
     } catch {
         Add-Check 'Family pace: Gemini daily' 'warn' "parse error: $_"
         Emit '!' 'Family pace: Gemini daily' "parse error"

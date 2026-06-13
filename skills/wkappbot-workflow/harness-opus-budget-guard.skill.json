@@ -1,0 +1,44 @@
+{
+  "id": "harness-opus-budget-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness opus-budget-guard: Opus over target -> delegate",
+  "title_ko": null,
+  "desc": "Blocks an Opus Agent dispatch when Opus total or monthly budget is exceeded; the correct response is to route the work to a cheaper model via Agent.cmd, not to wait.",
+  "steps": [
+    "TRIGGER: fires on an Opus Agent/Agent.cmd dispatch when Get-ClaudePaceInfo shows total or monthly exceeded for the Opus family.",
+    "FIX: Agent.cmd --model haiku (or sonnet) for the actual execution; reserve Opus for judgment/synthesis only. Over-pace is NOT a stop -- delegate real work to gate-exempt cheaper agents.",
+    "WHY: Opus is the scarce judgment tier; burning it on execution at budget cap wastes the reserve. See: opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents, claude-code-agent-tier-routing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-opus-budget-guard",
+      "expect": "judgment",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "routing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "opus",
+    "budget",
+    "pace",
+    "delegation",
+    "guard"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:34:12.4773389Z",
+  "updated": "2026-06-12T06:34:12.4773524Z",
+  "version": "1.0"
+}

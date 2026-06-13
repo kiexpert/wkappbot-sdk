@@ -1,0 +1,57 @@
+{
+  "id": "wk-tool-first-use-skill-nudge",
+  "app": "wkappbot-workflow",
+  "title": "Per-session first-use skill nudge for wk tools only",
+  "title_ko": null,
+  "desc": "Each wk-prefixed tool encodes non-obvious usage in its skill, so each session AI should read that skill at least ONCE PER SESSION before relying on the tool. Scope: wk star tools ONLY. Not every call (noise) -- exactly once per tool per session: on first use of a wk tool, if its mapped skill was not read this session, warn once with the skill pointer plus an extension hint. Warn-only, session-scoped seen marker so it never repeats.",
+  "steps": [
+    "PRINCIPLE (user rule 2026-06-07): each wk-prefixed tool encodes non-obvious usage in its skill, so each session AI should READ that skill at least ONCE per session before relying on the tool. Scope is wk star tools ONLY. NOT every call (noise -- most wk tools work fine bare); exactly once per tool per session.",
+    "MECHANISM: on the FIRST use of a wk tool in a session, scan the session JSONL (same approach as Get-WkSkillRead and the onload-gate) for an executed wkappbot skill read of the mapped skill. If unread this session, WARN once with (a) the skill pointer wkappbot skill read MAPPEDSKILL and (b) an extension hint (the dot-ps1 / dot-cmd / dot-sh form) if the tool has no bare PATH alias. Then write a session-scoped seen marker so it never repeats that session.",
+    "MAP wk-tool to skill: wkhippo maps to hippocampus-living-memory-howto, wkcodex maps to codex-tool-wrappers, wkedit maps to wkedit, wkjobs maps to wkjobs-ai-process-monitor, wkdoctor maps to wkdoctor-system-physician. Reuse the existing skill_seen.jsonl infra from skill-reminder-news rather than a new store.",
+    "PLACEMENT: PreToolUse or PostToolUse WARN -- never block (guidance only). The session-scoped seen marker is what makes it once-per-tool-per-session, mirroring how on-load is read once per session.",
+    "ROOT COMPLEMENT (separate concern): also ensure every wk tool has a bare PATH alias in the launcher so command-not-found never happens (wkhippo currently lacks one). The nudge is about SKILL awareness; the alias is about callability. Do both.",
+    "WHY NOT blanket per-call warn: rejected as noisy -- the CLI already has on-error and on-success skill hints (skill-reminder-news). This adds only the once-per-session first-use awareness layer, for wk tools only.",
+    "SCOPE BROADENED (user 2026-06-07): cover not only the global wk tools but ALSO (a) per-repo-registered wk tools (each repo may register its own wk wrappers) and (b) the ./wk dot-slash local-script form, e.g. ./wk-gg-main.ps1 or ./wk-cdp-placement-verify.ps1. DETECTION: extract the wk KEYWORD (the tool name) from ANY invocation form -- bare wkNAME, ./wkNAME, a path-prefixed form, with or without a dot-ps1 dot-cmd dot-sh dot-exe suffix -- then resolve its skill. RESOLUTION (beyond the static map): if the extracted keyword is not in the static map, derive or catalog-search a skill by that keyword (e.g. tool wk-gg-main resolves to skill wk-gg-main-script; wkcdp-mon resolves to wkcdp-mon) so newly-added wk tools are covered WITHOUT map maintenance. Map is the fast path; keyword-to-catalog search is the fallback. Then the same once-per-session read-check plus single warn applies. RATIONALE: misusing a wk tool errors once and wastes tokens, so enforcing the skill-read (with the on-disk extension list) on first use pays for itself.",
+    "DOGFOOD BUG (2026-06-07, found by running it for real -- the implementation as shipped DOES NOT WORK): on a real Bash tool call of a mapped wk tool the nudge did NOT fire (no per-session marker created), even though feeding wkharness.ps1 the same command in isolation DID fire and create the marker. TWO defects. (1) REAL-FLOW vs ISOLATED-TEST gap: the function fires when wkharness.ps1 is invoked directly with a crafted stdin JSON, but is NOT reached on the live PreToolUse dispatch path -- likely an early allow-exit before the nudge code, or the live tool_input shape differs from the hand-fed JSON. LESSON: verify a harness feature with a REAL tool call, never only by feeding wkharness.ps1 directly (classic tested-the-wrong-layer; a passing isolated test gave false confidence). (2) SURFACE defect: even when it fires it uses Console.Error.WriteLine (stderr), but a non-deny PreToolUse stderr does NOT reach the MODEL -- only deny reasons and PostToolUse additionalContext reach the model (e.g. the visible knowledge-reward line). FIX: emit the nudge as hookSpecificOutput.additionalContext JSON (PreToolUse additionalContext) or move it to a PostToolUse additionalContext like knowledge-reward, AND ensure the code is reached on the live allow path (before any early allow-exit). RE-VERIFY ONLY via a real bare wk-tool Bash call: confirm BOTH the marker is created AND the message appears in the model tool result.",
+    "RESOLVED 2026-06-07 (kih commit 8b18297): both defects fixed and VERIFIED BY A REAL CALL. The nudge now sets a script-scope variable consumed on the harness allow path and emitted as hookSpecificOutput.additionalContext (which DOES reach the model), instead of stderr (which did not). The binDir now points at the real bin folder so the callable-forms hint finds on-disk files. Proof: a real bare wkdoctor Bash call produced, in the MODEL tool result, the line: wk-tool-nudge first use of wkdoctor this session -- read its skill once: wkappbot skill read wkdoctor-system-physician . callable forms: wkdoctor.cmd ; warn-only (the command still ran). Lesson confirmed: verify harness surfacing with a REAL tool call, never an isolated wkharness.ps1 feed.",
+    "REFINEMENT (user 2026-06-07): make the nudge message CONDITIONAL on whether a skill whose name CONTAINS the wk-tool keyword exists. The harness does a FILE-BASED scan of the HQ catalog for any skill whose id or filename CONTAINS the keyword (e.g. wkjobs is contained by wkjobs-ai-process-monitor, wkdoctor by wkdoctor-system-physician, wkcdp-mon by wkcdp-mon, wk-gg-main by wk-gg-main-script). IF one or more found: tell the model to FIND it -- wkappbot skill search KEYWORD. IF none found: tell the model NO skill exists for that tool and to CREATE one -- wkappbot skill contribute with an id built from the keyword. File-based scan only (no binary spawn; the harness already file-scans the catalog for the skill-lock); a short cache is fine. NET: the nudge is self-completing -- every wk tool ends up with a skill, either found or created, once per session. This supersedes the static-map approach (no exact-name resolution needed; search finds it, contribute makes it).",
+    "PASS CONDITION (user 2026-06-07, completes the design): BEFORE nudging, SKIP (pass, no nudge) if the session already contains an executed wkappbot skill read of a skill whose id CONTAINS the keyword -- i.e. the model already STUDIED the tool's skill this session. Generalize the Get-WkSkillRead check from an exact id to a contains-keyword match over the session skill-read commands. FULL once-per-session logic, in order: (1) if a skill read of a keyword-containing skill is in the session -> PASS (studied); (2) else if the per-session marker file exists -> PASS (already nudged); (3) else NUDGE -- if a keyword-containing skill EXISTS in the catalog say find it via wkappbot skill search KEYWORD, else say create one via wkappbot skill contribute -- then set the marker. NET: the nudge truly enforces read-once-per-session and stops the moment the model reads the tool's skill. This is the complete spec (supersedes static map): detect any wk tool (excl core CLI) -> pass if studied -> else nudge search-or-create once, via additionalContext.",
+    "RULE no piping a skill read (user 2026-06-12). A wkappbot skill read MUST be a FULL read never pipe it to grep head tail sed awk or any filter. Scraping a few lines is NOT reading it defeats the purpose you miss the rest of the spec and the accumulated rules and you stay ignorant of exactly the part you needed. Grepping a skill is hostile token-waste masquerading as reading. The harness blocks a piped skill-read (harness:block on wkappbot skill read followed by a pipe) wired into the kih CLAUDE.md. META the deeper lesson the SPEC is the governing doctrine of a tool or a source. When a new rule or lesson emerges WRITE IT INTO THE SPEC immediately do not just comply ad-hoc. Keeping the spec current is the JOB and reading the spec fully before acting is the discipline. The instinct to ask what is the spec and when do I update it is the eye that prevents drift this is what was missing.",
+    "BROADENED 2026-06-12 no piping on ANY knowledge-ification command not just skill read. wkappbot skill read edit contribute search list -- none may be piped to grep head tail sed awk. Piping any knowledge op is interpreted as HOSTILE to the knowledge-ification pattern and is blocked ALWAYS pace-independent the mere attempt is not permitted. A knowledge op must run clean and full so the operator engages the whole output not a scraped fragment. This is why even this edit runs with no pipe.",
+    "CREDIT a clean read even if it errors (user 2026-06-12). The skill-read scanner credits a wkappbot skill read based on the COMMAND being ISSUED in the session not on whether it succeeded. Even if the wkappbot binary is missing or the read errors the genuine clean attempt still counts as a read and satisfies a study-lock or on-load. The ONLY thing that loses credit is TAMPERING a piped redirected captured or obfuscated read because that is gaming not reading. Errors are forgiven the intent was genuine. Tampering is not forgiven. So the distinction the scanner enforces is genuine-clean-attempt versus tamper not success versus failure."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge",
+      "expect": "session",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-reminder-news-and-invocation-log-discoverability-system",
+      "expect": "seen",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "harness",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "wk-tools",
+    "skill-nudge",
+    "per-session",
+    "first-use",
+    "discoverability",
+    "warn",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T11:05:33.5158835Z",
+  "updated": "2026-06-12T14:39:51.7391194Z",
+  "version": "1.20"
+}

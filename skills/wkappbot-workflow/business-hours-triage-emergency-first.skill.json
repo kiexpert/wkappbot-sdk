@@ -1,0 +1,53 @@
+{
+  "id": "business-hours-triage-emergency-first",
+  "app": "wkappbot-workflow",
+  "title": "Business-Hours Triage: Emergency -> Solve -> Prevent",
+  "title_ko": null,
+  "desc": "MANDATORY business-hours triage order across all repos: emergency action -> problem solving -> recurrence prevention. Apply during KR 09:00-15:30 and US 18:00-05:00 KST. Skipping step 1 wastes user time; skipping step 3 guarantees recurrence.",
+  "steps": [
+    "ORDER MANDATORY: 1=emergency-action (restore service NOW), 2=problem-solving (root cause), 3=recurrence-prevention (permanent guard).",
+    "STEP 1 EMERGENCY examples: manually trigger workflow, refresh token directly, restart daemon, failover provider.",
+    "STEP 2 PROBLEM SOLVING: only AFTER step 1 makes service operational.",
+    "STEP 3 RECURRENCE PREVENTION (NEVER SKIP): add code guard, monitoring, alert, runbook.",
+    "BUSINESS HOURS (KST): KR 09:00-15:30 weekdays, US 18:00-05:00 weekdays.",
+    "SUCCESS CASE 2026-05-29 23:37 KST: full triage flow resolved US workflow KeyError. Sequence: (1) 5-paths token push at 22:13 = STEP 1 emergency. (2) YAML edit DEST_KR for _kr-suffix restore = STEP 2 fix attempt 1, hit Haiku typo bug (added ${ACCT}). (3) Inline Edit correcting to literal double-dot hantoo_token_kr..json = STEP 2 fix attempt 2, resolved KeyError but surfaced new error (empty CANO/PRDT in parse_account). (4) YAML env block mirror HANTOO_*_KR from US secrets = STEP 2 fix attempt 3, resolved root cause. Final commit 819fc39e4 + run 26643105996 success with real SELL order SQQQ@38.09. KEY LESSONS: (a) errors cascade -- fixing one surfaces the next, so do not stop after first symptom clears. (b) Haiku auto-corrects 'typos' that are intentional (literal double-dot in path) -- always include verification step that reads the actual committed YAML, not just trust the agent report. (c) User pre-authorization during business hours is critical -- the entire 80-minute fix sequence had ZERO approval pauses.",
+    "STEP 3 PREVENTION fix 2026-05-29 23:42 KST: the YAML double-dot DEST_KR I introduced earlier became wrong after adding env mirror HANTOO_ACCOUNTNO_KR=HANTOO_ACCOUNTNO_US. Now hantoo_kr.py if-True builds TOKEN_FILE=hantoo_token_kr.{US_ACCT}.json (with account, not empty middle). Workflow restored to hantoo_token_kr..json -- mismatch again, cache miss, daily token re-issued on every run (~24/day instead of 1/day). Fix: change DEST_KR back to use ${ACCT} like DEST_US so both paths use the account number. This is the canonical recurrence-prevention step missed in earlier rounds.",
+    "DISPATCH-FIRST + PARALLEL (user 2026-06-11): if STEP 1 emergency/stabilize is NOT solvable by you in ONE edit/shot, do NOT start solo work -- FIRST fire a quick safety dispatch IN PARALLEL (run_in_background, another intelligence; fan out several if useful), THEN proceed to STEP 2. Solo-floundering on a non-one-shot stabilize drains the expensive orchestrator and faints the cheap agents that share the budget (2026-06-11 incident: ~15 solo dispatches through a pace deadlock, nothing shipped). Cross: opus-mechanical-self-drag-antipattern, opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read business-hours-triage-emergency-first",
+      "expect": "MANDATORY",
+      "prompt": null
+    },
+    {
+      "cmd": "echo emergency-solve-prevent",
+      "expect": "emergency-solve-prevent",
+      "prompt": null
+    },
+    {
+      "cmd": "date +%H:%M",
+      "expect": ":",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "triage",
+    "emergency",
+    "business-hours",
+    "heal",
+    "recurrence",
+    "prevention",
+    "workflow",
+    "global",
+    "mandatory"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-29T12:31:01.234143Z",
+  "updated": "2026-06-11T11:53:14.0191768Z",
+  "version": "1.4"
+}

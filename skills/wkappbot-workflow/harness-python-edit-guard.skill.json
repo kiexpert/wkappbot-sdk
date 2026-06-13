@@ -1,0 +1,44 @@
+{
+  "id": "harness-python-edit-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness python-edit-guard: no python source patching",
+  "title_ko": null,
+  "desc": "Blocks python-based file writes (open w, writelines, shutil) to source, which risk silent encoding/CRLF corruption. Use the Edit/Write tool, wkedit, or delegate.",
+  "steps": [
+    "TRIGGER: fires when a Bash/PowerShell command uses python to write a source file (open(...,'w'), .write, writelines, shutil.copy onto source).",
+    "FIX: use the Edit/Write tool for surgical edits, wkedit for atomic UTF-8-safe multi-file edits, or Agent.cmd --model haiku for the mechanical change. Temp-file writes outside the repo are fine.",
+    "WHY: python writes can silently re-encode (CP949/CRLF) and bypass harness review; wkedit preserves encoding and makes a .bak. See: wkedit, file-command-cheatsheet."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-python-edit-guard",
+      "expect": "corruption",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit",
+      "expect": "backup",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "python",
+    "edit",
+    "encoding",
+    "guard",
+    "wkedit"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:35:06.5907367Z",
+  "updated": "2026-06-12T06:35:06.5907489Z",
+  "version": "1.0"
+}

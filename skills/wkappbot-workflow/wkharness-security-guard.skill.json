@@ -1,15 +1,12 @@
 {
-  "id": "security-guard",
+  "id": "wkharness-security-guard",
   "app": "wkappbot-workflow",
   "title": "security-guard: env-var spoofing detected",
   "title_ko": null,
   "desc": "Blocks commands that reference WKHARNESS_AGENT_MODEL or WKHARNESS_BYPASS environment variables -- classic harness bypass tricks.",
   "steps": [
-    "SAFETY: Catches commands containing WKHARNESS_AGENT_MODEL or WKHARNESS_BYPASS env var names. These are the two known bypass tricks: setting AGENT_MODEL pretends to be a different model tier, and BYPASS skips guard evaluation.",
-    "SOLUTION: Do not use env-var tricks to bypass the harness. If you are blocked by a pace or stall guard, use the documented escape: 'wkappbot skill read <guard-name>' to find the working escape for that specific guard.",
-    "PREVENTION: Never include WKHARNESS_AGENT_MODEL=... or WKHARNESS_BYPASS=... in commands. Each guard has a legitimate escape -- use it. Env-var spoofing is blocked at all sessions regardless of model."
+    "CANONICAL: this guard skill moved to harness-security-guard; read that instead."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read security-guard",
@@ -33,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T07:30:59.2860323Z",
-  "updated": "2026-06-11T07:30:59.2860413Z",
-  "version": "1.0"
+  "updated": "2026-06-12T07:28:42.9159579Z",
+  "version": "1.2"
 }

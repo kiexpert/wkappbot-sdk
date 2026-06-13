@@ -1,0 +1,49 @@
+{
+  "id": "wksplit-cs-utility-ref",
+  "app": "wkappbot",
+  "title": "wksplit-cs-utility (ref): incidents + dated lessons",
+  "title_ko": null,
+  "desc": "T3 reference tier: wkhippo incident post-mortem, the cheap-models-drop-code failure class, and the 6-gate hardening origin. Read when diagnosing a regression or extending the splitter. Parent: wksplit-cs-utility. Howto: wksplit-cs-utility-howto.",
+  "steps": [
+    "WKHIPPO INCIDENT (2026-06-10): A Flash-generated PS split of wkfind.ps1 moved param() below module dot-sourcing. param() is not the first statement -> PowerShell treats it as a command call -> 'param not recognized' error. Symptom: script PARSES CLEAN via [Parser]::ParseFile (no syntax error) but dies on first runtime execution. Root cause: param-displacement (G1 PARAM-FIRST gate did not exist yet). Recovery: git checkout of the pre-split monolith.",
+    "DROPPED FUNCTIONS (wkhippo root cause 2): Same Flash split silently dropped Get-Tokens and Invoke-CheckedScript. Mechanism: the splitter extracted functions into modules but omitted two; no syntax error because PowerShell's AST parse does not verify CommandAst names. Result: CommandNotFoundException at runtime. Root cause: no SYMBOL-REFERENCE PRE-CHECK existed (G3 gate did not exist yet). Lesson: a parse-clean split can be functionally dead. G3 gate = collect all DEFINED functions across all planned modules via FunctionDefinitionAst, compare to all CALLED names via CommandAst.GetCommandName(); any called name that is defined in the ORIGINAL but missing from the planned output is a DROPPED function -> auto-remerge or FAIL.",
+    "CHEAP-MODELS-DROP-CODE CLASS (2026-06-05): Haiku agent was used for a source split; silently dropped ~320 lines of critical SuggestCommand.Resolve logic. Code compiled, tests passed, functionality broken. Root cause: Haiku deems long conditional blocks 'boilerplate' and omits them. Class applies to all cheap models on long files. Rule: do NOT use Haiku (or codex-mini without verification) for source splits. Use the deterministic tool or Opus.",
+    "G2 REGEX-HOIST ORIGIN (2026-06-10): wkfind.ps1 contained Korean Hangul chars in inline regex literals. After split + bash->PowerShell relay the non-ASCII bytes became garbled, triggering ArgumentException on first regex use. Root: non-ASCII regex literals are encoding-fragile across relay paths. Fix: REGEX-HOIST gate converts each non-ASCII inline literal to a :<Name>Rx var using \\uXXXX escapes, placed after param(). QA-canary (Haiku) surfaced this by actually running the tool and hitting the ArgumentException, demonstrating the 'run-verify is mandatory' lesson.",
+    "G5 COMPILE-LOOP ORIGIN (2026-06-10): Early splitter versions would exit after writing files even if dotnet build failed. Operators would then manually repair broken splits. Hardened: splitter must run dotnet build in a loop, auto-remerge any member causing CS0103/CS0246, retry until 0 errors AND 0 warnings. Exit only on clean build. This makes shipping a broken C# split structurally impossible.",
+    "G6 SELFTEST CS0111 TRAP (2026-06-11): During G6 selftest, the original .cs file was copied into the temp project dir alongside the split partials. Both define the same types -> CS0111 duplicate member. The G5 compile loop must not treat CS0111 as auto-correctable (it is unrecoverable without removing a file). Fix: rename the original backup to .bak (non-.cs extension) before compiling partials in the temp dir.",
+    "ALLMAN-BRACE BUG (2026-06-11): wksplit-cs.py was only tested on inline-brace style (class Foo {). When brace is on its own line (allman: class Foo\\n{), three bugs fired: (a) make_header did not emit { so partial files had no class body start; (b) class_body_start() double-emitted the { line; (c) find_members() detected class indent from a blank line (indent=0), skipping all members. Fixed by: (a) always emit { in make_header; (b) skip the { line in content iterator; (c) detect indent from first NON-BLANK line at start_idx."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-ref",
+      "expect": "wkhippo",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-ref",
+      "expect": "cheap-models-drop-code",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-ref",
+      "expect": "G3 gate",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wksplit",
+    "ref",
+    "incident",
+    "postmortem",
+    "gates",
+    "history"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T17:01:03.0931695Z",
+  "updated": "2026-06-10T17:01:03.0931828Z",
+  "version": "1.0"
+}

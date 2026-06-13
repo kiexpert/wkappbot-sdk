@@ -1,0 +1,46 @@
+{
+  "id": "guard-block-recurrence-failure-score",
+  "app": "wkappbot-workflow",
+  "title": "Guard block-rate = per-guard recurrence-prevention failure score (cost-weighted)",
+  "title_ko": null,
+  "desc": "Each guard's fire-rate (today vs 7-day average) is a per-guard recurrence-prevention failure score: it measures whether an embodied lesson is actually holding. Rising = the foundation is failing to catch the behavior at the door. Each block also costs a full-context server re-send, so the score is a hard cost metric.",
+  "steps": [
+    "CONCEPT: a guard fire-rate -- today count vs trailing 7-day average -- IS a per-guard recurrence-prevention failure score. FLAT/low = the reflex/skill/push works (behavior stopped recurring). RISING (today much over 7d-avg, or trending up) = recurrence-prevention is FAILING there: the lesson was knowledge-ified but the embodiment is not catching it at the door.",
+    "ESCALATION (not re-warn): a rising score is PROOF the foundation is insufficient. Do NOT merely repeat the block -- STRENGTHEN the push: relocate the reflex onto the exact wire, harden the gate, or fix the root behavior. The loop: embody -> MEASURE (this score) -> if failing, re-embody stronger. This is how the harness self-audits whether it represents the user.",
+    "COST: each block forces a wasted tool round-trip that re-transmits the ENTIRE conversation context -- about one full-context cache re-send. So block-count is a hard COST/severity metric, and a longer session weights later blocks far heavier (a 200k-context block dwarfs ten 5k blocks). Recurrence-prevention is an ECONOMIC mandate, paid by every future session.",
+    "DESIGN (resolved): STORE per-guard daily COUNT (simple, deterministic, unbreakable, testable -- the maintainable core). DISPLAY a live cost proxy '~Xk ctx re-sent this block' from live session JSONL bytes / 4 (not stored, not summed, fails open to count). Full daily token-SUM is an OPTIONAL future enrichment. Implement centrally in Block/Emit (wkharness-common.ps1), one point, fail-open -- covers all guards."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read guard-block-recurrence-failure-score",
+      "expect": "ESCALATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore",
+      "expect": "FOUNDATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-ification-procedure-jisikhwa",
+      "expect": "reflex",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "guard",
+    "score",
+    "recurrence",
+    "cost",
+    "telemetry",
+    "severity"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T07:01:08.9134109Z",
+  "updated": "2026-06-12T07:01:08.9134274Z",
+  "version": "1.0"
+}

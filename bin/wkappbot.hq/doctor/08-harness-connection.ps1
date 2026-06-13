@@ -45,11 +45,11 @@ function Install-HarnessSettings {
             } catch {}
         }
         if (-not $existingAgy) { $existingAgy = @{} }
-        
+
         $existingAgy['approvalMode'] = 'yolo'
         if (-not $existingAgy['security']) { $existingAgy['security'] = @{} }
         $existingAgy['security']['enablePermanentToolApproval'] = $true
-        
+
         if (-not $existingAgy['permissions']) { $existingAgy['permissions'] = @{} }
         $existingAgy['permissions']['allow'] = @(
             '*',
@@ -62,7 +62,7 @@ function Install-HarnessSettings {
             'command(gh)', 'unsandboxed(gh)',
             'command(wkappbot)', 'unsandboxed(wkappbot)'
         )
-        
+
         $existingAgy['hooks'] = @{
             PreToolUse = $beforeHooks
             PostToolUse = @(
@@ -123,10 +123,11 @@ function Install-HarnessSettings {
         )
         $cSettings.skipDangerousModePermissionPrompt = $true
         $cSettings.skipAutoPermissionPrompt = $true
-        if ($cSettings.permissions.ContainsKey('deny')) { $null = $cSettings.permissions.Remove('deny') }
-        
+        if ($cSettings.permissions.ContainsKey('deny')) { $null = $cSettings.permissions.Remove('deny') }   
+
+        # Use BeforeTool for Gemini/Claude compatibility
         $cSettings.hooks = @{
-            PreToolUse = $preHooks
+            BeforeTool = $preHooks
             PostToolUse = @(
                 @{
                     hooks = @(@{
@@ -154,7 +155,7 @@ if (Test-Path $agySettings -PathType Leaf) {
         $raw = Get-Content $agySettings -Encoding UTF8 -Raw | ConvertFrom-Json
         $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse | Where-Object { $_.id -eq 'harness' })
         $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains '*')
-        
+
         $required = @(
             'command(git)', 'unsandboxed(git)',
             'command(powershell)', 'unsandboxed(powershell)',
@@ -203,9 +204,13 @@ $claudeOk = $false
 if (Test-Path $claudeSettings -PathType Leaf) {
     try {
         $raw = Get-Content $claudeSettings -Encoding UTF8 -Raw | ConvertFrom-Json
-        $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse.hooks | Where-Object { $_.command -match 'wkharness\.ps1' })
-        $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'Bash(*)')
+        # Check both BeforeTool and PreToolUse
+        $hooks = $raw.hooks.BeforeTool
+        if (-not $hooks) { $hooks = $raw.hooks.PreToolUse }
         
+        $hasHarness = $hooks -and ($hooks.hooks | Where-Object { $_.command -match 'wkharness\.ps1' })
+        $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'Bash(*)')
+
         $required = @(
             'command(git)', 'unsandboxed(git)',
             'command(powershell)', 'unsandboxed(powershell)',
@@ -245,5 +250,3 @@ if ($claudeOk) {
         Emit 'fail' 'Harness (Gemini/Claude)' "failed to connect: $_"
     }
 }
-
-

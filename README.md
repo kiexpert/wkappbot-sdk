@@ -1,4 +1,4 @@
-﻿# WKAppBot ??Computer Use, App Use, AppBot
+# WKAppBot ??Computer Use, App Use, AppBot
 
 [![build-launcher](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml)
 [![extended-smoke](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml/badge.svg)](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/extended-smoke.yml)

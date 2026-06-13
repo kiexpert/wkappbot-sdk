@@ -1,0 +1,50 @@
+{
+  "id": "wksplit-cs-utility-howto",
+  "app": "wkappbot",
+  "title": "wksplit-cs-utility (howto): gate implementation details",
+  "title_ko": null,
+  "desc": "T2 implementation tier for the splitter gates -- the exact patterns that make each gate work in PowerShell + Python (regex-hoist, allman-brace, selftest, compile-loop). Read when implementing or debugging a splitter gate. Parent: wksplit-cs-utility. Ref: wksplit-cs-utility-ref.",
+  "steps": [
+    "G2 REGEX-HOIST -- the PS 5.1 trap + the fix. Storing the range endpoint U+FFFF as a LITERAL char in a .ps1 can silently corrupt; and [regex]::Replace with a MatchEvaluator scriptblock does NOT close over a mutable outer counter ( stays 0). CORRECT: build the endpoint programmatically ($rangeEnd = [char]0xFFFF), and replace with [regex]::Matches() + reverse-order manual Substring (no scriptblock), naming vars by $assignments.Count+1. Final verified pattern: [regex]('(-(?:match",
+    "replace",
+    "cmatch",
+    "cimatch",
+    "notmatch",
+    "csplit",
+    "split)\\s+)''([^'']*(' + [char]0x80 + '-' + [char]0xFFFF + ')[^'']*)''')."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-howto",
+      "expect": "regex-hoist",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-howto",
+      "expect": "allman",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-cs-utility-howto",
+      "expect": "compile-loop",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wksplit",
+    "howto",
+    "implementation",
+    "regex-hoist",
+    "allman",
+    "selftest",
+    "splitter"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T16:37:00.8132018Z",
+  "updated": "2026-06-10T16:37:00.8132115Z",
+  "version": "1.0"
+}

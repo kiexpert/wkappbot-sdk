@@ -1,0 +1,63 @@
+{
+  "id": "wk-ai-tools-routing",
+  "app": "wkappbot-workflow",
+  "title": "wk AI Tools Routing",
+  "title_ko": null,
+  "desc": "Routing map for wk AI wrappers and model aliases.",
+  "steps": [
+    "ROUTING: wkopus = judgment or design, wksonnet = default work, wkhaiku = survey or read, wkcodex = budget-aware refactor",
+    "GPT aliases: wkgpt forces gpt-5.5, wkgpt-mini forces gpt-5.4-mini, wkcodex is budget-aware",
+    "Claude aliases: opus -> claude-opus-4-7, sonnet -> claude-sonnet-4-6, haiku -> claude-haiku-4-5-20251001",
+    "Gemini aliases: gemini or pro or 1.5-pro -> pro, flash or 1.5-flash -> flash",
+    "Prefer short wrapper names in docs and prompts",
+    "AUTO-TIER ROUTING = capability-gate THEN pace-filter (user 2026-06-12): 'auto' resolves to a cheap pool (gemini-flash-lite, claude-haiku, codex-mini). To add Groq/Cerebras: do NOT just front-place them -- they are REST chat-completion (NO file/tool capability), so a file-edit task routed to them FAILS. RULE: (1) CAPABILITY GATE first -- if the task needs file/tool use, candidates = codex-mini/haiku ONLY; if the task is tool-less (reasoning/ranking/review/synthesis), ADD Groq/Cerebras (and they may go FRONT since they are fast + pace-free with separate provider quotas). (2) PACE-CACHE FILTER next -- read each candidate family's pace cache (wkpace per-family), SKIP any at near-cap (>=95% of target), pick the first available. Result: tool-less work fast-routes to pace-free Groq/Cerebras; file work stays on tool-capable codex/haiku; everyone honors pace. Pairs with harness-active-model-scoping P8 (CLI-family pace) + refresh-before-breaker.",
+    "CORRECTION 2026-06-12 (Groq/Cerebras DO tool-call via Python): the earlier 'REST=no tools' premise was WRONG. Two paths exist per provider: (a) bash REST wrapper (wkgroq.sh/wkcerebras.sh) = chat-completion ONLY, no tools; (b) a PYTHON tool-call agent (e.g. WkAutoQuant/scripts/groq_agent.py, cerebras_agent.py) = full tool-calling loop (can do file/tool work). So the capability-gate is per-PATH not per-provider: a tool-requiring task CAN go to Groq/Cerebras VIA their python agent; only the bare bash-REST path is chat-only. Front-placement for pace-free speed applies to whichever path fits the task. Keep the pace-cache filter on top.",
+    "CANONICAL CLEANUP (2026-06-12, supersedes any earlier 'REST=no tools' line in this skill): the 'REST=no tools' premise is WRONG as a per-PROVIDER statement -- it is true ONLY of the bash-REST path. Each of Groq/Cerebras has TWO paths: (a) bash REST wrapper (wkgroq.sh/wkcerebras.sh) = chat-completion only, NO tools; (b) Python tool-call agent (groq_agent.py/cerebras_agent.py) = FULL tool-calling. Capability-gate per PATH, not per provider. Also confirm: Agent.cmd --model codex = codex-mini (tool-capable, was haiku-fallback before the owner remap); --model auto = the DEFAULT chore dispatcher (router picks; capability-gate THEN pace-filter). Vehicle reliability observed 2026-06-12: in-IDE Sonnet+wkedit.sh lands harness edits reliably (escapes pace edit-lockdown); codex-auto can PUNT (empty output) on complex PowerShell inserts; Agent.cmd spawns a separate process so wkagent-name detects the real model.",
+    "VEHICLE LESSON 2026-06-12 (codex-mini botched a calibration edit -> regression): codex-mini is reliable for MECHANICAL tool-edits (clear find/replace, append a known block) but UNRELIABLE for JUDGMENT/CALIBRATION edits. Given task #10 (set ONE Codex 5h cap value), codex-mini ALSO corrupted the weekly limit (5M->2M) and resurrected stale data -- a regression a Sonnet agent had to revert. RULE: the capability-gate splits needs-tools vs tool-less; ADD a SECOND axis WITHIN tool-edits -- route MECHANICAL edits (one clear change) to codex-mini/haiku, but JUDGMENT / CALIBRATION / multi-value / delicate-logic edits to in-IDE Sonnet + wkedit (the reliable vehicle this session). A delicate harness-pace edit is NOT codex-mini work."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-ai-tools-routing",
+      "expect": "returns routing steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wk-ai-tools",
+      "expect": "finds the routing index",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill install --app wkappbot-workflow --force",
+      "expect": "publishes the routed skill",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk",
+    "ai",
+    "routing",
+    "model",
+    "claude",
+    "gpt",
+    "codex",
+    "opus",
+    "sonnet",
+    "haiku",
+    "flash",
+    "pro",
+    "mini",
+    "wkopus",
+    "wksonnet",
+    "wkhaiku",
+    "wkgpt",
+    "wkcodex",
+    "wkclaude"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T10:33:47.5119858Z",
+  "updated": "2026-06-11T19:06:05.850898Z",
+  "version": "1.7"
+}

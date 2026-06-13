@@ -47,6 +47,73 @@ try {
         Add-Check 'harness-symlink-canonical' 'warn' $detail
         Emit '!' 'harness-symlink-canonical' $detail
         Emit '!' 'harness-symlink-canonical:fix' 'reconcile personal-docs edits into kih first (divergence trap), then repoint these symlinks + reinstall on session-init -- see cross-family-harness-integration-ref'
+
+        # ---- REPAIR MODE (guarded, dry-run default) --------------------------------
+        # Guard: kih/tools must exist and hold the canonical wrapper before repointing.
+        # Default: DRY-RUN only (prints WOULD lines). Real mklink fires only when
+        #   $env:WKDOCTOR_FIX_SYMLINKS -eq '1'
+        # Safety: backs up old target path before any deletion. Fail-open: any error
+        #   is caught and printed; remaining wrappers are still processed.
+        # NOTE: do NOT run with WKDOCTOR_FIX_SYMLINKS=1 until kih holds the
+        #   reconciled-latest source (divergence trap -- see cross-family-harness-integration-ref).
+        try {
+            $dryRun = ($env:WKDOCTOR_FIX_SYMLINKS -ne '1')
+            $modeTag = if ($dryRun) { '[DRY-RUN]' } else { '[REPAIR]' }
+
+            $repaired = @(); $skipped = @()
+            foreach ($n in $wrapperNames) {
+                foreach ($ext in @('.cmd', '.ps1')) {
+                    $linkPath   = Join-Path $binDir ($n + $ext)
+                    $kibTarget  = Join-Path 'D:\GitHub\wkappbot-kih\tools' ($n + $ext)
+
+                    # Guard: kih must hold this wrapper
+                    if (-not (Test-Path -LiteralPath $kibTarget)) { continue }
+
+                    if (-not (Test-Path -LiteralPath $linkPath)) { continue }
+
+                    $item = Get-Item -LiteralPath $linkPath -Force -ErrorAction SilentlyContinue
+                    if (-not $item) { continue }
+                    $currentTarget = [string]$item.Target
+                    if (-not $currentTarget) { continue }            # not a symlink
+
+                    # Already canonical -> skip
+                    if ($currentTarget -ieq $kibTarget) {
+                        $skipped += "$($n)$ext (already canonical)"
+                        continue
+                    }
+
+                    # Only repoint stale (personal-docs) entries
+                    if ($currentTarget -notmatch '(?i)personal-docs') { continue }
+
+                    Emit 'ok' "harness-symlink-canonical:repair" "$modeTag WOULD repoint $($n)$ext -> $kibTarget (was: $currentTarget)"
+                    Write-Host "  $modeTag $($n)$ext -> $kibTarget  (was $currentTarget)"
+
+                    if (-not $dryRun) {
+                        try {
+                            # Back up old target path to a sidecar file (non-destructive record)
+                            $backupFile = Join-Path $binDir (".$($n)$ext.symlink-backup")
+                            [IO.File]::WriteAllText($backupFile, $currentTarget, [Text.Encoding]::UTF8)
+
+                            # Remove existing symlink, then recreate pointing at kih
+                            Remove-Item -LiteralPath $linkPath -Force -ErrorAction Stop
+                            cmd /c mklink "$linkPath" "$kibTarget" *> $null
+                            $repaired += "$($n)$ext"
+                        } catch {
+                            Emit '!' "harness-symlink-canonical:repair-err" "$($n)$ext repoint failed: $_"
+                        }
+                    }
+                }
+            }
+
+            if (-not $dryRun -and $repaired.Count -gt 0) {
+                $detail2 = "repaired $($repaired.Count) symlink(s): $($repaired -join ', ')"
+                Add-Check 'harness-symlink-canonical' 'ok' $detail2
+                Emit 'ok' 'harness-symlink-canonical:repaired' $detail2
+            }
+        } catch {
+            Emit 'ok' 'harness-symlink-canonical:repair' "repair block error (fail-open): $_"
+        }
+        # ---- END REPAIR MODE -------------------------------------------------------
     }
 } catch {
     Add-Check 'harness-symlink-canonical' 'ok' "n/a (check error, fail-open): $_"

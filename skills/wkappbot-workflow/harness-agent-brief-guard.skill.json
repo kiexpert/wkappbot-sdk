@@ -1,0 +1,44 @@
+{
+  "id": "harness-agent-brief-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness agent-brief-guard: 3-skill-ref + SPEC requirement",
+  "title_ko": null,
+  "desc": "Blocks an Agent/Agent.cmd dispatch whose brief lacks 3 executed skill-read refs or the 5-part SPEC (Goal/Files/Approach/Constraints/Exit). Subagents start blank; the brief is their only knowledge.",
+  "steps": [
+    "TRIGGER: an Agent or Agent.cmd dispatch is blocked when the prompt has fewer than 3 'wkappbot skill read <id>' lines, or is missing any of the labeled SPEC sections Goal, Files, Approach, Constraints, Exit.",
+    "FIX: add agent-on-load plus 2 task-specific skill reads at the top, then the 5 SPEC labels. Do NOT abandon delegation and do the work yourself -- that is a harness violation. Re-dispatch with the fixed brief.",
+    "WHY: a blank-start subagent inherits zero context; under-briefed agents exit early or do the wrong thing, wasting more tokens than a complete brief. See: agent-on-load, claude-code-agent-tier-routing, agent-dispatch-preflight."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-agent-brief-guard",
+      "expect": "SPEC",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load",
+      "expect": "BLANK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "routing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "agent",
+    "brief",
+    "delegation",
+    "spec",
+    "guard"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:30:51.2871213Z",
+  "updated": "2026-06-12T06:30:51.2871314Z",
+  "version": "1.0"
+}

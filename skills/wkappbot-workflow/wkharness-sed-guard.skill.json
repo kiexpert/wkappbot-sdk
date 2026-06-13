@@ -1,5 +1,5 @@
 {
-  "id": "sed-guard",
+  "id": "wkharness-sed-guard",
   "app": "wkappbot-workflow",
   "title": "sed-guard: sed modifies files directly, prefer wkedit",
   "title_ko": null,

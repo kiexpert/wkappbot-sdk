@@ -1,0 +1,51 @@
+{
+  "id": "harness-active-model-scoping-ref",
+  "app": "wkappbot-workflow",
+  "title": "Harness active-model scoping (T3 ref): incidents + impl history",
+  "title_ko": null,
+  "desc": "T3 reference tier of harness-active-model-scoping: the dated incidents that birthed each principle + the impl-status history. Read only for archaeology; live use = T1 harness-active-model-scoping + T2 -howto.",
+  "steps": [
+    "INCIDENT 2026-06-09 GUARD-STORM (origin of the 5 principles): gemini-pace hit 954/500 and BLOCKED Opus + Haiku git/dotnet/gh calls that consume ZERO Gemini, deadlocking a release. Root: pace was GLOBAL not active-model-scoped. Birthed P3 (active-model pace) + P4 (stall-reset-on-user-turn, patched same day via Sync-WkStallResetOnUserTurn).",
+    "INCIDENT 2026-06-09 FAILED-GUIDANCE: stall-guard told Opus to 'delegate' but the delegate paths (wkcodex, Agent) were THEMSELVES blocked -- dead-end guidance made Opus give up. Birthed P5 gate-as-sign (every block names a VERIFIED working escape). Same day a bare-jargon suggest title made the Core owner ask the user 'which suggest, why' -- extended P5 to suggests/skill-ids (prepend one-line why/priority/context).",
+    "INCIDENT 2026-06-11 dd-DESTROYED-HARNESS: a Haiku used dd and destroyed a real harness .ps1. Birthed P7 (cheap models edit ONLY sandbox/-proto/gitignored; harness .ps1 = ROOT-only; ROOT merges cheap workers' output to canonical).",
+    "INCIDENT 2026-06-11 TOTAL-PACE-DEADLOCK: active-model-scoped pace + stacked failures blocked EVERY family (Claude pace-95, codex misattribution, Agent.ps1 --verbose bug, Gemini quota, opus-budget). An Opus shotgunned ~15 dispatches before escaping. Escape = R1 fix the mis-firing gate as ROOT, R2 jisikhwa is free. See pace-deadlock-escapes-harness-editable-and-jisikhwa-free.",
+    "IMPL STATUS history: P4 patched 2026-06-09 (Sync-WkStallResetOnUserTurn). P1/P2/P3/P5 were pending Core; 2026-06-11 session landed fail-safe versions of P3 (non-Claude executor early-return before Claude pace calc; pace-95 + claude-pace + wk-only-gate gate on near-cap not linear-target) and P6/P8 (per-guard same-named skills; CLI-unit family taxonomy in wkpace/breaker/doctor).",
+    "P8 CLI-FAMILY EXAMPLE 2026-06-11: agy (agy-pro ROOT) logs into wkgemini_usage.jsonl but is its OWN CLI -> split into an Agy family, not a Gemini sub-model. Codex 'weekly 83%' was a 101.5h-stale manual-paste; live sqlite (logs_2.sqlite) showed ~0.064M real -> auto-refresh on >1h stale corrects it. These prove: classify by CLI, refresh stale caches from the live source immediately.",
+    "CASE 2026-06-12 STALE-PACE FALSE-PAUSE (why refresh-before-breaker exists): at session start the pace-95 breaker PAUSED the whole session at ~15.6% REAL weekly usage, because it compared against the LINEAR-elapsed target (~7-9%) using a stale pace.json snapshot -- a false deadlock that burned ~15 solo dispatches before escape. Two root causes fixed: (1) gate the breaker on the REAL cap (>=95% of limit) not the linear target; (2) refresh the family cache from the live CLI before the breaker evaluates. Related: Codex 'weekly 83%' was a 101.5h-stale manual-dashboard-paste; live sqlite showed 0.064M = ~1.3% real -- a 60x error corrected by the >1h auto-refresh. Gemini per-model real quota is NOT persisted in any session file (only the live gemini CLI shows 'X% used'), so wkpace labels its token-sum 'estimate'."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "T1 core principles",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping-ref",
+      "expect": "incidents and impl history",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-deadlock-escapes-harness-editable-and-jisikhwa-free",
+      "expect": "total-deadlock escape",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "pace",
+    "active-model",
+    "ref",
+    "t3",
+    "incident",
+    "2026-06-09",
+    "2026-06-11"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T14:40:57.9844996Z",
+  "updated": "2026-06-11T15:21:19.5759036Z",
+  "version": "1.2"
+}

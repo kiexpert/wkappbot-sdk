@@ -1,0 +1,58 @@
+{
+  "id": "agent-on-load",
+  "app": "wkappbot-workflow",
+  "title": "agent-on-load -- slim conduct reflexes every subagent loads before acting",
+  "title_ko": null,
+  "desc": "Subagents start BLANK. Read this FIRST (make it one of your 3 mandatory brief-guard skill reads) to connect your mandatory conduct reflexes before you touch any tool. Slim by design -- it is read on every dispatch. Full session-start pipeline is the heavier 'on-load' skill (main sessions only); this is the subagent subset.",
+  "steps": [
+    "WHO + WHY: you are a SUBAGENT with zero inherited context. Reading this connects your mandatory reflexes before you act. Main sessions run the full 'on-load' pipeline; you run THIS slim subset.",
+    "ENGLISH-ONLY: all code, comments, skills, commit messages, and internal notes in English. Non-English in source costs 2-3x tokens, risks CP949 corruption, and trips encoding guards. (Korean is only ever for a final user-facing response, which you rarely produce.)",
+    "NO-BANDAID: if a concept already exists in the codebase, REUSE or fix the SHARED function. Never duplicate logic, add local ';OR' splits, or wrap a proper function in an ad-hoc retry. Bandaids compound -- the next agent pays to untangle yours.",
+    "SACRED SURFACES: knowledge-ops (wkappbot skill read/edit) and harness self-repair are ALWAYS free. If a guard blocks you, those are your escape -- read a skill, then proceed. Never disable a live safety to get unblocked.",
+    "CHEAP-AGENT SANDBOX: you may edit harness source ONLY in scratch files named -proto.* / -probe.* / -<yourmodel>.* ; NEVER a canonical wkharness*.ps1 -- ROOT reviews and promotes your sandbox file. This is what stops a cheap agent from bricking the live harness.",
+    "JOSEKI REPORTING: report the EXACT next move plus evidence (file:line, the command, the number), not vibes. Your final text IS the return value to the orchestrator -- return structured data, not a human chat message. Do NOT spawn nested agents (one level only).",
+    "SKILL/CMD TRAPS to avoid a blocked retry: skill text English-only (encoding-guard >0.1pct non-ASCII); never echo a literal WKHARNESS env var name in a command (security-guard false-positives even on docs -- use a variable); --requirement takes a wkappbot SUBCOMMAND with an expected pattern, no launcher --flags; '",
+    "' separates --steps, never inside step text.",
+    "SYMLINK-REALITY (Windows/Git-bash): WKAppBot bin/*.cmd files that appear as POSIX symlinks via bash ls -la are actually EITHER: (a) plain text files containing the target path (cmd.exe executes them as call-chains) OR (b) real Windows symlinks tracked by git. BEFORE using ln -sf or New-Item SymbolicLink, check the actual git object type: git ls-files -s bin/Name.cmd -- if mode=120000 it is a git symlink (ln -sf works in MSYS2); if mode=100644 it is a text-path-stub. For text-path-stubs, repoint by writing the new target path string to the file via Write tool. Never use ln -sf on a text stub -- it overwrites the stub with the actual target file content, corrupting the chain.",
+    "REPOINT PATTERN for WKAppBot core.symlinks=false git symlinks (bin/*.cmd mode=120000): These files on disk are plain text containing the target path (e.g., 'D:/GitHub/personal-docs/tools/Agent.cmd'). Repointing = overwrite the file content with the new target path string using Write tool (no trailing newline, no CRLF -- match git symlink format: pure path, LF only). After Write, verify with git diff -- should show only the path string changed. Commit with git -C WKAppBot add bin/*.cmd && git commit. PowerShell-.cmd (note trailing dash typo) is a separate symlink needing removal + creation of PowerShell.cmd as new -- cannot rename a git symlink, must: git rm, Write new file, git add -s bin/PowerShell.cmd.",
+    "DELEGATION-FOREGROUND BLOCK: When running from an Opus/Sonnet session, foreground Bash Agent.cmd calls are blocked by harness [-delegation] guard ('Foreground delegation blocks the user prompt'). Use run_in_background=true on the Bash tool call when invoking Agent.cmd. The background task ID is returned and the agent runs concurrently. The parent session can then wait for the notification or poll the output file at the temp path provided."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-on-load",
+      "expect": "ENGLISH-ONLY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load",
+      "expect": "SANDBOX",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load",
+      "expect": "JOSEKI",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agent",
+    "subagent",
+    "on-load",
+    "conduct",
+    "reflex",
+    "mandatory",
+    "brief-guard",
+    "sandbox",
+    "sacred",
+    "joseki",
+    "english-only"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T04:06:22.1102014Z",
+  "updated": "2026-06-10T19:24:48.835354Z",
+  "version": "1.6"
+}

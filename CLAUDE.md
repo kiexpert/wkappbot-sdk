@@ -1,4 +1,4 @@
-﻿# WKAppBot v7.6.0-sdk - Windows + Android App Automation Test Framework
+# WKAppBot v7.6.0-sdk - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -470,6 +470,14 @@ wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 wkappbot skill read cross-family-harness-integration       # Usage: the cross-family harness map + personal-docs->kih migration + the divergence trap
 wkappbot skill read cross-family-harness-integration-howto # Impl: relay, induce, autonomy.toml, doctor repair guards
 wkappbot skill read wkdoctor-system-physician              # Task: doctor module patterns + repair-vehicle governance
+
+## harness:skill bin/wkappbot.hq/doctor/*.ps1
+# Doctor code is harness-tier (ROOT proxy-code): editing ANY doctor module requires studying the
+# core guard model first, so a heal never ships blind. ROOT pace is lifted (Test-WkIsHarnessSourceEdit)
+# but this study-lock and stall-guard still apply.
+wkappbot skill read wkharness-guards            # Usage: guard/study-lock model before editing harness-tier code
+wkappbot skill read wkdoctor-system-physician   # Impl: doctor module Add-Check/Emit 4-phase pattern
+wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + study-lock wiring
 
 ## Pending
 

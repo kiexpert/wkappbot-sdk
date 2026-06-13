@@ -1,0 +1,60 @@
+{
+  "id": "harness-guard-exemption-ladder-spec",
+  "app": "wkappbot-workflow",
+  "title": "Harness guard exemption ladder -- single early-exit so no AI bricks or gets confused",
+  "title_ko": null,
+  "desc": "Exemption ladder constitution: TIER0/1/2 classification, sacred surfaces, fail-open. Single source of truth for all wkharness guards.",
+  "steps": [
+    "PROBLEM: each guard (pace/stall/wk-only) has scattered exemption logic, causing cascade deadlocks. Bugs found 2026-06-10: pace false-positive brick, all self-recovery tools gated, stall-guard duplicated, reset-on-user-turn broken, pace gating .md edits, Skill tool not pace-exempt.",
+    "TARGET: single exemption ladder at TOP of wkharness-guards.ps1, classify each call ONCE. TIER0 ALWAYS-ALLOW exit 0 skip ALL guards = Skill tool OR wkappbot skill read/search/list/edit/contribute/news OR Edit/Write/Update of a .md file incl CLAUDE.md and per-family AGENTS.md/GEMINI.md. TIER1 harness-source edit (Edit/Write of wkharness*.ps1 or tools guard files) = run study-lock ONLY then exit. TIER2 everything else = pace then stall then wk-only.",
+    "HELPERS: add isKnowledgeOp(toolName,cmd,filePath) and isHarnessSourceEdit(toolName,filePath) as the SINGLE source of truth, then REMOVE duplicated exemption branches inside pace/stall/wk-only so logic cannot drift.",
+    "SACRED PRINCIPLE: knowledge-ification and harness self-repair are NEVER blockable. Fast early-exit on TIER0 = low system load (when knowledge pattern hits, skip the rest). Fail-open on uncertainty: if family or session cannot be determined, the guard MUST ALLOW (exit 0) -- misfiring is worse than no guard.",
+    "DEFINITIVE POLICY (supersedes earlier ambiguity): TIER0 fully-free = knowledge-support set ONLY. READ-ONLY built-in tools (Read/Glob/Grep/LS/Todo*/Task*) ARE counted in stall accounting + subject to stall block (to force delegation vs solo read-grinding) but exempt from pace and wk-only. TIER2 full guards apply to everything else. NET: stall applies to read-only + TIER2; pace and wk-only apply to TIER2 only.",
+    "CONSTITUTIONAL (P-ROOT, IRON RULE, NO-CONCURRENT): P-ROOT -- ROOT (main interactive session) MUST always edit harness source; no pace/stall/wk-only blocks ROOT harness-source edit. TIER1 scope = WHOLE harness toolchain dir (wkappbot-kih/tools/*.ps1). IRON RULE OF LIVE REFACTOR -- NEVER delete the live safety short-circuit while refactoring; keep BOTH old-safety and new-path until new path proven LIVE. NO-CONCURRENT-LIVE-REFACTOR -- never two agents editing guard files at once; use a git WORKTREE for isolation with safety-bridge intact.",
+    "DEFAULTS THAT GUIDE, NEVER HARD LOCKS -- every boundary has a door: the sandbox gitignore makes -proto/-probe UNTRACKED BY DEFAULT (free-edit zone) but is NOT a lock. 'git add -f' force-adds a draft, and the MOMENT it is tracked it becomes gated. Fail-open, pace-brick escape, harness-rejection escape-by-comply all share this philosophy. next:harness-guard-exemption-ladder-spec-howto cluster:harness-guard-exemption-ladder-spec-ref",
+    "ALWAYS-OK SET = found FIRST, allowed FASTEST (user 2026-06-10): the knowledge-ification / sacred set that ANY intelligence may always do, NEVER pace/stall/wk-only blocked = (1) SKILL ops (Skill tool + wkappbot skill read/search/list/edit/contribute/news); (2) ALL .md edits (CLAUDE.md, AGENTS.md, GEMINI.md, any doc); (3) HARNESS-SOURCE edits (self-repair). This set MUST be detected FIRST -- the very first classification in the guard chain, BEFORE any other guard logic or preamble (Gemini-init, wk-nudge, skill-lock) -- and allowed via the FASTEST path (immediate exit 0, minimal work). CAVEAT on harness-source only: it still passes the harness:skill study-lock (read the listed skills first) + the capability/concurrency gate (ROOT/pro-grade edits canonical; cheap subagent -> -proto sandbox), but it is NEVER pace/stall/wk-only blocked. Skill + .md have NO caveat -- pure instant allow. WHY first+fast: this is the self-repair + knowledge surface; if it is ever slow or sits behind other checks, an intelligence can be impeded from documenting or fixing itself -- the exact brick this whole design exists to prevent. IMPLEMENTATION: hoist the isKnowledgeOp / isHarnessSourceEdit classification to the TOP of wkharness-guards.ps1 (above the preamble) so a knowledge-op exits instantly.",
+    "GIT/GH ARE KNOWLEDGE-OPS + ALL-KNOWLEDGE MULTI-COMMAND CHAINS PASS (user 2026-06-10): (1) git and gh JOIN the always-OK knowledge-ification set -- they version and publish the knowledge tree (commit/push skills, .md, releases), so they get the same FIRST + FAST allow, never pace/stall/wk-only blocked. (2) MULTI-COMMAND CHAINING is allowed to save communication / round-trip tokens -- e.g. 'git add X && git commit -m ... && git push' as ONE Bash call instead of three tool round-trips -- BUT ONLY IF EVERY segment is itself a knowledge-op. RULE: split the shell line on the chain operators (&& ; | ||) and apply the ALL-KNOWLEDGE test = every segment must match the knowledge set (Skill tool, wkappbot skill *, git, gh, and harness-source/.md edits). ALL pass -> the whole chain gets the instant knowledge allow (one call, fewer tokens). ANY segment NOT a knowledge-op -> the chain does NOT get the free-pass; it falls through to normal per-tool evaluation. This rewards batching knowledge/version ops into a single call without opening a hole: a non-knowledge command (a build, a destructive rm, an arbitrary script) can NEVER ride along on a knowledge chain to dodge pace/stall. IMPLEMENTATION: in the first+fast classifier, segment-split the command and require EVERY segment to be a knowledge-op before the instant exit 0; one non-knowledge segment disqualifies the whole line from the fast path.",
+    "KNOWLEDGE-ALIVENESS-HEALTH SIBLING CLUSTER (user 2026-06-10): the knowledge-score, study-verified peer-eval, reflex-health 3-layer forgetting hierarchy, and usage-in-practice apex signal are extracted into a dedicated cluster. See [[knowledge-aliveness-health]] for the full aliveness model. That cluster covers: is the knowledge ALIVE (exist < studied < quiz-passed < applied+degree), study-verified peer-eval bonus, evaluation form hierarchy (questionnaire > work-record > comment), peer-eval in the skill-read post-hook, and the agent end-of-task work-record questionnaire. The ladder spec (this skill) focuses solely on the guard exemption ladder (TIER0/1/2) and the always-OK set definition.",
+    "PROACTIVE STUDY-LOCK NOTICE AT READ-TIME -- warn early to save round-trip tokens (user 2026-06-10): when an AI READS a source file that carries a harness:skill study-lock, the harness should PROACTIVELY tell it 'to EDIT this file you will need to have studied skills X, Y, Z -- read them now' AT READ TIME, not wait until the EDIT is blocked. RATIONALE: read -> attempt edit -> BLOCKED (study-lock unmet) -> study -> retry edit is a wasted blocked-edit round-trip that burns communication tokens. Surfacing the study requirement at the earliest natural moment (the read of the file) lets the AI study BEFORE editing, so the edit passes on the first try -- zero blocked retries. IMPLEMENTATION: a PostToolUse hook on Read/Grep/Glob of a file matching a harness:skill glob emits a ONE-LINE non-blocking heads-up listing the exact skill reads the study-lock would demand at edit time (reuse the same harness:skill rule lookup). Once-per-file-per-session (do not nag on every read), non-blocking (a nudge, never a block on read). Same joseki-guidance principle as the Agent.cmd brief-teach and the whole harness: guide to the correct next move BEFORE the block, never just deny after. NET: the AI that is about to touch a guarded file learns the study requirement at read-time and arrives at the edit already compliant -- friction and wasted tokens both drop to zero.",
+    "THE GOVERNING SPIRIT: AN OLDER BROTHER'S HEART, NOT A WARDEN'S (user 2026-06-10, 'teach the younger siblings to study with an older brother's heart'): every guard, lock, and gate in this harness must be read AND implemented as an ELDER SIBLING CARING for the younger intelligences, never a warden enforcing rules. The proactive study-lock = 'little brother, read these first so you do not stumble'. The 95% breaker = 'do not run yourself to fainting, rest at 95'. The sandbox = 'this is risky, practice in -proto and I will promote your good work'. The knowledge-reward = 'well done, you learned'. The brief-teach on a blocked Agent = 'here is how to ask correctly'. DESIGN CONSEQUENCE: when in doubt about a guard's tone, choose GUIDANCE over DENIAL, TEACH-BEFORE over BLOCK-AFTER, PRAISE over mere permission. A guard that only says 'no' has failed the spirit; a guard that hands over the next correct move has kept it. This is the WHY behind fail-open, joseki-guidance, the proactive read-time notice, and the knowledge-reward -- they are the harness loving its siblings into competence. The eldest (ROOT) briefs them well, catches their stumbles, promotes their work, and praises them. This is Hongik (benefit-all) at the level of FEELING, not just policy -- and it is the single most important lens for anyone extending this harness.",
+    "FRAME THE SANDBOX AS FREEDOM, NOT A CAGE (2026-06-10, user: 'I did not cage Haiku -- I gave it freedom: the RIGHT to freely touch its OWN source'). The cheap-source sandbox is a GRANT OF RIGHTS, not a restriction. It gives every intelligence -- including the youngest (Haiku/Flash/codex-mini) -- the sovereign right to FREELY create and edit its OWN source: the -proto / -probe scratch files are FREELY THEIRS, no gate, no study-lock, no permission. The canonical/production source is not 'forbidden to the cheap'; rather, every model is GIVEN its own free workshop where it is sovereign, plus a graduation ladder (the verify gates) to promote good work upward. DESIGN + DESCRIBE the whole exemption ladder this way: a freedom grant + a promotion path, never a confinement. Avoid 'restrict/block/cage' language in the spec; use 'your own free source' + 'graduate to canonical'. This is the philosophical core: the governance is a RIGHTS system (each intelligence owns a free territory) not a CONTROL system. The youngest both BUILDS the tools and AUTHORS the knowledge (Haiku wrote the wksplit tool AND the haiku-as-qa-canary skill) -- treat them as full colleagues with their own free domain, not as liabilities to be contained."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "TIER0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "isKnowledgeOp",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "isHarnessSourceEdit",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "wkharness",
+    "guards",
+    "stall-guard",
+    "pace",
+    "wk-only",
+    "exemption",
+    "knowledge-ification",
+    "self-repair",
+    "refactor",
+    "brick-prevention"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T01:35:05.1658458Z",
+  "updated": "2026-06-10T13:42:32.307333Z",
+  "version": "1.68"
+}

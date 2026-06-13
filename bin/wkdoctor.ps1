@@ -1,4 +1,4 @@
-﻿# wkdoctor -- wkappbot-sdk health check orchestrator
+# wkdoctor -- wkappbot-sdk health check orchestrator
 # Usage: wkdoctor [-Json] [-DefenderFix] [-EmergencyKill] [-Build]
 # Drop custom checks as *.ps1 into wkappbot.hq/doctor/ for plugin extension
 param([switch]$Json, [switch]$EmergencyKill, [switch]$DefenderFix, [switch]$Build)

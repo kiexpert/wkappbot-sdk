@@ -1,15 +1,12 @@
 {
-  "id": "codex-spec-gate",
+  "id": "wkharness-codex-spec-gate",
   "app": "wkappbot-workflow",
   "title": "codex-spec-gate: non-mini codex needs SPEC block",
   "title_ko": null,
   "desc": "Blocks codex exec (non-mini models) without a 5-item SPEC block. Prevents underspecified Codex runs that exit early or produce wrong output.",
   "steps": [
-    "SAFETY: Fires on 'codex exec' without --model codex-mini when the command lacks 'SPEC:' plus numbered items 1-5. Non-mini Codex is expensive; underspecified prompts cause early exit with partial results or wrong output.",
-    "SOLUTION: Add a SPEC block with exactly 5 items: SPEC: 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. OR switch to --model codex-mini which is exempt from this gate (it is the default cheap model).",
-    "PREVENTION: Always write a SPEC block for non-mini Codex runs. The exit criterion (item 5) is the most important -- Codex stops when it thinks it is done, so a vague goal causes premature exit. Use wkcodex.sh for standard tasks (auto-validates and defaults to codex-mini)."
+    "CANONICAL: this guard skill moved to harness-codex-spec-gate; read that instead."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read codex-spec-gate",
@@ -33,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T07:32:15.3780024Z",
-  "updated": "2026-06-11T07:32:15.3780123Z",
-  "version": "1.0"
+  "updated": "2026-06-12T07:29:11.7852318Z",
+  "version": "1.2"
 }

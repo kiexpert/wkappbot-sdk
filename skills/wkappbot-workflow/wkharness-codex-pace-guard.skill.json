@@ -1,15 +1,12 @@
 {
-  "id": "codex-pace-guard",
+  "id": "wkharness-codex-pace-guard",
   "app": "wkappbot-workflow",
   "title": "codex-pace-guard: Codex over weekly threshold",
   "title_ko": null,
   "desc": "Blocks codex exec when Codex token usage exceeds the weekly threshold. Redirects to Haiku or waits for reset.",
   "steps": [
-    "SAFETY: Fires when Codex weekly token usage exceeds the configured block threshold (read from codex_measured_limit.json, default 3M tokens). Prevents runaway Codex spending when the budget is exhausted.",
-    "SOLUTION: Switch to --model haiku for the immediate task. OR wait until the weekly reset (Thursday 18:00 KST) for Codex budget to refresh. Haiku covers most read/survey/search tasks that Codex handles.",
-    "PREVENTION: Monitor Codex pace via wkdoctor (shows per-family pace dashboard). When Codex approaches 80% of weekly budget, switch non-critical tasks to Haiku. The 95% circuit breaker fires a speak alert before hard block."
+    "CANONICAL: this guard skill moved to harness-codex-pace-guard; read that instead."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read codex-pace-guard",
@@ -33,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T07:32:29.5786495Z",
-  "updated": "2026-06-11T07:32:29.578659Z",
-  "version": "1.0"
+  "updated": "2026-06-12T07:28:35.8446099Z",
+  "version": "1.2"
 }

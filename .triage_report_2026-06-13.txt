@@ -1,0 +1,150 @@
+SDK SUGGEST BACKLOG TRIAGE
+Generated: 2026-06-13
+Total: 115 suggests (28 urgent + 36 important + 40 stale + 11 other)
+
+═══════════════════════════════════════════════════════════════════════════════
+SHORTLISTED: TOP 12 ACTIONABLE ITEMS (by impact + freshness + SDK scope)
+═══════════════════════════════════════════════════════════════════════════════
+
+RANK | TS                    | TITLE                                        | BUCKET   | STATUS/ACTION
+─────┼───────────────────────┼──────────────────────────────────────────────┼──────────┼────────────────────────────
+  1  | 2026-06-12T17:20:44   | Agent blocked by wk-only-gate (background)   | Harness  | FRESH/BLOCK—fix guard scope
+  2  | 2026-06-12T17:19:20   | agent-brief-guard false-blocks VALIDATE      | Harness  | FRESH/BLOCK—investigate
+  3  | 2026-06-12T04:42:32   | wkcodex.sh rc=0 even when code fails         | SDK      | HIGH—codex reliability
+  4  | 2026-06-12T04:41:42   | guardian builds malformed core path          | SDK      | MEDIUM—path construction
+  5  | 2026-06-12T10:51:39   | eye restart reuses stale admin Eye           | SDK      | MEDIUM—lifecycle mgmt
+  6  | 2026-06-10T18:36:41   | LOGIN_PAGE ports 9612/9980 session expired   | Known    | KNOWN—session limit
+  7  | 2026-06-05T16:52:59   | LOGIN_PAGE port 9712 session expired (CO-RES)| Pending  | PENDING—await 2/2 confirm
+  8  | 2026-06-05T05:54:39   | skill edit/contribute strips $var PowerShell | SDK      | MEDIUM—authoring UX
+  9  | 2026-06-03T17:10:14   | wkask.sh exec line corrupted backslash       | Fixed    | RESOLVED—commit 94026081
+ 10  | 2026-06-05T16:53:58   | Chrome multiplication spike >20 procs         | Fixed    | RESOLVED—MyCdpContext
+ 11  | 2026-06-02T01:46:49   | pre-commit source-gate false-BLOCK Opus      | SDK      | MEDIUM—workflow friction
+ 12  | 2026-06-08T13:12:32   | cdp open --timeout 9 fails real sites        | Core     | BLOCKER—real-site tests
+
+═══════════════════════════════════════════════════════════════════════════════
+BUCKET SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+A) SDK DIRECT-FIX (5 items)
+   [3] wkcodex.sh rc=0 false-positive — automation reliability blocker
+   [4] guardian malformed path — launcher integrity
+   [5] eye restart stale process — process lifecycle
+   [8] skill edit $var stripping — skill authoring
+   [11] pre-commit source-gate false-block — dev workflow
+
+B) HARNESS/GUARD FALSE-BLOCKS (2 items, FRESH 06-13)
+   [1-2] wk-only-gate / agent-brief-guard — blocking background agents
+   → These are FRESH blockers affecting current automation
+
+C) KNOWN LIMITATIONS / SESSION MGMT (2 items)
+   [6-7] LOGIN_PAGE session expired — recurring, architectural limit
+   → Already documented; no fix without session redesign
+
+D) ALREADY FIXED (2 items, resolve candidates)
+   [9] wkask.sh backslash — FIXED in commit 94026081
+   [10] Chrome multiplication — FIXED in MyCdpContext.ChromeHealthCheck
+
+E) CORE ESCALATION / OUT-OF-SCOPE (1 item)
+   [12] cdp open --timeout 9 fails real sites — Core navigation bug
+
+═══════════════════════════════════════════════════════════════════════════════
+MAJOR CATEGORIES IN BACKLOG
+═══════════════════════════════════════════════════════════════════════════════
+
+BUG-AUTO STALE NOISE (recommend dismiss)
+  Items: 29-38 (10× FileNotFoundException/TypeInitializationException, 06-11 batch)
+  Pattern: Likely same root cause (file loading after deploy)
+  Action: Investigate one; dismiss others as stale
+
+MERGE CANDIDATES (consolidate duplicates)
+  [70, 56, 57, 113-114] WebSocketException (4 related)
+  [71, 91-92, 99] Chrome/CDP timeout (4 related)
+  [43, 51] wkcodex dispatch dead (2 related)
+  [58-62, 65-68] Various timeout/hook/request errors (MERGE tags 1-13)
+
+COOKIE/LOGIN ISSUES (architectural limits)
+  [17-18, 93-94] Cookie persistence SSO interference
+  [19-20] Hard-coded Port Guard (9xxx blocking)
+  [40-41, 84-85, 95-98] LOGIN_PAGE repeated (same root, duplicates)
+
+FOCUS-STEAL / CORE SCOPE (delegate)
+  [103-104, 108, 112, 115] FOCUS-STEAL / FOCUS-INNER-SLIDE
+  → Out of SDK; Core maintainers
+
+FEATURE REQUESTS (backlog)
+  [49-50] busybox symlink auto-relay
+  [52] Improve skill read output
+  [53] Harness 5 Principles
+  [88-89] agent-msg command
+  [106] skill read 3-tier auto-detect
+
+═══════════════════════════════════════════════════════════════════════════════
+TRIAGE METRICS
+═══════════════════════════════════════════════════════════════════════════════
+
+Total analyzed: 115
+├─ Fresh (06-13): 4 items (4%)
+├─ Recent (06-10..06-12): 17 items (15%)
+├─ Active (06-01..06-09): 21 items (18%)
+└─ Stale (earlier): 73 items (63%)
+
+Open (fixable): ~45 items (39%)
+Already-fixed/dismiss: ~10 items (9%)
+Known-limits/backlog: ~25 items (22%)
+Core-scope/escalated: ~25 items (22%)
+Out-of-scope/external: ~10 items (9%)
+
+═══════════════════════════════════════════════════════════════════════════════
+RECOMMENDED ACTIONS (ranked by priority)
+═══════════════════════════════════════════════════════════════════════════════
+
+URGENT (today):
+  1. Investigate wk-only-gate false-block (items 1-2)
+  2. Check wkcodex rc=0 post-exec validation (item 3)
+
+HIGH (this week):
+  3. Guardian path construction (item 4)
+  4. Eye restart stale process (item 5)
+  5. skill edit $var preservation (item 8)
+
+MEDIUM (backlog):
+  6. pre-commit source-gate condition logic (item 11)
+  7. Run `wkappbot suggest resolve --dismiss-stale` batch on items 9-10, 29-38, 100-101
+  8. Consolidate MERGE clusters (70+56+57, 71+91+92, etc.)
+
+ESCALATE:
+  9. Item 12 (cdp open timeout) → WKAppBot Core
+  10. FOCUS-STEAL items → Core maintainers
+
+═══════════════════════════════════════════════════════════════════════════════
+PENDING CO-RESOLVE
+═══════════════════════════════════════════════════════════════════════════════
+
+Item [48] / [7]: ts=2026-06-05T16:52:59
+  "LOGIN_PAGE session expired ports 9712"
+  Status: PENDING CO-RESOLVE (1/2 complete, awaiting 2nd-party confirmation)
+  Location: DG-wkappbot-sdk
+  Action: Run `wkappbot suggest check 2026-06-05T16:52:59` to verify requirements PASS,
+          then `--confirm` to finalize 2/2 resolution
+
+═══════════════════════════════════════════════════════════════════════════════
+ASSESSMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+The backlog is heavily skewed toward stale items (63% pre-06-10), with recent
+activity (06-13 and 06-12) concentrated in harness/guard false-blocks. Two items
+are FRESH blockers (wk-only-gate, agent-brief-guard).
+
+Actionable items cluster into:
+- 5 SDK direct-fixes (medium effort, high impact)
+- 2 harness/guard investigations (immediate, blocking)
+- 10+ candidates for resolve-dismiss-stale (mechanical cleanup)
+- 24 MERGE-tagged items (consolidation opportunity)
+
+Estimated effort:
+- Quick wins (dismiss stale, merge duplicates): 30-45 min
+- Medium fixes (SDK reliability, UX): 2-3 hours
+- Investigations (guard logic, path construction): 1-2 hours
+- Core escalations: out of scope
+
+Total actionable backlog: ~45-50 items (down from 115 with filtering by scope/status)

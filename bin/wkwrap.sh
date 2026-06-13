@@ -1,31 +1,12 @@
 #!/usr/bin/env bash
-# wkdoctor.sh -- universal bash->PS1 relay + auto-install (harness-managed)
-# RELAY (called as wkXXX.sh): routes to wkXXX.ps1 via powershell
-# MAINTENANCE (called as wkwrap.sh): --install / --status / help
+# wkwrap.sh -- thin bash shim for the wkwrap universal resolver (skill: wkwrap).
+# Invoked via a tool symlink (e.g. codex.sh -> wkwrap.sh): forwards the invocation
+# name + all args to the single wkwrap.ps1 brain.
 SELF="$(basename "$0" .sh)"
-DIR="$(dirname "$(realpath "$0")")"
-if [ "$SELF" != "wkwrap" ]; then
-    exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass \
-         -File "${DIR}/${SELF}.ps1" "$@"
+DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+if [ "$SELF" = "wkwrap" ]; then
+    echo "wkwrap: universal symlink resolver. Symlink a tool name to me (codex.sh -> wkwrap.sh) and I route to wkwrap.ps1."
+    exit 0
 fi
-case "${1:-}" in
---install)
-    sh_count=0; cmd_count=0
-    for ps1 in "$DIR"/wk*.ps1; do
-        base="$(basename "$ps1" .ps1)"
-        [ "$base" = "wkwrap" ] && continue
-        sh="${DIR}/${base}.sh"; cmd="${DIR}/${base}.cmd"
-        if [ ! -f "$sh" ]; then cp "$DIR/wkwrap.sh" "$sh" && chmod +x "$sh"; echo "  [sh]  $base.sh"; ((sh_count++)); fi
-        if [ ! -f "$cmd" ]; then cp "$DIR/wkwrap.cmd" "$cmd"; echo "  [cmd] $base.cmd"; ((cmd_count++)); fi
-    done
-    echo "Done. $sh_count .sh + $cmd_count .cmd created.";;
---status)
-    for ps1 in "$DIR"/wk*.ps1; do
-        base="$(basename "$ps1" .ps1)"; [ "$base" = "wkwrap" ] && continue
-        s="$([ -f "${DIR}/${base}.sh"  ] && echo OK || echo --)"; c="$([ -f "${DIR}/${base}.cmd" ] && echo OK || echo --)"
-        printf "  %-20s .sh:%-3s .cmd:%s\n" "$base" "$s" "$c"
-    done;;
-*)
-    echo "wkwrap.sh --install | --status | (called as wkXXX.sh -> relay to wkXXX.ps1)"
-    echo "bash/Claude: wkXXX.sh  |  CMD/user: wkXXX.cmd  |  PS direct: wkXXX.ps1";;
-esac
+exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DIR}/wkwrap.ps1" "$SELF" "$@"
+# (gate-validation probe -- safe to revert)

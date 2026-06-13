@@ -1,0 +1,46 @@
+{
+  "id": "harness-throttle-rot-spec-drift-prevention-ref",
+  "app": "wkappbot-workflow",
+  "title": "harness-throttle-rot-spec-drift-prevention-ref",
+  "title_ko": null,
+  "desc": "T3 reference for harness-throttle-rot-spec-drift-prevention: incident economics, doctrinal root + dedup distinction, the no-pipe capstone, the cure-not-depend-on-disease meta, and the 2026-06-13 commit-gate rejection outcome. Parent T1 = harness-throttle-rot-spec-drift-prevention; designs = -howto.",
+  "steps": [
+    "ECONOMICS (why read-first): reading the bound SPEC skill SAVES tokens (a predecessor already solved it); floundering by trial-and-error BURNS them. This incident burned ~40 percent of budget in under two days on avoidable re-discovery a one-second skill read would have prevented. RULE: before any non-trivial harness edit, read the bound SPEC first -- faster and cheaper than failing into the same lesson. The per-source SPEC locks exist to FORCE this read-first discipline; the arrogance of what-I-already-know-is-everything is the exact failure the locks defeat.",
+    "DOCTRINAL ROOT + THE DISTINCTION: no skill sanctions throttling a beneficial reflex; predecessors MISGENERALIZED the once-per-session seen-marker idiom (from wk-tool-first-use-skill-nudge and on-load) into pure TIME throttles (6h/20min/30min). A dedup marker is acceptable ONLY when it carries a SATISFACTION pass-condition: it stops the moment the GOAL is achieved (the wk-tool nudge stops when you READ the skill). A pure clock throttle that suppresses a beneficial reflex for N hours regardless of whether the action was done is garbage. RULE: gate a nudge dedup on GOAL-satisfied, never on elapsed time; audit any seen-marker for a satisfaction condition.",
+    "CAPSTONE no-messing-with-a-skill-read: all gaming or tampering with a skill command is forbidden -- pipe, redirect, null, command-substitution, backtick, variable, absolute path, exe or cmd extension. Enforced by a single CLEAN-CANONICAL match in Test-WkIsKnowledgeOp: after stripping quoted content and the one allowed stderr-merge (2 to 1), the statement must equal exactly bare wkappbot or wkappbot-core then skill then a subcommand then safe args. Multi-command bundling with semicolon or newline stays allowed. Final simple robust form, supersedes earlier blocklist/whitelist iterations.",
+    "META the cure must not depend on the disease (the strongest lesson): my recurrence-prevention was compliance-based -- rules in a SKILL that must be READ to work -- but the root cause was the AI NOT reading skills, so the cure was defeated by the very disease it treated (circular fragility). The owner design is STRUCTURAL: gates enforce read-before-edit, update-after-edit, a score-60 floor, auto-lock-sync regardless of whether the AI reads anything, so it is immune to its own failure mode. PRINCIPLE: a recurrence-prevention must not depend on the behavior it is preventing; structural beats compliance. Locks must be self-maintaining (from the source declaration). Enforce QUALITY (a score floor) not just presence. When designing any guard ask: can it be defeated by the same failing it targets? If yes, make it structural.",
+    "COMMIT-GATE OUTCOME (2026-06-13): only PART 1 shipped -- the edit-time PostToolUse spec-currency NOTICE (wkharness-post.ps1, fail-open, appends to additionalContext before the merge block), LIVE. The hard PRE-COMMIT GATE (Parts 2-3) was REJECTED by a gemini-2.5-pro adversarial re-review: (a) CRITICAL the awk file-to-skill matcher set a pattern var but never used it = checked the WRONG skills; (b) the score>=60 half shelled to pwsh (PS7) absent on this Win-PS5.1 machine = inert; (c) JSONL grep false-positives; (d) GNU-awk-only 3-arg match(); (e) too-aggressive false-block. auto-lock-sync (rewrite CLAUDE.md + git add during the pre-commit hook) was rejected outright as user-hostile (a pre-commit hook must never modify commit content -- breaks least-surprise and git bisect). LESSONS: ship the soft notice first; a hard gate must reuse the proven PS Get-WkHarnessSkillRules matcher NOT hand-rolled awk; never let a gate mutate files; a commit-blocking gate needs cross-check + PRO re-review before merge."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-throttle-rot-spec-drift-prevention-ref",
+      "expect": "economics",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-throttle-rot-spec-drift-prevention",
+      "expect": "preventions",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "additionalContext",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "prevention",
+    "incident",
+    "ref",
+    "t3",
+    "spec-drift"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T02:58:40.1702537Z",
+  "updated": "2026-06-13T02:58:40.1702648Z",
+  "version": "1.0"
+}

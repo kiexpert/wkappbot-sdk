@@ -13,7 +13,8 @@
     "MODEL ROUTING: opus -> claude-opus-4-7. sonnet -> claude-sonnet-4-6. haiku -> claude-haiku-4-5-20251001 (default). Full model IDs passed through unchanged.",
     "EXECUTION: Agent.ps1 extracts prompt+model, calls wkclaude.cmd -Model modelId prompt. wkclaude runs claude --print non-interactive. Output streams to Codex stdout.",
     "DIVISION OF LABOR: Codex=cheap executor (file edits, shell, search). Agent.cmd+Opus=judgment (architecture, root-cause, design). Codex calls Opus only when genuinely stuck or need planning -- same escalation rule as Claude Code.",
-    "SOURCE: personal-docs/tools/Agent.ps1 + Agent.cmd. Symlink: WKAppBot/bin/Agent.cmd."
+    "SOURCE: personal-docs/tools/Agent.ps1 + Agent.cmd. Symlink: WKAppBot/bin/Agent.cmd.",
+    "POWERSHELL MULTILINE Agent.cmd (for Codex -- PowerShell-only, no bash): pipe a SINGLE-QUOTED here-string to Agent.cmd stdin. Agent.ps1 reads stdin verbatim, so newlines + cmd-metachars (& | < > ^) + non-ASCII survive uncorrupted -- the PowerShell twin of the bash-heredoc path. PATTERN (closing terminator MUST be at column 0): line1 = @' ; then the multiline prompt (include 3x wkappbot skill read refs; add a 5-item SPEC block if the target model is mid-tier-or-higher per codex-spec-gate -- gemini-flash/Sonnet/pro/Opus need SPEC, flash-lite/Haiku/codex-mini do not); then a line with only '@ ; then | Agent.cmd --model haiku . RULES: use @'...'@ (single-quoted = literal, no dollar/backtick interpolation -- safe for prompts containing dollar signs or & | < >); the closing terminator must have NO leading whitespace or PowerShell throws a parse error; use the double-quoted here-string form only when you WANT variable interpolation. Single-line ASCII prompts may instead pass a quoted arg: Agent.cmd 'task' --model haiku. Reasoned from the Agent.ps1 stdin-verbatim mechanism; not live-verified (PS tool was down when authored). Sync target: AGENTS.md Codex section."
   ],
   "requirements": [
     {
@@ -47,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-23T13:38:55.1324205Z",
-  "updated": "2026-05-23T13:38:55.1324323Z",
-  "version": "1.0"
+  "updated": "2026-06-11T17:17:08.6240024Z",
+  "version": "1.2"
 }

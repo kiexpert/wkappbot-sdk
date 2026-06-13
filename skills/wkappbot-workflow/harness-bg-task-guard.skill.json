@@ -1,0 +1,43 @@
+{
+  "id": "harness-bg-task-guard",
+  "app": "wkappbot-workflow",
+  "title": "Harness bg-task-guard: read background output before new work",
+  "title_ko": null,
+  "desc": "Blocks new dispatch while a completed background task has unread output, so results are consumed before more work piles up.",
+  "steps": [
+    "TRIGGER: fires when a background task output file is unread (a pending mark older than the threshold) and a new action is attempted.",
+    "FIX: Read the output file path shown when the task was launched, consume the result, then proceed. This prevents losing a finished agent's findings.",
+    "WHY: unread background results = wasted work and lost context; the conductor must consume each completion before fanning out more. See: claude-code-agent-tier-routing-howto."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-bg-task-guard",
+      "expect": "unread",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "routing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd",
+      "expect": "dispatcher",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "background",
+    "task",
+    "guard",
+    "delegation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T06:34:11.8903727Z",
+  "updated": "2026-06-12T06:34:11.8903827Z",
+  "version": "1.0"
+}
