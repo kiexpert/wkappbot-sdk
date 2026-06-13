@@ -31,7 +31,7 @@ $_sdkRepoRoot = Split-Path -Parent $_sdkBin                          # repo root
 $sdkBin     = $_sdkBin
 $coreDevBin = 'D:\GitHub\WKAppBot\bin'                               # private dev repo bin
 
-# ── PHASE 1: DETECT ──────────────────────────────────────────────────────────
+# -- PHASE 1: DETECT --------------------------------------------------
 # Compare SDK bin versions against the freshest available source.
 
 # wkappbot.exe: compare SDK bin vs launcher publish output (rebuild freshness)
@@ -46,7 +46,7 @@ $devLauncherVer = Get-FileVer (Join-Path $coreDevBin 'wkappbot.exe')
 $sdkCoreVer = Get-FileVer (Join-Path $sdkBin 'wkappbot-core.exe')
 $devCoreVer = Get-FileVer (Join-Path $coreDevBin 'wkappbot-core.exe')
 
-# ── PHASE 2: SAFE ─────────────────────────────────────────────────────────────
+# -- PHASE 2: SAFE -------------------------------------------------
 # Never delete the working binary. Stale = warn, not fail. Missing = fail.
 
 # --- wkappbot-core.exe freshness ---
@@ -78,7 +78,8 @@ if ($null -eq $sdkCoreVer) {
 }
 
 # --- wkappbot.exe (launcher) freshness ---
-# Freshest launcher source: publish output (if newer than SDK bin), else dev bin.
+# Freshest launcher source: publish output (if newer than SDK bin), else dev bin, else public GitHub.
+# This supports both dev machines (with local bin) and public users (with only public SDK).
 $bestLauncherSrc = $null
 $bestLauncherVer = $null
 if ($null -ne $pubLauncherVer) {
@@ -94,29 +95,68 @@ if ($null -ne $devLauncherVer) {
 }
 
 if ($null -eq $sdkLauncherVer) {
-    Add-Check 'binary-freshness:launcher' 'fail' 'wkappbot.exe missing -- run: wkdoctor -Build'
-    Emit 'fail' 'binary-freshness:launcher' 'missing -- run: wkdoctor -Build'
+    Add-Check 'binary-freshness:launcher' 'fail' 'wkappbot.exe missing -- attempting heal...'
+    Emit 'fail' 'binary-freshness:launcher' 'missing -- attempting heal...'
+
+    # PHASE 3: SOLVE -- missing launcher: try all sources
+    $healed = $false
+    $healSrc = $null
+
+    # Try best available local source first (dev bin or publish output)
+    if ($null -ne $bestLauncherSrc -and (Test-Path $bestLauncherSrc)) {
+        $healed = Copy-Binary $bestLauncherSrc (Join-Path $sdkBin 'wkappbot.exe')
+        if ($healed) { $healSrc = $bestLauncherSrc }
+    }
+
+    # If local source unavailable/failed, try public GitHub (public user fallback)
+    if (-not $healed) {
+        $ghDownloadSuccess = Try-InstallBinaryFromGitHub -ExePath (Join-Path $sdkBin 'wkappbot.exe')
+        if ($ghDownloadSuccess) {
+            $healed = $true
+            $healSrc = 'kiexpert/wkappbot-sdk (public release)'
+        }
+    }
+
+    if ($healed) {
+        $newVer = Get-FileVer (Join-Path $sdkBin 'wkappbot.exe')
+        Add-Check 'binary-freshness:launcher' 'ok' "self-healed: v$newVer (from $healSrc)"
+        Emit 'ok' 'binary-freshness:launcher' "self-healed: v$newVer"
+    } else {
+        Add-Check 'binary-freshness:launcher' 'fail' 'missing and all heal sources unavailable'
+        Emit 'fail' 'binary-freshness:launcher' 'missing -- copy from local dev bin or download from public SDK release'
+    }
 } elseif ($null -ne $bestLauncherVer -and $bestLauncherVer -gt $sdkLauncherVer) {
-    # PHASE 3: SOLVE -- copy fresher launcher from best available source
+    # PHASE 3: SOLVE -- stale launcher: copy fresher from best available source
     $copied = Copy-Binary $bestLauncherSrc (Join-Path $sdkBin 'wkappbot.exe')
     if ($copied) {
         $newVer = Get-FileVer (Join-Path $sdkBin 'wkappbot.exe')
         Add-Check 'binary-freshness:launcher' 'ok' "self-healed: v$sdkLauncherVer -> v$newVer (copied from $(Split-Path $bestLauncherSrc -Parent))"
         Emit 'ok' 'binary-freshness:launcher' "self-healed: v$sdkLauncherVer -> v$newVer"
     } else {
-        Add-Check 'binary-freshness:launcher' 'warn' "stale v$sdkLauncherVer (best v$bestLauncherVer) -- run: wkdoctor -Build"
-        Emit '!' 'binary-freshness:launcher' "stale v$sdkLauncherVer < v$bestLauncherVer -- run: wkdoctor -Build"
+        Add-Check 'binary-freshness:launcher' 'warn' "stale v$sdkLauncherVer (best v$bestLauncherVer) -- copy failed; attempting GitHub fallback..."
+        Emit '!' 'binary-freshness:launcher' "stale v$sdkLauncherVer < v$bestLauncherVer -- attempting GitHub fallback..."
+
+        # Fallback to GitHub when local copy fails (public user path)
+        $ghDownloadSuccess = Try-InstallBinaryFromGitHub -ExePath (Join-Path $sdkBin 'wkappbot.exe')
+        if ($ghDownloadSuccess) {
+            $newVer = Get-FileVer (Join-Path $sdkBin 'wkappbot.exe')
+            Add-Check 'binary-freshness:launcher' 'ok' "self-healed: v$sdkLauncherVer -> v$newVer (from public SDK release)"
+            Emit 'ok' 'binary-freshness:launcher' "self-healed: v$sdkLauncherVer -> v$newVer (GitHub fallback)"
+        } else {
+            Add-Check 'binary-freshness:launcher' 'warn' "stale v$sdkLauncherVer (best v$bestLauncherVer) -- copy and GitHub fallback both failed; run: wkdoctor -Build"
+            Emit '!' 'binary-freshness:launcher' "stale v$sdkLauncherVer < v$bestLauncherVer -- GitHub fallback failed; run wkdoctor -Build"
+        }
     }
 } elseif ($null -eq $bestLauncherVer) {
-    # No comparison source -- launcher exists but freshness unknown; recommend rebuild
-    Add-Check 'binary-freshness:launcher' 'warn' "v$sdkLauncherVer (no source to compare -- run: wkdoctor -Build to refresh)"
-    Emit '!' 'binary-freshness:launcher' "v$sdkLauncherVer -- run wkdoctor -Build to ensure freshness"
+    # No comparison source available (no dev bin, no publish output) -- launcher exists, freshness unknown
+    Add-Check 'binary-freshness:launcher' 'warn' "v$sdkLauncherVer (no local source to compare -- freshness unknown)"
+    Emit '!' 'binary-freshness:launcher' "v$sdkLauncherVer -- cannot verify freshness (dev bin absent)"
 } else {
     Add-Check 'binary-freshness:launcher' 'ok' "v$sdkLauncherVer (current)"
     Emit 'ok' 'binary-freshness:launcher' "v$sdkLauncherVer"
 }
 
-# ── PHASE 4: PREVENT ──────────────────────────────────────────────────────────
+# -- PHASE 4: PREVENT --------------------------------------------------
 # This check runs every wkdoctor session -- version drift cannot go undetected.
 Add-Check 'binary-freshness:guard' 'ok' 'check runs every session -- version drift auto-detected'
 Emit 'ok' 'binary-freshness:guard' 'runs every session'
