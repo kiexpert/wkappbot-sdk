@@ -126,7 +126,34 @@ jobs:
           -DestinationPath $zip
         Write-Host "Bundled $zip ($('{0:N1} MB' -f ((Get-Item $zip).Length / 1MB)))"
 
-    - name: Publish GitHub Release
+    - name: Check if release exists
+      id: check_release
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $tag = '${{ steps.ver.outputs.tag }}'
+        if (gh release view $tag 2>$null) {
+          "exists=true" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release $tag already exists"
+        } else {
+          "exists=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Release $tag does not exist yet"
+        }
+
+    - name: Create GitHub Release
+      if: ${{ steps.check_release.outputs.exists != 'true' }}
+      shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $tag = '${{ steps.ver.outputs.tag }}'
+        gh release create $tag `
+          --title "WKAppBot $tag" `
+          --generate-notes
+        Write-Host "Release created: $tag"
+
+    - name: Upload release assets
       shell: pwsh
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -134,8 +161,9 @@ jobs:
         $tag = '${{ steps.ver.outputs.tag }}'
         $zip = "wkappbot-${{ steps.ver.outputs.version }}.zip"
 
-        gh release create $tag $zip `
-          --title "WKAppBot $tag" `
-          --generate-notes `
-          --verify-tag
-        Write-Host "Release published: https://github.com/${{ github.repository }}/releases/tag/$tag"
+        Write-Host "Uploading assets for $tag..."
+        gh release upload $tag `
+          bin/wkappbot.exe `
+          $zip `
+          --clobber
+        Write-Host "Assets uploaded: https://github.com/${{ github.repository }}/releases/tag/$tag"

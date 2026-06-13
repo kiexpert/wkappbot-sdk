@@ -1,0 +1,38 @@
+{
+  "id": "bash-uses-pwsh-guard",
+  "app": "wkappbot-workflow",
+  "title": "bash-uses-pwsh-guard: use PowerShell tool directly",
+  "title_ko": null,
+  "desc": "Blocks Bash commands that call powershell.exe or pwsh.exe. PowerShell work must use the PowerShell tool, not Bash spawning it.",
+  "steps": [
+    "SAFETY: Catches Bash commands matching 'powershell.exe', 'pwsh.exe', 'powershell -', or 'pwsh -'. Spawning PowerShell from Bash adds a process layer, loses the PowerShell tool's UTF-8/permission handling, and is the anti-pattern.",
+    "SOLUTION: Use the PowerShell tool directly instead of 'Bash(powershell.exe -Command ...)'. The PowerShell tool is already available -- use it natively.",
+    "PREVENTION: Never chain powershell.exe or pwsh.exe inside a Bash command. If your task is PowerShell-native, use the PowerShell tool. Detail: wkappbot skill read wrapper-harness-integration"
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read bash-uses-pwsh-guard",
+      "expect": "use PowerShell tool directly",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:31:12.2321074Z",
+  "updated": "2026-06-11T07:31:12.2321179Z",
+  "version": "1.0"
+}

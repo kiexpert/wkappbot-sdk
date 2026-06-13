@@ -1,0 +1,38 @@
+{
+  "id": "skill-list-guard",
+  "app": "wkappbot-workflow",
+  "title": "skill-list-guard: run skill news before editing",
+  "title_ko": null,
+  "desc": "Warns on Edit/Write if skill news or skill list was not run in the last 60 minutes. Prevents editing with stale skill knowledge.",
+  "steps": [
+    "SAFETY: Fires when you Edit/Write without running 'wkappbot skill news' or 'wkappbot skill list' in the last 60min -- you may overwrite work done by a parallel session or miss a new skill that already solves your task.",
+    "SOLUTION: Run 'wkappbot skill news' (shows skills added/changed in 7 days) before making file edits. This clears the guard for 60 minutes.",
+    "PREVENTION: Start every session with 'wkappbot skill news' to stay current on new skills and avoid redundant work."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-list-guard",
+      "expect": "skill news",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:30:21.232785Z",
+  "updated": "2026-06-11T07:30:21.2327955Z",
+  "version": "1.0"
+}

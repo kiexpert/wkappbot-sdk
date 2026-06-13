@@ -1,0 +1,38 @@
+{
+  "id": "skill-guard",
+  "app": "wkappbot-workflow",
+  "title": "skill-guard: direct .skill.json edit blocked",
+  "title_ko": null,
+  "desc": "Guard that blocks direct Edit/Write on .skill.json files. Fires when AI bypasses the skill catalog.",
+  "steps": [
+    "SAFETY: Catches direct Edit/Write/Update on any *.skill.json path, bypassing schema validation, version bumping, and catalog registration.",
+    "SOLUTION: Use 'wkappbot skill edit <id>' or 'wkappbot skill contribute'. They validate encoding, handle the pipe separator, update catalog, and bump version.",
+    "PREVENTION: Never use Edit/Write on *.skill.json. The pipe character splits steps -- a raw edit corrupts the step list silently."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-guard",
+      "expect": "direct .skill.json edit forbidden",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:30:09.1033151Z",
+  "updated": "2026-06-11T07:30:09.1033244Z",
+  "version": "1.0"
+}

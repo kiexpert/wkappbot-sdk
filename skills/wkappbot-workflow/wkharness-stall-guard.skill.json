@@ -1,0 +1,38 @@
+{
+  "id": "stall-guard",
+  "app": "wkappbot-workflow",
+  "title": "stall-guard: solo loop time limit exceeded",
+  "title_ko": null,
+  "desc": "Blocks when the AI runs 300+ seconds solo without user interaction. Forces delegation, knowledge contribution, or user turn.",
+  "steps": [
+    "SAFETY: Fires after 300 seconds of continuous solo tool calls without a user turn. A solo loop this long means the AI is thrashing -- either stuck in a retry loop, reading too many files speculatively, or doing mechanical work that should be delegated.",
+    "SOLUTION pick ONE: (1) DELEGATE: spawn Agent.cmd --model haiku with the remaining task -- delegation resets the stall window. (2) CONTRIBUTE KNOWLEDGE (instantly resets stall): run 'wkappbot skill edit <id> --add-step <insight>' with a substantive step (score >=75). This rewards knowledge creation and resets the window immediately. (3) Wait for the user to reply (a user turn resets the window).",
+    "PREVENTION: Delegate mechanical work to Haiku/Codex agents before the 300s window. Contribute knowledge after completing each major step. Never spin in a read-then-retry loop -- that is the pattern this guard catches."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read stall-guard",
+      "expect": "stall time limit exceeded",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption",
+      "expect": "exemption rules",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:32:44.3044702Z",
+  "updated": "2026-06-11T07:32:44.304479Z",
+  "version": "1.0"
+}

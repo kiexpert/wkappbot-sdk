@@ -1,0 +1,38 @@
+{
+  "id": "busy-fleet-guard",
+  "app": "wkappbot-workflow",
+  "title": "busy-fleet-guard: Opus must delegate or top up the fleet",
+  "title_ko": null,
+  "desc": "Blocks Opus from running direct non-wk commands when no delegation was dispatched in the last 30 minutes. Forces fleet usage.",
+  "steps": [
+    "SAFETY: Fires when Opus session runs a direct Bash/PowerShell/Edit command (non-wk-prefix, non-git, non-skill) and no delegation was dispatched in the last 30 minutes. Opus is expensive -- it must orchestrate, not execute.",
+    "SOLUTION: Dispatch work to cheap agents: 'Agent.cmd --model haiku <task>' or 'wkcodex.sh <task>'. This resets the fleet dispatch timestamp and allows subsequent direct commands. Kill switch: set WKHARNESS_BUSYFLEET=0 to disable for the session.",
+    "PREVENTION: As an Opus session, always delegate mechanical/execution work first. Run at least one Agent.cmd or wkcodex.sh dispatch before attempting direct file edits or shell commands. You orchestrate; agents execute."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read busy-fleet-guard",
+      "expect": "delegate or top up the fleet",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:32:56.9893316Z",
+  "updated": "2026-06-11T07:32:56.9893401Z",
+  "version": "1.0"
+}
