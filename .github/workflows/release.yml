@@ -96,13 +96,12 @@ jobs:
           "fetched=false" | Out-File $env:GITHUB_OUTPUT -Append -Encoding utf8
         }
 
-    - name: Build core (source fallback)
+    - name: Note missing core (non-fatal)
       if: ${{ steps.fetch_core.outputs.fetched != 'true' }}
       shell: pwsh
       run: |
-        Write-Host "::error::Core binary unavailable: WKAPPBOT_CORE_PAT/WKAPPBOT_CORE_REPO not set or fetch failed."
-        Write-Host "Set the secrets and re-run, or upload wkappbot-core.exe manually to the release."
-        exit 1
+        Write-Host "::warning::Core binary unavailable: WKAPPBOT_CORE_PAT/WKAPPBOT_CORE_REPO not set or fetch failed."
+        Write-Host "Publishing a launcher-only release (wkappbot.exe). Set the secrets to also publish wkappbot-core.exe + the bundle zip."
 
     - name: Seed bin/wkappbot.hq
       shell: pwsh
@@ -113,11 +112,14 @@ jobs:
     - name: Verify binaries
       shell: pwsh
       run: |
-        if (!(Test-Path bin/wkappbot.exe))      { throw 'wkappbot.exe missing' }
-        if (!(Test-Path bin/wkappbot-core.exe)) { throw 'wkappbot-core.exe missing' }
+        if (!(Test-Path bin/wkappbot.exe)) { throw 'wkappbot.exe missing' }
+        if (!(Test-Path bin/wkappbot-core.exe)) {
+          Write-Host "::warning::wkappbot-core.exe absent -- launcher-only release."
+        }
 
     # ── Bundle & publish ────────────────────────────────────────────────────────
     - name: Create release zip
+      if: ${{ steps.fetch_core.outputs.fetched == 'true' }}
       shell: pwsh
       run: |
         $zip = "wkappbot-${{ steps.ver.outputs.version }}.zip"
@@ -159,11 +161,10 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         $tag = '${{ steps.ver.outputs.tag }}'
+        $assets = @('bin/wkappbot.exe')
         $zip = "wkappbot-${{ steps.ver.outputs.version }}.zip"
+        if (Test-Path $zip) { $assets += $zip }
 
-        Write-Host "Uploading assets for $tag..."
-        gh release upload $tag `
-          bin/wkappbot.exe `
-          $zip `
-          --clobber
+        Write-Host "Uploading assets for $tag : $($assets -join ', ')"
+        gh release upload $tag @assets --clobber
         Write-Host "Assets uploaded: https://github.com/${{ github.repository }}/releases/tag/$tag"

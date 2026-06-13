@@ -4,8 +4,12 @@
 #                does NOT start with an uppercase letter (e.g. "unsandboxed(git)" is invalid --
 #                Claude requires "Unsandboxed(git)"). Also optionally probe `claude --version`
 #                for 'Settings Warning' output on the current system.
-#   (2) SAFE:    report only -- do NOT auto-modify settings.json (a separate higher-risk feature).
-#   (3) SOLVE:   emit the exact corrected rule(s) so the user can fix with one copy-paste.
+#   (2) HEAL:    0-token deterministic auto-fix (user-authorized 2026-06-12). Capitalize the
+#                first letter of each invalid rule -- Claude's own canonical suggestion, e.g.
+#                "command(git)" -> "Command(git)". Only the JSON-quoted literal "name(" is
+#                replaced, so the hook key "command": (colon, not paren) is never touched.
+#                Backup to <file>.wkdoctor-bak, verify-reparse, atomic UTF-8 (no BOM) write.
+#   (3) SOLVE:   emit what was healed; re-detect post-heal so the report reflects reality.
 #   (4) PREVENT: runs every doctor pass; invalid rules never accumulate silently.
 # FAIL-OPEN: any error / missing binary / missing file -> 'n/a (fail-open)', never crash.
 # FAST: one settings.json read + one optional fast `claude --version` probe (< 3s).
@@ -15,7 +19,7 @@ $_m20_myDir  = Split-Path -Parent $MyInvocation.MyCommand.Path   # .../wkappbot.
 $_m20_hqDir  = Split-Path -Parent $_m20_myDir                    # .../wkappbot.hq
 $_m20_sdkBin = Split-Path -Parent $_m20_hqDir                    # .../bin (SDK bin root)
 
-# ── PHASE 1: DETECT ──────────────────────────────────────────────────────────
+# -- PHASE 1: DETECT ----------------------------------------------------------
 
 # Settings files to scan: global user + project-level (if present)
 $_m20_settingsFiles = @()
@@ -82,7 +86,7 @@ foreach ($_m20_sf in $_m20_settingsFiles) {
     }
 }
 
-# ── FAST PROBE: claude --version for startup warnings ────────────────────────
+# -- FAST PROBE: claude --version for startup warnings ------------------------
 # `claude --version` is near-instant and emits 'Settings Warning' lines to stderr
 # when Claude detects invalid rules. We capture combined output and grep for them.
 $_m20_probeWarnings = @()
@@ -105,31 +109,106 @@ try {
     $_m20_probeMethod = 'n/a (fail-open)'
 }
 
-# ── PHASE 2 + 3: SAFE report + SOLVE ─────────────────────────────────────────
+# -- PHASE 2: HEAL (0-token deterministic auto-fix) ---------------------------
+# User-authorized 2026-06-12. Repair invalid lowercase tool-name rules in place by
+# capitalizing the first letter (Claude's own canonical suggestion). Only the JSON-
+# quoted literal "name(...)" is string-replaced, so the hook key "command": is safe.
 
 $totalViolations = $_m20_allViolations.Count
+$_m20_healedCount = 0
+$_m20_healErrors  = @()
+
+if ($totalViolations -gt 0) {
+    $_m20_pathByLabel = @{}
+    foreach ($sf in $_m20_settingsFiles) { $_m20_pathByLabel[$sf.Label] = $sf.Path }
+
+    foreach ($grp in ($_m20_allViolations | Group-Object File)) {
+        $filePath = $_m20_pathByLabel[$grp.Name]
+        if (-not $filePath) { continue }
+        try {
+            $orig   = [IO.File]::ReadAllText($filePath, [Text.Encoding]::UTF8)
+            $healed = $orig
+            $n = 0
+            foreach ($v in $grp.Group) {
+                $needle  = '"' + $v.Bad + '"'
+                $replace = '"' + $v.Fixed + '"'
+                if ($healed.Contains($needle)) { $healed = $healed.Replace($needle, $replace); $n++ }
+            }
+            if ($n -gt 0 -and -not [string]::Equals($healed, $orig)) {
+                $null = ConvertFrom-Json -InputObject $healed -ErrorAction Stop  # verify before commit
+                [IO.File]::Copy($filePath, "$filePath.wkdoctor-bak", $true)
+                [IO.File]::WriteAllText($filePath, $healed, (New-Object System.Text.UTF8Encoding($false)))
+                $_m20_healedCount += $n
+            }
+        } catch {
+            $_m20_healErrors += "$($grp.Name): heal failed -- $_"
+        }
+    }
+
+    # Re-detect post-heal so the report reflects the real current state
+    if ($_m20_healedCount -gt 0) {
+        $_m20_allViolations.Clear()
+        foreach ($_m20_sf in $_m20_settingsFiles) {
+            try {
+                $rawText2 = [IO.File]::ReadAllText($_m20_sf.Path, [Text.Encoding]::UTF8)
+                $parsed2  = ConvertFrom-Json -InputObject $rawText2 -ErrorAction Stop
+                $ruleSets2 = @()
+                if ($parsed2.permissions -and $parsed2.permissions.allow) { $ruleSets2 += [PSCustomObject]@{ Field='allow'; Rules=@($parsed2.permissions.allow) } }
+                if ($parsed2.permissions -and $parsed2.permissions.deny)  { $ruleSets2 += [PSCustomObject]@{ Field='deny';  Rules=@($parsed2.permissions.deny)  } }
+                foreach ($rs in $ruleSets2) {
+                    foreach ($rule in $rs.Rules) {
+                        $ruleStr = "$rule"
+                        if ($ruleStr -match '^mcp__') { continue }
+                        if ($_m20_lowercaseToolRx.IsMatch($ruleStr)) {
+                            $fixed = $ruleStr.Substring(0,1).ToUpperInvariant() + $ruleStr.Substring(1)
+                            $_m20_allViolations.Add([PSCustomObject]@{ File=$_m20_sf.Label; Field=$rs.Field; Bad=$ruleStr; Fixed=$fixed })
+                        }
+                    }
+                }
+            } catch {}
+        }
+        # The healed file now parses clean -- the pre-heal CLI probe warnings are stale.
+        $_m20_probeWarnings = @()
+        $_m20_probeMethod   = 'healed (probe stale, cleared)'
+    }
+    $totalViolations = $_m20_allViolations.Count
+}
+
+# -- PHASE 3: SOLVE (report healed + any remaining) ---------------------------
+
 $probeIssues     = $_m20_probeWarnings.Count
 $parseIssueCount = $_m20_parseErrors.Count
+$healIssueCount  = $_m20_healErrors.Count
 
-if ($totalViolations -eq 0 -and $probeIssues -eq 0 -and $parseIssueCount -eq 0) {
-    $detail = "no invalid rules in $($_m20_settingsFiles.Count) settings file(s); probe=$_m20_probeMethod"
+if ($totalViolations -eq 0 -and $probeIssues -eq 0 -and $parseIssueCount -eq 0 -and $healIssueCount -eq 0) {
+    if ($_m20_healedCount -gt 0) {
+        $detail = "auto-healed $($_m20_healedCount) invalid rule(s) (capitalized tool name); backup .wkdoctor-bak written"
+    } else {
+        $detail = "no invalid rules in $($_m20_settingsFiles.Count) settings file(s); probe=$_m20_probeMethod"
+    }
     Add-Check 'settings:rule-casing' 'ok' $detail
     Emit 'ok' 'settings:rule-casing' $detail
 } else {
     $parts = @()
-    if ($totalViolations -gt 0) { $parts += "$totalViolations invalid rule(s)" }
-    if ($probeIssues -gt 0)     { $parts += "$probeIssues CLI warning(s)" }
-    if ($parseIssueCount -gt 0) { $parts += "$parseIssueCount parse error(s)" }
+    if ($_m20_healedCount -gt 0)  { $parts += "$($_m20_healedCount) auto-healed" }
+    if ($totalViolations -gt 0)   { $parts += "$totalViolations still-invalid rule(s)" }
+    if ($probeIssues -gt 0)       { $parts += "$probeIssues CLI warning(s)" }
+    if ($parseIssueCount -gt 0)   { $parts += "$parseIssueCount parse error(s)" }
+    if ($healIssueCount -gt 0)    { $parts += "$healIssueCount heal error(s)" }
     $summary = ($parts -join '; ') + " -- probe=$_m20_probeMethod"
 
-    Add-Check 'settings:rule-casing' 'warn' $summary
-    Emit '!' 'settings:rule-casing' $summary
+    $finalStatus = if ($totalViolations -eq 0 -and $parseIssueCount -eq 0 -and $healIssueCount -eq 0) { 'ok' } else { 'warn' }
+    Add-Check 'settings:rule-casing' $finalStatus $summary
+    Emit $(if ($finalStatus -eq 'ok') { 'ok' } else { '!' }) 'settings:rule-casing' $summary
 
-    # SOLVE: emit each bad rule + its fix
     foreach ($v in $_m20_allViolations) {
-        $healMsg = "[$($v.File)/$($v.Field)] `"$($v.Bad)`" -> fix: `"$($v.Fixed)`" (tool name must start uppercase)"
+        $healMsg = "[$($v.File)/$($v.Field)] `"$($v.Bad)`" -> needs `"$($v.Fixed)`" (heal could not rewrite -- check file perms)"
         Add-Check 'settings:rule-casing:fix' 'warn' $healMsg
         Emit '!' 'settings:rule-casing:fix' $healMsg
+    }
+    foreach ($he in $_m20_healErrors) {
+        Add-Check 'settings:rule-casing:heal' 'warn' $he
+        Emit '!' 'settings:rule-casing:heal' $he
     }
     foreach ($pw in $_m20_probeWarnings) {
         $short = if ($pw.Length -gt 120) { $pw.Substring(0, 120) + '...' } else { $pw }
@@ -142,5 +221,6 @@ if ($totalViolations -eq 0 -and $probeIssues -eq 0 -and $parseIssueCount -eq 0) 
     }
 }
 
-# ── PHASE 4: PREVENT (self-documenting) ──────────────────────────────────────
+
+# -- PHASE 4: PREVENT (self-documenting) --------------------------------------
 # This check runs every doctor pass -- invalid permission rules cannot accumulate silently.
