@@ -69,7 +69,7 @@ function Install-HarnessSettings {
             PostToolUse = $commonPostHooks
         }
         $agyJson = ConvertTo-Json -InputObject $existingAgy -Depth 10
-        [IO.File]::WriteAllText($Path, $agyJson, [Text.Encoding]::UTF8)
+        [IO.File]::WriteAllText($Path, $agyJson, (New-Object System.Text.UTF8Encoding($false)))
     } else {
         # Claude/Gemini
         $cSettings = $null
@@ -107,7 +107,7 @@ function Install-HarnessSettings {
         if (-not $cSettings.model) { $cSettings.model = 'opus' }
 
         $cJson = ConvertTo-Json -InputObject $cSettings -Depth 10
-        [IO.File]::WriteAllText($Path, $cJson, [Text.Encoding]::UTF8)
+        [IO.File]::WriteAllText($Path, $cJson, (New-Object System.Text.UTF8Encoding($false)))
     }
 }
 

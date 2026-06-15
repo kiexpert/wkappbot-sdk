@@ -222,5 +222,164 @@ if ($totalViolations -eq 0 -and $probeIssues -eq 0 -and $parseIssueCount -eq 0 -
 }
 
 
+# =============================================================================
+# CHECK 2: hook-events -- detect + heal invalid hooks.<Event> keys that Claude
+# silently ignores ("Unknown hook event ... was ignored"). The classic case is a
+# wkharness wiring written under "BeforeTool" instead of the canonical "PreToolUse"
+# (and "AfterTool" instead of "PostToolUse"), which disables the guard entirely.
+# DOCTOR 4-PHASE FLOW mirrors CHECK 1:
+#   (1) DETECT:  parse .hooks keys; flag any key NOT in the valid-event whitelist.
+#   (2) HEAL:    0-token deterministic rename for known typo->canonical mappings,
+#                ONLY when the canonical key is not already present (merging arrays
+#                is non-deterministic, so that case is left as a warn). Regex-replace
+#                the JSON key token "<bad>": -> "<canonical>": (colon/whitespace kept),
+#                backup .wkdoctor-bak, verify-reparse, atomic UTF-8 (no BOM) write.
+#   (3) SOLVE:   emit healed + any remaining; re-detect post-heal.
+#   (4) PREVENT: runs every pass; dead/ignored hook keys never persist silently.
+# FAIL-OPEN: any error -> skipped, never crashes the doctor pass.
+
+# Canonical Claude Code hook events (superset; extra unknowns are reported, not renamed).
+$_m20h_validEvents = @(
+    'PreToolUse','PostToolUse','PostToolUseFailure','PostToolBatch','Notification',
+    'UserPromptSubmit','UserPromptExpansion','SessionStart','SessionEnd','Stop',
+    'StopFailure','SubagentStart','SubagentStop','PreCompact','PostCompact',
+    'PermissionRequest','PermissionDenied','Setup','TeammateIdle','TaskCreated',
+    'TaskCompleted','Elicitation','ElicitationResult','ConfigChange','WorktreeCreate',
+    'WorktreeRemove','InstructionsLoaded','CwdChanged','FileChanged','MessageDisplay'
+)
+# Known typo -> canonical renames (case-insensitive key match).
+$_m20h_renameMap = @{
+    'beforetool'    = 'PreToolUse'
+    'beforetooluse' = 'PreToolUse'
+    'pretool'       = 'PreToolUse'
+    'aftertool'     = 'PostToolUse'
+    'aftertooluse'  = 'PostToolUse'
+    'posttool'      = 'PostToolUse'
+}
+
+function Get-M20HookViolations {
+    param([object[]]$Files)
+    $out = [System.Collections.Generic.List[PSCustomObject]]::new()
+    foreach ($sf in $Files) {
+        try {
+            $raw = [IO.File]::ReadAllText($sf.Path, [Text.Encoding]::UTF8)
+            $p   = ConvertFrom-Json -InputObject $raw -ErrorAction Stop
+            if (-not $p.hooks) { continue }
+            $keys = @($p.hooks.PSObject.Properties.Name)
+            foreach ($k in $keys) {
+                if ($_m20h_validEvents -contains $k) { continue }   # already valid
+                $canon   = $_m20h_renameMap[$k.ToLowerInvariant()]
+                $conflict = $false
+                if ($canon) { $conflict = ($keys -contains $canon) }  # target key already exists -> needs array merge
+                $out.Add([PSCustomObject]@{
+                    File      = $sf.Label
+                    Path      = $sf.Path
+                    Bad       = $k
+                    Canonical = $canon                # $null when unknown event
+                    Conflict  = $conflict
+                })
+            }
+        } catch {}   # fail-open per file
+    }
+    return @($out)
+}
+
+$_m20h_violations = Get-M20HookViolations -Files $_m20_settingsFiles
+$_m20h_healed     = 0
+$_m20h_healErrors = @()
+
+# -- HEAL: rename known typos when no array-merge is required --
+foreach ($grp in ($_m20h_violations | Where-Object { $_.Canonical -and -not $_.Conflict } | Group-Object Path)) {
+    $filePath = $grp.Name
+    try {
+        $orig   = [IO.File]::ReadAllText($filePath, [Text.Encoding]::UTF8)
+        $healed = $orig
+        $n = 0
+        foreach ($v in $grp.Group) {
+            $pat = '"' + [regex]::Escape($v.Bad) + '"(\s*:)'
+            $rep = '"' + $v.Canonical + '"$1'
+            $new = [regex]::Replace($healed, $pat, $rep)
+            if (-not [string]::Equals($new, $healed)) { $healed = $new; $n++ }
+        }
+        if ($n -gt 0 -and -not [string]::Equals($healed, $orig)) {
+            $null = ConvertFrom-Json -InputObject $healed -ErrorAction Stop   # verify (also catches dup keys)
+            [IO.File]::Copy($filePath, "$filePath.wkdoctor-bak", $true)
+            [IO.File]::WriteAllText($filePath, $healed, (New-Object System.Text.UTF8Encoding($false)))
+            $_m20h_healed += $n
+        }
+    } catch {
+        $_m20h_healErrors += "$($grp.Name): hook-event heal failed -- $_"
+    }
+}
+
+# Re-detect post-heal so the report reflects reality.
+if ($_m20h_healed -gt 0) { $_m20h_violations = Get-M20HookViolations -Files $_m20_settingsFiles }
+
+# -- SOLVE: report --
+$_m20h_remaining = @($_m20h_violations)
+if ($_m20h_remaining.Count -eq 0 -and $_m20h_healErrors.Count -eq 0) {
+    $detail = if ($_m20h_healed -gt 0) {
+        "auto-healed $_m20h_healed invalid hook key(s) (e.g. BeforeTool -> PreToolUse); backup .wkdoctor-bak written"
+    } else {
+        "all hook event keys valid in $($_m20_settingsFiles.Count) settings file(s)"
+    }
+    Add-Check 'settings:hook-events' 'ok' $detail
+    Emit 'ok' 'settings:hook-events' $detail
+} else {
+    $parts = @()
+    if ($_m20h_healed -gt 0)            { $parts += "$_m20h_healed auto-healed" }
+    if ($_m20h_remaining.Count -gt 0)   { $parts += "$($_m20h_remaining.Count) invalid hook key(s) remain" }
+    if ($_m20h_healErrors.Count -gt 0)  { $parts += "$($_m20h_healErrors.Count) heal error(s)" }
+    $summary = $parts -join '; '
+    Add-Check 'settings:hook-events' 'warn' $summary
+    Emit '!' 'settings:hook-events' $summary
+    foreach ($v in $_m20h_remaining) {
+        $msg = if (-not $v.Canonical) {
+            "[$($v.File)] hooks.`"$($v.Bad)`" is not a valid event -- remove it or use a valid event name"
+        } elseif ($v.Conflict) {
+            "[$($v.File)] hooks.`"$($v.Bad)`" -> `"$($v.Canonical)`" needs manual ARRAY MERGE ($($v.Canonical) already exists)"
+        } else {
+            "[$($v.File)] hooks.`"$($v.Bad)`" -> `"$($v.Canonical)`" (heal could not rewrite -- check file perms)"
+        }
+        Add-Check 'settings:hook-events:fix' 'warn' $msg
+        Emit '!' 'settings:hook-events:fix' $msg
+    }
+    foreach ($he in $_m20h_healErrors) {
+        Add-Check 'settings:hook-events:heal' 'warn' $he
+        Emit '!' 'settings:hook-events:heal' $he
+    }
+}
+
 # -- PHASE 4: PREVENT (self-documenting) --------------------------------------
-# This check runs every doctor pass -- invalid permission rules cannot accumulate silently.
+# This check runs every doctor pass -- invalid permission rules AND dead hook
+# event keys never accumulate silently.
+
+# =============================================================================
+# CHECK 3: settings:bom -- detect a UTF-8 BOM in every settings file.
+# A BOM (0xEF 0xBB 0xBF) makes Claude Code reject or silently ignore settings.json
+# (and 08 used to WRITE one via [Text.Encoding]::UTF8 -- fixed). Emit a STRONG error
+# ('x'), NOT a warn, so the operator sees it; then auto-heal (strip BOM, rewrite no-BOM).
+# Detect via ReadAllBytes -- Get-Content/ReadAllText hide the BOM. FAIL-OPEN on read error.
+# =============================================================================
+foreach ($_m20b_sf in $_m20_settingsFiles) {
+    $_m20b_path = $_m20b_sf.Path
+    if (-not (Test-Path -LiteralPath $_m20b_path)) { continue }
+    try {
+        $_m20b_bytes = [IO.File]::ReadAllBytes($_m20b_path)
+        $_m20b_hasBom = ($_m20b_bytes.Length -ge 3) -and ($_m20b_bytes[0] -eq 0xEF) -and ($_m20b_bytes[1] -eq 0xBB) -and ($_m20b_bytes[2] -eq 0xBF)
+        if (-not $_m20b_hasBom) { continue }
+        Add-Check 'settings:bom' 'fail' "UTF-8 BOM in $($_m20b_sf.Label) settings.json -- Claude Code may reject it"
+        Emit 'x' 'settings:bom' "UTF-8 BOM detected in $($_m20b_sf.Label) settings.json -- Claude Code may reject it; healing"
+        try {
+            $_m20b_raw = [IO.File]::ReadAllText($_m20b_path, [Text.Encoding]::UTF8)
+            if ($_m20b_raw.Length -gt 0 -and [int][char]$_m20b_raw[0] -eq 0xFEFF) { $_m20b_raw = $_m20b_raw.Substring(1) }
+            $null = ConvertFrom-Json -InputObject $_m20b_raw -ErrorAction Stop
+            [IO.File]::Copy($_m20b_path, "$_m20b_path.wkdoctor-bom-bak", $true)
+            [IO.File]::WriteAllText($_m20b_path, $_m20b_raw, (New-Object System.Text.UTF8Encoding($false)))
+            $_m20b_b2 = [IO.File]::ReadAllBytes($_m20b_path)
+            $_m20b_still = ($_m20b_b2.Length -ge 3) -and ($_m20b_b2[0] -eq 0xEF) -and ($_m20b_b2[1] -eq 0xBB) -and ($_m20b_b2[2] -eq 0xBF)
+            if (-not $_m20b_still) { Emit 'ok' 'settings:bom:healed' "BOM stripped from $($_m20b_sf.Label) settings.json; backup .wkdoctor-bom-bak" }
+            else { Emit 'x' 'settings:bom:healfail' "BOM strip FAILED for $($_m20b_sf.Label) settings.json -- check permissions" }
+        } catch { Emit 'x' 'settings:bom:healerr' "BOM heal error for $($_m20b_sf.Label): $_" }
+    } catch { }
+}
