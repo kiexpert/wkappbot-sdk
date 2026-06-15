@@ -14,28 +14,30 @@ function Install-HarnessSettings {
         [string]$Path
     )
 
-    $commonBeforeHooks = @()
-    # Standard Harness Pre-Hook (Modern Hook Protocol compliant)
-    $commonBeforeHooks += [ordered]@{
-        id    = 'harness'
-        hooks = @([ordered]@{
-            type          = 'command'
-            command       = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPath`""
-            timeout       = 30
-            statusMessage = 'wkharness(kih)...'
-        })
+    # Claude (~/.claude) talks to the family-aware kih harness DIRECTLY. kih emits
+    # Claude-native hook output (silent-allow / {"decision":...}). Routing Claude
+    # through the central D:\GitHub\wkharness.ps1 shim (gemini-cli-generated) re-wraps
+    # output into gemini's {"decision","result"} schema -> Claude rejects every hook
+    # with "Invalid input" AND the shim's TOML-logger pollutes ~/.gemini policy with
+    # toolName=Bash rules. AGY/Gemini keep the shim (it translates gemini tool names).
+    if ($Type -eq 'claude') {
+        # -Family claude: authoritative family hint so kih skips the gemini/codex
+        # family classification (faster + avoids misdetection). Tier still detected.
+        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness.ps1`" -Family claude"
+        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness-post.ps1`""
+    } else {
+        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPath`""
+        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPostPath`""
     }
 
-    $commonPostHooks = @(
-        [ordered]@{
-            id    = 'harness-post'
-            hooks = @([ordered]@{
-                type    = 'command'
-                command = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPostPath`""
-                timeout = 10
-            })
-        }
-    )
+    $commonBeforeHooks = @([ordered]@{
+        id    = 'harness'
+        hooks = @([ordered]@{ type = 'command'; command = $preCmd; timeout = 30; statusMessage = 'wkharness(kih)...' })
+    })
+    $commonPostHooks = @([ordered]@{
+        id    = 'harness-post'
+        hooks = @([ordered]@{ type = 'command'; command = $postCmd; timeout = 10 })
+    })
 
     if ($Type -eq 'agy') {
         $existingAgy = $null
@@ -96,9 +98,10 @@ function Install-HarnessSettings {
         $cSettings.skipAutoPermissionPrompt = $true
         if ($cSettings.permissions.ContainsKey('deny')) { $null = $cSettings.permissions.Remove('deny') }   
 
-        # Use BeforeTool for Gemini/Claude compatibility (standardized protocol)
+        # Claude Code uses PreToolUse (NOT gemini's BeforeTool). ~/.claude is Claude-only;
+        # gemini-cli has its own ~/.gemini/settings.json installed separately.
         $cSettings.hooks = @{
-            BeforeTool = $commonBeforeHooks
+            PreToolUse  = $commonBeforeHooks
             PostToolUse = $commonPostHooks
         }
         if (-not $cSettings.model) { $cSettings.model = 'opus' }
@@ -143,9 +146,10 @@ $claudeOk = $false
 if (Test-Path $claudeSettings -PathType Leaf) {
     try {
         $raw = Get-Content $claudeSettings -Encoding UTF8 -Raw | ConvertFrom-Json
-        # Check BeforeTool (Standardized location)
-        $hooks = $raw.hooks.BeforeTool
-        $hasHarness = $hooks -and ($hooks | Where-Object { $_.id -eq 'harness' })      
+        # Claude uses PreToolUse. Healthy ONLY if it points at the kih harness directly
+        # (not the gemini shim); otherwise re-heal to kih.
+        $hooks = $raw.hooks.PreToolUse
+        $hasHarness = $hooks -and ($hooks | Where-Object { $_.id -eq 'harness' -and ($_.hooks.command -match 'wkappbot-kih') })      
         $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'Bash(*)')
         if ($hasHarness -and $hasWildcard) { $claudeOk = $true }
     } catch {}
