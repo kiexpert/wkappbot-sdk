@@ -20,6 +20,7 @@ try {
     $bomHealed = 0
     $badSettings = $false
     $errors = @()
+    $wiringDetail = @()
 
     # 1. Check & Heal BOM
     foreach ($p in $targets) {
@@ -51,6 +52,32 @@ try {
             $s = Get-Content $settingsPath -Raw | ConvertFrom-Json
             if ($s.approvalMode -ne 'yolo' -or -not $s.hooks.BeforeTool) {
                 $badSettings = $true
+            }
+            # Deep harness-wiring invariants (manual review 2026-06-16 codified into the doctor so a
+            # regression is caught every run, not by chance). Each failure -> badSettings + a reason.
+            $beforeHooks = @($s.hooks.BeforeTool | ForEach-Object { $_.hooks })
+            $harnessHook = $beforeHooks | Where-Object { $_.command -match 'wkharness' } | Select-Object -First 1
+            $harnessCmd  = if ($harnessHook) { [string]$harnessHook.command } else { '' }
+            # (1) BeforeTool harness hook must target the PER-FAMILY main, not the shared heart or a stray.
+            if (-not ($harnessCmd -match 'wkharness-gemini-main\.ps1')) {
+                $badSettings = $true; $wiringDetail += 'BeforeTool harness not -> wkharness-gemini-main.ps1; '
+            }
+            # (2) no reference to the retired stray hub D:\GitHub\wkharness.ps1 (deleted 2026-06-16).
+            if ($harnessCmd -match '(?i)github[\\/]+wkharness\.ps1') {
+                $badSettings = $true; $wiringDetail += 'references retired stray D:\GitHub\wkharness.ps1; '
+            }
+            # (3) a literal TAB inside the command path = the \t-escape JSON corruption.
+            if ($harnessCmd -match "`t") {
+                $badSettings = $true; $wiringDetail += 'TAB char in harness command (path corruption); '
+            }
+            # (4) gemini timeouts are MILLISECONDS; <3000 means the ~1.5s hook always times out -> gemini fails OPEN (unenforced).
+            if ($harnessHook -and $harnessHook.timeout -and [int]$harnessHook.timeout -lt 3000) {
+                $badSettings = $true; $wiringDetail += ('harness timeout ' + [int]$harnessHook.timeout + 'ms too small (instant-timeout/fail-open); ')
+            }
+            # (5) AfterTool post hook (wkharness-post.ps1) must EXIST -- post-tool knowledge-ops/study-lock/nudges. Regression guard (dropped 2026-06-16).
+            $afterCmd = @($s.hooks.AfterTool | ForEach-Object { $_.hooks } | Where-Object { $_.command -match 'wkharness-post' }) | Select-Object -First 1
+            if (-not $afterCmd) {
+                $badSettings = $true; $wiringDetail += 'AfterTool wkharness-post.ps1 hook MISSING (post-tool nudges/study-lock/knowledge-reward lost); '
             }
         } catch {
             $badSettings = $true
@@ -100,6 +127,7 @@ try {
         }
         if ($badSettings) {
             $msg += "Gemini settings are misconfigured or missing hooks/YOLO. "
+            if ($wiringDetail.Count -gt 0) { $msg += ('WIRING: ' + ($wiringDetail -join '')) }
         }
         if ($settingsHealed) {
             $msg += "Reinstalled correct Gemini/Antigravity settings. "
