@@ -40,7 +40,7 @@ try {
     if ($bad.Count -gt 0) {
         $detail = 'DEAD HOOK -- {0} harness script(s) FAIL TO PARSE (the hook cannot run = total enforcement loss for that family): {1}' -f $bad.Count, ($bad -join ' || ')
         Add-Check 'harness-parse-integrity' 'fail' $detail
-        Emit 'x' 'harness-parse-integrity' $detail
+        Emit 'fail' 'harness-parse-integrity' $detail
     } else {
         Add-Check 'harness-parse-integrity' 'ok' "all $checked harness hook scripts parse (heart + per-family mains/posts + common)"
         Emit 'ok' 'harness-parse-integrity' "all $checked harness hook scripts parse OK"

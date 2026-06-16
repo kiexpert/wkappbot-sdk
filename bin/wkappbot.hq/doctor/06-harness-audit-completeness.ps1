@@ -44,7 +44,7 @@ try {
     if ($fieldBad.Count -gt 0) {
         $detail = 'AUDIT FIELD-INCOMPLETE -- {0} entr(ies) missing required field(s) (ts/slug/sess/tool/body) = the hook recorded a partial/corrupt trail: {1}' -f $fieldBad.Count, (($fieldBad | Select-Object -First 6) -join ' || ')
         Add-Check 'harness-audit-completeness' 'fail' $detail
-        Emit 'x' 'harness-audit-completeness' $detail
+        Emit 'fail' 'harness-audit-completeness' $detail
         return
     }
     $auditTimes = foreach ($l in $auditLines) {
@@ -93,7 +93,7 @@ try {
     if ($offenders.Count -gt 0) {
         $detail = 'UNTRACKED TOOL-CALL(S) -- {0} active session(s) have tool-calls with NO audit trail (the hook did NOT fire = enforcement hole): {1}' -f $offenders.Count, ($offenders -join ' || ')
         Add-Check 'harness-audit-completeness' 'fail' $detail
-        Emit 'x' 'harness-audit-completeness' $detail
+        Emit 'fail' 'harness-audit-completeness' $detail
     } else {
         Add-Check 'harness-audit-completeness' 'ok' "audit trail complete (latest audit entry $($auditLatest.ToString('HH:mm:ss')); no untracked tool-calls in active sessions)"
         Emit 'ok' 'harness-audit-completeness' "audit trail complete (no untracked tool-calls)"

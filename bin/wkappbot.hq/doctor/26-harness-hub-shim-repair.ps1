@@ -28,7 +28,7 @@ try {
         Emit 'ok' 'harness-hub-shim-retire' "retired stray: $($removed -join ', ')"
     } else {
         Add-Check 'harness-hub-shim-retire' 'ok' 'no stray hub present (per-family direct wiring intact)'
-        Emit '+' 'harness-hub-shim-retire' 'no stray hub (per-family direct wiring intact)'
+        Emit 'ok' 'harness-hub-shim-retire' 'no stray hub (per-family direct wiring intact)'
     }
 } catch {
     Add-Check 'harness-hub-shim-retire' 'ok' "n/a (check error, fail-open): $_"

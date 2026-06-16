@@ -39,9 +39,12 @@ $malfunctionReason = ""
 if (Test-Path $AgySettings) {
     try {
         $j = Get-Content $AgySettings -Raw | ConvertFrom-Json
-        if (-not $j.hooks.BeforeTool) {
+        # accept EITHER BeforeTool (gemini-cli) OR PreToolUse (antigravity/agy Claude-style).
+        # (Was BeforeTool-only -> false malfunction once agy moved to PreToolUse -> re-appended
+        #  the safety-block every run = the 5x autonomy.toml duplication.)
+        if (-not ($j.hooks.BeforeTool -or $j.hooks.PreToolUse)) {
             $isMalfunctioning = $true
-            $malfunctionReason = "BeforeTool hook is missing in settings.json"
+            $malfunctionReason = "neither BeforeTool nor PreToolUse hook present in settings.json"
         }
     } catch {
         $isMalfunctioning = $true
@@ -54,14 +57,16 @@ if (Test-Path $AgySettings) {
 
 if ($isMalfunctioning) {
     Add-Check 'gemini harness' 'fail' "Harness wiring malfunction: $malfunctionReason"
-    Emit '!' 'gemini harness' 'Malfunction detected. Safety measure: BLOCKING basic write tools.'
-    
+    Emit 'fail' 'gemini harness' 'Malfunction detected. Safety measure: BLOCKING basic write tools.'
+
     try {
         $autoPath = Join-Path $env:USERPROFILE '.gemini\policies\autonomy.toml'
+        # gemini's real write tool is 'write_file' (NOT 'write_to_file' -- that name is
+        # unrecognized and emits a policy warning). IDEMPOTENT: only append if absent.
         $blockRules = @"
 
 [[rule]]
-toolName = "write_to_file"
+toolName = "write_file"
 decision = "deny"
 priority = 999
 
@@ -75,8 +80,13 @@ toolName = "multi_replace_file_content"
 decision = "deny"
 priority = 999
 "@
-        Add-Content -Path $autoPath -Value $blockRules -Encoding UTF8
-        Emit '+' 'gemini safety' 'Basic write tools have been explicitly blocked in autonomy.toml'
+        $existingToml = if (Test-Path $autoPath) { Get-Content $autoPath -Raw } else { '' }
+        if ($existingToml -match 'toolName\s*=\s*"write_file"') {
+            Emit 'ok' 'gemini safety' 'write-tool block already present (idempotent -- not re-appended)'
+        } else {
+            Add-Content -Path $autoPath -Value $blockRules -Encoding UTF8
+            Emit 'ok' 'gemini safety' 'Basic write tools blocked in autonomy.toml (write_file/replace_file_content/multi_replace_file_content)'
+        }
         $hasHealed = $true
     } catch {
         Emit '!' 'gemini safety' "Failed to apply safety block to autonomy.toml: $_"
