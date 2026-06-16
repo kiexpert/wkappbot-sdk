@@ -27,7 +27,7 @@ function Test-HookProtocol {
     try {
         $proc = New-Object System.Diagnostics.Process
         $proc.StartInfo.FileName = "powershell.exe"
-        $proc.StartInfo.Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPath`""
+        $proc.StartInfo.Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPath`" -Family $Family"
         $proc.StartInfo.RedirectStandardInput = $true
         $proc.StartInfo.RedirectStandardOutput = $true
         $proc.StartInfo.RedirectStandardError = $true
@@ -52,7 +52,13 @@ function Test-HookProtocol {
         # For Gemini/Codex, wkharness.ps1 is now configured to detect via WKHARNESS_AGENT_MODEL
         # and exit 0 with JSON.
         $modelMatch = ($resolvedModel -match $Family) -or ($resolvedModel -match 'flash' -and $Family -eq 'gemini') -or ($resolvedModel -match 'mini' -and $Family -eq 'codex')
-        $ok = ($exitCode -eq $ExpectExit) -and ($decision -eq 'deny') -and $modelMatch
+        # Claude blocks by EXIT CODE only (emits NO stdout JSON by design -> $j null -> model='PARSE_ERROR'
+        # is EXPECTED, not a failure). Verify exit-code alone for claude; gemini/codex emit JSON so check it.
+        if ($Family -eq 'claude') {
+            $ok = ($exitCode -eq $ExpectExit)
+        } else {
+            $ok = ($exitCode -eq $ExpectExit) -and ($decision -eq 'deny') -and $modelMatch
+        }
         
         if ($ok) {
             return $true
