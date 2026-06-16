@@ -2,10 +2,10 @@
 # Runs within wkdoctor context. $binDir, $repoRoot are already defined by wkdoctor.ps1.
 
 $gitHubDir = try { Split-Path $repoRoot -Parent } catch { 'D:\GitHub' }
-# CRITICAL: Always use the central shim paths at D:\GitHub for settings.json integration.
-# These shims handle model detection and stream-safe JSON communication.
-$harnessPath = "D:\GitHub\wkharness.ps1"
-$harnessPostPath = "D:\GitHub\wkharness-post.ps1"
+# Per-family DIRECT wiring (stray D:\GitHub shim retired 2026-06-17). Each family points
+# straight at its kih per-family main + post; the old shim's gemini tool-name translation
+# now lives inside wkharness-<family>-main.ps1 (commit 678ca08).
+$kihTools = "D:\GitHub\wkappbot-kih\tools"
 
 # Helper function to install / fix settings.json
 function Install-HarnessSettings {
@@ -19,15 +19,17 @@ function Install-HarnessSettings {
     # through the central D:\GitHub\wkharness.ps1 shim (gemini-cli-generated) re-wraps
     # output into gemini's {"decision","result"} schema -> Claude rejects every hook
     # with "Invalid input" AND the shim's TOML-logger pollutes ~/.gemini policy with
-    # toolName=Bash rules. AGY/Gemini keep the shim (it translates gemini tool names).
+    # toolName=Bash rules. AGY now wires DIRECT to wkharness-agy-main.ps1 too -- the gemini
+    # tool-name remap moved into the per-family mains (commit 678ca08); stray shim retired.
     if ($Type -eq 'claude') {
         # -Family claude: authoritative family hint so kih skips the gemini/codex
         # family classification (faster + avoids misdetection). Tier still detected.
         $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness.ps1`" -Family claude"
         $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness-post.ps1`""
     } else {
-        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPath`""
-        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$harnessPostPath`""
+        # AGY: wire DIRECTLY to the per-family agy main + post (shim retired).
+        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\wkharness-agy-main.ps1`" -Family agy"
+        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\wkharness-agy-post.ps1`""
     }
 
     $commonBeforeHooks = @([ordered]@{
