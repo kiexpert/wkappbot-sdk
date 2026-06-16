@@ -32,10 +32,14 @@ function Install-HarnessSettings {
         $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\wkharness-agy-post.ps1`""
     }
 
-    $commonBeforeHooks = @([ordered]@{
-        id    = 'harness'
-        hooks = @([ordered]@{ type = 'command'; command = $preCmd; timeout = 30; statusMessage = 'wkharness(kih)...' })
-    })
+    # AUDIT hook (universal incl Claude/AGY 2026-06-17): every tool call leaves an ai-audit.log
+    # trail so the audit-completeness check can prove no tool-call went UNtracked. Was gemini-only
+    # (installer); now wired for every family here. async = fire-and-forget (never blocks a tool).
+    $auditCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\audit-log.ps1`""
+    $commonBeforeHooks = @(
+        [ordered]@{ id = 'audit';   hooks = @([ordered]@{ type = 'command'; command = $auditCmd; async = $true }) },
+        [ordered]@{ id = 'harness'; hooks = @([ordered]@{ type = 'command'; command = $preCmd; timeout = 30; statusMessage = 'wkharness(kih)...' }) }
+    )
     $commonPostHooks = @([ordered]@{
         id    = 'harness-post'
         hooks = @([ordered]@{ type = 'command'; command = $postCmd; timeout = 10 })
