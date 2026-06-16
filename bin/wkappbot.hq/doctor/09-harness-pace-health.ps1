@@ -7,6 +7,41 @@
 # FAIL-OPEN: missing files / parse errors always produce warn (never crash wkdoctor).
 # Runs within wkdoctor context. $binDir, $repoRoot are already defined by wkdoctor.ps1.
 
+# --- SHARED HELPER: run a .ps1 with NO visible console window --------------------------------
+# Doctor modules are dot-sourced in sorted order into one shared scope (wkdoctor.ps1:313), so
+# defining this once in the lowest-ordinal module that needs it (09) makes it available to the
+# later 34/35 modules without duplication. When wkdoctor runs console-less (the gg-cycle path),
+# a nested `& powershell.exe ... -File X` ALWAYS flashes a new console window (the user HATES
+# this). Invoke-WkHiddenPs1 launches the script via ProcessStartInfo with CreateNoWindow=$true
+# (same idiom as 36-hook-integration-test.ps1), so no window ever appears. Returns the exit code.
+if (-not (Get-Command 'Invoke-WkHiddenPs1' -ErrorAction SilentlyContinue)) {
+    function Invoke-WkHiddenPs1 {
+        param(
+            [Parameter(Mandatory = $true)][string]$Path,
+            [string[]]$ScriptArgs = @(),
+            [int]$TimeoutMs = 30000
+        )
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = 'powershell.exe'
+        $argLine = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$Path`""
+        foreach ($a in $ScriptArgs) { $argLine += " `"$a`"" }
+        $psi.Arguments = $argLine
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $p = [System.Diagnostics.Process]::Start($psi)
+        # Drain pipes so a chatty script can't deadlock on a full buffer.
+        $null = $p.StandardOutput.ReadToEnd()
+        $null = $p.StandardError.ReadToEnd()
+        if (-not $p.WaitForExit($TimeoutMs)) {
+            try { $p.Kill() } catch {}
+            return -1
+        }
+        return $p.ExitCode
+    }
+}
+
 $_harnessDir = try {
     # Try well-known canonical locations in priority order (fail-open: last fallback)
     $gitHubDir = try { Split-Path $repoRoot -Parent } catch { 'D:\GitHub' }
@@ -31,7 +66,7 @@ $_harnessHome = if ($env:WKHARNESS_HOME) { $env:WKHARNESS_HOME } else { "$env:US
 $_anchorFile  = Join-Path $_harnessHome 'usage_anchor_claude.json'
 $_paceJson    = Join-Path $_harnessHome 'pace.json'
 
-# ── (a) FALSE OVER-TARGET: pace.json says high while anchor says low ─────────────────────────
+# -- (a) FALSE OVER-TARGET: pace.json says high while anchor says low -------------------------
 $_paceHealthDetail = 'n/a (pace.json absent)'
 if (Test-Path $_paceJson) {
     try {
@@ -64,7 +99,9 @@ if (Test-Path $_paceJson) {
                 $_captureScript = Join-Path $_harnessDir 'claude-usage-capture.ps1'
                 if (Test-Path $_captureScript) {
                     try {
-                        $job = Start-Job -ScriptBlock { param($s) & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $s } -ArgumentList $_captureScript
+                        # Run the capture .ps1 IN-PROCESS inside the job (NO grandchild powershell.exe,
+                        # which always flashes a console window from the console-less job host).
+                        $job = Start-Job -ScriptBlock { param($s) & $s } -ArgumentList $_captureScript
                         $null = Wait-Job $job -Timeout 20
                         Remove-Job $job -Force -ErrorAction SilentlyContinue
                         Add-Check 'Pace: false-high' 'ok' "re-anchored (capture script ran)"
@@ -95,7 +132,7 @@ if (Test-Path $_paceJson) {
     Emit 'ok' 'Pace: on-track' 'pace.json absent'
 }
 
-# ── (b) SAFETY short-circuit in wkharness-guards-pace.ps1 ────────────────────────────────────
+# -- (b) SAFETY short-circuit in wkharness-guards-pace.ps1 ------------------------------------
 if (-not (Test-Path $_paceFile)) {
     Add-Check 'Pace: safety-bridge' 'warn' "pace file not found ($($_paceFile))"
     Emit '!' 'Pace: safety-bridge' "file absent -- harness not installed?"
@@ -113,7 +150,7 @@ if (-not (Test-Path $_paceFile)) {
     }
 }
 
-# ── (c) TIER0/1/2 ladder in wkharness-guards.ps1 ─────────────────────────────────────────────
+# -- (c) TIER0/1/2 ladder in wkharness-guards.ps1 ---------------------------------------------
 if (-not (Test-Path $_guardsFile)) {
     Add-Check 'Pace: tier-ladder' 'warn' "guards file not found ($($_guardsFile))"
     Emit '!' 'Pace: tier-ladder' "guards file absent"
@@ -135,7 +172,7 @@ if (-not (Test-Path $_guardsFile)) {
     }
 }
 
-# ── (d) stall exemptions in wkharness-guards-infra.ps1 ───────────────────────────────────────
+# -- (d) stall exemptions in wkharness-guards-infra.ps1 ---------------------------------------
 if (-not (Test-Path $_infraFile)) {
     Add-Check 'Pace: stall-exempts' 'warn' "infra file not found ($($_infraFile))"
     Emit '!' 'Pace: stall-exempts' "infra file absent"

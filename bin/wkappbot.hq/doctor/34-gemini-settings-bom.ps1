@@ -108,7 +108,13 @@ try {
     $settingsHealed = $false
     if ($badSettings) {
         if ($env:WKDOCTOR_HEAL -eq '1' -and (Test-Path $installScript)) {
-            & powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $installScript | Out-Null
+            # Run hidden (no flashing console window) via the shared helper from 09-harness-pace-health.ps1.
+            if (Get-Command 'Invoke-WkHiddenPs1' -ErrorAction SilentlyContinue) {
+                $null = Invoke-WkHiddenPs1 -Path $installScript
+            } else {
+                # Fallback (helper not loaded): in-process, still no grandchild console.
+                & $installScript | Out-Null
+            }
             $settingsHealed = $true
             $badSettings = $false
         }
