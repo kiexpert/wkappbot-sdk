@@ -60,7 +60,11 @@ if ($lastForensic) {
     $detail += " | last-storm: $_lf"
 }
 
-if ($spawnStorm) {
+# A real STORM needs RECENT churn (logs60m>0) or an EXTREME standing count. A merely-high count
+# with logs60m=0 (many agent subprocesses, no ACTIVE spawning) is a WARN, not a false [x] FAIL --
+# it was firing [x] on every busy multi-agent session (user 2026-06-17).
+$realStorm = $spawnStorm -and ($logRecentCount -gt 0 -or $wkCore -gt 30 -or $wkFam -gt 40)
+if ($realStorm) {
     # Surface the runaway wkappbot-core command lines so the user sees WHAT spawned them.
     $dupCmd = ''
     try {
@@ -86,6 +90,9 @@ if ($spawnStorm) {
             Emit 'warn' 'wkappbot spawn-storm' 'auto-filed a wkappbot suggest BUG (throttled 24h)'
         }
     } catch {}
+} elseif ($spawnStorm) {
+    Add-Check 'wkappbot spawn-storm' 'warn' "high process count but NO recent spawn churn (logs60m=$logRecentCount) -- standing count, not an active storm: $detail"
+    Emit 'warn' 'wkappbot spawn-storm' "high count, no recent churn (likely agent subprocesses): $detail"
 } else {
     Add-Check 'wkappbot spawn-storm' 'ok' $detail
     Emit 'ok' 'wkappbot spawn-storm' $detail

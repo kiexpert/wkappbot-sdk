@@ -75,7 +75,10 @@ try {
                 $badSettings = $true; $wiringDetail += ('harness timeout ' + [int]$harnessHook.timeout + 'ms too small (instant-timeout/fail-open); ')
             }
             # (5) AfterTool post hook (wkharness-post.ps1) must EXIST -- post-tool knowledge-ops/study-lock/nudges. Regression guard (dropped 2026-06-16).
-            $afterCmd = @($s.hooks.AfterTool | ForEach-Object { $_.hooks } | Where-Object { $_.command -match 'wkharness-post' }) | Select-Object -First 1
+            # match BOTH shared wkharness-post.ps1 AND per-family wkharness-<fam>-post.ps1
+            # (gemini wires wkharness-gemini-post.ps1; the bare 'wkharness-post' regex missed it
+            #  -> falsely reported "AfterTool MISSING").
+            $afterCmd = @($s.hooks.AfterTool | ForEach-Object { $_.hooks } | Where-Object { $_.command -match 'wkharness(?:-\w+)?-post' }) | Select-Object -First 1
             if (-not $afterCmd) {
                 $badSettings = $true; $wiringDetail += 'AfterTool wkharness-post.ps1 hook MISSING (post-tool nudges/study-lock/knowledge-reward lost); '
             }
