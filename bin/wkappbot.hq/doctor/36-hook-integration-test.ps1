@@ -57,7 +57,9 @@ function Test-HookProtocol {
         if ($Family -eq 'claude') {
             $ok = ($exitCode -eq $ExpectExit)
         } else {
-            $ok = ($exitCode -eq $ExpectExit) -and ($decision -eq 'deny') -and $modelMatch
+            # gemini/codex: a deny now EXITS NON-ZERO (theater-fix 2026-06-17) + emits JSON. Verify the
+            # deny ACTUALLY blocks (exit != 0) -- the stale exit-0 expectation was the theater the fix removed.
+            $ok = ($exitCode -ne 0) -and ($decision -eq 'deny') -and $modelMatch
         }
         
         if ($ok) {
