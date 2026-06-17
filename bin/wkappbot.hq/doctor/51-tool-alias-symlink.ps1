@@ -71,6 +71,20 @@ function Get-AgyInstallExePath {
     return $null
 }
 
+function Get-RgExePath {
+    # Discover a bundled ripgrep (VS Code / chatgpt-codex extension ship rg.exe). GLOB -- never
+    # hardcode the version-stamped extension path (it changes on every update). Newest wins.
+    $globs = @(
+        (Join-Path $env:USERPROFILE '.vscode\extensions\*\bin\windows-x86_64\rg.exe'),
+        (Join-Path $env:USERPROFILE '.vscode\extensions\*\bin\windows-x86_64\codex-path\rg.exe'),
+        (Join-Path $env:USERPROFILE '.vscode\extensions\*\node_modules\@vscode\ripgrep\bin\rg.exe')
+    )
+    $hits = foreach ($g in $globs) { Get-ChildItem -Path $g -ErrorAction SilentlyContinue }
+    $newest = $hits | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($newest) { return [System.IO.Path]::GetFullPath($newest.FullName) }
+    return $null
+}
+
 $script:WrapperInstallRan = $false
 
 function Invoke-WrapperInstall {
@@ -170,5 +184,37 @@ foreach ($root in $aliasRoots) {
 
     foreach ($pair in $aliasPairs) {
         Ensure-ToolAliasLink -LinkPath $pair.Link -TargetPath $pair.Target -Label $pair.Label
+    }
+}
+
+# rg.exe alias (user 2026-06-17): when rg.exe is absent from PATH, gemini falls back to a slow
+# GrepTool (the doctor's "gemini ripgrep -- rg.exe is missing" warn). Symlink the bundled VS
+# Code/codex ripgrep into the appbot bin (copy-fallback if symlink is unprivileged -- New-Item
+# SymbolicLink needs admin/developer-mode). Self-heals every doctor run. Glob-discovered target.
+$rgTarget = Get-RgExePath
+$rgLink   = Join-Path ([System.IO.Path]::GetFullPath($pathBin)) 'rg.exe'
+if (-not $rgTarget) {
+    Add-Check 'rg.exe alias' 'warn' 'no bundled rg.exe found (VS Code / codex ripgrep absent) -- gemini grep falls back to GrepTool (lag)'
+    Emit 'warn' 'rg.exe alias' 'no bundled rg.exe found'
+} elseif (Test-Path -LiteralPath $rgLink -PathType Leaf) {
+    Add-Check 'rg.exe alias' 'ok' "present at $rgLink"
+    Emit 'ok' 'rg.exe alias' "rg.exe present (gemini grep fast-path)"
+} else {
+    $rgDone = $false
+    try {
+        New-Item -ItemType SymbolicLink -Path $rgLink -Target $rgTarget -Force -ErrorAction Stop | Out-Null
+        $rgDone = $true
+        Add-Check 'rg.exe alias' 'ok' "symlinked -> $rgTarget"
+        Emit 'ok' 'rg.exe alias' "rg.exe symlinked -> $rgTarget"
+    } catch {
+        try {
+            Copy-Item -LiteralPath $rgTarget -Destination $rgLink -Force -ErrorAction Stop
+            $rgDone = $true
+            Add-Check 'rg.exe alias' 'ok' "copied (symlink unprivileged) -> $rgTarget"
+            Emit 'ok' 'rg.exe alias' "rg.exe copied into bin (symlink needs admin/dev-mode) -> $rgTarget"
+        } catch {
+            Add-Check 'rg.exe alias' 'warn' "could not symlink/copy rg.exe (fail-open): $_"
+            Emit 'warn' 'rg.exe alias' "rg.exe install failed (fail-open): $_"
+        }
     }
 }
