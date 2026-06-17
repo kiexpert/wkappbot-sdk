@@ -14,27 +14,22 @@ try {
     $lines = [IO.File]::ReadAllLines($tomlPath, [Text.Encoding]::UTF8)
     $badPaths = @()
     $badPriority = @()
-    $badTool = @()      # invalid gemini tool names (e.g. write_to_file -> write_file) that emit
-                        # "Unrecognized tool name" warnings; was UNCHECKED -> 30 falsely said "valid".
-    $dupRules = 0       # duplicate [[rule]] blocks (a re-append bug bloated this 5x)
-    $seenRules = @{}
-    $curTool = $null; $curDec = $null; $curPrio = $null
+    $badTool = @()      # invalid gemini tool names (write_to_file -> write_file) -> "Unrecognized tool name"
     for ($i = 0; $i -lt $lines.Length; $i++) {
         if ($lines[$i] -match '^\s*\w+\s*=\s*"[^"]*\\[^"]*"') { $badPaths += $i }
         if ($lines[$i] -match '^\s*priority\s*=\s*(\d+)') {
             if ([int]$Matches[1] -gt 999) { $badPriority += $i }
         }
         if ($lines[$i] -match '^\s*toolName\s*=\s*"write_to_file"') { $badTool += $i }
-        # duplicate-rule detection (by toolName+decision+priority signature)
-        if ($lines[$i] -match '^\s*toolName\s*=\s*"([^"]*)"') { $curTool = $Matches[1] }
-        elseif ($lines[$i] -match '^\s*decision\s*=\s*"([^"]*)"') { $curDec = $Matches[1] }
-        elseif ($lines[$i] -match '^\s*priority\s*=\s*(\d+)') {
-            $curPrio = $Matches[1]
-            $sig = "$curTool|$curDec|$curPrio"
-            if ($seenRules.ContainsKey($sig)) { $dupRules++ } else { $seenRules[$sig] = $true }
-            $curTool = $null; $curDec = $null; $curPrio = $null
-        }
     }
+    # duplicate-rule detection by FULL [[rule]] block content (commandPrefix/target/commandRegex
+    # INCLUDED), CONSISTENT with the auto-fix block-dedup below. A coarse toolName|decision|priority
+    # signature falsely flagged rules that differ ONLY by commandPrefix (e.g. the 4 knowledge-op
+    # allow rules all share run_shell_command|allow|100) -> a perpetual false [x] fail the block-dedup
+    # could never resolve. Count only TRUE content-duplicate blocks.
+    $allBlocks = [regex]::Split((($lines -join "`n")), '(?m)(?=^\s*\[\[rule\]\])') | Where-Object { $_ -match '\[\[rule\]\]' }
+    $seenB = @{}; $dupRules = 0
+    foreach ($b in $allBlocks) { $k = ($b -replace '\s+', ' ').Trim(); if ($seenB.ContainsKey($k)) { $dupRules++ } else { $seenB[$k] = $true } }
 
     if ($badTool.Count -gt 0 -or $dupRules -gt 0) {
         # surface as a FAIL (user 2026-06-17: a false 'valid' OK while gemini warns is unacceptable),
