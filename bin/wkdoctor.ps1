@@ -282,7 +282,7 @@ if ($EmergencyKill) {
         $kept = $false
         foreach ($pat in $keepPatterns) { if ($proc.Name -match $pat -or $proc.CommandLine -match $pat) { $kept = $true; break } }
         # < 85%: spare the protected AI work set. >= 85% (extreme load): override and reap AI
-        # children too (user: "AI 자식 프로세스도 부하 극심하면 다 킬") -- the session tree above stays safe.
+        # children too (user: kill AI child procs too under extreme load) -- the session tree above stays safe.
         if ($kept -and $st.ram -lt 85 -and $st.cpu -lt 85) { $keptCount++; continue }
 
         # Capture ancestry BEFORE the kill -- a dead process has no queryable CommandLine.
@@ -310,7 +310,7 @@ if ($EmergencyKill) {
 # Load check modules (sorted by name, so 00- runs before 01- etc.)
 $doctorDir = Join-Path $binDir 'wkappbot.hq\doctor'
 if (Test-Path $doctorDir -PathType Container) {
-    Get-ChildItem $doctorDir -Filter '*.ps1' | Sort-Object Name | ForEach-Object { . $_.FullName }
+    Get-ChildItem $doctorDir -Filter '*.ps1' | Where-Object { $_.Name -notmatch '-proto\.ps1$' } | Sort-Object Name | ForEach-Object { . $_.FullName }
 } else {
     Add-Check 'doctor modules' 'warn' "not found at $doctorDir -- run setup.ps1"
     Emit '!' 'doctor modules' 'missing'
@@ -326,4 +326,11 @@ if (-not $Json) {
 if ($Json) {
     [PSCustomObject]@{ pass = $pass; warn = $warn; fail = $fail; items = $items } | ConvertTo-Json -Depth 5
 }
-if ($fail -gt 0) { exit 1 } else { exit 0 }
+$_doctorBrokenFlag = Join-Path $env:USERPROFILE '.claude\wkharness\wkdoctor_broken.flag'
+if ($fail -gt 0) { 
+    try { [System.IO.File]::WriteAllText($_doctorBrokenFlag, "wkdoctor failed: $fail failures at $(Get-Date)") } catch {}
+    exit 1 
+} else { 
+    if (Test-Path $_doctorBrokenFlag) { Remove-Item $_doctorBrokenFlag -Force -ErrorAction SilentlyContinue }
+    exit 0 
+}
