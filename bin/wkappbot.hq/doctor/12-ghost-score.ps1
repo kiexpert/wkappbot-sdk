@@ -74,6 +74,7 @@ $systemRamPct = Get-RamPct
 if (-not $taskListPath) { $taskListPath = "D:\GitHub\WKAppBot\bin\wktasklist.ps1" }
 try {
     $procList = & $taskListPath -Json -ErrorAction Stop | ConvertFrom-Json
+    $procList = @($procList)   # PS 5.1: normalize the CFJ array (else the foreach below iterates once on the whole array)
 } catch {
     Add-Check "ghost-score" "warn" "Failed to fetch tasklist for scoring"
     return

@@ -259,7 +259,9 @@ if ($EmergencyKill) {
     }
 
     Write-Host "[ek] TRIGGERED: CPU:$($status.cpu)% RAM:$($status.ram)%. fetching targets..." -ForegroundColor Red
-    $pool = & $taskListPath -Json -Force | ConvertFrom-Json | Sort-Object Score -Descending
+    # PS 5.1: ConvertFrom-Json emits the array as ONE object; pipe->Sort/foreach treats it as 1 item
+    # (emergency-kill iterated once on the whole array -> $proc.Score null -> NEVER killed anything).
+    $pool = & $taskListPath -Json -Force | ConvertFrom-Json; $pool = @($pool) | Sort-Object Score -Descending
 
     # Invariant #0 (user 2026-06-06): never reap the reaper's OWN live session tree
     # (this powershell -> claude session -> launching shells). At extreme load the keep-override
