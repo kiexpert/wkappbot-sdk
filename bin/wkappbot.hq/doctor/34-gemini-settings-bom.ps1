@@ -9,6 +9,12 @@ try {
     }
     $installScript = Join-Path $toolsDir 'wkharness-gemini-install.ps1'
 
+    # PRESENCE-GATE (2026-06-22): @google/gemini-cli is EOL and uninstalled. Its root
+    # ~/.gemini/settings.json is now irrelevant; only the antigravity-cli (agy) settings matter.
+    # Skip the standalone-CLI root-settings checks/heal when the gemini binary is absent, so this
+    # doctor no-ops cleanly instead of perpetually warning. Auto-lifts if gemini CLI is reinstalled.
+    $geminiCliPresent = $null -ne (Get-Command 'gemini' -ErrorAction SilentlyContinue)
+
     $geminiDir = Join-Path $env:USERPROFILE '.gemini'
     $targets = @(
         (Join-Path $geminiDir 'settings.json'),
@@ -46,8 +52,8 @@ try {
     $settingsPath = Join-Path $geminiDir 'settings.json'
     $agySettingsPath = Join-Path $geminiDir 'antigravity-cli\settings.json'
 
-    # Check root settings.json
-    if (Test-Path $settingsPath) {
+    # Check root settings.json (standalone Gemini CLI -- gated: skip when CLI is EOL/absent)
+    if ($geminiCliPresent -and (Test-Path $settingsPath)) {
         try {
             $s = Get-Content $settingsPath -Raw | ConvertFrom-Json
             if ($s.approvalMode -ne 'yolo' -or -not $s.hooks.BeforeTool) {
@@ -85,7 +91,7 @@ try {
         } catch {
             $badSettings = $true
         }
-    } else {
+    } elseif ($geminiCliPresent) {
         $badSettings = $true
     }
 
