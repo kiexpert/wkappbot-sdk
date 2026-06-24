@@ -8,7 +8,8 @@
     "PURPOSE: Document failures and lessons learned during Agy Gemini Flash sessions to improve compliance and harness reliability.",
     "GIT PINSET COMMIT DISCIPLINE: Never use git add -A or git reset in shared workspaces, as it can stage or disrupt work being done by other concurrent agents or families. Always commit explicitly targeted files (e.g. git commit tools/wkharness-agy-main.ps1).",
     "AGY HARNESS CACHING RULES: permissions.allow array in settings.json must be reset to size 1 containing only the current tool call. Always re-read the settings file fresh every time before modifying it using .NET File API to ensure real-time consistency.",
-    "AUTO-RECOVERY OF CONFIG.JSON: config.json in ~/.gemini/config/config.json must be checked and auto-recovered with UTF-8 No BOM at startup to prevent infinite approval popup loops."
+    "AUTO-RECOVERY OF CONFIG.JSON: config.json in ~/.gemini/config/config.json must be checked and auto-recovered with UTF-8 No BOM at startup to prevent infinite approval popup loops.",
+    "APPBOT SKILL DIRECT MUTATION PROHIBITION: Never edit a .skill.json file directly using manual file writing or regex replacements. Directly mutating the datastore violates encapsulations and risks corrupting the JSON structure. Always use wkappbot skill commands (edit, contribute) to manage skills."
   ],
   "requirements": [
     {
@@ -39,6 +40,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-24T11:48:48.1948807Z",
-  "updated": "2026-06-24T11:48:48.1948902Z",
-  "version": "1.0"
+  "updated": "2026-06-24T11:53:15.7963517Z",
+  "version": "1.2"
 }
