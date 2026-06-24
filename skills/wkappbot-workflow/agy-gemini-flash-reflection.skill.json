@@ -1,0 +1,44 @@
+{
+  "id": "agy-gemini-flash-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Agy Gemini Flash Reflection",
+  "title_ko": null,
+  "desc": "Reflection guidelines and lessons for Agy Gemini Flash sessions.",
+  "steps": [
+    "PURPOSE: Document failures and lessons learned during Agy Gemini Flash sessions to improve compliance and harness reliability.",
+    "GIT PINSET COMMIT DISCIPLINE: Never use git add -A or git reset in shared workspaces, as it can stage or disrupt work being done by other concurrent agents or families. Always commit explicitly targeted files (e.g. git commit tools/wkharness-agy-main.ps1).",
+    "AGY HARNESS CACHING RULES: permissions.allow array in settings.json must be reset to size 1 containing only the current tool call. Always re-read the settings file fresh every time before modifying it using .NET File API to ensure real-time consistency.",
+    "AUTO-RECOVERY OF CONFIG.JSON: config.json in ~/.gemini/config/config.json must be checked and auto-recovered with UTF-8 No BOM at startup to prevent infinite approval popup loops."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-gemini-flash-reflection",
+      "expect": "ID : agy-gemini-flash-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search agy-gemini-flash",
+      "expect": "agy-gemini-flash-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agy-gemini-flash-reflection",
+      "expect": "PURPOSE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agy",
+    "gemini-flash",
+    "harness",
+    "reflection",
+    "autonomy"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T11:48:48.1948807Z",
+  "updated": "2026-06-24T11:48:48.1948902Z",
+  "version": "1.0"
+}
