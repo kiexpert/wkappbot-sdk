@@ -5,7 +5,7 @@ $gitHubDir = try { Split-Path $repoRoot -Parent } catch { 'D:\GitHub' }
 # Per-family DIRECT wiring (stray D:\GitHub shim retired 2026-06-17). Each family points
 # straight at its kih per-family main + post; the old shim's gemini tool-name translation
 # now lives inside wkharness-<family>-main.ps1 (commit 678ca08).
-$kihTools = "D:\GitHub\wkappbot-kih\tools"
+$kihTools = "D:/GitHub/wkappbot-kih/tools"
 
 # Helper function to install / fix settings.json
 function Install-HarnessSettings {
