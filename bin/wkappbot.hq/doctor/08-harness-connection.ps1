@@ -24,8 +24,8 @@ function Install-HarnessSettings {
     if ($Type -eq 'claude') {
         # -Family claude: authoritative family hint so kih skips the gemini/codex
         # family classification (faster + avoids misdetection). Tier still detected.
-        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness.ps1`" -Family claude"
-        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:\GitHub\wkappbot-kih\tools\wkharness-post.ps1`""
+        $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:/GitHub/wkappbot-kih/tools/wkharness.ps1`" -Family claude"
+        $postCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"D:/GitHub/wkappbot-kih/tools/wkharness-post.ps1`""
     } else {
         # AGY: wire DIRECTLY to the per-family agy main + post (shim retired).
         $preCmd  = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\wkharness-agy-main.ps1`" -Family agy"
@@ -36,46 +36,26 @@ function Install-HarnessSettings {
     # trail so the audit-completeness check can prove no tool-call went UNtracked. Was gemini-only
     # (installer); now wired for every family here. async = fire-and-forget (never blocks a tool).
     $auditCmd = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$kihTools\audit-log.ps1`""
+    $timeoutVal = if ($Type -eq 'claude') { 30 } else { 30000 }
+    $postTimeoutVal = if ($Type -eq 'claude') { 10 } else { 20000 }
+
     $commonBeforeHooks = @(
         [ordered]@{ id = 'audit';   hooks = @([ordered]@{ type = 'command'; command = $auditCmd; async = $true }) },
-        [ordered]@{ id = 'harness'; hooks = @([ordered]@{ type = 'command'; command = $preCmd; timeout = 30; statusMessage = 'wkharness(kih)...' }) }
+        [ordered]@{ id = 'harness'; hooks = @([ordered]@{ type = 'command'; command = $preCmd; timeout = $timeoutVal; statusMessage = 'wkharness(kih)...' }) }
     )
     $commonPostHooks = @([ordered]@{
         id    = 'harness-post'
-        hooks = @([ordered]@{ type = 'command'; command = $postCmd; timeout = 10 })
+        hooks = @([ordered]@{ type = 'command'; command = $postCmd; timeout = $postTimeoutVal })
     })
 
     if ($Type -eq 'agy') {
-        $existingAgy = $null
-        if (Test-Path $Path) {
-            try {
-                $aText = [IO.File]::ReadAllText($Path, [Text.Encoding]::UTF8)
-                $existingAgy = ConvertFrom-Json -InputObject $aText -AsHashtable
-            } catch {}
+        # Delegate to the canonical AGY installer to avoid settings conflict
+        $installer = "D:\GitHub\wkappbot-kih\tools\wkharness-agy-install.ps1"
+        if (Test-Path $installer) {
+            & powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $installer | Out-Null
+        } else {
+            throw "Canonical AGY installer not found at $installer"
         }
-        if (-not $existingAgy) { $existingAgy = @{} }
-
-        $existingAgy['approvalMode'] = 'yolo'
-        if (-not $existingAgy['security']) { $existingAgy['security'] = @{} }
-        $existingAgy['security']['enablePermanentToolApproval'] = $true
-
-        if (-not $existingAgy['permissions']) { $existingAgy['permissions'] = @{} }
-        $existingAgy['permissions']['allow'] = @(
-            'command(*)',
-            'unsandboxed(*)',
-            'read_file(*)',
-            'write_file(*)',
-            'execute_url(*)',
-            'read_url(*)',
-            'mcp(*)'
-        )
-
-        $existingAgy['hooks'] = @{
-            PreToolUse = $commonBeforeHooks
-            PostToolUse = $commonPostHooks
-        }
-        $agyJson = ConvertTo-Json -InputObject $existingAgy -Depth 10
-        [IO.File]::WriteAllText($Path, $agyJson, (New-Object System.Text.UTF8Encoding($false)))
     } else {
         # Claude/Gemini
         $cSettings = $null
@@ -126,8 +106,9 @@ if (Test-Path $agySettings -PathType Leaf) {
     try {
         $raw = Get-Content $agySettings -Encoding UTF8 -Raw | ConvertFrom-Json
         $hasHarness = $raw.hooks -and $raw.hooks.PreToolUse -and ($raw.hooks.PreToolUse | Where-Object { $_.id -eq 'harness' })
-        $hasWildcard = $raw.permissions -and $raw.permissions.allow -and ($raw.permissions.allow -contains 'command(*)')
-        if ($hasHarness -and $hasWildcard) { $agyOk = $true }
+        $isAuto = $raw.approvalMode -eq 'auto'
+        $noBypass = -not ($raw.PSObject.Properties['grantedPermissions'] -or ($raw.security -and $raw.security.enablePermanentToolApproval))
+        if ($hasHarness -and $isAuto -and $noBypass) { $agyOk = $true }
     } catch {}
 }
 
