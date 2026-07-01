@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using STARTUPINFOW = AppBotPipe.STARTUPINFOW;
 using PROCESS_INFORMATION = AppBotPipe.PROCESS_INFORMATION;
@@ -297,7 +297,7 @@ partial class Program
             // happens to appear in the process ancestry. Caller HWND for placement is resolved
             // by MyCdpContext via console/ancestor/host chain, and by Eye IPC via __hwnd: prefix.
             // Build JSON with stealth \r after each field -- cursor resets, no wrap
-            if (!quietFind && !(args.Length > 0 && args[0].Equals("skill", StringComparison.OrdinalIgnoreCase))
+            if (!quietFind && !(args.Length > 0 && Array.Exists(new[]{"skill","suggest","file","screensaver","speak"}, c => c.Equals(args[0], StringComparison.OrdinalIgnoreCase)))
                 && Environment.GetEnvironmentVariable("WKAPPBOT_WORKER") != "1") // suppress in worker/script context
             {
             var err = Console.Error;

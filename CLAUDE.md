@@ -447,7 +447,7 @@ wkappbot skill read standard-chrome-window  # Impl: Chrome window filtering, DPI
 wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: ancestor walk maintenance, regression testing
 
 ## harness:skill csharp/**/*.cs
-wkappbot skill read sdk-launcher-maintenance  # Usage: SDK launcher lifecycle and versioning
+wkappbot skill read harness-edit-write-skill-bypass  # Usage: when study-lock blocks and how to satisfy it
 wkappbot skill read wkappbot-build-verify-workflow  # Impl: publish process, hot-swap deployment
 wkappbot skill read wkharness-guards  # Task: guard reference when unblocking edits
 
@@ -535,7 +535,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - [ ] [CDP-TODO-5] Haiku isHaikuSession not propagated to subagents (suggest filed). Core fix needed for proper Haiku subagent exemption.
 - [ ] [CDP-TODO-6] CronDelete stall-guard false positive (suggest needed). One-time admin ops should be exempt.
 
-- [ ] wk-gg-main.sh + wk-gg-main.cmd: create .sh relay + fix .cmd to call bash scripts/gg-main.sh (currently calls nonexistent .ps1)
 - [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending) -- merge with [2] zombie over-protect, fix together
 - [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
 - [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
@@ -563,3 +562,9 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
 - [x] nightly-heal 2026-06-11: skill audit run (FILE MISSING = expected, Core repo refs); 5 new SDK skills installed (releasing-under-harness-pace-guards, sdk-release-playbook-howto/ref, harness-active-model-scoping, opus-mechanical-self-drag-antipattern); CLAUDE.md Pending compressed 563→555 lines
+## wksplit-400-lock wkagent-name.py (auto: 601 lines, read on 2026-06-18)
+## harness:skill (?i)[/\\]wkagent-name\.py$
+wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
+wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec  # Impl: round-trip + dedup spec
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify not parse-only
+
