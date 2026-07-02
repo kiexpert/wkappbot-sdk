@@ -466,6 +466,15 @@ wkappbot skill read wkagent-name-tool           # Usage: agent model detection
 wkappbot skill read wkharness-guards            # Impl: ctypes Windows API patterns
 wkappbot skill read haiku-as-qa-canary          # Task: fast prototype QA canary
 
+## harness:skill (?i)[/\\]wksplit_md\.py$
+wkappbot skill read wksplit-md  # Usage: 0-token CLAUDE.md Pending extractor -- canonical home as of 2026-07-02 (moved off wkappbot-kih, zero harness dependency)
+wkappbot skill read willkim-tool-harness-independence-install-location  # Impl: why this standalone tool lives here, not in kih/tools
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: dry-run verify before any real (non---dry-run) invocation
+## harness:skill (?i)[/\\]wksplit-md\.cmd$
+wkappbot skill read wksplit-md  # Usage: thin launcher for bin/wksplit_md.py
+wkappbot skill read willkim-tool-harness-independence-install-location  # Impl: bare-name verification mandate (bash needs the .cmd extension)
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: verify launcher forwards args correctly (--dry-run, --file, --threshold)
+
 ## harness:skill bin/wkappbot.hq/doctor/*harness*
 wkappbot skill read cross-family-harness-integration       # Usage: the cross-family harness map + personal-docs->kih migration + the divergence trap
 wkappbot skill read cross-family-harness-integration-howto # Impl: relay, induce, autonomy.toml, doctor repair guards
