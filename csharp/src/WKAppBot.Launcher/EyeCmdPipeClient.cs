@@ -229,6 +229,10 @@ internal static class EyeCmdPipeClient
     /// </summary>
     internal static IntPtr ResolveCallerTerminalHwnd()
     {
+        // Diagnostic prints in this function are noisy on every plain invocation -- gate
+        // them behind --verbose (self-contained check, no signature changes needed since
+        // this function has multiple callers across the codebase).
+        bool verbose = Array.Exists(Environment.GetCommandLineArgs(), a => a == "--verbose");
         // Walk Launcher's parent process chain in order (immediate parent first).
         var ancestorPids = new List<uint>();
         try
@@ -301,7 +305,7 @@ internal static class EyeCmdPipeClient
             }, IntPtr.Zero);
             if (cascadiaMatch != IntPtr.Zero)
             {
-                Console.Error.WriteLine($"[CALLER:HWND] via GA_ROOTOWNER PCW=0x{pcwForLog.ToInt64():X} CASCADIA=0x{cascadiaMatch.ToInt64():X}");
+                if (verbose) Console.Error.WriteLine($"[CALLER:HWND] via GA_ROOTOWNER PCW=0x{pcwForLog.ToInt64():X} CASCADIA=0x{cascadiaMatch.ToInt64():X}");
                 return cascadiaMatch;
             }
 
@@ -376,7 +380,7 @@ internal static class EyeCmdPipeClient
                     }, IntPtr.Zero);
                     if (visibleMatch != IntPtr.Zero)
                     {
-                        Console.Error.WriteLine($"[CALLER:HWND] via ConPTY owner chain 0x{visibleMatch.ToInt64():X} (conpty=0x{conptyHwnd.ToInt64():X})");
+                        if (verbose) Console.Error.WriteLine($"[CALLER:HWND] via ConPTY owner chain 0x{visibleMatch.ToInt64():X} (conpty=0x{conptyHwnd.ToInt64():X})");
                         return visibleMatch;
                     }
                 }
