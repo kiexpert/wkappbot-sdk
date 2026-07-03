@@ -5,9 +5,8 @@
 
 $importantWkTools = @(
     'wkpace','wkhippo','wkagent-name','wktasklist','wkdoctor','wkcdp','wkask','wkedit',
-    'wkcodex','wkclaude','wkjobs','wkkill','wkfind','wkspeak','wksplit','wkpush'  # wkgemini removed 2026-06-22 (Gemini CLI EOL)
+    'wkjobs','wkkill','wkfind','wkspeak','wksplit','wkpush'  # wkcodex and wkclaude intentionally excluded -- both are hand-crafted scripts with custom harness-check/routing logic, NOT wkwrap-pattern relay shims; syncing them from the wkwrap template destroys real functionality (regression found 2026-07-03, reproduced twice). wkgemini removed 2026-06-22 (Gemini CLI EOL)
 )
-
 $binPlans = @(
     [pscustomobject]@{ Tier='USER'; Bin='D:\GitHub\wkappbot-sdk\bin' },
     [pscustomobject]@{ Tier='DEV';  Bin='D:\GitHub\WKAppBot\bin' }
