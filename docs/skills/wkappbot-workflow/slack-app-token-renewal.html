@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CDP Command Guide: Full Reference | WKAppBot Skills</title>
-  <meta name="description" content="CDP full reference: cdp-mon anomaly codes, bug history, PS5.1 gotchas, tab accumulation, caller HWND, placement. Load when investigating anomalies.">
-  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/cdp-command-guide-ref.html'>
-  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"CDP Command Guide: Full Reference","description":"CDP full reference: cdp-mon anomaly codes, bug history, PS5.1 gotchas, tab accumulation, caller HWND, placement. Load wh"}</script>
-  <meta property="og:title" content="CDP Command Guide: Full Reference | WKAppBot Skills">
-  <meta property="og:description" content="CDP full reference: cdp-mon anomaly codes, bug history, PS5.1 gotchas, tab accumulation, caller HWND, placement. Load when investigating anomalies.">
+  <title>slack-app-token-renewal | WKAppBot Skills</title>
+  <meta name="description" content="WKAppBot Slack App-Level Token renewal. Use when Eye logs: apps.connections.open failed: invalid_auth">
+  <link rel='canonical' href='https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/slack-app-token-renewal.html'>
+  <script type='application/ld+json'>{"@context":"https://schema.org","@type":"TechArticle","name":"slack-app-token-renewal","description":"WKAppBot Slack App-Level Token renewal. Use when Eye logs: apps.connections.open failed: invalid_auth"}</script>
+  <meta property="og:title" content="slack-app-token-renewal | WKAppBot Skills">
+  <meta property="og:description" content="WKAppBot Slack App-Level Token renewal. Use when Eye logs: apps.connections.open failed: invalid_auth">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/cdp-command-guide-ref.html">
+  <meta property="og:url" content="https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/slack-app-token-renewal.html">
   <meta name="twitter:card" content="summary">
   <style>
     :root {
@@ -254,113 +254,25 @@
     <article class="skill-detail">
       <div class="card-top">
         <span class="app-badge">wkappbot-workflow</span>
-        <span class="stars" aria-label="3 star rating">&#9733;&#9733;&#9733;</span>
+        <span class="stars" aria-label="2 star rating">&#9733;&#9733;&#9734;</span>
       </div>
-      <h1>CDP Command Guide: Full Reference</h1>
-      <p class="description">CDP full reference: cdp-mon anomaly codes, bug history, PS5.1 gotchas, tab accumulation, caller HWND, placement. Load when investigating anomalies.</p>
+      <h1>slack-app-token-renewal</h1>
+      <p class="description">WKAppBot Slack App-Level Token renewal. Use when Eye logs: apps.connections.open failed: invalid_auth</p>
       <div class="meta">user/developer</div>
-      <div class="breadcrumb">Part of: <a href="cdp-command-guide.html">cdp-command-guide</a></div>
-      <div class="tags"><span class="chip">cdp</span><span class="chip">chrome</span><span class="chip">reference</span><span class="chip">anomaly</span><span class="chip">bugs</span><span class="chip">ps5.1</span><span class="chip">riqua</span><span class="chip">tab-accumulation</span></div>
+      
+      <div class="tags"></div>
       <h2>Steps</h2>
       <div class="steps-wrap">
-        <ol class="steps blurred"><li>cdp-mon ANOMALY REPORT: [CRIT] offscreen TGT...</li><li>cdp-mon LAUNCHED-BY (3-tier chain): (1) aliv...</li><li>cdp-mon JS ALERT detection: Get-TabIdle conn...</li><li>cdp-mon IME DAEMON: Watch-ImeDaemon counts *...</li><li>cdp-mon PS5.1 GOTCHAS: (1) localhost resolve...</li><li>TAB ACCUMULATION BUG (gemini-whisper, fixed...</li><li>CALLER HWND DETECTION: Launcher walks ancest...</li><li>TAB-ACCUMULATION FIX (2026-05-25): web/cdp o...</li><li>PLACEMENT-PREFLIGHT (v7.4.0): MyCdpContext.P...</li><li>ROOT CAUSE cdp open &gt;1min: KillStaleChromesA...</li><li>CRLF-EDIT-BUG: wkappbot file edit multiline...</li><li>LOCK-FIX: to clear skill-update-pending, cha...</li><li>BUG (2026-05-25) cdp open spawns new Chrome...</li><li>SESSION-2026-05-25: Chrome reuse CI test wri...</li></ol>
-        <div class="unlock"><div style="margin-bottom:10px;font-size:18px">&#128274; Pro Skill</div><a href="https://kiexpert.github.io/wkappbot-sdk/pricing" style="display:inline-block;padding:8px 20px;background:var(--accent);color:#04110d;font-weight:800;border-radius:6px;text-decoration:none;font-size:14px">Get Pro Access &rarr;</a></div>
+        <ol class="steps"><li>Open api.slack.com/apps in Chrome</li><li>Find WKAppBot app (App ID: A0APH6RJ1AA) and...</li><li>Basic Information -&gt; App-Level Tokens -&gt; Gen...</li><li>Token Name: wkappbot-socket, Add Scope: conn...</li><li>Copy xapp-1-A0APH6RJ1AA-... token</li><li>Update app_token in both: wkappbot-sdk/bin/w...</li><li>wkappbot eye hotswap then verify no invalid_...</li></ol>
+        
       </div>
       <footer class="skill-footer">
-        <div class="related"><strong>Related:</strong> <a href="./cdp-command-guide-howto.html">CDP Command Guide: Step-by-Step Howto</a></div>
-      <nav class="skill-nav"><a href="./cdp-command-guide.html">← CDP Command Guide</a> | <a href="./cdp-command-guide-howto.html">CDP Command Guide: Step-by-Step Howto →</a></nav>
+        <nav class="skill-nav"><a href="./slack-command-cheatsheet.html">← slack -- Send &amp; Reply Cheatsheet</a> | <a href="./stall-guard-wk-exemption.html">stall-guard-wk-exemption →</a></nav>
         <p style="color:var(--muted);font-size:12px;margin-top:24px;margin-bottom:0;">Generated from live WKAppBot HQ skill catalog.</p>
       </footer>
     </article>
   </main>
-    <button id="proUnlockButton" class="pro-unlock-button" type="button" title="Enter PAT to unlock Pro" aria-label="Enter PAT to unlock Pro" style="position: fixed; right: 16px; bottom: 16px; z-index: 12; display: inline-grid; place-items: center; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: rgba(12,17,26,.9); color: var(--text); font-size: 18px; cursor: pointer; box-shadow: 0 16px 48px rgba(0,0,0,.34); backdrop-filter: blur(12px);">&#128274;</button>
-  <script>
-    const SKILL_ID = 'cdp-command-guide-ref';
-    const proUnlockButton = document.getElementById('proUnlockButton');
-    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-    function injectFullSteps() {
-      if (!window.SKILLS_FULL) return;
-      const d = window.SKILLS_FULL.find(s => s.id === SKILL_ID);
-      if (!d || !d.steps) return;
-      const ol = document.querySelector('ol.steps');
-      if (!ol) return;
-      ol.innerHTML = d.steps.map(s => '<li>' + escapeHtml(s) + '</li>').join('');
-    }
-    function unlockAll() {
-      injectFullSteps();
-      const overlays = document.querySelectorAll('.unlock');
-      const stepsLists = document.querySelectorAll('.steps.blurred');
-      for (const overlay of overlays) {
-        overlay.remove();
-      }
-      for (const list of stepsLists) {
-        list.classList.remove('blurred');
-      }
-      proUnlockButton.style.display = 'none';
-      const msg = document.createElement('p');
-      msg.style.cssText = 'color:#6ee7b7;font-size:13px;margin-top:8px';
-      msg.textContent = 'Pro access verified';
-      document.querySelector('.skill-detail').appendChild(msg);
-    }
-    window.unlockAll = unlockAll;
-    function showIdleState() {
-      proUnlockButton.classList.remove('unlocked', 'denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x1f512);
-      proUnlockButton.title = 'Enter PAT to unlock Pro';
-      proUnlockButton.setAttribute('aria-label', 'Enter PAT to unlock Pro');
-    }
-    function showDeniedState(reason) {
-      proUnlockButton.classList.add('denied');
-      proUnlockButton.textContent = String.fromCodePoint(0x26d4);
-      const label = reason === 'invalid'
-        ? 'PAT invalid or expired — click to re-enter'
-        : 'PAT lacks collaborator access — click to re-enter';
-      proUnlockButton.title = label;
-      proUnlockButton.setAttribute('aria-label', label);
-    }
-    async function checkGitHubAccess(token) {
-      if (!token) {
-        showIdleState();
-        return;
-      }
-      try {
-        const response = await fetch('https://raw.githubusercontent.com/kiexpert/wkappbot-harness/main/skills-data-full.js', {
-          headers: {
-            Authorization: 'Bearer ' + token,
-            Accept: 'application/vnd.github.raw'
-          }
-        });
-        if (response.status === 200) {
-          const js = await response.text();
-          const sc = document.createElement('script'); sc.textContent = js; document.head.appendChild(sc);
-          unlockAll();
-        } else if (response.status === 401) {
-          showDeniedState('invalid');
-        } else if (response.status === 403 || response.status === 404) {
-          showDeniedState('noaccess');
-        } else {
-          showIdleState();
-        }
-      } catch (error) {
-        console.warn('GitHub access check failed', error);
-        showIdleState();
-      }
-    }
-    proUnlockButton.addEventListener('click', () => {
-      const existing = sessionStorage.getItem('gh_token') || '';
-      const token = window.prompt('Enter GitHub Personal Access Token', existing);
-      if (token === null) return;
-      const trimmed = token.trim();
-      if (!trimmed) {
-        sessionStorage.removeItem('gh_token');
-        showIdleState();
-        return;
-      }
-      sessionStorage.setItem('gh_token', trimmed);
-      checkGitHubAccess(trimmed);
-    });
-    checkGitHubAccess(sessionStorage.getItem('gh_token'));
-  </script>
+  
   <script>
     if (window.self !== window.top) { var t = document.getElementById('sidebar-toggle'); if(t) t.style.display='none'; }
     function toggleSidebar(){
