@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 
-REPO_ROOT = Path("D:/GitHub/wkappbot-sdk")
+REPO_ROOT = Path(__file__).resolve().parent.parent
 HQ_SKILL_DIRS = [
     Path("D:/GitHub/WKAppBot/bin/wkappbot.hq/skills"),
     Path("D:/SDK/bin/wkappbot.hq/skills"),
