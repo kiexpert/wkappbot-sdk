@@ -1,4 +1,4 @@
-﻿namespace WKAppBot.Launcher;
+namespace WKAppBot.Launcher;
 
 partial class Program
 {
@@ -187,14 +187,34 @@ partial class Program
             //                     wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern
             var expectedPort = GetExpectedCdpPort();
             Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port filter: expectedPort={expectedPort?.ToString() ?? "null"}");
-            if (expectedPort.HasValue && TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
+            // SAFETY FIX (user 2026-07-06, confirmed live cross-repo hijack): when the expected
+            // port has NO listener yet (Chrome still starting, or just crashed), the OLD code
+            // fell through to the UNFILTERED candidate list and happily moved whatever Chrome
+            // window started most recently -- which can belong to a COMPLETELY DIFFERENT repo's
+            // wkappbot session (confirmed: port 9980 had no listener, and the unfiltered fallback
+            // picked personal-docs' port-9612 Chrome and moved it). If we cannot POSITIVELY verify
+            // which candidate is ours, we must SKIP placement entirely, matching the
+            // standard-appbot-window design rule "Zero returned = placement SKIP, never fall back
+            // to a guess." Only fall back to unfiltered when expectedPort itself is unknown (null)
+            // -- that is the pre-existing single-Chrome-instance bootstrap case, not a hijack risk.
+            if (expectedPort.HasValue)
             {
-                var filtered = candidates.Where(c => c.pid == cdpPid).ToList();
-                Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port {expectedPort.Value} -> pid={cdpPid}, filtered to {filtered.Count} candidate(s)");
-                if (filtered.Count > 0)
+                if (TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
+                {
+                    var filtered = candidates.Where(c => c.pid == cdpPid).ToList();
+                    Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port {expectedPort.Value} -> pid={cdpPid}, filtered to {filtered.Count} candidate(s)");
                     candidates = filtered;
+                }
                 else
-                    Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP-pid filter yielded 0 -- falling back to unfiltered");
+                {
+                    Console.Error.WriteLine($"[PLACEMENT:STEP2] no listener yet on port {expectedPort.Value} -- cannot verify ownership, skipping move (never fall back to unfiltered/foreign Chrome)");
+                    candidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
+                }
+                if (candidates.Count == 0)
+                {
+                    Console.Error.WriteLine($"[PLACEMENT:STEP2] no verified-own Chrome candidate -- skip move (cmd={cmd})");
+                    return;
+                }
             }
 
             // Pick the most recently started chrome.exe top-level window -- that's
