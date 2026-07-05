@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WKAppBot Demo -- Its Today Media AI Challenge</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: dark light; }
+  body {
+    margin: 0;
+    background: #0b0b10;
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+  }
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
+    max-width: 900px;
+    margin: 0 0 8px;
+  }
+  p.sub {
+    color: #aaa;
+    text-align: center;
+    max-width: 700px;
+    margin: 0 0 28px;
+    font-size: 0.95rem;
+  }
+  video {
+    width: 100%;
+    max-width: 900px;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    background: #000;
+  }
+  .links {
+    margin-top: 28px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .links a {
+    color: #7ec8ff;
+    text-decoration: none;
+    font-size: 0.95rem;
+    padding: 8px 16px;
+    border: 1px solid #2a2a35;
+    border-radius: 8px;
+  }
+  .links a:hover { background: #1a1a22; }
+  .email {
+    margin-top: 40px;
+    max-width: 700px;
+    width: 100%;
+    background: #15151c;
+    border: 1px solid #2a2a35;
+    border-radius: 12px;
+    padding: 24px 28px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+  .email h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #888;
+    margin: 0 0 16px;
+    font-weight: 600;
+  }
+  @media (prefers-color-scheme: light) {
+    body { background: #fafafa; color: #111; }
+    p.sub { color: #555; }
+    .links a { color: #0366d6; border-color: #ddd; }
+    .links a:hover { background: #f0f0f0; }
+    .email { background: #f5f5f7; border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+  <h1>WKAppBot Skill Harness -- Demo</h1>
+  <p class="sub">A knowledge-compounding harness that lets a cheap model perform like an expensive one by connecting it to a team own accumulated operational knowledge. Submitted for the Its Today Media AI Challenge.</p>
+  <video controls preload="metadata" playsinline>
+    <source src="https://cdn.jsdelivr.net/gh/kiexpert/wkappbot-sdk@main/docs/public/itstoday-demo-video.mp4" type="video/mp4">
+    Your browser does not support the video tag. Direct link:
+    <a href="https://cdn.jsdelivr.net/gh/kiexpert/wkappbot-sdk@main/docs/public/itstoday-demo-video.mp4">itstoday-demo-video.mp4</a>
+  </video>
+  <div class="links">
+    <a href="https://kiexpert.github.io/wkappbot-sdk/skills/">Live skill browser</a>
+    <a href="https://github.com/kiexpert/wkappbot-sdk">GitHub repo</a>
+  </div>
+  <div class="email">
+    <h2>Submitted entry</h2>
+    <p><strong>Subject:</strong> Build contest submission -- Will Kim (wkappbot-sdk)</p>
+    <p>Hi there,</p>
+    <p>For the build contest, I am submitting something I already built and use daily, rather than a fresh contest-day project: an AI knowledge-compounding harness, live at kiexpert.github.io/wkappbot-sdk/skills/.</p>
+    <p>The idea: AI agents are amnesiac between sessions -- they hit the same wall twice. My harness turns key lessons into mechanical guards instead of documentation a model can ignore, so the next session inherits what the last one learned the hard way. Point a cheap model at your team own campaign playbooks and past creative decisions through a system like this, and it can start running your best practices reliably -- the accumulated knowledge does the heavy lifting, not a bigger model.</p>
+    <p>Tonight is a live example: I hit a browser-automation bug, recorded the fix as a skill, and the very next attempt succeeded in under 5 minutes instead of hours.</p>
+    <p>This is daily real use, not a mockup: 400+ dated skills from real work (browser/desktop automation, legal case tracking, job-search automation, trading bots), publicly browsable now with a privacy filter designed to keep personal repos out.</p>
+    <p>Happy to walk through it live.</p>
+    <p>Best,<br>Will Kim</p>
+  </div>
+</body>
+</html>
